@@ -24,7 +24,7 @@ export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const pathname = usePathname();
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLLIElement>(null);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -97,7 +97,7 @@ export default function Navbar() {
 
             {/* 모바일 메뉴 */}
             {isOpen && (
-                <ul className="md:hidden bg-gray-800 space-y-2 py-2">
+                <ul className="md:hidden bg-gray-800 space-y-2 py-2 px-4">
                     {navLinks.map((link) => (
                         <li key={link.href} className="text-center">
                             <Link
@@ -113,20 +113,20 @@ export default function Navbar() {
                     ))}
 
                     {/* 마이페이지 (드롭다운) */}
-                    <li className="text-center">
+                    <li className="text-center relative group" ref={dropdownRef}>
                         <button
-                            className="block w-full py-2 text-gray-500 hover:text-gray-300 transition"
+                            className="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition pb-2"
                             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         >
-                            마이페이지
+                            <User size={20} className="text-gray-500" /> 마이페이지
                         </button>
                         {isDropdownOpen && (
-                            <ul className="bg-gray-700 space-y-1">
+                            <ul className="space-y-1">
                                 {myPageLinks.map((link) => (
                                     <li key={link.href}>
                                         <Link
                                             href={link.href}
-                                            className="block py-2 hover:bg-gray-600 transition flex items-center gap-1"
+                                            className="block pl-4 py-2 hover:bg-gray-600 transition flex items-center gap-1"
                                             onClick={() => {
                                                 setIsDropdownOpen(false);
                                                 setIsOpen(false);
