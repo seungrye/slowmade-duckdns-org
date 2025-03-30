@@ -40,11 +40,12 @@ export default function Navbar() {
         <nav className="bg-gray-900 text-white shadow-lg">
             <div className="container mx-auto px-4 py-3 flex justify-between items-center">
                 {/* 로고 */}
-                <Link href="/" className="text-2xl font-bold text-gray-300">
-                    <div className="d-flex">
-                        <Layers size={30} className="inline mr-2" /> Handmade Site
-                    </div>
-                </Link>
+                <div className="d-flex">
+                    <Link href={navLinks[0].href} className="text-2xl font-bold text-gray-300">
+                        <Layers size={30} className="inline mr-2" />
+                        Handmade Site
+                    </Link>
+                </div>
 
                 {/* 데스크탑 메뉴 */}
                 <ul className="hidden md:flex space-x-6 items-center">
