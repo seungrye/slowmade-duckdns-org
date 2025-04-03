@@ -77,7 +77,7 @@ export default function Navbar() {
                                     <li key={link.href}>
                                         <Link
                                             href={link.href}
-                                            className="block px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
+                                            className="px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
                                             onClick={() => setIsDropdownOpen(false)}
                                         >
                                             {link.icon}
@@ -127,7 +127,7 @@ export default function Navbar() {
                                     <li key={link.href}>
                                         <Link
                                             href={link.href}
-                                            className="block pl-4 py-2 hover:bg-gray-600 transition flex items-center gap-1"
+                                            className="pl-4 py-2 hover:bg-gray-600 transition flex items-center gap-1"
                                             onClick={() => {
                                                 setIsDropdownOpen(false);
                                                 setIsOpen(false);

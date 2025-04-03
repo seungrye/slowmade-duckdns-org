@@ -1,0 +1,22 @@
+@import 'react-quill-new/dist/quill.snow.css';
+
+.ql-toolbar.ql-snow {
+    position: -webkit-sticky; /* For Safari */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: rgb(255 255 255 / var(--tw-bg-opacity)); 
+    border: unset;
+    border-bottom: 1px solid #ccc;
+    font-family: var(--font-family);
+}
+
+.ql-container.ql-snow {
+    border: unset;
+    font-family: var(--font-family);
+    height: 600px;
+}
+
+.ql-container {
+    font-size: inherit;
+}
