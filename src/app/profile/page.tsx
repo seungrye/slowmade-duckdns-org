@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -16,9 +15,9 @@ const myHumorList = [
   { id: 2, title: "이 밈 진짜 터진다! 🤣", views: 950, comments: 20, image: "/humor-2.jpg" },
 ];
 
-const savedHumorList = [
-  { id: 3, title: "웃다가 배 찢어질 뻔! 😆", views: 1400, comments: 45, image: "/humor-3.jpg" },
-];
+// const savedHumorList = [
+//   { id: 3, title: "웃다가 배 찢어질 뻔! 😆", views: 1400, comments: 45, image: "/humor-3.jpg" },
+// ];
 
 export default function ProfilePage() {
   return (

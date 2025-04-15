@@ -13,7 +13,7 @@ const humorList = [
 
 export default function RandomHumor() {
   const getRandomHumor = () => humorList[Math.floor(Math.random() * humorList.length)];
-  const [randomHumor, setRandomHumor] = useState(getRandomHumor);
+  const [randomHumor/*, setRandomHumor*/] = useState(getRandomHumor);
 
   return (
     <main className="container mx-auto px-4 py-6 text-center">

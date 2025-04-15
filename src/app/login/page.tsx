@@ -6,8 +6,6 @@ import { useEffect, useState } from "react";
 import { FcGoogle } from "react-icons/fc";
 import { FaGithub } from "react-icons/fa";
 
-// TODO: 이미 로그인이 되어 있다면, 어떻게 처리해야 하나?
-
 export default function LoginPage() {
     const searchParams = useSearchParams();
     const error = searchParams.get("error");
@@ -27,7 +25,9 @@ export default function LoginPage() {
                 )}
 
                 <button
-                    onClick={() => signIn("google")}
+                    onClick={() => {
+                        signIn("google", { callbackUrl: "/" }); // 로그인 후 홈으로 이동
+                    }}
                     className="flex items-center justify-center w-full bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm text-gray-600 hover:bg-gray-100 transition mb-3"
                 >
                     <FcGoogle size={20} className="mr-2" />
