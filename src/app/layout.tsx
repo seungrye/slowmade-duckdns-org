@@ -3,6 +3,8 @@
 import { SessionProvider } from "next-auth/react";
 import Navbar from "./components/Navbar";
 import "@/app/globals.css";
+import "@/styles/_keyframe-animations.scss";
+import "@/styles/_variables.scss";
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
