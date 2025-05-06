@@ -59,7 +59,7 @@ export default function UploadPage() {
                 className='w-full p-3'
             />
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px]">
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px] upload-editor-wrapper">
             <UploadEditor />
         </div>
         <div className="flex justify-end mt-4">
