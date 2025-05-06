@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import '@/app/upload/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
-import { SimpleEditor } from "@/components/tiptap-templates/simple/simple-editor"
+import { UploadEditor } from '../components/UploadEditor';
 
 export default function UploadPage() {
     const [content, setContent] = useState('');
@@ -59,8 +59,8 @@ export default function UploadPage() {
                 className='w-full p-3'
             />
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg">
-            <SimpleEditor />
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px]">
+            <UploadEditor />
         </div>
         <div className="flex justify-end mt-4">
             <button
