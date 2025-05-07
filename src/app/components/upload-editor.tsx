@@ -3,7 +3,7 @@
 // Note. copy from @/components/tiptap-templates/simple/simple-editor.tsx
 
 import * as React from "react"
-import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
+import { EditorContent, EditorContext, HTMLContent, useEditor } from "@tiptap/react"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -215,7 +215,12 @@ const MobileToolbarContent = ({
     </>
 )
 
-export function UploadEditor() {
+export interface UploadEditorHandle {
+    getContent: () => HTMLContent | undefined;
+    setContent: (content: HTMLContent) => void;
+}
+
+export const UploadEditor = React.forwardRef<UploadEditorHandle, {}>((props, ref) => {
     const isMobile = useMobile()
     const windowSize = useWindowSize()
     const [mobileView, setMobileView] = React.useState<
@@ -324,6 +329,13 @@ export function UploadEditor() {
         }
     }, [isMobile, mobileView])
 
+    React.useImperativeHandle(ref, () => ({
+        getContent: () => editor?.getHTML(),
+        setContent: (content: HTMLContent) => {
+            editor?.commands.setContent(content)
+        },
+    }), [editor])
+
     return (
         <EditorContext.Provider value={{ editor }}>
             <Toolbar
@@ -359,4 +371,4 @@ export function UploadEditor() {
             </div>
         </EditorContext.Provider>
     )
-}
+})

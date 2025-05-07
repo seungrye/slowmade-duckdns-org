@@ -4,15 +4,24 @@
 import React, { useMemo, useState } from 'react';
 import '@/app/upload/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
-import { UploadEditor } from '../components/upload-editor';
+import { UploadEditor, UploadEditorHandle } from '../components/upload-editor';
 
 export default function UploadPage() {
+    const editorRef = React.useRef<UploadEditorHandle>(null);
     const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const [loading, setLoading] = useState(false);
 
+    React.useEffect(() => {
+        if (content && editorRef.current) {
+            editorRef.current.setContent(content);
+        }
+    }, [content]);
+
     const handleSubmit = async () => {
-        if (!title.trim() || !content.trim()) {
+        // 에디터에서 값 가져오기
+        const editorContent = editorRef.current?.getContent();
+        if (!title.trim() || !editorContent) {
             return toast.error("제목과 내용을 입력해주세요.");
         } else {
             setLoading(true);
@@ -20,7 +29,7 @@ export default function UploadPage() {
 
         const postData = {
             title,
-            content,
+            content: editorContent,
             author: "익명", // 실제 프로젝트에서는 로그인된 사용자의 닉네임 사용
             userId: "661e7a1234567890abcd1234", // 실제 프로젝트에서는 로그인된 사용자 ID 사용
         };
@@ -60,7 +69,7 @@ export default function UploadPage() {
             />
         </div>
         <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px] upload-editor-wrapper">
-            <UploadEditor />
+            <UploadEditor ref={editorRef} />
         </div>
         <div className="flex justify-end mt-4">
             <button
