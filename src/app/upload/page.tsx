@@ -30,8 +30,8 @@ export default function UploadPage() {
         const postData = {
             title,
             content: editorContent,
-            author: "익명", // 실제 프로젝트에서는 로그인된 사용자의 닉네임 사용
-            userId: "661e7a1234567890abcd1234", // 실제 프로젝트에서는 로그인된 사용자 ID 사용
+            author: "익명", // FIXME: 실제 프로젝트에서는 로그인된 사용자의 닉네임 사용
+            userId: "661e7a1234567890abcd1234", // FIXME: 실제 프로젝트에서는 로그인된 사용자 ID 사용
         };
 
         try {
