@@ -1,7 +1,7 @@
 'use client';
 
 import { SessionProvider } from "next-auth/react";
-import Navbar from "./components/Navbar";
+import Navbar from "./components/navbar";
 import "@/app/globals.css";
 import "@/styles/_keyframe-animations.scss";
 import "@/styles/_variables.scss";

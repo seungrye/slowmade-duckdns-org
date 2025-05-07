@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import '@/app/upload/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
-import { UploadEditor } from '../components/UploadEditor';
+import { UploadEditor } from '../components/upload-editor';
 
 export default function UploadPage() {
     const [content, setContent] = useState('');

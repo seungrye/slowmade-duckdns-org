@@ -72,7 +72,7 @@ import { useWindowSize } from "@/hooks/use-window-size"
 import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
-import "@/app/components/UploadEditor.scss"
+import "@/app/components/upload-editor.scss"
 
 import content from "@/components/tiptap-templates/simple/data/content.json"
 
