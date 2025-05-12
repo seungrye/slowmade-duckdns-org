@@ -1,20 +1,19 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getPosts } from "@/lib/posts";
+import { formatNumber } from "@/lib/format";
 
 export default async function Home() {
   return (
     <main className="container mx-auto px-4 py-6">
       {/* 히어로 섹션 */}
-      {/*
       <section className="text-center py-10">
         <h1 className="text-4xl font-bold text-gray-800">오늘도 웃음을 잃지 마세요! 😂</h1>
         <p className="text-gray-600 mt-2">지금 가장 인기 있는 유머를 확인하세요.</p>
         <div className="mt-6">
           <Image src="/funny-image.jpg" alt="Funny Meme" width={500} height={300} className="rounded-lg shadow-lg mx-auto" />
         </div>
-      </section> 
-      */}
+      </section>
 
       {/* 최신 유머 섹션 */}
       <section className="mt-12">
@@ -30,7 +29,7 @@ export default async function Home() {
                 className="rounded-md"
               />
               <h3 className="mt-3 text-lg font-semibold">{post.title}</h3>
-              <p className="text-gray-500 text-sm">조회수 1.2K • 댓글 32</p>
+              <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
               <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
             </div>
           ))}

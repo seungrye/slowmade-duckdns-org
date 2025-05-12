@@ -34,11 +34,12 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@next/eslint-plugin-next": "^15.3.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
+    "eslint": "^9.23.0",
     "eslint-config-next": "15.2.4",
     "eslint-plugin-react-hooks": "^5.2.0",
     "sass": "^1.87.0",

@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import '@/app/upload/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
-import { UploadEditor, UploadEditorHandle } from '../components/upload-editor';
+import { UploadEditor, UploadEditorHandle } from '@/components/upload-editor';
 
 export default function UploadPage() {
     const editorRef = React.useRef<UploadEditorHandle>(null);

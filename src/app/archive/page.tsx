@@ -1,18 +1,20 @@
-'use client'
-
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { getPosts } from "@/lib/posts";
+import { formatNumber } from "@/lib/format";
+import { SortOption, isValidSortOption } from "@/lib/sort";
+import SelectSorter from "@/components/select-sorter";
 
-const humorList = [
-  { id: 1, title: "이거 실화냐? 😂", views: 1200, comments: 32, image: "/humor-1.jpg" },
-  { id: 2, title: "이 밈 진짜 터진다! 🤣", views: 950, comments: 20, image: "/humor-2.jpg" },
-  { id: 3, title: "웃다가 배 찢어질 뻔! 😆", views: 1400, comments: 45, image: "/humor-3.jpg" },
-  { id: 4, title: "이 장면 너무 웃겨요! 😂", views: 800, comments: 12, image: "/humor-4.jpg" },
-];
+type ArchivePageProps = {
+  archiveParams: {
+    sort?: string;
+  };
+};
 
-export default function LatestHumor() {
-  const [sortOption, setSortOption] = useState("latest"); // 정렬 옵션 (latest, popular)
+export default async function ArchivePage({ archiveParams }: ArchivePageProps) {
+    const rawSort = archiveParams?.sort;
+  const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
+  const posts = await getPosts(sortOption); // 정렬 기준에 따라 게시글 불러오기
 
   return (
     <main className="container mx-auto px-4 py-6">
@@ -24,25 +26,27 @@ export default function LatestHumor() {
 
       {/* 정렬 옵션 */}
       <div className="flex justify-end mb-4">
-        <select
-          className="border border-gray-300 rounded px-3 py-2"
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value)}
-        >
-          <option value="latest">최신순</option>
-          <option value="popular">인기순</option>
-          <option value="commented">댓글 많은 순</option>
-        </select>
+        <SelectSorter current={sortOption} />
       </div>
 
       {/* 유머 리스트 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {humorList.map((humor) => (
-          <div key={humor.id} className="bg-white rounded-lg shadow-md p-4">
-            <Image src={humor.image} alt={humor.title} width={300} height={200} className="rounded-md" />
-            <h3 className="mt-3 text-lg font-semibold">{humor.title}</h3>
-            <p className="text-gray-500 text-sm">조회수 {humor.views} • 댓글 {humor.comments}</p>
-            <Link href={`/humor/${humor.id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
+        {posts.map((post: any) => (
+          <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
+            <Image
+              src={`/humor-${post.imageId ?? "default"}.jpg`}
+              alt={post.title}
+              width={300}
+              height={200}
+              className="rounded-md"
+            />
+            <h3 className="mt-3 text-lg font-semibold">{post.title}</h3>
+            <p className="text-gray-500 text-sm">
+              조회수 {formatNumber(post.views)} • 댓글 {32}
+            </p>
+            <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">
+              더 보기 →
+            </Link>
           </div>
         ))}
       </section>

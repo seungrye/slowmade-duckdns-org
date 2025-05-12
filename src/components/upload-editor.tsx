@@ -72,7 +72,7 @@ import { useWindowSize } from "@/hooks/use-window-size"
 import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
-import "@/app/components/upload-editor.scss"
+import "@/components/upload-editor.scss"
 
 import content from "@/components/tiptap-templates/simple/data/content.json"
 
@@ -220,7 +220,7 @@ export interface UploadEditorHandle {
     setContent: (content: HTMLContent) => void;
 }
 
-export const UploadEditor = React.forwardRef<UploadEditorHandle, {}>((props, ref) => {
+export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props, ref) => {
     const isMobile = useMobile()
     const windowSize = useWindowSize()
     const [mobileView, setMobileView] = React.useState<
@@ -372,3 +372,5 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, {}>((props, ref
         </EditorContext.Provider>
     )
 })
+
+UploadEditor.displayName = "UploadEditor";
