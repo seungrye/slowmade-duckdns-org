@@ -1,28 +1,26 @@
-'use client'
-
-import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import SelectSorter from "@/components/select-sorter";
+import { SortOption, isValidSortOption } from "@/lib/sort";
+import InputSearch from "@/components/input-search";
+import { formatNumber } from "@/lib/format";
+import { searchPosts } from "@/lib/posts";
 
-const allHumorList = [
-  { id: 1, title: "이거 실화냐? 😂", views: 1200, comments: 32, image: "/humor-1.jpg" },
-  { id: 2, title: "이 밈 진짜 터진다! 🤣", views: 950, comments: 20, image: "/humor-2.jpg" },
-  { id: 3, title: "웃다가 배 찢어질 뻔! 😆", views: 1400, comments: 45, image: "/humor-3.jpg" },
-  { id: 4, title: "이 장면 너무 웃겨요! 😂", views: 800, comments: 12, image: "/humor-4.jpg" },
-];
-
-export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [filteredHumor, setFilteredHumor] = useState(allHumorList);
-  const [sortOption, setSortOption] = useState("latest");
-
-  // 검색 기능
-  const handleSearch = () => {
-    const results = allHumorList.filter((humor) =>
-      humor.title.toLowerCase().includes(query.toLowerCase())
-    );
-    setFilteredHumor(results);
+type SearchPageProps = {
+  searchParams: {
+    sort?: string;
+    query?: string;
   };
+};
+
+export default async function SearchPage({ searchParams }: SearchPageProps) {
+  const rawSort = searchParams?.sort;
+  const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
+
+  const rawQuery = searchParams?.query;
+  const query = rawQuery ? decodeURIComponent(rawQuery) : "";
+
+  const posts = await searchPosts(query, sortOption); // 정렬 기준에 따라 검색한 게시글 불러오기
 
   return (
     <main className="container mx-auto px-4 py-6">
@@ -31,44 +29,28 @@ export default function SearchPage() {
         <h1 className="text-3xl font-bold text-gray-800">🔍 유머 검색</h1>
         <p className="text-gray-600 mt-2">찾고 싶은 유머를 검색해 보세요.</p>
         <div className="mt-4 flex justify-center">
-          <input
-            type="text"
-            className="border border-gray-300 px-4 py-2 rounded-l-md w-80"
-            placeholder="유머 제목 또는 키워드 입력..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button
-            className="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 transition"
-            onClick={handleSearch}
-          >
-            검색
-          </button>
+          <InputSearch current={query} />
         </div>
       </section>
 
       {/* 정렬 옵션 */}
       <div className="flex justify-end mb-4">
-        <select
-          className="border border-gray-300 rounded px-3 py-2"
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value)}
-        >
-          <option value="latest">최신순</option>
-          <option value="popular">인기순</option>
-          <option value="commented">댓글 많은 순</option>
-        </select>
+        <SelectSorter current={sortOption} />
       </div>
 
       {/* 검색 결과 리스트 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-        {filteredHumor.length > 0 ? (
-          filteredHumor.map((humor) => (
-            <div key={humor.id} className="bg-white rounded-lg shadow-md p-4">
-              <Image src={humor.image} alt={humor.title} width={300} height={200} className="rounded-md" />
-              <h3 className="mt-3 text-lg font-semibold">{humor.title}</h3>
-              <p className="text-gray-500 text-sm">조회수 {humor.views} • 댓글 {humor.comments}</p>
-              <Link href={`/humor/${humor.id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
+        {posts.length > 0 ? (
+          posts.map((post: any) => (
+            <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
+              <Image
+                src={`/humor-${post.imageId ?? "default"}.jpg`}
+                alt={post.title} width={300} height={200} className="rounded-md" />
+              <h3 className="mt-3 text-lg font-semibold">{post.title}</h3>
+              <p className="text-gray-500 text-sm">
+                조회수 {formatNumber(post.views)} • 댓글 {32}
+              </p>
+              <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
             </div>
           ))
         ) : (

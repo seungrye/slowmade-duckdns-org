@@ -1,4 +1,3 @@
-// components/SelectSorter.tsx
 "use client";
 
 import { SORT_LABELS, SortOption } from "@/lib/sort";

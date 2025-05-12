@@ -3,8 +3,20 @@ import Post from "@/models/post";
 import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 
-async function fetchLatestPosts(withComments: boolean) {
-  const pipeline: PipelineStage[] = [
+async function fetchLatestPosts(query: string | undefined, withComments: boolean) {
+  const pipeline: PipelineStage[] = [];
+
+  if (query) {
+    pipeline.push(
+      {
+        $match: {
+          title: { $regex: query, $options: "i" }, // 대소문자 구분 없이 검색
+        },
+      },
+    );
+  }
+
+  pipeline.push(
     {
       $sort: {
         createdAt: -1,
@@ -21,7 +33,7 @@ async function fetchLatestPosts(withComments: boolean) {
         as: "comments",
       },
     },
-  ];
+  );
 
   if (!withComments) {
     pipeline.push(
@@ -35,8 +47,20 @@ async function fetchLatestPosts(withComments: boolean) {
   return await Post.aggregate(pipeline);
 }
 
-async function fetchPopularPosts(withComments: boolean) {
-  const pipeline: PipelineStage[] = [
+async function fetchPopularPosts(query: string | undefined, withComments: boolean) {
+  const pipeline: PipelineStage[] = [];
+
+  if (query) {
+    pipeline.push(
+      {
+        $match: {
+          title: { $regex: query, $options: "i" }, // 대소문자 구분 없이 검색
+        },
+      },
+    );
+  }
+
+  pipeline.push(
     {
       $sort: {
         views: -1,
@@ -53,7 +77,7 @@ async function fetchPopularPosts(withComments: boolean) {
         as: "comments",
       },
     },
-  ];
+  );
 
   if (!withComments) {
     pipeline.push(
@@ -67,8 +91,20 @@ async function fetchPopularPosts(withComments: boolean) {
   return await Post.aggregate(pipeline);
 }
 
-async function fetchMostCommentedPosts(withComments: boolean) {
-  const pipeline: PipelineStage[] = [
+async function fetchMostCommentedPosts(query: string | undefined, withComments: boolean) {
+  const pipeline: PipelineStage[] = [];
+
+  if (query) {
+    pipeline.push(
+      {
+        $match: {
+          title: { $regex: query, $options: "i" }, // 대소문자 구분 없이 검색
+        },
+      },
+    );
+  }
+
+  pipeline.push(
     {
       $lookup: {
         from: "comments", // 실제 MongoDB 컬렉션 이름은 소문자+복수형이 기본
@@ -87,7 +123,7 @@ async function fetchMostCommentedPosts(withComments: boolean) {
         commentCount: -1,
       },
     },
-  ];
+  );
 
   if (!withComments) {
     pipeline.push(
@@ -105,15 +141,32 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   await connectToDB();
 
   if (sort === 'latest') {
-    return fetchLatestPosts(withComments);
+    return fetchLatestPosts(undefined, withComments);
   }
   if (sort === 'popular') {
-    return fetchPopularPosts(withComments);
+    return fetchPopularPosts(undefined, withComments);
   }
   if (sort === 'commented') {
-    return fetchMostCommentedPosts(withComments);
+    return fetchMostCommentedPosts(undefined, withComments);
   }
 
   // 기본 fallback
-  return fetchLatestPosts(withComments);
+  return fetchLatestPosts(undefined, withComments);
+}
+
+export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false) {
+  await connectToDB();
+
+  if (sort === 'latest') {
+    return fetchLatestPosts(query, withComments);
+  }
+  if (sort === 'popular') {
+    return fetchPopularPosts(query, withComments);
+  }
+  if (sort === 'commented') {
+    return fetchMostCommentedPosts(query, withComments);
+  }
+
+  // 기본 fallback
+  return fetchLatestPosts(query, withComments);
 }
