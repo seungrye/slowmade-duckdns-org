@@ -3,8 +3,18 @@ import Post from "@/models/post";
 import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 
-async function fetchLatestPosts(query: string | undefined, withComments: boolean) {
+async function fetchLatestPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
   const pipeline: PipelineStage[] = [];
+
+  if (userEmail) {
+    pipeline.push(
+      {
+        $match: {
+          userEmail: userEmail,
+        },
+      },
+    );
+  }
 
   if (query) {
     pipeline.push(
@@ -47,8 +57,18 @@ async function fetchLatestPosts(query: string | undefined, withComments: boolean
   return await Post.aggregate(pipeline);
 }
 
-async function fetchPopularPosts(query: string | undefined, withComments: boolean) {
+async function fetchPopularPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
   const pipeline: PipelineStage[] = [];
+
+  if (userEmail) {
+    pipeline.push(
+      {
+        $match: {
+          userEmail: userEmail,
+        },
+      },
+    );
+  }
 
   if (query) {
     pipeline.push(
@@ -91,8 +111,18 @@ async function fetchPopularPosts(query: string | undefined, withComments: boolea
   return await Post.aggregate(pipeline);
 }
 
-async function fetchMostCommentedPosts(query: string | undefined, withComments: boolean) {
+async function fetchMostCommentedPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
   const pipeline: PipelineStage[] = [];
+
+  if (userEmail) {
+    pipeline.push(
+      {
+        $match: {
+          userEmail: userEmail,
+        },
+      },
+    );
+  }
 
   if (query) {
     pipeline.push(
@@ -141,32 +171,53 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   await connectToDB();
 
   if (sort === 'latest') {
-    return fetchLatestPosts(undefined, withComments);
+    return fetchLatestPosts(undefined, undefined, withComments);
   }
   if (sort === 'popular') {
-    return fetchPopularPosts(undefined, withComments);
+    return fetchPopularPosts(undefined, undefined, withComments);
   }
   if (sort === 'commented') {
-    return fetchMostCommentedPosts(undefined, withComments);
+    return fetchMostCommentedPosts(undefined, undefined, withComments);
   }
 
   // 기본 fallback
-  return fetchLatestPosts(undefined, withComments);
+  return fetchLatestPosts(undefined, undefined, withComments);
 }
 
 export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false) {
   await connectToDB();
 
   if (sort === 'latest') {
-    return fetchLatestPosts(query, withComments);
+    return fetchLatestPosts(undefined, query, withComments);
   }
   if (sort === 'popular') {
-    return fetchPopularPosts(query, withComments);
+    return fetchPopularPosts(undefined, query, withComments);
   }
   if (sort === 'commented') {
-    return fetchMostCommentedPosts(query, withComments);
+    return fetchMostCommentedPosts(undefined, query, withComments);
   }
 
   // 기본 fallback
-  return fetchLatestPosts(query, withComments);
+  return fetchLatestPosts(undefined, query, withComments);
+}
+
+export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false) {
+  if (!userEmail) {
+    throw new Error("User email is required to fetch posts.");
+  }
+
+  await connectToDB();
+
+  if (sort === 'latest') {
+    return fetchLatestPosts(userEmail, undefined, withComments);
+  }
+  if (sort === 'popular') {
+    return fetchPopularPosts(userEmail, undefined, withComments);
+  }
+  if (sort === 'commented') {
+    return fetchMostCommentedPosts(userEmail, undefined, withComments);
+  }
+
+  // 기본 fallback
+  return fetchLatestPosts(userEmail, undefined, withComments);
 }

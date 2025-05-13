@@ -1,18 +1,21 @@
 
 "use client";
 
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import '@/app/upload/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
 import { UploadEditor, UploadEditorHandle } from '@/components/upload-editor';
+import { useSession } from 'next-auth/react';
 
 export default function UploadPage() {
-    const editorRef = React.useRef<UploadEditorHandle>(null);
+    const { data: session } = useSession();
+    
+    const editorRef = useRef<UploadEditorHandle>(null);
     const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const [loading, setLoading] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (content && editorRef.current) {
             editorRef.current.setContent(content);
         }
@@ -27,11 +30,13 @@ export default function UploadPage() {
             setLoading(true);
         }
 
+        console.assert(session?.user, "session.user should not be null");
+
         const postData = {
             title,
             content: editorContent,
-            author: "익명", // FIXME: 실제 프로젝트에서는 로그인된 사용자의 닉네임 사용
-            userId: "661e7a1234567890abcd1234", // FIXME: 실제 프로젝트에서는 로그인된 사용자 ID 사용
+            author: session?.user.name,
+            userEmail: session?.user.email,
         };
 
         try {

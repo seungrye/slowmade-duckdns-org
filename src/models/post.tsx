@@ -5,7 +5,7 @@ const PostSchema = new Schema(
     title: { type: String, required: true },  // 게시글 제목
     content: { type: String, required: true }, // 본문 (HTML 가능)
     author: { type: String, required: true },  // 작성자 (닉네임 또는 ID)
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // 작성자 ID
+    userEmail: { type: String, required: true }, // 작성자 Email
     likes: { type: Number, default: 0 }, // 좋아요 수
     views: { type: Number, default: 0 }, // 조회수
     createdAt: { type: Date, default: Date.now }, // 작성일
