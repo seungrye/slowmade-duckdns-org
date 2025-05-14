@@ -54,7 +54,7 @@ async function fetchLatestPosts(userEmail: string | undefined, query: string | u
       });
   }
 
-  return await Post.aggregate(pipeline);
+  return await Post.aggregate(pipeline).limit(12);
 }
 
 async function fetchPopularPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
@@ -108,7 +108,7 @@ async function fetchPopularPosts(userEmail: string | undefined, query: string | 
       });
   }
 
-  return await Post.aggregate(pipeline);
+  return await Post.aggregate(pipeline).limit(12);
 }
 
 async function fetchMostCommentedPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
@@ -170,35 +170,43 @@ async function fetchMostCommentedPosts(userEmail: string | undefined, query: str
 export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false) {
   await connectToDB();
 
-  if (sort === 'latest') {
-    return fetchLatestPosts(undefined, undefined, withComments);
-  }
-  if (sort === 'popular') {
-    return fetchPopularPosts(undefined, undefined, withComments);
-  }
-  if (sort === 'commented') {
-    return fetchMostCommentedPosts(undefined, undefined, withComments);
+  let result;
+
+  switch (sort) {
+    case 'popular':
+      result = await fetchPopularPosts(undefined, undefined, withComments);
+      break;
+    case 'commented':
+      result = await fetchMostCommentedPosts(undefined, undefined, withComments);
+      break;
+    case 'latest':
+    default: // 기본 fallback
+      result = await fetchLatestPosts(undefined, undefined, withComments);
+      break;
   }
 
-  // 기본 fallback
-  return fetchLatestPosts(undefined, undefined, withComments);
+  return result;
 }
 
 export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false) {
   await connectToDB();
 
-  if (sort === 'latest') {
-    return fetchLatestPosts(undefined, query, withComments);
-  }
-  if (sort === 'popular') {
-    return fetchPopularPosts(undefined, query, withComments);
-  }
-  if (sort === 'commented') {
-    return fetchMostCommentedPosts(undefined, query, withComments);
+  let result;
+
+  switch (sort) {
+    case 'popular':
+      result = await fetchPopularPosts(undefined, query, withComments);
+      break;
+    case 'commented':
+      result = await fetchMostCommentedPosts(undefined, query, withComments);
+      break;
+    case 'latest':
+    default: // 기본 fallback
+      result = await fetchLatestPosts(undefined, query, withComments);
+      break;
   }
 
-  // 기본 fallback
-  return fetchLatestPosts(undefined, query, withComments);
+  return result;
 }
 
 export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false) {
@@ -208,16 +216,20 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
 
   await connectToDB();
 
-  if (sort === 'latest') {
-    return fetchLatestPosts(userEmail, undefined, withComments);
-  }
-  if (sort === 'popular') {
-    return fetchPopularPosts(userEmail, undefined, withComments);
-  }
-  if (sort === 'commented') {
-    return fetchMostCommentedPosts(userEmail, undefined, withComments);
+  let result;
+
+  switch (sort) {
+    case 'popular':
+      result = await fetchPopularPosts(userEmail, undefined, withComments);
+      break;
+    case 'commented':
+      result = await fetchMostCommentedPosts(userEmail, undefined, withComments);
+      break;
+    case 'latest':
+    default: // 기본 fallback
+      result = await fetchLatestPosts(userEmail, undefined, withComments);
+      break;
   }
 
-  // 기본 fallback
-  return fetchLatestPosts(userEmail, undefined, withComments);
+  return result;
 }

@@ -7,15 +7,17 @@ import { myPosts } from "@/lib/posts";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 
-type MyUploadsPageProps = {
-  myUploadParams: {
-    sort?: string;
-  };
+type Props = {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
-export default async function MyUploadsPage({ myUploadParams }: MyUploadsPageProps) {
+export default async function MyUploadsPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
-  const rawSort = myUploadParams?.sort;
+
+  const params = await searchParams;
+  const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
+
+  console.log("rawSort", rawSort);
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
   const posts = await myPosts(session?.user.email, sortOption, false); // 정렬 기준에 따라 게시글 불러오기
 
