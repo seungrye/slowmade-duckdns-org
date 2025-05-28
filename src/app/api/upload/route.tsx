@@ -1,26 +1,37 @@
-import { NextResponse } from "next/server";
-import { connectToDB } from "@/lib/db";
-import Post from "@/models/post";
+// app/api/upload/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import * as Minio from 'minio' // MinIO 클라이언트 설정
 
-export async function POST(req: Request) {
-  await connectToDB();
-  const { title, content, author, userEmail } = await req.json();
+console.assert(process.env.MINIO_ENDPOINT, 'MINIO_ENDPOINT is not defined');
+console.assert(process.env.MINIO_ACCESSKEY, 'MINIO_ACCESSKEY is not defined');
+console.assert(process.env.MINIO_SECRETKEY, 'MINIO_SECRETKEY is not defined');
 
-  if (!title || !content || !userEmail) {
-    return NextResponse.json({ message: "모든 필드를 입력해주세요." }, { status: 400 });
+const minioClient = new Minio.Client({
+  endPoint: process.env.MINIO_ENDPOINT!,
+  // port: parseInt(process.env.MINIO_PORT!),
+  useSSL: true,
+  accessKey: process.env.MINIO_ACCESSKEY,
+  secretKey: process.env.MINIO_SECRETKEY,
+})
+
+export async function POST(req: NextRequest) {
+  const formData = await req.formData();
+  const file = formData.get("file") as File;
+
+  if (!file) {
+    return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
   }
 
-  try {
-    const newPost = new Post({
-      title,
-      content,
-      author,
-      userEmail
-    });
-    await newPost.save();
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+  const fileName = `${Date.now()}-${file.name}`;
 
-    return NextResponse.json({ message: "게시글 저장 완료" }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ message: "게시글 저장 실패", error }, { status: 500 });
-  }
+  // 업로드
+  await minioClient.putObject(process.env.MINIO_BUCKET || "", fileName, fileBuffer, file.size,{
+    "Content-Type": file.type,
+  });
+
+  const publicUrl = `https://${process.env.MINIO_ENDPOINT}/${process.env.MINIO_BUCKET}/${fileName}`;
+  console.log("File uploaded successfully:", publicUrl);
+
+  return NextResponse.json({ url: publicUrl });
 }

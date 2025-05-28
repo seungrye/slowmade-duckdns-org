@@ -40,7 +40,7 @@ export default function UploadPage() {
         };
 
         try {
-            const response = await fetch("/api/upload", {
+            const response = await fetch("/api/submit", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(postData),

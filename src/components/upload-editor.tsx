@@ -69,12 +69,13 @@ import { useMobile } from "@/hooks/use-mobile"
 import { useWindowSize } from "@/hooks/use-window-size"
 
 // --- Lib ---
-import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
 import "@/components/upload-editor.scss"
 
 import content from "@/components/tiptap-templates/simple/data/content.json"
+import { imageUploadHandler } from "./upload-image-handler"
 
 function ThemeToggle() {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
@@ -254,6 +255,7 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
         }
     }, [])
 
+    const previousImages = React.useRef<string[]>([])
     const editor = useEditor({
         immediatelyRender: false,
         editorProps: {
@@ -280,8 +282,8 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
             ImageUploadNode.configure({
                 accept: "image/*",
                 maxSize: MAX_FILE_SIZE,
-                limit: 3,
-                upload: handleImageUpload,
+                limit: 32,
+                upload: imageUploadHandler,
                 onError: (error) => console.error("Upload failed:", error),
             }),
             TrailingNode,
