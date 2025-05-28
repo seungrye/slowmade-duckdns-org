@@ -1,4 +1,4 @@
-import mongoose, { Schema, model, models } from "mongoose";
+import { InferSchemaType, Schema, model, models } from "mongoose";
 
 const PostSchema = new Schema(
   {
@@ -13,4 +13,7 @@ const PostSchema = new Schema(
   { timestamps: true }
 );
 
+// 타입 자동 추론
+export type PostType = InferSchemaType<typeof PostSchema>
+// 모델 생성
 export default models.Post || model("Post", PostSchema);

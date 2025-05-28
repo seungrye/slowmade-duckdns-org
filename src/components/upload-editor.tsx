@@ -255,7 +255,6 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
         }
     }, [])
 
-    const previousImages = React.useRef<string[]>([])
     const editor = useEditor({
         immediatelyRender: false,
         editorProps: {

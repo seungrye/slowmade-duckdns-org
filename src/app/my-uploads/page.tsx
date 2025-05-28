@@ -6,6 +6,7 @@ import { formatNumber } from "@/lib/format";
 import { myPosts } from "@/lib/posts";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { GetPostType } from "@/types/posts.d";
 
 type Props = {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
@@ -16,8 +17,8 @@ export default async function MyUploadsPage({ searchParams }: Props) {
 
   const params = await searchParams;
   const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
-
   console.log("rawSort", rawSort);
+
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
   const posts = await myPosts(session?.user.email, sortOption, false); // 정렬 기준에 따라 게시글 불러오기
 
@@ -39,10 +40,10 @@ export default async function MyUploadsPage({ searchParams }: Props) {
       {/* 유머 리스트 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
         {posts.length > 0 ? (
-          posts.map((post: any) => (
+          posts.map((post: GetPostType) => (
             <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
               <Image
-                src={`/humor-${post.imageId ?? "default"}.jpg`}
+                src={`/humor-${"default"}.jpg`}
                 alt={post.title}
                 width={300}
                 height={200}

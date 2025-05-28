@@ -5,19 +5,18 @@ import { SortOption, isValidSortOption } from "@/lib/sort";
 import InputSearch from "@/components/input-search";
 import { formatNumber } from "@/lib/format";
 import { searchPosts } from "@/lib/posts";
+import { GetPostType } from "@/types/posts.d";
 
 type SearchPageProps = {
-  searchParams: {
-    sort?: string;
-    query?: string;
-  };
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 };
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
-  const rawSort = searchParams?.sort;
-  const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
+  const params = await searchParams;
+  const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
+  const rawQuery = params.query as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
 
-  const rawQuery = searchParams?.query;
+  const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
   const query = rawQuery ? decodeURIComponent(rawQuery) : "";
 
   const posts = await searchPosts(query, sortOption); // 정렬 기준에 따라 검색한 게시글 불러오기
@@ -41,10 +40,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       {/* 검색 결과 리스트 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {posts.length > 0 ? (
-          posts.map((post: any) => (
+          posts.map((post: GetPostType) => (
             <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
               <Image
-                src={`/humor-${post.imageId ?? "default"}.jpg`}
+                src={`/humor-${"default"}.jpg`}
                 alt={post.title} width={300} height={200} className="rounded-md" />
               <h3 className="mt-3 text-lg font-semibold">{post.title}</h3>
               <p className="text-gray-500 text-sm">

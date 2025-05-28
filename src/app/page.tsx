@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getPosts } from "@/lib/posts";
 import { formatNumber } from "@/lib/format";
+import { GetPostType } from "@/types/posts.d";
 
 export default async function Home() {
   return (
@@ -19,10 +20,10 @@ export default async function Home() {
       <section className="mt-12">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">🔥 최신 유머</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {(await getPosts()).map((post: any) => (
+          {(await getPosts()).map((post: GetPostType) => (
             <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
               <Image
-                src={`/humor-${post.imageId ?? "default"}.jpg`}
+                src={`/humor-${"default"}.jpg`}
                 alt={post.title}
                 width={300}
                 height={200}

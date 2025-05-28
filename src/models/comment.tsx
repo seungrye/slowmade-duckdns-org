@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose, { InferSchemaType } from "mongoose";
 
 const CommentSchema = new mongoose.Schema(
     {
@@ -12,5 +12,8 @@ const CommentSchema = new mongoose.Schema(
     { timestamps: true }
   );
   
+  // 타입 자동 추론
+  export type CommentType = InferSchemaType<typeof CommentSchema>
+  // 모델 생성
   module.exports = mongoose.model("Comment", CommentSchema);
   

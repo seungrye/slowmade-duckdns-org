@@ -2,8 +2,9 @@ import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
 import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
+import { GetPostType } from "@/types/posts.d";
 
-async function fetchLatestPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
+async function fetchLatestPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean): Promise<GetPostType[]> {
   const pipeline: PipelineStage[] = [];
 
   if (userEmail) {
@@ -54,10 +55,11 @@ async function fetchLatestPosts(userEmail: string | undefined, query: string | u
       });
   }
 
-  return await Post.aggregate(pipeline).limit(12);
+  const result = await Post.aggregate(pipeline).limit(12);
+  return result;
 }
 
-async function fetchPopularPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
+async function fetchPopularPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean): Promise<GetPostType[]> {
   const pipeline: PipelineStage[] = [];
 
   if (userEmail) {
@@ -108,10 +110,11 @@ async function fetchPopularPosts(userEmail: string | undefined, query: string | 
       });
   }
 
-  return await Post.aggregate(pipeline).limit(12);
+  const result = await Post.aggregate(pipeline).limit(12);
+  return result;
 }
 
-async function fetchMostCommentedPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean) {
+async function fetchMostCommentedPosts(userEmail: string | undefined, query: string | undefined, withComments: boolean): Promise<GetPostType[]> {
   const pipeline: PipelineStage[] = [];
 
   if (userEmail) {
@@ -167,7 +170,7 @@ async function fetchMostCommentedPosts(userEmail: string | undefined, query: str
   return await Post.aggregate(pipeline).limit(12);
 }
 
-export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false) {
+export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
   await connectToDB();
 
   let result;
@@ -188,7 +191,7 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   return result;
 }
 
-export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false) {
+export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
   await connectToDB();
 
   let result;
@@ -209,7 +212,7 @@ export async function searchPosts(query: string, sort: SortOption = 'latest', wi
   return result;
 }
 
-export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false) {
+export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
   if (!userEmail) {
     throw new Error("User email is required to fetch posts.");
   }
