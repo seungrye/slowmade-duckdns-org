@@ -3,12 +3,17 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GetPostType } from '@/types/posts.d';
 import parse from 'html-react-parser';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 
 export default function InfiniteHumorList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const loaderRef = useRef<HTMLDivElement>(null);
+
+  // 기본적으로 모든 post가 열려 있음
+  const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
 
   const loadPosts = useCallback(async () => {
     const res = await fetch(`/api/posts?page=${page}`);
@@ -18,6 +23,12 @@ export default function InfiniteHumorList() {
       return;
     }
     setPosts((prev) => [...prev, ...data]);
+    // 새로 가져온 게시물도 열려 있도록 추가
+    setOpenedPostIds((prev) => {
+      const newSet = new Set(prev);
+      data.forEach((post: GetPostType) => newSet.add(post._id));
+      return newSet;
+    });
     setPage((prev) => prev + 1);
   }, [page]);
 
@@ -42,19 +53,45 @@ export default function InfiniteHumorList() {
     };
   }, [loadPosts, hasMore]);
 
+  const togglePost = (id: string) => {
+    setOpenedPostIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 gap-6">
-        {posts.map((post) => (
-          <div key={post._id} className="bg-white rounded-lg shadow-md py-4">
-            <h3 className="text-lg font-semibold border-b px-4 pb-4">{post.title}</h3>
-            <div className="p-4">
-              {parse(post.content)}
-            </div>
+      <div className="grid grid-cols-1 gap-6">
+        {posts.map((post) => {
+          const isOpen = openedPostIds.has(post._id);
+          return (
+            <div key={post._id} className="bg-white rounded-lg shadow-md py-4">
+              <div className="flex items-center justify-between px-4 pb-4 border-b">
+                <h3 className="text-lg font-semibold">{post.title}</h3>
+                <button
+                  onClick={() => togglePost(post._id)}
+                  className="text-gray-500 hover:text-gray-700 transition"
+                  aria-label="토글 열기/닫기"
+                >
+                  <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} />
+                </button>
+              </div>
+              {isOpen && (
+                <div className="p-4 transition-all duration-300 ease-in-out">
+                  {parse(post.content)}
+                </div>
+              )}
             {/* <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
              <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link> */}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
       {hasMore && <div ref={loaderRef} className="text-center mt-6 text-gray-400">로딩 중...</div>}
     </>
