@@ -1,10 +1,8 @@
-
 'use client';
+
 import { useEffect, useRef, useState, useCallback } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { GetPostType } from '@/types/posts.d';
-import { formatNumber } from '@/lib/format';
+import parse from 'html-react-parser';
 
 export default function InfiniteHumorList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
@@ -48,17 +46,13 @@ export default function InfiniteHumorList() {
     <>
       <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-1 gap-6">
         {posts.map((post) => (
-          <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
-            <Image
-              src={`/humor-default.jpg`}
-              alt={post.title}
-              width={300}
-              height={200}
-              className="rounded-md"
-            />
-            <h3 className="mt-3 text-lg font-semibold">{post.title}</h3>
-            <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
-            <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
+          <div key={post._id} className="bg-white rounded-lg shadow-md py-4">
+            <h3 className="text-lg font-semibold border-b px-4 pb-4">{post.title}</h3>
+            <div className="p-4">
+              {parse(post.content)}
+            </div>
+            {/* <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
+             <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link> */}
           </div>
         ))}
       </div>
