@@ -74,7 +74,6 @@ import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/upload-editor.scss"
 
-import content from "@/components/tiptap-templates/simple/data/content.json"
 import { imageUploadHandler } from "./upload-image-handler"
 
 function ThemeToggle() {
@@ -288,7 +287,7 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
             TrailingNode,
             Link.configure({ openOnClick: false }),
         ],
-        content: content,
+        content: "",
     })
 
     React.useEffect(() => {
