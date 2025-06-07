@@ -23,8 +23,8 @@ export default function UploadPage() {
 
     const handleSubmit = async () => {
         // 에디터에서 값 가져오기
-        const editorContent = editorRef.current?.getContent();
-        if (!title.trim() || !editorContent) {
+        const {content, urls} = editorRef.current?.getContent() || { content: null, urls: [] };
+        if (!title.trim() || !content) {
             return toast.error("제목과 내용을 입력해주세요.");
         } else {
             setLoading(true);
@@ -34,9 +34,10 @@ export default function UploadPage() {
 
         const postData = {
             title,
-            content: editorContent,
+            content: content,
             author: session?.user.name,
             userEmail: session?.user.email,
+            urls: urls || [], // 에디터에서 가져온 이미지 URL 배열
         };
 
         try {

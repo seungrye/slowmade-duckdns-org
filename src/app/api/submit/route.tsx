@@ -4,19 +4,14 @@ import Post from "@/models/post";
 
 export async function POST(req: Request) {
   await connectToDB();
-  const { title, content, author, userEmail } = await req.json();
+  const payload = await req.json();
 
-  if (!title || !content || !userEmail) {
+  if (!payload?.title || !payload?.content || !payload?.userEmail) {
     return NextResponse.json({ message: "모든 필드를 입력해주세요." }, { status: 400 });
   }
 
   try {
-    const newPost = new Post({
-      title,
-      content,
-      author,
-      userEmail
-    });
+    const newPost = new Post(payload);
     await newPost.save();
 
     return NextResponse.json({ message: "게시글 저장 완료" }, { status: 201 });

@@ -74,7 +74,7 @@ import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 // --- Styles ---
 import "@/components/upload-editor.scss"
 
-import { imageUploadHandler } from "./upload-image-handler"
+import { onImageUploadHandler } from "./upload-image-handler"
 
 function ThemeToggle() {
     const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
@@ -216,8 +216,16 @@ const MobileToolbarContent = ({
 )
 
 export interface UploadEditorHandle {
-    getContent: () => HTMLContent | undefined;
+    getContent: () => {
+        content: HTMLContent | undefined,
+        urls: UploadImageUrl[]
+    };
     setContent: (content: HTMLContent) => void;
+}
+
+interface UploadImageUrl {
+    url: string;
+    thumbnailUrl: string;
 }
 
 export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props, ref) => {
@@ -235,6 +243,7 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
         height: 0,
     })
     const toolbarRef = React.useRef<HTMLDivElement>(null)
+    const uploadedImageUrlsRef = React.useRef<UploadImageUrl[]>([]);
 
     React.useEffect(() => {
         const updateRect = () => {
@@ -281,7 +290,15 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
                 accept: "image/*",
                 maxSize: MAX_FILE_SIZE,
                 limit: 32,
-                upload: imageUploadHandler,
+                upload: async (file, onProgress?, abortSignal?) => {
+                    const {url, thumbnailUrl} = await onImageUploadHandler(file, onProgress, abortSignal);
+
+                    if (uploadedImageUrlsRef.current.findIndex(x => x.url === url) < 0) {
+                        uploadedImageUrlsRef.current.push({url, thumbnailUrl}); // 중복 방지 후 저장
+                    }
+
+                    return url;
+                },
                 onError: (error) => console.error("Upload failed:", error),
             }),
             TrailingNode,
@@ -330,7 +347,10 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
     }, [isMobile, mobileView])
 
     React.useImperativeHandle(ref, () => ({
-        getContent: () => editor?.getHTML(),
+        getContent: () => ({
+            content: editor?.getHTML(),
+            urls: uploadedImageUrlsRef.current,
+        }),
         setContent: (content: HTMLContent) => {
             editor?.commands.setContent(content)
         },
