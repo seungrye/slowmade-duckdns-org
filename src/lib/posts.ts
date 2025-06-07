@@ -4,170 +4,143 @@ import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 import { GetPostType, SetPostQuery } from "@/types/posts.d";
 
-async function fetchLatestPosts(params: SetPostQuery): Promise<GetPostType[]> {
-  const { userEmail, query, withComments, page, limit } = params;
-  const pipeline: PipelineStage[] = [];
+async function fetchLatestPosts(params: SetPostQuery): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
+  const { userEmail, query, withComments, page = 1, limit = 12 } = params;
+
+  const matchStage: PipelineStage.Match = {
+    $match: {},
+  };
 
   if (userEmail) {
-    pipeline.push(
-      {
-        $match: {
-          userEmail: userEmail,
-        },
-      },
-    );
+    matchStage.$match["userEmail"] = userEmail;
   }
 
   if (query) {
-    pipeline.push(
-      {
-        $match: {
-          title: { $regex: query, $options: "i" }, // 대소문자 구분 없이 검색
-        },
-      },
-    );
+    matchStage.$match["title"] = { $regex: query, $options: "i" };
   }
 
-  pipeline.push(
+  const pipeline: PipelineStage[] = [
+    matchStage,
     {
-      $sort: {
-        createdAt: -1,
-      },
-    }
-  )
-
-  // 페이지네이션을 위해 $skip과 $limit을 사용합니다.
-  if (page && limit) {
-    pipeline.push(
-      {
-        $skip: (page - 1) * limit, // 페이지네이션을 위해 $skip을 사용합니다.
-      },
-      {
-        $limit: limit, // 페이지당 가져올 문서 수
-      },
-    );
-  }
-
-  pipeline.push(
+      $sort: { createdAt: -1 },
+    },
     {
-      $lookup: {
-        from: "comments", // 실제 MongoDB 컬렉션 이름은 소문자+복수형이 기본
-        localField: "_id",
-        foreignField: "post",
-        as: "comments",
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: "comments",
+              localField: "_id",
+              foreignField: "post",
+              as: "comments",
+            },
+          },
+          ...(withComments ? [] : [{ $project: { comments: 0 } }]),
+        ],
       },
     },
-  );
-
-  if (!withComments) {
-    pipeline.push(
-      {
-        $project: {
-          comments: 0,
-        },
-      });
-  }
-
-  const result = await Post.aggregate(pipeline).limit(12);
-  return result;
-}
-
-async function fetchPopularPosts(params: SetPostQuery): Promise<GetPostType[]> {
-  const { userEmail, query, withComments, page, limit } = params;
-  const pipeline: PipelineStage[] = [];
-
-  if (userEmail) {
-    pipeline.push(
-      {
-        $match: {
-          userEmail: userEmail,
-        },
-      },
-    );
-  }
-
-  if (query) {
-    pipeline.push(
-      {
-        $match: {
-          title: { $regex: query, $options: "i" }, // 대소문자 구분 없이 검색
-        },
-      },
-    );
-  }
-
-  pipeline.push(
     {
-      $sort: {
-        views: -1,
-      },
-    }
-  )
-
-  // 페이지네이션을 위해 $skip과 $limit을 사용합니다.
-  if (page && limit) {
-    pipeline.push(
-      {
-        $skip: (page - 1) * limit, // 페이지네이션을 위해 $skip을 사용합니다.
-      },
-      {
-        $limit: limit, // 페이지당 가져올 문서 수
-      },
-    );
-  }
-
-  pipeline.push(
-    {
-      $lookup: {
-        from: "comments", // 실제 MongoDB 컬렉션 이름은 소문자+복수형이 기본
-        localField: "_id",
-        foreignField: "post",
-        as: "comments",
+      $project: {
+        posts: "$data",
+        total: { $arrayElemAt: ["$metadata.total", 0] },
       },
     },
-  );
+  ];
 
-  if (!withComments) {
-    pipeline.push(
-      {
-        $project: {
-          comments: 0,
-        },
-      });
-  }
+  const [result] = await Post.aggregate(pipeline);
 
-  const result = await Post.aggregate(pipeline).limit(12);
-  return result;
+  return {
+    posts: result?.posts || [],
+    total: result?.total || 0,
+  };
 }
 
-async function fetchMostCommentedPosts(params: SetPostQuery): Promise<GetPostType[]> {
-  const { userEmail, query, withComments, page, limit } = params;
-  const pipeline: PipelineStage[] = [];
+async function fetchPopularPosts(params: SetPostQuery): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
+  const { userEmail, query, withComments, page = 1, limit = 12 } = params;
+
+  const match: PipelineStage.Match = {
+    $match: {},
+  };
 
   if (userEmail) {
-    pipeline.push(
-      {
-        $match: {
-          userEmail: userEmail,
-        },
-      },
-    );
+    match.$match["userEmail"] = userEmail;
   }
 
   if (query) {
-    pipeline.push(
-      {
-        $match: {
-          title: { $regex: query, $options: "i" }, // 대소문자 구분 없이 검색
-        },
-      },
-    );
+    match.$match["title"] = { $regex: query, $options: "i" };
   }
 
-  pipeline.push(
+  const pipeline: PipelineStage[] = [
+    match,
+    {
+      $sort: { views: -1 },
+    },
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          {
+            $lookup: {
+              from: "comments",
+              localField: "_id",
+              foreignField: "post",
+              as: "comments",
+            },
+          },
+          ...(withComments ? [] : [{ $project: { comments: 0 } }]),
+        ],
+      },
+    },
+    {
+      $project: {
+        posts: "$data",
+        total: { $ifNull: [{ $arrayElemAt: ["$metadata.total", 0] }, 0] },
+      },
+    },
+  ];
+
+  const [result] = await Post.aggregate(pipeline);
+
+  return {
+    posts: result?.posts || [],
+    total: result?.total || 0,
+  };
+}
+
+async function fetchMostCommentedPosts(params: SetPostQuery): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
+  const { userEmail, query, withComments, page = 1, limit = 12 } = params;
+
+  const match: PipelineStage.Match = {
+    $match: {},
+  };
+
+  if (userEmail) {
+    match.$match["userEmail"] = userEmail;
+  }
+
+  if (query) {
+    match.$match["title"] = { $regex: query, $options: "i" };
+  }
+
+  const pipeline: PipelineStage[] = [
+    match,
     {
       $lookup: {
-        from: "comments", // 실제 MongoDB 컬렉션 이름은 소문자+복수형이 기본
+        from: "comments",
         localField: "_id",
         foreignField: "post",
         as: "comments",
@@ -183,33 +156,36 @@ async function fetchMostCommentedPosts(params: SetPostQuery): Promise<GetPostTyp
         commentCount: -1,
       },
     },
-  );
-
-  // 페이지네이션을 위해 $skip과 $limit을 사용합니다.
-  if (page && limit) {
-    pipeline.push(
-      {
-        $skip: (page - 1) * limit, // 페이지네이션을 위해 $skip을 사용합니다.
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          { $skip: (page - 1) * limit },
+          { $limit: limit },
+          ...(withComments ? [] : [{ $project: { comments: 0 } }]),
+        ],
       },
-      {
-        $limit: limit, // 페이지당 가져올 문서 수
+    },
+    {
+      $project: {
+        posts: "$data",
+        total: { $ifNull: [{ $arrayElemAt: ["$metadata.total", 0] }, 0] },
       },
-    );
-  }
+    },
+  ];
 
-  if (!withComments) {
-    pipeline.push(
-      {
-        $project: {
-          comments: 0,
-        },
-      });
-  }
+  const [result] = await Post.aggregate(pipeline);
 
-  return await Post.aggregate(pipeline);
+  return {
+    posts: result?.posts || [],
+    total: result?.total || 0,
+  };
 }
 
-export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
+export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
   await connectToDB();
 
   let result;
@@ -237,7 +213,10 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   return result;
 }
 
-export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
+export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
   await connectToDB();
 
   let result;
@@ -248,6 +227,8 @@ export async function getPaginatedPosts(page: number, limit: number, sort: SortO
     sort: sort || 'latest',
     withComments: withComments || false,
   };
+
+  if (userEmail) { params.userEmail = userEmail; }
 
   switch (sort) {
     case 'popular':
@@ -265,7 +246,10 @@ export async function getPaginatedPosts(page: number, limit: number, sort: SortO
   return result;
 }
 
-export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
+export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
   await connectToDB();
 
   let result;
@@ -293,7 +277,10 @@ export async function searchPosts(query: string, sort: SortOption = 'latest', wi
   return result;
 }
 
-export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false): Promise<GetPostType[]> {
+export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false): Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
   if (!userEmail) {
     throw new Error("User email is required to fetch posts.");
   }

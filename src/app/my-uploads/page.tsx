@@ -20,7 +20,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
   console.log("rawSort", rawSort);
 
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
-  const posts = await myPosts(session?.user.email, sortOption, false); // 정렬 기준에 따라 게시글 불러오기
+  const {posts} = await myPosts(session?.user.email, sortOption, false); // 정렬 기준에 따라 게시글 불러오기
 
   // const currentPage = 1;
   // const itemsPerPage = 6;

@@ -16,17 +16,17 @@ export default function InfiniteHumorList() {
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
 
   const loadPosts = useCallback(async () => {
-    const res = await fetch(`/api/posts?page=${page}`);
-    const data = await res.json();
-    if (data.length === 0) {
+    const res = await fetch(`/api/posts?page=${page}&limit=9`);
+    const {posts} = await res.json();
+    if (posts.length === 0) {
       setHasMore(false);
       return;
     }
-    setPosts((prev) => [...prev, ...data]);
+    setPosts((prev) => [...prev, ...posts]);
     // 새로 가져온 게시물도 열려 있도록 추가
     setOpenedPostIds((prev) => {
       const newSet = new Set(prev);
-      data.forEach((post: GetPostType) => newSet.add(post._id));
+      posts.forEach((post: GetPostType) => newSet.add(post._id));
       return newSet;
     });
     setPage((prev) => prev + 1);
