@@ -12,6 +12,15 @@ const nextConfig: NextConfig = {
     domains: [
       'minio-api.slowmade.duckdns.org'
     ], // ← 여기에 도메인 추가
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+        search: '',
+      },
+    ],
   },
 };
 

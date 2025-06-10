@@ -10,7 +10,7 @@ import { useSession } from "next-auth/react";
 const pageSize = 9; // 한 페이지에 보여줄 게시물 수
 
 export default function MyHumorList() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const [posts, setPosts] = useState<GetPostType[]>([]);
     const [page, setPage] = useState(1);
     const [endPage, setEndPage] = useState(0);
@@ -22,11 +22,15 @@ export default function MyHumorList() {
 
         setPosts(posts);
         setEndPage(Math.ceil(total / pageSize));
-    }, []);
+    }, [session?.user?.email]);
 
     useEffect(() => {
         loadPosts(page);
     }, [loadPosts, page]);
+
+    if (status === "loading") { return <></>; }
+
+    if (!session) { return <></>; }
 
     return <section className="mt-8">
         <h3 className="text-xl font-semibold">📌 내가 올린 유머</h3>
@@ -41,6 +45,7 @@ export default function MyHumorList() {
                                     alt={post.title}
                                     width={300}             // 고정 or 동적으로 조절 가능
                                     height={200}            // 고정 or 동적으로 조절 가능
+                                    priority
                                     className="rounded-md object-contain w-full h-auto"
                                 />
                             ) : (

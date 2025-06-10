@@ -1,29 +1,12 @@
-import Image from "next/image";
 import MyHumorList from "@/components/my-humor-list";
-
-const user = {
-  name: "김유머",
-  email: "humor@example.com",
-  joined: "2024-01-01",
-  profileImage: "/profile.jpg",
-};
+import MyProfile from "@/components/my-profile";
 
 export default function ProfilePage() {
   
   return (
     <main className="container mx-auto px-4 py-6">
       {/* 프로필 정보 */}
-      <section className="bg-white shadow-md rounded-lg p-6 flex items-center gap-6">
-        <Image src={user.profileImage} alt="프로필 이미지" width={80} height={80} className="rounded-full" />
-        <div>
-          <h2 className="text-2xl font-bold">{user.name}</h2>
-          <p className="text-gray-600">{user.email}</p>
-          <p className="text-gray-500 text-sm">가입일: {user.joined}</p>
-        </div>
-        <button className="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
-          프로필 수정
-        </button>
-      </section>
+      <MyProfile/>
 
       {/* 내가 올린 유머 */}
       <MyHumorList/>
