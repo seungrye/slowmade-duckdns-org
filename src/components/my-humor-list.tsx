@@ -37,7 +37,7 @@ export default function MyHumorList() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-4">
             {posts.length > 0 ? (
                 posts.map((post: GetPostType) => (
-                    <div key={post._id} className="bg-white rounded-lg shadow-md p-4">
+                    <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4">
                         <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400">
                             {post.urls?.[0]?.thumbnailUrl ? (
                                 <Image

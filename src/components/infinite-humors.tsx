@@ -71,8 +71,8 @@ export default function InfiniteHumorList() {
         {posts.map((post) => {
           const isOpen = openedPostIds.has(post._id);
           return (
-            <div key={post._id} className="bg-white rounded-lg shadow-md py-4">
-              <div className="flex items-center justify-between px-4 pb-4 border-b">
+            <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs py-4">
+              <div className="flex items-center justify-between px-4 pb-4 border-b border-b-gray-200">
                 <h3 className="text-lg font-semibold">{post.title}</h3>
                 <button
                   onClick={() => togglePost(post._id)}

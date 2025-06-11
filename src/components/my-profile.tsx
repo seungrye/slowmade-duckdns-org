@@ -12,12 +12,12 @@ export default function MyProfile() {
     }
 
     if (!session) {
-        return <section className="bg-white shadow-md rounded-lg p-6 flex items-center gap-6">
+        return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
             <p className="text-center text-gray-500">로그인이 필요합니다.</p>
         </section>;
     }
 
-    return <section className="bg-white shadow-md rounded-lg p-6 flex items-center gap-6">
+    return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
         <Image src={session?.user.image || '/user-avatar.svg' } priority alt="프로필 이미지" width={80} height={80} className="rounded-full bg-gray-300" />
         <div>
             <h2 className="text-2xl font-bold">{session?.user.name}</h2>
