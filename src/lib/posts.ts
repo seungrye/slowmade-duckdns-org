@@ -277,7 +277,7 @@ export async function searchPosts(query: string, sort: SortOption = 'latest', wi
   return result;
 }
 
-export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', withComments: boolean = false): Promise<{
+export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', page: number, limit: number, withComments: boolean = false): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
@@ -285,29 +285,5 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
     throw new Error("User email is required to fetch posts.");
   }
 
-  await connectToDB();
-
-  let result;
-  const params: SetPostQuery = {
-    page: 1,
-    limit: 12,
-    userEmail: userEmail,
-    sort: sort || 'latest',
-    withComments: withComments || false,
-  };
-
-  switch (sort) {
-    case 'popular':
-      result = await fetchPopularPosts(params);
-      break;
-    case 'commented':
-      result = await fetchMostCommentedPosts(params);
-      break;
-    case 'latest':
-    default: // 기본 fallback
-      result = await fetchLatestPosts(params);
-      break;
-  }
-
-  return result;
+  return await getPaginatedPosts(page, limit, sort, userEmail, withComments);
 }

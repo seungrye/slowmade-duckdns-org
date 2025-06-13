@@ -76,7 +76,7 @@ export default function InfiniteHumorList() {
                 <h3 className="text-lg font-semibold">{post.title}</h3>
                 <button
                   onClick={() => togglePost(post._id)}
-                  className="text-gray-500 hover:text-gray-700 transition"
+                  className="text-gray-500 hover:text-gray-700 transition ps-4"
                   aria-label="토글 열기/닫기"
                 >
                   <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} />
