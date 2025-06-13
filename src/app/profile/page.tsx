@@ -1,4 +1,3 @@
-import MyHumorList from "@/components/my-humor-list";
 import MyProfile from "@/components/my-profile";
 
 export default function ProfilePage() {

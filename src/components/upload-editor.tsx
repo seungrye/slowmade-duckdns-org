@@ -3,7 +3,7 @@
 // Note. copy from @/components/tiptap-templates/simple/simple-editor.tsx
 
 import * as React from "react"
-import { EditorContent, EditorContext, HTMLContent, useEditor } from "@tiptap/react"
+import { EditorContent, EditorContext, HTMLContent, JSONContent, useEditor } from "@tiptap/react"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -217,13 +217,14 @@ const MobileToolbarContent = ({
 
 export interface UploadEditorHandle {
     getContent: () => {
-        content: HTMLContent | undefined,
-        urls: UploadImageUrl[]
+        jsonContent: JSONContent | undefined,
+        htmlContent: HTMLContent | undefined,
+        uploadImageUrls: UploadImageUrl[]
     };
     setContent: (content: HTMLContent) => void;
 }
 
-interface UploadImageUrl {
+export interface UploadImageUrl {
     url: string;
     thumbnailUrl: string;
 }
@@ -348,8 +349,9 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
 
     React.useImperativeHandle(ref, () => ({
         getContent: () => ({
-            content: editor?.getHTML(),
-            urls: uploadedImageUrlsRef.current,
+            jsonContent: editor?.getJSON(),
+            htmlContent: editor?.getHTML(),
+            uploadImageUrls: uploadedImageUrlsRef.current,
         }),
         setContent: (content: HTMLContent) => {
             editor?.commands.setContent(content)

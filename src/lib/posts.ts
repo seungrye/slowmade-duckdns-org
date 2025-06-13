@@ -41,7 +41,12 @@ async function fetchLatestPosts(params: SetPostQuery): Promise<{
               as: "comments",
             },
           },
-          ...(withComments ? [] : [{ $project: { comments: 0 } }]),
+          {
+            $project: {
+              jsonContent: 0,
+              ...(withComments ? {} : { comments: 0 }),
+            },
+          }
         ],
       },
     },
@@ -98,7 +103,12 @@ async function fetchPopularPosts(params: SetPostQuery): Promise<{
               as: "comments",
             },
           },
-          ...(withComments ? [] : [{ $project: { comments: 0 } }]),
+          {
+            $project: {
+              jsonContent: 0,
+              ...(withComments ? {} : { comments: 0 }),
+            },
+          }
         ],
       },
     },
@@ -162,7 +172,12 @@ async function fetchMostCommentedPosts(params: SetPostQuery): Promise<{
         data: [
           { $skip: (page - 1) * limit },
           { $limit: limit },
-          ...(withComments ? [] : [{ $project: { comments: 0 } }]),
+          {
+            $project: {
+              jsonContent: 0,
+              ...(withComments ? {} : { comments: 0 }),
+            },
+          }
         ],
       },
     },
@@ -286,4 +301,10 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
   }
 
   return await getPaginatedPosts(page, limit, sort, userEmail, withComments);
+}
+
+
+export async function getPost(_id: string): Promise<{ post: GetPostType; } | null> {
+  await connectToDB();
+  return await Post.findById(_id);
 }

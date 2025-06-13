@@ -56,7 +56,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
               </div>
               <h4 className="mt-3 text-lg font-semibold">{post.title}</h4>
               <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.comments?.length || '0'}</p>
-              <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
+              <Link href={`/upload/${post._id}`} className="text-blue-500 mt-2 block me-2">수정 →</Link>
             </div>
           ))
         ) : (

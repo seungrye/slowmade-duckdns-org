@@ -2,29 +2,49 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import '@/app/upload/page.css';
+import '@/app/upload/[[...id]]/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
 import { UploadEditor, UploadEditorHandle } from '@/components/upload-editor';
 import { useSession } from 'next-auth/react';
+import { useParams } from 'next/navigation';
+import { PostDataParams } from '@/types/api/submit.d';
 
 export default function UploadPage() {
     const { data: session } = useSession();
-    
+    const params = useParams(); // 예: { id: '123' }
+
     const editorRef = useRef<UploadEditorHandle>(null);
     const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (content && editorRef.current) {
-            editorRef.current.setContent(content);
-        }
-    }, [content]);
+        if (!params.id) return;
+        if (!editorRef.current) return;
+
+        const loadPost = async (_id: string) => {
+            try {
+                const res = await fetch(`/api/post?_id=${_id}`);
+                const { jsonContent, title } = await res.json();
+                if (jsonContent) {
+                    editorRef.current?.setContent(jsonContent);
+                    setTitle(title);
+                } else {
+                    toast.error("게시글을 불러오는 데 실패했습니다.");
+                }
+            } catch (error) {
+                console.error("Error loading post:", error);
+                toast.error("게시글을 불러오는 데 오류가 발생했습니다.");
+            }
+        };
+
+        loadPost(params.id as string);
+    }, [params.id, content]);
 
     const handleSubmit = async () => {
         // 에디터에서 값 가져오기
-        const {content, urls} = editorRef.current?.getContent() || { content: null, urls: [] };
-        if (!title.trim() || !content) {
+        const { htmlContent, jsonContent, uploadImageUrls: urls } = editorRef.current?.getContent() || { jsonContent: null, htmlContent: null, urls: [] };
+        if (!title.trim() || !jsonContent) {
             return toast.error("제목과 내용을 입력해주세요.");
         } else {
             setLoading(true);
@@ -32,13 +52,19 @@ export default function UploadPage() {
 
         console.assert(session?.user, "session.user should not be null");
 
-        const postData = {
+        const postData: PostDataParams = {
+            _id: null, // 새 게시글인 경우 ID는 null
             title,
-            content: content,
+            htmlContent: htmlContent,
+            jsonContent: jsonContent,
             author: session?.user.name,
             userEmail: session?.user.email,
             urls: urls || [], // 에디터에서 가져온 이미지 URL 배열
         };
+
+        if (params.id) {
+            postData._id = params.id as string; // 수정하는 경우 ID 추가
+        }
 
         try {
             const response = await fetch("/api/submit", {
@@ -69,7 +95,7 @@ export default function UploadPage() {
             <input
                 type="text"
                 placeholder="제목을 입력하세요"
-                value={title}
+                defaultValue={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className='w-full p-3'
             />

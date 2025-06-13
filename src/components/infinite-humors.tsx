@@ -84,7 +84,7 @@ export default function InfiniteHumorList() {
               </div>
               {isOpen && (
                 <div className="p-4 transition-all duration-300 ease-in-out">
-                  {parse(post.content)}
+                  {parse(post.htmlContent || '')}
                 </div>
               )}
             {/* <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
