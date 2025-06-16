@@ -5,6 +5,10 @@ import { GetPostType } from '@/types/posts.d';
 import parse from 'html-react-parser';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
+import "@/components/tiptap-node/code-block-node/code-block-node.scss"
+import "@/components/tiptap-node/list-node/list-node.scss"
+import "@/components/tiptap-node/image-node/image-node.scss"
+import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 
 export default function InfiniteHumorList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
@@ -83,7 +87,7 @@ export default function InfiniteHumorList() {
                 </button>
               </div>
               {isOpen && (
-                <div className="p-4 transition-all duration-300 ease-in-out">
+                <div className="p-4 transition-all duration-300 ease-in-out tiptap ProseMirror">
                   {parse(post.htmlContent || '')}
                 </div>
               )}

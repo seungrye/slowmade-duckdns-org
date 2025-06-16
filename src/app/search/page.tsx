@@ -19,7 +19,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
   const query = rawQuery ? decodeURIComponent(rawQuery) : "";
 
-  const posts = await searchPosts(query, sortOption); // 정렬 기준에 따라 검색한 게시글 불러오기
+  const {posts} = await searchPosts(query, sortOption); // 정렬 기준에 따라 검색한 게시글 불러오기
 
   return (
     <main className="container mx-auto px-4 py-6">

@@ -265,12 +265,14 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
     }, [])
 
     const editor = useEditor({
-        immediatelyRender: false,
+        immediatelyRender: true,
+        shouldRerenderOnTransaction: false,
         editorProps: {
             attributes: {
                 autocomplete: "off",
                 autocorrect: "off",
                 autocapitalize: "off",
+                spellcheck: 'false',
                 "aria-label": "Main content area, start typing to enter text.",
             },
         },

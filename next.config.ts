@@ -15,6 +15,13 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
+        hostname: 'minio-api.slowmade.duckdns.org',
+        port: '',
+        pathname: '/**',
+        search: '',
+      },
+      {
+        protocol: 'https',
         hostname: '*.googleusercontent.com',
         port: '',
         pathname: '/**',
