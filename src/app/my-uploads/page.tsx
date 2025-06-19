@@ -14,7 +14,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
 
   const params = await searchParams;
   const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
-  console.log("rawSort", rawSort);
+  // console.log("rawSort", rawSort);
 
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
   const page = parseInt(params.page as string) || 1; // 쿼리 파라미터에서 page 값 가져오기

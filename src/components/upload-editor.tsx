@@ -181,11 +181,18 @@ const MainToolbarContent = ({
 
             <Spacer />
 
+            {/* Note. hydration mismatch 수정
+                **원인 요약 : <html> 태그의 className 동적 변경**
+                ThemeToggle 컴포넌트에서 document.documentElement.classList.toggle("dark", isDarkMode)
+                즉, <html> 태그의 className을 클라이언트에서 직접 조작함.
+                하지만 Next.js의 app 디렉토리 구조에서 <html> 태그는 layout.tsx에서만 직접적으로 className을 줄 수 있음.
+
             {isMobile && <ToolbarSeparator />}
 
             <ToolbarGroup>
                 <ThemeToggle />
-            </ToolbarGroup>
+            </ToolbarGroup> 
+            */}
         </>
     )
 }
@@ -265,8 +272,7 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
     }, [])
 
     const editor = useEditor({
-        immediatelyRender: true,
-        shouldRerenderOnTransaction: false,
+        immediatelyRender: false,
         editorProps: {
             attributes: {
                 autocomplete: "off",

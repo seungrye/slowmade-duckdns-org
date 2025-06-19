@@ -1,10 +1,5 @@
-import Link from "next/link";
-import Image from "next/image";
 import { getPosts } from "@/lib/posts";
-import { formatNumber } from "@/lib/format";
 import { SortOption, isValidSortOption } from "@/lib/sort";
-import SelectSorter from "@/components/select-sorter";
-import { GetPostType } from "@/types/posts.d";
 import "@/app/archive/page.css"; // CSS 파일 임포트
 
 type Props = {
@@ -16,7 +11,7 @@ export default async function ArchivePage({ searchParams }: Props) {
   const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
 
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
-  const {posts} = await getPosts(sortOption); // 정렬 기준에 따라 게시글 불러오기
+  /*const {posts} =*/ await getPosts(sortOption); // 정렬 기준에 따라 게시글 불러오기
 
   return (
     <main className="container mx-auto px-4 py-6">

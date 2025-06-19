@@ -62,11 +62,11 @@
 }
 
 .upload-editor-content .tiptap.ProseMirror {
-  padding: 3rem 3rem;
+  padding: 1.5rem 1.5rem;
 }
 
 @media screen and (max-width: 480px) {
   .upload-editor-content .tiptap.ProseMirror {
-    padding: 1rem 1.5rem;
+    padding: .5rem .75rem;
   }
 }

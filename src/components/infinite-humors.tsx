@@ -2,13 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GetPostType } from '@/types/posts.d';
-import parse from 'html-react-parser';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
-import "@/components/tiptap-node/code-block-node/code-block-node.scss"
-import "@/components/tiptap-node/list-node/list-node.scss"
-import "@/components/tiptap-node/image-node/image-node.scss"
-import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
+import { ReadonlyEditor } from './readonly-editor';
 
 export default function InfiniteHumorList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
@@ -20,7 +16,7 @@ export default function InfiniteHumorList() {
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
 
   const loadPosts = useCallback(async () => {
-    const res = await fetch(`/api/posts?page=${page}&limit=9`);
+    const res = await fetch(`/api/posts?page=${page}&limit=3`);
     const {posts} = await res.json();
     if (posts.length === 0) {
       setHasMore(false);
@@ -87,8 +83,8 @@ export default function InfiniteHumorList() {
                 </button>
               </div>
               {isOpen && (
-                <div className="p-4 transition-all duration-300 ease-in-out tiptap ProseMirror">
-                  {parse(post.htmlContent || '')}
+                <div className="p-4 transition-all duration-300 ease-in-out">
+                  <ReadonlyEditor content={post.htmlContent} />
                 </div>
               )}
             {/* <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
