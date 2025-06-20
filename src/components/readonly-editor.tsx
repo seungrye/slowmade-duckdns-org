@@ -36,7 +36,6 @@ import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 
 // --- Hooks ---
 import { useMobile } from "@/hooks/use-mobile"
-import { useWindowSize } from "@/hooks/use-window-size"
 
 // --- Lib ---
 

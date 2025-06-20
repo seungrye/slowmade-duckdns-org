@@ -61,8 +61,6 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
-import { MoonStarIcon } from "@/components/tiptap-icons/moon-star-icon"
-import { SunIcon } from "@/components/tiptap-icons/sun-icon"
 
 // --- Hooks ---
 import { useMobile } from "@/hooks/use-mobile"
@@ -76,43 +74,43 @@ import "@/components/upload-editor.scss"
 
 import { onImageUploadHandler } from "./upload-image-handler"
 
-function ThemeToggle() {
-    const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
+// function ThemeToggle() {
+//     const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
 
-    React.useEffect(() => {
-        const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-        const handleChange = () => setIsDarkMode(mediaQuery.matches)
-        mediaQuery.addEventListener("change", handleChange)
-        return () => mediaQuery.removeEventListener("change", handleChange)
-    }, [])
+//     React.useEffect(() => {
+//         const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
+//         const handleChange = () => setIsDarkMode(mediaQuery.matches)
+//         mediaQuery.addEventListener("change", handleChange)
+//         return () => mediaQuery.removeEventListener("change", handleChange)
+//     }, [])
 
-    React.useEffect(() => {
-        const initialDarkMode =
-            !!document.querySelector('meta[name="color-scheme"][content="dark"]') ||
-            window.matchMedia("(prefers-color-scheme: dark)").matches
-        setIsDarkMode(initialDarkMode)
-    }, [])
+//     React.useEffect(() => {
+//         const initialDarkMode =
+//             !!document.querySelector('meta[name="color-scheme"][content="dark"]') ||
+//             window.matchMedia("(prefers-color-scheme: dark)").matches
+//         setIsDarkMode(initialDarkMode)
+//     }, [])
 
-    React.useEffect(() => {
-        document.documentElement.classList.toggle("dark", isDarkMode)
-    }, [isDarkMode])
+//     React.useEffect(() => {
+//         document.documentElement.classList.toggle("dark", isDarkMode)
+//     }, [isDarkMode])
 
-    const toggleDarkMode = () => setIsDarkMode((isDark) => !isDark)
+//     const toggleDarkMode = () => setIsDarkMode((isDark) => !isDark)
 
-    return (
-        <Button
-            onClick={toggleDarkMode}
-            aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
-            data-style="ghost"
-        >
-            {isDarkMode ? (
-                <MoonStarIcon className="tiptap-button-icon" />
-            ) : (
-                <SunIcon className="tiptap-button-icon" />
-            )}
-        </Button>
-    )
-}
+//     return (
+//         <Button
+//             onClick={toggleDarkMode}
+//             aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
+//             data-style="ghost"
+//         >
+//             {isDarkMode ? (
+//                 <MoonStarIcon className="tiptap-button-icon" />
+//             ) : (
+//                 <SunIcon className="tiptap-button-icon" />
+//             )}
+//         </Button>
+//     )
+// }
 
 const MainToolbarContent = ({
     onHighlighterClick,
@@ -180,19 +178,6 @@ const MainToolbarContent = ({
             </ToolbarGroup>
 
             <Spacer />
-
-            {/* Note. hydration mismatch 수정
-                **원인 요약 : <html> 태그의 className 동적 변경**
-                ThemeToggle 컴포넌트에서 document.documentElement.classList.toggle("dark", isDarkMode)
-                즉, <html> 태그의 className을 클라이언트에서 직접 조작함.
-                하지만 Next.js의 app 디렉토리 구조에서 <html> 태그는 layout.tsx에서만 직접적으로 className을 줄 수 있음.
-
-            {isMobile && <ToolbarSeparator />}
-
-            <ToolbarGroup>
-                <ThemeToggle />
-            </ToolbarGroup> 
-            */}
         </>
     )
 }

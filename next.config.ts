@@ -9,9 +9,6 @@ const nextConfig: NextConfig = {
       'https://slowmade.duckdns.org'
     ],
   images: {
-    domains: [
-      'minio-api.slowmade.duckdns.org'
-    ], // ← 여기에 도메인 추가
     remotePatterns: [
       {
         protocol: 'https',
