@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@/app/post/write/[[...id]]/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
-import { RichWebEditor, UploadEditorHandle } from '@/components/rich-web-editor/editor';
+import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
 import { useParams } from 'next/navigation';
 import { PostDataParams } from '@/types/api/submit.d';
@@ -13,7 +13,7 @@ export default function UploadPage() {
     const { data: session } = useSession();
     const params = useParams(); // 예: { id: '123' }
 
-    const editorRef = useRef<UploadEditorHandle>(null);
+    const editorRef = useRef<RichWebEditorHandle>(null);
     const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const [loading, setLoading] = useState(false);
