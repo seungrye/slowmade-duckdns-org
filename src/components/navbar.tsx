@@ -30,7 +30,7 @@ const navLinks = [
 const myPageLinks = [
     { href: "/profile", label: "내 프로필", description: "회원 정보 보기", icon: <User size={20} /> },
     { href: "/my-uploads", label: "내가 올린 유머", description: "내가 업로드한 유머 보기", icon: <Archive size={20} /> },
-    { href: "/upload", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
+    { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
     { href: "/settings", label: "설정", description: "계정 설정하기", icon: <Settings size={20} /> },
 ];
 
