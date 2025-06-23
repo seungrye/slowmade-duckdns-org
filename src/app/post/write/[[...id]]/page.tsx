@@ -9,7 +9,7 @@ import { useSession } from 'next-auth/react';
 import { useParams } from 'next/navigation';
 import { PostDataParams } from '@/types/api/submit.d';
 
-export default function UploadPage() {
+export default function PostWriter() {
     const { data: session } = useSession();
     const params = useParams(); // 예: { id: '123' }
 

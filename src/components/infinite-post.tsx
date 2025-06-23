@@ -1,12 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
+import Link from 'next/link';
 
-export default function InfiniteHumorList() {
+export default function InfinitPostList() {
+  const router = useRouter();
   const [posts, setPosts] = useState<GetPostType[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -73,7 +76,9 @@ export default function InfiniteHumorList() {
           return (
             <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs py-4">
               <div className="flex items-center justify-between px-4 pb-4 border-b border-b-gray-200">
-                <h3 className="text-lg font-semibold grow cursor-pointer">{post.title}</h3>
+                <Link href={`/post/view/${post._id}`} className='grow'>
+                  <h3 className="text-lg font-semibold">{post.title}</h3>
+                </Link>
                 <button
                   onClick={() => togglePost(post._id)}
                   className="text-gray-500 hover:text-gray-700 transition ps-4 cursor-pointer"
