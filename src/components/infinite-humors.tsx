@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
-import { ReadonlyEditor } from './readonly-editor';
+import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 
 export default function InfiniteHumorList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
@@ -84,7 +84,7 @@ export default function InfiniteHumorList() {
               </div>
               {isOpen && (
                 <div className="p-4 transition-all duration-300 ease-in-out">
-                  <ReadonlyEditor content={post.htmlContent} />
+                  <RichContentViewer content={post.htmlContent} />
                 </div>
               )}
             {/* <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>

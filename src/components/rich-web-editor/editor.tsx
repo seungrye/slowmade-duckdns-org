@@ -68,11 +68,10 @@ import { useWindowSize } from "@/hooks/use-window-size"
 
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
+import { uploadImageFile } from "./editor.upload-image-handler"
 
 // --- Styles ---
-import "@/components/upload-editor.scss"
-
-import { onImageUploadHandler } from "./upload-image-handler"
+import "./editor.scss"
 
 // function ThemeToggle() {
 //     const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
@@ -207,7 +206,7 @@ const MobileToolbarContent = ({
     </>
 )
 
-export interface UploadEditorHandle {
+export interface RichWebEditorHandle {
     getContent: () => {
         jsonContent: JSONContent | undefined,
         htmlContent: HTMLContent | undefined,
@@ -221,7 +220,7 @@ export interface UploadImageUrl {
     thumbnailUrl: string;
 }
 
-export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props, ref) => {
+export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((props, ref) => {
     const isMobile = useMobile()
     const windowSize = useWindowSize()
     const [mobileView, setMobileView] = React.useState<
@@ -285,7 +284,7 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
                 maxSize: MAX_FILE_SIZE,
                 limit: 32,
                 upload: async (file, onProgress?, abortSignal?) => {
-                    const {url, thumbnailUrl} = await onImageUploadHandler(file, onProgress, abortSignal);
+                    const {url, thumbnailUrl} = await uploadImageFile(file, onProgress, abortSignal);
 
                     if (uploadedImageUrlsRef.current.findIndex(x => x.url === url) < 0) {
                         uploadedImageUrlsRef.current.push({url, thumbnailUrl}); // 중복 방지 후 저장
@@ -388,4 +387,4 @@ export const UploadEditor = React.forwardRef<UploadEditorHandle, object>((props,
     )
 })
 
-UploadEditor.displayName = "UploadEditor";
+RichWebEditor.displayName = "RichWebEditor";

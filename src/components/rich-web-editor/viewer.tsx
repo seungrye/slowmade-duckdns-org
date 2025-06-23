@@ -40,13 +40,13 @@ import { useMobile } from "@/hooks/use-mobile"
 // --- Lib ---
 
 // --- Styles ---
-import "@/components/upload-editor.scss"
+import "./editor.scss"
 
-export interface ReadonlyEditorProps {
+export interface RichContentViewerProps {
     content: HTMLContent;
 }
 
-export const ReadonlyEditor = (props: ReadonlyEditorProps) => {
+export const RichContentViewer = (props: RichContentViewerProps) => {
     const isMobile = useMobile()
     const [mobileView, setMobileView] = React.useState<
         "main" | "highlighter" | "link"
@@ -104,4 +104,4 @@ export const ReadonlyEditor = (props: ReadonlyEditorProps) => {
     )
 };
 
-ReadonlyEditor.displayName = "ReadonlyEditor";
+RichContentViewer.displayName = "RichContentViewer";

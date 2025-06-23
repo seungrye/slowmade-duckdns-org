@@ -10,11 +10,8 @@ import {
     ChevronDown,
     User,
     Archive,
-    // Search,
     Upload,
-    // Shuffle,
     Home,
-    Settings,
     LogOut,
     Layers,
     LogIn,
@@ -23,15 +20,12 @@ import {
 const navLinks = [
     { href: "/", label: "홈", description: "사이트로 돌아가기", icon: <Home size={20} /> },
     // { href: "/archive", label: "아카이브", description: "유머 아카이브 보기", icon: <Archive size={20} /> },
-    // { href: "/search", label: "검색", description: "유머 검색하기", icon: <Search size={20} /> },
-    // { href: "/random", label: "랜덤 유머", description: "무작위 유머 보기", icon: <Shuffle size={20} /> },
 ];
 
 const myPageLinks = [
     { href: "/dashboard/profile", label: "내 프로필", description: "회원 정보 보기", icon: <User size={20} /> },
     { href: "/dashboard/posts", label: "내가 올린 유머", description: "내가 업로드한 유머 보기", icon: <Archive size={20} /> },
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
-    // { href: "/settings", label: "설정", description: "계정 설정하기", icon: <Settings size={20} /> },
 ];
 
 export default function Navbar() {

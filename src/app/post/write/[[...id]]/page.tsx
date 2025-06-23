@@ -4,7 +4,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import '@/app/post/write/[[...id]]/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
-import { UploadEditor, UploadEditorHandle } from '@/components/upload-editor';
+import { RichWebEditor, UploadEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
 import { useParams } from 'next/navigation';
 import { PostDataParams } from '@/types/api/submit.d';
@@ -101,7 +101,7 @@ export default function UploadPage() {
             />
         </div>
         <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px] upload-editor-wrapper">
-            <UploadEditor ref={editorRef} />
+            <RichWebEditor ref={editorRef} />
         </div>
         <div className="flex justify-end mt-4">
             <button

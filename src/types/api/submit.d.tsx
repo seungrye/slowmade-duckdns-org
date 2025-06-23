@@ -1,4 +1,4 @@
-import { UploadImageUrl } from "@/components/upload-editor";
+import { UploadImageUrl } from "@/components/rich-web-editor/editor";
 import { HTMLContent, JSONContent } from "@tiptap/react";
 
 export type PostDataParams = {
