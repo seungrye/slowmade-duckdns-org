@@ -10,9 +10,9 @@ import {
     ChevronDown,
     User,
     Archive,
-    Search,
+    // Search,
     Upload,
-    Shuffle,
+    // Shuffle,
     Home,
     Settings,
     LogOut,
@@ -22,9 +22,9 @@ import {
 
 const navLinks = [
     { href: "/", label: "홈", description: "사이트로 돌아가기", icon: <Home size={20} /> },
-    { href: "/archive", label: "아카이브", description: "유머 아카이브 보기", icon: <Archive size={20} /> },
-    { href: "/search", label: "검색", description: "유머 검색하기", icon: <Search size={20} /> },
-    { href: "/random", label: "랜덤 유머", description: "무작위 유머 보기", icon: <Shuffle size={20} /> },
+    // { href: "/archive", label: "아카이브", description: "유머 아카이브 보기", icon: <Archive size={20} /> },
+    // { href: "/search", label: "검색", description: "유머 검색하기", icon: <Search size={20} /> },
+    // { href: "/random", label: "랜덤 유머", description: "무작위 유머 보기", icon: <Shuffle size={20} /> },
 ];
 
 const myPageLinks = [
