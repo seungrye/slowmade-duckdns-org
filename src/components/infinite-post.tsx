@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
@@ -9,7 +8,6 @@ import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Link from 'next/link';
 
 export default function InfinitPostList() {
-  const router = useRouter();
   const [posts, setPosts] = useState<GetPostType[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);

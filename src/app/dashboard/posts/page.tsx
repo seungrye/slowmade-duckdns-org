@@ -56,7 +56,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
               </div>
               <h4 className="mt-3 text-lg font-semibold">{post.title}</h4>
               <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.comments?.length || '0'}</p>
-              <Link href={`/upload/${post._id}`} className="text-blue-500 mt-2 block me-2">수정 →</Link>
+              <Link href={`/post/edit/${post._id}`} className="text-blue-500 mt-2 block me-2">수정 →</Link>
             </div>
           ))
         ) : (
@@ -66,12 +66,12 @@ export default async function MyUploadsPage({ searchParams }: Props) {
 
       <div className="flex justify-center mt-8">
         <Link className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" href={{
-          pathname: page > 0 ? "/my-uploads" : "#",
+          pathname: page > 0 ? "/dashboard/posts" : "#",
           query: {...params, page: page > 1 ? page - 1 : page}
         }}>◀ 이전</Link>
         <span className="px-4 py-2 bg-gray-100">{page} / {endPage}</span>
         <Link className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" href={{
-          pathname: page < endPage ? "/my-uploads" : "#",
+          pathname: page < endPage ? "/dashboard/posts" : "#",
           query: {...params, page: endPage > page ? page + 1 : page}
         }}>다음 ▶</Link>
       </div>

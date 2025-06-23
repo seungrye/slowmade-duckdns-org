@@ -30,7 +30,7 @@ export default function YearScroller({ uniqueYears, focusYear }: { uniqueYears: 
 
             container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
         }
-    }, []);
+    }, [focusYear, uniqueYears]);
 
     return (
         <section className="text-center py-6">

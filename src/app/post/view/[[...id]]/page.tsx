@@ -10,6 +10,8 @@ export default async function PostViewier({ searchParams }: Props) {
     const params = await searchParams;
     const _id = params._id as string | undefined;
 
+    console.log(_id);
+
     return (<div className=''>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
             <div className='w-full p-3'>
