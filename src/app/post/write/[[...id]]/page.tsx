@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import '@/app/upload/[[...id]]/page.css';
+import '@/app/post/write/[[...id]]/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
 import { UploadEditor, UploadEditorHandle } from '@/components/upload-editor';
 import { useSession } from 'next-auth/react';
