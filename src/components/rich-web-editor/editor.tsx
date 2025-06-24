@@ -376,11 +376,11 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                 )}
             </Toolbar>
 
-            <div className="content-wrapper">
+            <div className="rich-web-content-wrapper">
                 <EditorContent
                     editor={editor}
                     role="presentation"
-                    className="upload-editor-content"
+                    className="rich-web-editor-content"
                 />
             </div>
         </EditorContext.Provider>

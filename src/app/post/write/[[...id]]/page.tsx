@@ -88,7 +88,7 @@ export default function PostWriter() {
         }
     };
 
-    return (<div className=''>
+    return (<div className='mx-auto px-4 py-6'>
         <Toaster position="top-right" /> {/* ✅ 토스트 메시지 표시 위치 */}
 
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
@@ -100,7 +100,7 @@ export default function PostWriter() {
                 className='w-full p-3'
             />
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px] upload-editor-wrapper">
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px] rich-web-editor-wrapper">
             <RichWebEditor ref={editorRef} />
         </div>
         <div className="flex justify-end mt-4">
