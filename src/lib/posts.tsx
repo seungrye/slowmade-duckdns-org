@@ -305,6 +305,12 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
 
 
 export async function getPost(_id: string): Promise<{ post: GetPostType; } | null> {
-  await connectToDB();
-  return await Post.findById(_id);
+  try {
+    await connectToDB();
+    const post = await Post.findById(_id);
+    return { post };
+  } catch (error) {
+    console.error("Error on <getPost>", error);
+    return null;
+  }
 }
