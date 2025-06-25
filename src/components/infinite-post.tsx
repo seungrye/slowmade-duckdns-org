@@ -74,8 +74,8 @@ export default function InfinitPostList() {
           return (
             <div key={post._id} className="bg-white rounded-lg shadow-sm hover:shadow-md inset-shadow-xs py-4">
               <div className="flex items-center justify-between px-4 pb-4 border-b border-b-gray-200">
-                <Link href={`/post/view/${post._id}`} className='grow'>
-                  <h3 className="text-lg font-semibold">{post.title}</h3>
+                <Link href={`/post/view/${post._id}`} className='grow truncate'>
+                  <h3 className="text-lg font-semibold truncate">{post.title}</h3>
                 </Link>
                 <button
                   onClick={() => togglePost(post._id)}

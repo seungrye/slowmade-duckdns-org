@@ -10,6 +10,6 @@ export async function GET(req: Request) {
   console.assert(_id, 'Post ID (_id) is required');
   console.log(`Fetching post with ID: ${_id}`);
 
-  const post = await getPost(_id);
+  const { post } = await getPost(_id) || { post: null };
   return NextResponse.json(post);
 }

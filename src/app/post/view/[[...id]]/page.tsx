@@ -4,7 +4,7 @@ import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import { getPost } from '@/lib/posts';
 
 type Params = Promise<{ id: string[] }>
-type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
+// type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
 
 function ipv4ToObfuscatedBase6(ip: string): string {
     const charset = "ill|!I"; // 6진수용 6글자
@@ -33,12 +33,12 @@ function ipv4ToObfuscatedBase6(ip: string): string {
 
 export default async function PostViewier(props: {
     params: Params
-    searchParams: SearchParams
+    // searchParams: SearchParams
   }) {
     const params = await props.params
-    const searchParams = await props.searchParams
+    // const searchParams = await props.searchParams
     const _id = params.id?.[0]
-    const query = searchParams.query
+    // const query = searchParams.query
 
     const { post } = await getPost(_id) || { post: null };    
     const { htmlContent, title } = post || { htmlContent: '', title: '' };
