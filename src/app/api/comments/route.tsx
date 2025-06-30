@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Comment from '@/models/comment';
 import { connectToDB } from '@/lib/db';
 import mongoose from 'mongoose';
-// import { getServerSession } from 'next-auth';
-// import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 
+// 익명 ID를 base62에서 base5로 변환하는 함수
 function __anonidObfuscated(anonid: string): string {
     const charset = ['i', 'l', 'I', '|', '!']; // base-5
   // base62 문자셋 정의
@@ -31,11 +30,6 @@ function __anonidObfuscated(anonid: string): string {
 }
 
 export async function POST(req: NextRequest) {
-    //   const session = await getServerSession(authOptions);
-    //   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    console.log("req", req);
-
     const { postId, parentId = null, content, anonid } = await req.json();
     const author = __anonidObfuscated(anonid);
 
@@ -61,8 +55,6 @@ export async function GET(
     }
 
     await connectToDB();
-
-    console.log("postId", postId);
 
     const comments = await Comment.find ({ post: new mongoose.Types.ObjectId(postId) })
         .sort({ createdAt: 1 })
