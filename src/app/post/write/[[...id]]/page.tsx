@@ -6,11 +6,12 @@ import '@/app/post/write/[[...id]]/page.css';
 import { Toaster, toast } from "react-hot-toast"; // ✅ 토스트 추가
 import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { PostDataParams } from '@/types/api/submit.d';
 
 export default function PostWriter() {
     const { data: session } = useSession();
+    const router = useRouter();
     const params = useParams(); // 예: { id: '123' }
 
     const editorRef = useRef<RichWebEditorHandle>(null);
@@ -77,6 +78,7 @@ export default function PostWriter() {
                 toast.success("게시글이 성공적으로 업로드되었습니다!");
                 setTitle("");
                 setContent("");
+                router.replace("/"); // 업로드 후 홈으로 이동
             } else {
                 toast.error("업로드에 실패했습니다.");
             }
