@@ -85,8 +85,8 @@ export default function Comments({ postId }: Props) {
   const nestedComments = useCallback((parentId: string | null = null) => {
     if (comments.length === 0) return null;
 
-    console.log("comments", comments);
-    console.log("parentId", parentId);
+    // console.log("comments", comments);
+    // console.log("parentId", parentId);
 
     return comments
       .filter(c => c.parent === parentId)
@@ -106,10 +106,7 @@ export default function Comments({ postId }: Props) {
               </p>
               <button
                 className="text-sm text-blue-600 hover:underline mt-2"
-                onClick={() => {
-                  console.log("Reply button clicked for comment:", c._id);
-                  setOpenReplyFor(prev => (prev === c._id ? null : c._id));
-                }}
+                onClick={() => setOpenReplyFor(prev => (prev === c._id ? null : c._id))}
               >
                 Reply
               </button>
