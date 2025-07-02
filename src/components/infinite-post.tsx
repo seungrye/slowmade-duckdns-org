@@ -11,36 +11,50 @@ export default function InfinitPostList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // 1. 로딩 상태 추가
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  // 기본적으로 모든 post가 열려 있음
+  // 첫 로드 시에만 게시물을 열어두기 위한 상태
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
 
   const loadPosts = useCallback(async () => {
+    // 1. 로딩 중이거나 더 이상 게시물이 없으면 중복 실행 방지
+    if (isLoading || !hasMore) return;
+
+    setIsLoading(true);
     const res = await fetch(`/api/posts?page=${page}&limit=3`);
-    const {posts} = await res.json();
-    if (posts.length === 0) {
+    const { posts: newPosts } = await res.json();
+    setIsLoading(false);
+
+    if (newPosts.length === 0) {
       setHasMore(false);
       return;
     }
-    setPosts((prev) => [...prev, ...posts]);
-    // 새로 가져온 게시물도 열려 있도록 추가
-    setOpenedPostIds((prev) => {
-      const newSet = new Set(prev);
-      posts.forEach((post: GetPostType) => newSet.add(post._id));
-      return newSet;
-    });
+
+    setPosts((prev) => [...prev, ...newPosts]);
     setPage((prev) => prev + 1);
-  }, [page]);
 
+    // 첫 페이지 로드 시에만 모든 게시물을 열린 상태로 설정
+    if (page === 1) {
+      setOpenedPostIds(new Set(newPosts.map((post: GetPostType) => post._id)));
+    }
+  }, [page, hasMore, isLoading]);
+
+  // 2. 초기 데이터 로딩을 위한 useEffect
   useEffect(() => {
-    const currentLoader = loaderRef.current; // ← 복사본 저장
+    loadPosts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 컴포넌트 마운트 시 한 번만 실행
 
+  // 3. Intersection Observer를 위한 useEffect
+  useEffect(() => {
+    const currentLoader = loaderRef.current;
     if (!currentLoader || !hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        // 화면에 보이고, 로딩 중이 아닐 때만 다음 페이지 로드
+        if (entries[0].isIntersecting && !isLoading) {
           loadPosts();
         }
       },
@@ -50,9 +64,9 @@ export default function InfinitPostList() {
     observer.observe(currentLoader);
 
     return () => {
-      if (currentLoader) observer.unobserve(currentLoader); // ← 복사본 사용
+      if (currentLoader) observer.unobserve(currentLoader);
     };
-  }, [loadPosts, hasMore]);
+  }, [loadPosts, hasMore, isLoading]); // isLoading을 의존성에 추가
 
   const togglePost = (id: string) => {
     setOpenedPostIds((prev) => {
@@ -82,6 +96,7 @@ export default function InfinitPostList() {
                   className="text-gray-500 hover:text-gray-700 transition ps-4 cursor-pointer grow text-right"
                   type="button"
                   aria-label="토글 열기/닫기"
+                  aria-expanded={isOpen} // 5. 접근성 개선
                 >
                   <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="aspect-square w-6 h-6"/>
                 </button>
@@ -97,7 +112,9 @@ export default function InfinitPostList() {
           );
         })}
       </div>
-      {hasMore && <div ref={loaderRef} className="text-center mt-6 text-gray-400">로딩 중...</div>}
+      {/* 4. 로딩 및 더보기 상태에 따른 UI 개선 */}
+      {isLoading && <div className="text-center mt-6 text-gray-400">로딩 중...</div>}
+      {hasMore && !isLoading && <div ref={loaderRef} className="h-10" />}
     </>
   );
 }
