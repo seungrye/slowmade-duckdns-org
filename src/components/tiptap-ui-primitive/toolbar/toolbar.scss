@@ -50,7 +50,7 @@
     }
 
     @media (max-width: 480px) {
-      position: fixed;
+      position: inherit;
       top: auto;
       bottom: 0;
       height: calc(var(--tt-toolbar-height) + var(--tt-safe-area-bottom));

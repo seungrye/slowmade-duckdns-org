@@ -97,7 +97,7 @@ export default function Comments({ postId }: Props) {
           <div className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4`}>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <h3 className={`font-medium text-gray-900 dark:text-white ${manrope.className}`}>{c.author}</h3>
+                <h3 className={`font-medium text-gray-900 dark:text-white tracking-tighter ${manrope.className}`}>{c.author}</h3>
                 <span className="text-sm text-gray-500">·</span> {/* 가운데 점 */}
                 <span className="text-sm text-gray-500">
                   {new Date(c.createdAt).toLocaleString()}

@@ -6,13 +6,13 @@ import mongoose from 'mongoose';
 // 익명 ID를 base62에서 base5로 변환하는 함수
 function __anonidObfuscated(anonid: string): string {
     const charset = ['i', 'l', 'I', '|', '!']; // base-5
-  // base62 문자셋 정의
-  const base62chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  // base 문자셋 정의
+  const baseChars = '_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  // Step 1: base62 문자열 → 하나의 큰 숫자로 변환
+  // Step 1: base 문자열 → 하나의 큰 숫자로 변환
   let num = BigInt(0);
   for (const char of anonid) {
-    const value = base62chars.indexOf(char);
+    const value = baseChars.indexOf(char);
     if (value === -1) throw new Error(`Invalid nanoid char: ${char}`);
     num = num * BigInt(62) + BigInt(value);
   }
