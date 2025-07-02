@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronUp } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faComment, faThumbsUp, faThumbsDown } from '@fortawesome/free-solid-svg-icons';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Link from 'next/link';
 
@@ -98,9 +98,9 @@ export default function InfinitPostList() {
         {posts.map((post) => {
           const isOpen = openedPostIds.has(post._id);
           return (
-            <div key={post._id} className="bg-white rounded-lg shadow-sm hover:shadow-md inset-shadow-xs py-4">
-              <div className="flex items-center justify-between px-4 pb-4 border-b border-b-gray-200">
-                <Link href={`/post/view/${post._id}`} className='truncate'>
+            <div key={post._id} className="bg-white rounded-lg shadow-sm hover:shadow-md inset-shadow-xs">
+              <div className="flex items-center justify-between px-4 pt-4 pb-3">
+                <Link href={`/post/view/${post._id}`} className='truncate ' aria-label={`게시물 제목: ${post.title}`}>
                   <h3 className="text-lg font-semibold truncate">{post.title}</h3>
                 </Link>
                 <button
@@ -110,16 +110,32 @@ export default function InfinitPostList() {
                   aria-label="토글 열기/닫기"
                   aria-expanded={isOpen} // 5. 접근성 개선
                 >
-                  <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="aspect-square w-6 h-6"/>
+                  <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="aspect-square w-6 h-6" />
                 </button>
               </div>
               {isOpen && (
-                <div className="p-4 transition-all duration-300 ease-in-out">
+                <div className="p-4 transition-all duration-300 ease-in-out border-t border-t-gray-200">
                   <RichContentViewer content={post.htmlContent} />
                 </div>
               )}
-            {/* <p className="text-gray-500 text-sm">조회수 {formatNumber(post.views)} • 댓글 32</p>
-             <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link> */}
+              <div className="flex justify-between items-center px-4 py-2 text-sm text-gray-600 border-t border-t-gray-200">
+                <div className="flex items-center cursor-pointer hover:text-blue-600" onClick={() => togglePost(post._id)}>
+                  <Link href={`/post/view/${post._id}`} className="flex items-center gap-2">
+                    <FontAwesomeIcon icon={faComment} />
+                    <span>{post.comments?.length || 0}</span>
+                  </Link>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <FontAwesomeIcon icon={faThumbsUp} />
+                    <span>{post.likes || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <FontAwesomeIcon icon={faThumbsDown} />
+                    <span>{post.dislikes || 0}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           );
         })}
