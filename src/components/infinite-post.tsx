@@ -74,12 +74,13 @@ export default function InfinitPostList() {
           return (
             <div key={post._id} className="bg-white rounded-lg shadow-sm hover:shadow-md inset-shadow-xs py-4">
               <div className="flex items-center justify-between px-4 pb-4 border-b border-b-gray-200">
-                <Link href={`/post/view/${post._id}`} className='grow truncate'>
+                <Link href={`/post/view/${post._id}`} className='truncate'>
                   <h3 className="text-lg font-semibold truncate">{post.title}</h3>
                 </Link>
                 <button
                   onClick={() => togglePost(post._id)}
-                  className="text-gray-500 hover:text-gray-700 transition ps-4 cursor-pointer"
+                  className="text-gray-500 hover:text-gray-700 transition ps-4 cursor-pointer grow text-right"
+                  type="button"
                   aria-label="토글 열기/닫기"
                 >
                   <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="aspect-square w-6 h-6"/>
