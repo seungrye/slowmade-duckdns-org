@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, RefObject, useCallback, useEffect, useRef, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { CommentType } from "@/models/comment";
 import { Manrope } from 'next/font/google';
@@ -16,11 +16,12 @@ type Comment = CommentType & {
 }
 
 export default function Comments({ postId }: Props) {
-  const [openReplyFor, setOpenReplyFor] = useState<string | null>(null);
+  const [openReplyFor, setOpenReplyFor] = useState<string | null>(null); // 답글 작성 폼을 열 댓글 ID
   const [submitting, setSubmitting] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
 
   const content = useRef<HTMLTextAreaElement>(null);
+  const replyContent = useRef<HTMLTextAreaElement>(null);
 
 
   const fetchComments = useCallback(async () => {
@@ -37,7 +38,7 @@ export default function Comments({ postId }: Props) {
     if (!submitting) fetchComments();
   }, [submitting, fetchComments]);
 
-  const submitComment = useCallback(async (parentId: string | null = null) => {
+  const submitComment = useCallback(async (parentId: string | null = null, content: RefObject<HTMLTextAreaElement | null>) => {
     // 에디터에서 값 가져오기
     if (!content.current?.value.trim()) {
       return toast.error("덧글을 입력해주세요.");
@@ -55,7 +56,7 @@ export default function Comments({ postId }: Props) {
       const postData = {
         postId,
         parentId,
-        content: content.current?.value
+        content: content.current.value
       }
       const response = await fetch("/api/comments", {
         method: "POST",
@@ -71,6 +72,7 @@ export default function Comments({ postId }: Props) {
         if (content.current) {
           content.current.value = "";
         }
+        setOpenReplyFor(null); // 답글 작성 후 폼 닫기
       } else {
         toast.error("덧글 작성에 실패했습니다.");
       }
@@ -96,7 +98,7 @@ export default function Comments({ postId }: Props) {
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <h3 className={`font-medium text-gray-900 dark:text-white ${manrope.className}`}>{c.author}</h3>
-                <span className="text-sm text-gray-500">·</span>
+                <span className="text-sm text-gray-500">·</span> {/* 가운데 점 */}
                 <span className="text-sm text-gray-500">
                   {new Date(c.createdAt).toLocaleString()}
                 </span>
@@ -122,14 +124,14 @@ export default function Comments({ postId }: Props) {
                     rows={4}
                     className="min-h-20 block w-full p-3 text-sm text-gray-900 bg-gray-50 border border-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                     placeholder="Write your comment here..."
-                    ref={content}
+                    ref={replyContent} // 답글 폼 ref
                   ></textarea>
                   <button
                     type="submit"
                     className="mt-4 md:mt-0 inline-flex justify-end items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600"
-                    onClick={() => submitComment(parentId || c._id)}
+                    onClick={() => submitComment(c._id, replyContent)} // 답글 작성 시 부모 댓글 ID 전달
                     disabled={submitting}
-                  >
+                  > {/* 답글 작성 버튼 */}
                     Post comment
                   </button>
                 </form>
@@ -138,7 +140,7 @@ export default function Comments({ postId }: Props) {
           </div>
 
           {nestedComments(c._id)} {/* 대댓글 추가 UI 위치 */}
-        </Fragment>
+        </Fragment> // 단일 댓글 끝
       ));
   }, [comments, openReplyFor, submitting, submitComment]);
 
@@ -157,14 +159,11 @@ export default function Comments({ postId }: Props) {
     {/* 댓글 작성 폼 */}
     <form className="mt-4 flex flex-col md:flex-row md:items-stretch md:gap-4">
       <label htmlFor="comment" className="sr-only">Add a comment</label>
-      <textarea id="comment" rows={4} className="min-h-20 block w-full p-3 text-sm text-gray-900 bg-gray-50 border border-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white" placeholder="Write your comment here..."
-        onClick={() => setOpenReplyFor(null)}
-        ref={content}
-      ></textarea>
+      <textarea id="comment" rows={4} className="min-h-20 block w-full p-3 text-sm text-gray-900 bg-gray-50 border border-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white" placeholder="Write your comment here..." ref={content}></textarea>
       <button type="submit" className="mt-4 md:mt-0 inline-flex justify-end items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600"
-        onClick={() => submitComment()}
+        onClick={() => submitComment(null, content)} // 최상위 댓글 작성 시 부모 댓글 ID는 undefined
         disabled={submitting}
-      >
+      > {/* 최상위 댓글 작성 버튼 */}
 
         Post comment
       </button>
