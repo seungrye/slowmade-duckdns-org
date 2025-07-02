@@ -31,7 +31,16 @@ export default function InfinitPostList() {
       return;
     }
 
-    setPosts((prev) => [...prev, ...newPosts]);
+    // 기존 게시물은 최신 정보로 업데이트하고, 새 게시물은 추가합니다.
+    // 이 방식은 데이터의 최신 상태를 유지하면서 'key' 중복 오류를 방지하는 가장 안정적인 방법입니다.
+    setPosts((prev) => {
+      const postsMap = new Map(prev.map(p => [p._id, p]));
+      newPosts.forEach((post: GetPostType) => {
+        postsMap.set(post._id, post);
+      });
+      // Map의 순서를 유지하면서 배열로 변환합니다.
+      return Array.from(postsMap.values());
+    });
     setPage((prev) => prev + 1);
 
     // 첫 페이지 로드 시에만 모든 게시물을 열린 상태로 설정
@@ -42,7 +51,10 @@ export default function InfinitPostList() {
 
   // 2. 초기 데이터 로딩을 위한 useEffect
   useEffect(() => {
-    loadPosts();
+    // 뒤로가기 등으로 컴포넌트가 다시 마운트될 때, posts가 이미 있다면 초기 로딩을 건너뜁니다.
+    if (posts.length === 0) {
+      loadPosts();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 컴포넌트 마운트 시 한 번만 실행
 
