@@ -122,7 +122,7 @@ export default function InfinitPostList() {
                 <div className="flex items-center cursor-pointer hover:text-blue-600" onClick={() => togglePost(post._id)}>
                   <Link href={`/post/view/${post._id}`} className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faComment} />
-                    <span>{post.comments?.length || 0}</span>
+                    <span>{post.commentCount || 0}</span>
                   </Link>
                 </div>
                 <div className="flex items-center gap-4">

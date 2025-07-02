@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   console.assert(parseResult.success, `Invalid sort option: ${rawSort}. Expected one of: latest, popular, commented.`);
   const order = parseResult.data;
 
-  const withComments = false;
+  const withComments = true;
 
   const posts = await getPaginatedPosts(page, limit, order, email, withComments);
   return NextResponse.json(posts);

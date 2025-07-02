@@ -42,9 +42,14 @@ async function fetchLatestPosts(params: SetPostQuery): Promise<{
             },
           },
           {
+            $addFields: {
+              ...(withComments && { commentCount: { $size: "$comments" } }),
+            },
+          },
+          {
             $project: {
               jsonContent: 0,
-              ...(withComments ? {} : { comments: 0 }),
+              comments: 0,
             },
           }
         ],
@@ -104,9 +109,14 @@ async function fetchPopularPosts(params: SetPostQuery): Promise<{
             },
           },
           {
+            $addFields: {
+              ...(withComments && { commentCount: { $size: "$comments" } }),
+            },
+          },
+          {
             $project: {
               jsonContent: 0,
-              ...(withComments ? {} : { comments: 0 }),
+              comments: 0,
             },
           }
         ],
@@ -132,7 +142,7 @@ async function fetchMostCommentedPosts(params: SetPostQuery): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
-  const { userEmail, query, withComments, page = 1, limit = 12 } = params;
+  const { userEmail, query, page = 1, limit = 12 } = params;
 
   const match: PipelineStage.Match = {
     $match: {},
@@ -175,7 +185,7 @@ async function fetchMostCommentedPosts(params: SetPostQuery): Promise<{
           {
             $project: {
               jsonContent: 0,
-              ...(withComments ? {} : { comments: 0 }),
+              comments: 0,
             },
           }
         ],
