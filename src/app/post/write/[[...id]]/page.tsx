@@ -105,7 +105,7 @@ export default function PostWriter() {
                 className='w-full p-3'
             />
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-[600px] rich-web-editor-wrapper">
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-5/6 rich-web-editor-wrapper">
             <RichWebEditor ref={editorRef} />
         </div>
         <div className="flex justify-end mt-4">

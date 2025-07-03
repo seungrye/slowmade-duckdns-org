@@ -3,6 +3,7 @@ import '@/app/post/view/[[...id]]/page.css';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Comments from '@/components/comments';
 import { getPost, updatePostViews } from '@/lib/posts';
+import LikeHateSection from './like-hate.section';
 
 type Params = Promise<{ id: string[] }>
 // type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
@@ -18,7 +19,7 @@ export default async function PostViewier(props: {
 
     const { post } = await getPost(_id) || { post: null };
     if (post) await updatePostViews(_id);
-    const { htmlContent, title } = post || { htmlContent: '', title: '' };
+    const { htmlContent, title, likes, dislikes } = post || { htmlContent: '', title: '', likes: 0, dislikes: 0 };
 
     return (<div className='mx-auto px-4 py-6'>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
@@ -26,10 +27,12 @@ export default async function PostViewier(props: {
                 {title}
             </div>
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[600px] upload-editor-wrapper">
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[600px] rich-web-editor-wrapper">
             <div className="p-4 transition-all duration-300 ease-in-out">
                 <RichContentViewer content={htmlContent} />
             </div>
+
+            <LikeHateSection defaultLikes={likes} defaultDislikes={dislikes} _id={_id} />
         </div>
 
         <div className="mt-6">
