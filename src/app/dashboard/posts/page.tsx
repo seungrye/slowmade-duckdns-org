@@ -20,7 +20,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
   const page = parseInt(params.page as string) || 1; // 쿼리 파라미터에서 page 값 가져오기
   const pageSize = parseInt(params.pageSize as string) || 12; // 페이지당 게시글 수
 
-  const { total, posts } = await myPosts(session?.user.email, sortOption, page, pageSize, false); // 정렬 기준에 따라 게시글 불러오기
+  const { total, posts } = await myPosts(session?.user.email, sortOption, page, pageSize, true); // 정렬 기준에 따라 게시글 불러오기
 
   const endPage = Math.ceil(total / pageSize); // 전체 페이지 수 계산
 
@@ -55,7 +55,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
                 )}
               </div>
               <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
-              <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.comments?.length || '0'}</p>
+              <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
               <Link href={`/post/write/${post._id}`} className="text-blue-500 mt-2 block me-2">수정 →</Link>
             </div>
           ))
