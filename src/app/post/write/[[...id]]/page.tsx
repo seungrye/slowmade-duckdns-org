@@ -27,7 +27,6 @@ export default function PostWriter() {
                 const res = await fetch(`/api/post?_id=${_id}`);
                 const { jsonContent, title, urls } = await res.json();
                 if (jsonContent) {
-                    console.log("Post loaded:", { jsonContent, title, urls });
                     // 에디터에 내용 설정
                     console.assert(typeof jsonContent !== 'undefined', "jsonContent should not be undefined");
                     console.assert(typeof title === 'string', "jsonContent should be a string");

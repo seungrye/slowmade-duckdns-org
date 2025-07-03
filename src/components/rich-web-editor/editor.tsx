@@ -346,7 +346,6 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             uploadImageUrls: uploadedImageUrlsRef.current,
         }),
         setContent: (content: HTMLContent, uploadImageUrls?: UploadImageUrl[]) => {
-            console.log("Setting content in RichWebEditor:", { content, uploadImageUrls });
             if (!editor) return console.warn("Editor is not initialized");
             uploadedImageUrlsRef.current = uploadImageUrls || [];
             editor?.commands.setContent(content)
