@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronUp, faComment, faThumbsUp, faThumbsDown } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faComment, faThumbsUp, faThumbsDown, faEye } from '@fortawesome/free-solid-svg-icons';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Link from 'next/link';
 
@@ -133,6 +133,10 @@ export default function InfinitPostList() {
                   <div className="flex items-center gap-1.5">
                     <FontAwesomeIcon icon={faThumbsDown} />
                     <span>{post.dislikes || 0}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <FontAwesomeIcon icon={faEye} />
+                    <span>{post.views || 0}</span>
                   </div>
                 </div>
               </div>
