@@ -15,7 +15,6 @@ export default function PostWriter() {
     const params = useParams(); // 예: { id: '123' }
 
     const editorRef = useRef<RichWebEditorHandle>(null);
-    const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -26,9 +25,16 @@ export default function PostWriter() {
         const loadPost = async (_id: string) => {
             try {
                 const res = await fetch(`/api/post?_id=${_id}`);
-                const { jsonContent, title } = await res.json();
+                const { jsonContent, title, urls } = await res.json();
                 if (jsonContent) {
-                    editorRef.current?.setContent(jsonContent);
+                    console.log("Post loaded:", { jsonContent, title, urls });
+                    // 에디터에 내용 설정
+                    console.assert(typeof jsonContent !== 'undefined', "jsonContent should not be undefined");
+                    console.assert(typeof title === 'string', "jsonContent should be a string");
+                    console.assert(Array.isArray(urls), "urls should be an array");
+                    console.assert(typeof title === 'string', "title should be a string");
+                    console.assert(editorRef.current, "editorRef.current should not be null");
+                    editorRef.current?.setContent(jsonContent, urls);
                     setTitle(title);
                 } else {
                     toast.error("게시글을 불러오는 데 실패했습니다.");
@@ -40,7 +46,7 @@ export default function PostWriter() {
         };
 
         loadPost(params.id as string);
-    }, [params.id, content]);
+    }, [params.id]);
 
     const handleSubmit = async () => {
         // 에디터에서 값 가져오기
@@ -76,8 +82,6 @@ export default function PostWriter() {
 
             if (response.ok) {
                 toast.success("게시글이 성공적으로 업로드되었습니다!");
-                setTitle("");
-                setContent("");
                 router.replace("/"); // 업로드 후 홈으로 이동
             } else {
                 toast.error("업로드에 실패했습니다.");

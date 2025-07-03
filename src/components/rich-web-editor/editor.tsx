@@ -212,7 +212,7 @@ export interface RichWebEditorHandle {
         htmlContent: HTMLContent | undefined,
         uploadImageUrls: UploadImageUrl[]
     };
-    setContent: (content: HTMLContent) => void;
+    setContent: (content: HTMLContent, uploadImageUrls?: UploadImageUrl[]) => void;
 }
 
 export interface UploadImageUrl {
@@ -345,7 +345,10 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             htmlContent: editor?.getHTML(),
             uploadImageUrls: uploadedImageUrlsRef.current,
         }),
-        setContent: (content: HTMLContent) => {
+        setContent: (content: HTMLContent, uploadImageUrls?: UploadImageUrl[]) => {
+            console.log("Setting content in RichWebEditor:", { content, uploadImageUrls });
+            if (!editor) return console.warn("Editor is not initialized");
+            uploadedImageUrlsRef.current = uploadImageUrls || [];
             editor?.commands.setContent(content)
         },
     }), [editor])
