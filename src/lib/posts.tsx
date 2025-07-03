@@ -324,3 +324,12 @@ export async function getPost(_id: string): Promise<{ post: GetPostType; } | nul
     return null;
   }
 }
+
+export async function updatePostViews(_id: string): Promise<void> {
+  try {
+    await connectToDB();
+    await Post.findByIdAndUpdate(_id, { $inc: { views: 1 } }, { new: true });
+  } catch (error) {
+    console.error("Error on <updatePostViews>", error);
+  }
+}

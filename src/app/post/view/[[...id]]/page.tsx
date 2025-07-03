@@ -2,7 +2,7 @@
 import '@/app/post/view/[[...id]]/page.css';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Comments from '@/components/comments';
-import { getPost } from '@/lib/posts';
+import { getPost, updatePostViews } from '@/lib/posts';
 
 type Params = Promise<{ id: string[] }>
 // type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
@@ -10,13 +10,14 @@ type Params = Promise<{ id: string[] }>
 export default async function PostViewier(props: {
     params: Params
     // searchParams: SearchParams
-  }) {
+}) {
     const params = await props.params
     // const searchParams = await props.searchParams
     const _id = params.id?.[0]
     // const query = searchParams.query
 
-    const { post } = await getPost(_id) || { post: null };    
+    const { post } = await getPost(_id) || { post: null };
+    if (post) await updatePostViews(_id);
     const { htmlContent, title } = post || { htmlContent: '', title: '' };
 
     return (<div className='mx-auto px-4 py-6'>
@@ -32,7 +33,7 @@ export default async function PostViewier(props: {
         </div>
 
         <div className="mt-6">
-            <Comments postId={_id}/>
+            <Comments postId={_id} />
         </div>
     </div>
     );
