@@ -76,6 +76,10 @@ export default function Comments({ postId }: Props) {
           content.current.value = "";
         }
 
+        if (result.pointsGained > 0) {
+            toast(`✨ ${result.pointsGained} 포인트를 획득했습니다!`);
+        }
+
         if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
             result.unlockedAchievements.forEach((achievement: AchievementType, index: number) => {
                 setTimeout(() => {

@@ -5,7 +5,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { checkAndGrantPostCountAchievements } from "@/lib/achievements";
 import { HydratedDocument } from "mongoose";
+import User from "@/models/user";
 import { AchievementType } from "@/models/achievement";
+
+const POINTS_FOR_NEW_POST = 5;
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -31,18 +34,24 @@ export async function POST(req: Request) {
 
   try {
     let unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+    let pointsGained = 0;
 
     if (payload._id) {
       await Post.findByIdAndUpdate(payload._id, payload);
     } else {
       const newPost = new Post(payload);
       await newPost.save();
+
+      // Grant points for new post
+      await User.findOneAndUpdate({ email: payload.userEmail }, { $inc: { points: POINTS_FOR_NEW_POST } });
+      pointsGained = POINTS_FOR_NEW_POST;
+      console.log(`+${pointsGained} points granted to ${payload.userEmail} for new post.`);
+
       // 새 글 작성 후, 글 개수 관련 업적 확인
       unlockedAchievements = await checkAndGrantPostCountAchievements(payload.userEmail);
     }
 
-    // Return the unlocked achievement in the response
-    return NextResponse.json({ message: "게시글 저장 완료", unlockedAchievements }, { status: 201 });
+    return NextResponse.json({ message: "게시글 저장 완료", unlockedAchievements, pointsGained }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ message: "게시글 저장 실패", error }, { status: 500 });
   }

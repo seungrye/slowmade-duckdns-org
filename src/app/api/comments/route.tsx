@@ -8,6 +8,8 @@ import User from '@/models/user';
 import { checkAndGrantCommentCountAchievements } from '@/lib/achievements';
 import { AchievementType } from '@/models/achievement';
 
+const POINTS_FOR_NEW_COMMENT = 1;
+
 // 익명 ID를 base62에서 base5로 변환하는 함수
 function __anonidObfuscated(anonid: string): string {
     const charset = ['i', 'l', 'I', '|', '!']; // base-5
@@ -69,11 +71,18 @@ export async function POST(req: NextRequest) {
         await newComment.save();
 
         let unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+        let pointsGained = 0;
+
         if (userEmail) {
+            // Grant points for new comment
+            await User.findOneAndUpdate({ email: userEmail }, { $inc: { points: POINTS_FOR_NEW_COMMENT } });
+            pointsGained = POINTS_FOR_NEW_COMMENT;
+            console.log(`+${pointsGained} point granted to ${userEmail} for new comment.`);
+            
             unlockedAchievements = await checkAndGrantCommentCountAchievements(userEmail);
         }
 
-        return NextResponse.json({ newComment, unlockedAchievements }, { status: 201 });
+        return NextResponse.json({ newComment, unlockedAchievements, pointsGained }, { status: 201 });
     } catch (error) {
         console.error("Error creating comment:", error);
         return NextResponse.json({ message: "댓글 작성에 실패했습니다." }, { status: 500 });

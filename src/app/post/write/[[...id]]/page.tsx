@@ -91,6 +91,10 @@ export default function PostWriter() {
                 const result = await response.json();
                 toast.success(params.id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
+                if (result.pointsGained > 0) {
+                    toast(`✨ ${result.pointsGained} 포인트를 획득했습니다!`);
+                }
+
                 if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
                     result.unlockedAchievements.forEach((achievement: AchievementType, index: number) => {
                         setTimeout(() => {
