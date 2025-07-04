@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 export default function InfinitPostList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState<number>(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false); // 1. 로딩 상태 추가
   const loaderRef = useRef<HTMLDivElement>(null);
@@ -17,7 +17,7 @@ export default function InfinitPostList() {
   // 첫 로드 시에만 게시물을 열어두기 위한 상태
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
 
-  const loadPosts = useCallback(async () => {
+  const loadPosts = useCallback(async (page: number) => {
     // 1. 로딩 중이거나 더 이상 게시물이 없으면 중복 실행 방지
     if (isLoading || !hasMore) return;
 
@@ -30,7 +30,7 @@ export default function InfinitPostList() {
       setHasMore(false);
       return;
     }
-
+    
     // 기존 게시물은 최신 정보로 업데이트하고, 새 게시물은 추가합니다.
     // 이 방식은 데이터의 최신 상태를 유지하면서 'key' 중복 오류를 방지하는 가장 안정적인 방법입니다.
     setPosts((prev) => {
@@ -41,19 +41,19 @@ export default function InfinitPostList() {
       // Map의 순서를 유지하면서 배열로 변환합니다.
       return Array.from(postsMap.values());
     });
-    setPage((prev) => prev + 1);
+    setPage(page + 1);
 
     // 첫 페이지 로드 시에만 모든 게시물을 열린 상태로 설정
     if (page === 1) {
       setOpenedPostIds(new Set(newPosts.map((post: GetPostType) => post._id)));
     }
-  }, [page, hasMore, isLoading]);
+  }, [hasMore, isLoading]);
 
   // 2. 초기 데이터 로딩을 위한 useEffect
   useEffect(() => {
     // 뒤로가기 등으로 컴포넌트가 다시 마운트될 때, posts가 이미 있다면 초기 로딩을 건너뜁니다.
     if (posts.length === 0) {
-      loadPosts();
+      loadPosts(1); // 첫 페이지 로드
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 컴포넌트 마운트 시 한 번만 실행
@@ -67,7 +67,7 @@ export default function InfinitPostList() {
       (entries) => {
         // 화면에 보이고, 로딩 중이 아닐 때만 다음 페이지 로드
         if (entries[0].isIntersecting && !isLoading) {
-          loadPosts();
+          loadPosts(page);
         }
       },
       { threshold: 1 }
@@ -78,7 +78,7 @@ export default function InfinitPostList() {
     return () => {
       if (currentLoader) observer.unobserve(currentLoader);
     };
-  }, [loadPosts, hasMore, isLoading]); // isLoading을 의존성에 추가
+  }, [loadPosts, hasMore, isLoading, page]); // isLoading을 의존성에 추가
 
   const togglePost = (id: string) => {
     setOpenedPostIds((prev) => {
