@@ -13,6 +13,7 @@ const UserSchema = new mongoose.Schema(
     profileImage: { type: String }, // 프로필 이미지 URL
     providers: { type: [String], default: [] }, // 소셜 로그인 제공자 (ex. google, kakao)
     achievements: { type: [UserAchievementSchema], default: [] },
+    points: { type: Number, default: 0 }, // 사용자 포인트
     createdAt: { type: Date, default: Date.now }, // 가입일
   },
   { timestamps: true }

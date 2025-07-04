@@ -24,6 +24,7 @@ type AchievementDefinition = {
   name: string;
   description: string;
   icon: string;
+  points: number;
 };
 
 // Predefined achievements
@@ -33,102 +34,119 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
     name: '첫 글 작성',
     description: '첫 번째 유머 글을 작성하여 커뮤니티에 기여했습니다.',
     icon: 'FaPencilAlt',
+    points: 10,
   },
   POST_COUNT_10: {
     key: 'POST_COUNT_10',
     name: '성실한 작가',
     description: '게시글을 10개 작성했습니다.',
     icon: 'FaPencilAlt',
+    points: 20,
   },
   POST_COUNT_50: {
     key: 'POST_COUNT_50',
     name: '열정적인 작가',
     description: '게시글을 50개 작성했습니다.',
     icon: 'FaAward',
+    points: 50,
   },
   POST_COUNT_100: {
     key: 'POST_COUNT_100',
     name: '꾸준한 작가',
     description: '게시글을 100개 작성했습니다.',
     icon: 'FaAward',
+    points: 100,
   },
   POST_COUNT_250: {
     key: 'POST_COUNT_250',
     name: '성실한 기고가',
     description: '게시글을 250개 작성했습니다.',
     icon: 'FaAward',
+    points: 250,
   },
   POST_COUNT_500: {
     key: 'POST_COUNT_500',
     name: '커뮤니티의 기둥',
     description: '게시글을 500개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 500,
   },
   POST_COUNT_1000: {
     key: 'POST_COUNT_1000',
     name: '지식의 대가',
     description: '게시글을 1,000개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 1000,
   },
   POST_COUNT_2500: {
     key: 'POST_COUNT_2500',
     name: '살아있는 전설',
     description: '게시글을 2,500개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 2500,
   },
   POST_COUNT_5000: {
     key: 'POST_COUNT_5000',
     name: '명예의 전당',
     description: '게시글을 5,000개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 5000,
   },
   POST_COUNT_10000: {
     key: 'POST_COUNT_10000',
     name: '사이트의 신',
     description: '게시글을 10,000개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 10000,
   },
   FIRST_COMMENT: {
     key: 'FIRST_COMMENT',
     name: '첫 댓글 작성',
     description: '다른 사람의 글에 처음으로 댓글을 달아 소통을 시작했습니다.',
     icon: 'FaComment',
+    points: 5,
   },
   COMMENT_COUNT_10: {
     key: 'COMMENT_COUNT_10',
     name: '수다쟁이',
     description: '댓글을 10개 작성했습니다.',
     icon: 'FaComment',
+    points: 10,
   },
   COMMENT_COUNT_50: {
     key: 'COMMENT_COUNT_50',
     name: '커뮤니케이터',
     description: '댓글을 50개 작성했습니다.',
     icon: 'FaComments',
+    points: 25,
   },
   COMMENT_COUNT_100: {
     key: 'COMMENT_COUNT_100',
     name: '소통의 달인',
     description: '댓글을 100개 작성했습니다.',
     icon: 'FaComments',
+    points: 50,
   },
   COMMENT_COUNT_250: {
     key: 'COMMENT_COUNT_250',
     name: '프로 참견러',
     description: '댓글을 250개 작성했습니다.',
     icon: 'FaComments',
+    points: 125,
   },
   COMMENT_COUNT_500: {
     key: 'COMMENT_COUNT_500',
     name: '커뮤니티의 감초',
     description: '댓글을 500개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 250,
   },
   COMMENT_COUNT_1000: {
     key: 'COMMENT_COUNT_1000',
     name: '만물박사',
     description: '댓글을 1,000개 작성했습니다.',
     icon: 'FaTrophy',
+    points: 500,
   },
 };
 
@@ -162,8 +180,9 @@ export async function grantAchievement(userEmail: string, achievementKey: string
 
   // Grant the achievement
   user.achievements.push({ achievement: achievement._id, unlockedAt: new Date() });
+  user.points += achievement.points;
   await user.save();
-  console.log(`Achievement '${achievement.name}' granted to ${userEmail}`);
+  console.log(`Achievement '${achievement.name}' (+${achievement.points}p) granted to ${userEmail}`);
   return achievement;
 }
 

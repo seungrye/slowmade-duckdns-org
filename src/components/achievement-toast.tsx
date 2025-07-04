@@ -17,6 +17,7 @@ export const AchievementToast = ({ achievement }: AchievementToastProps) => {
       <div>
         <p className="text-sm font-semibold">업적 달성!</p>
         <h4 className="font-bold text-lg">{achievement.name}</h4>
+        <p className="text-yellow-400 font-bold text-sm mt-1">+{achievement.points} P</p>
       </div>
     </div>
   );
