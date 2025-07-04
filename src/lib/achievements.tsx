@@ -31,13 +31,13 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
 };
 
 // Grant an achievement to a user
-export async function grantAchievement(userEmail: string, achievementKey: string): Promise<boolean> {
+export async function grantAchievement(userEmail: string, achievementKey: string): Promise<HydratedDocument<AchievementType> | null> {
   await connectToDB();
 
   const achievementData = ACHIEVEMENTS[achievementKey];
   if (!achievementData) {
     console.error(`Achievement with key ${achievementKey} not defined.`);
-    return false;
+    return null;
   }
 
   const user = await User.findOne({ email: userEmail });
@@ -45,7 +45,7 @@ export async function grantAchievement(userEmail: string, achievementKey: string
 
   if (!user || !achievement) {
     console.error("User or Achievement not found");
-    return false;
+    return null;
   }
 
   // Check if the user already has this achievement
@@ -54,19 +54,18 @@ export async function grantAchievement(userEmail: string, achievementKey: string
   );
 
   if (hasAchievement) {
-    console.log(`User ${userEmail} already has the achievement '${achievement.name}'.`);
-    return false; // Already has it
+    return null; // Already has it
   }
 
   // Grant the achievement
   user.achievements.push({ achievement: achievement._id, unlockedAt: new Date() });
   await user.save();
   console.log(`Achievement '${achievement.name}' granted to ${userEmail}`);
-  return true;
+  return achievement;
 }
 
 // Check for the "First Post" achievement
-export async function checkAndGrantFirstPostAchievement(userEmail: string) {
+export async function checkAndGrantFirstPostAchievement(userEmail: string): Promise<HydratedDocument<AchievementType> | null> {
   await connectToDB();
 
   // Optimization: First, check if the user already has the achievement to avoid expensive queries.
@@ -76,7 +75,7 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string) {
   // If user doesn't exist, we can't proceed.
   if (!user) {
     console.error("User not found");
-    return;
+    return null;
   }
 
   // 2. Get the ID of the 'FIRST_POST' achievement. This is also a fast, indexed query.
@@ -88,10 +87,7 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string) {
       (ach: UserAchievementSubdocument) => ach.achievement.equals(achievementDoc._id)
     );
     // If they have it, we're done. No need to count posts.
-    if (hasAchievement) {
-      console.log(`User ${userEmail} already has the FIRST_POST achievement.`);
-      return;
-    }
+    if (hasAchievement) return null;
   }
 
   // 4. Only if the user does NOT have the achievement, count their posts.
@@ -99,8 +95,10 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string) {
 
   // 5. Grant the achievement if it's their first post.
   if (postCount === 1) {
-    await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_POST.key);
+    return await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_POST.key);
   }
+
+  return null;
 }
 
 // Get achievements for a user

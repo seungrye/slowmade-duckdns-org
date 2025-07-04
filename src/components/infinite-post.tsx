@@ -17,7 +17,7 @@ export default function InfinitPostList() {
   // 첫 로드 시에만 게시물을 열어두기 위한 상태
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
 
-  const loadPosts = useCallback(async (page: number) => {
+  const fetchPosts = useCallback(async (page: number) => {
     // 1. 로딩 중이거나 더 이상 게시물이 없으면 중복 실행 방지
     if (isLoading || !hasMore) return;
 
@@ -53,7 +53,7 @@ export default function InfinitPostList() {
   useEffect(() => {
     // 뒤로가기 등으로 컴포넌트가 다시 마운트될 때, posts가 이미 있다면 초기 로딩을 건너뜁니다.
     if (posts.length === 0) {
-      loadPosts(1); // 첫 페이지 로드
+      fetchPosts(1); // 첫 페이지 로드
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // 컴포넌트 마운트 시 한 번만 실행
@@ -67,7 +67,7 @@ export default function InfinitPostList() {
       (entries) => {
         // 화면에 보이고, 로딩 중이 아닐 때만 다음 페이지 로드
         if (entries[0].isIntersecting && !isLoading) {
-          loadPosts(page);
+          fetchPosts(page);
         }
       },
       { threshold: 1 }
@@ -78,7 +78,7 @@ export default function InfinitPostList() {
     return () => {
       if (currentLoader) observer.unobserve(currentLoader);
     };
-  }, [loadPosts, hasMore, isLoading, page]); // isLoading을 의존성에 추가
+  }, [fetchPosts, hasMore, isLoading, page]); // isLoading을 의존성에 추가
 
   const togglePost = (id: string) => {
     setOpenedPostIds((prev) => {

@@ -28,16 +28,19 @@ export async function POST(req: Request) {
   }
 
   try {
+    let unlockedAchievement = null;
+
     if (payload._id) {
       await Post.findByIdAndUpdate(payload._id, payload);
     } else {
       const newPost = new Post(payload);
       await newPost.save();
       // 새 글 작성 후, 첫 글 작성 업적 확인
-      await checkAndGrantFirstPostAchievement(payload.userEmail);
+      unlockedAchievement = await checkAndGrantFirstPostAchievement(payload.userEmail);
     }
 
-    return NextResponse.json({ message: "게시글 저장 완료" }, { status: 201 });
+    // Return the unlocked achievement in the response
+    return NextResponse.json({ message: "게시글 저장 완료", unlockedAchievement }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ message: "게시글 저장 실패", error }, { status: 500 });
   }

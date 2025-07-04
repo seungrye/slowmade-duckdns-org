@@ -8,6 +8,7 @@ import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { PostDataParams } from '@/types/api/submit.d';
+import { AchievementToast } from '@/components/achievement-toast';
 
 export default function PostWriter() {
     const { data: session } = useSession();
@@ -22,9 +23,13 @@ export default function PostWriter() {
         if (!params.id) return;
         if (!editorRef.current) return;
 
-        const loadPost = async (_id: string) => {
+        const fetchPost = async (_id: string) => {
             try {
                 const res = await fetch(`/api/post?_id=${_id}`);
+                if (!res.ok) {
+                    throw new Error("Failed to fetch post");
+                }
+
                 const { jsonContent, title, urls } = await res.json();
                 if (jsonContent) {
                     // 에디터에 내용 설정
@@ -44,10 +49,12 @@ export default function PostWriter() {
             }
         };
 
-        loadPost(params.id as string);
+        fetchPost(params.id as string);
     }, [params.id]);
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (e: React.FormEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+
         // 에디터에서 값 가져오기
         const { htmlContent, jsonContent, uploadImageUrls: urls } = editorRef.current?.getContent() || { jsonContent: null, htmlContent: null, urls: [] };
         if (!title.trim() || !jsonContent) {
@@ -80,8 +87,27 @@ export default function PostWriter() {
             });
 
             if (response.ok) {
-                toast.success("게시글이 성공적으로 업로드되었습니다!");
-                router.replace("/"); // 업로드 후 홈으로 이동
+                toast.success(params._id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
+
+                // 업적 부여 로직 추가
+                const result = await response.json();
+                if (result.unlockedAchievement) {
+                    const achievement = result.unlockedAchievement;
+                    console.log("Unlocked Achievement:", achievement);
+                    toast.custom(
+                        (t) => (
+                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} transition-all duration-300`}>
+                                <AchievementToast achievement={achievement} />
+                            </div>
+                        ),
+                        { duration: 4000 }
+                    );
+                }
+
+                setTimeout(() => {
+                    router.replace("/"); // 홈으로 이동
+                    router.refresh(); // 페이지 새로고침
+                }, 1000);
             } else {
                 toast.error("업로드에 실패했습니다.");
             }

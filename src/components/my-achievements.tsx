@@ -2,15 +2,8 @@
 
 import { UserAchievementType } from "../types/achievements.d";
 import { useEffect, useState } from "react";
-import { type IconType } from "react-icons";
-import { FaAward, FaPencilAlt } from "react-icons/fa"; // 예시 아이콘
-
-// 데이터베이스의 아이콘 키와 실제 아이콘 컴포넌트를 매핑합니다.
-const iconMap: { [key: string]: IconType } = {
-  FaPencilAlt: FaPencilAlt,
-  FaAward: FaAward,
-  // 다른 아이콘들을 여기에 추가할 수 있습니다.
-};
+import { FaAward } from "react-icons/fa";
+import { achievementIconMap } from "./icons";
 
 export default function MyAchievements() {
   const [achievements, setAchievements] = useState<UserAchievementType[]>([]);
@@ -45,7 +38,7 @@ export default function MyAchievements() {
       {achievements.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-4">
           {achievements.map(({ achievement, unlockedAt }) => {
-            const IconComponent = iconMap[achievement.icon] || FaAward;
+            const IconComponent = achievementIconMap[achievement.icon] || FaAward;
             return (
               <div key={achievement._id} className="bg-white rounded-lg shadow-sm inset-shadow-xs p-4 flex items-center gap-4 border border-gray-200">
                 <div className="text-yellow-500">

@@ -15,7 +15,7 @@ export default function MyHumorList() {
     const [page, setPage] = useState(1);
     const [endPage, setEndPage] = useState(0);
 
-    const loadPosts = useCallback(async (page: number) => {
+    const fetchPosts = useCallback(async (page: number) => {
         const res = await fetch(`/api/posts?page=${page}&limit=${pageSize}&email=${session?.user?.email || ''}`);
         const { total, posts } = await res.json();
         console.assert(posts.length > 0, "No posts found for the current page");
@@ -25,8 +25,8 @@ export default function MyHumorList() {
     }, [session?.user?.email]);
 
     useEffect(() => {
-        loadPosts(page);
-    }, [loadPosts, page]);
+        fetchPosts(page);
+    }, [fetchPosts, page]);
 
     if (status === "loading") { return <></>; }
 
