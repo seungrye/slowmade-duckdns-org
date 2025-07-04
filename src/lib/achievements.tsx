@@ -87,7 +87,10 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string): Prom
       (ach: UserAchievementSubdocument) => ach.achievement.equals(achievementDoc._id)
     );
     // If they have it, we're done. No need to count posts.
-    if (hasAchievement) return null;
+    if (hasAchievement) {
+      console.log(`User ${userEmail} already has the FIRST_POST achievement.`);
+      return null;
+    }
   }
 
   // 4. Only if the user does NOT have the achievement, count their posts.

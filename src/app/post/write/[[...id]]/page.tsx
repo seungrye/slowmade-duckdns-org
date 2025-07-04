@@ -89,26 +89,8 @@ export default function PostWriter() {
             if (response.ok) {
                 toast.success(params._id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
-                // 업적 부여 로직 추가
-                const result = await response.json();
-                console.log("Response:", result);
-                if (result.unlockedAchievement) {
-                    const achievement = result.unlockedAchievement;
-                    console.log("Unlocked Achievement:", achievement);
-                    toast.custom(
-                        (t) => (
-                            <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} transition-all duration-300`}>
-                                <AchievementToast achievement={achievement} />
-                            </div>
-                        ),
-                        { duration: 4000 }
-                    );
-                }
-
-                setTimeout(() => {
-                    router.replace("/"); // 홈으로 이동
-                    router.refresh(); // 페이지 새로고침
-                }, 5000);
+                router.replace("/"); // 홈으로 이동
+                router.refresh(); // 페이지 새로고침
             } else {
                 toast.error("업로드에 실패했습니다.");
             }
