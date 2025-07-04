@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../auth/[...nextauth]/authOptions";
 import Comment from '@/models/comment';
 import { connectToDB } from '@/lib/db';
 import mongoose from 'mongoose';
+import User from '@/models/user';
+import { checkAndGrantFirstCommentAchievement } from '@/lib/achievements';
 
 // 익명 ID를 base62에서 base5로 변환하는 함수
 function __anonidObfuscated(anonid: string): string {
@@ -30,25 +34,53 @@ function __anonidObfuscated(anonid: string): string {
 }
 
 export async function POST(req: NextRequest) {
+    const session = await getServerSession(authOptions);
     const { postId, parentId = null, content, anonid } = await req.json();
-    const author = __anonidObfuscated(anonid);
+
+    if (!content) {
+        return NextResponse.json({ message: "댓글 내용이 없습니다." }, { status: 400 });
+    }
 
     await connectToDB();
 
-    const newComment = await Comment.create({
-        post: postId,
-        author: author,
-        authorId: null,
-        parent: parentId,
-        content,
-    });
+    let author;
+    let authorId = null;
+    let userEmail = null;
 
-    return NextResponse.json(newComment, { status: 201 });
+    if (session && session.user) {
+        author = session.user.name || "accounted user";
+        userEmail = session.user.email;
+        const user = await User.findOne({ email: userEmail });
+        if (user) authorId = user._id;
+    } else {
+        author = __anonidObfuscated(anonid);
+    }
+
+    try {
+        const newComment = new Comment({
+            post: postId,
+            parent: parentId,
+            content,
+            author,
+            authorId,
+        });
+
+        await newComment.save();
+
+        let unlockedAchievement = null;
+        if (userEmail) {
+            // Check for first comment achievement only for logged-in users
+            unlockedAchievement = await checkAndGrantFirstCommentAchievement(userEmail);
+        }
+
+        return NextResponse.json({ newComment, unlockedAchievement }, { status: 201 });
+    } catch (error) {
+        console.error("Error creating comment:", error);
+        return NextResponse.json({ message: "댓글 작성에 실패했습니다." }, { status: 500 });
+    }
 }
 
-export async function GET(
-    req: NextRequest
-) {
+export async function GET(req: NextRequest) {
     const postId = req.nextUrl.searchParams.get("postId") || "";
     if (!postId) {
       return NextResponse.json({ error: "Missing postId" }, { status: 400 });

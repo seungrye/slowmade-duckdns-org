@@ -1,4 +1,4 @@
-import mongoose, { model, models } from "mongoose";
+import mongoose, { InferSchemaType, model, models } from "mongoose";
 
 const UserAchievementSchema = new mongoose.Schema({
   achievement: { type: mongoose.Schema.Types.ObjectId, ref: 'Achievement', required: true },
@@ -18,4 +18,8 @@ const UserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default models.User || model("User", UserSchema);
+export type UserType = InferSchemaType<typeof UserSchema> & {
+  _id: string;
+};
+
+export default models.User || model<UserType>("User", UserSchema);

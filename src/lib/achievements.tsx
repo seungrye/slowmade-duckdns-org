@@ -5,6 +5,7 @@ import User from "@/models/user";
 import Post from "@/models/post";
 import { UserAchievementType } from "@/types/achievements.d";
 import { AchievementType } from "@/models/achievement";
+import Comment from "@/models/comment";
 
 // Mongoose subdocument type for clarity
 type UserAchievementSubdocument = {
@@ -26,6 +27,12 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
     name: '첫 글 작성',
     description: '첫 번째 유머 글을 작성하여 커뮤니티에 기여했습니다.',
     icon: 'FaPencilAlt',
+  },
+  FIRST_COMMENT: {
+    key: 'FIRST_COMMENT',
+    name: '첫 댓글 작성',
+    description: '다른 사람의 글에 처음으로 댓글을 달아 소통을 시작했습니다.',
+    icon: 'FaComment',
   },
   // ... 여기에 다른 업적들을 추가할 수 있습니다.
 };
@@ -98,6 +105,41 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string): Prom
   // 5. Grant the achievement if it's their first post.
   if (postCount === 1) {
     return await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_POST.key);
+  }
+
+  return null;
+}
+
+// Check for the "First Comment" achievement
+export async function checkAndGrantFirstCommentAchievement(userEmail: string): Promise<HydratedDocument<AchievementType> | null> {
+  await connectToDB();
+
+  // 1. Find the user and their achievements.
+  const user = await User.findOne({ email: userEmail }, '_id achievements').lean<{ _id: mongoose.Types.ObjectId; achievements: UserAchievementSubdocument[] }>();
+
+  if (!user) {
+    console.error("User not found for first comment check");
+    return null;
+  }
+
+  // 2. Get the ID of the 'FIRST_COMMENT' achievement.
+  const achievementDoc = await Achievement.findOne({ key: ACHIEVEMENTS.FIRST_COMMENT.key }, '_id').lean<{ _id: mongoose.Types.ObjectId }>();
+
+  // 3. If the achievement exists in the DB, check if the user already has it.
+  if (achievementDoc && user.achievements) {
+    const hasAchievement = user.achievements.some((ach) => ach.achievement.equals(achievementDoc._id));
+    if (hasAchievement) {
+      console.log(`User ${userEmail} already has the FIRST_COMMENT achievement.`);
+      return null;
+    }
+  }
+
+  // 4. Only if the user does NOT have the achievement, count their comments.
+  const commentCount = await Comment.countDocuments({ authorId: user._id });
+
+  // 5. Grant the achievement if it's their first comment.
+  if (commentCount === 1) {
+    return await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_COMMENT.key);
   }
 
   return null;
