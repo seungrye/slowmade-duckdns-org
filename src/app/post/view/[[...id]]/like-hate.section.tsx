@@ -35,7 +35,6 @@ export default function LikeHateSection({
 
             console.assert(response.ok, "Response should be ok");
             const { likes, dislikes } = await response.json();
-            console.log("Like/Dislike updated:", { likes, dislikes });
 
             setLikes(likes);
             setDislikes(dislikes);
