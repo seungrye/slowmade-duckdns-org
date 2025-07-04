@@ -8,6 +8,7 @@ import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { PostDataParams } from '@/types/api/submit.d';
+import { AchievementType } from '@/models/achievement';
 import { AchievementToast } from '@/components/achievement-toast';
 
 export default function PostWriter() {
@@ -87,10 +88,22 @@ export default function PostWriter() {
             });
 
             if (response.ok) {
-                toast.success(params._id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
+                const result = await response.json();
+                toast.success(params.id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
-                router.replace("/"); // 홈으로 이동
-                router.refresh(); // 페이지 새로고침
+                if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
+                    result.unlockedAchievements.forEach((achievement: AchievementType, index: number) => {
+                        setTimeout(() => {
+                            toast.custom((t) => (
+                                <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} transition-all duration-300`}>
+                                    <AchievementToast achievement={achievement} />
+                                </div>
+                            ), { duration: 4000, id: achievement._id });
+                        }, index * 500); // 0.5초 간격으로 토스트 표시
+                    });
+                }
+
+                setTimeout(() => router.push("/"), 1000); // 1초 후 홈으로 이동
             } else {
                 toast.error("업로드에 실패했습니다.");
             }

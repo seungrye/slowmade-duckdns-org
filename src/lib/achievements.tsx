@@ -6,10 +6,16 @@ import Post from "@/models/post";
 import { UserAchievementType } from "@/types/achievements.d";
 import { AchievementType } from "@/models/achievement";
 import Comment from "@/models/comment";
-
+ 
 // Mongoose subdocument type for clarity
 type UserAchievementSubdocument = {
   achievement: mongoose.Types.ObjectId;
+  unlockedAt: Date;
+};
+
+// The type for a subdocument after population, used across functions
+type PopulatedUserAchievement = {
+  achievement: HydratedDocument<AchievementType>;
   unlockedAt: Date;
 };
 
@@ -28,13 +34,66 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
     description: '첫 번째 유머 글을 작성하여 커뮤니티에 기여했습니다.',
     icon: 'FaPencilAlt',
   },
+  POST_COUNT_10: {
+    key: 'POST_COUNT_10',
+    name: '성실한 작가',
+    description: '게시글을 10개 작성했습니다.',
+    icon: 'FaPencilAlt',
+  },
+  POST_COUNT_50: {
+    key: 'POST_COUNT_50',
+    name: '열정적인 작가',
+    description: '게시글을 50개 작성했습니다.',
+    icon: 'FaAward',
+  },
+  POST_COUNT_100: {
+    key: 'POST_COUNT_100',
+    name: '꾸준한 작가',
+    description: '게시글을 100개 작성했습니다.',
+    icon: 'FaAward',
+  },
+  POST_COUNT_250: {
+    key: 'POST_COUNT_250',
+    name: '성실한 기고가',
+    description: '게시글을 250개 작성했습니다.',
+    icon: 'FaAward',
+  },
+  POST_COUNT_500: {
+    key: 'POST_COUNT_500',
+    name: '커뮤니티의 기둥',
+    description: '게시글을 500개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
+  POST_COUNT_1000: {
+    key: 'POST_COUNT_1000',
+    name: '지식의 대가',
+    description: '게시글을 1,000개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
+  POST_COUNT_2500: {
+    key: 'POST_COUNT_2500',
+    name: '살아있는 전설',
+    description: '게시글을 2,500개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
+  POST_COUNT_5000: {
+    key: 'POST_COUNT_5000',
+    name: '명예의 전당',
+    description: '게시글을 5,000개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
+  POST_COUNT_10000: {
+    key: 'POST_COUNT_10000',
+    name: '사이트의 신',
+    description: '게시글을 10,000개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
   FIRST_COMMENT: {
     key: 'FIRST_COMMENT',
     name: '첫 댓글 작성',
     description: '다른 사람의 글에 처음으로 댓글을 달아 소통을 시작했습니다.',
     icon: 'FaComment',
   },
-  // ... 여기에 다른 업적들을 추가할 수 있습니다.
 };
 
 // Grant an achievement to a user
@@ -72,42 +131,46 @@ export async function grantAchievement(userEmail: string, achievementKey: string
   return achievement;
 }
 
-// Check for the "First Post" achievement
-export async function checkAndGrantFirstPostAchievement(userEmail: string): Promise<HydratedDocument<AchievementType> | null> {
+/**
+ * Checks and grants achievements based on the number of posts.
+ * @param userEmail The email of the user.
+ * @returns An array of newly unlocked achievements.
+ */
+export async function checkAndGrantPostCountAchievements(userEmail: string): Promise<HydratedDocument<AchievementType>[]> {
   await connectToDB();
 
-  // Optimization: First, check if the user already has the achievement to avoid expensive queries.
-  // 1. Find the user's achievements array. .lean() makes it a fast, read-only query.
-  const user = await User.findOne({ email: userEmail }, 'achievements').lean<{ achievements: UserAchievementSubdocument[] }>();
+  const postCount = await Post.countDocuments({ userEmail });
+  const user = await User.findOne({ email: userEmail }).populate('achievements.achievement');
 
-  // If user doesn't exist, we can't proceed.
   if (!user) {
-    console.error("User not found");
-    return null;
+    console.error(`User not found: ${userEmail}`);
+    return [];
   }
 
-  // 2. Get the ID of the 'FIRST_POST' achievement. This is also a fast, indexed query.
-  const achievementDoc = await Achievement.findOne({ key: ACHIEVEMENTS.FIRST_POST.key }, '_id').lean<{ _id: mongoose.Types.ObjectId }>();
+  const unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+  const userAchievementKeys = new Set(user.achievements.map((ach: PopulatedUserAchievement) => ach.achievement.key));
 
-  // 3. If the achievement exists in the DB, check if the user already has it.
-  if (achievementDoc && user.achievements) {
-    const hasAchievement = user.achievements.some((ach: UserAchievementSubdocument) => ach.achievement.equals(achievementDoc._id));
-    // If they have it, we're done. No need to count posts.
-    if (hasAchievement) {
-      console.log(`User ${userEmail} already has the FIRST_POST achievement.`);
-      return null;
+  const achievementChecks = [
+    { key: 'FIRST_POST', condition: postCount >= 1 },
+    { key: 'POST_COUNT_10', condition: postCount >= 10 },
+    { key: 'POST_COUNT_50', condition: postCount >= 50 },
+    { key: 'POST_COUNT_100', condition: postCount >= 100 },
+    { key: 'POST_COUNT_250', condition: postCount >= 250 },
+    { key: 'POST_COUNT_500', condition: postCount >= 500 },
+    { key: 'POST_COUNT_1000', condition: postCount >= 1000 },
+    { key: 'POST_COUNT_2500', condition: postCount >= 2500 },
+    { key: 'POST_COUNT_5000', condition: postCount >= 5000 },
+    { key: 'POST_COUNT_10000', condition: postCount >= 10000 },
+  ];
+
+  for (const check of achievementChecks) {
+    if (check.condition && !userAchievementKeys.has(check.key)) {
+      const newAchievement = await grantAchievement(userEmail, check.key);
+      if (newAchievement) unlockedAchievements.push(newAchievement);
     }
   }
 
-  // 4. Only if the user does NOT have the achievement, count their posts.
-  const postCount = await Post.countDocuments({ userEmail });
-
-  // 5. Grant the achievement if it's their first post.
-  if (postCount === 1) {
-    return await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_POST.key);
-  }
-
-  return null;
+  return unlockedAchievements;
 }
 
 // Check for the "First Comment" achievement
@@ -164,12 +227,6 @@ export async function getMyAchievements(userEmail: string): Promise<UserAchievem
     path: 'achievements.achievement',
     model: 'Achievement'
   });
-
-  // The type for a subdocument after population
-  type PopulatedUserAchievement = {
-    achievement: HydratedDocument<AchievementType>;
-    unlockedAt: Date;
-  };
 
   return populatedUser.achievements.map((ach: PopulatedUserAchievement) => ({
     achievement: ach.achievement.toObject(),
