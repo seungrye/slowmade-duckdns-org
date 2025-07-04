@@ -160,28 +160,28 @@ export async function grantAchievement(userEmail: string, achievementKey: string
     return null;
   }
 
-  const user = await User.findOne({ email: userEmail });
   const achievement = await Achievement.findOneAndUpdate({ key: achievementKey }, achievementData, { upsert: true, new: true });
 
-  if (!user || !achievement) {
-    console.error("User or Achievement not found");
+  if (!achievement) {
+    console.error(`Could not find or create achievement for key: ${achievementKey}`);
     return null;
   }
 
-  // Check if the user already has this achievement
-  const hasAchievement = user.achievements.some(
-    (userAch: UserAchievementSubdocument) => userAch.achievement.equals(achievement._id)
+  // Atomically grant the achievement and points if the user doesn't have it yet.
+  const updatedUser = await User.findOneAndUpdate(
+    { email: userEmail, 'achievements.achievement': { $ne: achievement._id } }, // Grant only if the user doesn't have it
+    {
+      $push: { achievements: { achievement: achievement._id, unlockedAt: new Date() } },
+      $inc: { points: achievement.points }
+    }
   );
 
-  if (hasAchievement) {
-    console.log(`User ${userEmail} already has the achievement '${achievement.name}'.`);
-    return null; // Already has it
+  // If updatedUser is null, it means the user already had the achievement, or the user was not found.
+  if (!updatedUser) {
+    // This is expected if the achievement is already granted, so no error log is needed.
+    return null;
   }
 
-  // Grant the achievement
-  user.achievements.push({ achievement: achievement._id, unlockedAt: new Date() });
-  user.points += achievement.points;
-  await user.save();
   console.log(`Achievement '${achievement.name}' (+${achievement.points}p) granted to ${userEmail}`);
   return achievement;
 }
