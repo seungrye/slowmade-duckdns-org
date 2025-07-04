@@ -78,14 +78,21 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string) {
 // Get achievements for a user
 export async function getMyAchievements(userEmail: string): Promise<UserAchievementType[]> {
   await connectToDB();
-  const user = await User.findOne({ email: userEmail }).populate({
+
+  // 1. 먼저 사용자를 찾습니다.
+  const user = await User.findOne({ email: userEmail });
+
+  // 2. 사용자가 없거나, achievements 필드가 없거나, 비어있으면 빈 배열을 반환합니다.
+  //    이렇게 하면 데이터가 없는 오래된 사용자에 대해 populate를 시도하지 않아 오류를 방지합니다.
+  if (!user || !user.achievements || user.achievements.length === 0) {
+    return [];
+  }
+
+  // 3. achievements 필드가 있는 것이 확인된 후에 populate를 실행합니다.
+  const populatedUser = await user.populate({
     path: 'achievements.achievement',
     model: 'Achievement'
   });
-
-  if (!user || !user.achievements) {
-    return [];
-  }
 
   // The type for a subdocument after population
   type PopulatedUserAchievement = {
@@ -93,7 +100,7 @@ export async function getMyAchievements(userEmail: string): Promise<UserAchievem
     unlockedAt: Date;
   };
 
-  return user.achievements.map((ach: PopulatedUserAchievement) => ({
+  return populatedUser.achievements.map((ach: PopulatedUserAchievement) => ({
     achievement: ach.achievement.toObject(),
     unlockedAt: ach.unlockedAt.toISOString(),
   })).sort((a: UserAchievementType, b: UserAchievementType) => new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime());
