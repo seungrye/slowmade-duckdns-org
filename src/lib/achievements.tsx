@@ -54,6 +54,7 @@ export async function grantAchievement(userEmail: string, achievementKey: string
   );
 
   if (hasAchievement) {
+    console.log(`User ${userEmail} already has the achievement '${achievement.name}'.`);
     return null; // Already has it
   }
 
@@ -83,9 +84,7 @@ export async function checkAndGrantFirstPostAchievement(userEmail: string): Prom
 
   // 3. If the achievement exists in the DB, check if the user already has it.
   if (achievementDoc && user.achievements) {
-    const hasAchievement = user.achievements.some(
-      (ach: UserAchievementSubdocument) => ach.achievement.equals(achievementDoc._id)
-    );
+    const hasAchievement = user.achievements.some((ach: UserAchievementSubdocument) => ach.achievement.equals(achievementDoc._id));
     // If they have it, we're done. No need to count posts.
     if (hasAchievement) {
       console.log(`User ${userEmail} already has the FIRST_POST achievement.`);
@@ -114,6 +113,7 @@ export async function getMyAchievements(userEmail: string): Promise<UserAchievem
   // 2. 사용자가 없거나, achievements 필드가 없거나, 비어있으면 빈 배열을 반환합니다.
   //    이렇게 하면 데이터가 없는 오래된 사용자에 대해 populate를 시도하지 않아 오류를 방지합니다.
   if (!user || !user.achievements || user.achievements.length === 0) {
+    console.warn(`No achievements found for user: ${userEmail}`);
     return [];
   }
 
