@@ -54,6 +54,7 @@ export async function grantAchievement(userEmail: string, achievementKey: string
   );
 
   if (hasAchievement) {
+    console.log(`User ${userEmail} already has the achievement '${achievement.name}'.`);
     return false; // Already has it
   }
 
@@ -67,9 +68,36 @@ export async function grantAchievement(userEmail: string, achievementKey: string
 // Check for the "First Post" achievement
 export async function checkAndGrantFirstPostAchievement(userEmail: string) {
   await connectToDB();
+
+  // Optimization: First, check if the user already has the achievement to avoid expensive queries.
+  // 1. Find the user's achievements array. .lean() makes it a fast, read-only query.
+  const user = await User.findOne({ email: userEmail }, 'achievements').lean<{ achievements: UserAchievementSubdocument[] }>();
+
+  // If user doesn't exist, we can't proceed.
+  if (!user) {
+    console.error("User not found");
+    return;
+  }
+
+  // 2. Get the ID of the 'FIRST_POST' achievement. This is also a fast, indexed query.
+  const achievementDoc = await Achievement.findOne({ key: ACHIEVEMENTS.FIRST_POST.key }, '_id').lean<{ _id: mongoose.Types.ObjectId }>();
+
+  // 3. If the achievement exists in the DB, check if the user already has it.
+  if (achievementDoc && user.achievements) {
+    const hasAchievement = user.achievements.some(
+      (ach: UserAchievementSubdocument) => ach.achievement.equals(achievementDoc._id)
+    );
+    // If they have it, we're done. No need to count posts.
+    if (hasAchievement) {
+      console.log(`User ${userEmail} already has the FIRST_POST achievement.`);
+      return;
+    }
+  }
+
+  // 4. Only if the user does NOT have the achievement, count their posts.
   const postCount = await Post.countDocuments({ userEmail });
 
-  // This function is called after a new post is saved, so count should be 1 for the first post.
+  // 5. Grant the achievement if it's their first post.
   if (postCount === 1) {
     await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_POST.key);
   }

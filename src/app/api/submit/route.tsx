@@ -3,6 +3,7 @@ import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { checkAndGrantFirstPostAchievement } from "@/lib/achievements";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -32,6 +33,8 @@ export async function POST(req: Request) {
     } else {
       const newPost = new Post(payload);
       await newPost.save();
+      // 새 글 작성 후, 첫 글 작성 업적 확인
+      await checkAndGrantFirstPostAchievement(payload.userEmail);
     }
 
     return NextResponse.json({ message: "게시글 저장 완료" }, { status: 201 });
