@@ -94,6 +94,42 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
     description: '다른 사람의 글에 처음으로 댓글을 달아 소통을 시작했습니다.',
     icon: 'FaComment',
   },
+  COMMENT_COUNT_10: {
+    key: 'COMMENT_COUNT_10',
+    name: '수다쟁이',
+    description: '댓글을 10개 작성했습니다.',
+    icon: 'FaComment',
+  },
+  COMMENT_COUNT_50: {
+    key: 'COMMENT_COUNT_50',
+    name: '커뮤니케이터',
+    description: '댓글을 50개 작성했습니다.',
+    icon: 'FaComments',
+  },
+  COMMENT_COUNT_100: {
+    key: 'COMMENT_COUNT_100',
+    name: '소통의 달인',
+    description: '댓글을 100개 작성했습니다.',
+    icon: 'FaComments',
+  },
+  COMMENT_COUNT_250: {
+    key: 'COMMENT_COUNT_250',
+    name: '프로 참견러',
+    description: '댓글을 250개 작성했습니다.',
+    icon: 'FaComments',
+  },
+  COMMENT_COUNT_500: {
+    key: 'COMMENT_COUNT_500',
+    name: '커뮤니티의 감초',
+    description: '댓글을 500개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
+  COMMENT_COUNT_1000: {
+    key: 'COMMENT_COUNT_1000',
+    name: '만물박사',
+    description: '댓글을 1,000개 작성했습니다.',
+    icon: 'FaTrophy',
+  },
 };
 
 // Grant an achievement to a user
@@ -173,39 +209,44 @@ export async function checkAndGrantPostCountAchievements(userEmail: string): Pro
   return unlockedAchievements;
 }
 
-// Check for the "First Comment" achievement
-export async function checkAndGrantFirstCommentAchievement(userEmail: string): Promise<HydratedDocument<AchievementType> | null> {
+/**
+ * Checks and grants achievements based on the number of comments.
+ * @param userEmail The email of the user.
+ * @returns An array of newly unlocked achievements.
+ */
+export async function checkAndGrantCommentCountAchievements(userEmail: string): Promise<HydratedDocument<AchievementType>[]> {
   await connectToDB();
 
-  // 1. Find the user and their achievements.
-  const user = await User.findOne({ email: userEmail }, '_id achievements').lean<{ _id: mongoose.Types.ObjectId; achievements: UserAchievementSubdocument[] }>();
-
+  const user = await User.findOne({ email: userEmail }).populate('achievements.achievement');
+  
   if (!user) {
-    console.error("User not found for first comment check");
-    return null;
+    console.error(`User not found: ${userEmail}`);
+    return [];
   }
 
-  // 2. Get the ID of the 'FIRST_COMMENT' achievement.
-  const achievementDoc = await Achievement.findOne({ key: ACHIEVEMENTS.FIRST_COMMENT.key }, '_id').lean<{ _id: mongoose.Types.ObjectId }>();
+  const commentCount = await Comment.countDocuments({ authorId: user._id });
 
-  // 3. If the achievement exists in the DB, check if the user already has it.
-  if (achievementDoc && user.achievements) {
-    const hasAchievement = user.achievements.some((ach) => ach.achievement.equals(achievementDoc._id));
-    if (hasAchievement) {
-      console.log(`User ${userEmail} already has the FIRST_COMMENT achievement.`);
-      return null;
+  const unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+  const userAchievementKeys = new Set(user.achievements.map((ach: PopulatedUserAchievement) => ach.achievement.key));
+
+  const achievementChecks = [
+    { key: 'FIRST_COMMENT', condition: commentCount >= 1 },
+    { key: 'COMMENT_COUNT_10', condition: commentCount >= 10 },
+    { key: 'COMMENT_COUNT_50', condition: commentCount >= 50 },
+    { key: 'COMMENT_COUNT_100', condition: commentCount >= 100 },
+    { key: 'COMMENT_COUNT_250', condition: commentCount >= 250 },
+    { key: 'COMMENT_COUNT_500', condition: commentCount >= 500 },
+    { key: 'COMMENT_COUNT_1000', condition: commentCount >= 1000 },
+  ];
+
+  for (const check of achievementChecks) {
+    if (check.condition && !userAchievementKeys.has(check.key)) {
+      const newAchievement = await grantAchievement(userEmail, check.key);
+      if (newAchievement) unlockedAchievements.push(newAchievement);
     }
   }
 
-  // 4. Only if the user does NOT have the achievement, count their comments.
-  const commentCount = await Comment.countDocuments({ authorId: user._id });
-
-  // 5. Grant the achievement if it's their first comment.
-  if (commentCount === 1) {
-    return await grantAchievement(userEmail, ACHIEVEMENTS.FIRST_COMMENT.key);
-  }
-
-  return null;
+  return unlockedAchievements;
 }
 
 // Get achievements for a user

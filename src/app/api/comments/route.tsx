@@ -3,9 +3,10 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/authOptions";
 import Comment from '@/models/comment';
 import { connectToDB } from '@/lib/db';
-import mongoose from 'mongoose';
+import mongoose, { HydratedDocument } from 'mongoose';
 import User from '@/models/user';
-import { checkAndGrantFirstCommentAchievement } from '@/lib/achievements';
+import { checkAndGrantCommentCountAchievements } from '@/lib/achievements';
+import { AchievementType } from '@/models/achievement';
 
 // 익명 ID를 base62에서 base5로 변환하는 함수
 function __anonidObfuscated(anonid: string): string {
@@ -67,13 +68,12 @@ export async function POST(req: NextRequest) {
 
         await newComment.save();
 
-        let unlockedAchievement = null;
+        let unlockedAchievements: HydratedDocument<AchievementType>[] = [];
         if (userEmail) {
-            // Check for first comment achievement only for logged-in users
-            unlockedAchievement = await checkAndGrantFirstCommentAchievement(userEmail);
+            unlockedAchievements = await checkAndGrantCommentCountAchievements(userEmail);
         }
 
-        return NextResponse.json({ newComment, unlockedAchievement }, { status: 201 });
+        return NextResponse.json({ newComment, unlockedAchievements }, { status: 201 });
     } catch (error) {
         console.error("Error creating comment:", error);
         return NextResponse.json({ message: "댓글 작성에 실패했습니다." }, { status: 500 });

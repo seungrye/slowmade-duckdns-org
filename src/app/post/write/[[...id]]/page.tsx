@@ -115,8 +115,8 @@ export default function PostWriter() {
         }
     };
 
-    return (<div className='mx-auto px-4 py-6'>
-        <Toaster position="top-right" /> {/* ✅ 토스트 메시지 표시 위치 */}
+    return (<div className='mx-auto px-4 py-6'>        
+        <Toaster position="bottom-right" /> {/* ✅ 토스트 메시지 표시 위치 */}
 
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
             <input

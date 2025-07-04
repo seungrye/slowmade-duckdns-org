@@ -5,6 +5,8 @@ import toast, { Toaster } from "react-hot-toast";
 import { CommentType } from "@/models/comment";
 import { Manrope } from 'next/font/google';
 import { nanoid } from "nanoid";
+import { AchievementToast } from "./achievement-toast";
+import { AchievementType } from "@/models/achievement";
 
 const manrope = Manrope({ subsets: ['latin'] });
 
@@ -68,9 +70,22 @@ export default function Comments({ postId }: Props) {
       });
 
       if (response.ok) {
+        const result = await response.json();
         toast.success("덧글이 성공적으로 작성되었습니다!");
         if (content.current) {
           content.current.value = "";
+        }
+
+        if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
+            result.unlockedAchievements.forEach((achievement: AchievementType, index: number) => {
+                setTimeout(() => {
+                    toast.custom((t) => (
+                        <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} transition-all duration-300`}>
+                            <AchievementToast achievement={achievement} />
+                        </div>
+                    ), { duration: 4000, id: achievement._id });
+                }, index * 500); // 0.5초 간격으로 토스트 표시
+            });
         }
         setOpenReplyFor(null); // 답글 작성 후 폼 닫기
       } else {
