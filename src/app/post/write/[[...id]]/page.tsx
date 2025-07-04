@@ -91,6 +91,7 @@ export default function PostWriter() {
 
                 // 업적 부여 로직 추가
                 const result = await response.json();
+                console.log("Response:", result);
                 if (result.unlockedAchievement) {
                     const achievement = result.unlockedAchievement;
                     console.log("Unlocked Achievement:", achievement);
@@ -107,7 +108,7 @@ export default function PostWriter() {
                 setTimeout(() => {
                     router.replace("/"); // 홈으로 이동
                     router.refresh(); // 페이지 새로고침
-                }, 1000);
+                }, 5000);
             } else {
                 toast.error("업로드에 실패했습니다.");
             }

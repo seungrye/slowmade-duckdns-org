@@ -1,15 +1,9 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import Image from "next/image";
 import { Session } from "next-auth";
 
-export default function MyProfile() {
-    const { data: session, status }: { data: Session | null; status: string }= useSession();
-
-    if (status === "loading") {
-        return <p>Loading...</p>;
-    }
+export default function MyProfile({session}: { session: Session | null }) {
 
     if (!session) {
         return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
