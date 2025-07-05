@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
 import User from "@/models/user";
@@ -398,7 +397,7 @@ export async function deletePost(postId: string, userEmail: string): Promise<{ s
 export async function getPost(_id: string): Promise<{ post: GetPostType; } | null> {
   try {
     await connectToDB();
-    const post = await Post.findById(_id).lean();
+    const post = await Post.findById(_id);
     return { post };
   } catch (error) {
     console.error("Error on <getPost>", error);

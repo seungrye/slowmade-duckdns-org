@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Toaster } from "react-hot-toast";
 import { SortOption, isValidSortOption } from "@/lib/sort";
 import SelectSorter from "@/components/select-sorter";
 import { myPosts } from "@/lib/posts";
@@ -33,6 +34,8 @@ export default async function MyUploadsPage({ searchParams }: Props) {
 
   return (
     <main className="container mx-auto px-4 py-6">
+      <Toaster position="bottom-right" />
+
       {/* 제목 & 정렬 옵션 */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">📂 내가 올린 유머</h1>
