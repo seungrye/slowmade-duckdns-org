@@ -8,7 +8,7 @@ import { HydratedDocument } from "mongoose";
 import User from "@/models/user";
 import { AchievementType } from "@/models/achievement";
 
-const POINTS_FOR_NEW_POST = 5;
+const POINTS_FOR_NEW_POST = parseInt(process.env.POINTS_FOR_NEW_POST || '5', 10);
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);

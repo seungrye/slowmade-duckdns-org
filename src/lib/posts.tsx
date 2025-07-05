@@ -356,7 +356,7 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
 }
 
 export async function deletePost(postId: string, userEmail: string): Promise<{ success: boolean; message: string; }> {
-  const DELETE_POST_COST = 7; // 게시글 삭제에 필요한 포인트
+  const DELETE_POST_COST = parseInt(process.env.DELETE_POST_COST || '7', 10);
 
   await connectToDB();
 

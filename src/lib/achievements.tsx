@@ -1,4 +1,4 @@
-import mongoose, { HydratedDocument } from "mongoose";
+import { HydratedDocument } from "mongoose";
 import { connectToDB } from "./db";
 import Achievement from "@/models/achievement";
 import User from "@/models/user";
@@ -7,12 +7,6 @@ import { UserAchievementType } from "@/types/achievements.d";
 import { AchievementType } from "@/models/achievement";
 import Comment from "@/models/comment";
  
-// Mongoose subdocument type for clarity
-type UserAchievementSubdocument = {
-  achievement: mongoose.Types.ObjectId;
-  unlockedAt: Date;
-};
-
 // The type for a subdocument after population, used across functions
 type PopulatedUserAchievement = {
   achievement: HydratedDocument<AchievementType>;
@@ -34,119 +28,119 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
     name: '첫 글 작성',
     description: '첫 번째 유머 글을 작성하여 커뮤니티에 기여했습니다.',
     icon: 'FaPencilAlt',
-    points: 10,
+    points: parseInt(process.env.ACHIEVEMENT_FIRST_POST_POINTS || '10', 10),
   },
   POST_COUNT_10: {
     key: 'POST_COUNT_10',
     name: '성실한 작가',
     description: '게시글을 10개 작성했습니다.',
     icon: 'FaPencilAlt',
-    points: 20,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_10_POINTS || '20', 10),
   },
   POST_COUNT_50: {
     key: 'POST_COUNT_50',
     name: '열정적인 작가',
     description: '게시글을 50개 작성했습니다.',
     icon: 'FaAward',
-    points: 50,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_50_POINTS || '50', 10),
   },
   POST_COUNT_100: {
     key: 'POST_COUNT_100',
     name: '꾸준한 작가',
     description: '게시글을 100개 작성했습니다.',
     icon: 'FaAward',
-    points: 100,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_100_POINTS || '100', 10),
   },
   POST_COUNT_250: {
     key: 'POST_COUNT_250',
     name: '성실한 기고가',
     description: '게시글을 250개 작성했습니다.',
     icon: 'FaAward',
-    points: 250,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_250_POINTS || '250', 10),
   },
   POST_COUNT_500: {
     key: 'POST_COUNT_500',
     name: '커뮤니티의 기둥',
     description: '게시글을 500개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 500,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_500_POINTS || '500', 10),
   },
   POST_COUNT_1000: {
     key: 'POST_COUNT_1000',
     name: '지식의 대가',
     description: '게시글을 1,000개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 1000,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_1000_POINTS || '1000', 10),
   },
   POST_COUNT_2500: {
     key: 'POST_COUNT_2500',
     name: '살아있는 전설',
     description: '게시글을 2,500개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 2500,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_2500_POINTS || '2500', 10),
   },
   POST_COUNT_5000: {
     key: 'POST_COUNT_5000',
     name: '명예의 전당',
     description: '게시글을 5,000개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 5000,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_5000_POINTS || '5000', 10),
   },
   POST_COUNT_10000: {
     key: 'POST_COUNT_10000',
     name: '사이트의 신',
     description: '게시글을 10,000개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 10000,
+    points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_10000_POINTS || '10000', 10),
   },
   FIRST_COMMENT: {
     key: 'FIRST_COMMENT',
     name: '첫 댓글 작성',
     description: '다른 사람의 글에 처음으로 댓글을 달아 소통을 시작했습니다.',
     icon: 'FaComment',
-    points: 5,
+    points: parseInt(process.env.ACHIEVEMENT_FIRST_COMMENT_POINTS || '5', 10),
   },
   COMMENT_COUNT_10: {
     key: 'COMMENT_COUNT_10',
     name: '수다쟁이',
     description: '댓글을 10개 작성했습니다.',
     icon: 'FaComment',
-    points: 10,
+    points: parseInt(process.env.ACHIEVEMENT_COMMENT_COUNT_10_POINTS || '10', 10),
   },
   COMMENT_COUNT_50: {
     key: 'COMMENT_COUNT_50',
     name: '커뮤니케이터',
     description: '댓글을 50개 작성했습니다.',
     icon: 'FaComments',
-    points: 25,
+    points: parseInt(process.env.ACHIEVEMENT_COMMENT_COUNT_50_POINTS || '25', 10),
   },
   COMMENT_COUNT_100: {
     key: 'COMMENT_COUNT_100',
     name: '소통의 달인',
     description: '댓글을 100개 작성했습니다.',
     icon: 'FaComments',
-    points: 50,
+    points: parseInt(process.env.ACHIEVEMENT_COMMENT_COUNT_100_POINTS || '50', 10),
   },
   COMMENT_COUNT_250: {
     key: 'COMMENT_COUNT_250',
     name: '프로 참견러',
     description: '댓글을 250개 작성했습니다.',
     icon: 'FaComments',
-    points: 125,
+    points: parseInt(process.env.ACHIEVEMENT_COMMENT_COUNT_250_POINTS || '100', 10),
   },
   COMMENT_COUNT_500: {
     key: 'COMMENT_COUNT_500',
     name: '커뮤니티의 감초',
     description: '댓글을 500개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 250,
+    points: parseInt(process.env.ACHIEVEMENT_COMMENT_COUNT_500_POINTS || '250', 10),
   },
   COMMENT_COUNT_1000: {
     key: 'COMMENT_COUNT_1000',
     name: '만물박사',
     description: '댓글을 1,000개 작성했습니다.',
     icon: 'FaTrophy',
-    points: 500,
+    points: parseInt(process.env.ACHIEVEMENT_COMMENT_COUNT_1000_POINTS || '500', 10),
   },
 };
 

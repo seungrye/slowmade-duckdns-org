@@ -13,7 +13,7 @@ interface PostActionsProps {
   authorEmail: string;
 }
 
-const DELETE_POST_COST = 100; // 게시글 삭제에 필요한 포인트
+const DELETE_POST_COST = process.env.NEXT_PUBLIC_DELETE_POST_COST || 7; // 기본값을 7로 설정, 환경변수에서 가져오지 못할 경우를 대비
 
 export default function PostActions({ postId, authorEmail }: PostActionsProps) {
   const { data: session } = useSession();
