@@ -1,12 +1,10 @@
 import Link from "next/link";
-import Image from "next/image";
 import { SortOption, isValidSortOption } from "@/lib/sort";
 import SelectSorter from "@/components/select-sorter";
 import { myPosts } from "@/lib/posts";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
-import { GetPostType } from "@/types/posts.d";
-import { FaImage } from "react-icons/fa";
+import MyPostCard from "@/components/my-post-card";
 import { Props } from "@/types/my-uploads.d";
 
 export default async function MyUploadsPage({ searchParams }: Props) {
@@ -35,29 +33,8 @@ export default async function MyUploadsPage({ searchParams }: Props) {
       {/* 유머 리스트 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
         {posts.length > 0 ? (
-          posts.map((post: GetPostType) => (
-            <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4">
-              <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400">
-                {post.urls?.[0]?.thumbnailUrl ? (
-                  <Image
-                    src={post.urls[0].thumbnailUrl}
-                    alt={post.title}
-                    width={300}             // 고정 or 동적으로 조절 가능
-                    height={200}            // 고정 or 동적으로 조절 가능
-                    priority
-                    className="rounded-md object-contain w-full h-auto"
-                  />
-                ) : (
-                  <>
-                    <FaImage size={128} />
-                    <div className="text-sm mt-2">이미지가 없습니다</div>
-                  </>
-                )}
-              </div>
-              <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
-              <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
-              <Link href={`/post/write/${post._id}`} className="text-blue-500 mt-2 block me-2">수정 →</Link>
-            </div>
+          posts.map((post) => (
+            <MyPostCard key={post._id} post={post} />
           ))
         ) : (
           <p className="text-gray-500">아직 업로드한 유머가 없습니다.</p>

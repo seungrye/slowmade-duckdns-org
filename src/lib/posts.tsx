@@ -1,5 +1,8 @@
+import mongoose from "mongoose";
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
+import User from "@/models/user";
+import Comment from "@/models/comment";
 import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 import { GetPostType, SetPostQuery } from "@/types/posts.d";
@@ -313,6 +316,53 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
   return await getPaginatedPosts(page, limit, sort, userEmail, withComments);
 }
 
+export async function deletePost(postId: string, userEmail: string): Promise<{ success: boolean; message: string; }> {
+  const DELETE_POST_COST = 100; // 게시글 삭제에 필요한 포인트
+
+  await connectToDB();
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const user = await User.findOne({ email: userEmail }).session(session);
+
+    if (!user) {
+      throw new Error("사용자를 찾을 수 없습니다.");
+    }
+
+    if (user.points < DELETE_POST_COST) {
+      throw new Error(`게시글을 삭제하려면 ${DELETE_POST_COST}포인트가 필요합니다. (보유 포인트: ${user.points})`);
+    }
+
+    const post = await Post.findById(postId).session(session);
+
+    if (!post) {
+      throw new Error("게시글을 찾을 수 없습니다.");
+    }
+
+    if (post.userEmail !== userEmail) {
+      throw new Error("게시글을 삭제할 권한이 없습니다.");
+    }
+
+    // 포인트 차감 및 게시글/댓글 삭제
+    user.points -= DELETE_POST_COST;
+    await user.save({ session });
+
+    await Post.findByIdAndDelete(postId).session(session);
+    await Comment.deleteMany({ post: postId }).session(session);
+
+    await session.commitTransaction();
+    return { success: true, message: "게시글이 성공적으로 삭제되었습니다." };
+  } catch (error) {
+    await session.abortTransaction();
+    console.error("Error deleting post:", error);
+    const message = error instanceof Error ? error.message : "게시글 삭제 중 오류가 발생했습니다.";
+    return { success: false, message };
+  } finally {
+    session.endSession();
+  }
+}
 
 export async function getPost(_id: string): Promise<{ post: GetPostType; } | null> {
   try {
