@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import Modal from './common/modal';
 
 interface PostActionsProps {
   postId: string;
@@ -19,24 +20,19 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
   const { data: session } = useSession();
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isAuthor = session?.user?.email === authorEmail;
 
-  const handleDelete = async () => {
-    if (!window.confirm(`정말로 이 게시물을 삭제하시겠습니까? ${DELETE_POST_COST}포인트가 차감됩니다.`)) {
-      return;
-    }
-
+  const handleConfirmDelete = async () => {
+    setIsModalOpen(false);
     setIsDeleting(true);
     try {
-      const postData = {
-        postId,
-      }
       const response = await fetch(`/api/post`, {
         method: 'DELETE',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...postData,
+          postId,
         }),
       });
 
@@ -61,18 +57,38 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <Link href={`/post/write/${postId}`} className="text-blue-500 mt-2 block me-2 hover:text-red-700">
-        <FontAwesomeIcon icon={faEdit} className="mr-1" />
-      </Link>
+    <>
+      <div className="flex items-center gap-2">
+        <Link href={`/post/write/${postId}`} className="text-blue-500 mt-2 block me-2 hover:text-red-700" aria-label="게시글 수정">
+          <FontAwesomeIcon icon={faEdit} className="mr-1" />
+        </Link>
 
-      <span
-        onClick={handleDelete}
-        className={`text-blue-500 mt-2 block me-2 hover:text-red-700 disabled:text-red-400 disabled:cursor-not-allowed cursor-pointer ${isDeleting ? 'opacity-50' : ''}`}
-        aria-label="게시글 삭제"
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className={`text-blue-500 mt-2 block me-2 hover:text-red-700 disabled:text-red-400 disabled:cursor-not-allowed cursor-pointer ${isDeleting ? 'opacity-50' : ''}`}
+          aria-label="게시글 삭제"
+          disabled={isDeleting}
+        >
+          <FontAwesomeIcon icon={faTrash} className="mr-1" />
+        </button>
+      </div>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="게시물 삭제 확인"
       >
-        <FontAwesomeIcon icon={faTrash} className="mr-1" />
-      </span>
-    </div>
+        <div className="text-gray-700">
+          <p>정말로 이 게시물을 삭제하시겠습니까?</p>
+          <p className="text-sm text-red-600 mt-1">
+            삭제 작업은 되돌릴 수 없으며, {DELETE_POST_COST}포인트가 차감됩니다.
+          </p>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition" disabled={isDeleting}>취소</button>
+          <button onClick={handleConfirmDelete} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:bg-red-400" disabled={isDeleting}>{isDeleting ? '삭제 중...' : '삭제 확인'}</button>
+        </div>
+      </Modal>
+    </>
   );
 }
