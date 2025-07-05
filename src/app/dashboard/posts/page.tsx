@@ -1,14 +1,23 @@
 import Link from "next/link";
+import Image from "next/image";
 import { SortOption, isValidSortOption } from "@/lib/sort";
 import SelectSorter from "@/components/select-sorter";
 import { myPosts } from "@/lib/posts";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
-import MyPostCard from "@/components/my-post-card";
+import { GetPostType } from "@/types/posts.d";
+import { FaImage } from "react-icons/fa";
 import { Props } from "@/types/my-uploads.d";
+import PostActions from "@/components/post-actions";
 
 export default async function MyUploadsPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
+
+  if (!session) {
+    return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
+      <p className="text-center text-gray-500">로그인이 필요합니다.</p>
+    </section>;
+  }
 
   const params = await searchParams;
   const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
@@ -27,14 +36,35 @@ export default async function MyUploadsPage({ searchParams }: Props) {
       {/* 제목 & 정렬 옵션 */}
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">📂 내가 올린 유머</h1>
-        <SelectSorter current={sortOption}/>
+        <SelectSorter current={sortOption} />
       </div>
 
       {/* 유머 리스트 */}
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
         {posts.length > 0 ? (
-          posts.map((post) => (
-            <MyPostCard key={post._id} post={post} />
+          posts.map((post: GetPostType) => (
+            <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4">
+              <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400">
+                {post.urls?.[0]?.thumbnailUrl ? (
+                  <Image
+                    src={post.urls[0].thumbnailUrl}
+                    alt={post.title}
+                    width={300}             // 고정 or 동적으로 조절 가능
+                    height={200}            // 고정 or 동적으로 조절 가능
+                    priority
+                    className="rounded-md object-contain w-full h-auto"
+                  />
+                ) : (
+                  <>
+                    <FaImage size={128} />
+                    <div className="text-sm mt-2">이미지가 없습니다</div>
+                  </>
+                )}
+              </div>
+              <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
+              <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
+              <PostActions postId={post._id} authorEmail={post.userEmail} />
+            </div>
           ))
         ) : (
           <p className="text-gray-500">아직 업로드한 유머가 없습니다.</p>
@@ -44,12 +74,12 @@ export default async function MyUploadsPage({ searchParams }: Props) {
       <div className="flex justify-center mt-8">
         <Link className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" href={{
           pathname: page > 0 ? "/dashboard/posts" : "#",
-          query: {...params, page: page > 1 ? page - 1 : page}
+          query: { ...params, page: page > 1 ? page - 1 : page }
         }}>◀ 이전</Link>
         <span className="px-4 py-2 bg-gray-100">{page} / {endPage}</span>
         <Link className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" href={{
           pathname: page < endPage ? "/dashboard/posts" : "#",
-          query: {...params, page: endPage > page ? page + 1 : page}
+          query: { ...params, page: endPage > page ? page + 1 : page }
         }}>다음 ▶</Link>
       </div>
     </main>

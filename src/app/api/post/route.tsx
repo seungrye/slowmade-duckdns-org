@@ -1,6 +1,8 @@
 // app/api/post/route.ts
-import { getPost } from '@/lib/posts';
-import { NextResponse } from 'next/server';
+import { deletePost, getPost } from '@/lib/posts';
+import { getServerSession } from 'next-auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { authOptions } from '../auth/[...nextauth]/authOptions';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -12,4 +14,23 @@ export async function GET(req: Request) {
 
   const { post } = await getPost(_id) || { post: null };
   return NextResponse.json(post);
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });
+  }
+
+    const { postId } = await req.json();
+  const userEmail = session.user.email;
+
+  const result = await deletePost(postId, userEmail);
+
+  if (!result.success) {
+    return NextResponse.json({ message: result.message }, { status: 400 });
+  }
+
+  return NextResponse.json({ message: result.message });
 }

@@ -1,6 +1,9 @@
 'use client';
 
+import { faEdit, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useSession } from 'next-auth/react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -26,8 +29,15 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
 
     setIsDeleting(true);
     try {
-      const response = await fetch(`/api/posts/${postId}/delete`, {
-        method: 'POST',
+      const postData = {
+        postId,
+      }
+      const response = await fetch(`/api/post`, {
+        method: 'DELETE',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...postData,
+        }),
       });
 
       const result = await response.json();
@@ -51,12 +61,18 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
   }
 
   return (
-    <button
-      onClick={handleDelete}
-      disabled={isDeleting}
-      className="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed flex-shrink-0"
-    >
-      {isDeleting ? '삭제 중...' : '삭제'}
-    </button>
+    <div className="flex items-center gap-2">
+      <Link href={`/post/write/${postId}`} className="text-blue-500 mt-2 block me-2 hover:text-red-700">
+        <FontAwesomeIcon icon={faEdit} className="mr-1" />
+      </Link>
+
+      <span
+        onClick={handleDelete}
+        className={`text-blue-500 mt-2 block me-2 hover:text-red-700 disabled:text-red-400 disabled:cursor-not-allowed cursor-pointer ${isDeleting ? 'opacity-50' : ''}`}
+        aria-label="게시글 삭제"
+      >
+        <FontAwesomeIcon icon={faTrash} className="mr-1" />
+      </span>
+    </div>
   );
 }
