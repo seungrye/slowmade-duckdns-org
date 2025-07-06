@@ -1,5 +1,4 @@
 
-import '@/app/post/view/[[...id]]/page.css';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Comments from '@/components/comments';
 import { getPost, updatePostViews } from '@/lib/posts';

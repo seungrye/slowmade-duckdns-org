@@ -1,5 +1,4 @@
 import React from 'react';
-import '@/app/post/write/[[...id]]/page.css';
 import { Toaster } from "react-hot-toast"; // ✅ 토스트 추가
 import type { Metadata } from 'next';
 import PostWriterForm from './writer-form';
