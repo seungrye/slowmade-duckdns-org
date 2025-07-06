@@ -118,7 +118,7 @@ export default function InfinitPostList() {
                   <RichContentViewer content={post.htmlContent} />
                 </div>
               )}
-              <div className="flex justify-between items-center px-4 py-2 text-sm text-gray-600 border-t border-t-gray-200">
+              <div className="flex justify-between items-center px-4 py-3 text-sm text-gray-600 border-t border-t-gray-200">
                 <div className="flex items-center cursor-pointer hover:text-blue-600" onClick={() => togglePost(post._id)}>
                   <Link href={`/post/view/${post._id}`} className="flex items-center gap-2">
                     <FontAwesomeIcon icon={faComment} />
