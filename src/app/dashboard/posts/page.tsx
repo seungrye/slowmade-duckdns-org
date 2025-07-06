@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import { Toaster } from "react-hot-toast";
 import { SortOption, isValidSortOption } from "@/lib/sort";
 import SelectSorter from "@/components/select-sorter";
@@ -7,9 +6,11 @@ import { myPosts } from "@/lib/posts";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { GetPostType } from "@/types/posts.d";
-import { FaImage } from "react-icons/fa";
 import { Props } from "@/types/my-uploads.d";
 import PostActions from "@/components/post-actions";
+import Image from "next/image";
+import { Suspense } from "react";
+import Loading from "./loading";
 
 export default async function MyUploadsPage({ searchParams }: Props) {
   const session = await getServerSession(authOptions);
@@ -47,26 +48,37 @@ export default async function MyUploadsPage({ searchParams }: Props) {
         {posts.length > 0 ? (
           posts.map((post: GetPostType) => (
             <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4">
-              <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400">
-                {post.urls?.[0]?.thumbnailUrl ? (
-                  <Image
-                    src={post.urls[0].thumbnailUrl}
-                    alt={post.title}
-                    width={300}             // 고정 or 동적으로 조절 가능
-                    height={200}            // 고정 or 동적으로 조절 가능
-                    priority
-                    className="rounded-md object-contain w-full h-auto"
-                  />
-                ) : (
-                  <>
-                    <FaImage size={128} />
-                    <div className="text-sm mt-2">이미지가 없습니다</div>
-                  </>
-                )}
-              </div>
-              <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
-              <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
-              <PostActions postId={post._id} authorEmail={post.userEmail} />
+              <Suspense fallback={<Loading />}>
+                <Link href={`/post/view/${post._id}`} className="" aria-label={`유머 보기: ${post.title}`}>
+                  <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400 relative">
+                    {post.urls?.[0]?.thumbnailUrl ? (
+                      <Image
+                        src={post.urls[0].thumbnailUrl}
+                        alt={post.title}
+                        width={300}             // 고정 or 동적으로 조절 가능
+                        height={200}            // 고정 or 동적으로 조절 가능
+                        priority
+                        className="rounded-md object-contain w-full h-auto"
+                      />
+                    ) : (
+                      <>
+                        <div className="absolute w-full h-full" />
+                        <iframe
+                          className="transform-origin-top-left object-contain overflow-hidden"
+                          srcDoc={`<html><body style="scroll-behavior: none; overflow: hidden;">${post.htmlContent}</body></html>`}
+                          width="100%"
+                          height="100%"
+                          loading="lazy"
+                        >
+                        </iframe>
+                      </>
+                    )}
+                  </div>
+                  <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
+                </Link>
+                <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
+                <PostActions postId={post._id} authorEmail={post.userEmail} />
+              </Suspense>
             </div>
           ))
         ) : (
