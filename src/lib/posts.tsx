@@ -279,6 +279,22 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   return result;
 }
 
+export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> {
+  await connectToDB();
+
+  const result = await fetchLatestPosts({
+    page: 1,
+    limit: 1000, // 모든 게시물을 가져오기 위해 충분히 큰 limit 설정
+    sort: 'latest',
+    withComments: false,
+  });
+
+  return result.posts.map((post: GetPostType) => ({
+    id: post._id.toString(),
+    createdAt: post.createdAt,
+  }));
+}
+
 export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false): Promise<{
   total: number;
   posts: GetPostType[];
