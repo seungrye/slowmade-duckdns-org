@@ -72,6 +72,7 @@ import { uploadImageFile } from "./editor.upload-image-handler"
 
 // --- Styles ---
 import "./editor.scss"
+import { ImageUrlType } from "@/models/post"
 
 // function ThemeToggle() {
 //     const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
@@ -210,14 +211,9 @@ export interface RichWebEditorHandle {
     getContent: () => {
         jsonContent: JSONContent | undefined,
         htmlContent: HTMLContent | undefined,
-        uploadImageUrls: UploadImageUrl[]
+        uploadImageUrls: ImageUrlType[]
     };
-    setContent: (content: HTMLContent, uploadImageUrls?: UploadImageUrl[]) => void;
-}
-
-export interface UploadImageUrl {
-    url: string;
-    thumbnailUrl: string;
+    setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => void;
 }
 
 export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((props, ref) => {
@@ -235,7 +231,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         height: 0,
     })
     const toolbarRef = React.useRef<HTMLDivElement>(null)
-    const uploadedImageUrlsRef = React.useRef<UploadImageUrl[]>([]);
+    const uploadedImageUrlsRef = React.useRef<ImageUrlType[]>([]);
 
     React.useEffect(() => {
         const updateRect = () => {
@@ -345,7 +341,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             htmlContent: editor?.getHTML(),
             uploadImageUrls: uploadedImageUrlsRef.current,
         }),
-        setContent: (content: HTMLContent, uploadImageUrls?: UploadImageUrl[]) => {
+        setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => {
             if (!editor) return console.warn("Editor is not initialized");
             uploadedImageUrlsRef.current = uploadImageUrls || [];
             editor?.commands.setContent(content)

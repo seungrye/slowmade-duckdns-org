@@ -21,11 +21,17 @@ const PostSchema = new Schema(
     dislikes: { type: Number, default: 0 }, // 싫어요 수
     views: { type: Number, default: 0 }, // 조회수
     createdAt: { type: Date, default: Date.now }, // 작성일
+    tags: {
+        type: [String],
+        default: [],
+        index: true // 나중에 태그로 검색할 때 성능 향상을 위해 인덱스를 추가합니다.
+    },
   },
   { timestamps: true }
 );
 
 // 타입 자동 추론
-export type PostType = InferSchemaType<typeof PostSchema>
+export type PostType = InferSchemaType<typeof PostSchema>;
+export type ImageUrlType = InferSchemaType<typeof ImageUrlSchema>;
 // 모델 생성
 export default models.Post || model("Post", PostSchema);

@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast"; // ✅ 토스트 추가
 import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
-import { PostDataParams } from '@/types/api/submit.d';
+import { SetPostType } from '@/types/api/submit.d';
 import { AchievementType } from '@/models/achievement';
 import { AchievementToast } from '@/components/achievement-toast';
 
@@ -16,6 +16,7 @@ export default function PostWriterForm() {
 
     const editorRef = useRef<RichWebEditorHandle>(null);
     const [title, setTitle] = useState('');
+    const [tags, setTags] = useState(''); // 태그 입력을 위한 상태
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -29,16 +30,22 @@ export default function PostWriterForm() {
                     throw new Error("Failed to fetch post");
                 }
 
-                const { jsonContent, title, urls } = await res.json();
+                const { jsonContent, title, urls, tags: fetchedTags } = await res.json(); // API로부터 태그를 받아옵니다.
                 if (jsonContent) {
                     // 에디터에 내용 설정
                     console.assert(typeof jsonContent !== 'undefined', "jsonContent should not be undefined");
                     console.assert(typeof title === 'string', "jsonContent should be a string");
                     console.assert(Array.isArray(urls), "urls should be an array");
-                    console.assert(typeof title === 'string', "title should be a string");
+                    if (fetchedTags) {
+                        // 수정 모드일 때만 태그가 있을 수 있으므로, 배열인지 확인합니다.
+                        console.assert(Array.isArray(fetchedTags), "tags should be an array");
+                    }
                     console.assert(editorRef.current, "editorRef.current should not be null");
                     editorRef.current?.setContent(jsonContent, urls);
                     setTitle(title);
+                    if (fetchedTags) {
+                        setTags(fetchedTags.join(', ')); // 배열을 쉼표로 구분된 문자열로 변환하여 상태에 저장
+                    }
                 } else {
                     toast.error("게시글을 불러오는 데 실패했습니다.");
                 }
@@ -64,14 +71,15 @@ export default function PostWriterForm() {
 
         console.assert(session?.user, "session.user should not be null");
 
-        const postData: PostDataParams = {
+        const postData: SetPostType = {
             _id: null, // 새 게시글인 경우 ID는 null
             title,
-            htmlContent: htmlContent,
-            jsonContent: jsonContent,
+            htmlContent: htmlContent!, // HTMLContent는 null일 수 있지만, 여기서는 반드시 있어야 합니다.
+            jsonContent: jsonContent!, // JSONContent는 null일 수 있지만, 여기서는 반드시 있어야 합니다.
             author: session?.user.name,
             userEmail: session?.user.email,
             urls: urls || [], // 에디터에서 가져온 이미지 URL 배열
+            tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag), // 쉼표로 구분된 문자열을 배열로 변환하고, 빈 태그는 제거합니다.
         };
 
         if (params.id) {
@@ -129,6 +137,15 @@ export default function PostWriterForm() {
         </div>
         <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-dvh rich-web-editor-wrapper">
             <RichWebEditor ref={editorRef} />
+        </div>
+        <div className="border border-gray-300 rounded-lg mt-4 has-focus:shadow-sm">
+            <input
+                type="text"
+                placeholder="태그를 쉼표(,)로 구분하여 입력하세요 (예: 유머, 꿀팁, 정보)"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                className='w-full p-3 focus:outline-none bg-transparent'
+            />
         </div>
         <div className="flex justify-end mt-4">
             <button
