@@ -7,12 +7,13 @@ import { UserAchievementType } from "@/types/achievements.d";
 import { AchievementType } from "@/models/achievement";
 import Comment from "@/models/comment";
  
-// The type for a subdocument after population, used across functions
+// populate 이후의 하위 문서(subdocument) 유형으로, 여러 함수에서 공통으로 사용됩니다.
 type PopulatedUserAchievement = {
   achievement: HydratedDocument<AchievementType>;
   unlockedAt: Date;
 };
 
+// 업적의 기본 구조를 정의하는 타입입니다.
 type AchievementDefinition = {
   key: string;
   name: string;
@@ -21,7 +22,7 @@ type AchievementDefinition = {
   points: number;
 };
 
-// Predefined achievements
+// 사전 정의된 모든 업적의 목록입니다.
 export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
   FIRST_POST: {
     key: 'FIRST_POST',
@@ -93,6 +94,13 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
     icon: 'FaTrophy',
     points: parseInt(process.env.ACHIEVEMENT_POST_COUNT_10000_POINTS || '10000', 10),
   },
+  POST_10_LIKES: {
+    key: 'POST_10_LIKES',
+    name: '인기 게시글',
+    description: '게시글 하나가 추천을 10개 이상 받았습니다.',
+    icon: 'FaHeart',
+    points: parseInt(process.env.ACHIEVEMENT_POST_10_LIKES_POINTS || '50', 10),
+  },
   FIRST_COMMENT: {
     key: 'FIRST_COMMENT',
     name: '첫 댓글 작성',
@@ -144,7 +152,7 @@ export const ACHIEVEMENTS: { [key: string]: AchievementDefinition } = {
   },
 };
 
-// Grant an achievement to a user
+// 특정 사용자에게 업적을 부여하는 함수입니다.
 export async function grantAchievement(userEmail: string, achievementKey: string): Promise<HydratedDocument<AchievementType> | null> {
   await connectToDB();
 
@@ -161,18 +169,18 @@ export async function grantAchievement(userEmail: string, achievementKey: string
     return null;
   }
 
-  // Atomically grant the achievement and points if the user doesn't have it yet.
+  // 사용자가 아직 해당 업적을 가지고 있지 않은 경우에만, 원자적(atomic)으로 업적과 포인트를 부여합니다.
   const updatedUser = await User.findOneAndUpdate(
-    { email: userEmail, 'achievements.achievement': { $ne: achievement._id } }, // Grant only if the user doesn't have it
+    { email: userEmail, 'achievements.achievement': { $ne: achievement._id } }, // 사용자가 아직 없는 업적일 경우에만 부여
     {
       $push: { achievements: { achievement: achievement._id, unlockedAt: new Date() } },
       $inc: { points: achievement.points }
     }
   );
 
-  // If updatedUser is null, it means the user already had the achievement, or the user was not found.
+  // updatedUser가 null이면, 사용자를 찾지 못했거나 이미 해당 업적을 가지고 있다는 의미입니다.
   if (!updatedUser) {
-    // This is expected if the achievement is already granted, so no error log is needed.
+    // 이미 업적이 부여된 경우는 정상적인 상황이므로, 별도의 오류 로그를 남기지 않습니다.
     return null;
   }
 
@@ -181,9 +189,9 @@ export async function grantAchievement(userEmail: string, achievementKey: string
 }
 
 /**
- * Checks and grants achievements based on the number of posts.
- * @param userEmail The email of the user.
- * @returns An array of newly unlocked achievements.
+ * 게시글 수를 기반으로 업적을 확인하고 부여합니다.
+ * @param userEmail 사용자 이메일
+ * @returns 새로 잠금 해제된 업적의 배열
  */
 export async function checkAndGrantPostCountAchievements(userEmail: string): Promise<HydratedDocument<AchievementType>[]> {
   await connectToDB();
@@ -223,9 +231,9 @@ export async function checkAndGrantPostCountAchievements(userEmail: string): Pro
 }
 
 /**
- * Checks and grants achievements based on the number of comments.
- * @param userEmail The email of the user.
- * @returns An array of newly unlocked achievements.
+ * 댓글 수를 기반으로 업적을 확인하고 부여합니다.
+ * @param userEmail 사용자 이메일
+ * @returns 새로 잠금 해제된 업적의 배열
  */
 export async function checkAndGrantCommentCountAchievements(userEmail: string): Promise<HydratedDocument<AchievementType>[]> {
   await connectToDB();
@@ -262,7 +270,44 @@ export async function checkAndGrantCommentCountAchievements(userEmail: string): 
   return unlockedAchievements;
 }
 
-// Get achievements for a user
+/**
+ * 게시글의 상호작용(예: 추천)과 관련된 업적을 확인하고 부여합니다.
+ * 이 함수는 게시글이 추천과 같은 새로운 상호작용을 받았을 때 호출되어야 합니다.
+ * @param postId 상호작용을 받은 게시글의 ID
+ * @returns 게시글 작성자가 새로 잠금 해제한 업적의 배열
+ */
+export async function checkAndGrantPostInteractionAchievements(postId: string): Promise<HydratedDocument<AchievementType>[]> {
+  await connectToDB();
+
+  const post = await Post.findById(postId);
+  if (!post) {
+    console.error(`Post not found for interaction check: ${postId}`);
+    return [];
+  }
+
+  // 업적은 게시글 작성자에게 주어지므로, 본인이 추천했는지 여부를 확인할 필요는 없습니다.
+  const user = await User.findOne({ email: post.userEmail }).populate('achievements.achievement');
+  if (!user) {
+    console.error(`User not found for post author: ${post.userEmail}`);
+    return [];
+  }
+
+  const unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+  const userAchievementKeys = new Set(user.achievements.map((ach: PopulatedUserAchievement) => ach.achievement.key));
+
+  // --- 업적 확인: 추천 10개 이상 받은 게시글 ---
+  if (post.likes.length >= 10 && !userAchievementKeys.has('POST_10_LIKES')) {
+    const newAchievement = await grantAchievement(user.email, 'POST_10_LIKES');
+    if (newAchievement) unlockedAchievements.push(newAchievement);
+  }
+
+  // --- 이 게시글과 관련된 다른 업적 확인 로직을 여기에 추가할 수 있습니다 ---
+  // 예: 특정 게시글의 댓글 수 확인 등
+
+  return unlockedAchievements;
+}
+
+// 특정 사용자가 획득한 모든 업적 목록을 가져옵니다.
 export async function getMyAchievements(userEmail: string): Promise<UserAchievementType[]> {
   await connectToDB();
 

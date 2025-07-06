@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
 import { HttpStatusCode } from "axios";
+import { checkAndGrantPostInteractionAchievements } from "@/lib/achievements";
 
 export async function POST(req: Request) {
   await connectToDB();
@@ -43,6 +44,8 @@ export async function POST(req: Request) {
       ],
       { new: true } // ✅ 업데이트된 값을 반환
     );
+
+    await checkAndGrantPostInteractionAchievements(payload._id);
 
     return NextResponse.json({ message: "Like/Dislike 업데이트 성공", likes: updatedPost.likes, dislikes: updatedPost.dislikes }, { status: HttpStatusCode.Ok });
   } catch (error) {
