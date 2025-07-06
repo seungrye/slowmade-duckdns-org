@@ -76,6 +76,7 @@ export default function Navbar() {
                             <button
                                 className="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition"
                                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                aria-label="마이페이지 메뉴"
                             >
                                 <User size={20} /> 마이페이지 <ChevronDown size={16} />
                             </button>
@@ -99,6 +100,7 @@ export default function Navbar() {
                                         <button
                                             className="px-4 py-2 w-full text-left hover:bg-gray-700 transition flex items-center gap-1"
                                             onClick={() => signOut()}
+                                            aria-label="로그아웃"
                                         >
                                             <LogOut size={20} />
                                             로그아웃
@@ -122,7 +124,9 @@ export default function Navbar() {
                 </ul>
 
                 {/* 모바일 메뉴 버튼 */}
-                <button className="md:hidden text-gray-500" onClick={() => setIsOpen(!isOpen)}>
+                <button className="md:hidden text-gray-500" onClick={() => setIsOpen(!isOpen)}
+                    aria-label="모바일 메뉴 열기"
+                >
                     {isOpen ? <X size={28} /> : <Menu size={28} />}
                 </button>
             </div>
@@ -163,6 +167,7 @@ export default function Navbar() {
                                 <button
                                     className="py-2 w-full hover:bg-gray-600 transition flex items-center gap-1 justify-center"
                                     onClick={() => signOut()}
+                                    aria-label="로그아웃"
                                 >
                                     <LogOut size={20} />
                                     로그아웃

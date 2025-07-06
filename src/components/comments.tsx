@@ -128,6 +128,7 @@ export default function Comments({ postId }: Props) {
               <button
                 className="text-sm text-blue-600 hover:underline mt-2"
                 onClick={() => setOpenReplyFor(prev => (prev === c._id ? null : c._id))}
+                aria-label="Open reply form"
               >
                 Reply
               </button>
@@ -150,6 +151,7 @@ export default function Comments({ postId }: Props) {
                     className="mt-4 md:mt-0 inline-flex justify-end items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600"
                     onClick={() => submitComment(c._id, replyContent)} // 답글 작성 시 부모 댓글 ID 전달
                     disabled={submitting}
+                    aria-label="Reply to comment"
                   > {/* 답글 작성 버튼 */}
                     Post comment
                   </button>
@@ -182,6 +184,7 @@ export default function Comments({ postId }: Props) {
       <button type="submit" className="mt-4 md:mt-0 inline-flex justify-end items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600"
         onClick={() => submitComment(null, content)} // 최상위 댓글 작성 시 부모 댓글 ID는 undefined
         disabled={submitting}
+        aria-label="Post comment"
       > {/* 최상위 댓글 작성 버튼 */}
 
         Post comment

@@ -4,9 +4,47 @@ import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Comments from '@/components/comments';
 import { getPost, updatePostViews } from '@/lib/posts';
 import LikeHateSection from './like-hate.section';
+import { Metadata } from 'next';
 
 type Params = Promise<{ id: string[] }>
 // type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
+
+export async function generateMetadata(
+    props: {
+        params: Params
+        // searchParams: SearchParams
+    },
+    // parent: ResolvingMetadata
+): Promise<Metadata> {
+    const params = await props.params
+    // const searchParams = await props.searchParams
+    const _id = params.id?.[0]
+
+    if (!_id) {
+        return {
+            title: 'Post Not Found',
+        };
+    }
+
+    // API 또는 DB에서 게시물 데이터를 가져옵니다.
+    const { post } = (await getPost(_id)) || { post: null };
+
+    if (!post) {
+        return {
+            title: 'Post Not Found',
+        };
+    }
+
+    // 동적으로 제목을 생성하여 반환합니다.
+    return {
+        title: post.title,
+        description: `Author: ${post.author},
+        Title: '${post.title}',
+        Likes: ${post.likes},
+        Views: ${post.views},
+        Created At: ${post.createdAt.toLocaleDateString()}`,
+    };
+}
 
 export default async function PostViewier(props: {
     params: Params

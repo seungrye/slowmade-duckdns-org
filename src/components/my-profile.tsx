@@ -50,7 +50,9 @@ export default function MyProfile({session}: { session: Session | null }) {
                 {loading ? '로딩 중...' : `포인트: ${profile?.points?.toLocaleString() || 0} P | 가입일: ${profile ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}`}
             </p>
         </div>
-        <button className="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition">
+        <button className="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
+            aria-label="프로필 수정"
+        >
             프로필 수정
         </button>
     </section>

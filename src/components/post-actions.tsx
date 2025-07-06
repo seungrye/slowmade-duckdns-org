@@ -66,8 +66,8 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
         <button
           onClick={() => setIsModalOpen(true)}
           className={`text-blue-500 mt-2 block me-2 hover:text-red-700 disabled:text-red-400 disabled:cursor-not-allowed cursor-pointer ${isDeleting ? 'opacity-50' : ''}`}
-          aria-label="게시글 삭제"
           disabled={isDeleting}
+          aria-label="게시글 삭제"
         >
           <FontAwesomeIcon icon={faTrash} className="mr-1" />
         </button>
@@ -85,8 +85,12 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
           </p>
         </div>
         <div className="mt-6 flex justify-end gap-3">
-          <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition" disabled={isDeleting}>취소</button>
-          <button onClick={handleConfirmDelete} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:bg-red-400" disabled={isDeleting}>{isDeleting ? '삭제 중...' : '삭제 확인'}</button>
+          <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition" disabled={isDeleting}
+            aria-label="게시물 삭제 취소"
+          >취소</button>
+          <button onClick={handleConfirmDelete} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:bg-red-400" disabled={isDeleting}
+            aria-label="게시물 삭제 확인"
+          >{isDeleting ? '삭제 중...' : '삭제 확인'}</button>
         </div>
       </Modal>
     </>

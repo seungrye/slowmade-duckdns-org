@@ -29,6 +29,7 @@ export default function LoginPage() {
                         signIn("google", { callbackUrl: "/" }); // 로그인 후 홈으로 이동
                     }}
                     className="flex items-center justify-center w-full bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm text-gray-600 hover:bg-gray-100 transition mb-3"
+                    aria-label="Google 로그인"
                 >
                     <FcGoogle size={20} className="mr-2" />
                     Google 계정으로 로그인
@@ -37,6 +38,7 @@ export default function LoginPage() {
                 <button
                     onClick={() => signIn("github")}
                     className="flex items-center justify-center w-full bg-gray-900 text-white rounded-lg px-4 py-2 shadow-sm hover:bg-gray-800 transition"
+                    aria-label="GitHub 로그인"
                 >
                     <FaGithub size={20} className="mr-2" />
                     GitHub 계정으로 로그인

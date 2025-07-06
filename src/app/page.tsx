@@ -1,4 +1,10 @@
 import InfinitPostList from "@/components/infinite-post";
+import type { Metadata } from 'next'
+ 
+export const metadata: Metadata = {
+  title: 'Handmade Site - Home',
+  description: 'Overview of the latest posts',
+};
 
 export default async function Home() {
   return (

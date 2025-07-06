@@ -21,6 +21,7 @@ export default function InputSearch({ current }: { current: string }) {
         <button
             className="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 transition"
             onClick={handleSearch}
+            aria-label="검색"
         >
             검색
         </button>

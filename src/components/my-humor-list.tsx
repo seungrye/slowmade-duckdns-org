@@ -65,9 +65,13 @@ export default function MyHumorList() {
             )}
         </div>
         <div className="flex justify-center mt-8">
-            <button className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" disabled={page <= 1} onClick={() => page > 1 && setPage(page - 1)}>◀ 이전</button>
+            <button className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" disabled={page <= 1} onClick={() => page > 1 && setPage(page - 1)}
+                aria-label="이전 페이지"
+            >◀ 이전</button>
             <span className="px-4 py-2 bg-gray-100">{page} / {endPage}</span>
-            <button className="bg-gray-300 px-4 py-2 rounded-r cursor-pointer" disabled={page >= endPage} onClick={() => endPage > page && setPage(page + 1)}>다음 ▶</button>
+            <button className="bg-gray-300 px-4 py-2 rounded-r cursor-pointer" disabled={page >= endPage} onClick={() => endPage > page && setPage(page + 1)}
+                aria-label="다음 페이지"
+            >다음 ▶</button>
         </div>
     </section>;
 }

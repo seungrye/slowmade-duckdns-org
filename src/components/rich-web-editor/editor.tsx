@@ -125,8 +125,8 @@ const MainToolbarContent = ({
             <Spacer />
 
             <ToolbarGroup>
-                <UndoRedoButton action="undo" />
-                <UndoRedoButton action="redo" />
+                <UndoRedoButton action="undo" aria-label="Undo" />
+                <UndoRedoButton action="redo" aria-label="Redo" />
             </ToolbarGroup>
 
             <ToolbarSeparator />
@@ -134,46 +134,46 @@ const MainToolbarContent = ({
             <ToolbarGroup>
                 <HeadingDropdownMenu levels={[1, 2, 3, 4]} />
                 <ListDropdownMenu types={["bulletList", "orderedList", "taskList"]} />
-                <NodeButton type="codeBlock" />
-                <NodeButton type="blockquote" />
+                <NodeButton type="codeBlock" aria-label="Code Block" />
+                <NodeButton type="blockquote" aria-label="Blockquote" />
             </ToolbarGroup>
 
             <ToolbarSeparator />
 
             <ToolbarGroup>
-                <MarkButton type="bold" />
-                <MarkButton type="italic" />
-                <MarkButton type="strike" />
-                <MarkButton type="code" />
-                <MarkButton type="underline" />
+                <MarkButton type="bold" aria-label="Bold" />
+                <MarkButton type="italic" aria-label="Italic" />
+                <MarkButton type="strike" aria-label="Strike" />
+                <MarkButton type="code" aria-label="Code" />
+                <MarkButton type="underline" aria-label="Underline" />
                 {!isMobile ? (
                     <HighlightPopover />
                 ) : (
-                    <HighlighterButton onClick={onHighlighterClick} />
+                    <HighlighterButton onClick={onHighlighterClick} aria-label="Highlighter" />
                 )}
-                {!isMobile ? <LinkPopover /> : <LinkButton onClick={onLinkClick} />}
+                {!isMobile ? <LinkPopover /> : <LinkButton onClick={onLinkClick} aria-label="Link" />}
             </ToolbarGroup>
 
             <ToolbarSeparator />
 
             <ToolbarGroup>
-                <MarkButton type="superscript" />
-                <MarkButton type="subscript" />
+                <MarkButton type="superscript" aria-label="Superscript" />
+                <MarkButton type="subscript" aira-label="Subscript" />
             </ToolbarGroup>
 
             <ToolbarSeparator />
 
             <ToolbarGroup>
-                <TextAlignButton align="left" />
-                <TextAlignButton align="center" />
-                <TextAlignButton align="right" />
-                <TextAlignButton align="justify" />
+                <TextAlignButton align="left" aria-label="Align Left" />
+                <TextAlignButton align="center" aria-label="Align Center" />
+                <TextAlignButton align="right" aria-label="Align Right" />
+                <TextAlignButton align="justify" aria-label="Align Justify" />
             </ToolbarGroup>
 
             <ToolbarSeparator />
 
             <ToolbarGroup>
-                <ImageUploadButton text="Add" />
+                <ImageUploadButton text="Add" aria-label="Add Image" />
             </ToolbarGroup>
 
             <Spacer />
@@ -190,7 +190,7 @@ const MobileToolbarContent = ({
 }) => (
     <>
         <ToolbarGroup>
-            <Button data-style="ghost" onClick={onBack}>
+            <Button data-style="ghost" onClick={onBack} aria-label="Back to main toolbar">
                 <ArrowLeftIcon className="tiptap-button-icon" />
                 {type === "highlighter" ? (
                     <HighlighterIcon className="tiptap-button-icon" />

@@ -300,6 +300,7 @@ const ImageUploadPreview: React.FC<ImageUploadPreviewProps> = ({
               e.stopPropagation()
               onRemove()
             }}
+            aria-label="Remove file"
           >
             <CloseIcon />
           </button>
