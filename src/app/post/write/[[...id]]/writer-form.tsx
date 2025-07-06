@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import '@/app/post/write/[[...id]]/page.css';
 import { toast } from "react-hot-toast"; // ✅ 토스트 추가
 import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
