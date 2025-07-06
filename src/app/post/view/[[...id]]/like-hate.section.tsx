@@ -56,26 +56,24 @@ export default function LikeHateSection({
     }, [_id]);
 
     return (
-        <div className="flex justify-end items-center text-sm text-gray-600 border-t border-t-gray-200">
-            <div className="flex items-center gap-4 px-4">
-                <div className={`flex items-center gap-1.5 py-4 cursor-pointer ${likeChecked ? 'text-red-600' : 'hover:text-blue-600'}`}
-                    onClick={async () => {
-                        if (likeChecked) return; // 이미 좋아요 상태인 경우 아무 동작도 하지 않음
-                        await updateLikeDislike(true, false); // 좋아요 상태로 업데이트
-                        localStorage.setItem(`liked_${_id}`, '1');
-                    }}>
-                    <FontAwesomeIcon icon={faThumbsUp} size='lg' />
-                    <span>{likes || 0}</span>
-                </div>
-                <div className={`flex items-center gap-1.5 py-4 cursor-pointer ${dislikeChecked ? 'text-red-600' : 'hover:text-blue-600'}`}
-                    onClick={async () => {
-                        if (dislikeChecked) return; // 이미 싫어요 상태인 경우 아무 동작도 하지 않음
-                        await updateLikeDislike(false, true); // 싫어요 상태로 업데이트
-                        localStorage.setItem(`liked_${_id}`, '-1');
-                    }}>
-                    <FontAwesomeIcon icon={faThumbsDown} size='lg' />
-                    <span>{dislikes || 0}</span>
-                </div>
+        <div className="flex justify-end items-center text-sm text-gray-600 border-t border-t-gray-200 p-4 gap-4">
+            <div className={`flex items-center gap-1.5 cursor-pointer ${likeChecked ? 'text-red-600' : 'hover:text-blue-600'}`}
+                onClick={async () => {
+                    if (likeChecked) return; // 이미 좋아요 상태인 경우 아무 동작도 하지 않음
+                    await updateLikeDislike(true, false); // 좋아요 상태로 업데이트
+                    localStorage.setItem(`liked_${_id}`, '1');
+                }}>
+                <FontAwesomeIcon icon={faThumbsUp} size='lg' />
+                <span>{likes || 0}</span>
+            </div>
+            <div className={`flex items-center gap-1.5 cursor-pointer ${dislikeChecked ? 'text-red-600' : 'hover:text-blue-600'}`}
+                onClick={async () => {
+                    if (dislikeChecked) return; // 이미 싫어요 상태인 경우 아무 동작도 하지 않음
+                    await updateLikeDislike(false, true); // 싫어요 상태로 업데이트
+                    localStorage.setItem(`liked_${_id}`, '-1');
+                }}>
+                <FontAwesomeIcon icon={faThumbsDown} size='lg' />
+                <span>{dislikes || 0}</span>
             </div>
         </div>
     );

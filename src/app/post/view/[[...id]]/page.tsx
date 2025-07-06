@@ -4,6 +4,7 @@ import Comments from '@/components/comments';
 import { getPost, updatePostViews } from '@/lib/posts';
 import LikeHateSection from './like-hate.section';
 import { Metadata } from 'next';
+import Link from 'next/link';
 
 type Params = Promise<{ id: string[] }>
 // type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
@@ -42,6 +43,7 @@ export async function generateMetadata(
         Likes: ${post.likes},
         Views: ${post.views},
         Created At: ${post.createdAt.toLocaleDateString()}`,
+        keywords: post.tags, // 태그를 SEO 키워드로 활용합니다.
     };
 }
 
@@ -56,7 +58,7 @@ export default async function PostViewier(props: {
 
     const { post } = await getPost(_id) || { post: null };
     if (post) await updatePostViews(_id);
-    const { htmlContent, title, likes, dislikes } = post || { htmlContent: '', title: '', likes: 0, dislikes: 0 };
+    const { htmlContent, title, likes, dislikes, tags } = post || { htmlContent: '', title: '', likes: 0, dislikes: 0, tags: [] };
 
     return (<div className='mx-auto px-4 py-6'>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
@@ -68,6 +70,19 @@ export default async function PostViewier(props: {
             <div className="p-4 transition-all duration-300 ease-in-out flex-1">
                 <RichContentViewer content={htmlContent} />
             </div>
+
+            {/* 태그 목록 렌더링 */}
+            {tags && tags.length > 0 && (
+                <div className="p-3 text-sm text-gray-600 border-t border-t-gray-200">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {tags.map((tag: string) => (
+                            <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag} className="bg-gray-100 text-gray-700 text-sm font-medium px-3 py-1 rounded-full hover:bg-gray-200 transition-colors duration-200">
+                                # {tag}
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             <LikeHateSection defaultLikes={likes} defaultDislikes={dislikes} _id={_id} />
         </div>
