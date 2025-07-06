@@ -429,3 +429,89 @@ export async function updatePostViews(_id: string): Promise<void> {
     console.error("Error on <updatePostViews>", error);
   }
 }
+
+/**
+ * 특정 태그를 포함하는 모든 게시글을 검색합니다.
+ * @param tag 검색할 태그 문자열
+ * @returns 해당 태그를 가진 게시글의 배열
+ */
+export async function getPostsByTag(tag: string):  Promise<{
+  total: number;
+  posts: GetPostType[];
+}> {
+  await connectToDB();
+
+  const matchStage: PipelineStage.Match = {
+    $match: {},
+  };
+
+  if (tag) {
+    matchStage.$match["tags"] = { $regex: new RegExp(`^${tag}$`, 'i') }; // 대소문자 구분 없이 정확히 일치하는 태그 검색
+  }
+
+  const pipeline: PipelineStage[] = [
+    matchStage,
+    {
+      $sort: { createdAt: -1 },
+    },
+    {
+      $facet: {
+        metadata: [{ $count: "total" }],
+        data: [
+          {
+            $lookup: {
+              from: "comments",
+              localField: "_id",
+              foreignField: "post",
+              as: "comments",
+            },
+          },
+          {
+            $addFields: {
+              commentCount: { $size: "$comments" },
+            },
+          },
+          {
+            $project: {
+              tags: 0, // 태그는 필요 없으므로 제외
+              urls: 0,
+              createdAt: 0,
+              updatedAt: 0,
+              htmlContent: 0,
+              jsonContent: 0,
+              comments: 0,
+            },
+          }
+        ],
+      },
+    },
+    {
+      $project: {
+        posts: "$data",
+        total: { $arrayElemAt: ["$metadata.total", 0] },
+      },
+    },
+    {
+      $addFields: {
+        posts: {
+          $map: {
+            input: "$posts",
+            as: "post",
+            in: {
+              $mergeObjects: ["$$post", { _id: { $toString: "$$post._id" } }],
+            },
+          },
+        },
+      },
+    },
+  ];
+
+  const [result] = await Post.aggregate(pipeline);
+
+  console.log("getPostsByTag result:", result);
+
+  return {
+    posts: result?.posts || [],
+    total: result?.total || 0,
+  };
+}

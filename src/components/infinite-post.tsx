@@ -2,10 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { GetPostType } from '@/types/posts.d';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronUp, faComment, faThumbsUp, faThumbsDown, faEye } from '@fortawesome/free-solid-svg-icons';
-import { RichContentViewer } from '@/components/rich-web-editor/viewer';
-import Link from 'next/link';
+import PostItem from './post-item';
 
 export default function InfinitPostList() {
   const [posts, setPosts] = useState<GetPostType[]>([]);
@@ -97,51 +94,7 @@ export default function InfinitPostList() {
       <div className="grid grid-cols-1 gap-6">
         {posts.map((post) => {
           const isOpen = openedPostIds.has(post._id);
-          return (
-            <div key={post._id} className="bg-white rounded-lg shadow-sm hover:shadow-md inset-shadow-xs">
-              <div className="flex items-center justify-between px-4 pt-4 pb-3">
-                <Link href={`/post/view/${post._id}`} className='truncate ' aria-label={`게시물 제목: ${post.title}`}>
-                  <h3 className="text-lg font-semibold truncate">{post.title}</h3>
-                </Link>
-                <button
-                  onClick={() => togglePost(post._id)}
-                  className="text-gray-500 hover:text-gray-700 transition ps-4 cursor-pointer grow text-right"
-                  type="button"
-                  aria-label="토글 열기/닫기"
-                  aria-expanded={isOpen} // 5. 접근성 개선
-                >
-                  <FontAwesomeIcon icon={isOpen ? faChevronUp : faChevronDown} className="aspect-square w-6 h-6" />
-                </button>
-              </div>
-              {isOpen && (
-                <div className="p-4 transition-all duration-300 ease-in-out border-t border-t-gray-200">
-                  <RichContentViewer content={post.htmlContent} />
-                </div>
-              )}
-              <div className="flex justify-between items-center px-4 py-3 text-sm text-gray-600 border-t border-t-gray-200">
-                <div className="flex items-center cursor-pointer hover:text-blue-600" onClick={() => togglePost(post._id)}>
-                  <Link href={`/post/view/${post._id}`} className="flex items-center gap-2">
-                    <FontAwesomeIcon icon={faComment} />
-                    <span>{post.commentCount || 0}</span>
-                  </Link>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1.5">
-                    <FontAwesomeIcon icon={faThumbsUp} />
-                    <span>{post.likes || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <FontAwesomeIcon icon={faThumbsDown} />
-                    <span>{post.dislikes || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <FontAwesomeIcon icon={faEye} />
-                    <span>{post.views || 0}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
+          return <PostItem key={post._id} post={post} isOpen={isOpen} togglePost={togglePost} />;
         })}
       </div>
       {/* 4. 로딩 및 더보기 상태에 따른 UI 개선 */}
