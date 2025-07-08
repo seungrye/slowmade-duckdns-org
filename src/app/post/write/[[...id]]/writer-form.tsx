@@ -8,6 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
 import { AchievementType } from '@/models/achievement';
 import { AchievementToast } from '@/components/achievement-toast';
+import TagInput from '@/components/tag-input';
 
 export default function PostWriterForm() {
     const { data: session } = useSession();
@@ -16,7 +17,7 @@ export default function PostWriterForm() {
 
     const editorRef = useRef<RichWebEditorHandle>(null);
     const [title, setTitle] = useState('');
-    const [tags, setTags] = useState(''); // 태그 입력을 위한 상태
+    const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -43,9 +44,7 @@ export default function PostWriterForm() {
                     console.assert(editorRef.current, "editorRef.current should not be null");
                     editorRef.current?.setContent(jsonContent, urls);
                     setTitle(title);
-                    if (fetchedTags) {
-                        setTags(fetchedTags.join(', ')); // 배열을 쉼표로 구분된 문자열로 변환하여 상태에 저장
-                    }
+                    setTags(fetchedTags || []);
                 } else {
                     toast.error("게시글을 불러오는 데 실패했습니다.");
                 }
@@ -79,7 +78,7 @@ export default function PostWriterForm() {
             author: session?.user.name,
             userEmail: session?.user.email,
             urls: urls || [], // 에디터에서 가져온 이미지 URL 배열
-            tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag), // 쉼표로 구분된 문자열을 배열로 변환하고, 빈 태그는 제거합니다.
+            tags: tags, // 태그 상태는 이미 문자열 배열입니다.
         };
 
         if (params.id) {
@@ -144,13 +143,11 @@ export default function PostWriterForm() {
         >
             <RichWebEditor ref={editorRef} />
         </div>
-        <div className="border border-gray-300 rounded-lg mt-4 has-focus:shadow-sm">
-            <input
-                type="text"
-                placeholder="태그를 쉼표(,)로 구분하여 입력하세요 (예: 유머, 꿀팁, 정보)"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                className='w-full p-3 focus:outline-none bg-transparent'
+        <div className="mt-4">
+            <TagInput
+                tags={tags}
+                onTagsChange={setTags}
+                placeholder="태그를 입력하고 Enter 또는 쉼표를 누르세요"
             />
         </div>
         <div className="flex justify-end mt-4">
