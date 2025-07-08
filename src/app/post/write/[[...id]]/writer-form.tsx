@@ -135,7 +135,13 @@ export default function PostWriterForm() {
                 className='w-full p-3'
             />
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-dvh rich-web-editor-wrapper">
+        <div
+            className="border border-gray-300 has-focus:shadow-sm rounded-b-lg max-h-[600px] h-dvh rich-web-editor-wrapper cursor-text"
+            onClick={() => editorRef.current?.focus()}
+            onFocus={() => editorRef.current?.focus()}
+            tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
+            aria-label="Post content editor, click or press enter to start writing"
+        >
             <RichWebEditor ref={editorRef} />
         </div>
         <div className="border border-gray-300 rounded-lg mt-4 has-focus:shadow-sm">
