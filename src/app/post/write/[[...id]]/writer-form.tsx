@@ -71,7 +71,7 @@ export default function PostWriterForm() {
 
         console.assert(session?.user, "session.user should not be null");
 
-        const postData: SetPostType = {
+        const postData: Partial<SetPostType> = {
             _id: null, // 새 게시글인 경우 ID는 null
             title,
             htmlContent: htmlContent!, // HTMLContent는 null일 수 있지만, 여기서는 반드시 있어야 합니다.
