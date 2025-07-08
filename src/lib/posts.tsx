@@ -220,13 +220,14 @@ export async function getPost(_id: string): Promise<{ post: GetPostType; } | nul
   try {
     await connectToDB();
     // Fetch only if not soft-deleted
-    const post = await Post.findOne({ _id, isDeleted: { $ne: true } });
+    const post = await Post.findOne({ _id, isDeleted: { $ne: true } }).lean<GetPostType>();
 
     if (!post) {
+      console.warn(`Post with ID ${_id} not found or has been deleted.`);
       return null;
     }
 
-    return { post };
+    return { post: { ...post, _id: post._id.toString() } };
   } catch (error) {
     console.error("Error on <getPost>", error);
     return null;
@@ -248,7 +249,7 @@ export async function updatePostViews(_id: string): Promise<void> {
  * @param tag 검색할 태그 문자열
  * @returns 해당 태그를 가진 게시글의 배열
  */
-export async function getPostsByTag(tag: string):  Promise<{
+export async function getPostsByTag(tag: string): Promise<{
   total: number;
   posts: GetPostType[];
 }> {

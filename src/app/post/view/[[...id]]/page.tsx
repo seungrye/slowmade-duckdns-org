@@ -5,6 +5,7 @@ import { getPost, updatePostViews } from '@/lib/posts';
 import LikeHateSection from './like-hate.section';
 import { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 type Params = Promise<{ id: string[] }>
 // type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
@@ -55,10 +56,20 @@ export default async function PostViewier(props: {
     // const searchParams = await props.searchParams
     const _id = params.id?.[0]
     // const query = searchParams.query
+    if (!_id) {
+        notFound();
+    }
 
-    const { post } = await getPost(_id) || { post: null };
-    if (post) await updatePostViews(_id);
-    const { htmlContent, title, likes, dislikes, tags } = post || { htmlContent: '', title: '', likes: 0, dislikes: 0, tags: [] };
+    const data = await getPost(_id);
+    if (!data?.post) {
+        notFound();
+    }
+
+    // The post is guaranteed to exist here.
+    const { post } = data;
+    await updatePostViews(post._id);
+
+    const { htmlContent, title, likes, dislikes, tags } = post;
 
     return (<div className='mx-auto px-4 py-6'>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
@@ -84,11 +95,11 @@ export default async function PostViewier(props: {
                 </div>
             )}
 
-            <LikeHateSection defaultLikes={likes} defaultDislikes={dislikes} _id={_id} />
+            <LikeHateSection defaultLikes={likes} defaultDislikes={dislikes} _id={post._id} />
         </div>
 
         <div className="mt-6">
-            <Comments postId={_id} />
+            <Comments postId={post._id} />
         </div>
     </div>
     );
