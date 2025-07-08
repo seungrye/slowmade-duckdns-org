@@ -6,239 +6,97 @@ import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 import { GetPostType, SetPostQuery } from "@/types/posts.d";
 
-async function fetchLatestPosts(params: SetPostQuery): Promise<{
+/**
+ * A centralized function to fetch posts based on various criteria.
+ * It dynamically builds a MongoDB aggregation pipeline to filter out soft-deleted posts.
+ * @param params - Query parameters including sorting, pagination, and filtering.
+ * @returns A promise that resolves to an object containing the posts and the total count.
+ */
+async function fetchPosts(params: SetPostQuery): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
-  const { userEmail, query, withComments, page = 1, limit = 12 } = params;
+  const { userEmail, query, withComments, page = 1, limit = 12, sort = 'latest' } = params;
 
   const matchStage: PipelineStage.Match = {
-    $match: {},
+    $match: {
+      isDeleted: { $ne: true } // Soft-deleted posts are excluded by default
+    },
   };
 
   if (userEmail) {
-    matchStage.$match["userEmail"] = userEmail;
+    matchStage.$match.userEmail = userEmail;
   }
 
   if (query) {
-    matchStage.$match["title"] = { $regex: query, $options: "i" };
+    matchStage.$match.title = { $regex: query, $options: "i" };
   }
 
-  const pipeline: PipelineStage[] = [
-    matchStage,
-    {
-      $sort: { createdAt: -1 },
-    },
-    {
-      $facet: {
-        metadata: [{ $count: "total" }],
-        data: [
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: "comments",
-              localField: "_id",
-              foreignField: "post",
-              as: "comments",
-            },
-          },
-          {
-            $addFields: {
-              ...(withComments && { commentCount: { $size: "$comments" } }),
-            },
-          },
-          {
-            $project: {
-              jsonContent: 0,
-              comments: 0,
-            },
-          }
-        ],
-      },
-    },
-    {
-      $project: {
-        posts: "$data",
-        total: { $arrayElemAt: ["$metadata.total", 0] },
-      },
-    },
-    {
-      $addFields: {
-        posts: {
-          $map: {
-            input: "$posts",
-            as: "post",
-            in: {
-              $mergeObjects: ["$$post", { _id: { $toString: "$$post._id" } }],
-            },
-          },
+  const pipeline: PipelineStage[] = [matchStage];
+
+  // Dynamically build the pipeline based on the sort option
+  const sortStage: PipelineStage.Sort = { $sort: {} };
+  if (sort === 'commented') {
+    pipeline.push(
+      {
+        $lookup: {
+          from: "comments",
+          localField: "_id",
+          foreignField: "post",
+          as: "comments",
         },
       },
-    },
-  ];
-
-  const [result] = await Post.aggregate(pipeline);
-
-  return {
-    posts: result?.posts || [],
-    total: result?.total || 0,
-  };
-}
-
-async function fetchPopularPosts(params: SetPostQuery): Promise<{
-  total: number;
-  posts: GetPostType[];
-}> {
-  const { userEmail, query, withComments, page = 1, limit = 12 } = params;
-
-  const match: PipelineStage.Match = {
-    $match: {},
-  };
-
-  if (userEmail) {
-    match.$match["userEmail"] = userEmail;
+      {
+        $addFields: {
+          commentCount: { $size: "$comments" },
+        },
+      }
+    );
+    sortStage.$sort.commentCount = -1;
+  } else if (sort === 'popular') {
+    sortStage.$sort.views = -1;
+  } else { // 'latest'
+    sortStage.$sort.createdAt = -1;
   }
+  pipeline.push(sortStage);
 
-  if (query) {
-    match.$match["title"] = { $regex: query, $options: "i" };
-  }
-
-  const pipeline: PipelineStage[] = [
-    match,
-    {
-      $sort: { views: -1 },
-    },
-    {
-      $facet: {
-        metadata: [{ $count: "total" }],
-        data: [
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: "comments",
-              localField: "_id",
-              foreignField: "post",
-              as: "comments",
-            },
-          },
-          {
-            $addFields: {
-              ...(withComments && { commentCount: { $size: "$comments" } }),
-            },
-          },
-          {
-            $project: {
-              jsonContent: 0,
-              comments: 0,
-            },
-          }
-        ],
-      },
-    },
-    {
-      $project: {
-        posts: "$data",
-        total: { $ifNull: [{ $arrayElemAt: ["$metadata.total", 0] }, 0] },
-      },
-    },
-    {
-      $addFields: {
-        posts: {
-          $map: {
-            input: "$posts",
-            as: "post",
-            in: {
-              $mergeObjects: ["$$post", { _id: { $toString: "$$post._id" } }],
-            },
+  // Facet for pagination and metadata
+  pipeline.push({
+    $facet: {
+      metadata: [{ $count: "total" }],
+      data: [
+        { $skip: (page - 1) * limit },
+        { $limit: limit },
+        {
+          $lookup: {
+            from: "comments",
+            localField: "_id",
+            foreignField: "post",
+            as: "comments",
           },
         },
-      },
-    },
-  ];
-
-  const [result] = await Post.aggregate(pipeline);
-
-  return {
-    posts: result?.posts || [],
-    total: result?.total || 0,
-  };
-}
-
-async function fetchMostCommentedPosts(params: SetPostQuery): Promise<{
-  total: number;
-  posts: GetPostType[];
-}> {
-  const { userEmail, query, page = 1, limit = 12 } = params;
-
-  const match: PipelineStage.Match = {
-    $match: {},
-  };
-
-  if (userEmail) {
-    match.$match["userEmail"] = userEmail;
-  }
-
-  if (query) {
-    match.$match["title"] = { $regex: query, $options: "i" };
-  }
-
-  const pipeline: PipelineStage[] = [
-    match,
-    {
-      $lookup: {
-        from: "comments",
-        localField: "_id",
-        foreignField: "post",
-        as: "comments",
-      },
-    },
-    {
-      $addFields: {
-        commentCount: { $size: "$comments" },
-      },
-    },
-    {
-      $sort: {
-        commentCount: -1,
-      },
-    },
-    {
-      $facet: {
-        metadata: [{ $count: "total" }],
-        data: [
-          { $skip: (page - 1) * limit },
-          { $limit: limit },
-          {
-            $project: {
-              jsonContent: 0,
-              comments: 0,
-            },
-          }
-        ],
-      },
-    },
-    {
-      $project: {
-        posts: "$data",
-        total: { $ifNull: [{ $arrayElemAt: ["$metadata.total", 0] }, 0] },
-      },
-    },
-    {
-      $addFields: {
-        posts: {
-          $map: {
-            input: "$posts",
-            as: "post",
-            in: {
-              $mergeObjects: ["$$post", { _id: { $toString: "$$post._id" } }],
-            },
+        {
+          $addFields: {
+            ...(withComments && { commentCount: { $size: "$comments" } }),
+            _id: { $toString: "$_id" }, // Convert _id to string
           },
         },
-      },
+        {
+          $project: {
+            jsonContent: 0,
+            comments: 0,
+          },
+        },
+      ],
     },
-  ];
+  });
+
+  pipeline.push({
+    $project: {
+      posts: "$data",
+      total: { $ifNull: [{ $arrayElemAt: ["$metadata.total", 0] }, 0] },
+    },
+  });
 
   const [result] = await Post.aggregate(pipeline);
 
@@ -253,36 +111,18 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   posts: GetPostType[];
 }> {
   await connectToDB();
-
-  let result;
-
-  const params: SetPostQuery = {
+  return fetchPosts({
     page: 1,
     limit: 12,
     sort: sort || 'latest',
     withComments: withComments || false,
-  };
-
-  switch (sort) {
-    case 'popular':
-      result = await fetchPopularPosts(params);
-      break;
-    case 'commented':
-      result = await fetchMostCommentedPosts(params);
-      break;
-    case 'latest':
-    default: // 기본 fallback
-      result = await fetchLatestPosts(params);
-      break;
-  }
-
-  return result;
+  });
 }
 
 export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> {
   await connectToDB();
 
-  const result = await fetchLatestPosts({
+  const result = await fetchPosts({
     page: 1,
     limit: 1000, // 모든 게시물을 가져오기 위해 충분히 큰 limit 설정
     sort: 'latest',
@@ -300,32 +140,13 @@ export async function getPaginatedPosts(page: number, limit: number, sort: SortO
   posts: GetPostType[];
 }> {
   await connectToDB();
-
-  let result;
-
-  const params: SetPostQuery = {
+  return fetchPosts({
     page: page || 1,
     limit: limit || 12,
     sort: sort || 'latest',
     withComments: withComments || false,
-  };
-
-  if (userEmail) { params.userEmail = userEmail; }
-
-  switch (sort) {
-    case 'popular':
-      result = await fetchPopularPosts(params);
-      break;
-    case 'commented':
-      result = await fetchMostCommentedPosts(params);
-      break;
-    case 'latest':
-    default: // 기본 fallback
-      result = await fetchLatestPosts(params);
-      break;
-  }
-
-  return result;
+    userEmail: userEmail || undefined,
+  });
 }
 
 export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false): Promise<{
@@ -333,30 +154,13 @@ export async function searchPosts(query: string, sort: SortOption = 'latest', wi
   posts: GetPostType[];
 }> {
   await connectToDB();
-
-  let result;
-  const params: SetPostQuery = {
+  return fetchPosts({
     page: 1,
     limit: 12,
     query: query || '',
     sort: sort || 'latest',
     withComments: withComments || false,
-  };
-
-  switch (sort) {
-    case 'popular':
-      result = await fetchPopularPosts(params);
-      break;
-    case 'commented':
-      result = await fetchMostCommentedPosts(params);
-      break;
-    case 'latest':
-    default: // 기본 fallback
-      result = await fetchLatestPosts(params);
-      break;
-  }
-
-  return result;
+  });
 }
 
 export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', page: number, limit: number, withComments: boolean = false): Promise<{
@@ -396,11 +200,13 @@ export async function deletePost(postId: string, userEmail: string): Promise<{ s
       throw new Error("게시글을 삭제할 권한이 없습니다.");
     }
 
-    // 참고: MongoDB Replica Set이 아닌 환경에서는 트랜잭션이 지원되지 않습니다.
-    // 아래 작업들은 개별적으로 실행되며, 하나가 실패해도 이전에 성공한 작업이 롤백되지 않습니다.
+    // Soft delete the post and its comments
+    await Post.findByIdAndUpdate(postId, {
+      $set: { isDeleted: true, deletedAt: new Date() }
+    });
+    await Comment.updateMany({ post: postId }, { $set: { isDeleted: true } });
+
     await User.updateOne({ _id: user._id }, { $inc: { points: -DELETE_POST_COST } });
-    await Post.findByIdAndDelete(postId);
-    await Comment.deleteMany({ post: postId });
 
     return { success: true, message: "게시글이 성공적으로 삭제되었습니다." };
   } catch (error) {
@@ -413,7 +219,13 @@ export async function deletePost(postId: string, userEmail: string): Promise<{ s
 export async function getPost(_id: string): Promise<{ post: GetPostType; } | null> {
   try {
     await connectToDB();
-    const post = await Post.findById(_id);
+    // Fetch only if not soft-deleted
+    const post = await Post.findOne({ _id, isDeleted: { $ne: true } });
+
+    if (!post) {
+      return null;
+    }
+
     return { post };
   } catch (error) {
     console.error("Error on <getPost>", error);
@@ -424,7 +236,8 @@ export async function getPost(_id: string): Promise<{ post: GetPostType; } | nul
 export async function updatePostViews(_id: string): Promise<void> {
   try {
     await connectToDB();
-    await Post.findByIdAndUpdate(_id, { $inc: { views: 1 } }, { new: true });
+    // Do not increment views for a deleted post
+    await Post.findOneAndUpdate({ _id, isDeleted: { $ne: true } }, { $inc: { views: 1 } });
   } catch (error) {
     console.error("Error on <updatePostViews>", error);
   }
@@ -442,7 +255,9 @@ export async function getPostsByTag(tag: string):  Promise<{
   await connectToDB();
 
   const matchStage: PipelineStage.Match = {
-    $match: {},
+    $match: {
+      isDeleted: { $ne: true } // Exclude soft-deleted posts
+    },
   };
 
   if (tag) {

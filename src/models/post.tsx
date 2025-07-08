@@ -20,11 +20,19 @@ const PostSchema = new Schema(
     likes: { type: Number, default: 0 }, // 좋아요 수
     dislikes: { type: Number, default: 0 }, // 싫어요 수
     views: { type: Number, default: 0 }, // 조회수
-    createdAt: { type: Date, default: Date.now }, // 작성일
     tags: {
         type: [String],
         default: [],
         index: true // 나중에 태그로 검색할 때 성능 향상을 위해 인덱스를 추가합니다.
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true, // 삭제되지 않은 게시물을 필터링하는 쿼리의 성능을 향상시킵니다.
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
     },
   },
   { timestamps: true }
