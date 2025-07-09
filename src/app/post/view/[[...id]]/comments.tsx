@@ -5,7 +5,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { CommentType } from "@/models/comment";
 import { Manrope } from 'next/font/google';
 import { nanoid } from "nanoid";
-import { AchievementToast } from "./achievement-toast";
+import { AchievementToast } from "../../../../components/achievement-toast";
 import { AchievementType } from "@/models/achievement";
 
 const manrope = Manrope({ subsets: ['latin'] });
