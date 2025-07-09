@@ -16,6 +16,7 @@ type Props = { postId: string };
 type Comment = CommentType & {
   _id: string  // InferSchemaType에는 이게 없음
   parent: string | null
+  isDeleted?: boolean; // isDeleted 플래그 추가
   authorId?: { // populate를 통해 가져온 작성자 정보
     email: string;
     name: string;
@@ -144,62 +145,70 @@ export default function Comments({ postId }: Props) {
       .filter(c => c.parent === parentId)
       .map(c => (
         <Fragment key={c._id}>
-          <div className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4`}>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <h3 className={`font-medium text-gray-900 dark:text-white tracking-tighter ${manrope.className}`}>{c.author}</h3>
-                <span className="text-sm text-gray-500">·</span> {/* 가운데 점 */}
-                <span className="text-sm text-gray-500">
-                  {new Date(c.createdAt).toLocaleString()}
-                </span>
-              </div>
-              <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
-                {c.content}
-              </p>
-              <button
-                className="text-sm text-blue-600 hover:underline mt-2"
-                onClick={() => setOpenReplyFor(prev => (prev === c._id ? null : c._id))}
-                aria-label="Open reply form"
-              >
-                Reply
-              </button>
-
-              {/* 로그인한 사용자가 댓글 작성자일 경우 삭제 버튼 표시 */}
-              {session?.user?.email === c.authorId?.email && (
-                <button
-                  className="text-sm text-red-600 hover:underline mt-2 ml-4"
-                  onClick={() => handleDelete(c._id)}
-                >
-                  Delete
-                </button>
-              )}
-
-              {/* ✅ Reply form (열려있는 댓글일 때만 표시) */}
-              {openReplyFor === c._id && (
-                <form className="mt-4 flex flex-col md:flex-row md:items-stretch md:gap-4">
-                  <label htmlFor="comment" className="sr-only">
-                    Add a comment
-                  </label>
-                  <textarea
-                    id="comment"
-                    rows={4}
-                    className="min-h-20 block w-full p-3 text-sm text-gray-900 bg-gray-50 border border-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                    placeholder="Write your comment here..."
-                    ref={replyContent} // 답글 폼 ref
-                  ></textarea>
-                  <button
-                    type="submit"
-                    className="mt-4 md:mt-0 inline-flex justify-end items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600"
-                    onClick={() => submitComment(c._id, replyContent)} // 답글 작성 시 부모 댓글 ID 전달
-                    disabled={submitting}
-                    aria-label="Reply to comment"
-                  > {/* 답글 작성 버튼 */}
-                    Post comment
-                  </button>
-                </form>
-              )}
+          {c.isDeleted ? (
+            // 삭제된 댓글 UI
+            <div className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}border border-gray-200 rounded-lg rounded-br-none p-4`}>
+              <p className="text-gray-500 italic">{c.content}</p>
             </div>
-          </div>
+          ) : (
+            // 정상 댓글 UI
+            <div className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4`}>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className={`font-medium text-gray-900 dark:text-white tracking-tighter ${manrope.className}`}>{c.author}</h3>
+                  <span className="text-sm text-gray-500">·</span> {/* 가운데 점 */}
+                  <span className="text-sm text-gray-500">
+                    {new Date(c.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
+                  {c.content}
+                </p>
+                <button
+                  className="text-sm text-blue-600 hover:underline mt-2"
+                  onClick={() => setOpenReplyFor(prev => (prev === c._id ? null : c._id))}
+                  aria-label="Open reply form"
+                >
+                  Reply
+                </button>
+
+                {/* 로그인한 사용자가 댓글 작성자일 경우 삭제 버튼 표시 */}
+                {session?.user?.email === c.authorId?.email && (
+                  <button
+                    className="text-sm text-red-600 hover:underline mt-2 ml-4"
+                    onClick={() => handleDelete(c._id)}
+                  >
+                    Delete
+                  </button>
+                )}
+
+                {/* ✅ Reply form (열려있는 댓글일 때만 표시) */}
+                {openReplyFor === c._id && (
+                  <form className="mt-4 flex flex-col md:flex-row md:items-stretch md:gap-4">
+                    <label htmlFor="comment" className="sr-only">
+                      Add a comment
+                    </label>
+                    <textarea
+                      id="comment"
+                      rows={4}
+                      className="min-h-20 block w-full p-3 text-sm text-gray-900 bg-gray-50 border border-gray-100 rounded-lg focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                      placeholder="Write your comment here..."
+                      ref={replyContent} // 답글 폼 ref
+                    ></textarea>
+                    <button
+                      type="submit"
+                      className="mt-4 md:mt-0 inline-flex justify-end items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:outline-none focus:ring-blue-300 dark:bg-blue-500 dark:hover:bg-blue-600"
+                      onClick={() => submitComment(c._id, replyContent)} // 답글 작성 시 부모 댓글 ID 전달
+                      disabled={submitting}
+                      aria-label="Reply to comment"
+                    > {/* 답글 작성 버튼 */}
+                      Post comment
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
 
           {nestedComments(c._id)} {/* 대댓글 추가 UI 위치 */}
         </Fragment> // 단일 댓글 끝

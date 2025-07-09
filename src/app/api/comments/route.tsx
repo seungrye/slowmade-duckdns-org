@@ -97,16 +97,27 @@ export async function GET(req: NextRequest) {
 
     await connectToDB();
 
-    const comments = await Comment.find ({
+    const commentsFromDB = await Comment.find ({
         post: new mongoose.Types.ObjectId(postId),
-        isDeleted: { $ne: true } // 삭제되지 않은 댓글만 조회
-    })
+    }) // isDeleted 필터를 제거하여 삭제된 댓글도 함께 조회합니다.
         .populate({
             path: 'authorId',
             select: 'email name' // 필요한 필드만 선택적으로 가져옴
         })
         .sort({ createdAt: 1 })
         .lean();
+
+    // 삭제된 댓글의 내용을 서버에서 변경하여 반환합니다.
+    const comments = commentsFromDB.map(comment => {
+        if (comment.isDeleted) {
+            return {
+                ...comment,
+                content: '삭제된 댓글입니다.',
+                author: '알 수 없음',
+            };
+        }
+        return comment;
+    });
 
     return NextResponse.json(comments);
 }
