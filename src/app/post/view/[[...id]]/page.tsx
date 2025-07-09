@@ -1,6 +1,6 @@
 
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
-import Comments from '@/app/post/view/[[...id]]/comments';
+import Comments from '@/app/post/view/[[...id]]/comments.section';
 import { getPost, updatePostViews } from '@/lib/posts';
 import LikeHateSection from './like-hate.section';
 import { Metadata } from 'next';
