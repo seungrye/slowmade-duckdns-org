@@ -97,9 +97,49 @@ export async function GET(req: NextRequest) {
 
     await connectToDB();
 
-    const comments = await Comment.find ({ post: new mongoose.Types.ObjectId(postId) })
+    const comments = await Comment.find ({
+        post: new mongoose.Types.ObjectId(postId),
+        isDeleted: { $ne: true } // 삭제되지 않은 댓글만 조회
+    })
+        .populate({
+            path: 'authorId',
+            select: 'email name' // 필요한 필드만 선택적으로 가져옴
+        })
         .sort({ createdAt: 1 })
         .lean();
 
     return NextResponse.json(comments);
+}
+
+export async function DELETE(req: NextRequest) {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+        return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
+    }
+
+    const { commentId } = await req.json();
+    if (!commentId) {
+        return NextResponse.json({ message: "댓글 ID가 필요합니다." }, { status: 400 });
+    }
+
+    await connectToDB();
+
+    const user = await User.findOne({ email: session.user.email });
+    if (!user) {
+        return NextResponse.json({ message: "사용자를 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    // findOneAndUpdate를 사용하여 한 번의 쿼리로 처리
+    const updatedComment = await Comment.findOneAndUpdate(
+        { _id: commentId, authorId: user._id }, // 조건: 댓글 ID와 작성자 ID 일치
+        { $set: { isDeleted: true } }, // 작업: isDeleted 플래그 설정
+        { new: true }
+    );
+
+    if (!updatedComment) {
+        // updatedComment가 null이면 댓글이 존재하지 않거나 삭제 권한이 없는 경우입니다.
+        return NextResponse.json({ message: "댓글을 찾을 수 없거나 삭제 권한이 없습니다." }, { status: 404 });
+    }
+
+    return NextResponse.json({ message: "댓글이 삭제되었습니다." }, { status: 200 });
 }

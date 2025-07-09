@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { useSession } from "next-auth/react";
 import toast, { Toaster } from "react-hot-toast";
 import { CommentType } from "@/models/comment";
 import { Manrope } from 'next/font/google';
@@ -15,9 +16,14 @@ type Props = { postId: string };
 type Comment = CommentType & {
   _id: string  // InferSchemaType에는 이게 없음
   parent: string | null
+  authorId?: { // populate를 통해 가져온 작성자 정보
+    email: string;
+    name: string;
+  } | null;
 }
 
 export default function Comments({ postId }: Props) {
+  const { data: session } = useSession();
   const [openReplyFor, setOpenReplyFor] = useState<string | null>(null); // 답글 작성 폼을 열 댓글 ID
   const [submitting, setSubmitting] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -103,6 +109,31 @@ export default function Comments({ postId }: Props) {
     }
   }, [postId]);
 
+  const handleDelete = useCallback(async (commentId: string) => {
+    if (!confirm("정말로 이 댓글을 삭제하시겠습니까?")) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/comments', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId }),
+      });
+
+      if (response.ok) {
+        toast.success('댓글이 삭제되었습니다.');
+        fetchComments(); // 댓글 목록 새로고침
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || '댓글 삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast.error('댓글 삭제 중 오류가 발생했습니다.');
+    }
+  }, [fetchComments]);
+
   const nestedComments = useCallback((parentId: string | null = null) => {
     if (comments.length === 0) return null;
 
@@ -132,6 +163,16 @@ export default function Comments({ postId }: Props) {
               >
                 Reply
               </button>
+
+              {/* 로그인한 사용자가 댓글 작성자일 경우 삭제 버튼 표시 */}
+              {session?.user?.email === c.authorId?.email && (
+                <button
+                  className="text-sm text-red-600 hover:underline mt-2 ml-4"
+                  onClick={() => handleDelete(c._id)}
+                >
+                  Delete
+                </button>
+              )}
 
               {/* ✅ Reply form (열려있는 댓글일 때만 표시) */}
               {openReplyFor === c._id && (
@@ -163,7 +204,7 @@ export default function Comments({ postId }: Props) {
           {nestedComments(c._id)} {/* 대댓글 추가 UI 위치 */}
         </Fragment> // 단일 댓글 끝
       ));
-  }, [comments, openReplyFor, submitting, submitComment]);
+  }, [comments, openReplyFor, submitting, submitComment, session, handleDelete]);
 
 
 

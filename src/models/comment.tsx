@@ -9,6 +9,7 @@ const CommentSchema = new mongoose.Schema(
       content: { type: String, required: true }, // 댓글 내용
       likes: { type: Number, default: 0 }, // 좋아요 수
       createdAt: { type: Date, default: Date.now }, // 작성일
+      isDeleted: { type: Boolean, default: false },  // 삭제 플래그 추가
     },
     { timestamps: true }
   );
