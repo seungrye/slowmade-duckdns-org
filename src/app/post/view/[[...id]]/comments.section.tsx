@@ -166,8 +166,11 @@ export default function Comments({ postId }: Props) {
           {c.isDeleted ? (
             // 삭제된 댓글 UI
             <div
-              id={`comment-${c._id}`}
-              ref={(el) => commentRefs.current.set(c._id, el)}
+              id={`comment-${c._id}`} // `id` 속성 추가
+              ref={(el) => {
+                if (el) commentRefs.current.set(c._id, el);
+                else commentRefs.current.delete(c._id);
+              }}
               className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}border border-gray-200 rounded-lg rounded-br-none p-4`}
             >
               <p className="text-gray-500 italic">{c.content}</p>
@@ -176,7 +179,10 @@ export default function Comments({ postId }: Props) {
             // 정상 댓글 UI
             <div
               id={`comment-${c._id}`}
-              ref={(el) => commentRefs.current.set(c._id, el)}
+              ref={(el) => {
+                if (el) commentRefs.current.set(c._id, el);
+                else commentRefs.current.delete(c._id);
+              }}
               className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4 transition-all duration-300`}
             >
               <div className="flex-1">
