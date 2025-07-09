@@ -8,7 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
 import { AchievementType } from '@/models/achievement';
 import { AchievementToast } from '@/components/achievement-toast';
-import TagInput from '@/components/tag-input';
+import TagInput from '@/app/post/write/[[...id]]/tag-input';
 
 export default function PostWriterForm() {
     const { data: session } = useSession();
