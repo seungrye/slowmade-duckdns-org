@@ -15,7 +15,10 @@ type Props = { postId: string };
 
 type Comment = CommentType & {
   _id: string  // InferSchemaType에는 이게 없음
-  parent: string | null
+  parent: { // populate를 통해 가져온 부모 댓글 정보
+    _id: string;
+    author: string;
+  } | null;
   isDeleted?: boolean; // isDeleted 플래그 추가
   authorId?: { // populate를 통해 가져온 작성자 정보
     email: string;
@@ -31,6 +34,7 @@ export default function Comments({ postId }: Props) {
 
   const content = useRef<HTMLTextAreaElement>(null);
   const replyContent = useRef<HTMLTextAreaElement>(null);
+  const commentRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
 
   const fetchComments = useCallback(async () => {
@@ -135,24 +139,46 @@ export default function Comments({ postId }: Props) {
     }
   }, [fetchComments]);
 
+  const handleParentAuthorClick = useCallback((parentId: string) => {
+    const parentElement = commentRefs.current.get(parentId);
+    if (parentElement) {
+      parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 스크롤 대상에 하이라이트 효과 추가
+      parentElement.classList.add('highlight-scroll');
+      setTimeout(() => {
+        parentElement.classList.remove('highlight-scroll');
+      }, 1500); // 1.5초 후 하이라이트 제거
+    }
+  }, []);
+
   const nestedComments = useCallback((parentId: string | null = null) => {
     if (comments.length === 0) return null;
 
-    // console.log("comments", comments);
-    // console.log("parentId", parentId);
-
     return comments
-      .filter(c => c.parent === parentId)
+      .filter(c => {
+        // 부모 ID가 일치하는 댓글을 필터링합니다.
+        // c.parent는 populate된 객체일 수도 있고, null일 수도 있습니다.
+        const currentParentId = c.parent ? c.parent._id : null;
+        return currentParentId === parentId;
+      })
       .map(c => (
         <Fragment key={c._id}>
           {c.isDeleted ? (
             // 삭제된 댓글 UI
-            <div className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}border border-gray-200 rounded-lg rounded-br-none p-4`}>
+            <div
+              id={`comment-${c._id}`}
+              ref={(el) => commentRefs.current.set(c._id, el)}
+              className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}border border-gray-200 rounded-lg rounded-br-none p-4`}
+            >
               <p className="text-gray-500 italic">{c.content}</p>
             </div>
           ) : (
             // 정상 댓글 UI
-            <div className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4`}>
+            <div
+              id={`comment-${c._id}`}
+              ref={(el) => commentRefs.current.set(c._id, el)}
+              className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4 transition-all duration-300`}
+            >
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <h3 className={`font-medium text-gray-900 dark:text-white tracking-tighter ${manrope.className}`}>{c.author}</h3>
@@ -162,6 +188,19 @@ export default function Comments({ postId }: Props) {
                   </span>
                 </div>
                 <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
+                  {c.parent && (
+                    <a
+                      href={`#comment-${c.parent._id}`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleParentAuthorClick(c.parent._id);
+                      }}
+                      className="text-blue-600 hover:underline mr-2 p-1 bg-blue-50 rounded-md"
+                      aria-label={`부모 댓글로 이동: @${c.parent.author}`}
+                    >
+                      {c.parent.author}
+                    </a>
+                  )}
                   {c.content}
                 </p>
                 <button
@@ -213,12 +252,28 @@ export default function Comments({ postId }: Props) {
           {nestedComments(c._id)} {/* 대댓글 추가 UI 위치 */}
         </Fragment> // 단일 댓글 끝
       ));
-  }, [comments, openReplyFor, submitting, submitComment, session, handleDelete]);
+  }, [comments, openReplyFor, submitting, submitComment, session, handleDelete, handleParentAuthorClick]);
 
 
 
   return <>
     <Toaster position="bottom-right" /> {/* ✅ 토스트 메시지 표시 위치 */}
+    <style jsx global>{`
+      .highlight-scroll {
+        animation: highlight-animation 1.5s ease-out;
+      }
+      @keyframes highlight-animation {
+        0% { background-color: rgba(59, 130, 246, 0.3); }
+        100% { background-color: transparent; }
+      }
+      .dark .highlight-scroll {
+        animation: highlight-animation-dark 1.5s ease-out;
+      }
+      @keyframes highlight-animation-dark {
+        0% { background-color: rgba(59, 130, 246, 0.4); }
+        100% { background-color: transparent; }
+      }
+    `}</style>
 
     <h2 className="text-xl font-semibold mb-2">{comments?.length || 0} 덧글</h2>
 

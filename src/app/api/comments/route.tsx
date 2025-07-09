@@ -104,6 +104,10 @@ export async function GET(req: NextRequest) {
             path: 'authorId',
             select: 'email name' // 필요한 필드만 선택적으로 가져옴
         })
+        .populate({
+            path: 'parent',
+            select: 'author' // 부모 댓글의 작성자 이름만 가져옴
+        })
         .sort({ createdAt: 1 })
         .lean();
 
