@@ -83,7 +83,6 @@ async function fetchPosts(params: SetPostQuery): Promise<{
         },
         {
           $project: {
-            htmlContent: 0,
             comments: 0,
           },
         },
