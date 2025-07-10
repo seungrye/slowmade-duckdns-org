@@ -51,6 +51,25 @@ export default function Comments({ postId }: Props) {
     if (!submitting) fetchComments();
   }, [submitting, fetchComments]);
 
+  useEffect(() => {
+    const handleRenderComplete = () => {
+      if (window.location.hash !== '#comments-section') return;
+
+      const element = document.getElementById('comments-section');
+      if (element) {
+        requestAnimationFrame(() => {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+    };
+
+    window.addEventListener('richContentRendered', handleRenderComplete);
+
+    return () => {
+      window.removeEventListener('richContentRendered', handleRenderComplete);
+    };
+  }, []); // 컴포넌트 마운트 시 한 번만 실행
+
   const submitComment = useCallback(async (parentId: string | null = null, content: RefObject<HTMLTextAreaElement | null>) => {
     // 에디터에서 값 가져오기
     if (!content.current?.value.trim()) {
@@ -262,7 +281,7 @@ export default function Comments({ postId }: Props) {
 
 
 
-  return <>
+  return <section id="comments-section">
     <Toaster position="bottom-right" /> {/* ✅ 토스트 메시지 표시 위치 */}
     <style jsx global>{`
       .highlight-scroll {
@@ -301,5 +320,5 @@ export default function Comments({ postId }: Props) {
         Post comment
       </button>
     </form>
-  </>
+  </section>
 }

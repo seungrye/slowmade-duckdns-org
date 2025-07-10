@@ -69,7 +69,7 @@ export default async function PostViewier(props: {
     const { post } = data;
     await updatePostViews(post._id);
 
-    const { htmlContent, title, likes, dislikes, tags } = post;
+    const { jsonContent, title, likes, dislikes, tags } = post;
 
     return (<div className='mx-auto px-4 py-6'>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
@@ -79,7 +79,7 @@ export default async function PostViewier(props: {
         </div>
         <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[600px] rich-web-editor-wrapper flex flex-col">
             <div className="p-4 transition-all duration-300 ease-in-out flex-1">
-                <RichContentViewer content={htmlContent} />
+                <RichContentViewer content={jsonContent} waitRenderComplete={true} />
             </div>
 
             {/* 태그 목록 렌더링 */}

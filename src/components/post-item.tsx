@@ -33,12 +33,13 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
       </div>
       {isOpen && (
         <div className="p-4 transition-all duration-300 ease-in-out border-t border-t-gray-200">
-          <RichContentViewer content={post.htmlContent} />
+          <RichContentViewer content={post.jsonContent} />
         </div>
       )}
       <div className="flex justify-between items-center px-4 py-3 text-sm text-gray-600 border-t border-t-gray-200">
         <div className="flex items-center cursor-pointer hover:text-blue-600">
-          <Link href={`/post/view/${post._id}`} className="flex items-center gap-2">
+          {/* 댓글 아이콘 링크에 해시 추가 */}
+          <Link href={`/post/view/${post._id}#comments-section`} className="flex items-center gap-2">
             <FontAwesomeIcon icon={faComment} />
             <span>{post.commentCount || 0}</span>
           </Link>
