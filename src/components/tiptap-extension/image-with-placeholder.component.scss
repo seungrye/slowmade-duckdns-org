@@ -1,0 +1,40 @@
+.image-view-wrapper {
+  display: block;
+  line-height: 0;
+  margin: 2rem 0;
+  border-radius: var(--tt-radius-xs, 0.25rem);
+  overflow: hidden;
+
+  // Tiptap에서 노드가 선택되었을 때의 스타일입니다.
+  &.ProseMirror-selectednode {
+    outline: 3px solid var(--tt-brand-color-500);
+    outline-offset: 2px;
+  }
+
+  .image-placeholder-container {
+    position: relative;
+    background-color: #f0f0f0; // 플레이스홀더 배경색 (라이트 모드)
+    min-height: 100px; // 이미지가 로드되기 전 최소 높이
+    transition: background-color 0.4s ease;
+
+    &.loaded {
+      background-color: transparent;
+    }
+
+    .image-content {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+
+      &.visible {
+        opacity: 1;
+      }
+    }
+  }
+}
+
+.dark .image-view-wrapper .image-placeholder-container {
+  background-color: #333; // 플레이스홀더 배경색 (다크 모드)
+}
