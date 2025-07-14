@@ -15,7 +15,7 @@ const resizeImage = async (file: File) => {
 /**
  * Handles image upload with progress tracking and abort capability
  */
-export const uploadImageFile = async (
+export const uploadImage = async (
   file: File,
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal

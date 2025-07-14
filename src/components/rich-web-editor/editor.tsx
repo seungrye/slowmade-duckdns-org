@@ -68,7 +68,7 @@ import { useWindowSize } from "@/hooks/use-window-size"
 
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
-import { uploadImageFile } from "./editor.upload-image-handler"
+import { uploadImage } from "./editor.upload"
 
 // --- Styles ---
 import "./editor.scss"
@@ -281,7 +281,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                 maxSize: MAX_FILE_SIZE,
                 limit: 32,
                 upload: async (file, onProgress?, abortSignal?) => {
-                    const {url, thumbnailUrl} = await uploadImageFile(file, onProgress, abortSignal);
+                    const {url, thumbnailUrl} = await uploadImage(file, onProgress, abortSignal);
 
                     if (uploadedImageUrlsRef.current.findIndex(x => x.url === url) < 0) {
                         uploadedImageUrlsRef.current.push({url, thumbnailUrl}); // 중복 방지 후 저장
