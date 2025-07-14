@@ -115,11 +115,11 @@ export default function PostWriterForm() {
                 setTimeout(() => router.push("/"), 1000); // 1초 후 홈으로 이동
             } else {
                 toast.error("업로드에 실패했습니다.");
+                setLoading(false);
             }
         } catch (error) {
             console.error("Error:", error);
             toast.error("서버 오류가 발생했습니다.");
-        } finally {
             setLoading(false);
         }
     };
