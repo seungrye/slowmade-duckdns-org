@@ -7,6 +7,7 @@ import { EditorContent, EditorContext, JSONContent, useEditor } from "@tiptap/re
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
+import { Image } from "@tiptap/extension-image"
 import { TaskItem } from "@tiptap/extension-task-item"
 import { TaskList } from "@tiptap/extension-task-list"
 import { TextAlign } from "@tiptap/extension-text-align"
@@ -20,7 +21,6 @@ import { Underline } from "@tiptap/extension-underline"
 import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
 import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
-import { ImageWithPlaceholder } from "@/components/tiptap-extension/image-with-placeholder.extension"
 
 // --- UI Primitives ---
 
@@ -50,7 +50,7 @@ const tiptapExtensions = [
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: true }),
-    ImageWithPlaceholder,
+    Image,
     Typography,
     Superscript,
     Subscript,
