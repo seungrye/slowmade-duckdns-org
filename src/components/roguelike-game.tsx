@@ -8,6 +8,7 @@ const RoguelikeGame = () => {
   // 컴포넌트 리렌더링 시 상태가 초기화되지 않도록 ref를 사용합니다.
   const playerRef = useRef<{ x: number; y: number } | null>(null)
   const gameMap = useRef<{ [key: string]: string }>({})
+  const visibleCells = useRef<{ [key: string]: boolean }>({})
 
   useEffect(() => {
     // 이미 게임이 초기화된 경우 중복 실행을 방지합니다.
@@ -47,16 +48,33 @@ const RoguelikeGame = () => {
       freeCells.push(key)
     })
 
-    // 3. 맵과 플레이어 그리기
+    // 3. FOV 계산 및 맵 그리기 함수
+    const computeFOV = () => {
+      visibleCells.current = {} // 이전 시야 초기화
+      const fov = new ROT.FOV.PreciseShadowcasting((x, y) => {
+        return `${x},${y}` in gameMap.current
+      })
+
+      if (playerRef.current) {
+        fov.compute(playerRef.current.x, playerRef.current.y, 10, (x, y, r, visibility) => {
+          if (visibility > 0) {
+            visibleCells.current[`${x},${y}`] = true
+          }
+        })
+      }
+    }
+
     const drawMap = () => {
       for (const key in gameMap.current) {
         const parts = key.split(",")
         const x = parseInt(parts[0])
         const y = parseInt(parts[1])
-        display.draw(x, y, gameMap.current[key], "#888", "#111")
+        const isVisible = visibleCells.current[key]
+        const char = isVisible ? gameMap.current[key] : " "
+        display.draw(x, y, char, isVisible ? "#888" : "#333", "#111")
       }
     }
-
+    
     const createPlayer = () => {
       const randomIndex = Math.floor(ROT.RNG.getUniform() * freeCells.length)
       const key = freeCells.splice(randomIndex, 1)[0]
@@ -64,21 +82,26 @@ const RoguelikeGame = () => {
       playerRef.current = { x: parseInt(parts[0]), y: parseInt(parts[1]) }
     }
 
-    const drawPlayer = () => {
-      if (playerRef.current) {
+    const drawGame = () => {
+      display.clear()
+      drawMap()
+      if (playerRef.current && visibleCells.current[`${playerRef.current.x},${playerRef.current.y}`]) {
         display.draw(playerRef.current.x, playerRef.current.y, "@", "#ff0", null)
       }
     }
 
-    const drawGame = () => {
-      display.clear()
-      drawMap()
-      drawPlayer()
-    }
-
     // 초기 플레이어 생성 및 게임 그리기
     createPlayer()
+    computeFOV()
     drawGame()
+
+    // 4. FOV 업데이트 및 그리기
+    const updateFOVAndDraw = () => {
+      if (playerRef.current) {
+        computeFOV()
+        drawGame()
+      }
+    }
 
     // 4. 키보드 입력 처리
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -95,7 +118,7 @@ const RoguelikeGame = () => {
       if (!(`${newX},${newY}` in gameMap.current)) return
 
       playerRef.current = { x: newX, y: newY }
-      drawGame()
+      updateFOVAndDraw()
     }
 
     window.addEventListener("keydown", handleKeyDown)
