@@ -38,6 +38,31 @@ export default function ContentSection() {
     }
   }, [topmostPostId]);
 
+  const handleScrollToNext = useCallback(() => {
+    if (!topmostPostId) {
+      console.warn("No topmost post ID available to scroll to the next post.");
+      // If there's no topmost post, just try to scroll to the bottom to load initial content if needed.
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+      });
+      return;
+    }
+
+    const nextPostId = listRef.current?.getNextPostId(topmostPostId);
+    if (nextPostId) {
+      const nextPostElement = document.getElementById(nextPostId);
+      if (nextPostElement) {
+        requestAnimationFrame(() => {
+          // 'block: start' 옵션으로 엘리먼트의 상단이 뷰포트의 상단에 오도록 스크롤합니다.
+          nextPostElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+    } else {
+      // If at the end of the loaded list, scroll to the bottom of the page to trigger loading more posts.
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+    }
+  }, [topmostPostId]);
+
   return (
     <>
       <section className="mt-12">
@@ -47,6 +72,7 @@ export default function ContentSection() {
 
       {/* 우측 하단 플로팅 메뉴 */}
       <FloatingMenu
+        onScrollToNext={handleScrollToNext}
         onScrollToPrev={handleScrollToPrev}
         onExpandAll={handleExpandAll}
         onCollapseAll={handleCollapseAll}

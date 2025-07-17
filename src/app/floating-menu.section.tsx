@@ -1,15 +1,16 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Plus, ArrowUpToLine, PanelTopClose, PanelTopOpen, ChevronUp } from 'lucide-react'; // 아이콘 라이브러리 예시 (lucide-react)
+import { Plus, ArrowUpToLine, PanelTopClose, PanelTopOpen, ChevronUp, ChevronDown } from 'lucide-react'; // 아이콘 라이브러리 예시 (lucide-react)
 
 interface FloatingMenuProps {
     onExpandAll?: () => void;
     onCollapseAll?: () => void;
     onScrollToPrev?: () => void; // 이전 게시물로 스크롤하는 함수
+    onScrollToNext?: () => void; // 다음 게시물로 스크롤하는 함수
 }
 
-export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPrev }: FloatingMenuProps) {
+export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPrev, onScrollToNext }: FloatingMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isAllExpanded, setIsAllExpanded] = useState(false);
 
@@ -60,6 +61,16 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPre
                 >
                     <button onClick={() => onScrollToPrev?.()} className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600" title="수정">
                         <ChevronUp size={20} />
+                    </button>
+                </div>
+
+                {/* 다음 게시물로 scroll */}
+                <div
+                    className={`mb-3 transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
+                        }`}
+                >
+                    <button onClick={() => onScrollToNext?.()} className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600" title="다음 게시물">
+                        <ChevronDown size={20} />
                     </button>
                 </div>
 

@@ -6,6 +6,7 @@ import PostItem from '../components/post-item';
 
 export interface InfinitPostListRef {
   getPrevPostId: (currentPostId: string) => string | null;
+  getNextPostId: (currentPostId: string) => string | null;
   expandAll: () => void;
   collapseAll: () => void;
 }
@@ -154,6 +155,16 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     }
     return null;
   }, [posts]);
+
+    // 게시물 ID를 기반으로 다음 게시물의 ID를 찾는 함수
+  const getNextPostId = useCallback((currentPostId: string): string | null => {
+    const currentIndex = posts.findIndex(post => post._id === currentPostId);
+    if (currentIndex > -1 && currentIndex < posts.length - 1) {
+      return posts[currentIndex + 1]._id;
+    }
+    return null;
+  }, [posts]);
+
   // Define functions to be exposed via ref
   const expandAll = useCallback(() => {
     setExpansionMode('expand');
@@ -168,6 +179,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
   // Expose expandAll and collapseAll functions to the parent component
   useImperativeHandle(ref, () => ({
     getPrevPostId,
+    getNextPostId,
     expandAll,
     collapseAll,
   }));
