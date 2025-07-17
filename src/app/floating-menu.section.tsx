@@ -87,7 +87,7 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPre
                     {/* 메인 플로팅 버튼 */}
                     <button
                       onClick={toggleMenu}
-                        className={`flex h-12 w-12 items-center justify-center rounded-full bg-black ${isOpen? `opacity-100` : `opacity-30`} text-white shadow transition-transform duration-300 ease-in-out`} aria-haspopup="true" aria-expanded={isOpen}>
+                        className={`flex h-12 w-12 items-center justify-center rounded-full bg-black ${isOpen? `opacity-100` : `opacity-40`} text-white shadow transition-transform duration-300 ease-in-out`} aria-haspopup="true" aria-expanded={isOpen}>
                         <div className={`transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}>
                             <Plus size={24} />
                         </div>
