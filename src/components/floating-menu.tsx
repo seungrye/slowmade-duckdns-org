@@ -31,6 +31,10 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll,onScrollToPrev
         setIsAllExpanded(!isAllExpanded);
     }, [isAllExpanded, onExpandAll, onCollapseAll]);
 
+    const toggleMenu = useCallback(() => {
+        setIsOpen(!isOpen);
+    }, [isOpen]);
+
     return (
         <div
             className="fixed bottom-5 right-5 z-50 flex flex-col items-end"
@@ -73,7 +77,9 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll,onScrollToPrev
                     </div>
 
                     {/* 메인 플로팅 버튼 */}
-                    <button className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow transition-transform duration-300 ease-in-out hover:bg-blue-700" aria-haspopup="true" aria-expanded={isOpen}>
+                    <button 
+                        onClick={toggleMenu}
+                        className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow transition-transform duration-300 ease-in-out hover:bg-blue-700" aria-haspopup="true" aria-expanded={isOpen}>
                         <div className={`transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}>
                             <Plus size={24} />
                         </div>
