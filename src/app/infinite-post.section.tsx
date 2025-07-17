@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { GetPostType } from '@/types/posts.d';
-import PostItem from './post-item';
+import PostItem from '../components/post-item';
 
 export interface InfinitPostListRef {
   getPrevPostId: (currentPostId: string) => string | null;

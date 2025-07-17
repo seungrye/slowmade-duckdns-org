@@ -1,6 +1,6 @@
 'use client';
-import FloatingMenu from "@/components/floating-menu";
-import InfinitPostList, { InfinitPostListRef } from "@/components/infinite-post";
+import FloatingMenu from "@/app/floating-menu.section";
+import InfinitPostList, { InfinitPostListRef } from "@/app/infinite-post.section";
 import { useCallback, useRef, useState } from "react";
 
 export default function ContentSection() {
