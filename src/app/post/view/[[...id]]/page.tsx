@@ -69,7 +69,7 @@ export default async function PostViewier(props: {
     const { post } = data;
     await updatePostViews(post._id);
 
-    const { jsonContent, title, likes, dislikes, tags } = post;
+    const { jsonContent, title, likes, tags } = post;
 
     return (<div className='mx-auto px-4 py-6'>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
@@ -95,7 +95,7 @@ export default async function PostViewier(props: {
                 </div>
             )}
 
-            <LikeSection defaultLikes={likes} defaultDislikes={dislikes} _id={post._id} />
+            <LikeSection defaultLikes={likes} _id={post._id} />
         </div>
 
         <div className="mt-6">
