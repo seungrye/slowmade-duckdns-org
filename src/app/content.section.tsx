@@ -6,6 +6,7 @@ import { useCallback, useRef, useState } from "react";
 export default function ContentSection() {
   const listRef = useRef<InfinitPostListRef>(null);
   const [topmostPostId, setTopmostPostId] = useState<string | null>(null);
+  const [bottomPostId, setBottomPostId] = useState<string | null>(null);
 
   const handleExpandAll = useCallback(() => {
     listRef.current?.expandAll();
@@ -39,7 +40,7 @@ export default function ContentSection() {
   }, [topmostPostId]);
 
   const handleScrollToNext = useCallback(() => {
-    if (!topmostPostId) {
+    if (!bottomPostId) {
       console.warn("No topmost post ID available to scroll to the next post.");
       // If there's no topmost post, just try to scroll to the bottom to load initial content if needed.
       requestAnimationFrame(() => {
@@ -48,7 +49,7 @@ export default function ContentSection() {
       return;
     }
 
-    const nextPostId = listRef.current?.getNextPostId(topmostPostId);
+    const nextPostId = listRef.current?.getNextPostId(bottomPostId);
     if (nextPostId) {
       const nextPostElement = document.getElementById(nextPostId);
       if (nextPostElement) {
@@ -61,13 +62,16 @@ export default function ContentSection() {
       // If at the end of the loaded list, scroll to the bottom of the page to trigger loading more posts.
       window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
     }
-  }, [topmostPostId]);
+  }, [bottomPostId]);
 
   return (
     <>
       <section className="mt-12">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">🔥 최신 유머</h2>
-        <InfinitPostList ref={listRef} onTopmostVisiblePostChange={setTopmostPostId} />
+        <InfinitPostList ref={listRef} 
+        onTopmostVisiblePostChange={setTopmostPostId}
+        onBottomVisiblePostChange={setBottomPostId}
+        />
       </section>
 
       {/* 우측 하단 플로팅 메뉴 */}
