@@ -1,18 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Plus, Pencil, Trash2, ScrollIcon, Scroll, ArrowUpToLine, ExpandIcon, ListCollapse, LucideListCollapse, PanelTopClose } from 'lucide-react'; // 아이콘 라이브러리 예시 (lucide-react)
-import { FaExpand, FaExpandAlt } from 'react-icons/fa';
-import { FcCollapse } from 'react-icons/fc';
+import { useCallback, useState } from 'react';
+import { Plus, ArrowUpToLine, PanelTopClose, PanelTopOpen } from 'lucide-react'; // 아이콘 라이브러리 예시 (lucide-react)
 
 interface FloatingMenuProps {
-    postId: string;
-    // 나중에 onDelete와 같은 함수를 props로 받아 처리할 수 있습니다.
+    onExpandAll?: () => void;
+    onCollapseAll?: () => void;
 }
 
-export default function FloatingMenu({ }: FloatingMenuProps) {
+export default function FloatingMenu({ onExpandAll, onCollapseAll }: FloatingMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isAllExpanded, setIsAllExpanded] = useState(false);
 
     const handleScrollToTop = () => {
         requestAnimationFrame(() => {
@@ -21,22 +19,16 @@ export default function FloatingMenu({ }: FloatingMenuProps) {
                 behavior: 'smooth',
             });
         });
-
     };
 
-    const handleExpandAll = () => {
-        // 모든 게시물을 펼치는 로직을 구현합니다.
-        console.log('Expanding all posts...');
-        // 예: await expandAllPosts();
-        alert('모든 게시물이 펼쳐졌습니다.'); // 실제 구현에서는 API 응답에 따라 처리
-    };
-
-    const handleCollapseAll = () => {
-        // 모든 게시물을 접는 로직을 구현합니다.
-        console.log('Collapsing all posts...');
-        // 예: await collapseAllPosts();
-        alert('모든 게시물이 접혔습니다.'); // 실제 구현에서는 API 응답에 따라 처리
-    };
+    const toggleExpandCollapse = useCallback(() => {
+        if (isAllExpanded) {
+            onCollapseAll?.();
+        } else {
+            onExpandAll?.();
+        }
+        setIsAllExpanded(!isAllExpanded);
+    }, [isAllExpanded, onExpandAll, onCollapseAll]);
 
     return (
         <div
@@ -63,8 +55,8 @@ export default function FloatingMenu({ }: FloatingMenuProps) {
                     <div className={`mr-3 transform transition-all duration-300 ease-in-out ${
                         isOpen ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0 pointer-events-none'
                     }`}>
-                        <button onClick={handleExpandAll} className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600" title="삭제">
-                            <PanelTopClose size={20} />
+                        <button onClick={toggleExpandCollapse} className="flex h-10 w-10 items-center justify-center rounded-full bg-red-500 text-white shadow-lg hover:bg-red-600" title="삭제">
+                            {isAllExpanded ? <PanelTopClose size={20} /> : <PanelTopOpen size={20} />}
                         </button>
                     </div>
 

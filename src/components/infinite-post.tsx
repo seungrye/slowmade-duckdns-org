@@ -1,10 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { GetPostType } from '@/types/posts.d';
 import PostItem from './post-item';
 
-export default function InfinitPostList() {
+export interface InfinitPostListRef {
+  expandAll: () => void;
+  collapseAll: () => void;
+}
+
+// The component is wrapped in forwardRef to receive a ref from its parent.
+const InfinitPostList = forwardRef<InfinitPostListRef, {}>((props, ref) => {
   const [posts, setPosts] = useState<GetPostType[]>([]);
   const [page, setPage] = useState<number>(1);
   const [hasMore, setHasMore] = useState(true);
@@ -89,6 +95,21 @@ export default function InfinitPostList() {
     });
   };
 
+  // Define functions to be exposed via ref
+  const expandAll = useCallback(() => {
+    setOpenedPostIds(new Set(posts.map(post => post._id)));
+  }, [posts]);
+
+  const collapseAll = useCallback(() => {
+    setOpenedPostIds(new Set());
+  }, []);
+
+  // Expose expandAll and collapseAll functions to the parent component
+  useImperativeHandle(ref, () => ({
+    expandAll,
+    collapseAll,
+  }));
+
   return (
     <>
       <div className="grid grid-cols-1 gap-6">
@@ -102,5 +123,8 @@ export default function InfinitPostList() {
       {hasMore && !isLoading && <div ref={loaderRef} className="h-10" />}
     </>
   );
-}
+});
+
+InfinitPostList.displayName = 'InfinitPostList';
+export default InfinitPostList;
 // This component fetches and displays a list of humorous posts with infinite scrolling.
