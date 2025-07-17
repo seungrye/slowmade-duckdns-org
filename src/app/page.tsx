@@ -1,3 +1,4 @@
+import FloatingMenu from "@/components/floating-menu";
 import InfinitPostList from "@/components/infinite-post";
 import type { Metadata } from 'next'
  
@@ -13,6 +14,10 @@ export default async function Home() {
         <h2 className="text-2xl font-semibold text-gray-800 mb-4">🔥 최신 유머</h2>
         <InfinitPostList />
       </section>
+
+      {/* 우측 하단 플로팅 메뉴 */}
+      <FloatingMenu />
+
     </main>
   );
 }
