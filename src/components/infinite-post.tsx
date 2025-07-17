@@ -24,8 +24,10 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
   const [isLoading, setIsLoading] = useState(false); // 1. 로딩 상태 추가
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  // 첫 로드 시에만 게시물을 열어두기 위한 상태
+  // 열려있는 게시물의 ID를 관리하는 상태
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
+  // 전체 게시물의 열림/닫힘 상태를 제어하는 모드
+  const [expansionMode, setExpansionMode] = useState<'expand' | 'collapse' | 'individual'>('individual');
 
   const fetchPosts = useCallback(async (page: number) => {
     // 1. 로딩 중이거나 더 이상 게시물이 없으면 중복 실행 방지
@@ -51,13 +53,17 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
       // Map의 순서를 유지하면서 배열로 변환합니다.
       return Array.from(postsMap.values());
     });
-    setPage(page + 1);
 
-    // 첫 페이지 로드 시에만 모든 게시물을 열린 상태로 설정
-    if (page === 1) {
-      setOpenedPostIds(new Set(newPosts.map((post: GetPostType) => post._id)));
+    // expansionMode에 따라 새로 로드된 게시물의 열림 상태를 결정합니다.
+    if (expansionMode === 'expand') {
+      setOpenedPostIds(prev => {
+        const newSet = new Set(prev);
+        newPosts.forEach((p: GetPostType) => newSet.add(p._id));
+        return newSet;
+      });
     }
-  }, [hasMore, isLoading]);
+    setPage(page + 1);
+  }, [hasMore, isLoading, expansionMode]);
 
   // 2. 초기 데이터 로딩을 위한 useEffect
   useEffect(() => {
@@ -128,6 +134,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
   }, [fetchPosts, hasMore, isLoading, page]); // isLoading을 의존성에 추가
 
   const togglePost = useCallback((id: string) => {
+    setExpansionMode('individual'); // 사용자가 개별적으로 토글하면 'individual' 모드로 변경
     setOpenedPostIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -137,7 +144,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
       }
       return newSet;
     });
-  }, [setOpenedPostIds]);
+  }, []);
 
   // 게시물 ID를 기반으로 이전 게시물의 ID를 찾는 함수
   const getPrevPostId = useCallback((currentPostId: string): string | null => {
@@ -149,10 +156,12 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
   }, [posts]);
   // Define functions to be exposed via ref
   const expandAll = useCallback(() => {
+    setExpansionMode('expand');
     setOpenedPostIds(new Set(posts.map(post => post._id)));
   }, [posts]);
 
   const collapseAll = useCallback(() => {
+    setExpansionMode('collapse');
     setOpenedPostIds(new Set());
   }, []);
 
