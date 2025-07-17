@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { GetPostType } from '@/types/posts.d';
 import PostItem from '../components/post-item';
 
@@ -203,8 +203,8 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
           return (
             <div
               key={post._id}
-              id={post._id}
-              ref={el => postItemRefs.current.set(post._id, el)}>
+              id={post._id} // Assign id to the div wrapper
+              ref={el => { postItemRefs.current.set(post._id, el); }}>
               <PostItem post={post} isOpen={isOpen} togglePost={togglePost} />
             </div>
           );
