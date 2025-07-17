@@ -13,11 +13,10 @@ export interface InfinitPostListRef {
 
 interface InfinitPostListProps {
   onTopmostVisiblePostChange?: (postId: string | null) => void;
-  onBottomVisiblePostChange?: (postId: string | null) => void;
 }
 
 // The component is wrapped in forwardRef to receive a ref from its parent.
-const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange, onBottomVisiblePostChange }, ref) => {
+const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange }, ref) => {
   const [posts, setPosts] = useState<GetPostType[]>([]);
   // 각 PostItem 엘리먼트에 대한 ref를 저장합니다.
   const postItemRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -44,7 +43,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
       setHasMore(false);
       return;
     }
-
+    
     // 기존 게시물은 최신 정보로 업데이트하고, 새 게시물은 추가합니다.
     // 이 방식은 데이터의 최신 상태를 유지하면서 'key' 중복 오류를 방지하는 가장 안정적인 방법입니다.
     setPosts((prev) => {
@@ -78,27 +77,18 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
 
   // 현재 화면 상단의 게시물을 추적하기 위한 useEffect
   useEffect(() => {
-    // onTopmostVisiblePostChange,onBottomVisiblePostChange prop이 없으면 옵저버를 설정하지 않습니다.
-    if (!onTopmostVisiblePostChange || !onBottomVisiblePostChange) return;
+    // onTopmostVisiblePostChange prop이 없으면 옵저버를 설정하지 않습니다.
+    if (!onTopmostVisiblePostChange) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // 뷰포트 상단에 가장 가까운 엘리먼트를 찾습니다.
         const topEntry = entries
           .filter(entry => entry.isIntersecting)
+          // 뷰포트 상단에 가장 가까운 엘리먼트를 찾습니다.
           .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
 
         if (topEntry) {
-          onTopmostVisiblePostChange(topEntry.target.id);
-        }
-
-        // 뷰포트 하단에 가장 가까운 엘리먼트를 찾습니다.
-        const bottomEntry = entries
-          .filter(entry => entry.isIntersecting)
-          .sort((a, b) => b.boundingClientRect.bottom - a.boundingClientRect.bottom)[0];
-
-        if (bottomEntry) {
-          onBottomVisiblePostChange(bottomEntry.target.id);
+            onTopmostVisiblePostChange(topEntry.target.id);
         }
       },
       {
@@ -116,11 +106,11 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     });
 
     return () => {
-      currentRefs.forEach((el) => {
-        if (el) observer.unobserve(el);
-      });
+        currentRefs.forEach((el) => {
+            if (el) observer.unobserve(el);
+        });
     };
-  }, [posts, onTopmostVisiblePostChange, onBottomVisiblePostChange]);
+  }, [posts, onTopmostVisiblePostChange]);
 
   // 3. Intersection Observer를 위한 useEffect
   useEffect(() => {
@@ -166,7 +156,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     return null;
   }, [posts]);
 
-  // 게시물 ID를 기반으로 다음 게시물의 ID를 찾는 함수
+    // 게시물 ID를 기반으로 다음 게시물의 ID를 찾는 함수
   const getNextPostId = useCallback((currentPostId: string): string | null => {
     const currentIndex = posts.findIndex(post => post._id === currentPostId);
     if (currentIndex > -1 && currentIndex < posts.length - 1) {
@@ -202,9 +192,9 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
           // PostItem을 div로 감싸 id와 ref를 부여합니다.
           return (
             <div
-              key={post._id}
-              id={post._id}
-              ref={el => postItemRefs.current.set(post._id, el)}>
+                key={post._id}
+                id={post._id}
+                ref={el => postItemRefs.current.set(post._id, el)}>
               <PostItem post={post} isOpen={isOpen} togglePost={togglePost} />
             </div>
           );
