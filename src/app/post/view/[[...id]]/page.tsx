@@ -2,7 +2,7 @@
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import Comments from '@/app/post/view/[[...id]]/comments.section';
 import { getPost, updatePostViews } from '@/lib/posts';
-import LikeHateSection from './like-hate.section';
+import LikeSection from './like.section';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -95,7 +95,7 @@ export default async function PostViewier(props: {
                 </div>
             )}
 
-            <LikeHateSection defaultLikes={likes} defaultDislikes={dislikes} _id={post._id} />
+            <LikeSection defaultLikes={likes} defaultDislikes={dislikes} _id={post._id} />
         </div>
 
         <div className="mt-6">

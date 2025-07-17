@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronDown, faChevronUp, faComment, faThumbsUp, faThumbsDown, faEye } from '@fortawesome/free-solid-svg-icons';
+import { faChevronDown, faChevronUp, faComment, faEye, faHeart } from '@fortawesome/free-solid-svg-icons';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 
 interface PostItemProps {
@@ -46,12 +46,8 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5">
-            <FontAwesomeIcon icon={faThumbsUp} />
+            <FontAwesomeIcon icon={faHeart} />
             <span>{post.likes || 0}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <FontAwesomeIcon icon={faThumbsDown} />
-            <span>{post.dislikes || 0}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <FontAwesomeIcon icon={faEye} />

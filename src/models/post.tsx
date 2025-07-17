@@ -18,7 +18,6 @@ const PostSchema = new Schema(
     author: { type: String, required: true },  // 작성자 (닉네임 또는 ID)
     userEmail: { type: String, required: true }, // 작성자 Email
     likes: { type: Number, default: 0 }, // 좋아요 수
-    dislikes: { type: Number, default: 0 }, // 싫어요 수
     views: { type: Number, default: 0 }, // 조회수
     tags: {
         type: [String],
