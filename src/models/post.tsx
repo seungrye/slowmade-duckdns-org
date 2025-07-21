@@ -1,4 +1,4 @@
-import { InferSchemaType, Schema, model, models } from "mongoose";
+import { InferSchemaType, Schema, model, models, Model } from "mongoose";
 
 // 이미지 URL과 썸네일 URL을 포함하는 객체
 const ImageUrlSchema = new Schema(
@@ -41,5 +41,8 @@ const PostSchema = new Schema(
 // 타입 자동 추론
 export type PostType = InferSchemaType<typeof PostSchema>;
 export type ImageUrlType = InferSchemaType<typeof ImageUrlSchema>;
+
 // 모델 생성
-export default models.Post || model("Post", PostSchema);
+const Post: Model<PostType> = models.Post || model<PostType>("Post", PostSchema);
+
+export default Post;

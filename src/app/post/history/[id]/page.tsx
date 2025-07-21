@@ -1,52 +1,39 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { getPost } from '@/lib/posts';
+import { Metadata } from 'next';
 import Link from 'next/link';
-import { toast } from 'react-hot-toast';
+import { notFound } from 'next/navigation';
+import { getPostRevisions } from '@/lib/revisions';
 
-interface Revision {
-    _id: string;
-    version: number;
-    title: string;
-    author?: string;
-    createdAt: string;
+type Props = Promise<{ id: string }>;
+
+export async function generateMetadata(props: {
+    params: Props
+}): Promise<Metadata> {
+    const params = await props.params;
+    const postId = params.id;
+
+    // id가 없으면 기본 메타데이터 반환
+    if (!postId) return { title: '변경 이력' };
+
+    const { post } = (await getPost(postId)) || { post: null };
+
+    // 게시글이 없으면 404 페이지와 유사한 제목 반환
+    if (!post) return { title: '게시글을 찾을 수 없음' };
+
+    return { title: `"${post.title}"의 변경 이력` };
 }
 
-export default function PostHistoryPage() {
-    const params = useParams();
-    const router = useRouter();
-    const postId = params.id as string;
+export default async function PostHistoryPage(props: {
+    params: Props
+}) {
+    const params = await props.params;
+    const postId = params.id;
 
-    const [revisions, setRevisions] = useState<Revision[]>([]);
-    const [loading, setLoading] = useState(true);
+    const allRevisions = await getPostRevisions(postId);
 
-    useEffect(() => {
-        if (!postId) return;
-
-        const fetchRevisions = async () => {
-            setLoading(true);
-            try {
-                const res = await fetch(`/api/post/revisions?postId=${postId}`);
-                if (!res.ok) {
-                    throw new Error('Failed to fetch revisions');
-                }
-                const data = await res.json();
-                setRevisions(data);
-            } catch (error) {
-                console.error(error);
-                toast.error('게시글의 변경 이력을 불러오는 데 실패했습니다.');
-                router.push(`/post/view/${postId}`);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchRevisions();
-    }, [postId, router]);
-
-    if (loading) {
-        return <div className="mx-auto p-4">로딩 중...</div>;
+    // getPostRevisions가 null을 반환하면 게시글이 없는 것이므로 404 페이지를 표시합니다.
+    if (allRevisions === null) {
+        notFound();
     }
 
     return (
@@ -58,10 +45,10 @@ export default function PostHistoryPage() {
                 </Link>
             </p>
 
-            {revisions.length > 0 ? (
+            {allRevisions.length > 0 ? (
                 <ul className="border border-gray-200 rounded-lg">
-                    {revisions.map((revision, index) => (
-                        <li key={revision._id} className={`p-4 ${index < revisions.length - 1 ? 'border-b border-gray-200' : ''}`}>
+                    {allRevisions.map((revision, index) => (
+                        <li key={revision._id} className={`p-4 ${index < allRevisions.length - 1 ? 'border-b border-gray-200' : ''}`}>
                             <div className="flex justify-between items-center">
                                 <div>
                                     <span className="font-semibold text-lg">버전 {revision.version}</span>
