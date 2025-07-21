@@ -19,6 +19,7 @@ const PostSchema = new Schema(
     userEmail: { type: String, required: true }, // 작성자 Email
     likes: { type: Number, default: 0 }, // 좋아요 수
     views: { type: Number, default: 0 }, // 조회수
+    version: { type: Number, default: 1 }, // 기본값 1로 설정
     tags: {
         type: [String],
         default: [],

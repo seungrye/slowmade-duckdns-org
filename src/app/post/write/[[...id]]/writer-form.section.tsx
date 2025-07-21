@@ -13,7 +13,8 @@ import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
 export default function PostWriterForm() {
     const { data: session } = useSession();
     const router = useRouter();
-    const params = useParams(); // 예: { id: '123' }
+    const { id } = useParams(); // id: string | string[] | undefined
+    const _id = Array.isArray(id) ? id[0] : id;
 
     const editorRef = useRef<RichWebEditorHandle>(null);
     const [title, setTitle] = useState('');
@@ -21,8 +22,11 @@ export default function PostWriterForm() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!params.id) return;
+        console.log("PostWriterForm mounted with _id:", _id);
+        if (!_id) return;
         if (!editorRef.current) return;
+
+        console.assert(typeof _id === 'string', "_id should be a string");
 
         const fetchPost = async (_id: string) => {
             try {
@@ -54,8 +58,8 @@ export default function PostWriterForm() {
             }
         };
 
-        fetchPost(params.id as string);
-    }, [params.id]);
+        fetchPost(_id as string);
+    }, [_id]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLButtonElement>) => {
         e.preventDefault();
@@ -71,7 +75,6 @@ export default function PostWriterForm() {
         console.assert(session?.user, "session.user should not be null");
 
         const postData: Partial<SetPostType> = {
-            _id: null, // 새 게시글인 경우 ID는 null
             title,
             htmlContent: htmlContent!, // HTMLContent는 null일 수 있지만, 여기서는 반드시 있어야 합니다.
             jsonContent: jsonContent!, // JSONContent는 null일 수 있지만, 여기서는 반드시 있어야 합니다.
@@ -81,8 +84,9 @@ export default function PostWriterForm() {
             tags: tags, // 태그 상태는 이미 문자열 배열입니다.
         };
 
-        if (params.id) {
-            postData._id = params.id as string; // 수정하는 경우 ID 추가
+        if (_id) {
+            postData._id = _id as string; // 수정하는 경우 ID 추가
+            console.log("게시글 수정 데이터:", postData);
         }
 
         try {
@@ -94,7 +98,7 @@ export default function PostWriterForm() {
 
             if (response.ok) {
                 const result = await response.json();
-                toast.success(params.id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
+                toast.success(_id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
                 if (result.pointsGained > 0) {
                     toast(`✨ ${result.pointsGained} 포인트를 획득했습니다!`);

@@ -7,6 +7,8 @@ import { checkAndGrantPostCountAchievements } from "@/lib/achievements";
 import { HydratedDocument } from "mongoose";
 import User from "@/models/user";
 import { AchievementType } from "@/models/achievement";
+import { HttpStatusCode } from "axios";
+import PostRevision from "@/models/post-revision";
 
 const POINTS_FOR_NEW_POST = parseInt(process.env.POINTS_FOR_NEW_POST || '5', 10);
 
@@ -14,7 +16,7 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
 
   if (!session || !session.user?.email) {
-    return NextResponse.json({ message: "로그인 후 이용해주세요." }, { status: 401 });
+    return NextResponse.json({ message: "로그인 후 이용해주세요." }, { status: HttpStatusCode.Unauthorized });
   }
 
   await connectToDB();
@@ -25,11 +27,11 @@ export async function POST(req: Request) {
       sessionEmail: session.user.email,
       payloadEmail: payload?.userEmail,
     });
-    return NextResponse.json({ message: "사용자 정보가 일치하지 않습니다." }, { status: 403 });
+    return NextResponse.json({ message: "사용자 정보가 일치하지 않습니다." }, { status: HttpStatusCode.Forbidden });
   }
 
   if (!payload?.title || !payload?.jsonContent) {
-    return NextResponse.json({ message: "모든 필드를 입력해주세요." }, { status: 400 });
+    return NextResponse.json({ message: "모든 필드를 입력해주세요." }, { status: HttpStatusCode.BadRequest });
   }
 
   try {
@@ -37,10 +39,26 @@ export async function POST(req: Request) {
     let pointsGained = 0;
 
     if (payload._id) {
-      await Post.findByIdAndUpdate(payload._id, payload);
+      // --- 게시글 수정 ---
+      const existingPost = await Post.findById(payload._id);
+      if (!existingPost) {
+        return NextResponse.json({ message: "게시글을 찾을 수 없습니다." }, { status: HttpStatusCode.NotFound });
+      }
+
+      const {_id, ...postData } = existingPost.toObject();
+      await PostRevision.create({
+        ...postData,
+        postId: _id,
+        createdAt: existingPost.updatedAt,
+      });
+
+      // 2. 원본 게시글 업데이트 및 버전 증가
+      existingPost.set(payload);
+      existingPost.version += 1;
+
+      await existingPost.save();
     } else {
-      const newPost = new Post(payload);
-      await newPost.save();
+      await Post.create(payload);
 
       // Grant points for new post
       await User.findOneAndUpdate({ email: payload.userEmail }, { $inc: { points: POINTS_FOR_NEW_POST } });
@@ -51,8 +69,8 @@ export async function POST(req: Request) {
       unlockedAchievements = await checkAndGrantPostCountAchievements(payload.userEmail);
     }
 
-    return NextResponse.json({ message: "게시글 저장 완료", unlockedAchievements, pointsGained }, { status: 201 });
+    return NextResponse.json({ message: "게시글 저장 완료", unlockedAchievements, pointsGained }, { status: HttpStatusCode.Created });
   } catch (error) {
-    return NextResponse.json({ message: "게시글 저장 실패", error }, { status: 500 });
+    return NextResponse.json({ message: "게시글 저장 실패", error }, { status: HttpStatusCode.InternalServerError });
   }
 }

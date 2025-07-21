@@ -54,7 +54,9 @@ export default async function PostViewier(props: {
 }) {
     const params = await props.params
     // const searchParams = await props.searchParams
-    const _id = params.id?.[0]
+    const { id } = params; // id: string | string[] | undefined
+    const _id = Array.isArray(id) ? id[0] : id;
+
     // const query = searchParams.query
     if (!_id) {
         notFound();
