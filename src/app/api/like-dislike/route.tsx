@@ -36,6 +36,10 @@ export async function POST(req: Request) {
       { new: true } // ✅ 업데이트된 값을 반환
     );
 
+    if (!updatedPost) {
+      return NextResponse.json({ message: "게시글을 찾을 수 없습니다." }, { status: HttpStatusCode.NotFound });
+    }
+
     await checkAndGrantPostInteractionAchievements(payload._id);
 
     return NextResponse.json({ message: "Like/Dislike 업데이트 성공", likes: updatedPost.likes }, { status: HttpStatusCode.Ok });
