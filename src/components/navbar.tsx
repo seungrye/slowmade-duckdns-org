@@ -15,6 +15,7 @@ import {
     LogOut,
     Layers,
     LogIn,
+    Settings,
 } from "lucide-react";
 
 const navLinks = [
@@ -25,6 +26,7 @@ const navLinks = [
 const myPageLinks = [
     { href: "/dashboard/profile", label: "내 프로필", description: "회원 정보 보기", icon: <User size={20} /> },
     { href: "/dashboard/posts", label: "내가 올린 유머", description: "내가 업로드한 유머 보기", icon: <Archive size={20} /> },
+    { href: "/dashboard/settings", label: "설정", description: "내 설정 보기", icon: <Settings size={20} /> },
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
 ];
 

@@ -1,5 +1,5 @@
-import MyProfile from "@/components/my-profile";
-import MyAchievements from "@/components/my-achievements";
+import MyProfile from "@/app/dashboard/profile/my-profile.section";
+import MyAchievements from "@/app/dashboard/profile/my-achievements.section";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 

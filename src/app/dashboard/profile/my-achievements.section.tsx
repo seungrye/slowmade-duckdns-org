@@ -1,9 +1,9 @@
 'use client';
 
-import { UserAchievementType } from "../types/achievements.d";
+import { UserAchievementType } from "../../../types/achievements.d";
 import { useEffect, useState } from "react";
 import { FaAward } from "react-icons/fa";
-import { achievementIconMap } from "./icons";
+import { achievementIconMap } from "../../../components/icons";
 import { Session } from "next-auth";
 
 export default function MyAchievements({ session }: { session: Session | null }) {
@@ -47,7 +47,7 @@ export default function MyAchievements({ session }: { session: Session | null })
                     {achievements.map(({ achievement, unlockedAt }) => {
                         const IconComponent = achievementIconMap[achievement.icon] || FaAward;
                         return (
-                            <div key={achievement._id} className="bg-white rounded-lg shadow-sm inset-shadow-xs p-4 flex items-center gap-4 border border-gray-200">
+                            <div key={achievement._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4 flex items-center gap-4 border border-gray-200">
                                 <div className="text-yellow-500">
                                     <IconComponent size={32} />
                                 </div>

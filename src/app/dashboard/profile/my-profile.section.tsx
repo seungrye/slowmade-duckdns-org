@@ -41,7 +41,7 @@ export default function MyProfile({session}: { session: Session | null }) {
         </section>;
     }
     
-    return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
+    return <section className="bg-white shadow-md border border-gray-200 inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
         <Image src={profile?.image || session?.user.image || '/user-avatar.svg' } priority alt="프로필 이미지" width={80} height={80} className="rounded-full bg-gray-300" />
         <div>
             <h2 className="text-2xl font-bold">{profile?.name || session?.user.name}</h2>
