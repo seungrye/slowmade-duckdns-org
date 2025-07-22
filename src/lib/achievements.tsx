@@ -296,7 +296,7 @@ export async function checkAndGrantPostInteractionAchievements(postId: string): 
   const userAchievementKeys = new Set(user.achievements.map((ach: PopulatedUserAchievement) => ach.achievement.key));
 
   // --- 업적 확인: 추천 10개 이상 받은 게시글 ---
-  if (post.likes.length >= 10 && !userAchievementKeys.has('POST_10_LIKES')) {
+  if (post.likes >= 10 && !userAchievementKeys.has('POST_10_LIKES')) {
     const newAchievement = await grantAchievement(user.email, 'POST_10_LIKES');
     if (newAchievement) unlockedAchievements.push(newAchievement);
   }
