@@ -77,24 +77,26 @@ export const authOptions = {
       session: Session;
       token: JWT;
     }) {
-      // console.log("session", session, token);
-
-      if (token.value && session.user) {
+      console.log("session callback", session, token);
+      if (session.user) {
+        // jwt 콜백에서 전달된 정보를 세션에 포함시킵니다.
         session.user.token = token.secret;
+        session.user.theme = token.theme;
       }
       return session;
     },
 
-    async jwt({ token, user }:
-      {
-        token: JWT;
-        user?: User;
-      }
-    ) {
-      // console.log("jwt", token, user);
-
+    async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
-        token.secret = user.token;
+        // 사용자가 처음 로그인할 때 DB에서 사용자 정보를 조회합니다.
+        await connectToDB();
+        const dbUser = await UserModel.findOne({ email: user.email });
+        if (dbUser) {
+          // 조회한 테마 설정을 토큰에 추가합니다.
+          token.theme = dbUser.settings.theme;
+          // 기존의 커스텀 토큰 로직이 있다면 유지합니다.
+          if (user.token) token.secret = user.token;
+        }
       }
       return token;
     },
