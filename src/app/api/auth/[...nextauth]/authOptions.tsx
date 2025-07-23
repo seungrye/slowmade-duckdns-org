@@ -77,7 +77,6 @@ export const authOptions = {
       session: Session;
       token: JWT;
     }) {
-      console.log("session callback", session, token);
       if (session.user) {
         // jwt 콜백에서 전달된 정보를 세션에 포함시킵니다.
         session.user.token = token.secret;

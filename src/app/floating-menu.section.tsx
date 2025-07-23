@@ -39,7 +39,7 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPre
     return (
         <div
             onMouseLeave={() => setIsOpen(false)}
-            className="fixed bottom-5 right-5 z-50 flex flex-col items-end"
+            className={`fixed bottom-5 right-5 ${isOpen && 'z-50'} flex flex-col items-end`}
             aria-live="polite"
         >
             {/* ┛ 모양으로 펼쳐질 메뉴 아이템들 */}
@@ -75,10 +75,10 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPre
 
 
                 <div className="flex items-center ">
-                    {/* 좌측 메뉴 (삭제) */}
+                    {/* 좌측 메뉴 (게시글 펼치기) */}
                     <div className={`mr-3 transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0 pointer-events-none'
                         }`}>
-                        <button onClick={toggleExpandCollapse} className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600" title="삭제">
+                        <button onClick={toggleExpandCollapse} className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600" title="게시글 펼치기">
                             {isAllExpanded ? <PanelTopClose size={20} /> : <PanelTopOpen size={20} />}
                         </button>
                     </div>
