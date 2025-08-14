@@ -4,7 +4,12 @@ import Link from 'next/link';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp, faComment, faEye, faHeart } from '@fortawesome/free-solid-svg-icons';
-import { RichContentViewer } from '@/components/rich-web-editor/viewer';
+import dynamic from "next/dynamic";
+
+const RichContentViewer = dynamic(
+  () => import("@/components/rich-web-editor/viewer").then(mod => mod.RichContentViewer),
+  { ssr: false }
+);
 
 interface PostItemProps {
   post: GetPostType;
