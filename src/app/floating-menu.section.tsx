@@ -46,29 +46,36 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPre
             <div className="flex flex-col items-end">
                 {/* 최 상단으로 이동 */}
                 <div
-                    className={`mb-3 transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
-                        }`}
+                    className={`transform transition-all duration-300 ease-in-out ${isOpen ? 'mb-3 translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'}`}
+
                 >
-                    <button onClick={handleScrollToTop} className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600" title="최 상단으로 이동" aria-label='최 상단으로 이동'>
+                    <button onClick={handleScrollToTop}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 ${isOpen ? 'block' : 'hidden'}`}
+                        aria-label='최 상단으로 이동'
+                    >
                         <ArrowUpToLine size={20} color="white" />
                     </button>
                 </div>
                 {/* 이전 게시물로 scroll */}
                 <div
-                    className={`mb-3 transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
+                    className={`transform transition-all duration-300 ease-in-out ${isOpen ? 'mb-3 translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
                         }`}
                 >
-                    <button onClick={() => onScrollToPrev?.()} className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600" title="이전 게시물" aria-label='이전 게시물'>
+                    <button onClick={() => onScrollToPrev?.()}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 ${isOpen ? 'block' : 'hidden'}`}
+                        aria-label='이전 게시물'>
                         <ChevronUp size={20} color="white" />
                     </button>
                 </div>
 
                 {/* 다음 게시물로 scroll */}
                 <div
-                    className={`mb-3 transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
+                    className={`transform transition-all duration-300 ease-in-out ${isOpen ? 'mb-3 translate-y-0 opacity-100' : 'translate-y-4 opacity-0 pointer-events-none'
                         }`}
                 >
-                    <button onClick={() => onScrollToNext?.()} className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600" title="다음 게시물" aria-label='다음 게시물'>
+                    <button onClick={() => onScrollToNext?.()}
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-green-500 text-white shadow-lg hover:bg-green-600 ${isOpen ? 'block' : 'hidden'}`}
+                        aria-label='다음 게시물'>
                         <ChevronDown size={20} color="white" />
                     </button>
                 </div>
@@ -76,9 +83,11 @@ export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPre
 
                 <div className="flex items-center ">
                     {/* 좌측 메뉴 (게시글 펼치기) */}
-                    <div className={`mr-3 transform transition-all duration-300 ease-in-out ${isOpen ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0 pointer-events-none'
+                    <div className={`transform transition-all duration-300 ease-in-out ${isOpen ? 'mr-3 translate-x-0 opacity-100' : 'translate-x-4 opacity-0 pointer-events-none'
                         }`}>
-                        <button onClick={toggleExpandCollapse} className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600" title="게시글 펼치기" aria-label='게시글 펼치기'>
+                        <button onClick={toggleExpandCollapse}
+                            className={`flex h-10 w-10 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg hover:bg-blue-600 ${isOpen ? 'block' : 'hidden'}`}
+                            aria-label='게시글 펼치기'>
                             {isAllExpanded ? <PanelTopClose size={20} /> : <PanelTopOpen size={20} />}
                         </button>
                     </div>
