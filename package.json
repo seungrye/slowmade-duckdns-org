@@ -9,13 +9,7 @@
     "lint": "next lint"
   },
   "browserslist": [
-    "chrome >0 and last 2.5 years",
-    "edge >0 and last 2.5 years",
-    "safari >0 and last 2.5 years",
-    "firefox >0 and last 2.5 years",
-    "and_chr >0 and last 2.5 years",
-    "and_ff >0 and last 2.5 years",
-    "ios >0 and last 2.5 years"
+    "defaults"
   ],
   "dependencies": {
     "@floating-ui/react": "^0.27.15",

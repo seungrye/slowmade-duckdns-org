@@ -63,3 +63,18 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
     </div>
   );
 }
+
+export function PostItemSkeleton() {
+  return (
+    <div className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md inset-shadow-xs">
+      <div className="animate-pulse">
+        <div className="flex bg-gray-100 items-center justify-between px-4 pt-4 pb-3">
+          &nbsp;
+        </div>
+        <div className="flex justify-between items-center px-4 py-3 text-sm bg-gray-50 text-gray-600 border-t border-t-gray-200">
+          &nbsp;
+        </div>
+      </div>
+    </div>
+  );
+}

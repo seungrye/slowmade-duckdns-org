@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { GetPostType } from '@/types/posts.d';
-import PostItem from '../components/post-item';
+import PostItem, { PostItemSkeleton } from '../components/post-item';
 
 export interface InfinitPostListRef {
   getPrevPostId: (currentPostId: string) => string | null;
@@ -35,7 +35,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     if (isLoading || !hasMore) return;
 
     setIsLoading(true);
-    const res = await fetch(`/api/posts?page=${page}&limit=3`);
+    const res = await fetch(`/api/posts?page=${page}&limit=9`);
     const { posts: newPosts } = await res.json();
     setIsLoading(false);
 
@@ -184,24 +184,32 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     collapseAll,
   }));
 
+  // 초기 로딩 상태를 명확히 정의
+  const isInitialLoading = isLoading && posts.length === 0;
+
   return (
     <>
       <div className="grid grid-cols-1 gap-6">
-        {posts.map((post) => {
-          const isOpen = openedPostIds.has(post._id);
-          // PostItem을 div로 감싸 id와 ref를 부여합니다.
-          return (
-            <div
-              key={post._id}
-              id={post._id} // Assign id to the div wrapper
-              ref={el => { postItemRefs.current.set(post._id, el); }}>
-              <PostItem post={post} isOpen={isOpen} togglePost={togglePost} />
-            </div>
-          );
-        })}
+        {isInitialLoading ? (
+          // 초기 로딩 시 스켈레톤 UI 렌더링
+          Array.from({ length: 9 }).map((_, index) => <PostItemSkeleton key={index} />)
+        ) : (
+          posts.map((post) => {
+            const isOpen = openedPostIds.has(post._id);
+            // PostItem을 div로 감싸 id와 ref를 부여합니다.
+            return (
+              <div
+                key={post._id}
+                id={post._id} // Assign id to the div wrapper
+                ref={el => { postItemRefs.current.set(post._id, el); }}>
+                <PostItem post={post} isOpen={isOpen} togglePost={togglePost} />
+              </div>
+            );
+          })
+        )}
       </div>
       {/* 4. 로딩 및 더보기 상태에 따른 UI 개선 */}
-      {isLoading && <div className="text-center mt-6 text-gray-400">로딩 중...</div>}
+      {isLoading && !isInitialLoading && <div className="text-center mt-6 text-gray-400">로딩 중...</div>}
       {hasMore && !isLoading && <div ref={loaderRef} className="h-10" />}
     </>
   );
