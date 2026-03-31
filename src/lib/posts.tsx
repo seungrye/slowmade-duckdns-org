@@ -134,6 +134,41 @@ export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> 
   }));
 }
 
+export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
+  await connectToDB();
+
+  const pipeline: PipelineStage[] = [
+    {
+      $match: {
+        isDeleted: { $ne: true },
+        tags: { $exists: true, $ne: [] },
+      },
+    },
+    { $unwind: '$tags' },
+    {
+      $group: {
+        _id: '$tags',
+        count: { $sum: 1 },
+      },
+    },
+    {
+      $sort: {
+        count: -1,
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        tag: '$_id',
+        count: 1,
+      },
+    },
+  ];
+
+  const result = await Post.aggregate<{ tag: string; count: number }>(pipeline);
+  return result;
+}
+
 export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false): Promise<{
   total: number;
   posts: GetPostType[];
@@ -243,6 +278,10 @@ export async function updatePostViews(_id: string): Promise<void> {
   }
 }
 
+function escapeRegex(str: string) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /**
  * 특정 태그를 포함하는 모든 게시글을 검색합니다.
  * @param tag 검색할 태그 문자열
@@ -254,6 +293,7 @@ export async function getPostsByTag(tag: string): Promise<{
 }> {
   await connectToDB();
 
+  console.log("tag:", tag);
   const matchStage: PipelineStage.Match = {
     $match: {
       isDeleted: { $ne: true } // Exclude soft-deleted posts
@@ -261,7 +301,7 @@ export async function getPostsByTag(tag: string): Promise<{
   };
 
   if (tag) {
-    matchStage.$match["tags"] = { $regex: new RegExp(`^${tag}$`, 'i') }; // 대소문자 구분 없이 정확히 일치하는 태그 검색
+    matchStage.$match["tags"] = { $regex: new RegExp(`^${escapeRegex(tag)}$`, 'iu') }; // 대소문자 구분 없이 정확히 일치하는 태그 검색
   }
 
   const pipeline: PipelineStage[] = [
@@ -320,6 +360,8 @@ export async function getPostsByTag(tag: string): Promise<{
       },
     },
   ];
+
+  console.log("pipeline:", JSON.stringify(pipeline, null, 2));
 
   const [result] = await Post.aggregate(pipeline);
 
