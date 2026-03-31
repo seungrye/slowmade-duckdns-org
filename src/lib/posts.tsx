@@ -12,7 +12,7 @@ import { GetPostType, SetPostQuery } from "@/types/posts.d";
  * @param params - Query parameters including sorting, pagination, and filtering.
  * @returns A promise that resolves to an object containing the posts and the total count.
  */
-async function fetchPosts(params: SetPostQuery): Promise<{
+async function __fetchPosts(params: SetPostQuery): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
@@ -110,7 +110,7 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
   posts: GetPostType[];
 }> {
   await connectToDB();
-  return fetchPosts({
+  return __fetchPosts({
     page: 1,
     limit: 12,
     sort: sort || 'latest',
@@ -121,7 +121,7 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
 export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> {
   await connectToDB();
 
-  const result = await fetchPosts({
+  const result = await __fetchPosts({
     page: 1,
     limit: 1000, // 모든 게시물을 가져오기 위해 충분히 큰 limit 설정
     sort: 'latest',
@@ -134,9 +134,7 @@ export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> 
   }));
 }
 
-export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
-  await connectToDB();
-
+export async function __getAllTags(): Promise<{ tag: string; count: number }[]> {
   const pipeline: PipelineStage[] = [
     {
       $match: {
@@ -165,12 +163,17 @@ export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
   return result;
 }
 
+export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
+  await connectToDB();
+  return __getAllTags();
+}
+
 export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
   await connectToDB();
-  return fetchPosts({
+  return __fetchPosts({
     page: page || 1,
     limit: limit || 12,
     sort: sort || 'latest',
@@ -184,7 +187,7 @@ export async function searchPosts(query: string, sort: SortOption = 'latest', wi
   posts: GetPostType[];
 }> {
   await connectToDB();
-  return fetchPosts({
+  return __fetchPosts({
     page: 1,
     limit: 12,
     query: query || '',

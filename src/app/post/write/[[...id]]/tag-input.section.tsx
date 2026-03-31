@@ -11,43 +11,64 @@ interface TagInputProps {
 
 export default function TagInput({ tags, onTagsChange, placeholder }: TagInputProps) {
   const [inputValue, setInputValue] = useState('');
+  const [allTags, setAllTags] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  // Debounce fetching suggestions
+  const normalizeTag = (value: string) => value.trim().replace(/^#+/, '');
+
   useEffect(() => {
-    const fetchSuggestions = async () => {
-      if (inputValue.trim().length > 0) {
-        try {
-          const response = await fetch(`/api/tags?q=${inputValue}`);
-          if (response.ok) {
-            const data = await response.json();
-            // Filter out tags that are already selected
-            const filteredSuggestions = data.filter((tag: string) => !tags.includes(tag));
-            setSuggestions(filteredSuggestions);
-          }
-        } catch (error) {
-          console.error('Failed to fetch tag suggestions:', error);
+    const loadAllTags = async () => {
+      try {
+        const response = await fetch('/api/tags');
+        if (response.ok) {
+          const data = await response.json();
+          setAllTags(Array.isArray(data) ? data : []);
         }
-      } else {
-        setSuggestions([]);
+      } catch (error) {
+        console.error('Failed to load tag list:', error);
       }
     };
 
-    const debounceTimeout = setTimeout(fetchSuggestions, 300); // 300ms debounce
+    loadAllTags();
+  }, []);
 
-    return () => clearTimeout(debounceTimeout);
-  }, [inputValue, tags]);
+  useEffect(() => {
+    const query = normalizeTag(inputValue);
+
+    if (query.length === 0) {
+      setSuggestions([]);
+      setActiveIndex(-1);
+      return;
+    }
+
+    const filteredSuggestions = allTags
+      .filter((tag) => tag.toLowerCase().includes(query.toLowerCase()))
+      .filter((tag) => !tags.some((selectedTag) => selectedTag.toLowerCase() === tag.toLowerCase()))
+      .slice(0, 10);
+
+    setSuggestions(filteredSuggestions);
+    setActiveIndex((prevIndex) => (filteredSuggestions.length === 0 ? -1 : Math.min(prevIndex, filteredSuggestions.length - 1)));
+  }, [inputValue, allTags, tags]);
 
   const removeTag = (indexToRemove: number) => {
     onTagsChange(tags.filter((_, index) => index !== indexToRemove));
   };
 
   const addTag = (tag: string) => {
-    const newTag = tag.trim();
-    if (newTag && !tags.includes(newTag)) {
+    const newTag = normalizeTag(tag);
+    if (!newTag) {
+      return;
+    }
+
+    const alreadySelected = tags.some(
+      (existingTag) => existingTag.toLowerCase() === newTag.toLowerCase()
+    );
+
+    if (!alreadySelected) {
       onTagsChange([...tags, newTag]);
     }
+
     setInputValue('');
     setSuggestions([]);
     setActiveIndex(-1);

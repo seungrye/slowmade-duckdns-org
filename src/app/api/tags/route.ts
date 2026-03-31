@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
+import { __getAllTags } from '@/lib/posts';
 import Post from '@/models/post';
+import { PipelineStage } from 'mongoose';
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
  * Fetches existing tags for autocomplete suggestions.
@@ -9,25 +15,22 @@ import Post from '@/models/post';
  */
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const query = searchParams.get('q') || '';
-
-  if (!query) {
-    return NextResponse.json([]);
-  }
+  const query = searchParams.get('q')?.trim() || '';
 
   try {
     await connectToDB();
 
-    const pipeline = [
-      // Filter for documents that contain at least one matching tag and are not deleted
-      { $match: { isDeleted: { $ne: true }, tags: { $regex: `^${query}`, $options: 'i' } } },
-      // Unwind the tags array to process each tag individually
+    if (!query) { // get all tags
+      const tags = await __getAllTags();
+      return NextResponse.json(tags.map((item) => item.tag));
+    }
+
+    const escapedQuery = escapeRegex(query);
+    const pipeline: PipelineStage[] = [
+      { $match: { isDeleted: { $ne: true }, tags: { $regex: escapedQuery, $options: 'i' } } },
       { $unwind: '$tags' },
-      // Filter the unwound tags again to ensure they match the query
-      { $match: { tags: { $regex: `^${query}`, $options: 'i' } } },
-      // Group by tag to get unique values
-      { $group: { _id: '$tags' } },
-      // Limit the number of suggestions
+      { $match: { tags: { $regex: escapedQuery, $options: 'i' } } },
+      { $group: { _id: { $toLower: '$tags' } } },
       { $limit: 10 },
     ];
 
