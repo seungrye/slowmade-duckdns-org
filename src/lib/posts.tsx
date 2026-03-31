@@ -289,7 +289,6 @@ export async function getPostsByTag(tag: string): Promise<{
 }> {
   await connectToDB();
 
-  console.log("tag:", tag);
   const matchStage: PipelineStage.Match = {
     $match: {
       isDeleted: { $ne: true } // Exclude soft-deleted posts
