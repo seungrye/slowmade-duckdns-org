@@ -147,13 +147,9 @@ export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
     { $unwind: '$tags' },
     {
       $group: {
-        _id: '$tags',
+        // tags 값을 모두 소문자로 변환하여 그룹화
+        _id: { $toLower: '$tags' }, 
         count: { $sum: 1 },
-      },
-    },
-    {
-      $sort: {
-        count: -1,
       },
     },
     {

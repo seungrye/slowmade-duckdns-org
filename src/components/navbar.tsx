@@ -20,6 +20,7 @@ import {
 
 const navLinks = [
     { href: "/", label: "홈", description: "사이트로 돌아가기", icon: <Home size={20} /> },
+    { href: "/tags", label: "태그", description: "태그 클라우드 보기", icon: <Layers size={20} /> },
 ];
 
 const myPageLinks = [

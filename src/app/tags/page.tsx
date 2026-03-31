@@ -36,14 +36,14 @@ export default async function TagsPage() {
         </p>
       </section>
 
-      <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+      <section className="">
         {tags.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-1">
             {tags.map((item: TagInfo) => (
               <Link
                 key={item.tag}
                 href={`/tags/${encodeURIComponent(item.tag)}`}
-                className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-3 py-2 text-gray-800 transition-colors duration-200 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                className="inline-flex items-center px-3 text-gray-800 transition-colors duration-200 hover:text-blue-700"
                 style={{ fontSize: `${getTagSize(item.count, minCount, maxCount)}rem` }}
               >
                 <span className="font-medium">#{item.tag}</span>
