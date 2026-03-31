@@ -92,7 +92,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
           query: { ...params, page: page > 1 ? page - 1 : page }
         }}>◀ 이전</Link>
         <span className="px-4 py-2 bg-gray-100">{page} / {endPage}</span>
-        <Link className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" href={{
+        <Link className="bg-gray-300 px-4 py-2 rounded-r cursor-pointer" href={{
           pathname: page < endPage ? "/dashboard/posts" : "#",
           query: { ...params, page: endPage > page ? page + 1 : page }
         }}>다음 ▶</Link>

@@ -158,7 +158,9 @@ export default function Comments({ postId }: Props) {
     }
   }, [fetchComments]);
 
-  const handleParentAuthorClick = useCallback((parentId: string) => {
+  const handleParentAuthorClick = useCallback((parentId: string | null = null) => {
+    if (!parentId) return console.log("parentId should not null");
+
     const parentElement = commentRefs.current.get(parentId);
     if (parentElement) {
       parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -218,7 +220,7 @@ export default function Comments({ postId }: Props) {
                       href={`#comment-${c.parent._id}`}
                       onClick={(e) => {
                         e.preventDefault();
-                        handleParentAuthorClick(c.parent._id);
+                        handleParentAuthorClick(c.parent?._id);
                       }}
                       className="text-blue-600 hover:underline mr-2 p-1 bg-blue-50 rounded-md"
                       aria-label={`부모 댓글로 이동: @${c.parent.author}`}
