@@ -357,8 +357,6 @@ export async function getPostsByTag(tag: string): Promise<{
     },
   ];
 
-  console.log("pipeline:", JSON.stringify(pipeline, null, 2));
-
   const [result] = await Post.aggregate(pipeline);
 
   return {
