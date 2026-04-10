@@ -30,7 +30,7 @@ export default async function TagsPage() {
   const maxCount = Math.max(...counts, 0);
 
   return (
-    <main className="container mx-auto px-4 py-8">
+    <main className="mx-auto px-4 py-8">
       <section className="mb-10">
         <h1 className="text-3xl font-semibold text-gray-900">태그 클라우드</h1>
         <p className="mt-3 text-gray-600">

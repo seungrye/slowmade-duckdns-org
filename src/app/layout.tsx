@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <SessionProvider>
           <Navbar />
-          <main className="container mx-auto mt-4">{children}</main>
+          <main className="lg:container mx-auto lg:mt-4">{children}</main>
           <Footer />
         </SessionProvider>
       </body>

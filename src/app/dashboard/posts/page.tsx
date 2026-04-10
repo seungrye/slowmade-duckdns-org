@@ -34,7 +34,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
   const endPage = Math.ceil(total / pageSize); // 전체 페이지 수 계산
 
   return (
-    <main className="container mx-auto px-4 py-6">
+    <main className="mx-auto px-4 py-6">
       <Toaster position="bottom-right" />
 
       {/* 제목 & 정렬 옵션 */}

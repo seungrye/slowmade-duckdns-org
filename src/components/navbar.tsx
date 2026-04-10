@@ -49,7 +49,7 @@ export default function Navbar() {
 
     return (
         <nav className="bg-gray-900 text-white shadow-lg">
-            <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div className="lg:container mx-auto px-4 py-3 flex justify-between items-center">
                 {/* 로고 */}
                 <Link href={navLinks[0].href} className="text-2xl font-bold text-gray-300 flex items-center gap-2">
                     <Layers size={30} />

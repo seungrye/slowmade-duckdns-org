@@ -25,7 +25,7 @@ export default async function TagPage(props: {
   const {posts} = await getPostsByTag(decodedTag);
 
   return (
-        <main className="container mx-auto px-4 py-6">
+        <main className="mx-auto px-4 py-6">
       <section className="mt-12">
         <h2 className="text-2xl font-semibold text-gray-800 mb-4"><span className="text-blue-500 pe-1">#</span>{decodedTag}</h2>
         <p className="mt-2 text-gray-600 py-4">{posts.length}개의 게시글이 있습니다.</p>
