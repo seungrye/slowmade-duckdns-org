@@ -83,7 +83,7 @@ export default async function PostViewier(props: {
                 </div>
             </div>
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[600px] rich-web-editor-wrapper flex flex-col">
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
             <div className="p-4 transition-all duration-300 ease-in-out flex-1">
                 <RichContentViewer content={jsonContent} waitRenderComplete={true} />
             </div>
