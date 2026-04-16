@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack -p 3010",
     "build": "next build",
     "start": "next start -p 3010",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "browserslist": [
     "defaults"
@@ -55,6 +57,7 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "sass": "^1.97.0",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.4"
   }
 }
