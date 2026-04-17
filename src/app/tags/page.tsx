@@ -9,14 +9,8 @@ export const metadata: Metadata = {
   description: '모든 태그를 한눈에 볼 수 있는 태그 클라우드입니다.',
 };
 
-type TagInfo = {
-  tag: string;
-  count: number;
-};
-
-export default async function TagsPage({ searchParams }: { searchParams?: { query?: string } }) {
+export default async function TagsPage() {
   const tags = await getAllTags();
-  const currentQuery = searchParams?.query?.trim() || '';
 
   return (
     <main className="mx-auto px-4 py-8">
@@ -28,7 +22,7 @@ export default async function TagsPage({ searchParams }: { searchParams?: { quer
       </section>
 
       <section>
-        <TagCloudSearch initialTags={tags} currentSearch={currentQuery} />
+        <TagCloudSearch initialTags={tags} />
       </section>
     </main>
   );

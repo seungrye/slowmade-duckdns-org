@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { filterTags, getTagSize, TagInfo } from './tag-cloud-search.helpers';
 
-export default function TagCloudSearch({ initialTags, currentSearch }: { initialTags: TagInfo[]; currentSearch: string }) {
-  const [query, setQuery] = useState(currentSearch || '');
+export default function TagCloudSearch({ initialTags }: { initialTags: TagInfo[] }) {
+  const [query, setQuery] = useState('');
 
   const filteredTags = useMemo(() => filterTags(initialTags, query), [query, initialTags]);
 
