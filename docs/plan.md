@@ -1,18 +1,35 @@
 # Plan
 
-## 1. 태그 클라우드 검색 가능하도록
+## 1. 태그 클라우드 검색 가능하도록 ✅
 - `src/app/tags/page.tsx`에 검색 입력창 추가
-- 입력값 변경 시 `/api/tags?q=검색어` 호출
-- 응답으로 태그 클라우드 필터링
+- `src/app/tags/tag-cloud-search.tsx`에서 로드된 태그를 클라이언트에서 필터링
 - 검색 결과 없을 때 안내 메시지 표시
+- 테스트 추가: `src/app/tags/tag-cloud-search.helpers.ts`, `src/app/tags/tag-cloud-search.test.ts`
 
 ## 2. 작성 페이지 임시 저장
-- `src/app/post/write/[[...id]]/writer-form.section.tsx`
-- `title`, `tags`, 에디터 내용 저장
-- 5초 간격 `localStorage`에 저장
-- `beforeunload` 이벤트로 페이지 떠날 때 저장
-- 페이지 로드 시 draft 복구
-- 수정 모드와 신규 작성 모드 분리
+- 구현 위치: `src/app/post/write/[[...id]]/writer-form.section.tsx`
+- 저장 대상
+  - 제목(`title`)
+  - 태그(`tags`)
+  - 에디터 내용 (`htmlContent`, `jsonContent`)
+  - 업로드 이미지 URL 배열(`urls`)
+- 저장 방식
+  - 브라우저 `localStorage` 사용
+  - draft key: `postDraft-new` 또는 `postDraft-<postId>`
+  - 수정 모드와 신규 작성 모드를 별도 키로 분리
+- 트리거
+  - `beforeunload` 이벤트로 페이지 이탈 시 저장
+  - 언마운트 시 마지막 저장 수행
+- 복구
+  - 페이지 로드 시 `localStorage`에서 draft 확인
+  - draft가 있으면 제목/태그/에디터 내용을 복구
+  - 복구 시 사용자 안내 메시지 표시
+- 제출 후 처리
+  - 게시글 저장 성공 시 해당 draft 삭제
+- 추가 고려
+  - 빈 상태(제목/태그/내용 모두 없음)에서는 draft 삭제
+  - 로드된 기존 게시글 데이터와 draft 우선순위 결정
+  - 다음 단계: draft 복구 UI 표시(예: "임시 저장된 내용이 있습니다. 복원하시겠습니까?")
 
 ## 3. 작성글 revision 처리
 - 백엔드 `src/app/api/submit/route.tsx`는 수정 시 `PostRevision` 저장 이미 존재
