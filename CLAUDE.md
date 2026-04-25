@@ -28,3 +28,4 @@ npx vitest run src/lib/__tests__/sort.test.ts
 - [System Design (SDS)](docs/SDS.md) — DB 스키마, 데이터 흐름, 인증 설계
 - [Requirements (SRS)](docs/SRS.md) — 기능 요구사항
 - [Plan](docs/plan.md) — 개발 계획 및 우선순위
+- [Work logs](docs/work/) — 작업별 상세 문서 (문제·분석·결정·변경 요약)
