@@ -39,10 +39,48 @@
 - 선택 시 에디터에 과거 버전 로드 또는 복원 기능
 
 ## 4. 작성/보기 화면 위/아래 꽉 차도록 처리
-- `src/app/post/write/[[...id]]/writer-form.section.tsx`
-- `src/app/post/view/[[...id]]/page.tsx`
-- 현재 `min-h-[480px]` 레이아웃을 `min-h-screen`, `h-full`, `flex flex-col` 등으로 변경
-- 상단, 에디터, 하단 영역이 화면 전체를 채우도록 재구성
+
+### 검토 결과
+
+**사용자 관점**
+- 작성 페이지: 에디터가 화면을 가득 채워 더 넓고 몰입감 있는 글쓰기 경험 제공
+- 보기 페이지: 짧은 글도 여백 없이 화면을 채워 레이아웃 일관성 유지
+- 두 페이지 모두 현재 `min-h-[480px]`(고정 최솟값)로 인해 큰 화면에서 빈 여백이 남음
+
+**관리자 관점**
+- 관리자 기능 미구현으로 직접 영향 없음
+- 향후 관리 페이지 추가 시 동일 패턴 적용 가능
+
+**개발자 관점**
+- 단순히 `min-h-screen`을 해당 컴포넌트에 추가하는 방식은 Navbar/Footer 높이를 고려하지 않아 부적합
+- CSS `calc(100vh - 고정px)` 방식은 Navbar 높이를 하드코딩해야 해서 유지보수 취약
+- **채택: flex 체인 방식** — 조상부터 자식까지 `flex flex-col`을 연결하고, 에디터/콘텐츠 박스에 `flex-1` 부여
+  ```
+  <body>            flex flex-col min-h-dvh
+    <Navbar />      고정 높이
+    <main>          flex-1 flex flex-col     ← children이 stretch 가능
+      <Page div>    flex-1 flex flex-col
+        <Form div>  flex-1 flex flex-col     (작성 페이지만)
+          editor    flex-1 min-h-[240px]     ← 화면 나머지를 채움
+    <Footer />      고정 높이
+  ```
+- `min-h-screen`(`100vh`) 대신 `min-h-dvh`(`100dvh`) 사용: 모바일 브라우저 주소창 높이를 동적으로 반영
+- 다른 페이지(홈, 태그 등)는 flex-1을 사용하지 않아 자체 콘텐츠 높이로 동작, 영향 없음
+
+**데스크톱**
+- Navbar(~56px) + Footer(~100px) 제외, 나머지를 에디터가 채움
+- 1920×1080 기준 약 920px 에디터 높이 확보
+
+**모바일**
+- `100vh`는 iOS Safari에서 주소창 포함 계산으로 스크롤 발생 가능 → `100dvh` 사용으로 해결
+- 소프트 키보드 활성화 시 `dvh` 단위가 동적으로 조정됨
+- 모바일에서는 에디터가 키보드 위 공간까지만 채우고, 이하는 스크롤로 대응
+
+### 변경 파일
+- `src/app/layout.tsx` — body에 `flex flex-col min-h-dvh`, main에 `flex-1 flex flex-col`
+- `src/app/post/write/[[...id]]/page.tsx` — wrapper에 `flex-1 flex flex-col`
+- `src/app/post/write/[[...id]]/writer-form.section.tsx` — root에 `flex flex-col flex-1`, 에디터 wrapper `min-h-[480px]` → `flex-1 min-h-[240px]`
+- `src/app/post/view/[[...id]]/page.tsx` — wrapper에 `flex-1 flex flex-col`, 콘텐츠 박스 `min-h-[480px]` → `flex-1 min-h-[240px]`
 
 ## 5. 태그 검색된 자료 바로보기
 - `src/app/tags/[tag]/page.tsx`

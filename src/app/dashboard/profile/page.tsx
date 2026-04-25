@@ -7,7 +7,7 @@ export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
   
   return (
-    <main className="mx-auto px-4 py-6">
+    <main className="px-4 py-6">
       {/* 프로필 정보 */}
       <MyProfile session={session} />
       {/* 달성한 업적 */}

@@ -74,7 +74,7 @@ export default async function PostViewier(props: {
 
     const { jsonContent, title, likes, tags, userEmail } = post;
 
-    return (<div className='mx-auto px-4 py-6'>
+    return (<div className='px-4 py-6 flex-1 flex flex-col'>
         <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
             <div className='w-full p-3 flex justify-between items-center gap-4'>
                 <h1 className='font-bold md:text-lg truncate'>{title}</h1>
@@ -83,7 +83,7 @@ export default async function PostViewier(props: {
                 </div>
             </div>
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
+        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg flex-1 min-h-[240px] rich-web-editor-wrapper flex flex-col">
             <div className="p-4 transition-all duration-300 ease-in-out flex-1">
                 <RichContentViewer content={jsonContent} waitRenderComplete={true} />
             </div>
