@@ -3,7 +3,7 @@
 // Note. copy from @/components/tiptap-templates/simple/simple-editor.tsx
 
 import * as React from "react"
-import { EditorContent, EditorContext, HTMLContent, JSONContent, useEditor } from "@tiptap/react"
+import { EditorContent, EditorContext, HTMLContent, JSONContent, useEditor, ReactNodeViewRenderer } from "@tiptap/react"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -16,6 +16,7 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
 
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
@@ -69,6 +70,8 @@ import { useWindowSize } from "@/hooks/use-window-size"
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import { uploadImage } from "./editor.upload"
+import { lowlight } from "@/lib/lowlight"
+import { CodeBlockLanguageSelect } from "@/components/tiptap-node/code-block-node/code-block-language-select"
 
 // --- Styles ---
 import "./editor.scss"
@@ -264,7 +267,12 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             },
         },
         extensions: [
-            StarterKit,
+            StarterKit.configure({ codeBlock: false }),
+            CodeBlockLowlight.extend({
+                addNodeView() {
+                    return ReactNodeViewRenderer(CodeBlockLanguageSelect);
+                },
+            }).configure({ lowlight }),
             TextAlign.configure({ types: ["heading", "paragraph"] }),
             Underline,
             TaskList,
