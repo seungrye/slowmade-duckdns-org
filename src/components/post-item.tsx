@@ -37,8 +37,17 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
         </button>
       </div>
       {isOpen && (
-        <div className="p-4 transition-all duration-300 ease-in-out border-t border-t-gray-200">
-          <RichContentViewer content={post.jsonContent} />
+        <div className="border-t border-t-gray-200">
+          <div className="relative max-h-64 overflow-hidden p-4">
+            <RichContentViewer content={post.jsonContent} />
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+          </div>
+          <Link
+            href={`/post/view/${post._id}`}
+            className="flex justify-center py-2 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+          >
+            전체 보기
+          </Link>
         </div>
       )}
       <div className="flex justify-between items-center px-4 py-3 text-sm text-gray-600 border-t border-t-gray-200">
