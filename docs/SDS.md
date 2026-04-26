@@ -90,6 +90,7 @@
   - 작성자 본인만 삭제 가능
   - 연관 댓글도 `isDeleted` 처리
   - `User.points` 차감
+- `GET /api/post/revisions?postId=` — 게시글 수정 이력 목록 조회
 
 ### 2.3 댓글
 
@@ -141,6 +142,7 @@
 - `src/components/rich-web-editor/viewer.tsx` — 게시글 뷰어
 - `src/components/post-item.tsx` — 게시글 목록 아이템
 - `src/components/achievement-toast.tsx` — 업적 획득 알림
+- `src/components/ui/` — UI 프리미티브 컴포넌트 (Button, Card, Input, Badge); variant 설정은 `.variants.ts`로 분리
 
 ### 3.3 공통 라이브러리
 
@@ -148,6 +150,7 @@
 - `src/lib/posts.tsx` — 게시글/태그/조회수/삭제 도메인 로직
 - `src/lib/achievements.tsx` — 업적 정의 및 자동 부여 로직
 - `src/lib/revisions.tsx` — 게시글 개정 이력
+- `src/lib/cn.ts` — `clsx` + `tailwind-merge` 기반 클래스 병합 유틸리티
 
 ## 4. 데이터 흐름
 
