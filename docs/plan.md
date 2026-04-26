@@ -8,6 +8,22 @@
 - 테스트: `src/app/tags/tag-cloud-search.helpers.ts`, `src/app/tags/tag-cloud-search.test.ts`
 - 버그 수정: 긴 태그명으로 인한 모바일 수평 스크롤 (`break-all` 적용)
 
+### 9. 카드 본문 토글 미리보기 ✅
+- 메인 페이지 및 태그 검색 결과 페이지: 카드 토글 시 본문 일부 표시
+- `max-h-64 overflow-hidden` + 하단 gradient fade + "전체 보기" 링크
+- `src/app/tags/[tag]/tag-post-list.tsx` — 태그 결과용 클라이언트 토글 컴포넌트 신설
+- `getPostsByTag` `$project`에서 `jsonContent` 제외 항목 삭제
+
+### 10. 다크 모드 ✅
+- 시스템 테마(`@media (prefers-color-scheme: dark)`) 기반
+- `layout.tsx` `DarkClassSync` 컴포넌트: 미디어 쿼리 변화 감지 → `<html class="dark">` 동기화 (TipTap 자체 디자인 시스템 대응)
+- `globals.css`: `[data-theme="dark/light"]` 변수, `:root:not([data-theme="light"])` 미디어 쿼리 조건 추가
+- UI 컴포넌트(Button/Badge/Card/Input), 공통 컴포넌트, 전체 페이지에 `dark:` 클래스 적용
+
+### 11. 내가 올린 유머 본문 프리뷰 ✅
+- `src/components/post-content-preview.tsx` — `RichContentViewer` 래퍼 (ssr: false, 로딩 스켈레톤 포함)
+- `dashboard/posts/page.tsx`: 썸네일 없을 때 기존 iframe → `PostContentPreview`로 교체
+
 ### 8. 디자인 시스템 기초 ✅
 - `src/lib/cn.ts` — clsx + tailwind-merge 기반 클래스 병합 유틸리티
 - `src/components/ui/` — Button, Card, Input, Badge 프리미티브 컴포넌트

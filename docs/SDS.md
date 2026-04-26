@@ -143,6 +143,8 @@
 - `src/components/post-item.tsx` — 게시글 목록 아이템
 - `src/components/achievement-toast.tsx` — 업적 획득 알림
 - `src/components/ui/` — UI 프리미티브 컴포넌트 (Button, Card, Input, Badge); variant 설정은 `.variants.ts`로 분리
+- `src/components/post-content-preview.tsx` — `RichContentViewer` 동적 래퍼; 카드 목록에서 본문 프리뷰 표시용 (로딩 스켈레톤 포함)
+- `src/app/tags/[tag]/tag-post-list.tsx` — 태그 검색 결과 페이지용 카드 토글 클라이언트 컴포넌트
 
 ### 3.3 공통 라이브러리
 

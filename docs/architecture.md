@@ -117,3 +117,5 @@ flowchart TB
 - **익명 댓글 ID**: `nanoid`로 생성된 ID를 base-5 인코딩하여 익명 닉네임 표시.
 - **좋아요 카운트**: `likes`는 0 미만으로 떨어지지 않도록 쿼리에 방어 로직 포함.
 - **포인트 삭제 비용**: 게시글 삭제 시 포인트 차감으로 삭제에 간접 비용 부여.
+- **다크 모드**: 시스템 테마(`@media (prefers-color-scheme: dark)`) 기반. `layout.tsx`의 `DarkClassSync` 컴포넌트가 미디어 쿼리 변화를 감지해 `<html class="dark">`를 동기화 — TipTap이 `.dark` 클래스 기반 자체 CSS 변수를 사용하기 때문. Tailwind `dark:` 유틸리티 클래스로 컴포넌트 스타일 적용.
+- **카드 본문 프리뷰**: 목록에서 카드 토글 또는 내가 올린 유머 카드에서 `RichContentViewer`로 본문 일부 표시. `max-h` + `overflow-hidden` + gradient fade 패턴. `PostContentPreview` 컴포넌트(`ssr: false`)로 재사용.
