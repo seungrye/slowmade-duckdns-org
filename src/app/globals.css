@@ -12,6 +12,19 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Design system tokens */
+  --shadow-card: var(--tt-shadow-elevated-md);
+  --color-brand-50: var(--tt-brand-color-50);
+  --color-brand-100: var(--tt-brand-color-100);
+  --color-brand-200: var(--tt-brand-color-200);
+  --color-brand-300: var(--tt-brand-color-300);
+  --color-brand-400: var(--tt-brand-color-400);
+  --color-brand-500: var(--tt-brand-color-500);
+  --color-brand-600: var(--tt-brand-color-600);
+  --color-brand-700: var(--tt-brand-color-700);
+  --color-brand-800: var(--tt-brand-color-800);
+  --color-brand-900: var(--tt-brand-color-900);
 }
 
 @media (prefers-color-scheme: dark) {

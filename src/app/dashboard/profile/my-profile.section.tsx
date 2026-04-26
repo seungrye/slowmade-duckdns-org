@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { Session } from "next-auth";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 type UserProfile = {
     name: string;
@@ -36,24 +38,33 @@ export default function MyProfile({session}: { session: Session | null }) {
     }, [session]);
 
     if (!session) {
-        return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
-            <p className="text-center text-gray-500">로그인이 필요합니다.</p>
-        </section>;
+        return (
+            <Card className="flex items-center gap-6">
+                <p className="text-center text-gray-500">로그인이 필요합니다.</p>
+            </Card>
+        );
     }
-    
-    return <section className="bg-white shadow-md border border-gray-200 inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
-        <Image src={profile?.image || session?.user.image || '/user-avatar.svg' } priority alt="프로필 이미지" width={80} height={80} className="rounded-full bg-gray-300" />
-        <div>
-            <h2 className="text-2xl font-bold">{profile?.name || session?.user.name}</h2>
-            <p className="text-gray-600">{profile?.email || session?.user.email}</p>
-            <p className="text-gray-500 text-sm mt-1">
-                {loading ? '로딩 중...' : `포인트: ${profile?.points?.toLocaleString() || 0} P | 가입일: ${profile ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}`}
-            </p>
-        </div>
-        <button className="ml-auto bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition"
-            aria-label="프로필 수정"
-        >
-            프로필 수정
-        </button>
-    </section>
+
+    return (
+        <Card className="flex items-center gap-6">
+            <Image
+                src={profile?.image || session?.user.image || '/user-avatar.svg'}
+                priority
+                alt="프로필 이미지"
+                width={80}
+                height={80}
+                className="rounded-full bg-gray-300"
+            />
+            <div>
+                <h2 className="text-2xl font-bold">{profile?.name || session?.user.name}</h2>
+                <p className="text-gray-600">{profile?.email || session?.user.email}</p>
+                <p className="text-gray-500 text-sm mt-1">
+                    {loading ? '로딩 중...' : `포인트: ${profile?.points?.toLocaleString() || 0} P | 가입일: ${profile ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}`}
+                </p>
+            </div>
+            <Button variant="secondary" className="ml-auto" aria-label="프로필 수정">
+                프로필 수정
+            </Button>
+        </Card>
+    );
 }

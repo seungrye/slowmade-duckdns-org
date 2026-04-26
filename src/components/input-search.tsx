@@ -2,6 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function InputSearch({ current }: { current: string }) {
     const router = useRouter();
@@ -11,20 +13,22 @@ export default function InputSearch({ current }: { current: string }) {
         router.replace(`?query=${encodeURIComponent(query)}`);
     };
 
-    return (<><input
-        type="text"
-        className="border border-gray-300 px-4 py-2 rounded-l-md w-80"
-        placeholder="유머 제목 또는 키워드 입력..."
-        defaultValue={query}
-        onChange={(e) => setQuery(e.target.value)}
-    />
-        <button
-            className="bg-blue-500 text-white px-4 py-2 rounded-r-md hover:bg-blue-600 transition"
-            onClick={handleSearch}
-            aria-label="검색"
-        >
-            검색
-        </button>
-    </>
+    return (
+        <div className="flex">
+            <Input
+                type="text"
+                placeholder="유머 제목 또는 키워드 입력..."
+                defaultValue={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="rounded-r-none w-80"
+            />
+            <Button
+                onClick={handleSearch}
+                className="rounded-l-none"
+                aria-label="검색"
+            >
+                검색
+            </Button>
+        </div>
     );
 }

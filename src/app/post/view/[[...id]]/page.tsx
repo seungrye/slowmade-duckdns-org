@@ -7,6 +7,7 @@ import { Metadata } from 'next';
 import PostActions from './post-actions.section';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Badge } from '@/components/ui/badge';
 
 type Params = Promise<{ id: string[] }>
 // type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>
@@ -93,8 +94,8 @@ export default async function PostViewier(props: {
                 <div className="p-3 text-sm text-gray-600 border-t border-t-gray-200">
                     <div className="flex flex-wrap items-center gap-3">
                         {tags.map((tag: string) => (
-                            <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag} className="bg-gray-100 text-gray-700 text-sm font-medium px-3 py-1 rounded-full hover:bg-gray-200 transition-colors duration-200">
-                                # {tag}
+                            <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag}>
+                                <Badge className="text-sm px-3 py-1 cursor-pointer"># {tag}</Badge>
                             </Link>
                         ))}
                     </div>
