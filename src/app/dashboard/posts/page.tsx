@@ -8,6 +8,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
 import { GetPostType } from "@/types/posts.d";
 import { Props } from "@/types/my-uploads.d";
 import PostActions from "@/components/post-actions";
+import PostContentPreview from "@/components/post-content-preview";
 import Image from "next/image";
 import { Suspense } from "react";
 import Loading from "./loading";
@@ -50,28 +51,20 @@ export default async function MyUploadsPage({ searchParams }: Props) {
             <div key={post._id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md inset-shadow-xs p-4">
               <Suspense fallback={<Loading />}>
                 <Link href={`/post/view/${post._id}`} className="" aria-label={`유머 보기: ${post.title}`}>
-                  <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400 dark:text-gray-500 relative">
+                  <div className="h-[200px] overflow-hidden">
                     {post.urls?.[0]?.thumbnailUrl ? (
-                      <Image
-                        src={post.urls[0].thumbnailUrl}
-                        alt={post.title}
-                        width={300}
-                        height={200}
-                        priority
-                        className="rounded-md object-contain w-full h-auto"
-                      />
+                      <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
+                        <Image
+                          src={post.urls[0].thumbnailUrl}
+                          alt={post.title}
+                          width={300}
+                          height={200}
+                          priority
+                          className="rounded-md object-contain w-full h-auto"
+                        />
+                      </div>
                     ) : (
-                      <>
-                        <div className="absolute w-full h-full" />
-                        <iframe
-                          className="transform-origin-top-left object-contain overflow-hidden"
-                          srcDoc={`<html><body style="scroll-behavior: none; overflow: hidden;">${post.htmlContent}</body></html>`}
-                          width="100%"
-                          height="100%"
-                          loading="lazy"
-                        >
-                        </iframe>
-                      </>
+                      <PostContentPreview content={post.jsonContent} />
                     )}
                   </div>
                   <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
