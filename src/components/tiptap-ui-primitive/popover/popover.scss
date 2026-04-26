@@ -18,6 +18,7 @@
   --border-width: 1px;
 
   z-index: 50;
+  transition: none;
   border-radius: calc(
     var(--padding) + var(--tt-radius-lg) + var(--border-width)
   );
