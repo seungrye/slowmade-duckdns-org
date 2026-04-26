@@ -33,7 +33,7 @@ export default function TagCloudSearch({ initialTags }: { initialTags: TagInfo[]
             <Link
               key={item.tag}
               href={`/tags/${encodeURIComponent(item.tag)}`}
-              className="inline-flex items-center px-3 text-gray-800 transition-colors duration-200 hover:text-blue-700"
+              className="inline-flex items-center px-3 text-gray-800 transition-colors duration-200 hover:text-blue-700 break-all"
               style={{ fontSize: `${getTagSize(item.count, minCount, maxCount)}rem` }}
             >
               <span className="font-medium">#{item.tag}</span>
