@@ -107,14 +107,14 @@ export default function TagInput({ tags, onTagsChange, placeholder }: TagInputPr
 
   return (
     <div className="relative w-full">
-      <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 rounded-lg has-focus:shadow-sm w-full">
+      <div className="flex flex-wrap items-center gap-2 p-2 border border-gray-300 dark:border-gray-600 rounded-lg has-focus:shadow-sm w-full">
         {tags.map((tag, index) => (
-          <div key={index} className="flex items-center gap-1 bg-blue-100 text-blue-800 text-sm font-medium px-2 py-1 rounded-full">
+          <div key={index} className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 text-sm font-medium px-2 py-1 rounded-full">
             <span>{tag}</span>
             <button
               type="button"
               onClick={() => removeTag(index)}
-              className="text-blue-500 hover:text-blue-700"
+              className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-200"
               aria-label={`Remove tag ${tag}`}
             >
               <X size={14} />
@@ -127,16 +127,16 @@ export default function TagInput({ tags, onTagsChange, placeholder }: TagInputPr
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || '태그를 입력하세요...'}
-          className="flex-grow p-1 bg-transparent focus:outline-none min-w-[120px]"
+          className="flex-grow p-1 bg-transparent focus:outline-none min-w-[120px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
         />
       </div>
       {suggestions.length > 0 && (
-        <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
           {suggestions.map((suggestion, index) => (
             <li
               key={suggestion}
               onClick={() => handleSuggestionClick(suggestion)}
-              className={`px-3 py-2 cursor-pointer hover:bg-gray-100 ${index === activeIndex ? 'bg-gray-100' : ''}`}
+              className={`px-3 py-2 cursor-pointer text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 ${index === activeIndex ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
             >
               {suggestion}
             </li>
