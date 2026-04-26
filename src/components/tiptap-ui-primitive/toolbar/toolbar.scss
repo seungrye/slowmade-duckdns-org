@@ -53,7 +53,8 @@
       position: inherit;
       top: auto;
       bottom: 0;
-      height: calc(var(--tt-toolbar-height) + var(--tt-safe-area-bottom));
+      min-height: calc(var(--tt-toolbar-height) + var(--tt-safe-area-bottom));
+      height: min-content;
       border-top: 1px solid var(--tt-toolbar-border-color);
       border-bottom: none;
       padding: 0 0.5rem var(--tt-safe-area-bottom);

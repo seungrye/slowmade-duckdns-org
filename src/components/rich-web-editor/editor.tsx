@@ -59,12 +59,13 @@ import {
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
-import { MathPopover } from "@/components/tiptap-ui/math-popover"
+import { MathPopover, MathButton, MathContent } from "@/components/tiptap-ui/math-popover"
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
+import { SigmaIcon } from "@/components/tiptap-icons/sigma-icon"
 
 // --- Hooks ---
 import { useMobile } from "@/hooks/use-mobile"
@@ -120,10 +121,12 @@ import { ImageUrlType } from "@/models/post"
 const MainToolbarContent = ({
     onHighlighterClick,
     onLinkClick,
+    onMathClick,
     isMobile,
 }: {
     onHighlighterClick: () => void
     onLinkClick: () => void
+    onMathClick: () => void
     isMobile: boolean
 }) => {
     return (
@@ -180,7 +183,11 @@ const MainToolbarContent = ({
 
             <ToolbarGroup>
                 <ImageUploadButton text="Add" aria-label="Add Image" />
-                <MathPopover />
+                {!isMobile ? (
+                    <MathPopover />
+                ) : (
+                    <MathButton onClick={onMathClick} aria-label="수식 삽입" />
+                )}
             </ToolbarGroup>
 
             <Spacer />
@@ -192,7 +199,7 @@ const MobileToolbarContent = ({
     type,
     onBack,
 }: {
-    type: "highlighter" | "link"
+    type: "highlighter" | "link" | "math"
     onBack: () => void
 }) => (
     <>
@@ -201,15 +208,25 @@ const MobileToolbarContent = ({
                 <ArrowLeftIcon className="tiptap-button-icon" />
                 {type === "highlighter" ? (
                     <HighlighterIcon className="tiptap-button-icon" />
-                ) : (
+                ) : type === "link" ? (
                     <LinkIcon className="tiptap-button-icon" />
+                ) : (
+                    <SigmaIcon className="tiptap-button-icon" />
                 )}
             </Button>
         </ToolbarGroup>
 
         <ToolbarSeparator />
 
-        {type === "highlighter" ? <HighlightContent /> : <LinkContent />}
+        {type === "highlighter" ? (
+            <HighlightContent />
+        ) : type === "link" ? (
+            <LinkContent />
+        ) : (
+            <div className="math-popover-content" style={{ alignSelf: "flex-start" }}>
+                <MathContent onApply={onBack} />
+            </div>
+        )}
     </>
 )
 
@@ -227,7 +244,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     const isMobile = useMobile()
     const windowSize = useWindowSize()
     const [mobileView, setMobileView] = React.useState<
-        "main" | "highlighter" | "link"
+        "main" | "highlighter" | "link" | "math"
     >("main")
     const [rect, setRect] = React.useState<
         Pick<DOMRect, "x" | "y" | "width" | "height">
@@ -377,11 +394,12 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                     <MainToolbarContent
                         onHighlighterClick={() => setMobileView("highlighter")}
                         onLinkClick={() => setMobileView("link")}
+                        onMathClick={() => setMobileView("math")}
                         isMobile={isMobile}
                     />
                 ) : (
                     <MobileToolbarContent
-                        type={mobileView === "highlighter" ? "highlighter" : "link"}
+                        type={mobileView}
                         onBack={() => setMobileView("main")}
                     />
                 )}

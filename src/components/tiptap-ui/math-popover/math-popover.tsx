@@ -12,7 +12,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/tiptap-ui-primitive/popover"
-import { Separator } from "@/components/tiptap-ui-primitive/separator"
 import { SigmaIcon } from "@/components/tiptap-icons/sigma-icon"
 import { CornerDownLeftIcon } from "@/components/tiptap-icons/corner-down-left-icon"
 import { TrashIcon } from "@/components/tiptap-icons/trash-icon"
@@ -43,30 +42,41 @@ function getInitialLatex(editor: Editor | null): string {
   return ""
 }
 
-export function MathPopover({ editor: providedEditor, ...props }: MathPopoverProps) {
+export const MathButton = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ children, ...props }, ref) => (
+    <Button
+      type="button"
+      data-style="ghost"
+      role="button"
+      tabIndex={-1}
+      aria-label="수식 삽입"
+      tooltip="수식"
+      ref={ref}
+      {...props}
+    >
+      {children || <SigmaIcon className="tiptap-button-icon" />}
+    </Button>
+  )
+)
+
+MathButton.displayName = "MathButton"
+
+export const MathContent: React.FC<{
+  editor?: Editor | null
+  onApply?: () => void
+}> = ({ editor: providedEditor, onApply }) => {
   const editor = useTiptapEditor(providedEditor)
-  const [isOpen, setIsOpen] = React.useState(false)
-  const [latex, setLatex] = React.useState("")
+  const [latex, setLatex] = React.useState(() => getInitialLatex(editor))
   const isActive = getInlineMathLatex(editor) !== null
 
-  // 기존 인라인 수식 선택 시 자동으로 팝오버 열기
   React.useEffect(() => {
     if (!editor) return
     const handleSelectionUpdate = () => {
-      if (getInlineMathLatex(editor) !== null) {
-        setLatex(getInlineMathLatex(editor) ?? "")
-        setIsOpen(true)
-      }
+      const mathLatex = getInlineMathLatex(editor)
+      if (mathLatex !== null) setLatex(mathLatex)
     }
     editor.on("selectionUpdate", handleSelectionUpdate)
     return () => { editor.off("selectionUpdate", handleSelectionUpdate) }
-  }, [editor])
-
-  const handleOpenChange = React.useCallback((open: boolean) => {
-    if (open) {
-      setLatex(getInitialLatex(editor))
-    }
-    setIsOpen(open)
   }, [editor])
 
   const preview = React.useMemo(() => {
@@ -100,14 +110,14 @@ export function MathPopover({ editor: providedEditor, ...props }: MathPopoverPro
       }).run()
     }
 
-    setIsOpen(false)
-  }, [editor, latex])
+    onApply?.()
+  }, [editor, latex, onApply])
 
   const handleDelete = React.useCallback(() => {
     if (!editor) return
     editor.chain().focus().deleteSelection().run()
-    setIsOpen(false)
-  }, [editor])
+    onApply?.()
+  }, [editor, onApply])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -116,66 +126,79 @@ export function MathPopover({ editor: providedEditor, ...props }: MathPopoverPro
     }
   }
 
-  if (!editor || !editor.isEditable) return null
-
   return (
-    <Popover open={isOpen} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
+    <>
+      <div className="tiptap-button-group" data-orientation="horizontal">
+        <input
+          autoFocus
+          type="text"
+          className="math-popover-input"
+          placeholder="LaTeX 수식 입력 (예: E=mc^2)"
+          value={latex}
+          onChange={(e) => setLatex(e.target.value)}
+          onKeyDown={handleKeyDown}
+          autoComplete="off"
+          spellCheck={false}
+        />
         <Button
           type="button"
           data-style="ghost"
-          role="button"
-          tabIndex={-1}
-          aria-label="수식 삽입"
-          tooltip="수식"
+          onClick={handleApply}
+          disabled={!latex.trim()}
+          title={isActive ? "수정" : "삽입"}
+        >
+          <CornerDownLeftIcon className="tiptap-button-icon" />
+        </Button>
+        {isActive && (
+          <Button
+            type="button"
+            data-style="ghost"
+            onClick={handleDelete}
+            title="수식 삭제"
+          >
+            <TrashIcon className="tiptap-button-icon" />
+          </Button>
+        )}
+      </div>
+
+      {preview && (
+        <div
+          className="math-popover-preview"
+          dangerouslySetInnerHTML={{ __html: preview }}
+        />
+      )}
+    </>
+  )
+}
+
+export function MathPopover({ editor: providedEditor, ...props }: MathPopoverProps) {
+  const editor = useTiptapEditor(providedEditor)
+  const [isOpen, setIsOpen] = React.useState(false)
+  const isActive = getInlineMathLatex(editor) !== null
+
+  React.useEffect(() => {
+    if (!editor) return
+    const handleSelectionUpdate = () => {
+      if (getInlineMathLatex(editor) !== null) setIsOpen(true)
+    }
+    editor.on("selectionUpdate", handleSelectionUpdate)
+    return () => { editor.off("selectionUpdate", handleSelectionUpdate) }
+  }, [editor])
+
+  if (!editor || !editor.isEditable) return null
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <MathButton
           data-active-state={isActive ? "on" : "off"}
           {...props}
-        >
-          <SigmaIcon className="tiptap-button-icon" />
-        </Button>
+        />
       </PopoverTrigger>
 
       <PopoverContent>
         <div className="math-popover-content">
-          <div className="tiptap-button-group" data-orientation="horizontal">
-            <input
-              autoFocus
-              type="text"
-              className="math-popover-input"
-              placeholder="LaTeX 수식 입력 (예: E=mc^2)"
-              value={latex}
-              onChange={(e) => setLatex(e.target.value)}
-              onKeyDown={handleKeyDown}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <Button
-              type="button"
-              data-style="ghost"
-              onClick={handleApply}
-              disabled={!latex.trim()}
-              title={isActive ? "수정" : "삽입"}
-            >
-              <CornerDownLeftIcon className="tiptap-button-icon" />
-            </Button>
-            {isActive && (
-              <Button
-                type="button"
-                data-style="ghost"
-                onClick={handleDelete}
-                title="수식 삭제"
-              >
-                <TrashIcon className="tiptap-button-icon" />
-              </Button>
-            )}
-          </div>
-
-          {preview && (
-            <div
-              className="math-popover-preview"
-              dangerouslySetInnerHTML={{ __html: preview }}
-            />
-          )}
+          <MathContent editor={editor} onApply={() => setIsOpen(false)} />
         </div>
       </PopoverContent>
     </Popover>
