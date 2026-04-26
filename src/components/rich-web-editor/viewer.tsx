@@ -17,6 +17,8 @@ import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
+import { InlineMath, BlockMath } from "@tiptap/extension-mathematics"
+import "katex/dist/katex.min.css"
 
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
@@ -60,6 +62,8 @@ const tiptapExtensions = [
     Selection,
     TrailingNode,
     Link.configure({ openOnClick: true }),
+    InlineMath.configure({ katexOptions: { throwOnError: false } }),
+    BlockMath.configure({ katexOptions: { throwOnError: false } }),
 ];
 
 export interface RichContentViewerProps {

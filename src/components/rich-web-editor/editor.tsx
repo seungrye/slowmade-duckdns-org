@@ -17,6 +17,8 @@ import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
+import { InlineMath, BlockMath } from "@tiptap/extension-mathematics"
+import "katex/dist/katex.min.css"
 
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
@@ -57,6 +59,7 @@ import {
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
+import { MathPopover } from "@/components/tiptap-ui/math-popover"
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
@@ -177,6 +180,7 @@ const MainToolbarContent = ({
 
             <ToolbarGroup>
                 <ImageUploadButton text="Add" aria-label="Add Image" />
+                <MathPopover />
             </ToolbarGroup>
 
             <Spacer />
@@ -296,6 +300,8 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             }),
             TrailingNode,
             Link.configure({ openOnClick: false }),
+            InlineMath.configure({ katexOptions: { throwOnError: false } }),
+            BlockMath.configure({ katexOptions: { throwOnError: false } }),
         ],
         content: "",
     })
