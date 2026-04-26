@@ -70,35 +70,16 @@
     margin-top: 1.5em;
     margin-bottom: 1.5em;
 
-    .code-block-language-select {
+    .code-block-language-label {
       position: absolute;
       top: 0.5em;
-      right: 0.5em;
+      right: 0.6em;
       z-index: 10;
-
-      select {
-        appearance: none;
-        background-color: transparent;
-        border: 1px solid rgba(128, 128, 128, 0.3);
-        border-radius: 4px;
-        color: inherit;
-        cursor: pointer;
-        font-size: 0.75rem;
-        opacity: 0.6;
-        padding: 0.15em 0.5em;
-        transition: opacity 0.15s;
-
-        &:hover,
-        &:focus {
-          opacity: 1;
-          outline: none;
-        }
-
-        option {
-          background-color: var(--tt-codeblock-bg);
-          color: var(--tt-codeblock-text);
-        }
-      }
+      font-size: 0.7rem;
+      font-family: "JetBrains Mono NL", monospace;
+      opacity: 0.45;
+      pointer-events: none;
+      user-select: none;
     }
 
     pre {

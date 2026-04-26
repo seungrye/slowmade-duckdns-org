@@ -41,7 +41,7 @@ import { useMobile } from "@/hooks/use-mobile"
 
 // --- Lib ---
 import { lowlight } from "@/lib/lowlight"
-import { CodeBlockLanguageSelect } from "@/components/tiptap-node/code-block-node/code-block-language-select"
+import { CodeBlockView } from "@/components/tiptap-node/code-block-node/code-block-view"
 
 // --- Styles ---
 import "./editor.scss"
@@ -51,7 +51,7 @@ const tiptapExtensions = [
     StarterKit.configure({ codeBlock: false }),
     CodeBlockLowlight.extend({
         addNodeView() {
-            return ReactNodeViewRenderer(CodeBlockLanguageSelect);
+            return ReactNodeViewRenderer(CodeBlockView);
         },
     }).configure({ lowlight }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),

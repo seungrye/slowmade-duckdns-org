@@ -71,7 +71,7 @@ import { useWindowSize } from "@/hooks/use-window-size"
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import { uploadImage } from "./editor.upload"
 import { lowlight } from "@/lib/lowlight"
-import { CodeBlockLanguageSelect } from "@/components/tiptap-node/code-block-node/code-block-language-select"
+import { CodeBlockView } from "@/components/tiptap-node/code-block-node/code-block-view"
 
 // --- Styles ---
 import "./editor.scss"
@@ -270,7 +270,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             StarterKit.configure({ codeBlock: false }),
             CodeBlockLowlight.extend({
                 addNodeView() {
-                    return ReactNodeViewRenderer(CodeBlockLanguageSelect);
+                    return ReactNodeViewRenderer(CodeBlockView);
                 },
             }).configure({ lowlight }),
             TextAlign.configure({ types: ["heading", "paragraph"] }),
