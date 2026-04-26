@@ -139,8 +139,8 @@ export default function RevisionHistorySection({
 
                 {/* 본문 (펼침) */}
                 {isOpen && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
-                    <div className="p-4 rich-web-editor-wrapper">
+                  <div className="border-t border-gray-200 dark:border-gray-700 rich-web-editor-wrapper">
+                    <div className="p-4">
                       {loadingId === revision._id ? (
                         <div className="h-40 animate-pulse bg-gray-100 dark:bg-gray-800 rounded" />
                       ) : contents[revision._id] ? (
