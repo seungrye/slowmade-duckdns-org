@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getPostsByTag } from '@/lib/posts';
-import PostItem from '@/components/post-item';
+import TagPostList from './tag-post-list';
 
 type Props = Promise<{ tag: string }>;
 
@@ -31,11 +31,7 @@ export default async function TagPage(props: {
         <p className="mt-2 text-gray-600 py-4">{posts.length}개의 게시글이 있습니다.</p>
 
       {posts.length > 0 ? (
-        <div className="space-y-4">
-          {posts.map((post) => 
-            <PostItem key={post._id} post={post} isOpen={false} togglePost={undefined} />
-          )}
-        </div>
+        <TagPostList posts={posts} />
       ) : (
         <div className="text-center py-16">
           <p className="text-gray-500">해당 태그가 달린 게시글이 없습니다.</p>

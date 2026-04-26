@@ -326,12 +326,11 @@ export async function getPostsByTag(tag: string): Promise<{
           },
           {
             $project: {
-              tags: 0, // 태그는 필요 없으므로 제외
+              tags: 0,
               urls: 0,
               createdAt: 0,
               updatedAt: 0,
               htmlContent: 0,
-              jsonContent: 0,
               comments: 0,
             },
           }
