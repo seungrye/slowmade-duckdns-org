@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function PostWriter() {
-    return (<div className='px-4 py-6 flex-1 flex flex-col'>
+    return (<div className='mx-auto px-4 py-6'>        
         <Toaster position="bottom-right" /> {/* ✅ 토스트 메시지 표시 위치 */}
 
         <PostWriterForm />

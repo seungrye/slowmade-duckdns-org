@@ -129,7 +129,7 @@ export default function SettingsPage() {
     // 세션을 확인하는 동안 로딩 상태를 보여줍니다.
     if (status === 'loading') {
         return (
-            <main className="px-4 py-6">
+            <main className="mx-auto px-4 py-6">
                 <div className="h-8 bg-gray-200 rounded w-32 mb-6 animate-pulse"></div>
                 <div className="h-64 bg-gray-200 rounded-lg animate-pulse"></div>
             </main>

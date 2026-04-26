@@ -38,9 +38,11 @@
 - revision 별 `version`, `작성일`, `제목` 표시
 - 선택 시 에디터에 과거 버전 로드 또는 복원 기능
 
-## 4. 작성/보기 화면 위/아래 꽉 차도록 처리 ✅
-
-→ [작업 문서](work/004-full-height-layout.md)
+## 4. 작성/보기 화면 위/아래 꽉 차도록 처리
+- `src/app/post/write/[[...id]]/writer-form.section.tsx`
+- `src/app/post/view/[[...id]]/page.tsx`
+- 현재 `min-h-[480px]` 레이아웃을 `min-h-screen`, `h-full`, `flex flex-col` 등으로 변경
+- 상단, 에디터, 하단 영역이 화면 전체를 채우도록 재구성
 
 ## 5. 태그 검색된 자료 바로보기
 - `src/app/tags/[tag]/page.tsx`
