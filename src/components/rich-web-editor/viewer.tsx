@@ -17,7 +17,6 @@ import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
-import { ReactNodeViewRenderer } from "@tiptap/react"
 
 // --- Custom Extensions ---
 import { Link } from "@/components/tiptap-extension/link-extension"
@@ -41,7 +40,6 @@ import { useMobile } from "@/hooks/use-mobile"
 
 // --- Lib ---
 import { lowlight } from "@/lib/lowlight"
-import { CodeBlockView } from "@/components/tiptap-node/code-block-node/code-block-view"
 
 // --- Styles ---
 import "./editor.scss"
@@ -49,11 +47,7 @@ import "./editor.scss"
 // Tiptap 확장 기능은 컴포넌트 외부에서 정의하여 리렌더링 시 재생성되지 않도록 합니다.
 const tiptapExtensions = [
     StarterKit.configure({ codeBlock: false }),
-    CodeBlockLowlight.extend({
-        addNodeView() {
-            return ReactNodeViewRenderer(CodeBlockView);
-        },
-    }).configure({ lowlight }),
+    CodeBlockLowlight.configure({ lowlight }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Underline,
     TaskList,

@@ -3,7 +3,7 @@
 // Note. copy from @/components/tiptap-templates/simple/simple-editor.tsx
 
 import * as React from "react"
-import { EditorContent, EditorContext, HTMLContent, JSONContent, useEditor, ReactNodeViewRenderer } from "@tiptap/react"
+import { EditorContent, EditorContext, HTMLContent, JSONContent, useEditor } from "@tiptap/react"
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
@@ -71,7 +71,6 @@ import { useWindowSize } from "@/hooks/use-window-size"
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import { uploadImage } from "./editor.upload"
 import { lowlight } from "@/lib/lowlight"
-import { CodeBlockView } from "@/components/tiptap-node/code-block-node/code-block-view"
 
 // --- Styles ---
 import "./editor.scss"
@@ -268,11 +267,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         },
         extensions: [
             StarterKit.configure({ codeBlock: false }),
-            CodeBlockLowlight.extend({
-                addNodeView() {
-                    return ReactNodeViewRenderer(CodeBlockView);
-                },
-            }).configure({ lowlight }),
+            CodeBlockLowlight.configure({ lowlight }),
             TextAlign.configure({ types: ["heading", "paragraph"] }),
             Underline,
             TaskList,
