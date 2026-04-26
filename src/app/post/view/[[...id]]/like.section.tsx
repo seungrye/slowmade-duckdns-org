@@ -48,7 +48,7 @@ export default function LikeSection({
     }, [_id]);
 
     return (
-        <div className="flex justify-end items-center text-sm text-gray-600 border-t border-t-gray-200 p-4 gap-4">
+        <div className="flex justify-end items-center text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700 p-4 gap-4">
             <div className={`flex items-center gap-1.5 cursor-pointer ${likeChecked ? 'text-red-600' : 'hover:text-blue-600'}`}
                 onClick={async () => {
                     if (!likeChecked) {

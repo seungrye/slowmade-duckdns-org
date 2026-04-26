@@ -13,7 +13,7 @@ export default function SelectSorter({ current }: { current: string }) {
 
     return (
         <select
-            className="border border-gray-300 rounded px-3 py-2"
+            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
             defaultValue={current}
             onChange={handleChange}
         >

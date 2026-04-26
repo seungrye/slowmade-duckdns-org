@@ -192,7 +192,7 @@ export default function Comments({ postId }: Props) {
                 if (el) commentRefs.current.set(c._id, el);
                 else commentRefs.current.delete(c._id);
               }}
-              className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}border border-gray-200 rounded-lg rounded-br-none p-4`}
+              className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}border border-gray-200 dark:border-gray-700 rounded-lg rounded-br-none p-4`}
             >
               <p className="text-gray-500 italic">{c.content}</p>
             </div>
@@ -204,7 +204,7 @@ export default function Comments({ postId }: Props) {
                 if (el) commentRefs.current.set(c._id, el);
                 else commentRefs.current.delete(c._id);
               }}
-              className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 rounded-lg rounded-br-none p-4 transition-all duration-300`}
+              className={`${Boolean(parentId) ? "ml-6 md:ml-12 " : ""}flex items-start gap-4 border border-gray-200 dark:border-gray-700 rounded-lg rounded-br-none p-4 transition-all duration-300`}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -222,7 +222,7 @@ export default function Comments({ postId }: Props) {
                         e.preventDefault();
                         handleParentAuthorClick(c.parent?._id);
                       }}
-                      className="text-blue-600 hover:underline mr-2 p-1 bg-blue-50 rounded-md"
+                      className="text-blue-600 hover:underline mr-2 p-1 bg-blue-50 dark:bg-blue-900/30 rounded-md"
                       aria-label={`부모 댓글로 이동: @${c.parent.author}`}
                     >
                       {c.parent.author}

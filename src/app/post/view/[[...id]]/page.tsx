@@ -76,7 +76,7 @@ export default async function PostViewier(props: {
     const { jsonContent, title, likes, tags, userEmail } = post;
 
     return (<div className='mx-auto px-4 py-6'>
-        <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
+        <div className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
             <div className='w-full p-3 flex justify-between items-center gap-4'>
                 <h1 className='font-bold md:text-lg truncate'>{title}</h1>
                 <div className="flex-shrink-0">
@@ -84,14 +84,14 @@ export default async function PostViewier(props: {
                 </div>
             </div>
         </div>
-        <div className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
+        <div className="border border-gray-300 dark:border-gray-700 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
             <div className="p-4 transition-all duration-300 ease-in-out flex-1">
                 <RichContentViewer content={jsonContent} waitRenderComplete={true} />
             </div>
 
             {/* 태그 목록 렌더링 */}
             {tags && tags.length > 0 && (
-                <div className="p-3 text-sm text-gray-600 border-t border-t-gray-200">
+                <div className="p-3 text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700">
                     <div className="flex flex-wrap items-center gap-3">
                         {tags.map((tag: string) => (
                             <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag}>

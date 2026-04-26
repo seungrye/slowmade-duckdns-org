@@ -82,24 +82,24 @@ function SettingsForm() {
     }
 
     return (
-        <form onSubmit={handleSave} className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+        <form onSubmit={handleSave} className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
             <div className="mb-6">
-                <h2 className="text-xl font-semibold mb-2 text-gray-800">테마 설정</h2>
-                <p className="text-sm text-gray-600 mb-4">
+                <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">테마 설정</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
                     사이트의 전체적인 테마를 선택합니다. &apos;시스템&apos;은 기기의 설정을 따릅니다.
                 </p>
                 <div className="space-x-3 flex flex-row items-center">
                     {(['light', 'dark', 'system'] as const).map((value) => (
-                        <label key={value} className="flex items-center cursor-pointer p-2 rounded-md hover:bg-gray-50 transition-colors">
+                        <label key={value} className="flex items-center cursor-pointer p-2 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                             <input
                                 type="radio"
                                 name="theme"
                                 value={value}
                                 checked={theme === value}
                                 onChange={() => setTheme(value)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                                className="h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 focus:ring-blue-500 focus:ring-2"
                             />
-                            <span className="ml-3 text-gray-700 capitalize">{value === 'light' ? '라이트' : value === 'dark' ? '다크' : '시스템'}</span>
+                            <span className="ml-3 text-gray-700 dark:text-gray-300 capitalize">{value === 'light' ? '라이트' : value === 'dark' ? '다크' : '시스템'}</span>
                         </label>
                     ))}
                 </div>

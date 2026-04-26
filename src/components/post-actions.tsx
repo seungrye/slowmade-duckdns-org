@@ -78,14 +78,14 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
         onClose={() => setIsModalOpen(false)}
         title="게시물 삭제 확인"
       >
-        <div className="text-gray-700">
+        <div className="text-gray-700 dark:text-gray-300">
           <p>정말로 이 게시물을 삭제하시겠습니까?</p>
           <p className="text-sm text-red-600 mt-1">
             삭제 작업은 되돌릴 수 없으며, {DELETE_POST_COST}포인트가 차감됩니다.
           </p>
         </div>
         <div className="mt-6 flex justify-end gap-3">
-          <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition" disabled={isDeleting}
+          <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition" disabled={isDeleting}
             aria-label="게시물 삭제 취소"
           >취소</button>
           <button onClick={handleConfirmDelete} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:bg-red-400" disabled={isDeleting}

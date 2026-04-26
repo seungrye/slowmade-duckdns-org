@@ -21,11 +21,11 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
       role="dialog"
     >
       <div
-        className="bg-white rounded-lg shadow-card w-full max-w-md"
+        className="bg-white dark:bg-gray-900 rounded-lg shadow-card w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center border-b p-4">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <div className="flex justify-between items-center border-b dark:border-gray-700 p-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
           <Button
             variant="ghost"
             size="sm"

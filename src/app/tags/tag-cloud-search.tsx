@@ -22,7 +22,7 @@ export default function TagCloudSearch({ initialTags }: { initialTags: TagInfo[]
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="검색할 태그를 입력하세요"
-              className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="w-full min-w-0 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 placeholder:text-gray-400 dark:placeholder:text-gray-500"
             />
         </div>
       </div>
@@ -33,15 +33,15 @@ export default function TagCloudSearch({ initialTags }: { initialTags: TagInfo[]
             <Link
               key={item.tag}
               href={`/tags/${encodeURIComponent(item.tag)}`}
-              className="inline-flex items-center px-3 text-gray-800 transition-colors duration-200 hover:text-blue-700 break-all"
+              className="inline-flex items-center px-3 text-gray-800 dark:text-gray-200 transition-colors duration-200 hover:text-blue-700 dark:hover:text-blue-400 break-all"
               style={{ fontSize: `${getTagSize(item.count, minCount, maxCount)}rem` }}
             >
               <span className="font-medium">#{item.tag}</span>
-              <span className="ml-2 text-xs text-gray-500">{item.count}</span>
+              <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">{item.count}</span>
             </Link>
           ))
         ) : (
-          <div className="w-full rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-6 py-12 text-center text-sm text-gray-500">
+          <div className="w-full rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
             조건에 맞는 태그가 없습니다. 검색어를 변경해 보세요.
           </div>
         )}

@@ -17,7 +17,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
 
   if (!session) {
     return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">
-      <p className="text-center text-gray-500">로그인이 필요합니다.</p>
+      <p className="text-center text-gray-500 dark:text-gray-400">로그인이 필요합니다.</p>
     </section>;
   }
 
@@ -47,16 +47,16 @@ export default async function MyUploadsPage({ searchParams }: Props) {
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
         {posts.length > 0 ? (
           posts.map((post: GetPostType) => (
-            <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4">
+            <div key={post._id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md inset-shadow-xs p-4">
               <Suspense fallback={<Loading />}>
                 <Link href={`/post/view/${post._id}`} className="" aria-label={`유머 보기: ${post.title}`}>
-                  <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400 relative">
+                  <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400 dark:text-gray-500 relative">
                     {post.urls?.[0]?.thumbnailUrl ? (
                       <Image
                         src={post.urls[0].thumbnailUrl}
                         alt={post.title}
-                        width={300}             // 고정 or 동적으로 조절 가능
-                        height={200}            // 고정 or 동적으로 조절 가능
+                        width={300}
+                        height={200}
                         priority
                         className="rounded-md object-contain w-full h-auto"
                       />
@@ -76,23 +76,23 @@ export default async function MyUploadsPage({ searchParams }: Props) {
                   </div>
                   <h4 className="mt-3 text-lg font-semibold truncate">{post.title}</h4>
                 </Link>
-                <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
                 <PostActions postId={post._id} authorEmail={post.userEmail} />
               </Suspense>
             </div>
           ))
         ) : (
-          <p className="text-gray-500">아직 업로드한 유머가 없습니다.</p>
+          <p className="text-gray-500 dark:text-gray-400">아직 업로드한 유머가 없습니다.</p>
         )}
       </section>
 
       <div className="flex justify-center mt-8">
-        <Link className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" href={{
+        <Link className="bg-gray-300 dark:bg-gray-700 px-4 py-2 rounded-l cursor-pointer" href={{
           pathname: page > 0 ? "/dashboard/posts" : "#",
           query: { ...params, page: page > 1 ? page - 1 : page }
         }}>◀ 이전</Link>
-        <span className="px-4 py-2 bg-gray-100">{page} / {endPage}</span>
-        <Link className="bg-gray-300 px-4 py-2 rounded-r cursor-pointer" href={{
+        <span className="px-4 py-2 bg-gray-100 dark:bg-gray-800">{page} / {endPage}</span>
+        <Link className="bg-gray-300 dark:bg-gray-700 px-4 py-2 rounded-r cursor-pointer" href={{
           pathname: page < endPage ? "/dashboard/posts" : "#",
           query: { ...params, page: endPage > page ? page + 1 : page }
         }}>다음 ▶</Link>

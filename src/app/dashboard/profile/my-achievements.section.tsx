@@ -47,14 +47,14 @@ export default function MyAchievements({ session }: { session: Session | null })
                     {achievements.map(({ achievement, unlockedAt }) => {
                         const IconComponent = achievementIconMap[achievement.icon] || FaAward;
                         return (
-                            <div key={achievement._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4 flex items-center gap-4 border border-gray-200">
+                            <div key={achievement._id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md inset-shadow-xs p-4 flex items-center gap-4 border border-gray-200 dark:border-gray-700">
                                 <div className="text-yellow-500">
                                     <IconComponent size={32} />
                                 </div>
                                 <div>
-                                    <h4 className="font-semibold text-gray-800">{achievement.name}</h4>
-                                    <p className="text-sm text-gray-600">{achievement.description}</p>
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <h4 className="font-semibold text-gray-800 dark:text-gray-200">{achievement.name}</h4>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">{achievement.description}</p>
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                         달성일: {new Date(unlockedAt).toLocaleDateString()}
                                     </p>
                                 </div>
@@ -63,7 +63,7 @@ export default function MyAchievements({ session }: { session: Session | null })
                     })}
                 </div>
             ) : (
-                <p className="text-gray-500 mt-4">아직 달성한 업적이 없습니다.</p>
+                <p className="text-gray-500 dark:text-gray-400 mt-4">아직 달성한 업적이 없습니다.</p>
             )}
         </section>
     );

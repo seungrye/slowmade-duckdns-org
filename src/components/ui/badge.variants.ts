@@ -1,9 +1,9 @@
 export type BadgeVariant = 'default' | 'primary' | 'success' | 'warning' | 'danger'
 
 export const badgeVariantClasses: Record<BadgeVariant, string> = {
-  default: 'bg-gray-100 text-gray-700 hover:bg-gray-200',
-  primary: 'bg-blue-100 text-blue-800 hover:bg-blue-200',
-  success: 'bg-green-100 text-green-800 hover:bg-green-200',
-  warning: 'bg-amber-100 text-amber-700 hover:bg-amber-200',
-  danger: 'bg-red-100 text-red-700 hover:bg-red-200',
+  default: 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600',
+  primary: 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900',
+  success: 'bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900',
+  warning: 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900',
+  danger: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900',
 }

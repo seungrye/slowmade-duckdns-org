@@ -27,14 +27,14 @@ export default async function TagPage(props: {
   return (
         <main className="mx-auto px-4 py-6">
       <section className="mt-12">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4"><span className="text-blue-500 pe-1">#</span>{decodedTag}</h2>
-        <p className="mt-2 text-gray-600 py-4">{posts.length}개의 게시글이 있습니다.</p>
+        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4"><span className="text-blue-500 pe-1">#</span>{decodedTag}</h2>
+        <p className="mt-2 text-gray-600 dark:text-gray-400 py-4">{posts.length}개의 게시글이 있습니다.</p>
 
       {posts.length > 0 ? (
         <TagPostList posts={posts} />
       ) : (
         <div className="text-center py-16">
-          <p className="text-gray-500">해당 태그가 달린 게시글이 없습니다.</p>
+          <p className="text-gray-500 dark:text-gray-400">해당 태그가 달린 게시글이 없습니다.</p>
         </div>
       )}
     </section>

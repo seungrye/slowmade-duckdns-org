@@ -53,12 +53,12 @@ export default function MyProfile({session}: { session: Session | null }) {
                 alt="프로필 이미지"
                 width={80}
                 height={80}
-                className="rounded-full bg-gray-300"
+                className="rounded-full bg-gray-300 dark:bg-gray-600"
             />
             <div>
                 <h2 className="text-2xl font-bold">{profile?.name || session?.user.name}</h2>
-                <p className="text-gray-600">{profile?.email || session?.user.email}</p>
-                <p className="text-gray-500 text-sm mt-1">
+                <p className="text-gray-600 dark:text-gray-400">{profile?.email || session?.user.email}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                     {loading ? '로딩 중...' : `포인트: ${profile?.points?.toLocaleString() || 0} P | 가입일: ${profile ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}`}
                 </p>
             </div>

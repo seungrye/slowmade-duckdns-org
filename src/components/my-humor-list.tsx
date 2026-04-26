@@ -37,8 +37,8 @@ export default function MyHumorList() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-4">
             {posts.length > 0 ? (
                 posts.map((post: GetPostType) => (
-                    <div key={post._id} className="bg-white rounded-lg shadow-md inset-shadow-xs p-4">
-                        <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400">
+                    <div key={post._id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md inset-shadow-xs p-4">
+                        <div className="flex flex-col items-center justify-center h-[200px] max-h-[200px] overflow-hidden text-gray-400 dark:text-gray-500">
                             {post.urls?.[0]?.thumbnailUrl ? (
                                 <Image
                                     src={post.urls[0].thumbnailUrl}
@@ -56,7 +56,7 @@ export default function MyHumorList() {
                             )}
                         </div>
                         <h4 className="mt-3 text-lg font-semibold">{post.title}</h4>
-                        <p className="text-gray-500 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">조회수 {post.views} • 댓글 {post.commentCount || '0'}</p>
                         <Link href={`/humor/${post._id}`} className="text-blue-500 mt-2 block">더 보기 →</Link>
                     </div>
                 ))
@@ -65,11 +65,11 @@ export default function MyHumorList() {
             )}
         </div>
         <div className="flex justify-center mt-8">
-            <button className="bg-gray-300 px-4 py-2 rounded-l cursor-pointer" disabled={page <= 1} onClick={() => page > 1 && setPage(page - 1)}
+            <button className="bg-gray-300 dark:bg-gray-700 px-4 py-2 rounded-l cursor-pointer" disabled={page <= 1} onClick={() => page > 1 && setPage(page - 1)}
                 aria-label="이전 페이지"
             >◀ 이전</button>
-            <span className="px-4 py-2 bg-gray-100">{page} / {endPage}</span>
-            <button className="bg-gray-300 px-4 py-2 rounded-r cursor-pointer" disabled={page >= endPage} onClick={() => endPage > page && setPage(page + 1)}
+            <span className="px-4 py-2 bg-gray-100 dark:bg-gray-800">{page} / {endPage}</span>
+            <button className="bg-gray-300 dark:bg-gray-700 px-4 py-2 rounded-r cursor-pointer" disabled={page >= endPage} onClick={() => endPage > page && setPage(page + 1)}
                 aria-label="다음 페이지"
             >다음 ▶</button>
         </div>

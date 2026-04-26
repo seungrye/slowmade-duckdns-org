@@ -66,7 +66,7 @@ export default function ContentSection() {
   return (
     <>
       <section className="mt-12">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">🔥 최신 유머</h2>
+        <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">🔥 최신 유머</h2>
         <InfinitPostList ref={listRef} onTopmostVisiblePostChange={setTopmostPostId} />
       </section>
 
