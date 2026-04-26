@@ -9,6 +9,7 @@ import { SetPostType } from '@/types/api/submit.d';
 import { AchievementType } from '@/models/achievement';
 import { AchievementToast } from '@/components/achievement-toast';
 import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
+import RevisionHistorySection from '@/app/post/write/[[...id]]/revision-history.section';
 
 export default function PostWriterForm() {
     const { data: session } = useSession();
@@ -20,6 +21,9 @@ export default function PostWriterForm() {
     const [title, setTitle] = useState('');
     const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
     const [loading, setLoading] = useState(false);
+    const [showRevisions, setShowRevisions] = useState(false);
+    // 에디터에 현재 로드된 리비전 ID (_id = postId이면 DB 최신 버전)
+    const [loadedRevisionId, setLoadedRevisionId] = useState<string | null>(_id || null);
 
     useEffect(() => {
         console.log("PostWriterForm mounted with _id:", _id);
@@ -128,41 +132,69 @@ export default function PostWriterForm() {
         }
     };
 
-    return (<div className="flex flex-col flex-1">
-        <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
-            <input
-                type="text"
-                placeholder="제목을 입력하세요"
-                defaultValue={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className='w-full p-3'
+    const handleRevisionRestore = (jsonContent: unknown, title: string, urls: unknown[], revisionId: string) => {
+        editorRef.current?.setContent(jsonContent, urls as never);
+        setTitle(title);
+        setLoadedRevisionId(revisionId);
+        setShowRevisions(false);
+        toast.success('버전이 복원되었습니다.');
+    };
+
+    return (<div className="flex flex-col flex-1 min-h-0">
+        {/* 에디터 영역: 수정이력 뷰에서도 언마운트하지 않고 숨김 처리 (내용 유지) */}
+        <div className={showRevisions ? 'hidden' : 'flex flex-col flex-1 min-h-0'}>
+            <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
+                <input
+                    type="text"
+                    placeholder="제목을 입력하세요"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className='w-full p-3'
+                />
+            </div>
+            <div
+                className="border border-gray-300 has-focus:shadow-sm rounded-b-lg flex-1 min-h-[240px] rich-web-editor-wrapper cursor-text"
+                onClick={() => editorRef.current?.focus()}
+                onFocus={() => editorRef.current?.focus()}
+                tabIndex={0}
+                aria-label="Post content editor, click or press enter to start writing"
+            >
+                <RichWebEditor ref={editorRef} />
+            </div>
+            <div className="mt-4">
+                <TagInput
+                    tags={tags}
+                    onTagsChange={setTags}
+                    placeholder="태그를 입력하고 Enter 또는 쉼표를 누르세요"
+                />
+            </div>
+        </div>
+        {/* 수정이력 패널: showRevisions일 때만 표시 */}
+        {showRevisions && _id && (
+            <RevisionHistorySection
+                postId={_id}
+                onRestore={handleRevisionRestore}
+                loadedRevisionId={loadedRevisionId}
             />
-        </div>
-        <div
-            className="border border-gray-300 has-focus:shadow-sm rounded-b-lg flex-1 min-h-[240px] rich-web-editor-wrapper cursor-text"
-            onClick={() => editorRef.current?.focus()}
-            onFocus={() => editorRef.current?.focus()}
-            tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
-            aria-label="Post content editor, click or press enter to start writing"
-        >
-            <RichWebEditor ref={editorRef} />
-        </div>
-        <div className="mt-4">
-            <TagInput
-                tags={tags}
-                onTagsChange={setTags}
-                placeholder="태그를 입력하고 Enter 또는 쉼표를 누르세요"
-            />
-        </div>
-        <div className="flex justify-end mt-4">
+        )}
+        <div className="flex justify-end gap-2 mt-4 shrink-0">
             <button
                 onClick={handleSubmit}
-                className={`bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition duration-200 ${loading && "opacity-50 cursor-not-allowed"}`}
-                disabled={loading}
+                className={`bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition duration-200 ${(loading || showRevisions) && "opacity-50 cursor-not-allowed"}`}
+                disabled={loading || showRevisions}
                 aria-label="Submit"
             >
                 {loading ? "업로드 중..." : "Submit"}
             </button>
+            {_id && (
+                <button
+                    type="button"
+                    onClick={() => setShowRevisions(prev => !prev)}
+                    className="border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium px-4 py-2 rounded-lg transition duration-200"
+                >
+                    {showRevisions ? "← 편집" : "수정이력"}
+                </button>
+            )}
         </div>
     </div>
     );

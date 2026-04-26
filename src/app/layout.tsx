@@ -10,7 +10,7 @@ import Footer from "@/components/footer";
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="flex flex-col min-h-dvh">
+      <body className="flex flex-col min-h-dvh overflow-x-hidden">
         <SessionProvider>
           <Navbar />
           <main className="lg:container mx-auto lg:mt-4 flex-1 flex flex-col">{children}</main>

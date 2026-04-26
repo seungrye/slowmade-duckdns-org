@@ -30,6 +30,9 @@
 
 .tiptap.ProseMirror {
   font-family: "DM Sans", sans-serif;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .rich-web-content-wrapper {
