@@ -140,8 +140,8 @@ export default function PostWriterForm() {
         </div>
         <div
             className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper cursor-text"
-            onClick={() => editorRef.current?.focus()}
-            onFocus={() => editorRef.current?.focus()}
+            onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
+            onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
             tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
             aria-label="Post content editor, click or press enter to start writing"
         >
