@@ -3,8 +3,7 @@ import { Toaster } from "react-hot-toast";
 import { SortOption, isValidSortOption } from "@/lib/sort";
 import SelectSorter from "@/components/select-sorter";
 import { myPosts } from "@/lib/posts";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { auth } from "@/auth";
 import { GetPostType } from "@/types/posts.d";
 import { Props } from "@/types/my-uploads.d";
 import PostActions from "@/components/post-actions";
@@ -14,7 +13,7 @@ import { Suspense } from "react";
 import Loading from "./loading";
 
 export default async function MyUploadsPage({ searchParams }: Props) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
 
   if (!session) {
     return <section className="bg-white shadow-md inset-shadow-xs rounded-lg p-6 flex items-center gap-6">

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { auth } from "@/auth";
 import { checkAndGrantPostCountAchievements } from "@/lib/achievements";
 import { HydratedDocument } from "mongoose";
 import User from "@/models/user";
@@ -13,7 +12,7 @@ import PostRevision from "@/models/post-revision";
 const POINTS_FOR_NEW_POST = parseInt(process.env.POINTS_FOR_NEW_POST || '5', 10);
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
 
   if (!session || !session.user?.email) {
     return NextResponse.json({ message: "로그인 후 이용해주세요." }, { status: HttpStatusCode.Unauthorized });

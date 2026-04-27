@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/authOptions";
+import { auth } from "@/auth";
 import { connectToDB } from "@/lib/db";
 import User from "@/models/user";
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
 
   if (!session || !session.user?.email) {
     return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });

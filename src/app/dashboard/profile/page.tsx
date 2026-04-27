@@ -1,10 +1,9 @@
 import MyProfile from "@/app/dashboard/profile/my-profile.section";
 import MyAchievements from "@/app/dashboard/profile/my-achievements.section";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/authOptions";
+import { auth } from "@/auth";
 
 export default async function ProfilePage() {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
   
   return (
     <main className="mx-auto px-4 py-6">

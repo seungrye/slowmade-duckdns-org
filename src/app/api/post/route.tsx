@@ -1,8 +1,7 @@
 // app/api/post/route.ts
 import { deletePost, getPost } from '@/lib/posts';
-import { getServerSession } from 'next-auth';
+import { auth } from "@/auth";
 import { NextRequest, NextResponse } from 'next/server';
-import { authOptions } from '../auth/[...nextauth]/authOptions';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -17,7 +16,7 @@ export async function GET(req: Request) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions);
+  const session = await auth();
 
   if (!session?.user?.email) {
     return NextResponse.json({ message: '인증이 필요합니다.' }, { status: 401 });

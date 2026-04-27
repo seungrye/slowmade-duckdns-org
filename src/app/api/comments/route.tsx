@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]/authOptions";
+import { auth } from "@/auth";
 import Comment from '@/models/comment';
 import { connectToDB } from '@/lib/db';
 import mongoose, { HydratedDocument } from 'mongoose';
@@ -37,7 +36,7 @@ function __anonidObfuscated(anonid: string): string {
 }
 
 export async function POST(req: NextRequest) {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     const { postId, parentId = null, content, anonid } = await req.json();
 
     if (!content) {
@@ -127,7 +126,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.email) {
         return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
     }
