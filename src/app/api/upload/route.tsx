@@ -1,14 +1,15 @@
-// app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import * as Minio from 'minio' // MinIO 클라이언트 설정
+import * as Minio from 'minio';
+import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
 
 console.assert(process.env.MINIO_ENDPOINT, 'MINIO_ENDPOINT is not defined');
 console.assert(process.env.MINIO_ACCESSKEY, 'MINIO_ACCESSKEY is not defined');
 console.assert(process.env.MINIO_SECRETKEY, 'MINIO_SECRETKEY is not defined');
+console.assert(process.env.MINIO_BUCKET, 'MINIO_BUCKET is not defined');
 
 const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT!,
-  // port: parseInt(process.env.MINIO_PORT!),
+  port: process.env.MINIO_PORT ? parseInt(process.env.MINIO_PORT) : undefined,
   useSSL: true,
   accessKey: process.env.MINIO_ACCESSKEY,
   secretKey: process.env.MINIO_SECRETKEY,
@@ -16,29 +17,41 @@ const minioClient = new Minio.Client({
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
-  const file = formData.get("file") as File;
-  const thumbnail = formData.get("thumbnail") as File;
+  const validation = validateUploadFormData(formData);
 
-  if (!file) {
-    return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
-  const fileName = `${Date.now()}-${file.name}`;
+  const { file, thumbnail } = validation;
+  const bucket = process.env.MINIO_BUCKET!;
+  const fileName = buildFileName(Date.now(), file.name);
 
-  // 업로드
-  const fileBuffer = Buffer.from(await file.arrayBuffer());
-  await minioClient.putObject(process.env.MINIO_BUCKET || "", fileName, fileBuffer, file.size,{
-    "Content-Type": file.type,
-  });
-  const publicUrl = `https://${process.env.MINIO_ENDPOINT}/${process.env.MINIO_BUCKET}/${fileName}`;
+  try {
+    const fileBuffer = Buffer.from(await file.arrayBuffer());
+    await minioClient.putObject(bucket, fileName, fileBuffer, file.size, {
+      "Content-Type": file.type,
+    });
+  } catch (err) {
+    console.error("MinIO upload failed:", err);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
 
-  const thumbnailBuffer = Buffer.from(await thumbnail.arrayBuffer());
-  await minioClient.putObject(process.env.MINIO_BUCKET || "", `thumbnails/${fileName}`, thumbnailBuffer, thumbnail.size,{
-    "Content-Type": thumbnail.type,
-  });
-  const publicThumbnailUrl = `https://${process.env.MINIO_ENDPOINT}/${process.env.MINIO_BUCKET}/thumbnails/${fileName}`;
+  try {
+    const thumbnailBuffer = Buffer.from(await thumbnail.arrayBuffer());
+    await minioClient.putObject(bucket, `thumbnails/${fileName}`, thumbnailBuffer, thumbnail.size, {
+      "Content-Type": thumbnail.type,
+    });
+  } catch (err) {
+    console.error("MinIO thumbnail upload failed, rolling back:", err);
+    await minioClient.removeObject(bucket, fileName);
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
 
-  console.log("File uploaded successfully:", publicUrl);
+  const url = buildPublicUrl(process.env.MINIO_ENDPOINT!, bucket, fileName);
+  const thumbnailUrl = buildPublicUrl(process.env.MINIO_ENDPOINT!, bucket, `thumbnails/${fileName}`);
 
-  return NextResponse.json({ url: publicUrl, thumbnailUrl: publicThumbnailUrl });
+  console.log("File uploaded successfully:", url);
+
+  return NextResponse.json({ url, thumbnailUrl });
 }
