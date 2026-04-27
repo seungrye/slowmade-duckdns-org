@@ -3,7 +3,8 @@ export function buildFileName(timestamp: number, originalName: string): string {
 }
 
 export function buildPublicUrl(endpoint: string, bucket: string, fileName: string): string {
-  return `https://${endpoint}/${bucket}/${fileName}`;
+  const encodedFileName = fileName.split('/').map(encodeURIComponent).join('/');
+  return `https://${endpoint}/${bucket}/${encodedFileName}`;
 }
 
 export type ValidationSuccess = { ok: true; file: File; thumbnail: File };

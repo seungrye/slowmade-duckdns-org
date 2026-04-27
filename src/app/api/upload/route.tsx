@@ -44,7 +44,11 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("MinIO thumbnail upload failed, rolling back:", err);
-    await minioClient.removeObject(bucket, fileName);
+    try {
+      await minioClient.removeObject(bucket, fileName);
+    } catch (rollbackErr) {
+      console.error("MinIO rollback failed:", rollbackErr);
+    }
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 

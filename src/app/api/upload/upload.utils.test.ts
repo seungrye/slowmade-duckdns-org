@@ -19,6 +19,16 @@ describe('buildPublicUrl', () => {
     expect(buildPublicUrl('storage.example.com', 'my-bucket', 'thumbnails/123-photo.jpg'))
       .toBe('https://storage.example.com/my-bucket/thumbnails/123-photo.jpg');
   });
+
+  it('파일명의 공백을 URL 인코딩한다', () => {
+    expect(buildPublicUrl('storage.example.com', 'my-bucket', '123-my photo.jpg'))
+      .toBe('https://storage.example.com/my-bucket/123-my%20photo.jpg');
+  });
+
+  it('thumbnails/ 경로 구분자는 인코딩하지 않는다', () => {
+    expect(buildPublicUrl('storage.example.com', 'my-bucket', 'thumbnails/123-my photo.jpg'))
+      .toBe('https://storage.example.com/my-bucket/thumbnails/123-my%20photo.jpg');
+  });
 });
 
 describe('validateUploadFormData', () => {

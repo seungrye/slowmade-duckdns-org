@@ -30,6 +30,7 @@ function makeRequest(formData: FormData): NextRequest {
 
 describe('POST /api/upload', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     mockPutObject.mockResolvedValue(undefined);
     mockRemoveObject.mockResolvedValue(undefined);
   });
@@ -62,6 +63,20 @@ describe('POST /api/upload', () => {
 
   it('원본 업로드 실패 시 500을 반환한다', async () => {
     mockPutObject.mockRejectedValue(new Error('MinIO connection failed'));
+
+    const formData = new FormData();
+    formData.append('file', new File(['content'], 'photo.jpg', { type: 'image/jpeg' }));
+    formData.append('thumbnail', new File(['thumb'], 'thumb.jpg', { type: 'image/jpeg' }));
+
+    const res = await POST(makeRequest(formData));
+    expect(res.status).toBe(500);
+  });
+
+  it('rollback(removeObject) 실패 시에도 500을 반환한다', async () => {
+    mockPutObject
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('thumbnail fail'));
+    mockRemoveObject.mockRejectedValue(new Error('remove fail'));
 
     const formData = new FormData();
     formData.append('file', new File(['content'], 'photo.jpg', { type: 'image/jpeg' }));
