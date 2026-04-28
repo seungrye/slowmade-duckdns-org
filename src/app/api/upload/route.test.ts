@@ -11,6 +11,7 @@ vi.hoisted(() => {
   process.env.MINIO_BUCKET = 'test-bucket';
 });
 
+vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('minio', () => ({
   Client: class {
     putObject = mockPutObject;
@@ -20,6 +21,9 @@ vi.mock('minio', () => ({
 
 import { POST } from './route';
 import { NextRequest } from 'next/server';
+import { auth } from '@/auth';
+
+const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 
 function makeRequest(formData: FormData): NextRequest {
   return new Request('http://localhost/api/upload', {
@@ -31,8 +35,15 @@ function makeRequest(formData: FormData): NextRequest {
 describe('POST /api/upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ user: { email: 'user@example.com' }, expires: '' });
     mockPutObject.mockResolvedValue(undefined);
     mockRemoveObject.mockResolvedValue(undefined);
+  });
+
+  it('미인증 사용자는 401을 반환한다', async () => {
+    mockAuth.mockResolvedValue(null);
+    const res = await POST(makeRequest(new FormData()));
+    expect(res.status).toBe(401);
   });
 
   it('file이 없으면 400을 반환한다', async () => {
