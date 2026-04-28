@@ -287,7 +287,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             },
         },
         extensions: [
-            StarterKit.configure({ codeBlock: false }),
+            StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
             CodeBlockLowlight.configure({ lowlight }),
             TextAlign.configure({ types: ["heading", "paragraph"] }),
             Underline,

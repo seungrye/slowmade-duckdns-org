@@ -47,8 +47,8 @@ import { lowlight } from "@/lib/lowlight"
 import "./editor.scss"
 
 // Tiptap 확장 기능은 컴포넌트 외부에서 정의하여 리렌더링 시 재생성되지 않도록 합니다.
-const tiptapExtensions = [
-    StarterKit.configure({ codeBlock: false }),
+export const tiptapExtensions = [
+    StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
     CodeBlockLowlight.configure({ lowlight }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     Underline,
