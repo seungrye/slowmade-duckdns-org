@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
+import { env } from "./env";
 
-const MONGO_URI = process.env.MONGO_URI as string;
+const MONGO_URI = env.mongoUri;
 
 export const connectToDB = async () => {
   // console.log("Connecting to MongoDB... readyState:", mongoose.connection.readyState);

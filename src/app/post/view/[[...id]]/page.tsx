@@ -4,10 +4,11 @@ import { notFound } from 'next/navigation';
 import PostViewContainer from './post-view-container';
 import { buildArticleJsonLd } from './article-json-ld';
 import { buildPostMetadata } from './build-post-metadata';
+import { env } from '@/lib/env';
 
 type Params = Promise<{ id: string[] }>
 
-const siteUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+const siteUrl = env.siteUrl;
 
 export async function generateMetadata(props: { params: Params }): Promise<Metadata> {
     const params = await props.params;

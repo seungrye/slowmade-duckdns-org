@@ -6,11 +6,6 @@
 
 ## 대기
 
-### D1. 환경변수 중앙화
-- `src/lib/env.ts` 신규 생성
-- `achievements.tsx`, `post-actions.tsx`, API 라우트 5개에 분산된 `parseInt(process.env.X || '기본값')` 패턴 통합
-- 시작 시 필수 환경변수 일괄 검증 (`MONGO_URI`, `MINIO_*` 등)
-
 ### D2. API 인증 헬퍼 추출
 - `src/lib/require-auth.ts` 신규 생성
 - 6개 API 라우트에서 반복되는 `auth()` + 401 응답 패턴 추출

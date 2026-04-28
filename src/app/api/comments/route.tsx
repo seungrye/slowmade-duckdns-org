@@ -6,8 +6,9 @@ import mongoose, { HydratedDocument } from 'mongoose';
 import User from '@/models/user';
 import { checkAndGrantCommentCountAchievements } from '@/lib/achievements';
 import { AchievementType } from '@/models/achievement';
+import { env } from '@/lib/env';
 
-const POINTS_FOR_NEW_COMMENT = parseInt(process.env.POINTS_FOR_NEW_COMMENT || '1', 10);
+const POINTS_FOR_NEW_COMMENT = env.points.newComment;
 
 // 익명 ID를 base62에서 base5로 변환하는 함수
 function __anonidObfuscated(anonid: string): string {

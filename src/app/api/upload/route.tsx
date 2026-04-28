@@ -1,18 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Minio from 'minio';
 import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
-
-if (!process.env.MINIO_ENDPOINT) throw new Error('MINIO_ENDPOINT is not defined');
-if (!process.env.MINIO_ACCESSKEY) throw new Error('MINIO_ACCESSKEY is not defined');
-if (!process.env.MINIO_SECRETKEY) throw new Error('MINIO_SECRETKEY is not defined');
-if (!process.env.MINIO_BUCKET) throw new Error('MINIO_BUCKET is not defined');
+import { env } from '@/lib/env';
 
 const minioClient = new Minio.Client({
-  endPoint: process.env.MINIO_ENDPOINT!,
-  port: process.env.MINIO_PORT ? parseInt(process.env.MINIO_PORT) : undefined,
+  endPoint: env.minio.endpoint,
+  port: env.minio.port,
   useSSL: true,
-  accessKey: process.env.MINIO_ACCESSKEY,
-  secretKey: process.env.MINIO_SECRETKEY,
+  accessKey: env.minio.accessKey,
+  secretKey: env.minio.secretKey,
 })
 
 export async function POST(req: NextRequest) {
@@ -24,7 +20,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { file, thumbnail } = validation;
-  const bucket = process.env.MINIO_BUCKET!;
+  const bucket = env.minio.bucket;
   const fileName = buildFileName(Date.now(), file.name);
 
   try {
@@ -52,8 +48,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 
-  const url = buildPublicUrl(process.env.MINIO_ENDPOINT!, bucket, fileName);
-  const thumbnailUrl = buildPublicUrl(process.env.MINIO_ENDPOINT!, bucket, `thumbnails/${fileName}`);
+  const url = buildPublicUrl(env.minio.endpoint, bucket, fileName);
+  const thumbnailUrl = buildPublicUrl(env.minio.endpoint, bucket, `thumbnails/${fileName}`);
 
   console.log("File uploaded successfully:", url);
 

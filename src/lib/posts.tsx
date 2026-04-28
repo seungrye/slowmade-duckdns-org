@@ -6,6 +6,7 @@ import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 import { GetPostType, SetPostQuery } from "@/types/posts.d";
 import { escapeRegex } from "@/lib/utils";
+import { env } from "@/lib/env";
 
 /**
  * A centralized function to fetch posts based on various criteria.
@@ -209,7 +210,7 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
 }
 
 export async function deletePost(postId: string, userEmail: string): Promise<{ success: boolean; message: string; }> {
-  const DELETE_POST_COST = parseInt(process.env.DELETE_POST_COST || '7', 10);
+  const DELETE_POST_COST = env.points.deletePostCost;
 
   await connectToDB();
 

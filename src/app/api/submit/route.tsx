@@ -8,8 +8,9 @@ import User from "@/models/user";
 import { AchievementType } from "@/models/achievement";
 import { HttpStatusCode } from "axios";
 import PostRevision from "@/models/post-revision";
+import { env } from "@/lib/env";
 
-const POINTS_FOR_NEW_POST = parseInt(process.env.POINTS_FOR_NEW_POST || '5', 10);
+const POINTS_FOR_NEW_POST = env.points.newPost;
 
 export async function POST(req: Request) {
   const session = await auth();

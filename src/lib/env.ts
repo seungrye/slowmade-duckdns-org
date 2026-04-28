@@ -1,0 +1,55 @@
+export function intEnv(name: string, defaultValue: number): number {
+  const val = process.env[name];
+  if (!val) return defaultValue;
+  const parsed = parseInt(val, 10);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
+export const env = {
+  mongoUri: process.env.MONGO_URI ?? '',
+
+  minio: {
+    endpoint: process.env.MINIO_ENDPOINT ?? '',
+    accessKey: process.env.MINIO_ACCESSKEY ?? '',
+    secretKey: process.env.MINIO_SECRETKEY ?? '',
+    bucket: process.env.MINIO_BUCKET ?? '',
+    port: process.env.MINIO_PORT ? parseInt(process.env.MINIO_PORT, 10) : undefined,
+  },
+
+  points: {
+    newPost: intEnv('POINTS_FOR_NEW_POST', 5),
+    newComment: intEnv('POINTS_FOR_NEW_COMMENT', 1),
+    deletePostCost: intEnv('DELETE_POST_COST', 7),
+  },
+
+  achievements: {
+    firstPost: intEnv('ACHIEVEMENT_FIRST_POST_POINTS', 10),
+    postCount10: intEnv('ACHIEVEMENT_POST_COUNT_10_POINTS', 20),
+    postCount50: intEnv('ACHIEVEMENT_POST_COUNT_50_POINTS', 50),
+    postCount100: intEnv('ACHIEVEMENT_POST_COUNT_100_POINTS', 100),
+    postCount250: intEnv('ACHIEVEMENT_POST_COUNT_250_POINTS', 250),
+    postCount500: intEnv('ACHIEVEMENT_POST_COUNT_500_POINTS', 500),
+    postCount1000: intEnv('ACHIEVEMENT_POST_COUNT_1000_POINTS', 1000),
+    postCount2500: intEnv('ACHIEVEMENT_POST_COUNT_2500_POINTS', 2500),
+    postCount5000: intEnv('ACHIEVEMENT_POST_COUNT_5000_POINTS', 5000),
+    postCount10000: intEnv('ACHIEVEMENT_POST_COUNT_10000_POINTS', 10000),
+    post10Likes: intEnv('ACHIEVEMENT_POST_10_LIKES_POINTS', 50),
+    firstComment: intEnv('ACHIEVEMENT_FIRST_COMMENT_POINTS', 5),
+    commentCount10: intEnv('ACHIEVEMENT_COMMENT_COUNT_10_POINTS', 10),
+    commentCount50: intEnv('ACHIEVEMENT_COMMENT_COUNT_50_POINTS', 25),
+    commentCount100: intEnv('ACHIEVEMENT_COMMENT_COUNT_100_POINTS', 50),
+    commentCount250: intEnv('ACHIEVEMENT_COMMENT_COUNT_250_POINTS', 100),
+    commentCount500: intEnv('ACHIEVEMENT_COMMENT_COUNT_500_POINTS', 250),
+    commentCount1000: intEnv('ACHIEVEMENT_COMMENT_COUNT_1000_POINTS', 500),
+  },
+
+  siteUrl: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
+} as const;
+
+export function validateEnv(): void {
+  const required = ['MONGO_URI', 'MINIO_ENDPOINT', 'MINIO_ACCESSKEY', 'MINIO_SECRETKEY', 'MINIO_BUCKET'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`필수 환경변수가 설정되지 않았습니다: ${missing.join(', ')}`);
+  }
+}

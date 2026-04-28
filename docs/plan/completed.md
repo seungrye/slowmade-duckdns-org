@@ -28,6 +28,11 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### D1. 환경변수 중앙화 ✅
+- `src/lib/env.ts` — `intEnv` 헬퍼, `env` 객체, `validateEnv()`
+- 8개 파일의 분산된 `parseInt(process.env.X || '기본값')` 패턴 통합
+- `src/lib/env.test.ts` — 8개 케이스
+
 ### S8. `llms.txt` 추가 ✅
 - `public/llms.txt` — 사이트 목적, 콘텐츠 구조, 크롤 안내
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { env } from "@/lib/env";
 import Providers from "@/components/providers";
 import DarkClassSync from "@/components/dark-class-sync";
 import Navbar from "@/components/navbar";
@@ -7,7 +8,7 @@ import "@/app/globals.css";
 import "@/styles/_keyframe-animations.scss";
 import "@/styles/_variables.scss";
 
-const siteUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+const siteUrl = env.siteUrl;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
