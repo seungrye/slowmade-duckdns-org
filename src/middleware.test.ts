@@ -36,4 +36,24 @@ describe('middleware', () => {
     const csp = middleware(makeRequest('/api/posts')).headers.get('Content-Security-Policy');
     expect(csp).toBeTruthy();
   });
+
+  it('HSTS 헤더를 설정한다', () => {
+    const res = middleware(makeRequest('/'));
+    expect(res.headers.get('Strict-Transport-Security')).toBe('max-age=31536000; includeSubDomains');
+  });
+
+  it('X-Content-Type-Options 헤더를 설정한다', () => {
+    const res = middleware(makeRequest('/'));
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('Referrer-Policy 헤더를 설정한다', () => {
+    const res = middleware(makeRequest('/'));
+    expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
+  });
+
+  it('Permissions-Policy 헤더를 설정한다', () => {
+    const res = middleware(makeRequest('/'));
+    expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=()');
+  });
 });
