@@ -6,9 +6,6 @@
 
 ## 대기
 
-### M1-remaining. posts aggregation $lookup 중복 제거
-- `src/lib/posts.tsx` — `'commented'` 정렬 시 `$lookup` 중복 제거
-
 ### T1. 테스트 커버리지 확대
 - `src/lib/achievements.tsx` — 업적 조건 단위 테스트
 - `src/app/api/*/route.tsx` — 주요 API 라우트 테스트

@@ -63,32 +63,37 @@ async function __fetchPosts(params: SetPostQuery): Promise<{
   pipeline.push(sortStage);
 
   // Facet for pagination and metadata
+  // When sort === 'commented', comments are already joined before this stage for sorting.
+  // Only re-join when comments data is actually needed and not yet present.
+  const dataStages: PipelineStage[] = [
+    { $skip: (page - 1) * limit },
+    { $limit: limit },
+  ];
+  if (sort !== 'commented' && withComments) {
+    dataStages.push({
+      $lookup: {
+        from: "comments",
+        localField: "_id",
+        foreignField: "post",
+        as: "comments",
+      },
+    });
+  }
+  dataStages.push(
+    {
+      $addFields: {
+        ...(withComments && { commentCount: { $size: "$comments" } }),
+        _id: { $toString: "$_id" },
+      },
+    },
+    { $project: { comments: 0 } }
+  );
+
   pipeline.push({
     $facet: {
       metadata: [{ $count: "total" }],
-      data: [
-        { $skip: (page - 1) * limit },
-        { $limit: limit },
-        {
-          $lookup: {
-            from: "comments",
-            localField: "_id",
-            foreignField: "post",
-            as: "comments",
-          },
-        },
-        {
-          $addFields: {
-            ...(withComments && { commentCount: { $size: "$comments" } }),
-            _id: { $toString: "$_id" }, // Convert _id to string
-          },
-        },
-        {
-          $project: {
-            comments: 0,
-          },
-        },
-      ],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      data: dataStages as any,
     },
   });
 

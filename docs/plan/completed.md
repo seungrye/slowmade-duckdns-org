@@ -97,3 +97,7 @@
 - `src/lib/utils.ts` 신규 — `escapeRegex` 통합
 - `!=` → `!==` (submit/route.tsx)
 - `console.assert` → 명시적 에러/400 응답 (upload, post route)
+
+### M1-remaining. posts aggregation $lookup 중복 제거 ✅
+- `src/lib/posts.tsx` — `sort === 'commented'` 시 `$facet.data` 내 `$lookup` 제거 (pre-facet에서 이미 조인됨)
+- `withComments` false일 때도 불필요한 `$lookup` 건너뜀
