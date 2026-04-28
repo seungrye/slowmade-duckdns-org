@@ -115,29 +115,18 @@ return NextResponse.json({ error: validation.error }, { status: 400 });
 
 **개선**: 첫 번째 stage에서 조인 후 재사용
 
-### M2. `console.assert`로 환경변수 검증
+### M2. `console.assert`로 환경변수 검증 ✅
 
-- `src/app/api/upload/route.tsx`
-- `console.assert(process.env.MINIO_ENDPOINT, '...')` 는 런타임 에러를 던지지 않음
-- 운영 환경에서 설정 누락 시 조용히 실패
+- `src/app/api/upload/route.tsx` — `if (!process.env.X) throw new Error(...)` 로 교체
+- `src/app/api/post/route.tsx` — `console.assert` → 400 응답으로 교체
 
-**개선**: `if (!process.env.X) throw new Error(...)` 또는 D1의 env.ts에서 시작 시 일괄 검증
+### M3. `!=` 대신 `!==` 사용 ✅
 
-### M3. `!=` 대신 `!==` 사용
+- `src/app/api/submit/route.tsx` — `!==` 로 교체
 
-- 파일: `src/app/api/post/route.tsx` 24줄
-- `session.user?.email != payload?.userEmail` — 타입 강제 비교
+### M4. `escapeRegex` 함수 중복 정의 ✅
 
-**개선**: `!==` 로 교체
-
-### M4. `escapeRegex` 함수 중복 정의
-
-- `src/lib/posts.tsx` 280줄
-- `src/app/api/tags/route.ts` 7~8줄
-
-동일한 함수가 두 곳에 정의됨.
-
-**개선**: `src/lib/utils.ts` 등 공통 유틸로 이동
+- `src/lib/utils.ts` 로 통합, `posts.tsx` / `tags/route.ts` 에서 import로 교체
 
 ---
 
@@ -174,6 +163,6 @@ return NextResponse.json({ error: validation.error }, { status: 400 });
 
 ### Low
 - [ ] M1. posts aggregation `$lookup` 중복 제거
-- [ ] M2. 환경변수 검증 방식 교체
-- [ ] M3. `!=` → `!==`
-- [ ] M4. `escapeRegex` 공통 유틸로 이동
+- [x] M2. 환경변수 검증 방식 교체
+- [x] M3. `!=` → `!==`
+- [x] M4. `escapeRegex` 공통 유틸로 이동
