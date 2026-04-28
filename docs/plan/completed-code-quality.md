@@ -56,6 +56,7 @@
 - `src/app/api/post/route.test.ts` — 6개 케이스 (GET·DELETE)
 - `src/app/api/posts/route.test.ts` — 5개 케이스 (파라미터 전달·정렬)
 - `src/app/api/comments/route.test.ts` — 9개 케이스 (POST·GET·DELETE)
+- 총 43개 케이스 추가 → 전체 187개 테스트
 
 ### B1. Tiptap v3 StarterKit 중복 확장 경고 수정 ✅
 - `viewer.tsx`, `editor.tsx` — `StarterKit.configure({ link: false, underline: false, trailingNode: false })`
