@@ -6,11 +6,6 @@
 
 ## 대기
 
-### D7. `comments.section.tsx` 분리
-- `src/hooks/use-comments.ts` — 댓글 CRUD 로직 훅으로 추출
-- `src/components/comment-item.tsx` — 단일 댓글 렌더링 컴포넌트
-- `src/components/comment-input.tsx` — 입력 영역 컴포넌트
-
 ### M1-remaining. posts aggregation $lookup 중복 제거
 - `src/lib/posts.tsx` — `'commented'` 정렬 시 `$lookup` 중복 제거
 

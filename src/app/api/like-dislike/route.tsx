@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   if (!postId) return apiError('postId가 필요합니다.', HttpStatusCode.BadRequest);
 
   await connectToDB();
-  const user = await User.findOne({ email: auth.email }).select('likedPosts').lean();
+  const user = await User.findOne({ email: auth.email }).select('likedPosts').lean<{ likedPosts?: string[] }>();
   if (!user) return apiError('사용자를 찾을 수 없습니다.', HttpStatusCode.NotFound);
 
   const isLiked = (user.likedPosts ?? []).includes(postId);

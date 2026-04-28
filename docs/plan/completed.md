@@ -28,6 +28,17 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### D7. `comments.section.tsx` 분리 ✅
+- `src/types/comment.d.ts` — `Comment` 타입 추출
+- `src/hooks/use-comments.ts` — fetch/submit/delete CRUD 로직 + 상태 관리
+- `src/components/comment-item.tsx` — 댓글 단건 렌더링 (삭제됨/정상, 답글 폼 포함)
+- `src/components/comment-input.tsx` — textarea + 버튼 폼 (controlled, onSubmit 콜백)
+- `comments.section.tsx` — 311줄 → 100줄 오케스트레이터로 축소
+- `src/hooks/use-comments.test.ts` — 10개 케이스
+- `src/components/comment-item.test.tsx` — 10개 케이스
+- `src/components/comment-input.test.tsx` — 7개 케이스
+- `@testing-library/jest-dom` 설치, `src/test-setup.ts` 추가
+
 ### D6. 좋아요 상태 DB 조회로 전환 ✅
 - `src/models/user.tsx` — `likedPosts: [String]` 필드 추가
 - `GET /api/like-dislike?postId=X` 신규 — 로그인 사용자의 좋아요 여부 조회
