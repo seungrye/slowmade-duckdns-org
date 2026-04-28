@@ -28,6 +28,11 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### S4. 루트 layout `'use client'` 분리 ✅
+- `src/components/dark-class-sync.tsx` — DarkClassSync 클라이언트 컴포넌트
+- `src/components/providers.tsx` — SessionProvider 래퍼 클라이언트 컴포넌트
+- `src/app/layout.tsx` — 서버 컴포넌트 전환, 전역 `metadata` 추가
+
 ### S3. Sitemap 인증 페이지 제거 ✅
 - `src/app/sitemap.ts` — `/login`, `/dashboard/*` 제거
 

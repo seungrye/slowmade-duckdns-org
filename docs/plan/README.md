@@ -5,7 +5,7 @@
 | 1 | ✅ S2 + S3 — `lang="ko"` + Sitemap 정리 | 독립, 한 커밋 |
 | 2 | ✅ S1 — description 본문 요약 교체 | 독립 |
 | 3 | ✅ M1 — bugfix + escapeRegex 이동 | 빠른 정리 |
-| 4 | S4 — 루트 layout `'use client'` 분리 | S6 전제조건이자 코드 품질 개선 |
+| 4 | ✅ S4 — 루트 layout `'use client'` 분리 | S6 전제조건이자 코드 품질 개선 |
 | 5 | S5 + S7 — 시맨틱 HTML + JSON-LD | 같은 데이터(createdAt, author) 추가 작업 공유 |
 | 6 | S6 — Open Graph + Canonical URL | S4 완료 후 가능 |
 | 7 | S8 — llms.txt 추가 | 독립 |

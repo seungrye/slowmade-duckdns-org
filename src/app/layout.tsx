@@ -1,36 +1,30 @@
-'use client';
-
-import { useEffect } from "react";
-import { SessionProvider } from "next-auth/react";
+import type { Metadata } from "next";
+import Providers from "@/components/providers";
+import DarkClassSync from "@/components/dark-class-sync";
 import Navbar from "@/components/navbar";
+import Footer from "@/components/footer";
 import "@/app/globals.css";
 import "@/styles/_keyframe-animations.scss";
 import "@/styles/_variables.scss";
-import Footer from "@/components/footer";
 
-function DarkClassSync() {
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = (dark: boolean) =>
-      document.documentElement.classList.toggle('dark', dark);
-
-    apply(mq.matches);
-    mq.addEventListener('change', (e) => apply(e.matches));
-    return () => mq.removeEventListener('change', (e) => apply(e.matches));
-  }, []);
-  return null;
-}
+export const metadata: Metadata = {
+  title: {
+    default: "Slowmade",
+    template: "%s | Slowmade",
+  },
+  description: "느리게, 하지만 제대로 만드는 공간",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
       <body>
-        <SessionProvider>
+        <Providers>
           <DarkClassSync />
           <Navbar />
           <main className="lg:container mx-auto lg:mt-4">{children}</main>
           <Footer />
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );

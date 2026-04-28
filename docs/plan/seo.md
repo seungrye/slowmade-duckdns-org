@@ -6,12 +6,6 @@
 
 ## 대기
 
-### S4. 루트 layout `'use client'` 분리
-- `src/app/layout.tsx`
-- `DarkClassSync` 컴포넌트를 별도 파일로 분리
-- 루트 layout을 서버 컴포넌트로 전환 → 전역 metadata 설정 가능
-- S6 작업의 전제조건
-
 ### S5 + S7. 시맨틱 HTML + JSON-LD Article 스키마
 - `src/app/post/view/[[...id]]/post-view-container.tsx` — `<article>`, `<header>`, `<time>`, `<address>`
 - `src/app/post/view/[[...id]]/page.tsx` — `<script type="application/ld+json">` 삽입
