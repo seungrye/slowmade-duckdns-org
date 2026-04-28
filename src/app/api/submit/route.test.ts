@@ -63,6 +63,7 @@ describe('POST /api/submit', () => {
   it('_id가 있으면 게시글 수정 분기로 진입한다', async () => {
     mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
     const mockPost = {
+      userEmail: 'a@test.com',
       toObject: () => ({ title: 'old', jsonContent: '{}', updatedAt: new Date() }),
       set: vi.fn(),
       save: vi.fn(),
@@ -82,5 +83,31 @@ describe('POST /api/submit', () => {
     (Post.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     const res = await POST(makeRequest({ _id: 'missing', userEmail: 'a@test.com', title: 'T', jsonContent: '{}' }));
     expect(res.status).toBe(404);
+  });
+
+  it('수정 시 소유자가 아니면 403을 반환한다 (IDOR)', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'attacker@test.com' } });
+    const mockPost = { userEmail: 'victim@test.com', toObject: vi.fn(), set: vi.fn(), save: vi.fn(), version: 1 };
+    (Post.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost);
+    const res = await POST(makeRequest({ _id: 'post1', userEmail: 'attacker@test.com', title: 'T', jsonContent: '{}' }));
+    expect(res.status).toBe(403);
+    expect(mockPost.save).not.toHaveBeenCalled();
+  });
+
+  it('수정 시 허용된 필드만 set에 전달된다 (Mass Assignment 방지)', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
+    const mockPost = {
+      userEmail: 'a@test.com',
+      toObject: () => ({ title: 'old', jsonContent: '{}', updatedAt: new Date() }),
+      set: vi.fn(),
+      save: vi.fn(),
+      version: 1,
+      updatedAt: new Date(),
+    };
+    (Post.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost);
+    (PostRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    await POST(makeRequest({ _id: 'post1', userEmail: 'a@test.com', title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'], version: 999 }));
+    expect(mockPost.set).toHaveBeenCalledWith({ title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'] });
+    expect(mockPost.set).not.toHaveBeenCalledWith(expect.objectContaining({ version: 999 }));
   });
 });

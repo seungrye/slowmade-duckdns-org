@@ -43,6 +43,10 @@ export async function POST(req: Request) {
         return apiError("게시글을 찾을 수 없습니다.", HttpStatusCode.NotFound);
       }
 
+      if (existingPost.userEmail !== auth.email) {
+        return apiError("수정 권한이 없습니다.", HttpStatusCode.Forbidden);
+      }
+
       const {_id, ...postData } = existingPost.toObject();
       await PostRevision.create({
         ...postData,
@@ -51,7 +55,8 @@ export async function POST(req: Request) {
       });
 
       // 2. 원본 게시글 업데이트 및 버전 증가
-      existingPost.set(payload);
+      const { title, htmlContent, jsonContent, tags } = payload;
+      existingPost.set({ title, htmlContent, jsonContent, tags });
       existingPost.version += 1;
 
       await existingPost.save();
