@@ -22,7 +22,7 @@
 - **설명**: `POST /api/upload`에 `requireAuth()` 미호출. 미인증 사용자가 MinIO에 임의 파일 무제한 업로드 가능
 - **수정**: 핸들러 최상단에 `requireAuth()` 추가
 
-### H-2 — 파일 업로드 MIME 타입 미검증
+### ✅ H-2 — 파일 업로드 MIME 타입 미검증
 
 - **파일**: `src/app/api/upload/upload.utils.ts`
 - **설명**: 파일 존재 여부만 확인, MIME 타입·확장자 검증 없음. `.html`, `.svg`, `.exe` 등 업로드 가능
