@@ -3,7 +3,7 @@ title: High 보안 이슈 수정 (H-1 ~ H-8, H-9 제외)
 status: plan
 ---
 
-## H-1 — 파일 업로드 인증 추가
+## H-1 — 파일 업로드 인증 추가 (완료)
 `src/app/api/upload/route.tsx` POST 핸들러 최상단에 `requireAuth()` 추가
 
 ## H-2 — MIME 타입 검증 추가
