@@ -6,6 +6,7 @@ function makeRequest(path = '/') {
   return new NextRequest(`http://localhost${path}`);
 }
 
+// request 파라미터를 사용하지 않으므로 _request로 선언
 describe('middleware', () => {
   it('CSP 헤더를 응답에 설정한다', () => {
     const res = middleware(makeRequest('/'));
