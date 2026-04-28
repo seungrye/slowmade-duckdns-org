@@ -36,7 +36,7 @@ export const uploadImage = async (
   });
 
   return {
-    url: response.data.url,
-    thumbnailUrl: response.data.thumbnailUrl
+    url: response.data.data.url,
+    thumbnailUrl: response.data.data.thumbnailUrl
   };
 };

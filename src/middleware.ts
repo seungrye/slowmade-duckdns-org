@@ -11,6 +11,7 @@ export function middleware(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
+    "worker-src 'self' blob:",
     "upgrade-insecure-requests",
   ].join('; ')
 
