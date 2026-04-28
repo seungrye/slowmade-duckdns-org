@@ -36,7 +36,8 @@ describe('buildPostMetadata', () => {
 
   it('openGraph type이 article이다', () => {
     const result = buildPostMetadata(base);
-    expect(result.openGraph?.type).toBe('article');
+    const og = result.openGraph as Record<string, unknown>;
+    expect(og.type).toBe('article');
   });
 
   it('openGraph에 publishedTime과 author, tags를 포함한다', () => {
@@ -49,7 +50,8 @@ describe('buildPostMetadata', () => {
 
   it('twitter card를 summary로 설정한다', () => {
     const result = buildPostMetadata(base);
-    expect(result.twitter?.card).toBe('summary');
+    const twitter = result.twitter as Record<string, unknown>;
+    expect(twitter.card).toBe('summary');
   });
 
   it('keywords에 tags 배열을 그대로 전달한다', () => {

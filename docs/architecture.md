@@ -102,7 +102,6 @@ flowchart TB
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
 - `MINIO_ENDPOINT`, `MINIO_ACCESSKEY`, `MINIO_SECRETKEY`, `MINIO_BUCKET`
-- `NEXT_PUBLIC_SITE_URL` — 정규 URL 및 OG 메타태그 기준 (`https://your-domain.com`)
 - 선택적: `POINTS_FOR_NEW_POST`, `POINTS_FOR_NEW_COMMENT`, `DELETE_POST_COST`, 업적 포인트 환경 변수
 
 배포 형태: Vercel, 자체 Node 서버, Docker 기반 호스팅

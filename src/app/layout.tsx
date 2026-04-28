@@ -7,7 +7,7 @@ import "@/app/globals.css";
 import "@/styles/_keyframe-animations.scss";
 import "@/styles/_variables.scss";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const siteUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

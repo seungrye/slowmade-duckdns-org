@@ -29,7 +29,7 @@
 - `src/app/layout.tsx` — `<html lang="ko">`
 
 ### S6. Open Graph / Twitter Card + Canonical URL ✅
-- `layout.tsx` — `metadataBase(NEXT_PUBLIC_SITE_URL)`, 전역 OG/Twitter 기본값
+- `layout.tsx` — `metadataBase(NEXTAUTH_URL)`, 전역 OG/Twitter 기본값
 - `build-post-metadata.ts` — 게시글 메타데이터 헬퍼 (테스트용 분리)
 - `page.tsx` — `generateMetadata`에 OG article + canonical 적용
 - `build-post-metadata.test.ts` — 8개 케이스

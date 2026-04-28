@@ -7,7 +7,7 @@ import { buildPostMetadata } from './build-post-metadata';
 
 type Params = Promise<{ id: string[] }>
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
+const siteUrl = process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
 
 export async function generateMetadata(props: { params: Params }): Promise<Metadata> {
     const params = await props.params;
