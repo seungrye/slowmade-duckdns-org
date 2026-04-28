@@ -32,6 +32,8 @@
 - `src/components/dark-class-sync.tsx` — DarkClassSync 클라이언트 컴포넌트
 - `src/components/providers.tsx` — SessionProvider 래퍼 클라이언트 컴포넌트
 - `src/app/layout.tsx` — 서버 컴포넌트 전환, 전역 `metadata` 추가
+- `src/components/dark-class-sync.test.tsx` — jsdom 환경 테스트 (마운트·이벤트·언마운트)
+- `vitest.config.ts` — `@vitejs/plugin-react` 추가, jsdom 지원
 
 ### S3. Sitemap 인증 페이지 제거 ✅
 - `src/app/sitemap.ts` — `/login`, `/dashboard/*` 제거
