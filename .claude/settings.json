@@ -7,7 +7,7 @@
           {
             "type": "command",
             "if": "Bash(*git *commit *)",
-            "command": "staged=$(git -C /home/seungrye/site diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q '^src/' && ! echo \"$staged\" | grep -q '^docs/plan/'; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 변경이 감지되었습니다. docs/plan/ 하위 파일에 진행 현황을 반영한 후 커밋하세요.\"}}'; exit 1; fi",
+            "command": "staged=$(git -C /home/seungrye/site diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q '^src/' && ! echo \"$staged\" | grep -q '^docs/'; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 변경이 감지되었습니다. docs/ 하위 문서에 갱신·추가·삭제가 필요한 내용을 반영한 후 커밋하세요.\"}}'; exit 1; fi",
             "statusMessage": "계획 문서 갱신 여부 확인 중..."
           },
           {
