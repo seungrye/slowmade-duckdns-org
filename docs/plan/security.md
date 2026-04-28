@@ -16,7 +16,7 @@
 
 ## High
 
-### ✅ H-1 — 파일 업로드 인증 없음
+### H-1 — 파일 업로드 인증 없음
 
 - **파일**: `src/app/api/upload/route.tsx`
 - **설명**: `POST /api/upload`에 `requireAuth()` 미호출. 미인증 사용자가 MinIO에 임의 파일 무제한 업로드 가능
