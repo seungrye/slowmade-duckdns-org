@@ -1,11 +1,13 @@
 import { getPost, updatePostViews } from '@/lib/posts';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { headers } from 'next/headers';
 import PostViewContainer from './post-view-container';
 import { buildArticleJsonLd } from './article-json-ld';
+import { buildPostMetadata } from './build-post-metadata';
 
 type Params = Promise<{ id: string[] }>
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
 
 export async function generateMetadata(props: { params: Params }): Promise<Metadata> {
     const params = await props.params;
@@ -16,17 +18,15 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
     const { post } = (await getPost(_id)) || { post: null };
     if (!post) return { title: 'Post Not Found' };
 
-    const description = post.htmlContent
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 160);
-
-    return {
+    return buildPostMetadata({
+        id: _id,
         title: post.title,
-        description,
-        keywords: post.tags,
-    };
+        htmlContent: post.htmlContent,
+        author: post.author,
+        createdAt: post.createdAt as Date,
+        tags: post.tags ?? [],
+        siteUrl,
+    });
 }
 
 export default async function PostViewer(props: { params: Params }) {
@@ -42,11 +42,7 @@ export default async function PostViewer(props: { params: Params }) {
     const { post } = data;
     await updatePostViews(post._id);
 
-    const headersList = await headers();
-    const host = headersList.get('host') ?? '';
-    const protocol = host.startsWith('localhost') ? 'http' : 'https';
-    const url = `${protocol}://${host}/post/view/${_id}`;
-
+    const url = `${siteUrl}/post/view/${_id}`;
     const description = post.htmlContent
         .replace(/<[^>]*>/g, ' ')
         .replace(/\s+/g, ' ')

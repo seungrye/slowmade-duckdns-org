@@ -7,7 +7,7 @@
 | 3 | ✅ M1 — bugfix + escapeRegex 이동 | 빠른 정리 |
 | 4 | ✅ S4 — 루트 layout `'use client'` 분리 | S6 전제조건이자 코드 품질 개선 |
 | 5 | ✅ S5 + S7 — 시맨틱 HTML + JSON-LD | 같은 데이터(createdAt, author) 추가 작업 공유 |
-| 6 | S6 — Open Graph + Canonical URL | S4 완료 후 가능 |
+| 6 | ✅ S6 — Open Graph + Canonical URL | S4 완료 후 가능 |
 | 7 | S8 — llms.txt 추가 | 독립 |
 | 8 | D1 — 환경변수 중앙화 | 이후 D 시리즈의 기반 |
 | 9 | D2 — API 인증 헬퍼 추출 | D1 이후 |

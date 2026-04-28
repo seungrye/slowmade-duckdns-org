@@ -6,11 +6,6 @@
 
 ## 대기
 
-### S6. Open Graph / Twitter Card + Canonical URL
-- `src/app/layout.tsx` — 사이트 전체 기본 OG 설정 (S4 완료 후 가능)
-- `src/app/post/view/[[...id]]/page.tsx` — 게시글별 OG 태그 + `alternates.canonical`
-- `og:type("article")`, `article:published_time`, `article:author`, `article:tag` 포함
-
 ### S8. `llms.txt` 추가
 - `public/llms.txt` 생성
 - AI 크롤러(ChatGPT, Perplexity 등) 전용 사이트 안내 파일
