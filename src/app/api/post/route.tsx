@@ -8,8 +8,7 @@ export async function GET(req: Request) {
 
   const _id = searchParams.get('_id') || '';
 
-  console.assert(_id, 'Post ID (_id) is required');
-  console.log(`Fetching post with ID: ${_id}`);
+  if (!_id) return NextResponse.json({ message: 'Post ID (_id) is required' }, { status: 400 });
 
   const { post } = await getPost(_id) || { post: null };
   return NextResponse.json(post);

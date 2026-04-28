@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Minio from 'minio';
 import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
 
-console.assert(process.env.MINIO_ENDPOINT, 'MINIO_ENDPOINT is not defined');
-console.assert(process.env.MINIO_ACCESSKEY, 'MINIO_ACCESSKEY is not defined');
-console.assert(process.env.MINIO_SECRETKEY, 'MINIO_SECRETKEY is not defined');
-console.assert(process.env.MINIO_BUCKET, 'MINIO_BUCKET is not defined');
+if (!process.env.MINIO_ENDPOINT) throw new Error('MINIO_ENDPOINT is not defined');
+if (!process.env.MINIO_ACCESSKEY) throw new Error('MINIO_ACCESSKEY is not defined');
+if (!process.env.MINIO_SECRETKEY) throw new Error('MINIO_SECRETKEY is not defined');
+if (!process.env.MINIO_BUCKET) throw new Error('MINIO_BUCKET is not defined');
 
 const minioClient = new Minio.Client({
   endPoint: process.env.MINIO_ENDPOINT!,

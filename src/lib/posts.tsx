@@ -5,6 +5,7 @@ import Comment from "@/models/comment";
 import { SortOption } from "./sort";
 import { PipelineStage } from "mongoose";
 import { GetPostType, SetPostQuery } from "@/types/posts.d";
+import { escapeRegex } from "@/lib/utils";
 
 /**
  * A centralized function to fetch posts based on various criteria.
@@ -277,9 +278,6 @@ export async function updatePostViews(_id: string): Promise<void> {
   }
 }
 
-function escapeRegex(str: string) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /**
  * 특정 태그를 포함하는 모든 게시글을 검색합니다.

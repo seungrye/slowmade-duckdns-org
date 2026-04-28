@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   await connectToDB();
   const payload = await req.json();
 
-  if (session.user?.email != payload?.userEmail) {
+  if (session.user?.email !== payload?.userEmail) {
     console.error("사용자 이메일이 일치하지 않습니다.", {
       sessionEmail: session.user.email,
       payloadEmail: payload?.userEmail,

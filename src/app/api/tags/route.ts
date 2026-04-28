@@ -3,10 +3,7 @@ import { connectToDB } from '@/lib/db';
 import { __getAllTags } from '@/lib/posts';
 import Post from '@/models/post';
 import { PipelineStage } from 'mongoose';
-
-function escapeRegex(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
+import { escapeRegex } from '@/lib/utils';
 
 /**
  * Fetches existing tags for autocomplete suggestions.
