@@ -6,11 +6,6 @@
 
 ## 대기
 
-### D2. API 인증 헬퍼 추출
-- `src/lib/require-auth.ts` 신규 생성
-- 6개 API 라우트에서 반복되는 `auth()` + 401 응답 패턴 추출
-- D1 이후 진행
-
 ### D4. 업적 토스트 유틸 추출
 - `src/lib/show-achievement-toast.ts` 신규 생성
 - `writer-form.section.tsx`, `comments.section.tsx` 공통 패턴 추출

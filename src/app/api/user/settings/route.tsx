@@ -1,18 +1,15 @@
 import { NextResponse } from 'next/server';
-import { auth } from "@/auth";
 import { connectToDB } from '@/lib/db';
 import User, { UserType } from '@/models/user';
+import { requireAuth } from '@/lib/require-auth';
 
 export async function GET() {
-  const session = await auth();
-
-  if (!session || !session.user?.email) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   try {
     await connectToDB();
-    const user: UserType | null = await User.findOne({ email: session.user.email }, 'settings');
+    const user: UserType | null = await User.findOne({ email: auth.email }, 'settings');
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
@@ -25,24 +22,20 @@ export async function GET() {
   }
 }
 
-
 export async function PUT(request: Request) {
-  const session = await auth();
-
-  if (!session || !session.user?.email) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   try {
     const { theme } = await request.json();
 
     if (!['light', 'dark', 'system'].includes(theme)) {
-        return NextResponse.json({ message: 'Invalid theme value' }, { status: 400 });
+      return NextResponse.json({ message: 'Invalid theme value' }, { status: 400 });
     }
 
     await connectToDB();
     const updatedUser = await User.findOneAndUpdate(
-      { email: session.user.email },
+      { email: auth.email },
       { $set: { 'settings.theme': theme } },
       { new: true, upsert: true, projection: { settings: 1 } }
     );

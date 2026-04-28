@@ -28,6 +28,11 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### D2. API 인증 헬퍼 추출 ✅
+- `src/lib/require-auth.ts` — `requireAuth()` 헬퍼, `instanceof NextResponse`로 조기 반환
+- 7개 API 라우트의 `auth()` + 401 패턴 교체
+- `src/lib/require-auth.test.ts` — 4개 케이스
+
 ### D1. 환경변수 중앙화 ✅
 - `src/lib/env.ts` — `intEnv` 헬퍼, `env` 객체, `validateEnv()`
 - 8개 파일의 분산된 `parseInt(process.env.X || '기본값')` 패턴 통합

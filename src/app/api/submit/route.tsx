@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
-import { auth } from "@/auth";
 import { checkAndGrantPostCountAchievements } from "@/lib/achievements";
 import { HydratedDocument } from "mongoose";
 import User from "@/models/user";
@@ -9,22 +8,20 @@ import { AchievementType } from "@/models/achievement";
 import { HttpStatusCode } from "axios";
 import PostRevision from "@/models/post-revision";
 import { env } from "@/lib/env";
+import { requireAuth } from "@/lib/require-auth";
 
 const POINTS_FOR_NEW_POST = env.points.newPost;
 
 export async function POST(req: Request) {
-  const session = await auth();
-
-  if (!session || !session.user?.email) {
-    return NextResponse.json({ message: "로그인 후 이용해주세요." }, { status: HttpStatusCode.Unauthorized });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   await connectToDB();
   const payload = await req.json();
 
-  if (session.user?.email !== payload?.userEmail) {
+  if (auth.email !== payload?.userEmail) {
     console.error("사용자 이메일이 일치하지 않습니다.", {
-      sessionEmail: session.user.email,
+      sessionEmail: auth.email,
       payloadEmail: payload?.userEmail,
     });
     return NextResponse.json({ message: "사용자 정보가 일치하지 않습니다." }, { status: HttpStatusCode.Forbidden });

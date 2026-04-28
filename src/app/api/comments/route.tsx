@@ -7,6 +7,7 @@ import User from '@/models/user';
 import { checkAndGrantCommentCountAchievements } from '@/lib/achievements';
 import { AchievementType } from '@/models/achievement';
 import { env } from '@/lib/env';
+import { requireAuth } from '@/lib/require-auth';
 
 const POINTS_FOR_NEW_COMMENT = env.points.newComment;
 
@@ -127,10 +128,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-    const session = await auth();
-    if (!session?.user?.email) {
-        return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
-    }
+    const auth = await requireAuth();
+    if (auth instanceof NextResponse) return auth;
 
     const { commentId } = await req.json();
     if (!commentId) {
@@ -139,7 +138,7 @@ export async function DELETE(req: NextRequest) {
 
     await connectToDB();
 
-    const user = await User.findOne({ email: session.user.email });
+    const user = await User.findOne({ email: auth.email });
     if (!user) {
         return NextResponse.json({ message: "사용자를 찾을 수 없습니다." }, { status: 404 });
     }

@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { getMyAchievements } from "@/lib/achievements";
+import { requireAuth } from "@/lib/require-auth";
 
 export async function GET() {
-  const session = await auth();
-
-  if (!session || !session.user?.email) {
-    return NextResponse.json({ message: "인증이 필요합니다." }, { status: 401 });
-  }
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
 
   try {
-    const achievements = await getMyAchievements(session.user.email);
+    const achievements = await getMyAchievements(auth.email);
     return NextResponse.json(achievements);
   } catch (error) {
     console.error("Error fetching achievements:", error);
