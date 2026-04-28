@@ -13,7 +13,7 @@
           {
             "type": "command",
             "if": "Bash(*git *commit *)",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/ 하위 문서(plan/, architecture.md, SDS.md, SRS.md, code-quality.md 등) 중 갱신·추가·삭제가 필요한 항목이 있는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\"}}'",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/plan/ 하위 파일이 현재 진행 상황을 반영하는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\"}}'",
             "statusMessage": "커밋 전 체크리스트 확인 중..."
           }
         ]
