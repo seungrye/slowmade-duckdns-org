@@ -1,7 +1,7 @@
 ---
 issue: bugfix
 title: 미들웨어 Edge Runtime 호환 수정
-status: plan
+status: ✅ done
 ---
 
 ## 문제
