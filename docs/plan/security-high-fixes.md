@@ -16,7 +16,7 @@ file, thumbnail 모두 검증.
 - `existingPost.userEmail !== auth.email` 소유권 검증 → 403
 - `existingPost.set(payload)` → `existingPost.set({ title, htmlContent, jsonContent, tags })`
 
-## H-4 — 좋아요 POST 인증 추가
+## H-4 — 좋아요 POST 인증 추가 (완료)
 `src/app/api/like-dislike/route.tsx` POST 핸들러에 `requireAuth()` 추가.
 `payload.userEmail` → `auth.email` 교체
 
