@@ -50,13 +50,13 @@
   existingPost.set({ title, htmlContent, jsonContent, tags });
   ```
 
-### H-4 — 좋아요 POST 인증 없음
+### ✅ H-4 — 좋아요 POST 인증 없음
 
 - **파일**: `src/app/api/like-dislike/route.tsx:25-82`
 - **설명**: `GET`은 `requireAuth()` 호출하지만 `POST`는 인증 없음. 비로그인 사용자가 반복 호출로 좋아요 수 무제한 조작 가능
 - **수정**: `POST` 핸들러에 `requireAuth()` 추가
 
-### H-5 — 프로덕션 소스맵 노출
+### ✅ H-5 — 프로덕션 소스맵 노출
 
 - **파일**: `next.config.ts:30`
 - **설명**: `productionBrowserSourceMaps: true` 설정으로 원본 TypeScript 소스가 브라우저에서 공개됨
