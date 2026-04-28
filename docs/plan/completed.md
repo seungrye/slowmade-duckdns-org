@@ -28,6 +28,13 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### D6. 좋아요 상태 DB 조회로 전환 ✅
+- `src/models/user.tsx` — `likedPosts: [String]` 필드 추가
+- `GET /api/like-dislike?postId=X` 신규 — 로그인 사용자의 좋아요 여부 조회
+- `POST /api/like-dislike` — 로그인 시 `$addToSet`/`$pull`로 `likedPosts` 동기화
+- `like.section.tsx` — `useSession()` 연동, 로그인이면 DB, 비로그인이면 localStorage
+- `src/app/api/like-dislike/route.test.ts` — 13개 케이스 (GET 6개, POST 7개)
+
 ### D5. API 응답 형식 표준화 ✅
 - `src/types/api.d.ts` — `ApiResponse<T>` discriminated union 타입 (`{ success: true, data, message? } | { success: false, message }`)
 - `src/lib/api-response.ts` — `apiSuccess()`, `apiError()` 헬퍼 (TDD: 테스트 먼저 작성)

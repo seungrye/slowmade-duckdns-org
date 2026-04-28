@@ -1,9 +1,26 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
+import User from "@/models/user";
 import { HttpStatusCode } from "axios";
 import { checkAndGrantPostInteractionAchievements } from "@/lib/achievements";
+import { requireAuth } from "@/lib/require-auth";
+
+export async function GET(req: NextRequest) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
+  const postId = new URL(req.url).searchParams.get('postId');
+  if (!postId) return apiError('postId가 필요합니다.', HttpStatusCode.BadRequest);
+
+  await connectToDB();
+  const user = await User.findOne({ email: auth.email }).select('likedPosts').lean();
+  if (!user) return apiError('사용자를 찾을 수 없습니다.', HttpStatusCode.NotFound);
+
+  const isLiked = (user.likedPosts ?? []).includes(postId);
+  return apiSuccess({ isLiked });
+}
 
 export async function POST(req: Request) {
   await connectToDB();
@@ -42,6 +59,21 @@ export async function POST(req: Request) {
     }
 
     await checkAndGrantPostInteractionAchievements(payload._id);
+
+    // 로그인 사용자의 경우 likedPosts 업데이트
+    if (payload.userEmail) {
+      if (payload.likeChecked) {
+        await User.findOneAndUpdate(
+          { email: payload.userEmail },
+          { $addToSet: { likedPosts: payload._id } }
+        );
+      } else {
+        await User.findOneAndUpdate(
+          { email: payload.userEmail },
+          { $pull: { likedPosts: payload._id } }
+        );
+      }
+    }
 
     return apiSuccess({ likes: updatedPost.likes }, HttpStatusCode.Ok, "Like/Dislike 업데이트 성공");
   } catch (error) {
