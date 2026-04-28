@@ -68,7 +68,7 @@
 - **설명**: 파일명이 `moddleware.ts` (d 두 개)로 Next.js가 미들웨어로 인식하지 못해 CSP가 전혀 적용되지 않았음. `d6e0b41`에서 수정 완료.
 - **현황**: CSP 활성화 후 앱 전체 인라인 스타일·스크립트 차단 이슈 발생 → H-9 참고
 
-### H-7 — 보안 헤더 누락
+### ✅ H-7 — 보안 헤더 누락
 
 - **파일**: `next.config.ts`, `src/app/middleware.ts`
 - **설명**: 아래 헤더 미설정
@@ -78,7 +78,7 @@
   - `Permissions-Policy`
 - **수정**: `next.config.ts`의 `headers()` 또는 미들웨어에 추가
 
-### H-8 — next DoS 취약점
+### ✅ H-8 — next DoS 취약점
 
 - **파일**: `package.json`
 - **설명**: `next <15.3.9`에 HTTP 요청 역직렬화 DoS 취약점 (GHSA-h25m-26qc-wcjf)
