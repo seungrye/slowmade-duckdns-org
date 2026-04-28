@@ -42,7 +42,7 @@ MinIO 업로드는 성공하지만 URL이 에디터에 전달되지 않아 "No U
 
 ## ✅ CSP worker-src 누락 수정
 
-## middleware.ts lint 오류 수정
+## ✅ middleware.ts lint 오류 수정
 `request` → `_request` (미사용 파라미터 ESLint 오류 해소)
 
 ## ✅ CSP script-src에 cdn.jsdelivr.net 추가
