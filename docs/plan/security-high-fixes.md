@@ -6,7 +6,7 @@ status: plan
 ## H-1 — 파일 업로드 인증 추가 (완료)
 `src/app/api/upload/route.tsx` POST 핸들러 최상단에 `requireAuth()` 추가
 
-## H-2 — MIME 타입 검증 추가
+## H-2 — MIME 타입 검증 추가 (완료)
 `src/app/api/upload/upload.utils.ts` `validateUploadFormData`에
 `ALLOWED_MIME_TYPES = ['image/jpeg','image/png','image/gif','image/webp']` 화이트리스트 검증 추가.
 file, thumbnail 모두 검증.
