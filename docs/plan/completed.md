@@ -28,6 +28,13 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### D5. API 응답 형식 표준화 ✅
+- `src/types/api.d.ts` — `ApiResponse<T>` discriminated union 타입 (`{ success: true, data, message? } | { success: false, message }`)
+- `src/lib/api-response.ts` — `apiSuccess()`, `apiError()` 헬퍼 (TDD: 테스트 먼저 작성)
+- `src/lib/api-response.test.ts` — 11개 케이스 (falsy data, data 키 부재 등)
+- 12개 API 라우트 (`upload`, `submit`, `post`, `post/revision`, `post/revisions`, `posts`, `tags`, `like-dislike`, `comments`, `my-achievements`, `user/profile`, `user/settings`) 모두 표준화
+- 12개 클라이언트 파일 (`infinite-post.section`, `like.section`, `writer-form.section`, `tag-input.section`, `revision-history.section`, `settings/page`, `my-achievements.section`, `my-profile.section`, `comments.section`, `my-humor-list`, 기존 `upload` 테스트 포함) 응답 파싱 업데이트
+
 ### D4. 업적 토스트 유틸 추출 ✅
 - `src/lib/show-achievement-toast.tsx` — `showAchievementToasts()` 헬퍼
 - `writer-form.section.tsx`, `comments.section.tsx` 각 14줄 → 1줄

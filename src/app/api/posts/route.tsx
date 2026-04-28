@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getPaginatedPosts } from '@/lib/posts';
 import { SortOptionSchema } from '@/lib/sort';
+import { apiSuccess } from '@/lib/api-response';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -18,5 +19,5 @@ export async function GET(req: Request) {
   const withComments = true;
 
   const posts = await getPaginatedPosts(page, limit, order, email, withComments);
-  return NextResponse.json(posts);
+  return apiSuccess(posts);
 }

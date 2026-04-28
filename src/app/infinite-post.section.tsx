@@ -36,7 +36,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
 
     setIsLoading(true);
     const res = await fetch(`/api/posts?page=${page}&limit=9`);
-    const { posts: newPosts } = await res.json();
+    const { data: { posts: newPosts } } = await res.json();
     setIsLoading(false);
 
     if (newPosts.length === 0) {

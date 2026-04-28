@@ -16,7 +16,7 @@ export default function MyAchievements({ session }: { session: Session | null })
                 setLoading(true);
                 const res = await fetch('/api/my-achievements');
                 if (res.ok) {
-                    const data = await res.json();
+                    const { data } = await res.json();
                     setAchievements(data);
                 }
             } catch (error) {

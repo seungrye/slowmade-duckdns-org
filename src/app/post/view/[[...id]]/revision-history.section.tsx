@@ -53,7 +53,7 @@ export default function RevisionHistorySection({
   useEffect(() => {
     fetch(`/api/post/revisions?postId=${postId}`)
       .then(r => r.json())
-      .then(data => {
+      .then(({ data }) => {
         if (Array.isArray(data)) setRevisions(data);
       })
       .finally(() => setLoading(false));
@@ -76,7 +76,7 @@ export default function RevisionHistorySection({
         jsonContent = currentJsonContent as JSONContent;
       } else {
         const res = await fetch(`/api/post/revision?revisionId=${revision._id}`);
-        const data = await res.json();
+        const { data } = await res.json();
         jsonContent = data.jsonContent;
       }
       setContents(prev => ({ ...prev, [revision._id]: jsonContent }));

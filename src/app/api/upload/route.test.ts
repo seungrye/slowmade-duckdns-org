@@ -56,7 +56,7 @@ describe('POST /api/upload', () => {
     const res = await POST(makeRequest(formData));
     expect(res.status).toBe(200);
 
-    const data = await res.json();
+    const { data } = await res.json();
     expect(data.url).toContain('test-endpoint.com/test-bucket');
     expect(data.thumbnailUrl).toContain('test-endpoint.com/test-bucket/thumbnails/');
   });

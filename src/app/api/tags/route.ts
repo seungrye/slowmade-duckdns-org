@@ -4,6 +4,7 @@ import { __getAllTags } from '@/lib/posts';
 import Post from '@/models/post';
 import { PipelineStage } from 'mongoose';
 import { escapeRegex } from '@/lib/utils';
+import { apiSuccess, apiError } from '@/lib/api-response';
 
 /**
  * Fetches existing tags for autocomplete suggestions.
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
 
     if (!query) { // get all tags
       const tags = await __getAllTags();
-      return NextResponse.json(tags.map((item) => item.tag));
+      return apiSuccess(tags.map((item) => item.tag));
     }
 
     const escapedQuery = escapeRegex(query);
@@ -34,9 +35,9 @@ export async function GET(req: NextRequest) {
     const tags = await Post.aggregate(pipeline);
     const tagStrings = tags.map(item => item._id);
 
-    return NextResponse.json(tagStrings);
+    return apiSuccess(tagStrings);
   } catch (error) {
     console.error('Error fetching tags:', error);
-    return NextResponse.json({ message: 'Failed to fetch tags' }, { status: 500 });
+    return apiError('Failed to fetch tags', 500);
   }
 }

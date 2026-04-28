@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiSuccess, apiError } from '@/lib/api-response';
 import { connectToDB } from "@/lib/db";
 import User from "@/models/user";
 import { requireAuth } from "@/lib/require-auth";
@@ -12,12 +13,12 @@ export async function GET() {
     const user = await User.findOne({ email: auth.email }).select('name email profileImage points createdAt');
 
     if (!user) {
-      return NextResponse.json({ message: "사용자를 찾을 수 없습니다." }, { status: 404 });
+      return apiError("사용자를 찾을 수 없습니다.", 404);
     }
 
-    return NextResponse.json(user);
+    return apiSuccess(user);
   } catch (error) {
     console.error("Error fetching user profile:", error);
-    return NextResponse.json({ message: "프로필 정보를 불러오는 데 실패했습니다." }, { status: 500 });
+    return apiError("프로필 정보를 불러오는 데 실패했습니다.", 500);
   }
 }

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiSuccess, apiError } from '@/lib/api-response';
 import { getMyAchievements } from "@/lib/achievements";
 import { requireAuth } from "@/lib/require-auth";
 
@@ -8,9 +9,9 @@ export async function GET() {
 
   try {
     const achievements = await getMyAchievements(auth.email);
-    return NextResponse.json(achievements);
+    return apiSuccess(achievements);
   } catch (error) {
     console.error("Error fetching achievements:", error);
-    return NextResponse.json({ message: "업적을 불러오는 데 실패했습니다." }, { status: 500 });
+    return apiError("업적을 불러오는 데 실패했습니다.", 500);
   }
 }

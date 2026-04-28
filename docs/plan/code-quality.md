@@ -6,11 +6,6 @@
 
 ## 대기
 
-### D5. API 응답 형식 표준화
-- `src/types/api.d.ts`에 `ApiResponse<T>` 타입 정의
-- 모든 API 라우트의 성공/에러 응답 구조 통일 (`success`, `data`, `message`)
-- HTTP 상태 코드 상수 통일
-
 ### D3. fetch 클라이언트 라이브러리
 - `src/lib/api-client.ts` 신규 생성
 - 15개 이상 컴포넌트에 산재한 `fetch + 에러처리` 패턴 통합

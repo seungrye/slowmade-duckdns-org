@@ -17,7 +17,7 @@ export default function MyHumorList() {
 
     const fetchPosts = useCallback(async (page: number) => {
         const res = await fetch(`/api/posts?page=${page}&limit=${pageSize}&email=${session?.user?.email || ''}`);
-        const { total, posts } = await res.json();
+        const { data: { total, posts } } = await res.json();
         console.assert(posts.length > 0, "No posts found for the current page");
 
         setPosts(posts);

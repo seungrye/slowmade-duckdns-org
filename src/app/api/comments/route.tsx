@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
+import { apiSuccess, apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
 import { connectToDB } from '@/lib/db';
 import mongoose, { HydratedDocument } from 'mongoose';
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest) {
     const { postId, parentId = null, content, anonid } = await req.json();
 
     if (!content) {
-        return NextResponse.json({ message: "댓글 내용이 없습니다." }, { status: 400 });
+        return apiError("댓글 내용이 없습니다.", 400);
     }
 
     await connectToDB();
@@ -83,17 +84,17 @@ export async function POST(req: NextRequest) {
             unlockedAchievements = await checkAndGrantCommentCountAchievements(userEmail);
         }
 
-        return NextResponse.json({ newComment, unlockedAchievements, pointsGained }, { status: 201 });
+        return apiSuccess({ newComment, unlockedAchievements, pointsGained }, 201);
     } catch (error) {
         console.error("Error creating comment:", error);
-        return NextResponse.json({ message: "댓글 작성에 실패했습니다." }, { status: 500 });
+        return apiError("댓글 작성에 실패했습니다.", 500);
     }
 }
 
 export async function GET(req: NextRequest) {
     const postId = req.nextUrl.searchParams.get("postId") || "";
     if (!postId) {
-      return NextResponse.json({ error: "Missing postId" }, { status: 400 });
+      return apiError("Missing postId", 400);
     }
 
     await connectToDB();
@@ -124,7 +125,7 @@ export async function GET(req: NextRequest) {
         return comment;
     });
 
-    return NextResponse.json(comments);
+    return apiSuccess(comments);
 }
 
 export async function DELETE(req: NextRequest) {
@@ -133,27 +134,25 @@ export async function DELETE(req: NextRequest) {
 
     const { commentId } = await req.json();
     if (!commentId) {
-        return NextResponse.json({ message: "댓글 ID가 필요합니다." }, { status: 400 });
+        return apiError("댓글 ID가 필요합니다.", 400);
     }
 
     await connectToDB();
 
     const user = await User.findOne({ email: auth.email });
     if (!user) {
-        return NextResponse.json({ message: "사용자를 찾을 수 없습니다." }, { status: 404 });
+        return apiError("사용자를 찾을 수 없습니다.", 404);
     }
 
-    // findOneAndUpdate를 사용하여 한 번의 쿼리로 처리
     const updatedComment = await Comment.findOneAndUpdate(
-        { _id: commentId, authorId: user._id }, // 조건: 댓글 ID와 작성자 ID 일치
-        { $set: { isDeleted: true } }, // 작업: isDeleted 플래그 설정
+        { _id: commentId, authorId: user._id },
+        { $set: { isDeleted: true } },
         { new: true }
     );
 
     if (!updatedComment) {
-        // updatedComment가 null이면 댓글이 존재하지 않거나 삭제 권한이 없는 경우입니다.
-        return NextResponse.json({ message: "댓글을 찾을 수 없거나 삭제 권한이 없습니다." }, { status: 404 });
+        return apiError("댓글을 찾을 수 없거나 삭제 권한이 없습니다.", 404);
     }
 
-    return NextResponse.json({ message: "댓글이 삭제되었습니다." }, { status: 200 });
+    return apiSuccess(null, 200, "댓글이 삭제되었습니다.");
 }

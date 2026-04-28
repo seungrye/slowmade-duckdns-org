@@ -22,8 +22,8 @@ function SettingsForm() {
                 if (!res.ok) throw new Error('Failed to fetch settings');
                 return res.json();
             })
-            .then(data => {
-                if (data.theme) {
+            .then(({ data }) => {
+                if (data?.theme) {
                     setTheme(data.theme);
                     setInitialTheme(data.theme);
                 }
@@ -54,7 +54,7 @@ function SettingsForm() {
             }
 
             const savedSettings = await res.json();
-            setInitialTheme(savedSettings.theme); // 저장 후 현재 상태를 초기 상태로 업데이트
+            setInitialTheme(savedSettings.data?.theme); // 저장 후 현재 상태를 초기 상태로 업데이트
             setMessage('✅ 설정이 저장되었습니다.');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiSuccess, apiError } from '@/lib/api-response';
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
 import { checkAndGrantPostCountAchievements } from "@/lib/achievements";
@@ -24,11 +25,11 @@ export async function POST(req: Request) {
       sessionEmail: auth.email,
       payloadEmail: payload?.userEmail,
     });
-    return NextResponse.json({ message: "사용자 정보가 일치하지 않습니다." }, { status: HttpStatusCode.Forbidden });
+    return apiError("사용자 정보가 일치하지 않습니다.", HttpStatusCode.Forbidden);
   }
 
   if (!payload?.title || !payload?.jsonContent) {
-    return NextResponse.json({ message: "모든 필드를 입력해주세요." }, { status: HttpStatusCode.BadRequest });
+    return apiError("모든 필드를 입력해주세요.", HttpStatusCode.BadRequest);
   }
 
   try {
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
       // --- 게시글 수정 ---
       const existingPost = await Post.findById(payload._id);
       if (!existingPost) {
-        return NextResponse.json({ message: "게시글을 찾을 수 없습니다." }, { status: HttpStatusCode.NotFound });
+        return apiError("게시글을 찾을 수 없습니다.", HttpStatusCode.NotFound);
       }
 
       const {_id, ...postData } = existingPost.toObject();
@@ -66,8 +67,8 @@ export async function POST(req: Request) {
       unlockedAchievements = await checkAndGrantPostCountAchievements(payload.userEmail);
     }
 
-    return NextResponse.json({ message: "게시글 저장 완료", unlockedAchievements, pointsGained }, { status: HttpStatusCode.Created });
+    return apiSuccess({ unlockedAchievements, pointsGained }, HttpStatusCode.Created, "게시글 저장 완료");
   } catch (error) {
-    return NextResponse.json({ message: "게시글 저장 실패", error }, { status: HttpStatusCode.InternalServerError });
+    return apiError("게시글 저장 실패", HttpStatusCode.InternalServerError);
   }
 }

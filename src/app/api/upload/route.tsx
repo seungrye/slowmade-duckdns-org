@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as Minio from 'minio';
 import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
 import { env } from '@/lib/env';
+import { apiSuccess, apiError } from '@/lib/api-response';
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
   const validation = validateUploadFormData(formData);
 
   if (!validation.ok) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
+    return apiError(validation.error, 400);
   }
 
   const { file, thumbnail } = validation;
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("MinIO upload failed:", err);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return apiError("Upload failed", 500);
   }
 
   try {
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     } catch (rollbackErr) {
       console.error("MinIO rollback failed:", rollbackErr);
     }
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return apiError("Upload failed", 500);
   }
 
   const url = buildPublicUrl(env.minio.endpoint, bucket, fileName);
@@ -53,5 +54,5 @@ export async function POST(req: NextRequest) {
 
   console.log("File uploaded successfully:", url);
 
-  return NextResponse.json({ url, thumbnailUrl });
+  return apiSuccess({ url, thumbnailUrl });
 }

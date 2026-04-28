@@ -39,7 +39,7 @@ export default function Comments({ postId }: Props) {
   const fetchComments = useCallback(async () => {
     try {
       const response = await fetch(`/api/comments?postId=${postId}`);
-      const data = await response.json();
+      const { data } = await response.json();
       setComments(data);
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -105,7 +105,7 @@ export default function Comments({ postId }: Props) {
           content.current.value = "";
         }
 
-        showAchievementToasts(result);
+        showAchievementToasts(result.data);
         setOpenReplyFor(null); // 답글 작성 후 폼 닫기
       } else {
         toast.error("덧글 작성에 실패했습니다.");

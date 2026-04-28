@@ -30,7 +30,7 @@ export default function LikeSection({
             });
 
             console.assert(response.ok, "Response should be ok");
-            const { likes } = await response.json();
+            const { data: { likes } } = await response.json();
 
             setLikes(likes);
             setLikeChecked(likeChecked);

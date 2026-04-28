@@ -22,7 +22,7 @@ export default function TagInput({ tags, onTagsChange, placeholder }: TagInputPr
       try {
         const response = await fetch('/api/tags');
         if (response.ok) {
-          const data = await response.json();
+          const { data } = await response.json();
           setAllTags(Array.isArray(data) ? data : []);
         }
       } catch (error) {

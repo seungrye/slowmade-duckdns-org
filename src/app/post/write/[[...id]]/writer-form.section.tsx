@@ -34,7 +34,8 @@ export default function PostWriterForm() {
                     throw new Error("Failed to fetch post");
                 }
 
-                const { jsonContent, title, urls, tags: fetchedTags } = await res.json(); // API로부터 태그를 받아옵니다.
+                const { data: post } = await res.json();
+                const { jsonContent, title, urls, tags: fetchedTags } = post; // API로부터 태그를 받아옵니다.
                 if (jsonContent) {
                     // 에디터에 내용 설정
                     console.assert(typeof jsonContent !== 'undefined', "jsonContent should not be undefined");
@@ -99,7 +100,7 @@ export default function PostWriterForm() {
                 const result = await response.json();
                 toast.success(_id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
-                showAchievementToasts(result);
+                showAchievementToasts(result.data);
 
                 setTimeout(() => router.push("/"), 1000); // 1초 후 홈으로 이동
             } else {
