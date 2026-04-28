@@ -7,8 +7,14 @@
           {
             "type": "command",
             "if": "Bash(*git commit*)",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/ 문서가 변경 내용을 반영하여 갱신되었는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\\n미비한 항목이 있으면 완료 후 커밋하세요.\"}}'",
-            "statusMessage": "커밋 전 문서·테스트 체크 중..."
+            "command": "staged=$(git -C /home/seungrye/site diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q '^src/' && ! echo \"$staged\" | grep -q '^docs/plan\\.md'; then echo 'src/ 코드 변경이 감지되었습니다. docs/plan.md에 진행 현황을 반영한 후 커밋하세요.'; exit 1; fi",
+            "statusMessage": "계획 문서 갱신 여부 확인 중..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(*git commit*)",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/plan.md가 현재 진행 상황을 반영하는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\"}}'",
+            "statusMessage": "커밋 전 체크리스트 확인 중..."
           }
         ]
       }
