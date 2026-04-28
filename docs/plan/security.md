@@ -35,7 +35,7 @@
   ```
   추가로 파일 magic bytes 검증 권장
 
-### H-3 — 게시글 수정 IDOR + Mass Assignment
+### ✅ H-3 — 게시글 수정 IDOR + Mass Assignment
 
 - **파일**: `src/app/api/submit/route.tsx:39-57`
 - **설명**: 수정 시 `existingPost.userEmail !== auth.email` 검증 없음. 타인 게시글 `_id`를 알면 덮어쓰기 가능. `existingPost.set(payload)`로 클라이언트 payload를 검증 없이 전체 적용 (Mass Assignment)
