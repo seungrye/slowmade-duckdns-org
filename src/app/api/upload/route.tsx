@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import * as Minio from 'minio';
 import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
 import { env } from '@/lib/env';

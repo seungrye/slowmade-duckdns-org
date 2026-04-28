@@ -68,7 +68,7 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ unlockedAchievements, pointsGained }, HttpStatusCode.Created, "게시글 저장 완료");
-  } catch (error) {
+  } catch {
     return apiError("게시글 저장 실패", HttpStatusCode.InternalServerError);
   }
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { __getAllTags } from '@/lib/posts';
 import Post from '@/models/post';

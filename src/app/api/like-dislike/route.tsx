@@ -76,7 +76,7 @@ export async function POST(req: Request) {
     }
 
     return apiSuccess({ likes: updatedPost.likes }, HttpStatusCode.Ok, "Like/Dislike 업데이트 성공");
-  } catch (error) {
+  } catch {
     return apiError("게시글 저장 실패", HttpStatusCode.InternalServerError);
   }
 }

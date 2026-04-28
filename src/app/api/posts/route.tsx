@@ -1,5 +1,4 @@
 // app/api/posts/route.ts
-import { NextResponse } from 'next/server';
 import { getPaginatedPosts } from '@/lib/posts';
 import { SortOptionSchema } from '@/lib/sort';
 import { apiSuccess } from '@/lib/api-response';

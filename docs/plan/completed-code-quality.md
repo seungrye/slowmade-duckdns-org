@@ -58,6 +58,11 @@
 - `src/app/api/comments/route.test.ts` — 9개 케이스 (POST·GET·DELETE)
 - 총 43개 케이스 추가 → 전체 187개 테스트
 
+### B2. ESLint no-unused-vars 빌드 에러 수정 ✅
+- 프로덕션 라우트 5개 — 미사용 `NextResponse` import 제거
+- `like-dislike`, `submit` route — `catch (error)` → `catch`
+- 테스트 파일 4개 — 미사용 `NextResponse` import 제거
+
 ### B1. Tiptap v3 StarterKit 중복 확장 경고 수정 ✅
 - `viewer.tsx`, `editor.tsx` — `StarterKit.configure({ link: false, underline: false, trailingNode: false })`
 - Tiptap v3에서 StarterKit이 link·underline·trailingNode를 기본 포함하도록 변경됨

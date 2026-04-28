@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getPostRevisions } from '@/lib/revisions';
 import { HttpStatusCode } from 'axios';
 import { apiSuccess, apiError } from '@/lib/api-response';
