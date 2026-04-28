@@ -34,3 +34,9 @@ file, thumbnail 모두 검증.
 ## H-8 — next 패키지 업그레이드
 `next 15.3.8 → 15.5.15` (DoS 취약점 해소)
 (H-7 impl과 함께 커밋)
+
+## CSP img-src 외부 이미지 허용
+`src/middleware.ts` `img-src`에 `https:` 추가.
+기존: 특정 도메인만 허용 (minio, googleusercontent)
+수정: `https:` 추가하여 HTTPS 이미지 전체 허용
+이유: 게시글에 붙여넣기 된 외부 이미지(huggingface.co 등) CSP 차단 문제
