@@ -17,6 +17,16 @@
             "statusMessage": "커밋 전 체크리스트 확인 중..."
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))\" 2>/dev/null); if echo \"$file\" | grep -q '^/home/seungrye/site/src/'; then changed=$(git -C /home/seungrye/site diff HEAD -- docs/plan.md 2>/dev/null); staged=$(git -C /home/seungrye/site diff --cached -- docs/plan.md 2>/dev/null); if [ -z \"$changed\" ] && [ -z \"$staged\" ]; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 수정 전에 docs/plan.md를 먼저 갱신하세요.\"}}'; exit 1; fi; fi",
+            "statusMessage": "계획 문서 확인 중..."
+          }
+        ]
       }
     ]
   }
