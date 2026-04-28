@@ -14,9 +14,15 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
     const { post } = (await getPost(_id)) || { post: null };
     if (!post) return { title: 'Post Not Found' };
 
+    const description = post.htmlContent
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 160);
+
     return {
         title: post.title,
-        description: `Author: ${post.author}, Title: '${post.title}', Likes: ${post.likes}, Views: ${post.views}, Created At: ${post.createdAt.toLocaleDateString()}`,
+        description,
         keywords: post.tags,
     };
 }
