@@ -42,7 +42,7 @@ MinIO 업로드는 성공하지만 URL이 에디터에 전달되지 않아 "No U
 
 ## ✅ CSP worker-src 누락 수정
 
-## CSP script-src에 cdn.jsdelivr.net 추가
+## ✅ CSP script-src에 cdn.jsdelivr.net 추가
 `src/middleware.ts` `script-src`에 `https://cdn.jsdelivr.net` 추가.
 `browser-image-compression` Web Worker가 jsDelivr CDN에서 라이브러리를 importScripts()로 로드.
 현재 unsafe-inline 존재로 실질적 CSP 약화는 미미. H-9(static CSP) 전환 시 재검토 예정.
