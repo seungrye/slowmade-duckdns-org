@@ -7,13 +7,13 @@
           {
             "type": "command",
             "if": "Bash(*git *commit *)",
-            "command": "staged=$(git -C /home/seungrye/site diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q '^src/' && ! echo \"$staged\" | grep -q '^docs/plan\\.md'; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 변경이 감지되었습니다. docs/plan.md에 진행 현황을 반영한 후 커밋하세요.\"}}'; exit 1; fi",
+            "command": "staged=$(git -C /home/seungrye/site diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q '^src/' && ! echo \"$staged\" | grep -q '^docs/plan/'; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 변경이 감지되었습니다. docs/plan/ 하위 파일에 진행 현황을 반영한 후 커밋하세요.\"}}'; exit 1; fi",
             "statusMessage": "계획 문서 갱신 여부 확인 중..."
           },
           {
             "type": "command",
             "if": "Bash(*git *commit *)",
-            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/plan.md가 현재 진행 상황을 반영하는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\"}}'",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/plan/ 하위 파일이 현재 진행 상황을 반영하는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\"}}'",
             "statusMessage": "커밋 전 체크리스트 확인 중..."
           }
         ]
@@ -23,7 +23,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "file=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))\" 2>/dev/null); if echo \"$file\" | grep -q '^/home/seungrye/site/src/'; then changed=$(git -C /home/seungrye/site diff HEAD -- docs/plan.md 2>/dev/null); staged=$(git -C /home/seungrye/site diff --cached -- docs/plan.md 2>/dev/null); if [ -z \"$changed\" ] && [ -z \"$staged\" ]; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 수정 전에 docs/plan.md를 먼저 갱신하세요.\"}}'; exit 1; fi; fi",
+            "command": "file=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))\" 2>/dev/null); if echo \"$file\" | grep -q '^/home/seungrye/site/src/'; then changed=$(git -C /home/seungrye/site diff HEAD -- docs/plan/ 2>/dev/null); staged=$(git -C /home/seungrye/site diff --cached -- docs/plan/ 2>/dev/null); if [ -z \"$changed\" ] && [ -z \"$staged\" ]; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 수정 전에 docs/plan/ 하위 파일을 먼저 갱신하세요.\"}}'; exit 1; fi; fi",
             "statusMessage": "계획 문서 확인 중..."
           }
         ]
