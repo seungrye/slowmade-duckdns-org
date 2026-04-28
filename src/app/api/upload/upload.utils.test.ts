@@ -58,4 +58,33 @@ describe('validateUploadFormData', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe('No thumbnail uploaded');
   });
+
+  it('허용되지 않은 file MIME 타입이면 ok: false를 반환한다', () => {
+    const formData = new FormData();
+    formData.append('file', new File(['content'], 'script.html', { type: 'text/html' }));
+    formData.append('thumbnail', new File(['thumb'], 'thumb.jpg', { type: 'image/jpeg' }));
+
+    const result = validateUploadFormData(formData);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Invalid file type');
+  });
+
+  it('허용되지 않은 thumbnail MIME 타입이면 ok: false를 반환한다', () => {
+    const formData = new FormData();
+    formData.append('file', new File(['content'], 'photo.jpg', { type: 'image/jpeg' }));
+    formData.append('thumbnail', new File(['thumb'], 'thumb.svg', { type: 'image/svg+xml' }));
+
+    const result = validateUploadFormData(formData);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe('Invalid thumbnail type');
+  });
+
+  it.each(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])('%s는 허용된다', (mimeType) => {
+    const formData = new FormData();
+    formData.append('file', new File(['content'], 'photo', { type: mimeType }));
+    formData.append('thumbnail', new File(['thumb'], 'thumb', { type: mimeType }));
+
+    const result = validateUploadFormData(formData);
+    expect(result.ok).toBe(true);
+  });
 });
