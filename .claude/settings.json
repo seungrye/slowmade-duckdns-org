@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit *)",
+            "command": "echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"additionalContext\": \"[커밋 전 체크리스트]\\n1. docs/ 문서가 변경 내용을 반영하여 갱신되었는지 확인\\n2. 변경된 코드에 대응하는 테스트가 추가 또는 수정되었는지 확인\\n미비한 항목이 있으면 완료 후 커밋하세요.\"}}'",
+            "statusMessage": "커밋 전 문서·테스트 체크 중..."
+          }
+        ]
+      }
+    ]
+  }
+}
