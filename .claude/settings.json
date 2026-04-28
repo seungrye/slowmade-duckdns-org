@@ -6,6 +6,12 @@
         "hooks": [
           {
             "type": "command",
+            "if": "Bash(*git*commit*)",
+            "command": "cmd=$(python3 -c \"import json,sys; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))\" 2>/dev/null); if python3 -c \"import re,sys; cmd=sys.argv[1]; sys.exit(0 if re.search(r'git.+add.+&&.+git.+commit', cmd, re.DOTALL) else 1)\" \"$cmd\" 2>/dev/null; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"git add와 git commit을 &&로 묶어 실행하지 마세요. staged 파일 검증 훅이 동작하지 않습니다. 두 명령을 분리해서 실행하세요.\"}}'; exit 1; fi",
+            "statusMessage": "git add/commit 분리 실행 확인 중..."
+          },
+          {
+            "type": "command",
             "if": "Bash(*git *commit *)",
             "command": "staged=$(git -C /home/seungrye/site diff --cached --name-only 2>/dev/null); if echo \"$staged\" | grep -q '^src/' && ! echo \"$staged\" | grep -q '^docs/'; then echo '{\"hookSpecificOutput\": {\"hookEventName\": \"PreToolUse\", \"permissionDecision\": \"deny\", \"permissionDecisionReason\": \"src/ 코드 변경이 감지되었습니다. docs/ 하위 문서에 갱신·추가·삭제가 필요한 내용을 반영한 후 커밋하세요.\"}}'; exit 1; fi",
             "statusMessage": "계획 문서 갱신 여부 확인 중..."
