@@ -16,7 +16,7 @@
 | 12 | ✅ D6 — 좋아요 상태 DB 조회 | 독립 기능 수정 |
 | 13 | ✅ D7 — comments.section 분리 | 독립 |
 | 14 | ✅ M1-remaining — posts $lookup 중복 제거 | 독립 |
-| 15 | T1 — 테스트 커버리지 확대 | 리팩토링 이후 작성이 의미 있음 |
+| 15 | ✅ T1 — 테스트 커버리지 확대 | achievements + 주요 API 라우트 |
 | 16 | #2 — 작성 페이지 임시 저장 | |
 | 17 | #4 — 작성/보기 화면 전체 높이 | |
 | 18 | #3 — 작성글 revision UI | |
@@ -27,7 +27,7 @@
 
 ## 파일 구조
 
-- [completed.md](completed.md) — 완료 항목
+- [completed.md](completed.md) — 완료 항목 인덱스 (→ features/seo/code-quality 로 분할됨)
 - [seo.md](seo.md) — SEO / AI 크롤링 (S 시리즈)
 - [code-quality.md](code-quality.md) — 코드 품질 개선 (D/M/T 시리즈)
 - [features.md](features.md) — 기존 기능 개발 (#2~#7)
