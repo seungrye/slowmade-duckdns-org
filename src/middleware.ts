@@ -5,7 +5,7 @@ export function middleware(request: NextRequest) {
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' blob: data: https://minio-api.slowmade.duckdns.org https://*.googleusercontent.com",
+    "img-src 'self' blob: data: https:",
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",

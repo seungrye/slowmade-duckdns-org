@@ -32,6 +32,11 @@ describe('middleware', () => {
     expect(csp).toContain("frame-ancestors 'none'");
   });
 
+  it('img-src에 https:를 허용한다', () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain("img-src 'self' blob: data: https:");
+  });
+
   it('API 경로에도 CSP를 설정한다', () => {
     const csp = middleware(makeRequest('/api/posts')).headers.get('Content-Security-Policy');
     expect(csp).toBeTruthy();
