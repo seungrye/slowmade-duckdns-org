@@ -62,11 +62,11 @@
 - **설명**: `productionBrowserSourceMaps: true` 설정으로 원본 TypeScript 소스가 브라우저에서 공개됨
 - **수정**: 해당 설정 제거 또는 `false`로 변경
 
-### H-6 — 미들웨어 파일명 오타 (CSP 미적용)
+### ✅ H-6 — 미들웨어 파일명 오타 (CSP 미적용)
 
-- **파일**: `src/app/moddleware.ts`
-- **설명**: 파일명이 `moddleware.ts` (d 두 개)로 Next.js가 미들웨어로 인식하지 못해 CSP를 포함한 보안 헤더가 실제로 전혀 적용되지 않음
-- **수정**: 파일명을 `middleware.ts`로 변경. matcher에 `/api` 경로도 포함 여부 검토
+- **파일**: `src/app/moddleware.ts` → `src/middleware.ts`
+- **설명**: 파일명이 `moddleware.ts` (d 두 개)로 Next.js가 미들웨어로 인식하지 못해 CSP가 전혀 적용되지 않았음. `d6e0b41`에서 수정 완료.
+- **현황**: CSP 활성화 후 앱 전체 인라인 스타일·스크립트 차단 이슈 발생 → H-9 참고
 
 ### H-7 — 보안 헤더 누락
 
@@ -149,6 +149,17 @@
 - **설명**: NextAuth 기본값에 의존, `sameSite` 쿠키 옵션 미명시
 - **수정**: NextAuth `cookies` 옵션에 `sameSite: 'lax'` 명시
 
+### H-9 — CSP strict 모드 미적용 (unsafe-inline 임시 허용)
+
+- **파일**: `src/middleware.ts`
+- **설명**: 앱이 CSP를 고려하지 않고 설계되어 nonce 기반 strict CSP 적용 시 인라인 스타일·스크립트가 전면 차단됨. Tiptap, KaTeX 등 서드파티 라이브러리도 인라인 스타일 사용. 현재 `'unsafe-inline'`을 임시 허용 중.
+- **현황**: 임시 완화 상태 (`script-src 'self' 'unsafe-inline'`, `style-src 'self' 'unsafe-inline'`)
+- **향후 수정**: 아래 작업 완료 후 hash 기반 static CSP로 전환
+  1. 인라인 스타일 → CSS 클래스 전환
+  2. 인라인 스크립트 제거
+  3. 서드파티 라이브러리 nonce 지원 확인
+  4. `script-src`에 hash 기반 허용 목록 적용
+
 ---
 
 ## 수정 우선순위
@@ -156,13 +167,14 @@
 | 순위 | 항목 | 비고 |
 |------|------|------|
 | 1 | C-1 시크릿 로테이션 | 즉시 |
-| 2 | H-6 미들웨어 파일명 수정 | CSP 현재 미작동 |
-| 3 | H-1 업로드 인증 추가 | |
-| 4 | H-2 MIME 타입 검증 | |
-| 5 | H-3 소유권 검증 + allowlist | |
-| 6 | H-4 좋아요 인증 추가 | |
-| 7 | H-5 소스맵 비활성화 | |
+| 2 | H-1 업로드 인증 추가 | |
+| 3 | H-2 MIME 타입 검증 | |
+| 4 | H-3 소유권 검증 + allowlist | |
+| 5 | H-4 좋아요 인증 추가 | |
+| 6 | H-5 소스맵 비활성화 | |
+| 7 | ✅ H-6 미들웨어 파일명 수정 | 완료 |
 | 8 | H-7 보안 헤더 추가 | |
 | 9 | H-8, M-6, M-7 패키지 업그레이드 | `pnpm update next axios minio` |
 | 10 | M-2 limit 상한선 | |
 | 11 | L-2 JSON-LD 이스케이프 | |
+| 12 | H-9 static CSP 전환 | 인라인 스타일·스크립트 제거 후 진행 |
