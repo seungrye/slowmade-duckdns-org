@@ -12,19 +12,28 @@ describe('middleware', () => {
     expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
   });
 
-  it('Node.js crypto 없이 Web Crypto API로 nonce를 생성한다', () => {
-    // btoa(crypto.randomUUID()) — UUID는 36자이므로 base64 결과는 48자
-    const res = middleware(makeRequest('/'));
-    const csp = res.headers.get('Content-Security-Policy') ?? '';
-    const match = csp.match(/nonce-([A-Za-z0-9+/=]+)/);
-    const nonce = match?.[1] ?? '';
-    expect(nonce).toHaveLength(48);
-    expect(() => atob(nonce)).not.toThrow();
+  it("script-src에 'unsafe-inline'을 허용한다", () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain("script-src 'self' 'unsafe-inline'");
   });
 
-  it('요청마다 다른 nonce를 생성한다', () => {
-    const csp1 = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    const csp2 = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    expect(csp1).not.toBe(csp2);
+  it("style-src에 'unsafe-inline'을 허용한다", () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+  });
+
+  it('nonce를 생성하지 않는다', () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).not.toContain('nonce-');
+  });
+
+  it('frame-ancestors를 none으로 설정한다', () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain("frame-ancestors 'none'");
+  });
+
+  it('API 경로에도 CSP를 설정한다', () => {
+    const csp = middleware(makeRequest('/api/posts')).headers.get('Content-Security-Policy');
+    expect(csp).toBeTruthy();
   });
 });
