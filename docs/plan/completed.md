@@ -28,6 +28,9 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### S8. `llms.txt` 추가 ✅
+- `public/llms.txt` — 사이트 목적, 콘텐츠 구조, 크롤 안내
+
 ### S6. Open Graph / Twitter Card + Canonical URL ✅
 - `layout.tsx` — `metadataBase(NEXTAUTH_URL)`, 전역 OG/Twitter 기본값
 - `build-post-metadata.ts` — 게시글 메타데이터 헬퍼 (테스트용 분리)
