@@ -11,7 +11,7 @@ status: plan
 `ALLOWED_MIME_TYPES = ['image/jpeg','image/png','image/gif','image/webp']` 화이트리스트 검증 추가.
 file, thumbnail 모두 검증.
 
-## H-3 — 게시글 수정 IDOR + Mass Assignment
+## H-3 — 게시글 수정 IDOR + Mass Assignment (완료)
 `src/app/api/submit/route.tsx`
 - `existingPost.userEmail !== auth.email` 소유권 검증 → 403
 - `existingPost.set(payload)` → `existingPost.set({ title, htmlContent, jsonContent, tags })`
