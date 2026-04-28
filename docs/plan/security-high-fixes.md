@@ -35,12 +35,12 @@ file, thumbnail 모두 검증.
 `next 15.3.8 → 15.5.15` (DoS 취약점 해소)
 (H-7 impl과 함께 커밋)
 
-## editor.upload.tsx 응답 파싱 버그 수정
+## ✅ editor.upload.tsx 응답 파싱 버그 수정
 `response.data.url` → `response.data.data.url` 수정.
 `apiSuccess`가 `{ success, data }` 래퍼로 반환하는데 클라이언트가 `.data.url`로 읽어 항상 undefined.
 MinIO 업로드는 성공하지만 URL이 에디터에 전달되지 않아 "No URL returned" 에러 발생.
 
-## CSP worker-src 누락 수정
+## ✅ CSP worker-src 누락 수정
 `src/middleware.ts`에 `worker-src 'self' blob:` 추가.
 `browser-image-compression`이 blob URL Web Worker를 사용하는데 `worker-src` 미설정 시
 `script-src` fallback 적용 → blob: 차단됨.
