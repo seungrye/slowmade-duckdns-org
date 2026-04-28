@@ -23,6 +23,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   await connectToDB();
   const payload = await req.json();
 
@@ -60,19 +63,16 @@ export async function POST(req: Request) {
 
     await checkAndGrantPostInteractionAchievements(payload._id);
 
-    // 로그인 사용자의 경우 likedPosts 업데이트
-    if (payload.userEmail) {
-      if (payload.likeChecked) {
-        await User.findOneAndUpdate(
-          { email: payload.userEmail },
-          { $addToSet: { likedPosts: payload._id } }
-        );
-      } else {
-        await User.findOneAndUpdate(
-          { email: payload.userEmail },
-          { $pull: { likedPosts: payload._id } }
-        );
-      }
+    if (payload.likeChecked) {
+      await User.findOneAndUpdate(
+        { email: auth.email },
+        { $addToSet: { likedPosts: payload._id } }
+      );
+    } else {
+      await User.findOneAndUpdate(
+        { email: auth.email },
+        { $pull: { likedPosts: payload._id } }
+      );
     }
 
     return apiSuccess({ likes: updatedPost.likes }, HttpStatusCode.Ok, "Like/Dislike 업데이트 성공");

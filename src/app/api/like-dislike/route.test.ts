@@ -96,8 +96,15 @@ describe('GET /api/like-dislike', () => {
 describe('POST /api/like-dislike', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ user: { email: 'user@test.com' }, expires: '' });
     mockPostFindByIdAndUpdate.mockResolvedValue({ likes: 1 });
     mockUserFindOneAndUpdate.mockResolvedValue({});
+  });
+
+  it('인증되지 않으면 401을 반환한다', async () => {
+    mockAuth.mockResolvedValue(null);
+    const res = await POST(makePostRequest({ _id: 'post123', likeChecked: true }));
+    expect(res.status).toBe(401);
   });
 
   it('_id가 없으면 400을 반환한다', async () => {
@@ -124,27 +131,30 @@ describe('POST /api/like-dislike', () => {
     expect(data.likes).toBe(5);
   });
 
-  it('로그인 사용자가 좋아요하면 likedPosts에 추가한다', async () => {
+  it('좋아요하면 세션 이메일로 likedPosts에 추가한다', async () => {
     mockPostFindByIdAndUpdate.mockResolvedValue({ likes: 1 });
-    await POST(makePostRequest({ _id: 'post123', likeChecked: true, userEmail: 'user@test.com' }));
+    await POST(makePostRequest({ _id: 'post123', likeChecked: true }));
     expect(mockUserFindOneAndUpdate).toHaveBeenCalledWith(
       { email: 'user@test.com' },
       { $addToSet: { likedPosts: 'post123' } }
     );
   });
 
-  it('로그인 사용자가 좋아요 취소하면 likedPosts에서 제거한다', async () => {
+  it('좋아요 취소하면 세션 이메일로 likedPosts에서 제거한다', async () => {
     mockPostFindByIdAndUpdate.mockResolvedValue({ likes: 0 });
-    await POST(makePostRequest({ _id: 'post123', likeChecked: false, userEmail: 'user@test.com' }));
+    await POST(makePostRequest({ _id: 'post123', likeChecked: false }));
     expect(mockUserFindOneAndUpdate).toHaveBeenCalledWith(
       { email: 'user@test.com' },
       { $pull: { likedPosts: 'post123' } }
     );
   });
 
-  it('비로그인 사용자는 likedPosts를 업데이트하지 않는다', async () => {
+  it('payload.userEmail을 무시하고 세션 이메일을 사용한다', async () => {
     mockPostFindByIdAndUpdate.mockResolvedValue({ likes: 1 });
-    await POST(makePostRequest({ _id: 'post123', likeChecked: true }));
-    expect(mockUserFindOneAndUpdate).not.toHaveBeenCalled();
+    await POST(makePostRequest({ _id: 'post123', likeChecked: true, userEmail: 'attacker@test.com' }));
+    expect(mockUserFindOneAndUpdate).toHaveBeenCalledWith(
+      { email: 'user@test.com' },
+      expect.anything()
+    );
   });
 });
