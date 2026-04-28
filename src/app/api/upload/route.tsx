@@ -1,8 +1,9 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import * as Minio from 'minio';
 import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
 import { env } from '@/lib/env';
 import { apiSuccess, apiError } from '@/lib/api-response';
+import { requireAuth } from '@/lib/require-auth';
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -13,6 +14,9 @@ const minioClient = new Minio.Client({
 })
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth();
+  if (auth instanceof NextResponse) return auth;
+
   const formData = await req.formData();
   const validation = validateUploadFormData(formData);
 
