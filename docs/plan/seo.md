@@ -6,12 +6,6 @@
 
 ## 대기
 
-### S5 + S7. 시맨틱 HTML + JSON-LD Article 스키마
-- `src/app/post/view/[[...id]]/post-view-container.tsx` — `<article>`, `<header>`, `<time>`, `<address>`
-- `src/app/post/view/[[...id]]/page.tsx` — `<script type="application/ld+json">` 삽입
-- page.tsx에서 `createdAt`, `author` 데이터를 PostViewContainer에 추가 전달 필요
-- 두 작업 모두 같은 데이터 추가가 필요하므로 함께 처리
-
 ### S6. Open Graph / Twitter Card + Canonical URL
 - `src/app/layout.tsx` — 사이트 전체 기본 OG 설정 (S4 완료 후 가능)
 - `src/app/post/view/[[...id]]/page.tsx` — 게시글별 OG 태그 + `alternates.canonical`

@@ -17,6 +17,8 @@ interface PostData {
   likes: number;
   tags: string[];
   userEmail: string;
+  author: string;
+  createdAt: string;
 }
 
 export default function PostViewContainer({ post }: { post: PostData }) {
@@ -34,11 +36,20 @@ export default function PostViewContainer({ post }: { post: PostData }) {
   }
 
   return (
-    <div className="mx-auto px-4 py-6">
-      <div className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
+    <article className="mx-auto px-4 py-6">
+      <header className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
         <div className="w-full p-3 flex justify-between items-center gap-4">
           <h1 className="font-bold md:text-lg truncate">{post.title}</h1>
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex items-center gap-3">
+            <address className="not-italic text-sm text-gray-500 dark:text-gray-400">
+              <span>{post.author}</span>
+            </address>
+            <time
+              dateTime={post.createdAt}
+              className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap"
+            >
+              {new Date(post.createdAt).toLocaleDateString('ko-KR')}
+            </time>
             <PostActions
               postId={post._id}
               authorEmail={post.userEmail}
@@ -46,7 +57,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
             />
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="border border-gray-300 dark:border-gray-700 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
         <div className="p-4 transition-all duration-300 ease-in-out flex-1">
@@ -71,6 +82,6 @@ export default function PostViewContainer({ post }: { post: PostData }) {
       <div className="mt-6">
         <Comments postId={post._id} />
       </div>
-    </div>
+    </article>
   );
 }

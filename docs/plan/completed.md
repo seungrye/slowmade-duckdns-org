@@ -28,6 +28,12 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### S5 + S7. 시맨틱 HTML + JSON-LD Article 스키마 ✅
+- `post-view-container.tsx` — `<article>`, `<header>`, `<time>`, `<address>` 적용
+- `article-json-ld.ts` — `buildArticleJsonLd` 헬퍼 추출
+- `page.tsx` — JSON-LD `<script>` 삽입, `createdAt`/`author` 전달
+- `article-json-ld.test.ts` — 7개 케이스
+
 ### S4. 루트 layout `'use client'` 분리 ✅
 - `src/components/dark-class-sync.tsx` — DarkClassSync 클라이언트 컴포넌트
 - `src/components/providers.tsx` — SessionProvider 래퍼 클라이언트 컴포넌트
