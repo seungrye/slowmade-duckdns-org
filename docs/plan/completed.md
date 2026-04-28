@@ -28,6 +28,11 @@
 ### S2. `lang="ko"` 수정 ✅
 - `src/app/layout.tsx` — `<html lang="ko">`
 
+### D4. 업적 토스트 유틸 추출 ✅
+- `src/lib/show-achievement-toast.tsx` — `showAchievementToasts()` 헬퍼
+- `writer-form.section.tsx`, `comments.section.tsx` 각 14줄 → 1줄
+- `src/lib/show-achievement-toast.test.tsx` — 5개 케이스 (fake timer 활용)
+
 ### D2. API 인증 헬퍼 추출 ✅
 - `src/lib/require-auth.ts` — `requireAuth()` 헬퍼, `instanceof NextResponse`로 조기 반환
 - 7개 API 라우트의 `auth()` + 401 패턴 교체

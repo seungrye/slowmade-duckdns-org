@@ -8,7 +8,8 @@ vi.mock('@/auth', () => ({
 import { auth } from '@/auth';
 import { requireAuth } from './require-auth';
 
-const mockAuth = vi.mocked(auth);
+// Auth.js v5의 auth는 오버로드 타입이므로 세션 반환 형태로 한정
+const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 
 describe('requireAuth', () => {
   beforeEach(() => {

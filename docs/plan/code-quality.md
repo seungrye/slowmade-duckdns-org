@@ -6,10 +6,6 @@
 
 ## 대기
 
-### D4. 업적 토스트 유틸 추출
-- `src/lib/show-achievement-toast.ts` 신규 생성
-- `writer-form.section.tsx`, `comments.section.tsx` 공통 패턴 추출
-
 ### D5. API 응답 형식 표준화
 - `src/types/api.d.ts`에 `ApiResponse<T>` 타입 정의
 - 모든 API 라우트의 성공/에러 응답 구조 통일 (`success`, `data`, `message`)

@@ -1,14 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { toast } from "react-hot-toast"; // ✅ 토스트 추가
+import { toast } from "react-hot-toast";
 import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
-import { AchievementType } from '@/models/achievement';
-import { AchievementToast } from '@/components/achievement-toast';
 import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
+import { showAchievementToasts } from '@/lib/show-achievement-toast';
 
 export default function PostWriterForm() {
     const { data: session } = useSession();
@@ -100,21 +99,7 @@ export default function PostWriterForm() {
                 const result = await response.json();
                 toast.success(_id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
-                if (result.pointsGained > 0) {
-                    toast(`✨ ${result.pointsGained} 포인트를 획득했습니다!`);
-                }
-
-                if (result.unlockedAchievements && result.unlockedAchievements.length > 0) {
-                    result.unlockedAchievements.forEach((achievement: AchievementType, index: number) => {
-                        setTimeout(() => {
-                            toast.custom((t) => (
-                                <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} transition-all duration-300`}>
-                                    <AchievementToast achievement={achievement} />
-                                </div>
-                            ), { duration: 4000, id: achievement._id });
-                        }, index * 500); // 0.5초 간격으로 토스트 표시
-                    });
-                }
+                showAchievementToasts(result);
 
                 setTimeout(() => router.push("/"), 1000); // 1초 후 홈으로 이동
             } else {
