@@ -1,6 +1,6 @@
 ---
 title: 재실 감지 토큰 QR 코드 연동
-status: plan
+status: ✅ done
 ---
 
 ## 변경 내용
