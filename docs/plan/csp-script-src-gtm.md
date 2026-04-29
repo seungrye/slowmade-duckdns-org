@@ -1,6 +1,6 @@
 ---
 title: CSP script-src 추가 — Google Tag Manager 허용
-status: plan
+status: ✅ done
 ---
 
 ## 문제
