@@ -9,3 +9,4 @@
 - [Code Quality](docs/code-quality.md) — 재사용·설계·유지보수 개선 항목
 - [SEO / AI Crawling](docs/seo-ai-crawling.md) — 검색엔진·AI 크롤링 최적화 항목
 - [Analytics](docs/analytics.md) — Firebase Analytics 이벤트 목록, DebugView vs Events 탭 차이
+- [Android 재실 감지 앱](docs/android-presence-app.md) — Kotlin 앱 구현 가이드 (API 명세 포함)

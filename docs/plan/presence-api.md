@@ -1,6 +1,6 @@
 ---
 title: 재실 감지 API + 차트 페이지
-status: plan
+status: ✅ done
 ---
 
 ## 개요
