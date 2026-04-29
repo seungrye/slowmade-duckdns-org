@@ -1,0 +1,16 @@
+# 시크릿 / 환경변수
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+
+# 인증서 / 키
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 기타 민감 파일
+secrets/
+credentials/
