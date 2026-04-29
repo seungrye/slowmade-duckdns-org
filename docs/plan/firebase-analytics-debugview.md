@@ -1,6 +1,6 @@
 ---
 title: Firebase Analytics DebugView 활성화 + 이벤트 보강
-status: plan
+status: ✅ done
 ---
 
 ## 변경 내용
