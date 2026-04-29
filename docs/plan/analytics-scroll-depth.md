@@ -1,6 +1,6 @@
 ---
 title: Analytics scroll_depth 이벤트 추가
-status: plan
+status: ✅ done
 ---
 
 ## 목적
