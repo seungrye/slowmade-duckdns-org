@@ -8,19 +8,56 @@ status: plan
 루트에 흩어진 Next.js 코드를 `webapp/` 이하로 이동하고 `android/` 디렉터리를 신설해
 하나의 레포에서 웹앱과 Android 앱을 함께 관리한다.
 
+## 현재 루트 파일 전수 조사
+
+```
+# git mv 대상 (webapp/으로 이동)
+src/
+public/
+package.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+next.config.ts
+tsconfig.json
+postcss.config.mjs        # tailwind.config.ts 는 없음 — postcss에 통합
+vitest.config.ts
+vitest.d.ts
+eslint.config.mjs
+components.json
+next-env.d.ts
+.env.local.example
+.vscode/                  # vitest.enable 설정 → webapp/ 기준이어야 동작
+copilot-instructions.md
+.gitignore                # webapp/.gitignore 로 이동 (Next.js 전용)
+
+# gitignore 대상 — 이동 불필요 (재생성/재설치)
+node_modules/
+.next/
+tsconfig.tsbuildinfo
+
+# 루트 유지
+.git/
+.claude/                  # Claude Code 훅 — working dir 기준
+.claudeignore             # 루트 유지하되 경로 패턴 업데이트 필요
+CLAUDE.md
+README.md
+docs/
+scripts/                  # 빈 디렉터리 — git mv 대신 mkdir로 재생성
+```
+
 ## 최종 디렉터리 구조
 
 ```
 site/
-├── webapp/                  ← Next.js 앱 (현재 루트에서 이동)
+├── webapp/
 │   ├── src/
 │   ├── public/
+│   ├── .vscode/
 │   ├── package.json
 │   ├── pnpm-lock.yaml
 │   ├── pnpm-workspace.yaml
 │   ├── next.config.ts
 │   ├── tsconfig.json
-│   ├── tailwind.config.ts
 │   ├── postcss.config.mjs
 │   ├── vitest.config.ts
 │   ├── vitest.d.ts
@@ -28,22 +65,25 @@ site/
 │   ├── components.json
 │   ├── next-env.d.ts
 │   ├── .env.local.example
-│   ├── .gitignore           ← 루트에서 이동 (Next.js 전용 항목)
+│   ├── .gitignore
 │   └── copilot-instructions.md
-├── android/                 ← Android 앱 (신규)
-├── docs/                    ← 공유 문서 (그대로)
-├── .claude/                 ← 훅 (경로만 수정)
+├── android/
+├── docs/
+├── .claude/
+├── .claudeignore          ← 경로 패턴 업데이트
 ├── CLAUDE.md
 ├── README.md
-└── .gitignore               ← Android 아티팩트만 남김 (신규 작성)
+└── .gitignore             ← Android 아티팩트 전용으로 교체
 ```
 
 ## 단계별 작업
 
 ### 0단계: 사전 확인
 
-- `pnpm test` 전부 통과 확인
-- 미커밋 변경 없음 확인 (`git status`)
+```bash
+pnpm test      # 전체 통과 확인
+git status     # clean 확인
+```
 
 ### 1단계: git mv로 파일 이동
 
@@ -52,37 +92,40 @@ site/
 ```bash
 mkdir webapp
 
-git mv src              webapp/src
-git mv public           webapp/public
-git mv package.json     webapp/package.json
-git mv pnpm-lock.yaml   webapp/pnpm-lock.yaml
-git mv pnpm-workspace.yaml webapp/pnpm-workspace.yaml
-git mv next.config.ts   webapp/next.config.ts
-git mv tsconfig.json    webapp/tsconfig.json
-git mv tailwind.config.ts webapp/tailwind.config.ts
-git mv postcss.config.mjs webapp/postcss.config.mjs
-git mv vitest.config.ts webapp/vitest.config.ts
-git mv vitest.d.ts      webapp/vitest.d.ts
-git mv eslint.config.mjs webapp/eslint.config.mjs
-git mv components.json  webapp/components.json
-git mv next-env.d.ts    webapp/next-env.d.ts
-git mv .env.local.example webapp/.env.local.example
+git mv src                  webapp/src
+git mv public               webapp/public
+git mv package.json         webapp/package.json
+git mv pnpm-lock.yaml       webapp/pnpm-lock.yaml
+git mv pnpm-workspace.yaml  webapp/pnpm-workspace.yaml
+git mv next.config.ts       webapp/next.config.ts
+git mv tsconfig.json        webapp/tsconfig.json
+git mv postcss.config.mjs   webapp/postcss.config.mjs
+git mv vitest.config.ts     webapp/vitest.config.ts
+git mv vitest.d.ts          webapp/vitest.d.ts
+git mv eslint.config.mjs    webapp/eslint.config.mjs
+git mv components.json      webapp/components.json
+git mv next-env.d.ts        webapp/next-env.d.ts
+git mv .env.local.example   webapp/.env.local.example
+git mv .vscode              webapp/.vscode
 git mv copilot-instructions.md webapp/copilot-instructions.md
+git mv .gitignore           webapp/.gitignore
 ```
 
 이동하지 않는 항목:
-- `node_modules/` — gitignore 대상, 이동 후 재설치
-- `tsconfig.tsbuildinfo`, `.next/` — gitignore 대상, 자동 재생성
-- `docs/`, `.claude/`, `CLAUDE.md`, `README.md` — 루트 유지
+- `node_modules/` — gitignore 대상, 이동 후 `pnpm install` 재실행
+- `.next/` — gitignore 대상, 자동 재생성
+- `tsconfig.tsbuildinfo` — gitignore 대상, 자동 재생성
+- `scripts/` — 빈 디렉터리라 git mv 불필요, `webapp/scripts/` 직접 생성
 
-### 2단계: .gitignore 분리
-
-**`webapp/.gitignore`** (루트에서 이동한 내용 그대로):
-- Next.js, pnpm, TypeScript 빌드 아티팩트 항목 유지
-- 경로 앞 `/`가 `webapp/.gitignore` 기준으로 동작하므로 그대로 사용 가능
-
-**루트 `.gitignore`** 를 Android 전용으로 교체:
+```bash
+mkdir webapp/scripts
 ```
+
+### 2단계: 루트 .gitignore 신규 작성
+
+`webapp/.gitignore`로 기존 Next.js 항목이 이동했으므로, 루트에는 Android 아티팩트와 공통 항목만:
+
+```gitignore
 # Android
 .gradle/
 android/.gradle/
@@ -98,56 +141,84 @@ android/local.properties
 .DS_Store
 ```
 
-### 3단계: 훅 경로 수정
+### 3단계: .claudeignore 경로 패턴 업데이트
+
+현재 `.env.local` 패턴은 루트 기준이라 `webapp/.env.local` 에 매칭 안됨.
+glob 패턴으로 교체:
+
+```
+# 시크릿 / 환경변수 (webapp/ 이하 포함)
+**/.env
+**/.env.local
+**/.env.*.local
+**/.env.production
+**/.env.production.local
+
+# 인증서 / 키
+*.pem
+*.key
+*.p12
+*.pfx
+
+# 기타 민감 파일
+secrets/
+credentials/
+```
+
+### 4단계: 훅 경로 수정
 
 `.claude/hooks/check-src-edit.sh`
 - `^$REPO/src/` → `^$REPO/webapp/src/`
 
 `.claude/hooks/check-commit-sequence.sh`
 - `grep '^src/'` → `grep '^webapp/src/'` (3곳)
-- `grep '^docs/plan/'` 는 그대로
+- `grep '^docs/plan/'` 는 그대로 유지
 
-### 4단계: docs/development.md 경로 수정
+### 5단계: docs/development.md 명령어 수정
 
-```bash
-# 변경 전              → 변경 후
-pnpm dev              → cd webapp && pnpm dev
-pnpm build            → cd webapp && pnpm build
-pnpm lint             → cd webapp && pnpm lint
-pnpm test             → cd webapp && pnpm test
-pnpm test:watch       → cd webapp && pnpm test:watch
-npx vitest run src/…  → npx vitest run webapp/src/…
-```
+| 변경 전 | 변경 후 |
+|---------|---------|
+| `pnpm dev` | `cd webapp && pnpm dev` |
+| `pnpm build` | `cd webapp && pnpm build` |
+| `pnpm lint` | `cd webapp && pnpm lint` |
+| `pnpm test` | `cd webapp && pnpm test` |
+| `pnpm test:watch` | `cd webapp && pnpm test:watch` |
+| `npx vitest run src/...` | `npx vitest run webapp/src/...` |
 
-### 5단계: android/ 디렉터리 신설
+### 6단계: android/ 디렉터리 신설
 
 ```bash
 mkdir android
 touch android/.gitkeep
 ```
 
-### 6단계: 동작 확인 후 커밋
+### 7단계: 동작 확인 후 커밋
 
 ```bash
 cd webapp
-pnpm install          # node_modules 재설치
-pnpm test             # 테스트 통과 확인
-pnpm build            # 빌드 확인 (선택)
+pnpm install      # node_modules 재설치
+pnpm test         # 테스트 전부 통과 확인
 cd ..
 git add -A
-git status            # 확인
+git status        # 확인 후
+# impl: 커밋
 ```
 
-## 사용자 수동 작업
+## 사용자 수동 작업 (커밋 후)
 
-커밋 이후 아래를 직접 수행:
+gitignore 대상이라 `git mv` 불가 — 직접 이동:
 
-1. `.env.local` 이동: `mv .env.local webapp/.env.local`
-2. `cd webapp && pnpm install` 재실행
-3. `cd webapp && pnpm dev` 로 정상 동작 최종 확인
+```bash
+mv .env.local webapp/.env.local
+cd webapp && pnpm install
+cd webapp && pnpm dev     # 정상 동작 최종 확인
+```
 
 ## 주의사항
 
 - `git mv` 사용 필수 — `cp + rm`은 이력 단절
-- 훅 수정 → git mv 순서로 진행 (훅이 먼저 업데이트되어야 impl 커밋 가능)
-- `.gitignore` 앞 `/` 는 해당 파일이 위치한 디렉터리 기준이므로 `webapp/` 이동 후에도 동일하게 동작
+- 훅 수정을 먼저 하고 git mv 진행 (훅이 `^src/` 체크하므로)
+  - 단, 훅은 Edit 도구 호출 시 체크 → Bash의 `git mv`는 훅 미적용
+  - 실제로는 순서 무관하게 Bash로 git mv 후 훅 파일 수정 가능
+- `.gitignore` 앞 `/`는 해당 파일 위치 기준이므로 `webapp/.gitignore`로 이동 후에도 동일하게 동작
+- `scripts/`는 빈 디렉터리라 git이 추적하지 않음 → `webapp/scripts/.gitkeep` 필요 또는 그냥 생략
