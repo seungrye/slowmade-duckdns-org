@@ -1,6 +1,6 @@
 ---
 title: 모노레포 구조 개편 (webapp/ + android/)
-status: plan
+status: ✅ done
 ---
 
 ## 목표
