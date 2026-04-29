@@ -1,4 +1,4 @@
-# Firebase Auth 일원화
+# Firebase Auth 일원화 ✅
 
 ## 목적
 

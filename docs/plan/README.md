@@ -44,11 +44,12 @@
 
 ## Android
 
-상세: [android-doc-fixes.md](android-doc-fixes.md)
+상세: [android-doc-fixes.md](android-doc-fixes.md), [android-firebase-auth-setup.md](android-firebase-auth-setup.md)
 
 | 항목 | 내용 |
 |------|------|
 | - | 문서 버그/누락 수정 (MainViewModel, WifiInfo, @Volatile 등) |
+| - | Firebase Auth 설정: SHA-1 등록, Google Sign-In 활성화, google-services.json 배치 |
 
 ---
 
@@ -70,3 +71,5 @@
 | 재실 감지 QR 코드 | qrcode.react, `presence://setup?token=` deep link |
 | 테마 동기화 | cookie SSR + ThemeSync(로그인 시 DB 동기화) |
 | 테마 CSS 클래스 통일 | `@custom-variant dark`, `dark:` 유틸리티 `.dark` 클래스 반응 |
+| presenceToken → Firebase Auth | QR/presenceToken 제거, Firebase ID token Bearer 인증으로 전환 |
+| Firebase Auth 일원화 | Google tokeninfo 대신 accounts:lookup — provider 확장성 확보 |
