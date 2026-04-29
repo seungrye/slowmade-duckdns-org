@@ -161,7 +161,11 @@
 - **설명**: NextAuth 기본값에 의존, `sameSite` 쿠키 옵션 미명시
 - **수정**: NextAuth `cookies` 옵션에 `sameSite: 'lax'` 명시
 
-### H-9 — CSP strict 모드 미적용 (unsafe-inline 임시 허용)
+### ✅ H-9 (1단계) — CSP script-src nonce 도입
+
+- **수정**: `script-src 'unsafe-inline'` → `'nonce-{uuid}'` 로 교체
+- **현황**: `style-src 'unsafe-inline'` 은 Tiptap 제약으로 유지
+- **원래 설명** — CSP strict 모드 미적용 (unsafe-inline 임시 허용)
 
 - **파일**: `src/middleware.ts`
 - **설명**: 앱이 CSP를 고려하지 않고 설계되어 nonce 기반 strict CSP 적용 시 인라인 스타일·스크립트가 전면 차단됨. Tiptap, KaTeX 등 서드파티 라이브러리도 인라인 스타일 사용. 현재 `'unsafe-inline'`을 임시 허용 중.
