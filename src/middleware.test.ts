@@ -12,9 +12,9 @@ describe('middleware', () => {
     expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
   });
 
-  it("script-src에 'unsafe-inline'과 cdn.jsdelivr.net을 허용한다", () => {
+  it("script-src에 'unsafe-inline'과 cdn.jsdelivr.net, googletagmanager.com을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net");
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com");
   });
 
   it("style-src에 'unsafe-inline'을 허용한다", () => {

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export function middleware(_request: NextRequest) {
   const cspHeader = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self'",
