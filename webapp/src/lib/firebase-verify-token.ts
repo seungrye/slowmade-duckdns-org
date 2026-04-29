@@ -13,8 +13,10 @@ export async function verifyFirebaseIdToken(idToken: string): Promise<string | n
       }
     );
     if (!res.ok) return null;
+
     const data = await res.json();
-    return (data.users?.[0]?.email as string) ?? null;
+    const user = data.users?.[0];
+    return (user?.email as string) ?? null;
   } catch {
     return null;
   }

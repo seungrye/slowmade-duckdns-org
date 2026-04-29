@@ -50,4 +50,18 @@ describe('verifyFirebaseIdToken', () => {
 
     expect(await verifyFirebaseIdToken('empty-users-token')).toBeNull();
   });
+
+  it('Firebase accounts:lookup 엔드포인트에 POST로 요청한다', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ users: [{ email: 'user@example.com' }] }),
+    });
+
+    await verifyFirebaseIdToken('valid-token');
+
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toContain('identitytoolkit.googleapis.com/v1/accounts:lookup');
+    expect(url).toContain('test-api-key');
+    expect(options.method).toBe('POST');
+  });
 });
