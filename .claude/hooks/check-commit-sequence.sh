@@ -2,11 +2,11 @@
 # plan → impl → report 커밋 순서를 강제합니다.
 #
 # 커밋 타입은 스테이징된 파일 위치로 판별합니다:
-#   neutral : webapp/src/ 도 docs/plan/ 도 없음
+#   neutral : webapp/ 도 android/ 도 docs/plan/ 도 없음
 #   plan    : docs/plan/ 만 있고, 추가된 줄에 ✅ 없음
-#   impl    : webapp/src/ 만 있음
+#   impl    : webapp/ 또는 android/ 만 있음
 #   report  : docs/plan/ 만 있고, 추가된 줄에 ✅ 있음
-#   mixed   : webapp/src/ + docs/plan/ 혼재 → 항상 차단
+#   mixed   : (webapp/ 또는 android/) + docs/plan/ 혼재 → 항상 차단
 
 REPO=$(git rev-parse --show-toplevel 2>/dev/null)
 
@@ -20,10 +20,18 @@ LAST=$(git -C "$REPO" log --format="%s" --max-count=100 2>/dev/null \
 
 # 스테이징된 파일 분류
 staged=$(git -C "$REPO" diff --cached --name-only 2>/dev/null)
-staged_src=$(echo "$staged"          | grep '^webapp/src/')
-staged_src_non_test=$(echo "$staged" | grep '^webapp/src/' | grep -v '\.test\.')
-staged_src_test=$(echo "$staged"     | grep '^webapp/src/' | grep '\.test\.')
-staged_plan=$(echo "$staged"         | grep '^docs/plan/')
+
+staged_src=$(echo "$staged" | grep -E '^(webapp|android)/')
+
+# 테스트 파일 판별:
+#   webapp  — *.test.ts / *.test.tsx 등 (.test. 포함)
+#   android — src/test/ 또는 src/androidTest/ 디렉터리
+staged_src_non_test=$(echo "$staged" | grep -E '^(webapp|android)/' \
+  | grep -vE '(\.test\.|/src/(android)?[Tt]est/)')
+staged_src_test=$(echo "$staged" | grep -E '^(webapp|android)/' \
+  | grep -E  '(\.test\.|/src/(android)?[Tt]est/)')
+
+staged_plan=$(echo "$staged"  | grep '^docs/plan/')
 staged_check=$(git -C "$REPO" diff --cached -- docs/plan/ 2>/dev/null | grep '^+.*✅')
 
 # 현재 커밋 타입 판별
@@ -64,6 +72,6 @@ case "$CURRENT" in
     [ "$LAST" != "impl" ] && deny "report 커밋은 impl 커밋 다음에만 가능합니다."
     ;;
   mixed)
-    deny "webapp/src/와 docs/plan/을 함께 커밋할 수 없습니다. plan/impl/report 타입을 분리하세요."
+    deny "webapp/ 또는 android/ 와 docs/plan/ 을 함께 커밋할 수 없습니다. plan/impl/report 타입을 분리하세요."
     ;;
 esac

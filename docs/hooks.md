@@ -12,9 +12,9 @@ flowchart TD
     A([작업 시작]) --> B[docs/plan/ 에 계획 작성]
     B --> C{plan 커밋}
     C -->|차단| C1["❌ impl 직후엔 report 먼저\n(impl → report 미완료)"]
-    C -->|허용| D[webapp/src/ 파일 편집]
+    C -->|허용| D[webapp/ 또는 android/ 파일 편집]
 
-    D --> E{webapp/src/ 편집 시도}
+    D --> E{webapp/ 또는 android/ 편집 시도}
     E -->|차단| E1[❌ plan 커밋이 없으면 편집 불가]
     E -->|허용| F[구현 + 테스트 작성]
 
@@ -38,13 +38,17 @@ flowchart TD
 
 | 타입 | 조건 |
 |------|------|
-| `neutral` | `webapp/src/` 도 `docs/plan/` 도 없음 |
+| `neutral` | `webapp/` 도 `android/` 도 `docs/plan/` 도 없음 |
 | `plan` | `docs/plan/` 만 있고, 추가된 줄에 `✅` 없음 |
-| `impl` | `webapp/src/` 만 있음 |
+| `impl` | `webapp/` 또는 `android/` 만 있음 |
 | `report` | `docs/plan/` 만 있고, 추가된 줄에 `✅` 있음 |
-| `mixed` | `webapp/src/` + `docs/plan/` 혼재 → 항상 차단 |
+| `mixed` | (`webapp/` 또는 `android/`) + `docs/plan/` 혼재 → 항상 차단 |
 
 `neutral` 커밋(`chore:`, `fix:` 등 설정·문서 변경)은 순서 검증 없이 항상 허용됩니다.
+
+테스트 파일 판별 기준:
+- **webapp**: `*.test.ts`, `*.test.tsx` 등 파일명에 `.test.` 포함
+- **android**: `src/test/` 또는 `src/androidTest/` 디렉터리 내 파일
 
 ---
 
@@ -77,7 +81,7 @@ flowchart LR
         D3(impl → 테스트 없으면 차단)
         D4(report → LAST≠impl 차단)
         D5(mixed → 항상 차단)
-        D6(webapp/src/ 편집 → LAST≠plan 차단)
+        D6(webapp/ 또는 android/ 편집 → LAST≠plan 차단)
     end
 ```
 
@@ -89,7 +93,7 @@ flowchart LR
 |------|--------|------|
 | `check-git-add-commit.sh` | `Bash(*git*commit*)` | `git add && git commit` 한 줄 실행 차단 |
 | `check-commit-sequence.sh` | `Bash(*git*commit*)` | plan → impl → report 순서 강제 |
-| `check-src-edit.sh` | `Edit`, `Write` | `webapp/src/` 편집은 plan 커밋 이후에만 허용 |
+| `check-src-edit.sh` | `Edit`, `Write` | `webapp/` 또는 `android/` 편집은 plan 커밋 이후에만 허용 |
 
 ---
 
