@@ -1,6 +1,6 @@
 ---
 title: CSP connect-src 추가 — Firebase Remote Config 허용
-status: plan
+status: ✅ done
 ---
 
 ## 문제
