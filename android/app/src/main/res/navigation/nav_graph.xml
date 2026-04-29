@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/landingFragment">
+
+    <fragment
+        android:id="@+id/landingFragment"
+        android:name="org.slowmade.presence.LandingFragment"
+        android:label="Landing">
+        <action
+            android:id="@+id/action_landing_to_setup"
+            app:destination="@id/setupFragment" />
+        <action
+            android:id="@+id/action_landing_to_main"
+            app:destination="@id/mainFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/setupFragment"
+        android:name="org.slowmade.presence.SetupFragment"
+        android:label="Setup">
+        <action
+            android:id="@+id/action_setup_to_main"
+            app:destination="@id/mainFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/mainFragment"
+        android:name="org.slowmade.presence.MainFragment"
+        android:label="Main">
+        <action
+            android:id="@+id/action_main_to_setup"
+            app:destination="@id/setupFragment" />
+    </fragment>
+
+</navigation>
