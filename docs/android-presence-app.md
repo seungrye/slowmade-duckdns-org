@@ -9,7 +9,10 @@
 
 ```
 [사용자 흐름]
-앱 설치 → 랜딩 화면 → 앱에서 QR 스캔 → 사이트 설정 페이지의 QR 촬영 → 자동 연결 → 메인 화면
+앱 설치 → 랜딩 화면 → QR 스캔 화면
+  → 사이트(slowmade.duckdns.org) 대시보드 → 설정 → QR 코드 생성
+  → 앱 카메라로 촬영 → Wi-Fi 이름 입력 → 저장
+  → 메인 화면 (상태 + 차트)
 
 [백그라운드 동작]
 집 Wi-Fi 연결됨 → ForegroundService 감지
@@ -55,10 +58,6 @@ Content-Type: application/json
 { "success": false, "message": "event must be \"enter\" or \"exit\"" }
 ```
 
-### GET /api/presence?days=30 — 이벤트 목록 (사이트 웹뷰용)
-
-NextAuth 세션 필요 (앱에서는 직접 호출하지 않고 웹뷰로 `/presence` 페이지 표시)
-
 ### QR 코드 연동 방법
 1. 브라우저에서 `https://slowmade.duckdns.org` 로그인
 2. 대시보드 → 설정 → "Android 앱 연동" 섹션
@@ -70,9 +69,13 @@ QR 코드에 인코딩된 값:
 presence://setup?token=<64자리_hex_토큰>
 ```
 
-**curl로 API 테스트**:
+### 차트 데이터 (현재 제약)
+`GET /api/presence`는 NextAuth 쿠키 세션 기반이라 앱에서 직접 호출 불가.
+**현재 구현**: MainFragment에서 POST 이벤트 전송만 하고, 차트는 마지막 이벤트 상태만 표시.
+**향후 개선**: 서버에 `GET /api/presence`를 Bearer 토큰도 허용하도록 수정하면 앱 네이티브 차트 가능.
+
+### curl로 API 테스트
 ```bash
-# 이벤트 전송 테스트
 curl -X POST https://slowmade.duckdns.org/api/presence \
   -H "Authorization: Bearer 여기에_토큰" \
   -H "Content-Type: application/json" \
@@ -86,7 +89,7 @@ curl -X POST https://slowmade.duckdns.org/api/presence \
 ## 3. Android 프로젝트 설정
 
 ### 3-1. 프로젝트 생성
-- Android Studio → New Project → **Empty Activity**
+- Android Studio → New Project → **Empty Views Activity**
 - Language: **Kotlin**
 - Min SDK: **API 26** (Android 8.0)
 - Package: `org.slowmade.presence`
@@ -94,6 +97,10 @@ curl -X POST https://slowmade.duckdns.org/api/presence \
 ### 3-2. 의존성 (`app/build.gradle.kts`)
 ```kotlin
 dependencies {
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.1")
+    implementation("com.google.android.material:material:1.12.0")
+
     // HTTP 클라이언트
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
@@ -101,8 +108,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // ViewModel + LiveData
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.3")
+    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.3")
 
     // 암호화 SharedPreferences (토큰 안전 저장)
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
@@ -114,11 +121,11 @@ dependencies {
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
 
-    // QR 코드 스캔 (ML Kit)
+    // QR 코드 스캔 (ML Kit + CameraX)
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
-    implementation("androidx.camera:camera-camera2:1.3.2")
-    implementation("androidx.camera:camera-lifecycle:1.3.2")
-    implementation("androidx.camera:camera-view:1.3.2")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
 }
 ```
 
@@ -133,7 +140,18 @@ dependencyResolutionManagement {
 }
 ```
 
-### 3-3. 권한 (`AndroidManifest.xml`)
+### 3-3. ProGuard 룰 (`proguard-rules.pro`)
+```
+# OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keepnames class okhttp3.internal.publicsuffix.PublicSuffixDatabase
+
+# MPAndroidChart
+-keep class com.github.mikephil.charting.** { *; }
+```
+
+### 3-4. 권한 (`AndroidManifest.xml`)
 ```xml
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -157,7 +175,7 @@ dependencyResolutionManagement {
 <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 ```
 
-### 3-4. Manifest 서비스/리시버/액티비티 등록
+### 3-5. Manifest 컴포넌트 등록
 ```xml
 <application ...>
 
@@ -191,14 +209,17 @@ dependencyResolutionManagement {
 ### 화면 흐름
 ```
 LandingFragment
-  ├─ 토큰 없음 → SetupFragment (토큰 입력)
-  └─ 토큰 있음 → MainFragment (차트)
+  ├─ 토큰 없음 → SetupFragment (QR 스캔)
+  └─ 토큰 있음 → MainFragment (상태)
 
 SetupFragment
   └─ 저장 완료 → MainFragment
+
+MainFragment
+  └─ 설정 변경 → SetupFragment
 ```
 
-Navigation Graph (`res/navigation/nav_graph.xml`):
+### Navigation Graph (`res/navigation/nav_graph.xml`)
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
@@ -206,22 +227,36 @@ Navigation Graph (`res/navigation/nav_graph.xml`):
     android:id="@+id/nav_graph"
     app:startDestination="@id/landingFragment">
 
-    <fragment android:id="@+id/landingFragment" android:name=".LandingFragment" />
-    <fragment android:id="@+id/setupFragment" android:name=".SetupFragment" />
-    <fragment android:id="@+id/mainFragment" android:name=".MainFragment">
+    <fragment android:id="@+id/landingFragment"
+        android:name=".LandingFragment"
+        android:label="Landing">
+        <action android:id="@+id/action_landing_to_setup"
+            app:destination="@id/setupFragment" />
+        <action android:id="@+id/action_landing_to_main"
+            app:destination="@id/mainFragment" />
+    </fragment>
+
+    <fragment android:id="@+id/setupFragment"
+        android:name=".SetupFragment"
+        android:label="Setup">
+        <action android:id="@+id/action_setup_to_main"
+            app:destination="@id/mainFragment" />
+    </fragment>
+
+    <fragment android:id="@+id/mainFragment"
+        android:name=".MainFragment"
+        android:label="Main">
         <action android:id="@+id/action_main_to_setup"
             app:destination="@id/setupFragment" />
     </fragment>
 
-    <action android:id="@+id/action_to_main" app:destination="@id/mainFragment" />
-    <action android:id="@+id/action_to_setup" app:destination="@id/setupFragment" />
 </navigation>
 ```
 
 ---
 
 ### 화면 1: LandingFragment
-앱 로고 + 서비스 실행 상태 확인. 토큰 유무에 따라 자동 이동.
+토큰 유무 확인 후 자동 이동.
 
 **레이아웃** (`res/layout/fragment_landing.xml`):
 ```xml
@@ -250,7 +285,6 @@ Navigation Graph (`res/navigation/nav_graph.xml`):
         android:layout_marginBottom="48dp" />
 
     <ProgressBar
-        android:id="@+id/progressBar"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content" />
 
@@ -259,14 +293,13 @@ Navigation Graph (`res/navigation/nav_graph.xml`):
 
 **코드** (`LandingFragment.kt`):
 ```kotlin
-class LandingFragment : Fragment() {
+class LandingFragment : Fragment(R.layout.fragment_landing) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val token = TokenStore.getToken(requireContext())
-        if (token != null) {
-            findNavController().navigate(R.id.action_to_main)
+        if (TokenStore.getToken(requireContext()) != null) {
+            findNavController().navigate(R.id.action_landing_to_main)
         } else {
-            findNavController().navigate(R.id.action_to_setup)
+            findNavController().navigate(R.id.action_landing_to_setup)
         }
     }
 }
@@ -302,7 +335,6 @@ class LandingFragment : Fragment() {
         android:lineSpacingExtra="4dp"
         android:layout_marginBottom="24dp" />
 
-    <!-- 카메라 미리보기 -->
     <androidx.camera.view.PreviewView
         android:id="@+id/cameraPreview"
         android:layout_width="match_parent"
@@ -317,7 +349,6 @@ class LandingFragment : Fragment() {
         android:text="QR 코드 스캔"
         android:layout_marginBottom="16dp" />
 
-    <!-- 스캔 성공 후 확인용 -->
     <TextView
         android:id="@+id/tvScanned"
         android:layout_width="match_parent"
@@ -346,7 +377,10 @@ class LandingFragment : Fragment() {
 
 **코드** (`SetupFragment.kt`):
 ```kotlin
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -356,25 +390,29 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 
-class SetupFragment : Fragment() {
+class SetupFragment : Fragment(R.layout.fragment_setup) {
 
-    private val viewModel: SetupViewModel by viewModels()
     private var scannedToken: String? = null
     private val cameraExecutor = Executors.newSingleThreadExecutor()
 
+    // 권한 요청 결과 처리 (ActivityResultLauncher 방식 — deprecated requestPermissions 대체)
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startCamera()
+            else Toast.makeText(requireContext(), "카메라 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+        }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val ctx = requireContext()
 
-        // 기존 SSID 불러오기
-        view.findViewById<EditText>(R.id.etSsid).setText(TokenStore.getSsid(ctx))
+        view.findViewById<EditText>(R.id.etSsid).setText(TokenStore.getSsid(requireContext()))
 
         view.findViewById<Button>(R.id.btnScan).setOnClickListener {
-            if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.CAMERA)
-                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 200)
+            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+                startCamera()
             } else {
-                startCamera(view)
+                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
             }
         }
 
@@ -382,79 +420,65 @@ class SetupFragment : Fragment() {
             val token = scannedToken ?: return@setOnClickListener
             val ssid = view.findViewById<EditText>(R.id.etSsid).text.toString().trim()
             if (ssid.isEmpty()) {
-                Toast.makeText(ctx, "Wi-Fi 이름을 입력하세요", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "Wi-Fi 이름을 입력하세요", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            TokenStore.saveToken(ctx, token)
-            TokenStore.saveSsid(ctx, ssid)
-            ContextCompat.startForegroundService(ctx, Intent(ctx, PresenceService::class.java))
-            findNavController().navigate(R.id.action_to_main)
+            TokenStore.saveToken(requireContext(), token)
+            TokenStore.saveSsid(requireContext(), ssid)
+            ContextCompat.startForegroundService(
+                requireContext(), Intent(requireContext(), PresenceService::class.java)
+            )
+            findNavController().navigate(R.id.action_setup_to_main)
         }
     }
 
-    private fun startCamera(view: View) {
+    private fun startCamera() {
+        val view = requireView()
         val previewView = view.findViewById<PreviewView>(R.id.cameraPreview)
         previewView.visibility = View.VISIBLE
 
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
-        cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
+        val future = ProcessCameraProvider.getInstance(requireContext())
+        future.addListener({
+            val provider = future.get()
             val preview = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
             }
-            val imageAnalysis = ImageAnalysis.Builder()
+            val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-                .also { analysis ->
-                    analysis.setAnalyzer(cameraExecutor) { imageProxy ->
-                        scanBarcode(imageProxy, view)
-                    }
-                }
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                viewLifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                preview,
-                imageAnalysis
-            )
+                .also { it.setAnalyzer(cameraExecutor, ::analyzeImage) }
+
+            provider.unbindAll()
+            provider.bindToLifecycle(viewLifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
         }, ContextCompat.getMainExecutor(requireContext()))
     }
 
     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-    private fun scanBarcode(imageProxy: ImageProxy, view: View) {
-        val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
-        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-        val scanner = BarcodeScanning.getClient()
+    private fun analyzeImage(proxy: ImageProxy) {
+        val mediaImage = proxy.image ?: run { proxy.close(); return }
+        val image = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
 
-        scanner.process(image)
+        BarcodeScanning.getClient().process(image)
             .addOnSuccessListener { barcodes ->
                 for (barcode in barcodes) {
-                    if (barcode.valueType == Barcode.TYPE_URL || barcode.valueType == Barcode.TYPE_TEXT) {
-                        val raw = barcode.rawValue ?: continue
-                        val token = parseToken(raw) ?: continue
-
-                        scannedToken = token
-                        requireActivity().runOnUiThread {
-                            view.findViewById<TextView>(R.id.tvScanned).apply {
-                                text = "✅ 스캔 완료"
-                                visibility = View.VISIBLE
-                            }
-                            view.findViewById<PreviewView>(R.id.cameraPreview).visibility = View.GONE
-                            view.findViewById<Button>(R.id.btnSave).isEnabled = true
-                        }
-                    }
+                    val raw = barcode.rawValue ?: continue
+                    val token = Uri.parse(raw).getQueryParameter("token") ?: continue
+                    scannedToken = token
+                    requireActivity().runOnUiThread { onScanSuccess() }
+                    break
                 }
             }
-            .addOnCompleteListener { imageProxy.close() }
+            .addOnCompleteListener { proxy.close() }
     }
 
-    // "presence://setup?token=<hex>" 파싱
-    private fun parseToken(raw: String): String? {
-        return try {
-            Uri.parse(raw).getQueryParameter("token")
-        } catch (e: Exception) {
-            null
+    private fun onScanSuccess() {
+        val view = requireView()
+        view.findViewById<TextView>(R.id.tvScanned).apply {
+            text = "✅ 스캔 완료"
+            visibility = View.VISIBLE
         }
+        view.findViewById<PreviewView>(R.id.cameraPreview).visibility = View.GONE
+        view.findViewById<Button>(R.id.btnSave).isEnabled = true
     }
 
     override fun onDestroyView() {
@@ -466,8 +490,12 @@ class SetupFragment : Fragment() {
 
 ---
 
-### 화면 3: MainFragment (차트 + 상태)
-현재 재실 상태 + 최근 30일 바 차트.
+### 화면 3: MainFragment (상태 표시)
+현재 재실 상태와 마지막 이벤트 시각 표시.
+
+> **참고**: 앱 네이티브 차트는 서버 GET /api/presence가 현재 NextAuth 세션 전용이라 불가.
+> 현재는 상태(재실 중/외출 중)와 마지막 기록 시각만 표시한다.
+> 차트는 기기 브라우저로 `https://slowmade.duckdns.org/presence` 접속해서 확인.
 
 **레이아웃** (`res/layout/fragment_main.xml`):
 ```xml
@@ -476,17 +504,17 @@ class SetupFragment : Fragment() {
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:gravity="center"
+    android:padding="32dp">
 
-    <!-- 상태 표시 -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="상태 확인 중..."
-        android:textSize="20sp"
+        android:textSize="28sp"
         android:textStyle="bold"
-        android:layout_marginBottom="4dp" />
+        android:layout_marginBottom="8dp" />
 
     <TextView
         android:id="@+id/tvLastEvent"
@@ -494,29 +522,29 @@ class SetupFragment : Fragment() {
         android:layout_height="wrap_content"
         android:textSize="13sp"
         android:alpha="0.6"
-        android:layout_marginBottom="24dp" />
+        android:layout_marginBottom="48dp" />
 
-    <!-- 차트 -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="일별 재실 시간 (최근 30일)"
-        android:textSize="14sp"
-        android:textStyle="bold"
+        android:text="차트는 브라우저에서 확인하세요"
+        android:textSize="12sp"
+        android:alpha="0.4"
         android:layout_marginBottom="8dp" />
 
-    <com.github.mikephil.charting.charts.BarChart
-        android:id="@+id/barChart"
-        android:layout_width="match_parent"
-        android:layout_height="220dp"
-        android:layout_marginBottom="24dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="slowmade.duckdns.org/presence"
+        android:textSize="12sp"
+        android:alpha="0.4"
+        android:layout_marginBottom="48dp" />
 
-    <!-- 설정으로 이동 -->
     <Button
         android:id="@+id/btnSettings"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="토큰 설정 변경"
+        android:text="토큰 재설정"
         style="@style/Widget.AppCompat.Button.Borderless" />
 
 </LinearLayout>
@@ -524,19 +552,17 @@ class SetupFragment : Fragment() {
 
 **코드** (`MainFragment.kt`):
 ```kotlin
-class MainFragment : Fragment() {
+class MainFragment : Fragment(R.layout.fragment_main) {
 
     private val viewModel: MainViewModel by viewModels()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val token = TokenStore.getToken(requireContext()) ?: run {
-            findNavController().navigate(R.id.action_to_setup)
+        if (TokenStore.getToken(requireContext()) == null) {
+            findNavController().navigate(R.id.action_main_to_setup)
             return
         }
-
-        viewModel.load(token)
 
         viewModel.status.observe(viewLifecycleOwner) { status ->
             view.findViewById<TextView>(R.id.tvStatus).text =
@@ -544,49 +570,92 @@ class MainFragment : Fragment() {
         }
 
         viewModel.lastEventTime.observe(viewLifecycleOwner) { time ->
-            view.findViewById<TextView>(R.id.tvLastEvent).text = "마지막 기록: $time"
-        }
-
-        viewModel.dailySummary.observe(viewLifecycleOwner) { summary ->
-            renderChart(view.findViewById(R.id.barChart), summary)
+            view.findViewById<TextView>(R.id.tvLastEvent).text =
+                if (time != null) "마지막 기록: $time" else ""
         }
 
         view.findViewById<Button>(R.id.btnSettings).setOnClickListener {
             findNavController().navigate(R.id.action_main_to_setup)
         }
     }
-
-    private fun renderChart(chart: BarChart, summary: List<DailyEntry>) {
-        val entries = summary.mapIndexed { i, d ->
-            BarEntry(i.toFloat(), d.minutes / 60f)
-        }
-        val labels = summary.map { it.date.substring(5) } // "04-30" 형식
-
-        val dataSet = BarDataSet(entries, "재실 시간(h)").apply {
-            color = android.graphics.Color.parseColor("#6366f1")
-            valueTextSize = 9f
-        }
-
-        chart.apply {
-            data = BarData(dataSet)
-            xAxis.valueFormatter = IndexAxisValueFormatter(labels)
-            xAxis.position = XAxis.XAxisPosition.BOTTOM
-            xAxis.granularity = 1f
-            axisRight.isEnabled = false
-            description.isEnabled = false
-            legend.isEnabled = false
-            animateY(500)
-            invalidate()
-        }
-    }
 }
-
-data class DailyEntry(val date: String, val minutes: Int)
 ```
 
 ---
 
-## 5. 핵심 유틸리티 코드
+## 5. ViewModel
+
+### MainViewModel.kt
+```kotlin
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.*
+
+class MainViewModel : ViewModel() {
+
+    private val _status = MutableLiveData<String>("unknown")
+    val status: LiveData<String> = _status
+
+    private val _lastEventTime = MutableLiveData<String?>()
+    val lastEventTime: LiveData<String?> = _lastEventTime
+
+    // 앱 내 마지막 이벤트를 메모리에 보관
+    // (GET /api/presence가 NextAuth 세션 기반이라 직접 조회 불가)
+    fun onEventSent(event: String) {
+        _status.postValue(event)
+        val formatted = SimpleDateFormat("MM/dd HH:mm", Locale.KOREA).format(Date())
+        _lastEventTime.postValue(formatted)
+    }
+}
+```
+
+> PresenceService가 이벤트를 전송할 때 `MainViewModel`에 직접 접근할 수 없다.
+> 대신 `LocalBroadcastManager` 또는 SharedPreferences로 마지막 이벤트를 공유한다.
+> 가장 단순한 방법: `TokenStore`에 `lastEvent`, `lastEventTime` 추가.
+
+**TokenStore에 추가**:
+```kotlin
+private const val KEY_LAST_EVENT = "last_event"
+private const val KEY_LAST_EVENT_TIME = "last_event_time"
+
+fun saveLastEvent(context: Context, event: String) {
+    val time = System.currentTimeMillis().toString()
+    prefs(context).edit()
+        .putString(KEY_LAST_EVENT, event)
+        .putString(KEY_LAST_EVENT_TIME, time)
+        .apply()
+}
+
+fun getLastEvent(context: Context): String? =
+    prefs(context).getString(KEY_LAST_EVENT, null)
+
+fun getLastEventTime(context: Context): Long? =
+    prefs(context).getString(KEY_LAST_EVENT_TIME, null)?.toLongOrNull()
+```
+
+**MainViewModel 수정** (TokenStore에서 읽기):
+```kotlin
+fun load(context: Context) {
+    viewModelScope.launch(Dispatchers.IO) {
+        val event = TokenStore.getLastEvent(context)
+        val timeMs = TokenStore.getLastEventTime(context)
+        _status.postValue(event ?: "unknown")
+        if (timeMs != null) {
+            val formatted = SimpleDateFormat("MM/dd HH:mm", Locale.KOREA).format(Date(timeMs))
+            _lastEventTime.postValue(formatted)
+        }
+    }
+}
+```
+
+---
+
+## 6. 핵심 유틸리티 코드
 
 ### TokenStore.kt — 암호화 저장소
 ```kotlin
@@ -598,6 +667,8 @@ object TokenStore {
     private const val FILE_NAME = "presence_secure_prefs"
     private const val KEY_TOKEN = "presence_token"
     private const val KEY_SSID = "target_ssid"
+    private const val KEY_LAST_EVENT = "last_event"
+    private const val KEY_LAST_EVENT_TIME = "last_event_time"
 
     private fun prefs(context: Context) = EncryptedSharedPreferences.create(
         context,
@@ -619,6 +690,19 @@ object TokenStore {
     fun getSsid(context: Context): String? =
         prefs(context).getString(KEY_SSID, null)
 
+    fun saveLastEvent(context: Context, event: String) {
+        prefs(context).edit()
+            .putString(KEY_LAST_EVENT, event)
+            .putString(KEY_LAST_EVENT_TIME, System.currentTimeMillis().toString())
+            .apply()
+    }
+
+    fun getLastEvent(context: Context): String? =
+        prefs(context).getString(KEY_LAST_EVENT, null)
+
+    fun getLastEventTime(context: Context): Long? =
+        prefs(context).getString(KEY_LAST_EVENT_TIME, null)?.toLongOrNull()
+
     fun clear(context: Context) =
         prefs(context).edit().clear().apply()
 }
@@ -629,7 +713,6 @@ object TokenStore {
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import org.json.JSONArray
 import org.json.JSONObject
 
 object PresenceApi {
@@ -658,19 +741,8 @@ object PresenceApi {
             false
         }
     }
-
-    fun fetchSummary(token: String): Pair<String?, List<DailyEntry>> {
-        // 차트 데이터는 웹뷰로 보여주거나, 별도 인증 방식 필요
-        // 현재 GET /api/presence는 NextAuth 세션 필요 → 앱에서 직접 호출 불가
-        // 대안: 웹뷰로 /presence 페이지 표시, 또는 토큰 기반 GET 엔드포인트 추가
-        return Pair(null, emptyList())
-    }
 }
 ```
-
-> **참고**: GET /api/presence는 NextAuth 세션 기반이라 앱에서 직접 호출 불가.
-> 차트를 앱에서 네이티브로 보여주려면 서버에 토큰 기반 GET 엔드포인트를 추가해야 한다.
-> 당장은 WebView로 `/presence` 페이지를 띄우거나, 차트 없이 상태만 표시하는 것도 방법이다.
 
 ### PresenceService.kt — Wi-Fi 감지 백그라운드 서비스
 ```kotlin
@@ -678,7 +750,7 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.net.*
-import android.net.wifi.WifiManager
+import android.net.wifi.WifiInfo
 import android.os.Build
 import android.os.IBinder
 import kotlinx.coroutines.*
@@ -689,9 +761,9 @@ class PresenceService : Service() {
     private lateinit var networkCallback: ConnectivityManager.NetworkCallback
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // 빠른 연결/해제 중복 방지 (debounce)
-    private var lastEventTime = 0L
-    private var lastEventType = ""
+    // @Volatile — NetworkCallback 스레드와 코루틴이 동시 접근하므로 필수
+    @Volatile private var lastEventType = ""
+    @Volatile private var lastEventTime = 0L
     private val DEBOUNCE_MS = 3000L
 
     override fun onCreate() {
@@ -704,11 +776,17 @@ class PresenceService : Service() {
     private fun registerCallback() {
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
 
         networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                val ssid = getConnectedSsid()
+
+            // onCapabilitiesChanged: SSID가 안정적으로 읽히는 시점 (onAvailable보다 안전)
+            override fun onCapabilitiesChanged(
+                network: Network,
+                capabilities: NetworkCapabilities
+            ) {
+                val ssid = getSsidFromCapabilities(capabilities) ?: return
                 val targetSsid = TokenStore.getSsid(applicationContext) ?: return
                 if (ssid == targetSsid) sendEvent("enter", ssid)
             }
@@ -722,28 +800,35 @@ class PresenceService : Service() {
         connectivityManager.registerNetworkCallback(request, networkCallback)
     }
 
-    private fun sendEvent(event: String, ssid: String) {
-        val now = System.currentTimeMillis()
-        // 동일 이벤트 3초 이내 중복 무시
-        if (event == lastEventType && now - lastEventTime < DEBOUNCE_MS) return
-        lastEventTime = now
-        lastEventType = event
-
-        val token = TokenStore.getToken(applicationContext) ?: return
-        scope.launch {
-            var retries = 0
-            while (retries < 3) {
-                val success = PresenceApi.sendEvent(token, event, ssid)
-                if (success) break
-                retries++
-                delay(5000L * retries) // 5초, 10초, 15초 재시도
-            }
+    private fun getSsidFromCapabilities(capabilities: NetworkCapabilities): String? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ 방식
+            val wifiInfo = capabilities.transportInfo as? WifiInfo ?: return null
+            wifiInfo.ssid.removeSurrounding("\"").takeIf { it != "<unknown ssid>" }
+        } else {
+            // Android 9 이하 (deprecated이지만 API 26 min이므로 필요)
+            @Suppress("DEPRECATION")
+            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as android.net.wifi.WifiManager
+            @Suppress("DEPRECATION")
+            wm.connectionInfo.ssid.removeSurrounding("\"").takeIf { it != "<unknown ssid>" }
         }
     }
 
-    private fun getConnectedSsid(): String {
-        val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as WifiManager
-        return wifiManager.connectionInfo.ssid.removeSurrounding("\"")
+    private fun sendEvent(event: String, ssid: String) {
+        val now = System.currentTimeMillis()
+        if (event == lastEventType && now - lastEventTime < DEBOUNCE_MS) return
+        lastEventType = event
+        lastEventTime = now
+
+        val token = TokenStore.getToken(applicationContext) ?: return
+        TokenStore.saveLastEvent(applicationContext, event) // MainFragment 표시용
+
+        scope.launch {
+            repeat(3) { attempt ->
+                if (PresenceApi.sendEvent(token, event, ssid)) return@launch
+                delay(5000L * (attempt + 1)) // 5초, 10초, 15초
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
@@ -759,10 +844,8 @@ class PresenceService : Service() {
     private fun buildNotification(): Notification {
         val channelId = "presence_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId, "재실 감지", NotificationManager.IMPORTANCE_LOW
-            )
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            NotificationChannel(channelId, "재실 감지", NotificationManager.IMPORTANCE_LOW)
+                .also { getSystemService(NotificationManager::class.java).createNotificationChannel(it) }
         }
         return Notification.Builder(this, channelId)
             .setContentTitle("재실 감지 실행 중")
@@ -785,112 +868,43 @@ import androidx.core.content.ContextCompat
 
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val token = TokenStore.getToken(context)
-            if (token != null) {
-                ContextCompat.startForegroundService(
-                    context, Intent(context, PresenceService::class.java)
-                )
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED
+            && TokenStore.getToken(context) != null) {
+            ContextCompat.startForegroundService(
+                context, Intent(context, PresenceService::class.java)
+            )
+        }
+    }
+}
+```
+
+### MainActivity.kt
+```kotlin
+import androidx.activity.result.contract.ActivityResultContracts
+
+class MainActivity : AppCompatActivity() {
+
+    private val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+        requestRequiredPermissions()
+    }
+
+    private fun requestRequiredPermissions() {
+        val perms = buildList {
+            add(android.Manifest.permission.CAMERA)
+            if (Build.VERSION.SDK_INT >= 33) {
+                add(android.Manifest.permission.NEARBY_WIFI_DEVICES)
+            } else {
+                add(android.Manifest.permission.ACCESS_FINE_LOCATION)
             }
-        }
+        }.toTypedArray()
+        permissionLauncher.launch(perms)
     }
 }
-```
-
-### ViewModel 예시 (`SetupViewModel.kt`)
-```kotlin
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-
-class SetupViewModel : ViewModel() {
-    fun testConnection(token: String, callback: (Boolean) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val success = PresenceApi.sendEvent(token, "enter", "test")
-            launch(Dispatchers.Main) { callback(success) }
-        }
-    }
-}
-```
-
----
-
-## 6. 주의사항 및 트러블슈팅
-
-### SSID가 `<unknown ssid>` 로 읽히는 경우
-- Android 8.1+: `ACCESS_FINE_LOCATION` 권한 런타임 허용 필요
-- Android 13+: `NEARBY_WIFI_DEVICES` 권한 런타임 허용 필요
-- 권한 없이는 SSID 읽기 불가
-
-**권한 런타임 요청** (MainActivity에 추가):
-```kotlin
-private fun requestPermissions() {
-    val perms = buildList {
-        // QR 스캔용 카메라
-        add(android.Manifest.permission.CAMERA)
-        // SSID 읽기
-        if (Build.VERSION.SDK_INT >= 33) {
-            add(android.Manifest.permission.NEARBY_WIFI_DEVICES)
-        } else {
-            add(android.Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-    }.toTypedArray()
-    ActivityCompat.requestPermissions(this, perms, 100)
-}
-```
-
-### 배터리 최적화로 서비스가 죽는 경우
-설정 → 앱 → 이 앱 → 배터리 → "제한 없음" 선택.
-또는 앱에서 안내:
-```kotlin
-val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-    data = Uri.parse("package:${packageName}")
-}
-startActivity(intent)
-```
-
-### enter/exit가 연속으로 중복 발생하는 경우
-- PresenceService의 `DEBOUNCE_MS = 3000L` 값 조절
-- 서버는 중복 저장을 허용하므로 앱에서 막아야 함
-
-### 차트를 앱에서 네이티브로 보고 싶다면
-GET /api/presence가 현재 NextAuth 세션 기반이라 앱에서 직접 호출 불가.
-서버에 토큰 기반 GET 엔드포인트를 추가해야 한다:
-```
-GET /api/presence?days=30
-Authorization: Bearer <presenceToken>
-→ 해당 사용자 데이터만 반환
-```
-이 변경은 서버 사이드 작업이 필요하다.
-
----
-
-## 7. 파일 구조
-
-```
-app/src/main/
-├── java/org/slowmade/presence/
-│   ├── MainActivity.kt
-│   ├── LandingFragment.kt
-│   ├── SetupFragment.kt
-│   ├── MainFragment.kt
-│   ├── SetupViewModel.kt
-│   ├── MainViewModel.kt
-│   ├── PresenceService.kt
-│   ├── BootReceiver.kt
-│   ├── PresenceApi.kt
-│   ├── TokenStore.kt
-│   └── DailyEntry.kt
-├── res/
-│   ├── layout/
-│   │   ├── activity_main.xml       ← NavHostFragment 포함
-│   │   ├── fragment_landing.xml
-│   │   ├── fragment_setup.xml
-│   │   └── fragment_main.xml
-│   └── navigation/
-│       └── nav_graph.xml
-└── AndroidManifest.xml
 ```
 
 ### activity_main.xml (NavHost)
@@ -912,35 +926,68 @@ app/src/main/
 </FrameLayout>
 ```
 
-### MainActivity.kt
-```kotlin
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-        requestPermissions()
-    }
+---
 
-    private fun requestPermissions() {
-        val perms = if (Build.VERSION.SDK_INT >= 33) {
-            arrayOf(android.Manifest.permission.NEARBY_WIFI_DEVICES)
-        } else {
-            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
-        }
-        ActivityCompat.requestPermissions(this, perms, 100)
-    }
+## 7. 주의사항 및 트러블슈팅
+
+### SSID가 `<unknown ssid>` 로 읽히는 경우
+- 위치/Wi-Fi 권한이 런타임에 허용되지 않은 경우
+- `onCapabilitiesChanged` 사용해도 권한 없으면 `<unknown ssid>` 반환
+- MainActivity에서 권한 요청 후 재시도 유도
+
+### 배터리 최적화로 서비스가 죽는 경우
+```kotlin
+val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+    data = Uri.parse("package:${packageName}")
 }
+startActivity(intent)
+```
+설정에서 직접: 배터리 → 앱 → 이 앱 → "제한 없음"
+
+### enter/exit가 중복 발생하는 경우
+`PresenceService.DEBOUNCE_MS` 값(기본 3000ms)을 늘린다.
+서버는 중복 이벤트를 그대로 저장하므로 앱에서 반드시 막아야 한다.
+
+### Android 9(API 28) 이하에서 SSID 읽기
+`WifiManager.connectionInfo`가 deprecated이지만 API 26이 min SDK이므로 분기 처리 필요.
+`getSsidFromCapabilities()` 코드가 이미 분기 처리되어 있다.
+
+---
+
+## 8. 파일 구조
+
+```
+app/src/main/
+├── java/org/slowmade/presence/
+│   ├── MainActivity.kt
+│   ├── LandingFragment.kt
+│   ├── SetupFragment.kt
+│   ├── MainFragment.kt
+│   ├── MainViewModel.kt
+│   ├── PresenceService.kt
+│   ├── BootReceiver.kt
+│   ├── PresenceApi.kt
+│   └── TokenStore.kt          ← DailyEntry 불필요 (차트 미구현)
+├── res/
+│   ├── layout/
+│   │   ├── activity_main.xml
+│   │   ├── fragment_landing.xml
+│   │   ├── fragment_setup.xml
+│   │   └── fragment_main.xml
+│   └── navigation/
+│       └── nav_graph.xml
+├── proguard-rules.pro
+└── AndroidManifest.xml
 ```
 
 ---
 
-## 8. 개발 순서 권장
+## 9. 개발 순서 권장
 
-1. Android Studio 프로젝트 생성 + 의존성 추가
+1. 프로젝트 생성 + 의존성/ProGuard 설정
 2. `TokenStore`, `PresenceApi` 구현
-3. `SetupFragment` + 연결 테스트 버튼으로 서버 통신 확인
-4. `PresenceService` 구현 + 수동 테스트 (서비스 직접 시작)
-5. Wi-Fi 연결/해제 테스트 (실제 공유기 or 핫스팟 켜고 끄기)
-6. `LandingFragment` → `MainFragment` 차트 구현
-7. `BootReceiver` 추가 + 재부팅 후 자동 시작 확인
-8. 배터리 최적화 예외 설정 안내 추가
+3. `SetupFragment` QR 스캔 → curl로 서버 통신 확인
+4. `PresenceService` 구현 → 수동으로 서비스 시작해서 Wi-Fi 연결/해제 테스트
+5. `LandingFragment` → `MainFragment` 상태 표시 연결
+6. `BootReceiver` + 재부팅 테스트
+7. 배터리 최적화 예외 설정 안내 추가
