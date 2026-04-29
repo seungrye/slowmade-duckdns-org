@@ -37,5 +37,36 @@
 
 | 항목 | 내용 |
 |------|------|
-| D3 | `src/lib/api-client.ts` — fetch 클라이언트 통일 |
+| D3 | `webapp/src/lib/api-client.ts` — fetch 클라이언트 통일 |
 | T1 잔여 | 업적 시스템 / API 라우트 추가 테스트 |
+
+---
+
+## Android
+
+상세: [android-doc-fixes.md](android-doc-fixes.md)
+
+| 항목 | 내용 |
+|------|------|
+| - | 문서 버그/누락 수정 (MainViewModel, WifiInfo, @Volatile 등) |
+
+---
+
+## 완료된 작업
+
+| 작업 | 요약 |
+|------|------|
+| 모노레포 구조 개편 | Next.js → `webapp/`, Android → `android/` 분리 |
+| Firebase Analytics 연동 | `pnpm add firebase`, page_view 이벤트, layout.tsx 추가 |
+| Firebase Analytics DebugView | `initializeAnalytics` + debug_mode, page_title/location 파라미터 |
+| Firebase Performance 연동 | `getFirebasePerformance()` 싱글턴, FirebasePerformance 컴포넌트 |
+| Analytics scroll_depth | 25/50/75/100% 구간 이벤트, PostScrollDepth 컴포넌트 |
+| CSP connect-src (Firebase Analytics) | firebase.googleapis.com 외 3개 도메인 허용 |
+| CSP connect-src (Remote Config) | firebaseremoteconfig.googleapis.com 허용 |
+| CSP script-src (GTM) | www.googletagmanager.com 허용 |
+| H-9 unsafe-inline 복원 | Next.js RSC nonce 미적용 한계로 nonce 방식 롤백 |
+| 재실 감지 API + 차트 | Presence 모델/API, Recharts 바 차트 페이지 |
+| 재실 감지 다중 사용자 | presenceToken 기반 인증, 사용자별 이벤트 분리 |
+| 재실 감지 QR 코드 | qrcode.react, `presence://setup?token=` deep link |
+| 테마 동기화 | cookie SSR + ThemeSync(로그인 시 DB 동기화) |
+| 테마 CSS 클래스 통일 | `@custom-variant dark`, `dark:` 유틸리티 `.dark` 클래스 반응 |
