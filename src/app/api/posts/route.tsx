@@ -6,8 +6,8 @@ import { apiSuccess } from '@/lib/api-response';
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
 
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '9', 10);
+  const page = Math.max(parseInt(searchParams.get('page') || '1', 10), 1);
+  const limit = Math.min(parseInt(searchParams.get('limit') || '9', 10), 50);
   const email = searchParams.get('email') || null;
 
   const rawSort = searchParams.get('sort') || 'latest'; // 기본값 'latest'로 설정

@@ -32,6 +32,12 @@ export async function POST(req: Request) {
     return apiError("모든 필드를 입력해주세요.", HttpStatusCode.BadRequest);
   }
 
+  const htmlBytes = Buffer.byteLength(payload.htmlContent ?? '', 'utf8');
+  const jsonBytes = Buffer.byteLength(JSON.stringify(payload.jsonContent ?? {}), 'utf8');
+  if (htmlBytes > 2 * 1024 * 1024 || jsonBytes > 2 * 1024 * 1024) {
+    return apiError("게시글 본문이 너무 큽니다. (최대 2MB)", HttpStatusCode.PayloadTooLarge);
+  }
+
   try {
     let unlockedAchievements: HydratedDocument<AchievementType>[] = [];
     let pointsGained = 0;
@@ -66,7 +72,7 @@ export async function POST(req: Request) {
       // Grant points for new post
       await User.findOneAndUpdate({ email: payload.userEmail }, { $inc: { points: POINTS_FOR_NEW_POST } });
       pointsGained = POINTS_FOR_NEW_POST;
-      console.log(`+${pointsGained} points granted to ${payload.userEmail} for new post.`);
+      console.log(`+${pointsGained} points granted for new post.`);
 
       // 새 글 작성 후, 글 개수 관련 업적 확인
       unlockedAchievements = await checkAndGrantPostCountAchievements(payload.userEmail);

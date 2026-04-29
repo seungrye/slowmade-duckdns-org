@@ -94,6 +94,20 @@ describe('POST /api/submit', () => {
     expect(mockPost.save).not.toHaveBeenCalled();
   });
 
+  it('htmlContent가 2MB를 초과하면 413을 반환한다 (M-3)', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
+    const oversized = 'x'.repeat(2 * 1024 * 1024 + 1);
+    const res = await POST(makeRequest({ userEmail: 'a@test.com', title: 'T', jsonContent: '{}', htmlContent: oversized }));
+    expect(res.status).toBe(413);
+  });
+
+  it('jsonContent가 2MB를 초과하면 413을 반환한다 (M-3)', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
+    const oversized = { data: 'x'.repeat(2 * 1024 * 1024 + 1) };
+    const res = await POST(makeRequest({ userEmail: 'a@test.com', title: 'T', jsonContent: oversized }));
+    expect(res.status).toBe(413);
+  });
+
   it('수정 시 허용된 필드만 set에 전달된다 (Mass Assignment 방지)', async () => {
     mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
     const mockPost = {

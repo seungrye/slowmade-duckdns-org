@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
             // Grant points for new comment
             await User.findOneAndUpdate({ email: userEmail }, { $inc: { points: POINTS_FOR_NEW_COMMENT } });
             pointsGained = POINTS_FOR_NEW_COMMENT;
-            console.log(`+${pointsGained} point granted to ${userEmail} for new comment.`);
+            console.log(`+${pointsGained} point granted for new comment.`);
             
             unlockedAchievements = await checkAndGrantCommentCountAchievements(userEmail);
         }

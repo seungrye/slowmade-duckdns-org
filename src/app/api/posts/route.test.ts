@@ -50,4 +50,16 @@ describe('GET /api/posts', () => {
     // SortOptionSchema.safeParse 실패 시 data=undefined → getPaginatedPosts에 undefined 전달
     expect(getPaginatedPosts).toHaveBeenCalledWith(1, 9, undefined, null, true);
   });
+
+  it('limit이 50을 초과하면 50으로 제한된다 (M-2)', async () => {
+    (getPaginatedPosts as ReturnType<typeof vi.fn>).mockResolvedValue({ posts: [], total: 0 });
+    await GET(makeRequest({ limit: '100000' }));
+    expect(getPaginatedPosts).toHaveBeenCalledWith(1, 50, expect.anything(), null, true);
+  });
+
+  it('page가 0 이하이면 1로 제한된다 (M-2)', async () => {
+    (getPaginatedPosts as ReturnType<typeof vi.fn>).mockResolvedValue({ posts: [], total: 0 });
+    await GET(makeRequest({ page: '-5' }));
+    expect(getPaginatedPosts).toHaveBeenCalledWith(1, 9, expect.anything(), null, true);
+  });
 });

@@ -48,4 +48,14 @@ describe('buildArticleJsonLd', () => {
     const result = buildArticleJsonLd({ ...base, createdAt: '2024-01-15T10:00:00Z' });
     expect(result.datePublished).toBe('2024-01-15T10:00:00.000Z');
   });
+
+  it('직렬화 시 HTML 특수문자를 유니코드로 이스케이프한다 (L-2 XSS)', () => {
+    const result = buildArticleJsonLd({ ...base, title: '</script><script>alert(1)</script>' });
+    const serialized = JSON.stringify(result)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e')
+      .replace(/&/g, '\\u0026');
+    expect(serialized).not.toContain('</script>');
+    expect(serialized).toContain('\\u003c/script\\u003e');
+  });
 });
