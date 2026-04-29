@@ -1,6 +1,6 @@
 ---
 title: 재실 감지 다중 사용자 지원 + 빌드 오류 수정
-status: plan
+status: ✅ done
 ---
 
 ## 빌드 오류 수정
