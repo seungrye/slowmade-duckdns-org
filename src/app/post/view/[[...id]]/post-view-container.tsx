@@ -9,6 +9,7 @@ import PostActions from './post-actions.section';
 import RevisionHistorySection from './revision-history.section';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import PostScrollDepth from '@/components/post-scroll-depth';
 
 interface PostData {
   _id: string;
@@ -37,6 +38,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
 
   return (
     <article className="mx-auto px-4 py-6">
+      <PostScrollDepth postId={post._id} postTitle={post.title} />
       <header className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
         <div className="w-full p-3 flex justify-between items-center gap-4">
           <h1 className="font-bold md:text-lg truncate">{post.title}</h1>
