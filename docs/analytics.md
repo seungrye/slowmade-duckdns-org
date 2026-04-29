@@ -27,18 +27,18 @@ Firebase Analytics에는 이벤트를 보는 곳이 두 군데 있고, 동작 �
 ### `page_view`
 - **발생 시점**: 페이지 이동 시마다
 - **파라미터**: `page_path`, `page_title`, `page_location`
-- **구현**: `src/components/firebase-analytics.tsx`
+- **구현**: `webapp/src/components/firebase-analytics.tsx`
 
 ### `scroll_depth`
 - **발생 시점**: 포스트 페이지에서 25%, 50%, 75%, 100% 스크롤 도달 시
 - **파라미터**: `percent_scrolled`, `post_id`, `post_title`
 - **특징**: 구간당 페이지 방문 1회만 전송 (중복 없음)
-- **구현**: `src/components/post-scroll-depth.tsx`
+- **구현**: `webapp/src/components/post-scroll-depth.tsx`
 
 ### Performance Monitoring (자동 수집)
 - **수집 항목**: 페이지 로드 시간(FCP, FID), 네트워크 요청 타이밍(fetch/XHR)
 - **확인 위치**: Firebase Console → Performance
-- **구현**: `src/components/firebase-performance.tsx`
+- **구현**: `webapp/src/components/firebase-performance.tsx`
 - **참고**: Analytics와 달리 별도 이벤트 전송 없이 SDK 초기화만으로 자동 수집
 
 ## Events 탭에서 확인하는 법

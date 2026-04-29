@@ -128,31 +128,31 @@
 
 ### 3.1 페이지 라우트
 
-- `src/app/page.tsx` — 홈 (게시글 목록)
-- `src/app/post/view/[[...id]]/page.tsx` — 게시글 상세
-- `src/app/post/write/[[...id]]/page.tsx` — 게시글 작성/수정
-- `src/app/tags/page.tsx` — 태그 클라우드
-- `src/app/tags/[tag]/page.tsx` — 태그별 게시글 목록
-- `src/app/dashboard/*` — 사용자 대시보드
-- `src/app/login/page.tsx` — 로그인
+- `webapp/src/app/page.tsx` — 홈 (게시글 목록)
+- `webapp/src/app/post/view/[[...id]]/page.tsx` — 게시글 상세
+- `webapp/src/app/post/write/[[...id]]/page.tsx` — 게시글 작성/수정
+- `webapp/src/app/tags/page.tsx` — 태그 클라우드
+- `webapp/src/app/tags/[tag]/page.tsx` — 태그별 게시글 목록
+- `webapp/src/app/dashboard/*` — 사용자 대시보드
+- `webapp/src/app/login/page.tsx` — 로그인
 
 ### 3.2 주요 컴포넌트
 
-- `src/components/rich-web-editor/editor.tsx` — TipTap 에디터 (이미지 업로드 포함)
-- `src/components/rich-web-editor/viewer.tsx` — 게시글 뷰어
-- `src/components/post-item.tsx` — 게시글 목록 아이템
-- `src/components/achievement-toast.tsx` — 업적 획득 알림
-- `src/components/ui/` — UI 프리미티브 컴포넌트 (Button, Card, Input, Badge); variant 설정은 `.variants.ts`로 분리
-- `src/components/post-content-preview.tsx` — `RichContentViewer` 동적 래퍼; 카드 목록에서 본문 프리뷰 표시용 (로딩 스켈레톤 포함)
-- `src/app/tags/[tag]/tag-post-list.tsx` — 태그 검색 결과 페이지용 카드 토글 클라이언트 컴포넌트
+- `webapp/src/components/rich-web-editor/editor.tsx` — TipTap 에디터 (이미지 업로드 포함)
+- `webapp/src/components/rich-web-editor/viewer.tsx` — 게시글 뷰어
+- `webapp/src/components/post-item.tsx` — 게시글 목록 아이템
+- `webapp/src/components/achievement-toast.tsx` — 업적 획득 알림
+- `webapp/src/components/ui/` — UI 프리미티브 컴포넌트 (Button, Card, Input, Badge); variant 설정은 `.variants.ts`로 분리
+- `webapp/src/components/post-content-preview.tsx` — `RichContentViewer` 동적 래퍼; 카드 목록에서 본문 프리뷰 표시용 (로딩 스켈레톤 포함)
+- `webapp/src/app/tags/[tag]/tag-post-list.tsx` — 태그 검색 결과 페이지용 카드 토글 클라이언트 컴포넌트
 
 ### 3.3 공통 라이브러리
 
-- `src/lib/db.tsx` — MongoDB 싱글턴 연결 (`connectToDB()`)
-- `src/lib/posts.tsx` — 게시글/태그/조회수/삭제 도메인 로직
-- `src/lib/achievements.tsx` — 업적 정의 및 자동 부여 로직
-- `src/lib/revisions.tsx` — 게시글 개정 이력
-- `src/lib/cn.ts` — `clsx` + `tailwind-merge` 기반 클래스 병합 유틸리티
+- `webapp/src/lib/db.tsx` — MongoDB 싱글턴 연결 (`connectToDB()`)
+- `webapp/src/lib/posts.tsx` — 게시글/태그/조회수/삭제 도메인 로직
+- `webapp/src/lib/achievements.tsx` — 업적 정의 및 자동 부여 로직
+- `webapp/src/lib/revisions.tsx` — 게시글 개정 이력
+- `webapp/src/lib/cn.ts` — `clsx` + `tailwind-merge` 기반 클래스 병합 유틸리티
 
 ## 4. 데이터 흐름
 

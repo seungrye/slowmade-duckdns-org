@@ -11,9 +11,9 @@ Handmade Site는 유머형 콘텐츠 작성과 공유에 초점을 둔 웹 플�
 - **모놀리식 웹 애플리케이션**: 프론트엔드와 백엔드가 동일한 Next.js 애플리케이션 내에 존재
 - **서버 사이드 렌더링(SSR)**: 대부분 페이지가 서버 컴포넌트로 렌더링되고, 데이터는 서버에서 조회됨
 - **클라이언트 측 인터랙션**: 리치 에디터, 댓글 제출, 좋아요/싫어요, 무한 스크롤 등은 클라이언트 컴포넌트로 처리
-- **RESTful API**: `src/app/api/*` 경로로 기능별 엔드포인트 제공
+- **RESTful API**: `webapp/src/app/api/*` 경로로 기능별 엔드포인트 제공
 - **세션 기반 인증**: `next-auth`를 사용한 Google/GitHub 로그인 및 세션 검증
-- **데이터 계층 분리**: `src/lib/*`에 공통 DB 접근 및 도메인 로직 보관
+- **데이터 계층 분리**: `webapp/src/lib/*`에 공통 DB 접근 및 도메인 로직 보관
 
 ## 3. 시스템 컨텍스트 다이어그램
 
@@ -67,7 +67,7 @@ flowchart TB
 | 분류 | 기술 |
 |---|---|
 | 프레임워크 | Next.js 15, React 19 |
-| 언어 | TypeScript (경로 별칭 `@/*` → `src/*`) |
+| 언어 | TypeScript (경로 별칭 `@/*` → `webapp/src/*`) |
 | 스타일 | Tailwind CSS 4, Sass, clsx, tailwind-merge |
 | 인증 | next-auth v4 (Google, GitHub OAuth) |
 | DB | MongoDB + Mongoose |
@@ -78,7 +78,7 @@ flowchart TB
 
 ## 6. 디자인 시스템
 
-`src/components/ui/`에 재사용 가능한 UI 프리미티브 컴포넌트를 관리한다.
+`webapp/src/components/ui/`에 재사용 가능한 UI 프리미티브 컴포넌트를 관리한다.
 
 ### 컴포넌트
 
@@ -91,8 +91,8 @@ flowchart TB
 
 ### 설계 원칙
 - **variant 설정 분리**: `button.variants.ts`, `badge.variants.ts`에 순수 TS 객체로 분리 → JSX 없이 단위 테스트 가능
-- **클래스 병합**: `src/lib/cn.ts` (`clsx` + `tailwind-merge`) — `className` props override 시 충돌 없이 병합
-- **디자인 토큰**: `src/app/globals.css` `@theme inline`에 brand 색상(`--color-brand-*`)과 `shadow-card` 토큰 추가
+- **클래스 병합**: `webapp/src/lib/cn.ts` (`clsx` + `tailwind-merge`) — `className` props override 시 충돌 없이 병합
+- **디자인 토큰**: `webapp/src/app/globals.css` `@theme inline`에 brand 색상(`--color-brand-*`)과 `shadow-card` 토큰 추가
 
 ## 7. 운영 및 환경
 
