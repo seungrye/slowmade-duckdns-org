@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export function middleware(request: NextRequest) {
-  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
-
+export function middleware(_request: NextRequest) {
   const cspHeader = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self'",
@@ -17,14 +15,7 @@ export function middleware(request: NextRequest) {
     "upgrade-insecure-requests",
   ].join('; ')
 
-  const requestHeaders = new Headers(request.headers)
-  requestHeaders.set('x-nonce', nonce)
-  requestHeaders.set('content-security-policy', cspHeader)
-
-  const response = NextResponse.next({
-    request: { headers: requestHeaders },
-  })
-
+  const response = NextResponse.next()
   response.headers.set('Content-Security-Policy', cspHeader)
   response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
   response.headers.set('X-Content-Type-Options', 'nosniff')

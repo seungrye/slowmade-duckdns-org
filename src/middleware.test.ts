@@ -12,26 +12,19 @@ describe('middleware', () => {
     expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
   });
 
-  it("script-src에 nonce를 포함하고 script-src에는 unsafe-inline이 없다", () => {
+  it("script-src에 'unsafe-inline'과 cdn.jsdelivr.net을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    const scriptSrc = csp.split(';').find(d => d.trim().startsWith('script-src')) ?? '';
-    expect(scriptSrc).toContain("'nonce-");
-    expect(scriptSrc).toContain('https://cdn.jsdelivr.net');
-    expect(scriptSrc).not.toContain("'unsafe-inline'");
-  });
-
-  it('요청마다 서로 다른 nonce를 생성한다', () => {
-    const csp1 = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    const csp2 = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    const nonce1 = csp1.match(/'nonce-([^']+)'/)?.[1];
-    const nonce2 = csp2.match(/'nonce-([^']+)'/)?.[1];
-    expect(nonce1).toBeTruthy();
-    expect(nonce1).not.toBe(nonce2);
+    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net");
   });
 
   it("style-src에 'unsafe-inline'을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
     expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+  });
+
+  it('nonce를 생성하지 않는다', () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).not.toContain('nonce-');
   });
 
   it('frame-ancestors를 none으로 설정한다', () => {
