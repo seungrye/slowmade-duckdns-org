@@ -24,8 +24,7 @@
 | H-6 | 미들웨어 파일명 오타 (`moddleware.ts`) → `middleware.ts` 로 수정 | 완료 |
 | H-7 | 보안 헤더 누락 → HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy 추가 | 완료 |
 | H-8 | next DoS 취약점 (GHSA-h25m-26qc-wcjf) → 15.5.15 업그레이드 | 완료 |
-| H-9 | CSP `script-src 'unsafe-inline'` → nonce 기반 전환 | 완료 (1단계) |
-| H-9 (2단계) | `style-src 'unsafe-inline'` 제거 — Tiptap 인라인 스타일 CSS 클래스 전환 선행 필요 | 잔여 |
+| H-9 | CSP `script-src 'unsafe-inline'` 제거 — Next.js RSC 스트리밍 스크립트에 nonce 미적용 문제로 보류. `style-src`도 Tiptap 한계로 동일. | 보류 |
 
 ---
 

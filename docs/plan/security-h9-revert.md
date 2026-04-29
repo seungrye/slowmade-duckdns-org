@@ -1,6 +1,6 @@
 ---
 title: H-9 script-src unsafe-inline 복원
-status: plan
+status: ✅ done
 ---
 
 ## 배경

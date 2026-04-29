@@ -12,7 +12,7 @@
 |------|------|----------|
 | M-1 | 익명 댓글 IP Rate Limiting | Medium |
 | L-3 | NextAuth cookies `sameSite: 'lax'` 명시 | Low |
-| H-9 2단계 | `style-src 'unsafe-inline'` 제거 (Tiptap 인라인 스타일 CSS 전환 선행) | Low |
+| H-9 | `unsafe-inline` 제거 — Next.js RSC 스크립트 nonce 미적용 + Tiptap 한계로 보류 | Low |
 | C-1 | 시크릿 로테이션 (.env.local) — 사용자 직접 수행 | Critical |
 
 ---
