@@ -88,6 +88,26 @@
 
 ## Medium
 
+### ✅ M-2 — pagination limit 상한선 없음
+
+- **파일**: `src/app/api/posts/route.tsx`
+- **수정**: `Math.min(limit, 50)`, `Math.max(page, 1)` 적용
+
+### ✅ M-3 — 게시글 본문 크기 제한 없음
+
+- **파일**: `src/app/api/submit/route.tsx`
+- **수정**: htmlContent/jsonContent 각 2MB 초과 시 413 반환
+
+### ✅ M-6 — axios DoS 취약점 (GHSA-43fc-jf86-j433)
+
+- **수정**: axios 1.13.2 → 1.15.2
+
+### ✅ M-7 — minio fast-xml-parser 취약점 (GHSA-m7jm-9gc2-mpf2)
+
+- **수정**: minio 8.0.6 → 8.0.7
+
+---
+
 ### M-1 — 익명 댓글 Rate Limiting 없음
 
 - **파일**: `src/app/api/comments/route.tsx`
@@ -126,23 +146,15 @@
 
 ## Low
 
-### L-1 — 서버 로그에 사용자 이메일 평문 기록
+### ✅ L-1 — 서버 로그에 사용자 이메일 평문 기록
 
-- **파일**: `src/app/api/submit/route.tsx:64`, `src/app/api/comments/route.tsx:82`
-- **설명**: `console.log()`로 사용자 이메일(PII) 기록
-- **수정**: 로그에서 제거하거나 마스킹 처리 (`user@***`)
+- **파일**: `src/app/api/submit/route.tsx`, `src/app/api/comments/route.tsx`
+- **수정**: `console.log`에서 이메일 변수 제거
 
-### L-2 — JSON-LD XSS
+### ✅ L-2 — JSON-LD XSS
 
-- **파일**: `src/app/post/view/[[...id]]/page.tsx:66`
-- **설명**: `JSON.stringify(jsonLd)`를 `dangerouslySetInnerHTML`로 삽입. `JSON.stringify`는 `<`, `>` 등을 이스케이프하지 않아 게시글 제목에 `</script>` 포함 시 XSS 가능
-- **수정**:
-  ```typescript
-  const safeJsonLd = JSON.stringify(jsonLd)
-    .replace(/</g, '\\u003c')
-    .replace(/>/g, '\\u003e')
-    .replace(/&/g, '\\u0026');
-  ```
+- **파일**: `src/app/post/view/[[...id]]/page.tsx`
+- **수정**: `JSON.stringify(jsonLd)` 후 `<`, `>`, `&` 유니코드 이스케이프 적용
 
 ### L-3 — CSRF 보호 미명시
 
@@ -175,6 +187,6 @@
 | 7 | ✅ H-6 미들웨어 파일명 수정 | 완료 |
 | 8 | H-7 보안 헤더 추가 | |
 | 9 | H-8, M-6, M-7 패키지 업그레이드 | `pnpm update next axios minio` |
-| 10 | M-2 limit 상한선 | |
-| 11 | L-2 JSON-LD 이스케이프 | |
+| 10 | ✅ M-2 limit 상한선 | 완료 |
+| 11 | ✅ L-2 JSON-LD 이스케이프 | 완료 |
 | 12 | H-9 static CSP 전환 | 인라인 스타일·스크립트 제거 후 진행 |
