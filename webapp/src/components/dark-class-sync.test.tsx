@@ -65,6 +65,8 @@ describe('ThemeSync', () => {
   });
 
   // 고정 테마 — prefers-color-scheme 무시
+  // dark/light 테마는 .dark 클래스 기반으로 동작 (globals.css @custom-variant dark)
+  // SSR에서 <html class="dark">로 이미 설정되므로 ThemeSync는 로그인 동기화만 담당
   describe('dark/light 테마', () => {
     beforeEach(() => {
       document.documentElement.classList.remove('dark');
@@ -75,6 +77,14 @@ describe('ThemeSync', () => {
       render(<ThemeSync initialTheme="dark" />);
 
       mq.dispatchChange(false);
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+    });
+
+    it('light 테마이면 시스템이 다크여도 dark 클래스를 추가하지 않는다', () => {
+      const mq = mockMatchMedia(true);
+      render(<ThemeSync initialTheme="light" />);
+
+      mq.dispatchChange(true);
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
   });

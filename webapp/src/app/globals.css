@@ -1,10 +1,17 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
   --font-family: Arial, Helvetica, sans-serif;
   --tw-bg-opacity: 0.95;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 @theme inline {
@@ -25,13 +32,6 @@
   --color-brand-700: var(--tt-brand-color-700);
   --color-brand-800: var(--tt-brand-color-800);
   --color-brand-900: var(--tt-brand-color-900);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
