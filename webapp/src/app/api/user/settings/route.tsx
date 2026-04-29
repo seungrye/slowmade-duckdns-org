@@ -41,7 +41,12 @@ export async function PUT(request: Request) {
       { new: true, upsert: true, projection: { settings: 1 } }
     );
 
-    return apiSuccess(updatedUser?.settings);
+    const response = apiSuccess(updatedUser?.settings);
+    response.headers.set(
+      'Set-Cookie',
+      `theme=${theme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`
+    );
+    return response;
   } catch (error) {
     console.error('Error updating user settings:', error);
     return apiError('Internal Server Error', 500);
