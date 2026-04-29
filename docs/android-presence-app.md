@@ -9,7 +9,7 @@
 
 ```
 [사용자 흐름]
-앱 설치 → 랜딩 화면 → 사이트에서 토큰 복사 → 앱에 붙여넣기 → 메인 화면
+앱 설치 → 랜딩 화면 → 앱에서 QR 스캔 → 사이트 설정 페이지의 QR 촬영 → 자동 연결 → 메인 화면
 
 [백그라운드 동작]
 집 Wi-Fi 연결됨 → ForegroundService 감지
@@ -59,11 +59,16 @@ Content-Type: application/json
 
 NextAuth 세션 필요 (앱에서는 직접 호출하지 않고 웹뷰로 `/presence` 페이지 표시)
 
-### 토큰 발급 방법 (사용자가 직접)
+### QR 코드 연동 방법
 1. 브라우저에서 `https://slowmade.duckdns.org` 로그인
-2. 대시보드 → 설정 → "Android 앱 연동 토큰" 섹션
-3. "토큰 생성" 버튼 클릭 후 복사
-4. 앱의 토큰 입력 화면에 붙여넣기
+2. 대시보드 → 설정 → "Android 앱 연동" 섹션
+3. "QR 코드 생성" 버튼 클릭
+4. 앱의 SetupFragment에서 카메라 스캔 → 토큰 자동 입력
+
+QR 코드에 인코딩된 값:
+```
+presence://setup?token=<64자리_hex_토큰>
+```
 
 **curl로 API 테스트**:
 ```bash
@@ -108,6 +113,12 @@ dependencies {
     // Navigation Component
     implementation("androidx.navigation:navigation-fragment-ktx:2.7.7")
     implementation("androidx.navigation:navigation-ui-ktx:2.7.7")
+
+    // QR 코드 스캔 (ML Kit)
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("androidx.camera:camera-camera2:1.3.2")
+    implementation("androidx.camera:camera-lifecycle:1.3.2")
+    implementation("androidx.camera:camera-view:1.3.2")
 }
 ```
 
@@ -127,6 +138,9 @@ dependencyResolutionManagement {
 <uses-permission android:name="android.permission.INTERNET" />
 <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+<!-- 카메라 (QR 스캔) -->
+<uses-permission android:name="android.permission.CAMERA" />
 
 <!-- SSID 읽기: Android 13+ -->
 <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
@@ -260,8 +274,8 @@ class LandingFragment : Fragment() {
 
 ---
 
-### 화면 2: SetupFragment (토큰 입력)
-사이트 설정 페이지에서 복사한 토큰을 붙여넣는 화면.
+### 화면 2: SetupFragment (QR 스캔)
+카메라로 사이트 설정 페이지의 QR 코드를 찍으면 토큰이 자동 입력되는 화면.
 
 **레이아웃** (`res/layout/fragment_setup.xml`):
 ```xml
@@ -283,25 +297,35 @@ class LandingFragment : Fragment() {
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="1. slowmade.duckdns.org 에 로그인\n2. 대시보드 → 설정\n3. 'Android 앱 연동 토큰' 복사\n4. 아래에 붙여넣기"
+        android:text="1. slowmade.duckdns.org 로그인\n2. 대시보드 → 설정\n3. QR 코드 생성\n4. 아래 스캔 버튼으로 촬영"
         android:textSize="14sp"
-        android:layout_marginBottom="24dp"
-        android:lineSpacingExtra="4dp" />
+        android:lineSpacingExtra="4dp"
+        android:layout_marginBottom="24dp" />
 
-    <com.google.android.material.textfield.TextInputLayout
+    <!-- 카메라 미리보기 -->
+    <androidx.camera.view.PreviewView
+        android:id="@+id/cameraPreview"
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:layout_marginBottom="12dp"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btnScan"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="인증 토큰"
-        android:layout_marginBottom="8dp">
+        android:text="QR 코드 스캔"
+        android:layout_marginBottom="16dp" />
 
-        <com.google.android.material.textfield.TextInputEditText
-            android:id="@+id/etToken"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:inputType="textVisiblePassword"
-            android:fontFamily="monospace" />
-
-    </com.google.android.material.textfield.TextInputLayout>
+    <!-- 스캔 성공 후 확인용 -->
+    <TextView
+        android:id="@+id/tvScanned"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#22c55e"
+        android:visibility="gone"
+        android:layout_marginBottom="16dp" />
 
     <EditText
         android:id="@+id/etSsid"
@@ -314,62 +338,128 @@ class LandingFragment : Fragment() {
         android:id="@+id/btnSave"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="저장 및 시작" />
-
-    <Button
-        android:id="@+id/btnTest"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="연결 테스트"
-        style="@style/Widget.AppCompat.Button.Borderless"
-        android:layout_marginTop="8dp" />
-
-    <TextView
-        android:id="@+id/tvTestResult"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:textSize="13sp" />
+        android:text="저장 및 시작"
+        android:enabled="false" />
 
 </LinearLayout>
 ```
 
 **코드** (`SetupFragment.kt`):
 ```kotlin
+import android.net.Uri
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.Executors
+
 class SetupFragment : Fragment() {
 
     private val viewModel: SetupViewModel by viewModels()
+    private var scannedToken: String? = null
+    private val cameraExecutor = Executors.newSingleThreadExecutor()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
-        // 기존 값 불러오기
         val ctx = requireContext()
-        view.findViewById<EditText>(R.id.etToken).setText(TokenStore.getToken(ctx))
+
+        // 기존 SSID 불러오기
         view.findViewById<EditText>(R.id.etSsid).setText(TokenStore.getSsid(ctx))
 
+        view.findViewById<Button>(R.id.btnScan).setOnClickListener {
+            if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.CAMERA)
+                != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 200)
+            } else {
+                startCamera(view)
+            }
+        }
+
         view.findViewById<Button>(R.id.btnSave).setOnClickListener {
-            val token = view.findViewById<EditText>(R.id.etToken).text.toString().trim()
+            val token = scannedToken ?: return@setOnClickListener
             val ssid = view.findViewById<EditText>(R.id.etSsid).text.toString().trim()
-            if (token.isEmpty() || ssid.isEmpty()) {
-                Toast.makeText(ctx, "토큰과 Wi-Fi 이름을 입력하세요", Toast.LENGTH_SHORT).show()
+            if (ssid.isEmpty()) {
+                Toast.makeText(ctx, "Wi-Fi 이름을 입력하세요", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             TokenStore.saveToken(ctx, token)
             TokenStore.saveSsid(ctx, ssid)
-            // 서비스 시작
             ContextCompat.startForegroundService(ctx, Intent(ctx, PresenceService::class.java))
             findNavController().navigate(R.id.action_to_main)
         }
+    }
 
-        view.findViewById<Button>(R.id.btnTest).setOnClickListener {
-            val token = view.findViewById<EditText>(R.id.etToken).text.toString().trim()
-            val tvResult = view.findViewById<TextView>(R.id.tvTestResult)
-            tvResult.text = "테스트 중..."
-            viewModel.testConnection(token) { success ->
-                tvResult.text = if (success) "✅ 연결 성공" else "❌ 연결 실패 (토큰 확인)"
+    private fun startCamera(view: View) {
+        val previewView = view.findViewById<PreviewView>(R.id.cameraPreview)
+        previewView.visibility = View.VISIBLE
+
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
+        cameraProviderFuture.addListener({
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(previewView.surfaceProvider)
             }
+            val imageAnalysis = ImageAnalysis.Builder()
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .build()
+                .also { analysis ->
+                    analysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                        scanBarcode(imageProxy, view)
+                    }
+                }
+            cameraProvider.unbindAll()
+            cameraProvider.bindToLifecycle(
+                viewLifecycleOwner,
+                CameraSelector.DEFAULT_BACK_CAMERA,
+                preview,
+                imageAnalysis
+            )
+        }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
+    private fun scanBarcode(imageProxy: ImageProxy, view: View) {
+        val mediaImage = imageProxy.image ?: run { imageProxy.close(); return }
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        val scanner = BarcodeScanning.getClient()
+
+        scanner.process(image)
+            .addOnSuccessListener { barcodes ->
+                for (barcode in barcodes) {
+                    if (barcode.valueType == Barcode.TYPE_URL || barcode.valueType == Barcode.TYPE_TEXT) {
+                        val raw = barcode.rawValue ?: continue
+                        val token = parseToken(raw) ?: continue
+
+                        scannedToken = token
+                        requireActivity().runOnUiThread {
+                            view.findViewById<TextView>(R.id.tvScanned).apply {
+                                text = "✅ 스캔 완료"
+                                visibility = View.VISIBLE
+                            }
+                            view.findViewById<PreviewView>(R.id.cameraPreview).visibility = View.GONE
+                            view.findViewById<Button>(R.id.btnSave).isEnabled = true
+                        }
+                    }
+                }
+            }
+            .addOnCompleteListener { imageProxy.close() }
+    }
+
+    // "presence://setup?token=<hex>" 파싱
+    private fun parseToken(raw: String): String? {
+        return try {
+            Uri.parse(raw).getQueryParameter("token")
+        } catch (e: Exception) {
+            null
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        cameraExecutor.shutdown()
     }
 }
 ```
@@ -736,11 +826,16 @@ class SetupViewModel : ViewModel() {
 **권한 런타임 요청** (MainActivity에 추가):
 ```kotlin
 private fun requestPermissions() {
-    val perms = if (Build.VERSION.SDK_INT >= 33) {
-        arrayOf(android.Manifest.permission.NEARBY_WIFI_DEVICES)
-    } else {
-        arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION)
-    }
+    val perms = buildList {
+        // QR 스캔용 카메라
+        add(android.Manifest.permission.CAMERA)
+        // SSID 읽기
+        if (Build.VERSION.SDK_INT >= 33) {
+            add(android.Manifest.permission.NEARBY_WIFI_DEVICES)
+        } else {
+            add(android.Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }.toTypedArray()
     ActivityCompat.requestPermissions(this, perms, 100)
 }
 ```
