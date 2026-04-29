@@ -42,6 +42,15 @@
 
 ---
 
+## Firebase Auth 웹 통합
+
+상세: [firebase-auth-web.md](firebase-auth-web.md)
+
+NextAuth → Firebase Auth 전환으로 웹·Android 사용자를 Firebase 콘솔에서 통합 관리.
+작업 규모가 크므로 별도 착수 시점 결정 필요.
+
+---
+
 ## Android
 
 상세: [android-doc-fixes.md](android-doc-fixes.md), [android-firebase-auth-setup.md](android-firebase-auth-setup.md)
