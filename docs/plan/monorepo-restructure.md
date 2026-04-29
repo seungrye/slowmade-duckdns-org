@@ -26,9 +26,11 @@ eslint.config.mjs
 components.json
 next-env.d.ts
 .env.local.example
-.vscode/                  # vitest.enable 설정 → webapp/ 기준이어야 동작
 copilot-instructions.md
 .gitignore                # webapp/.gitignore 로 이동 (Next.js 전용)
+
+# 루트 유지 (이동 불필요)
+.vscode/                  # 워크스페이스 전체 적용 — 루트에 두고 vitest.rootConfig 설정 추가
 
 # gitignore 대상 — 이동 불필요 (재생성/재설치)
 node_modules/
@@ -52,7 +54,6 @@ site/
 ├── webapp/
 │   ├── src/
 │   ├── public/
-│   ├── .vscode/
 │   ├── package.json
 │   ├── pnpm-lock.yaml
 │   ├── pnpm-workspace.yaml
@@ -71,6 +72,7 @@ site/
 ├── docs/
 ├── .claude/
 ├── .claudeignore          ← 경로 패턴 업데이트
+├── .vscode/               ← 루트 유지 (vitest.rootConfig 설정 추가)
 ├── CLAUDE.md
 ├── README.md
 └── .gitignore             ← Android 아티팩트 전용으로 교체
@@ -106,7 +108,6 @@ git mv eslint.config.mjs    webapp/eslint.config.mjs
 git mv components.json      webapp/components.json
 git mv next-env.d.ts        webapp/next-env.d.ts
 git mv .env.local.example   webapp/.env.local.example
-git mv .vscode              webapp/.vscode
 git mv copilot-instructions.md webapp/copilot-instructions.md
 git mv .gitignore           webapp/.gitignore
 ```
@@ -174,7 +175,19 @@ credentials/
 - `grep '^src/'` → `grep '^webapp/src/'` (3곳)
 - `grep '^docs/plan/'` 는 그대로 유지
 
-### 5단계: docs/development.md 명령어 수정
+### 5단계: .vscode/settings.json에 vitest.rootConfig 추가
+
+`.vscode/`는 루트에 유지하되, Vitest 익스텐션이 `webapp/vitest.config.ts`를 찾을 수 있도록 경로 설정 추가:
+
+```json
+{
+    "chat.tools.terminal.autoApprove": { "pnpm": true },
+    "vitest.enable": true,
+    "vitest.rootConfig": "webapp/vitest.config.ts"
+}
+```
+
+### 7단계: docs/development.md 명령어 수정
 
 | 변경 전 | 변경 후 |
 |---------|---------|
@@ -185,14 +198,14 @@ credentials/
 | `pnpm test:watch` | `cd webapp && pnpm test:watch` |
 | `npx vitest run src/...` | `npx vitest run webapp/src/...` |
 
-### 6단계: android/ 디렉터리 신설
+### 8단계: android/ 디렉터리 신설
 
 ```bash
 mkdir android
 touch android/.gitkeep
 ```
 
-### 7단계: 동작 확인 후 커밋
+### 9단계: 동작 확인 후 커밋
 
 ```bash
 cd webapp
