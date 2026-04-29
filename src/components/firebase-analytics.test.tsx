@@ -39,14 +39,18 @@ describe('FirebaseAnalytics', () => {
     });
   });
 
-  it('analytics 초기화 성공 시 page_view 이벤트를 전송한다', async () => {
+  it('analytics 초기화 성공 시 page_view 이벤트를 page_path, page_title, page_location과 함께 전송한다', async () => {
     process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID = 'G-TEST';
     render(<FirebaseAnalytics />);
     await vi.waitFor(() => {
       expect(logEvent).toHaveBeenCalledWith(
         expect.anything(),
         'page_view',
-        { page_path: '/' }
+        expect.objectContaining({
+          page_path: '/',
+          page_title: expect.any(String),
+          page_location: expect.any(String),
+        })
       );
     });
   });

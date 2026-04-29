@@ -13,7 +13,11 @@ export default function FirebaseAnalytics() {
 
     getFirebaseAnalytics().then((analytics) => {
       if (!analytics) return;
-      logEvent(analytics, 'page_view', { page_path: pathname });
+      logEvent(analytics, 'page_view', {
+        page_path: pathname,
+        page_title: document.title,
+        page_location: window.location.href,
+      });
     });
   }, [pathname]);
 

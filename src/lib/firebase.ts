@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getAnalytics, isSupported } from 'firebase/analytics';
+import { Analytics, initializeAnalytics, isSupported } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -13,7 +13,18 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-export async function getFirebaseAnalytics() {
-  if (!(await isSupported())) return null;
-  return getAnalytics(app);
+let analyticsPromise: Promise<Analytics | null> | null = null;
+
+export function getFirebaseAnalytics(): Promise<Analytics | null> {
+  if (!analyticsPromise) {
+    analyticsPromise = isSupported().then((supported) => {
+      if (!supported) return null;
+      return initializeAnalytics(app, {
+        config: {
+          debug_mode: process.env.NODE_ENV !== 'production',
+        },
+      });
+    });
+  }
+  return analyticsPromise;
 }
