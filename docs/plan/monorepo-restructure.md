@@ -187,6 +187,18 @@ credentials/
 }
 ```
 
+### 6단계: docs/ 내부 src/ 경로 참조 일괄 업데이트
+
+다음 파일에서 `src/` → `webapp/src/` 치환 (grep 결과로 확인된 파일 전체):
+
+- `docs/architecture.md` — `src/app/api/*`, `src/lib/*` 등
+- `docs/development.md` — `src/lib/__tests__/sort.test.ts`, `src/lib/*`
+- `docs/seo-ai-crawling.md` — `src/app/...` 다수
+- `docs/analytics.md` — `src/components/...`
+- `docs/SDS.md` — `src/app/...`, `src/lib/...`, `src/components/...` 다수
+- `docs/code-quality.md` — `src/lib/...`, `src/app/api/...` 다수
+- `docs/hooks.md` — `src/` 편집 설명 (`webapp/src/`로 변경)
+
 ### 7단계: docs/development.md 명령어 수정
 
 | 변경 전 | 변경 후 |
@@ -196,7 +208,7 @@ credentials/
 | `pnpm lint` | `cd webapp && pnpm lint` |
 | `pnpm test` | `cd webapp && pnpm test` |
 | `pnpm test:watch` | `cd webapp && pnpm test:watch` |
-| `npx vitest run src/...` | `npx vitest run webapp/src/...` |
+| `npx vitest run src/...` | `cd webapp && npx vitest run webapp/src/...` |
 
 ### 8단계: android/ 디렉터리 신설
 
