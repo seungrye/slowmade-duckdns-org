@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 - [Development](docs/development.md) — 명령어, 작업 규칙
+- [Hooks](docs/hooks.md) — Claude Code 훅 시스템 (plan→impl→report 순서 강제)
 - [Architecture](docs/architecture.md) — 시스템 구조, 컴포넌트 다이어그램, API 엔드포인트, 환경 변수
 - [System Design (SDS)](docs/SDS.md) — DB 스키마, 데이터 흐름, 인증 설계
 - [Requirements (SRS)](docs/SRS.md) — 기능 요구사항
