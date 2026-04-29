@@ -8,14 +8,16 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 object PresenceApi {
-    private const val BASE_URL = "https://slowmade.duckdns.org"
+    const val BASE_URL = "https://slowmade.duckdns.org"
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
     private val JSON_TYPE = "application/json".toMediaType()
 
-    fun sendEvent(token: String, event: String, ssid: String): Boolean {
+    suspend fun sendEvent(event: String, ssid: String): Boolean {
+        val idToken = AuthManager.getIdToken() ?: return false
+
         val body = JSONObject().apply {
             put("event", event)
             put("ssid", ssid)
@@ -23,7 +25,7 @@ object PresenceApi {
 
         val request = Request.Builder()
             .url("$BASE_URL/api/presence")
-            .header("Authorization", "Bearer $token")
+            .header("Authorization", AuthManager.buildAuthHeader(idToken))
             .post(body)
             .build()
 

@@ -3,68 +3,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useSession } from 'next-auth/react';
 
-import { QRCodeSVG } from 'qrcode.react';
-
-function PresenceTokenSection() {
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    fetch('/api/user/presence-token')
-      .then((r) => r.json())
-      .then(({ data }) => setToken(data.token))
-      .finally(() => setIsLoading(false));
-  }, []);
-
-  const generate = async () => {
-    setIsLoading(true);
-    const res = await fetch('/api/user/presence-token', { method: 'POST' });
-    const { data } = await res.json();
-    setToken(data.token);
-    setIsLoading(false);
-  };
-
-  const qrValue = token ? `presence://setup?token=${token}` : '';
-
-  return (
-    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 mt-6">
-      <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Android 앱 연동</h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        QR 코드를 생성한 후 Android 앱에서 카메라로 스캔하면 자동으로 연결됩니다.
-      </p>
-
-      {isLoading ? (
-        <div className="w-40 h-40 bg-gray-200 rounded animate-pulse" />
-      ) : token ? (
-        <div className="flex flex-col items-start gap-3">
-          <div className="p-3 bg-white rounded-lg border border-gray-200 inline-block">
-            <QRCodeSVG value={qrValue} size={160} />
-          </div>
-          <p className="text-xs text-gray-400">
-            앱 → 설정 → QR 스캔으로 연결하세요.
-          </p>
-          <button
-            onClick={generate}
-            className="text-sm text-red-500 hover:underline"
-          >
-            토큰 재발급 (기존 앱 연결 끊김)
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col items-start gap-3">
-          <p className="text-sm text-gray-400">토큰이 없습니다. 먼저 생성하세요.</p>
-          <button
-            onClick={generate}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-          >
-            QR 코드 생성
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
 type Theme = 'light' | 'dark' | 'system';
 
 /**
@@ -202,7 +140,6 @@ export default function SettingsPage() {
         <main className="mx-auto px-4 py-6">
             <h1 className="text-3xl font-bold mb-6 text-gray-900">설정</h1>
             <SettingsForm />
-            <PresenceTokenSection />
         </main>
     );
 }

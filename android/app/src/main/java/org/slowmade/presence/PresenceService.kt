@@ -84,12 +84,12 @@ class PresenceService : Service() {
         lastEventType = event
         lastEventTime = now
 
-        val token = TokenStore.getToken(applicationContext) ?: return
+        if (!AuthManager.isSignedIn()) return
         TokenStore.saveLastEvent(applicationContext, event)
 
         scope.launch {
             repeat(3) { attempt ->
-                if (PresenceApi.sendEvent(token, event, ssid)) return@launch
+                if (PresenceApi.sendEvent(event, ssid)) return@launch
                 delay(5_000L * (attempt + 1))
             }
         }

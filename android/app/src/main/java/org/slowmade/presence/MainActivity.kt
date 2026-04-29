@@ -18,7 +18,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestRequiredPermissions() {
         val perms = buildList {
-            add(android.Manifest.permission.CAMERA)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 add(android.Manifest.permission.NEARBY_WIFI_DEVICES)
             } else {

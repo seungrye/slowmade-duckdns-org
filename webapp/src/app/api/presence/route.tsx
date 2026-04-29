@@ -4,11 +4,7 @@ import { apiSuccess, apiError } from '@/lib/api-response';
 import { auth } from '@/auth';
 import Presence from '@/models/presence';
 import User from '@/models/user';
-
-async function getUserEmailByToken(token: string): Promise<string | null> {
-  const user = await User.findOne({ presenceToken: token }).select('email').lean();
-  return (user as { email?: string } | null)?.email ?? null;
-}
+import { verifyFirebaseIdToken } from '@/lib/firebase-verify-token';
 
 function extractBearerToken(req: NextRequest): string | null {
   const header = req.headers.get('Authorization') ?? '';
@@ -17,13 +13,16 @@ function extractBearerToken(req: NextRequest): string | null {
 }
 
 export async function POST(req: NextRequest) {
-  const token = extractBearerToken(req);
-  if (!token) return apiError('Unauthorized', 401);
+  const idToken = extractBearerToken(req);
+  if (!idToken) return apiError('Unauthorized', 401);
+
+  const userEmail = await verifyFirebaseIdToken(idToken);
+  if (!userEmail) return apiError('Unauthorized', 401);
 
   await connectToDB();
 
-  const userEmail = await getUserEmailByToken(token);
-  if (!userEmail) return apiError('Unauthorized', 401);
+  const user = await User.findOne({ email: userEmail }).select('email').lean();
+  if (!user) return apiError('Unauthorized', 401);
 
   let body: { event?: string; ssid?: string };
   try {

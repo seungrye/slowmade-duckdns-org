@@ -1,9 +1,6 @@
 package org.slowmade.presence
 
-import android.Manifest
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
@@ -11,28 +8,31 @@ import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageProxy
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.common.InputImage
-import java.util.concurrent.Executors
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 
 class SetupFragment : Fragment(R.layout.fragment_setup) {
 
-    private var scannedToken: String? = null
-    private val cameraExecutor = Executors.newSingleThreadExecutor()
-
-    private val cameraPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) startCamera()
-            else Toast.makeText(requireContext(), "카메라 권한이 필요합니다", Toast.LENGTH_SHORT).show()
+    private val signInLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                FirebaseAuth.getInstance().signInWithCredential(credential)
+                    .addOnSuccessListener { onSignInSuccess(it.user?.email) }
+                    .addOnFailureListener {
+                        Toast.makeText(requireContext(), "로그인 실패: ${it.message}", Toast.LENGTH_SHORT).show()
+                    }
+            } catch (e: ApiException) {
+                Toast.makeText(requireContext(), "Google 로그인 실패 (${e.statusCode})", Toast.LENGTH_SHORT).show()
+            }
         }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -40,24 +40,25 @@ class SetupFragment : Fragment(R.layout.fragment_setup) {
 
         view.findViewById<EditText>(R.id.etSsid).setText(TokenStore.getSsid(requireContext()))
 
-        view.findViewById<Button>(R.id.btnScan).setOnClickListener {
-            if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED
-            ) {
-                startCamera()
-            } else {
-                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-            }
+        // 이미 로그인된 경우 상태 표시
+        if (AuthManager.isSignedIn()) {
+            onSignInSuccess(AuthManager.currentEmail())
+        }
+
+        view.findViewById<Button>(R.id.btnGoogleSignIn).setOnClickListener {
+            launchGoogleSignIn()
         }
 
         view.findViewById<Button>(R.id.btnSave).setOnClickListener {
-            val token = scannedToken ?: return@setOnClickListener
+            if (!AuthManager.isSignedIn()) {
+                Toast.makeText(requireContext(), "먼저 Google 계정으로 로그인하세요", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             val ssid = view.findViewById<EditText>(R.id.etSsid).text.toString().trim()
             if (ssid.isEmpty()) {
                 Toast.makeText(requireContext(), "Wi-Fi 이름을 입력하세요", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            TokenStore.saveToken(requireContext(), token)
             TokenStore.saveSsid(requireContext(), ssid)
             ContextCompat.startForegroundService(
                 requireContext(), Intent(requireContext(), PresenceService::class.java)
@@ -66,62 +67,21 @@ class SetupFragment : Fragment(R.layout.fragment_setup) {
         }
     }
 
-    private fun startCamera() {
-        val view = requireView()
-        val previewView = view.findViewById<PreviewView>(R.id.cameraPreview)
-        previewView.visibility = View.VISIBLE
-
-        val future = ProcessCameraProvider.getInstance(requireContext())
-        future.addListener({
-            val provider = future.get()
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            val analysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .build()
-                .also { it.setAnalyzer(cameraExecutor, ::analyzeImage) }
-
-            provider.unbindAll()
-            provider.bindToLifecycle(
-                viewLifecycleOwner,
-                CameraSelector.DEFAULT_BACK_CAMERA,
-                preview,
-                analysis
-            )
-        }, ContextCompat.getMainExecutor(requireContext()))
+    private fun launchGoogleSignIn() {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        signInLauncher.launch(GoogleSignIn.getClient(requireActivity(), gso).signInIntent)
     }
 
-    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-    private fun analyzeImage(proxy: ImageProxy) {
-        val mediaImage = proxy.image ?: run { proxy.close(); return }
-        val image = InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees)
-
-        BarcodeScanning.getClient().process(image)
-            .addOnSuccessListener { barcodes ->
-                for (barcode in barcodes) {
-                    val raw = barcode.rawValue ?: continue
-                    val token = Uri.parse(raw).getQueryParameter("token") ?: continue
-                    scannedToken = token
-                    requireActivity().runOnUiThread { onScanSuccess() }
-                    break
-                }
-            }
-            .addOnCompleteListener { proxy.close() }
-    }
-
-    private fun onScanSuccess() {
+    private fun onSignInSuccess(email: String?) {
         val view = requireView()
-        view.findViewById<TextView>(R.id.tvScanned).apply {
-            text = "✅ 스캔 완료"
+        view.findViewById<TextView>(R.id.tvSignInStatus).apply {
+            text = "✅ ${email ?: "로그인 완료"}"
             visibility = View.VISIBLE
         }
-        view.findViewById<PreviewView>(R.id.cameraPreview).visibility = View.GONE
+        view.findViewById<Button>(R.id.btnGoogleSignIn).visibility = View.GONE
         view.findViewById<Button>(R.id.btnSave).isEnabled = true
-    }
-
-    override fun onDestroyView() {
-        super.onDestroyView()
-        cameraExecutor.shutdown()
     }
 }
