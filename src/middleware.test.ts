@@ -41,6 +41,7 @@ describe('middleware', () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
     expect(csp).toContain('connect-src');
     expect(csp).toContain('https://firebase.googleapis.com');
+    expect(csp).toContain('https://firebaseremoteconfig.googleapis.com');
     expect(csp).toContain('https://www.google-analytics.com');
     expect(csp).toContain('https://firebaselogging.googleapis.com');
     expect(csp).toContain('https://firebaselogging-pa.googleapis.com');
