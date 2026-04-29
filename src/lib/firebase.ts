@@ -1,5 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { Analytics, initializeAnalytics, isSupported } from 'firebase/analytics';
+import { FirebasePerformance, getPerformance } from 'firebase/performance';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -14,6 +15,16 @@ const firebaseConfig = {
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
 let analyticsPromise: Promise<Analytics | null> | null = null;
+
+let performanceInstance: FirebasePerformance | null = null;
+
+export function getFirebasePerformance(): FirebasePerformance | null {
+  if (typeof window === 'undefined') return null;
+  if (!performanceInstance) {
+    performanceInstance = getPerformance(app);
+  }
+  return performanceInstance;
+}
 
 export function getFirebaseAnalytics(): Promise<Analytics | null> {
   if (!analyticsPromise) {

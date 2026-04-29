@@ -11,7 +11,7 @@ export function middleware(_request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-    "connect-src 'self' https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://www.google-analytics.com https://analytics.google.com",
+    "connect-src 'self' https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://www.google-analytics.com https://analytics.google.com https://firebaselogging.googleapis.com https://firebaselogging-pa.googleapis.com",
     "worker-src 'self' blob:",
     "upgrade-insecure-requests",
   ].join('; ')

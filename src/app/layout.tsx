@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 import Providers from "@/components/providers";
 import DarkClassSync from "@/components/dark-class-sync";
 import FirebaseAnalytics from "@/components/firebase-analytics";
+import FirebasePerformance from "@/components/firebase-performance";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import "@/app/globals.css";
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Providers>
           <DarkClassSync />
           <FirebaseAnalytics />
+          <FirebasePerformance />
           <Navbar />
           <main className="lg:container mx-auto lg:mt-4">{children}</main>
           <Footer />
