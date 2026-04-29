@@ -1,19 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { apiSuccess, apiError } from '@/lib/api-response';
+import { auth } from '@/auth';
 import Presence from '@/models/presence';
+import User from '@/models/user';
 
-function isAuthorized(req: NextRequest): boolean {
-  const apiKey = process.env.PRESENCE_API_KEY;
-  if (!apiKey) return false;
+async function getUserEmailByToken(token: string): Promise<string | null> {
+  const user = await User.findOne({ presenceToken: token }).select('email').lean();
+  return (user as { email?: string } | null)?.email ?? null;
+}
+
+function extractBearerToken(req: NextRequest): string | null {
   const header = req.headers.get('Authorization') ?? '';
-  return header === `Bearer ${apiKey}`;
+  if (!header.startsWith('Bearer ')) return null;
+  return header.slice(7);
 }
 
 export async function POST(req: NextRequest) {
-  if (!isAuthorized(req)) {
-    return apiError('Unauthorized', 401);
-  }
+  const token = extractBearerToken(req);
+  if (!token) return apiError('Unauthorized', 401);
+
+  await connectToDB();
+
+  const userEmail = await getUserEmailByToken(token);
+  if (!userEmail) return apiError('Unauthorized', 401);
 
   let body: { event?: string; ssid?: string };
   try {
@@ -27,20 +37,24 @@ export async function POST(req: NextRequest) {
     return apiError('event must be "enter" or "exit"', 400);
   }
 
-  await connectToDB();
-
-  const doc = await Presence.create({ event, ssid });
+  const doc = await Presence.create({ event, ssid, userEmail });
   return apiSuccess({ id: doc._id.toString() }, 201);
 }
 
-export async function GET(req: NextRequest) {
-  const days = Math.min(parseInt(req.nextUrl.searchParams.get('days') ?? '30', 10), 365);
+export async function GET(_req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.email) return apiError('Unauthorized', 401);
+
+  const days = Math.min(parseInt(_req.nextUrl.searchParams.get('days') ?? '30', 10), 365);
   const since = new Date();
   since.setDate(since.getDate() - days);
 
   await connectToDB();
 
-  const events = await Presence.find({ timestamp: { $gte: since } })
+  const events = await Presence.find({
+    userEmail: session.user.email,
+    timestamp: { $gte: since },
+  })
     .sort({ timestamp: 1 })
     .lean();
 
@@ -63,10 +77,7 @@ function computeDailySummary(events: { event: string; timestamp: Date }[]) {
     }
   }
 
-  // 아직 집에 있는 경우 (exit 없음)
-  if (lastEnter) {
-    addMinutes(minutesByDate, lastEnter, new Date());
-  }
+  if (lastEnter) addMinutes(minutesByDate, lastEnter, new Date());
 
   return Object.entries(minutesByDate)
     .map(([date, minutes]) => ({ date, minutes }))
@@ -74,17 +85,14 @@ function computeDailySummary(events: { event: string; timestamp: Date }[]) {
 }
 
 function addMinutes(map: Record<string, number>, from: Date, to: Date) {
-  // 날짜를 넘어가는 경우도 날짜별로 분리
   const cursor = new Date(from);
   while (cursor < to) {
     const dateKey = cursor.toISOString().slice(0, 10);
     const endOfDay = new Date(cursor);
     endOfDay.setHours(23, 59, 59, 999);
-
     const segmentEnd = to < endOfDay ? to : endOfDay;
     const minutes = Math.round((segmentEnd.getTime() - cursor.getTime()) / 60000);
     map[dateKey] = (map[dateKey] ?? 0) + minutes;
-
     cursor.setDate(cursor.getDate() + 1);
     cursor.setHours(0, 0, 0, 0);
   }

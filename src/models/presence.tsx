@@ -4,6 +4,7 @@ const PresenceSchema = new Schema(
   {
     event: { type: String, enum: ['enter', 'exit'], required: true },
     ssid: { type: String, default: '' },
+    userEmail: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
   },
   { timestamps: true }

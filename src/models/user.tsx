@@ -27,6 +27,7 @@ const UserSchema = new mongoose.Schema(
     },
     points: { type: Number, default: 0 }, // 사용자 포인트
     likedPosts: { type: [String], default: [] }, // 좋아요한 게시글 ID 목록
+    presenceToken: { type: String, default: null }, // Android 앱 인증용 토큰
     createdAt: { type: Date, default: Date.now }, // 가입일
   },
   { timestamps: true }

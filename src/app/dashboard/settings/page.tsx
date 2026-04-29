@@ -3,6 +3,70 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useSession } from 'next-auth/react';
 
+function PresenceTokenSection() {
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/user/presence-token')
+      .then((r) => r.json())
+      .then(({ data }) => setToken(data.token))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const generate = async () => {
+    setIsLoading(true);
+    const res = await fetch('/api/user/presence-token', { method: 'POST' });
+    const { data } = await res.json();
+    setToken(data.token);
+    setIsLoading(false);
+  };
+
+  const copy = () => {
+    if (!token) return;
+    navigator.clipboard.writeText(token);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 mt-6">
+      <h2 className="text-xl font-semibold mb-2 text-gray-800 dark:text-gray-200">Android 앱 연동 토큰</h2>
+      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+        재실 감지 Android 앱에서 사용할 개인 인증 토큰입니다.
+        앱의 토큰 입력란에 이 값을 붙여넣으세요.
+      </p>
+      {isLoading ? (
+        <div className="h-10 bg-gray-200 rounded animate-pulse" />
+      ) : token ? (
+        <div className="flex items-center gap-2">
+          <code className="flex-1 text-xs bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded font-mono break-all">
+            {token}
+          </code>
+          <button
+            onClick={copy}
+            className="px-3 py-2 text-sm bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors whitespace-nowrap"
+          >
+            {copied ? '복사됨' : '복사'}
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400 mb-3">토큰이 없습니다.</p>
+      )}
+      <button
+        onClick={generate}
+        className="mt-3 text-sm text-blue-600 hover:underline"
+      >
+        {token ? '토큰 재발급' : '토큰 생성'}
+      </button>
+      {token && (
+        <p className="text-xs text-gray-400 mt-1">재발급 시 기존 앱 연결이 끊깁니다.</p>
+      )}
+    </div>
+  );
+}
+
 type Theme = 'light' | 'dark' | 'system';
 
 /**
@@ -140,6 +204,7 @@ export default function SettingsPage() {
         <main className="mx-auto px-4 py-6">
             <h1 className="text-3xl font-bold mb-6 text-gray-900">설정</h1>
             <SettingsForm />
+            <PresenceTokenSection />
         </main>
     );
 }

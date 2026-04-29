@@ -1,11 +1,10 @@
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
 import { connectToDB } from '@/lib/db';
 import Presence from '@/models/presence';
 import PresenceChart from './presence-chart';
 
-interface DailySummary {
-  date: string;
-  minutes: number;
-}
+interface DailySummary { date: string; minutes: number; }
 
 function computeDailySummary(events: { event: string; timestamp: Date }[]): DailySummary[] {
   const minutesByDate: Record<string, number> = {};
@@ -43,24 +42,39 @@ function addMinutes(map: Record<string, number>, from: Date, to: Date) {
 }
 
 export default async function PresencePage() {
+  const session = await auth();
+  if (!session?.user?.email) redirect('/login');
+
   await connectToDB();
 
   const since = new Date();
   since.setDate(since.getDate() - 30);
 
-  const events = await Presence.find({ timestamp: { $gte: since } })
+  const events = await Presence.find({
+    userEmail: session.user.email,
+    timestamp: { $gte: since },
+  })
     .sort({ timestamp: 1 })
     .lean();
 
-  const dailySummary = computeDailySummary(
-    events as { event: string; timestamp: Date }[]
-  );
-
+  const dailySummary = computeDailySummary(events as { event: string; timestamp: Date }[]);
   const recentEvents = [...events].reverse().slice(0, 20);
+
+  const isHome = events.length > 0 &&
+    events[events.length - 1].event === 'enter';
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-      <h1 className="text-xl font-bold">재실 현황 (최근 30일)</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-bold">재실 현황 (최근 30일)</h1>
+        <span className={`text-sm px-3 py-1 rounded-full font-medium ${
+          isHome
+            ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
+            : 'bg-gray-100 text-gray-500 dark:bg-gray-800'
+        }`}>
+          {isHome ? '재실 중' : '외출 중'}
+        </span>
+      </div>
 
       <section>
         <h2 className="text-sm font-semibold text-gray-500 mb-3">일별 재실 시간</h2>
