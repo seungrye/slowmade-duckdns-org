@@ -1,4 +1,4 @@
-# Firebase Auth 기반 Presence 인증 전환
+# Firebase Auth 기반 Presence 인증 전환 ✅
 
 ## 배경
 
