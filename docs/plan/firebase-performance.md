@@ -1,6 +1,6 @@
 ---
 title: Firebase Performance Monitoring 연동
-status: plan
+status: ✅ done
 ---
 
 ## 변경 내용

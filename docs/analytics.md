@@ -35,6 +35,12 @@ Firebase Analytics에는 이벤트를 보는 곳이 두 군데 있고, 동작 �
 - **특징**: 구간당 페이지 방문 1회만 전송 (중복 없음)
 - **구현**: `src/components/post-scroll-depth.tsx`
 
+### Performance Monitoring (자동 수집)
+- **수집 항목**: 페이지 로드 시간(FCP, FID), 네트워크 요청 타이밍(fetch/XHR)
+- **확인 위치**: Firebase Console → Performance
+- **구현**: `src/components/firebase-performance.tsx`
+- **참고**: Analytics와 달리 별도 이벤트 전송 없이 SDK 초기화만으로 자동 수집
+
 ## Events 탭에서 확인하는 법
 
 1. 프로덕션에 배포
