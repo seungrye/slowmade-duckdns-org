@@ -37,6 +37,13 @@ describe('middleware', () => {
     expect(csp).toContain("img-src 'self' blob: data: https:");
   });
 
+  it('connect-src에 Firebase와 Google Analytics 도메인을 허용한다', () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toContain('connect-src');
+    expect(csp).toContain('https://firebase.googleapis.com');
+    expect(csp).toContain('https://www.google-analytics.com');
+  });
+
   it("worker-src에 blob:을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
     expect(csp).toContain("worker-src 'self' blob:");
