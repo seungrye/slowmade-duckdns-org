@@ -1,6 +1,6 @@
 ---
 title: Firebase Analytics 연동
-status: plan
+status: ✅ done
 ---
 
 ## 변경 범위
