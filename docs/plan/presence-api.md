@@ -10,16 +10,16 @@ Android 앱이 집 Wi-Fi 연결/해제 시 서버에 이벤트를 전송.
 
 ## 변경 내용
 
-### `src/models/presence.tsx` (신규)
+### `webapp/src/models/presence.tsx` (신규)
 - event: 'enter' | 'exit'
 - ssid: string
 - timestamp: Date (서버 수신 시각)
 
-### `src/app/api/presence/route.tsx` (신규)
+### `webapp/src/app/api/presence/route.tsx` (신규)
 - POST: 이벤트 저장 (Bearer API Key 인증)
 - GET: 이벤트 목록 조회 (days 쿼리 파라미터)
 
-### `src/app/presence/page.tsx` (신규)
+### `webapp/src/app/presence/page.tsx` (신규)
 - 일별 재실 시간 바 차트 (Recharts)
 - 최근 입/출 이벤트 목록
 

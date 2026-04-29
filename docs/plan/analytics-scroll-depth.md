@@ -9,10 +9,10 @@ status: ✅ done
 
 ## 변경 내용
 
-### `src/components/post-scroll-depth.tsx` (신규)
+### `webapp/src/components/post-scroll-depth.tsx` (신규)
 - 스크롤 위치를 감지해 25%, 50%, 75%, 100% 구간마다 `scroll_depth` 이벤트 전송
 - 각 구간은 페이지당 한 번만 발생
 - 파라미터: `percent_scrolled`, `post_id`, `post_title`
 
-### `src/app/post/view/[[...id]]/post-view-container.tsx`
+### `webapp/src/app/post/view/[[...id]]/post-view-container.tsx`
 - `<PostScrollDepth>` 컴포넌트 추가

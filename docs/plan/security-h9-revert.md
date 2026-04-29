@@ -14,11 +14,11 @@ Next.js 15 App Router의 구조적 한계로 판단.
 
 ## 변경 내용
 
-### `src/middleware.ts`
+### `webapp/src/middleware.ts`
 - `script-src 'nonce-${nonce}'` → `'unsafe-inline'` 복원
 - nonce 생성 코드 및 request header 설정 제거
 
-### `src/middleware.test.ts`
+### `webapp/src/middleware.test.ts`
 - nonce 관련 테스트 → `unsafe-inline` 검증으로 교체
 
 ### `docs/plan/security.md`

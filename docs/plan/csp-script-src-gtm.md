@@ -10,6 +10,6 @@ Firebase Analytics SDK가 `https://www.googletagmanager.com/gtag/js`를 동적�
 
 ## 변경 내용
 
-### `src/middleware.ts`
+### `webapp/src/middleware.ts`
 script-src 디렉티브에 추가:
 - `https://www.googletagmanager.com` — gtag.js 스크립트 로드

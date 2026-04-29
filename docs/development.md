@@ -11,8 +11,8 @@ pnpm lint         # ESLint
 pnpm test         # 전체 테스트 1회 실행 (Vitest)
 pnpm test:watch   # Vitest watch 모드
 
-# 단일 테스트 파일 실행
-npx vitest run webapp/src/lib/__tests__/sort.test.ts
+# 단일 테스트 파일 실행 (webapp/ 디렉터리 안에서 실행)
+pnpm vitest run src/lib/__tests__/sort.test.ts
 ```
 
 ## 작업 규칙

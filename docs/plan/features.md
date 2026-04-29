@@ -3,7 +3,7 @@
 ---
 
 ## #2. 작성 페이지 임시 저장
-- **파일**: `src/app/post/write/[[...id]]/writer-form.section.tsx`
+- **파일**: `webapp/src/app/post/write/[[...id]]/writer-form.section.tsx`
 - 저장 대상: 제목, 태그, 에디터 내용 (`htmlContent`, `jsonContent`), 이미지 URL 배열
 - 저장 방식: `localStorage`, draft key: `postDraft-new` / `postDraft-<postId>`
 - 트리거: `beforeunload` 이벤트 및 언마운트 시
@@ -16,23 +16,23 @@
 - 선택한 버전을 에디터에 복원하는 기능
 
 ## #4. 작성/보기 화면 전체 높이 채우기
-- `src/app/post/write/[[...id]]/writer-form.section.tsx`
-- `src/app/post/view/[[...id]]/page.tsx`
+- `webapp/src/app/post/write/[[...id]]/writer-form.section.tsx`
+- `webapp/src/app/post/view/[[...id]]/page.tsx`
 - `min-h-[480px]` → flex 레이아웃으로 화면 나머지 영역 채우기
 - 주의: `flex` 컨텍스트에서 `mx-auto`가 마진으로 동작하는 버그 고려
 
 ## #5. 태그 검색된 자료 바로보기
-- `src/app/tags/[tag]/page.tsx`
+- `webapp/src/app/tags/[tag]/page.tsx`
 - 결과 리스트 항목 전체 클릭 가능하도록 변경
 
 ## #6. 작성글 바로보기 클릭 영역 확장
-- `src/components/post-item.tsx`
+- `webapp/src/components/post-item.tsx`
 - 카드 전체를 클릭 가능하게 구성
 
 ## #7. 작성순 / 갱신순 정렬 추가
-- `src/lib/sort.tsx`에 `updated` 옵션 추가
-- `src/lib/posts.tsx`에서 `updatedAt` 정렬 지원
-- `src/app/api/user/settings/route.tsx`에 기본 정렬 설정 추가
+- `webapp/src/lib/sort.tsx`에 `updated` 옵션 추가
+- `webapp/src/lib/posts.tsx`에서 `updatedAt` 정렬 지원
+- `webapp/src/app/api/user/settings/route.tsx`에 기본 정렬 설정 추가
 
 ---
 

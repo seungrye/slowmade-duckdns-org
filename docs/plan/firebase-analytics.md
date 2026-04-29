@@ -19,11 +19,11 @@ NEXT_PUBLIC_FIREBASE_APP_ID=
 NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=
 ```
 
-### `src/lib/firebase.ts`
+### `webapp/src/lib/firebase.ts`
 - Firebase app 초기화 (싱글턴)
 - `getAnalytics` — 브라우저 환경에서만 호출 (SSR 안전 처리)
 
-### `src/components/firebase-analytics.tsx`
+### `webapp/src/components/firebase-analytics.tsx`
 - `'use client'` — Analytics는 브라우저 전용
 - `usePathname` + `useEffect` 로 Next.js 라우트 변경 시 `page_view` 이벤트 전송
 - `layout.tsx`에 추가

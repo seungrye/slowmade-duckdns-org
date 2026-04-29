@@ -10,6 +10,6 @@ Firebase Performance SDK가 내부적으로 샘플링 설정을 Remote Config에
 
 ## 변경 내용
 
-### `src/middleware.ts`
+### `webapp/src/middleware.ts`
 connect-src에 추가:
 - `https://firebaseremoteconfig.googleapis.com` — Performance SDK 설정 조회

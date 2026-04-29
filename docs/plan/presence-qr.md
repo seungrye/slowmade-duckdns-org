@@ -7,7 +7,7 @@ status: ✅ done
 
 ### `pnpm add qrcode.react`
 
-### `src/app/dashboard/settings/page.tsx`
+### `webapp/src/app/dashboard/settings/page.tsx`
 - 텍스트 토큰 표시 → QR 코드 이미지로 교체
 - QR 코드 값: `presence://setup?token=TOKEN` (deep link 형식)
 - 토큰 없으면 "토큰 생성" 버튼만 표시
