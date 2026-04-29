@@ -4,6 +4,14 @@
 
 ---
 
+## 🔄 진행중
+
+| 작업 | 상태 | 상세 |
+|------|------|------|
+| Android Firebase Auth 설정 | 코드 완료, Firebase Console 설정 대기 | [android-firebase-auth-setup.md](android-firebase-auth-setup.md) |
+
+---
+
 ## 보안
 
 상세 현황: [security.md](security.md)
