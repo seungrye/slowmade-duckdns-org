@@ -15,7 +15,11 @@ nvm use lts/iron --silent 2>/dev/null || true
 cd "$REPO/webapp" || deny "webapp 디렉터리를 찾을 수 없습니다."
 
 pnpm test >&2
-[ $? -ne 0 ] && deny "전체 테스트가 실패했습니다. 모든 테스트를 통과한 후 push하세요."
+TEST_EXIT=$?
+[ "$TEST_EXIT" -ne 0 ] && deny "전체 테스트가 실패했습니다. 모든 테스트를 통과한 후 push하세요."
 
 pnpm run build >&2
-[ $? -ne 0 ] && deny "빌드가 실패했습니다. 빌드 오류를 수정한 후 push하세요."
+BUILD_EXIT=$?
+[ "$BUILD_EXIT" -ne 0 ] && deny "빌드가 실패했습니다. 빌드 오류를 수정한 후 push하세요."
+
+exit 0

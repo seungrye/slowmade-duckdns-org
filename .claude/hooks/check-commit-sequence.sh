@@ -74,15 +74,16 @@ case "$CURRENT" in
     [ -n "$staged_src_non_test" ] && [ -z "$staged_src_test" ] && deny "impl 커밋 시 테스트 파일도 함께 커밋해야 합니다."
     # 변경된 테스트 파일 실행하여 통과 확인
     if [ -n "$staged_src_test" ]; then
-      TEST_FILES=$(echo "$staged_src_test" | grep '^webapp/' | sed 's|^webapp/||' | tr '\n' ' ')
-      if [ -n "$TEST_FILES" ]; then
+      # mapfile로 배열에 담아 [id] 같은 대괄호 경로가 bash glob 으로 오해석되지 않도록 함
+      mapfile -t TEST_FILES < <(echo "$staged_src_test" | grep '^webapp/' | sed 's|^webapp/||')
+      if [ "${#TEST_FILES[@]}" -gt 0 ]; then
         export NVM_DIR="$HOME/.nvm"
         [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" --no-use
         nvm use lts/iron --silent 2>/dev/null || true
         cd "$REPO/webapp" || deny "webapp 디렉터리를 찾을 수 없습니다."
-        # shellcheck disable=SC2086
-        pnpm exec vitest run $TEST_FILES >&2
-        [ $? -ne 0 ] && deny "테스트가 실패했습니다. 테스트를 통과한 후 커밋하세요."
+        pnpm exec vitest run "${TEST_FILES[@]}" >&2
+        VITEST_EXIT=$?
+        [ "$VITEST_EXIT" -ne 0 ] && deny "테스트가 실패했습니다. 테스트를 통과한 후 커밋하세요."
       fi
     fi
     ;;
@@ -94,3 +95,5 @@ case "$CURRENT" in
     deny "webapp/ 또는 android/ 와 docs/spec/ 을 함께 커밋할 수 없습니다. spec/impl/report 타입을 분리하세요."
     ;;
 esac
+
+exit 0
