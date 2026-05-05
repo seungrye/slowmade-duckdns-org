@@ -17,7 +17,7 @@ headers: {
 }
 ```
 
-ASCII 전용 fallback(`filename=`) 은 현대 브라우저에서 불필요하므로 생략한다.
+ASCII 전용 fallback(`filename=`) 은 현대 브라우저(Chrome/Firefox/Safari 최신)에서 불필요하므로 생략한다.
 
 ## 검증
 
