@@ -122,17 +122,17 @@
 
 ## 작업 목록
 
-- [ ] `src/types/quest.ts` — 타입 정의
-- [ ] `src/models/quest.tsx` — Quest 모델
-- [ ] `src/models/quest-revision.tsx` — QuestRevision 모델
-- [ ] `src/lib/ron.ts` — RON 파서 + 직렬화
-- [ ] `src/lib/ron.test.ts` — RON 파서 단위 테스트
-- [ ] `src/app/api/quests/route.tsx` — GET / POST
-- [ ] `src/app/api/quests/[id]/route.tsx` — GET / PUT
-- [ ] `src/app/api/quests/[id]/export/route.tsx`
-- [ ] `src/app/api/quests/[id]/import/route.tsx`
-- [ ] `src/app/api/quests/[id]/revisions/route.tsx`
-- [ ] `src/app/api/quests/[id]/revisions/[ver]/restore/route.tsx`
-- [ ] `src/app/quests/page.tsx` — 목록 페이지
-- [ ] `src/app/quests/[id]/page.tsx` — 노드 에디터
-- [ ] `src/app/quests/[id]/revisions/page.tsx` — 버전 히스토리
+- ✅ `src/types/quest.ts` — 타입 정의
+- ✅ `src/models/quest.tsx` — Quest 모델
+- ✅ `src/models/quest-revision.tsx` — QuestRevision 모델
+- ✅ `src/lib/ron.ts` — RON 파서 + 직렬화
+- ✅ `src/lib/ron.test.ts` — RON 파서 단위 테스트 (10개)
+- ✅ `src/app/api/quests/route.tsx` — GET / POST
+- ✅ `src/app/api/quests/[id]/route.tsx` — GET / PUT
+- ✅ `src/app/api/quests/[id]/export/route.tsx`
+- ✅ `src/app/api/quests/[id]/import/route.tsx`
+- ✅ `src/app/api/quests/[id]/revisions/route.tsx`
+- ✅ `src/app/api/quests/[id]/revisions/[ver]/restore/route.tsx`
+- ✅ `src/app/quests/page.tsx` — 목록 페이지
+- ✅ `src/app/quests/[id]/page.tsx` — 노드 에디터
+- ✅ `src/app/quests/[id]/revisions/page.tsx` — 버전 히스토리
