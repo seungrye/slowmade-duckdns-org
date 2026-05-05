@@ -309,6 +309,8 @@ Branch 액션을 중첩 if/else 대신 switch/case 스타일로 표시.
 - 수정 파일: `src/app/quests/page.tsx`
 - 테스트: `src/app/quests/page.test.tsx` — 그리드 클래스 존재 여부 확인
 
+✅ 완료
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
