@@ -425,6 +425,8 @@ export default function QuestEditorPage() {
               setSelectedEdgeId(null);
             }}
             onNodeDragStop={(_, __, updatedNodes) => syncPositions(updatedNodes)}
+            snapToGrid
+            snapGrid={[20, 20]}
             fitView
           >
             <Background />

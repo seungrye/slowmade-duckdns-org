@@ -5,6 +5,21 @@ import { ActionEditor } from './action-editor';
 
 const noop = vi.fn();
 
+describe('ActionEditor — AdvancePhase', () => {
+  it('AdvancePhase 액션이 페이즈 선택 드롭다운을 렌더한다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'AdvancePhase', phaseId: 'active' }]}
+        onChange={noop}
+        phaseIds={['dormant', 'active', 'done']}
+      />
+    );
+    const select = screen.getAllByRole('combobox');
+    // 타입 선택 + 페이즈 선택 드롭다운 2개
+    expect(select.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
 describe('ActionEditor — SetFlag', () => {
   it('SetFlag 액션의 두 입력 필드가 렌더된다', () => {
     render(
