@@ -323,6 +323,8 @@ Branch 액션을 중첩 if/else 대신 switch/case 스타일로 표시.
 - `page.test.tsx`: 미사용 `screen` import 제거
 - 수정 파일: `src/app/quests/page.tsx`, `src/app/quests/page.test.tsx`
 
+✅ 완료
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
