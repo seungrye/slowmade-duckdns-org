@@ -1,4 +1,4 @@
-# 퀘스트 에디터 — smoothstep 비활성화
+# ✅ 퀘스트 에디터 — smoothstep 비활성화
 
 ## 변경
 
