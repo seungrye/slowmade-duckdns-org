@@ -11,7 +11,7 @@ export type PhaseNodeData = {
   giverNpc?: string;
 };
 
-export const PhaseNode = memo(function PhaseNode({ data }: NodeProps) {
+export const PhaseNode = memo(function PhaseNode({ data, selected }: NodeProps) {
   const { phaseId, phase, isInitial, giverNpc } = data as PhaseNodeData;
   const objective = phase.objective;
 
@@ -19,7 +19,11 @@ export const PhaseNode = memo(function PhaseNode({ data }: NodeProps) {
     <div
       className={[
         "min-w-[160px] max-w-[220px] rounded-lg border-2 bg-white dark:bg-gray-900 shadow-md text-xs",
-        isInitial ? "border-blue-500" : "border-gray-300 dark:border-gray-600",
+        selected
+          ? "border-yellow-400 ring-2 ring-yellow-300 dark:ring-yellow-500"
+          : isInitial
+          ? "border-blue-500"
+          : "border-gray-300 dark:border-gray-600",
       ].join(" ")}
     >
       <Handle type="target" position={Position.Top} className="!bg-gray-400" />

@@ -25,8 +25,8 @@ const baseData: PhaseNodeData = {
 
 import type { NodeProps } from "@xyflow/react";
 
-function renderNode(data: PhaseNodeData) {
-  const props = { id: data.phaseId, data } as unknown as NodeProps;
+function renderNode(data: PhaseNodeData, selected = false) {
+  const props = { id: data.phaseId, data, selected } as unknown as NodeProps;
   return render(<PhaseNode {...props} />);
 }
 
@@ -69,5 +69,18 @@ describe("PhaseNode", () => {
   it("isInitial=false이면 giverNpc가 있어도 NPC 뱃지가 없다", () => {
     renderNode({ ...baseData, isInitial: false, giverNpc: "eddard_stark" });
     expect(screen.queryByText("NPC: eddard_stark")).toBeNull();
+  });
+
+  it("selected=true이면 노란색 외곽선 클래스가 적용된다", () => {
+    const { container } = renderNode(baseData, true);
+    const root = container.firstChild as HTMLElement;
+    expect(root.className).toContain("border-yellow-400");
+    expect(root.className).toContain("ring-2");
+  });
+
+  it("selected=false이면 노란색 외곽선 클래스가 없다", () => {
+    const { container } = renderNode(baseData, false);
+    const root = container.firstChild as HTMLElement;
+    expect(root.className).not.toContain("border-yellow-400");
   });
 });
