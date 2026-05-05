@@ -15,6 +15,12 @@
             "if": "Bash(*git*commit*)",
             "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/check-commit-sequence.sh\"",
             "statusMessage": "커밋 타입 및 순서 검증 중..."
+          },
+          {
+            "type": "command",
+            "if": "Bash(*git*push*)",
+            "command": "bash \"$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hooks/check-push-tests.sh\"",
+            "statusMessage": "push 전 전체 테스트 실행 중..."
           }
         ]
       },
