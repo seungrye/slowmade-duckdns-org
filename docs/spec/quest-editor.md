@@ -311,6 +311,18 @@ Branch 액션을 중첩 if/else 대신 switch/case 스타일로 표시.
 
 ✅ 완료
 
+## 퀘스트 목록 카드 레이아웃 버그픽스
+
+### 문제
+- `page.test.tsx`에서 `screen` import 미사용 → ESLint 빌드 오류
+- 카드를 `flex-col`로 바꾸면서 데스크탑에서도 버튼이 아래 줄로 내려감
+
+### 수정
+- 카드: `flex flex-col sm:flex-row sm:items-center sm:justify-between` — 모바일은 세로, sm 이상은 가로(제목 좌, 버튼 우)
+- 버튼 컨테이너: `flex-shrink-0` 추가 — 제목이 길어도 버튼 영역이 줄어들지 않음
+- `page.test.tsx`: 미사용 `screen` import 제거
+- 수정 파일: `src/app/quests/page.tsx`, `src/app/quests/page.test.tsx`
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
