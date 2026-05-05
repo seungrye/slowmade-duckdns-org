@@ -1,5 +1,15 @@
 # 개발 가이드
 
+## 환경 요구사항
+
+| 도구 | 버전 |
+|------|------|
+| Node.js | **20 (LTS Iron)** — `nvm use lts/iron` |
+| pnpm | 최신 (corepack 또는 `npm i -g pnpm`) |
+
+> Vitest 4.x는 Node 20+ 필수입니다. Node 18에서는 `styleText` export 오류로 실행되지 않습니다.
+> 훅(`check-commit-sequence.sh`)은 커밋 시 자동으로 `nvm use lts/iron`으로 전환합니다.
+
 ## 명령어
 
 ```bash
