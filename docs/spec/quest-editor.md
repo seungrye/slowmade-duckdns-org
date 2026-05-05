@@ -291,6 +291,11 @@ Branch 액션을 중첩 if/else 대신 switch/case 스타일로 표시.
 ### 수정 파일
 - `src/app/quests/[id]/action-editor.tsx` — flattenBranch/unflattenBranch 헬퍼 + SwitchCaseEditor 컴포넌트
 
+## 퀘스트 목록 페이지 레이아웃 통일
+
+- `max-w-4xl mx-auto px-4 py-8` → `mx-auto px-4 py-6` (다른 페이지와 동일 패턴)
+- 수정 파일: `src/app/quests/page.tsx`
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
