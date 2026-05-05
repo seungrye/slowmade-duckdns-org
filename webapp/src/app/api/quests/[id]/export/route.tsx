@@ -26,12 +26,12 @@ export async function GET(_req: NextRequest, { params }: Params) {
   };
 
   const ron = serializeRon(def);
-  const filename = `${def.id}.ron`;
+  const encodedFilename = encodeURIComponent(`${def.id}.ron`);
 
   return new NextResponse(ron, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": `attachment; filename*=UTF-8''${encodedFilename}`,
     },
   });
 }
