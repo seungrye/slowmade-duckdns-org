@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseRon, serializeRon } from "./ron";
+import { readFileSync } from "fs";
+import { join } from "path";
 import type { QuestDef } from "@/types/quest";
 
 const SIMPLE_RON = `
@@ -52,8 +54,8 @@ QuestDef(
 )
 `;
 
-describe("parseRon", () => {
-  it("기본 QuestDef 파싱", () => {
+describe("parseRon — 기본", () => {
+  it("QuestDef 기본 필드 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
     expect(quest.id).toBe("test_quest");
     expect(quest.title).toBe("테스트 퀘스트");
@@ -61,7 +63,7 @@ describe("parseRon", () => {
     expect(quest.initialPhase).toBe("dormant");
   });
 
-  it("페이즈 파싱", () => {
+  it("페이즈 목록 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
     expect(Object.keys(quest.phases)).toEqual(["dormant", "active", "done"]);
   });
@@ -73,8 +75,7 @@ describe("parseRon", () => {
 
   it("on_interact AdvancePhase 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
-    const action = quest.phases["dormant"].on_interact[0];
-    expect(action).toEqual({ type: "AdvancePhase", phaseId: "active" });
+    expect(quest.phases["dormant"].on_interact[0]).toEqual({ type: "AdvancePhase", phaseId: "active" });
   });
 
   it("auto_advance HasItem 조건 파싱", () => {
@@ -100,19 +101,135 @@ describe("parseRon", () => {
   it("spawns 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
     expect(quest.spawns).toHaveLength(1);
-    expect(quest.spawns[0]).toEqual({
-      phase: "active",
-      item: "key_item",
-      zone: { type: "Dungeon", level: 1 },
+    expect(quest.spawns[0]).toEqual({ phase: "active", item: "key_item", zone: { type: "Dungeon", level: 1 } });
+  });
+});
+
+describe("parseRon — 복합 조건", () => {
+  const COMPLEX_COND_RON = `
+QuestDef(
+    id: "cond_test",
+    title: "조건 테스트",
+    giver_npc: "NPC",
+    initial_phase: "a",
+    phases: {
+        "a": QuestPhaseDef(
+            dialog: [],
+            on_interact: [],
+            auto_advance: [
+                AutoAdvance(condition: And([HasItem("x"), FlagIs(flag: "f", value: "v")]), next_phase: "b"),
+                AutoAdvance(condition: Or([HasItem("y"), PhaseIs(quest: "q2", phase: "done")]), next_phase: "c"),
+                AutoAdvance(condition: Not(HasItem("z")), next_phase: "d"),
+            ],
+            objective: None,
+        ),
+        "b": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+        "c": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+        "d": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+    },
+    spawns: [],
+)
+`;
+
+  it("And 조건 파싱", () => {
+    const quest = parseRon(COMPLEX_COND_RON);
+    const cond = quest.phases["a"].auto_advance[0].condition;
+    expect(cond).toEqual({
+      type: "And",
+      conditions: [
+        { type: "HasItem", itemId: "x" },
+        { type: "FlagIs", flag: "f", value: "v" },
+      ],
     });
+  });
+
+  it("Or + PhaseIs 조건 파싱", () => {
+    const quest = parseRon(COMPLEX_COND_RON);
+    const cond = quest.phases["a"].auto_advance[1].condition;
+    expect(cond).toEqual({
+      type: "Or",
+      conditions: [
+        { type: "HasItem", itemId: "y" },
+        { type: "PhaseIs", quest: "q2", phase: "done" },
+      ],
+    });
+  });
+
+  it("Not 조건 파싱", () => {
+    const quest = parseRon(COMPLEX_COND_RON);
+    const cond = quest.phases["a"].auto_advance[2].condition;
+    expect(cond).toEqual({ type: "Not", condition: { type: "HasItem", itemId: "z" } });
+  });
+});
+
+describe("parseRon — Branch / 새 액션", () => {
+  const BRANCH_RON = `
+QuestDef(
+    id: "branch_test",
+    title: "분기 테스트",
+    giver_npc: "NPC",
+    initial_phase: "a",
+    phases: {
+        "a": QuestPhaseDef(
+            dialog: [],
+            on_interact: [
+                Branch(
+                    condition: FlagIs(flag: "hero", value: "stark"),
+                    if_true: [AdvancePhase("stark_path")],
+                    if_false: [
+                        RemoveItem("old_item"),
+                        AdvancePhase("other_path"),
+                    ],
+                ),
+            ],
+            auto_advance: [
+                AutoAdvance(
+                    condition: HasItem("trigger"),
+                    next_phase: "b",
+                    actions: [DespawnWorldItem("world_obj")],
+                ),
+            ],
+            objective: None,
+        ),
+        "stark_path": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+        "other_path": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+        "b": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+    },
+    spawns: [],
+)
+`;
+
+  it("Branch(condition, if_true, if_false) 파싱", () => {
+    const quest = parseRon(BRANCH_RON);
+    const action = quest.phases["a"].on_interact[0];
+    expect(action.type).toBe("Branch");
+    if (action.type !== "Branch") return;
+    expect(action.condition).toEqual({ type: "FlagIs", flag: "hero", value: "stark" });
+    expect(action.ifTrue).toEqual([{ type: "AdvancePhase", phaseId: "stark_path" }]);
+    expect(action.ifFalse).toEqual([
+      { type: "RemoveItem", itemId: "old_item" },
+      { type: "AdvancePhase", phaseId: "other_path" },
+    ]);
+  });
+
+  it("AutoAdvance actions 필드 파싱", () => {
+    const quest = parseRon(BRANCH_RON);
+    const aa = quest.phases["a"].auto_advance[0];
+    expect(aa.actions).toEqual([{ type: "DespawnWorldItem", itemId: "world_obj" }]);
+  });
+
+  it("RemoveItem 액션 파싱", () => {
+    const quest = parseRon(BRANCH_RON);
+    const branch = quest.phases["a"].on_interact[0];
+    if (branch.type !== "Branch") return;
+    expect(branch.ifFalse[0]).toEqual({ type: "RemoveItem", itemId: "old_item" });
   });
 });
 
 describe("serializeRon", () => {
   it("직렬화 후 재파싱하면 동일 구조 반환", () => {
     const quest = parseRon(SIMPLE_RON);
-    const ron = serializeRon(quest);
-    const reparsed = parseRon(ron);
+    const reparsed = parseRon(serializeRon(quest));
     expect(reparsed.id).toBe(quest.id);
     expect(reparsed.title).toBe(quest.title);
     expect(reparsed.phases["dormant"].dialog).toEqual(quest.phases["dormant"].dialog);
@@ -131,24 +248,75 @@ describe("serializeRon", () => {
         dormant: {
           dialog: [],
           on_interact: [],
-          auto_advance: [
-            {
-              condition: { type: "FlagIs", flag: "character", value: "stark" },
-              nextPhase: "active",
-            },
-          ],
+          auto_advance: [{ condition: { type: "FlagIs", flag: "character", value: "stark" }, nextPhase: "active" }],
           objective: null,
         },
         active: { dialog: [], on_interact: [], auto_advance: [], objective: null },
       },
       spawns: [],
     };
-    const ron = serializeRon(quest);
-    const reparsed = parseRon(ron);
+    const reparsed = parseRon(serializeRon(quest));
     expect(reparsed.phases["dormant"].auto_advance[0].condition).toEqual({
-      type: "FlagIs",
-      flag: "character",
-      value: "stark",
+      type: "FlagIs", flag: "character", value: "stark",
     });
   });
+
+  it("Branch 직렬화/재파싱", () => {
+    const quest: QuestDef = {
+      id: "branch_serial",
+      title: "분기 직렬화",
+      giverNpc: "NPC",
+      initialPhase: "a",
+      phases: {
+        a: {
+          dialog: [],
+          on_interact: [
+            {
+              type: "Branch",
+              condition: { type: "And", conditions: [{ type: "HasItem", itemId: "x" }, { type: "FlagIs", flag: "f", value: "v" }] },
+              ifTrue: [{ type: "AdvancePhase", phaseId: "b" }],
+              ifFalse: [{ type: "Log", text: "실패" }],
+            },
+          ],
+          auto_advance: [],
+          objective: null,
+        },
+        b: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+      },
+      spawns: [],
+    };
+    const reparsed = parseRon(serializeRon(quest));
+    const branch = reparsed.phases["a"].on_interact[0];
+    expect(branch.type).toBe("Branch");
+    if (branch.type !== "Branch") return;
+    expect(branch.condition).toEqual({
+      type: "And",
+      conditions: [{ type: "HasItem", itemId: "x" }, { type: "FlagIs", flag: "f", value: "v" }],
+    });
+    expect(branch.ifTrue).toEqual([{ type: "AdvancePhase", phaseId: "b" }]);
+  });
+});
+
+describe("실제 .ron 파일 파싱", () => {
+  const questsDir = join(process.cwd(), "quests");
+
+  const files = [
+    "gem_quest.ron",
+    "jon_snow_quest.ron",
+    "stark_quest.ron",
+    "targaryen_quest.ron",
+    "prologue_fog.ron",
+    "alchemist_quest.ron",
+    "world_fracture.ron",
+  ];
+
+  for (const file of files) {
+    it(`${file} 파싱 성공`, () => {
+      const src = readFileSync(join(questsDir, file), "utf8");
+      expect(() => parseRon(src)).not.toThrow();
+      const quest = parseRon(src);
+      expect(quest.id).toBeTruthy();
+      expect(Object.keys(quest.phases).length).toBeGreaterThan(0);
+    });
+  }
 });

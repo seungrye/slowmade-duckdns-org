@@ -3,7 +3,12 @@
 export type Condition =
   | { type: "FlagIs"; flag: string; value: string }
   | { type: "HasItem"; itemId: string }
-  | { type: "Always" };
+  | { type: "Always" }
+  | { type: "And"; conditions: Condition[] }
+  | { type: "Or"; conditions: Condition[] }
+  | { type: "Not"; condition: Condition }
+  | { type: "PhaseIs"; quest: string; phase: string }
+  | { type: "InZone"; zone: SpawnZone };
 
 // ── 액션 타입 ─────────────────────────────────────────────────────────────
 
@@ -11,22 +16,26 @@ export type Action =
   | { type: "AdvancePhase"; phaseId: string }
   | { type: "Log"; text: string }
   | { type: "GiveItem"; itemId: string }
+  | { type: "RemoveItem"; itemId: string }
   | { type: "SetFlag"; flag: string; value: string }
   | { type: "KillNpc"; npcId: string }
-  | { type: "Branch"; branches: { condition: Condition; phaseId: string }[] };
+  | { type: "DespawnWorldItem"; itemId: string }
+  | { type: "Branch"; condition: Condition; ifTrue: Action[]; ifFalse: Action[] };
 
 // ── 자동 전진 ─────────────────────────────────────────────────────────────
 
 export interface AutoAdvance {
   condition: Condition;
   nextPhase: string;
+  actions?: Action[];
 }
 
 // ── 스폰 존 ───────────────────────────────────────────────────────────────
 
 export type SpawnZone =
   | { type: "Dungeon"; level: number }
-  | { type: "World"; mapId: string };
+  | { type: "World"; mapId: string }
+  | { type: "Forest" };
 
 export interface QuestSpawn {
   phase: string;

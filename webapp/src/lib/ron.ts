@@ -50,8 +50,8 @@ function tokenize(src: string): Token[] {
       tokens.push({ kind: "ident", val: s });
       continue;
     }
-    // 숫자
-    if (/[0-9\-]/.test(src[i]) && (src[i] !== "-" || /[0-9]/.test(src[i + 1]))) {
+    // 숫자 (음수 포함)
+    if (/[0-9]/.test(src[i]) || (src[i] === "-" && /[0-9]/.test(src[i + 1] ?? ""))) {
       let s = "";
       if (src[i] === "-") s += src[i++];
       while (i < src.length && /[0-9.]/.test(src[i])) s += src[i++];
@@ -76,18 +76,17 @@ class Parser {
   peek(): Token | undefined { return this.tokens[this.pos]; }
   next(): Token { return this.tokens[this.pos++]; }
 
-  expect(kind: "punct", val: string): void;
-  expect(kind: "ident"): string;
-  expect(kind: string, val?: string): string | void {
+  expectPunct(val: string): void {
     const t = this.next();
-    if (kind === "punct") {
-      if (t.kind !== "punct" || t.val !== val)
-        throw new Error(`Expected '${val}' but got '${JSON.stringify(t)}'`);
-    } else {
-      if (t.kind !== kind)
-        throw new Error(`Expected ${kind} but got '${JSON.stringify(t)}'`);
-      return (t as { kind: "ident"; val: string }).val;
-    }
+    if (t.kind !== "punct" || t.val !== val)
+      throw new Error(`Expected '${val}' got '${JSON.stringify(t)}' at pos ${this.pos}`);
+  }
+
+  expectIdent(): string {
+    const t = this.next();
+    if (t.kind !== "ident")
+      throw new Error(`Expected ident got '${JSON.stringify(t)}' at pos ${this.pos}`);
+    return t.val;
   }
 
   tryPunct(val: string): boolean {
@@ -105,9 +104,7 @@ class Parser {
   }
 
   parseIdent(): string {
-    const t = this.next();
-    if (t.kind !== "ident") throw new Error(`Expected ident, got ${JSON.stringify(t)}`);
-    return t.val;
+    return this.expectIdent();
   }
 
   parseNumber(): number {
@@ -116,146 +113,236 @@ class Parser {
     return t.val;
   }
 
-  /** `Some("...")` 또는 `None` */
   parseOptionString(): string | null {
     const name = this.parseIdent();
     if (name === "None") return null;
-    this.expect("punct", "(");
+    this.expectPunct("(");
     const v = this.parseString();
-    this.expect("punct", ")");
+    this.expectPunct(")");
     return v;
   }
 
-  /** `[item, item, ...]` */
   parseArray<T>(parseItem: () => T): T[] {
-    this.expect("punct", "[");
+    this.expectPunct("[");
     const items: T[] = [];
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === "]")) {
       items.push(parseItem());
       this.tryPunct(",");
     }
-    this.expect("punct", "]");
+    this.expectPunct("]");
     return items;
   }
 
+  // ── Condition ─────────────────────────────────────────────────────────────
+
   parseCondition(): Condition {
     const name = this.parseIdent();
-    if (name === "Always") return { type: "Always" };
 
-    this.expect("punct", "(");
-    if (name === "FlagIs") {
-      // FlagIs(flag: "...", value: "...")
-      this.expect("ident"); this.expect("punct", ":"); const flag = this.parseString();
-      this.tryPunct(",");
-      this.expect("ident"); this.expect("punct", ":"); const value = this.parseString();
-      this.tryPunct(",");
-      this.expect("punct", ")");
-      return { type: "FlagIs", flag, value };
+    switch (name) {
+      case "Always":
+        return { type: "Always" };
+
+      case "FlagIs": {
+        this.expectPunct("(");
+        this.expectIdent(); this.expectPunct(":"); const flag = this.parseString();
+        this.tryPunct(",");
+        this.expectIdent(); this.expectPunct(":"); const value = this.parseString();
+        this.tryPunct(",");
+        this.expectPunct(")");
+        return { type: "FlagIs", flag, value };
+      }
+
+      case "HasItem": {
+        this.expectPunct("(");
+        const itemId = this.parseString();
+        this.expectPunct(")");
+        return { type: "HasItem", itemId };
+      }
+
+      case "And": {
+        this.expectPunct("(");
+        const conditions = this.parseArray(() => this.parseCondition());
+        this.expectPunct(")");
+        return { type: "And", conditions };
+      }
+
+      case "Or": {
+        this.expectPunct("(");
+        const conditions = this.parseArray(() => this.parseCondition());
+        this.expectPunct(")");
+        return { type: "Or", conditions };
+      }
+
+      case "Not": {
+        this.expectPunct("(");
+        const condition = this.parseCondition();
+        this.expectPunct(")");
+        return { type: "Not", condition };
+      }
+
+      case "PhaseIs": {
+        this.expectPunct("(");
+        this.expectIdent(); this.expectPunct(":"); const quest = this.parseString();
+        this.tryPunct(",");
+        this.expectIdent(); this.expectPunct(":"); const phase = this.parseString();
+        this.tryPunct(",");
+        this.expectPunct(")");
+        return { type: "PhaseIs", quest, phase };
+      }
+
+      case "InZone": {
+        this.expectPunct("(");
+        const zone = this.parseSpawnZone();
+        this.expectPunct(")");
+        return { type: "InZone", zone };
+      }
+
+      default:
+        throw new Error(`Unknown condition: ${name}`);
     }
-    if (name === "HasItem") {
-      const itemId = this.parseString();
-      this.expect("punct", ")");
-      return { type: "HasItem", itemId };
-    }
-    throw new Error(`Unknown condition: ${name}`);
+  }
+
+  // ── Action list (shared for on_interact, if_true, if_false) ──────────────
+
+  parseActionList(): Action[] {
+    return this.parseArray(() => this.parseAction());
   }
 
   parseAction(): Action {
     const name = this.parseIdent();
-    this.expect("punct", "(");
+    this.expectPunct("(");
 
     switch (name) {
       case "AdvancePhase": {
         const phaseId = this.parseString();
-        this.expect("punct", ")");
+        this.expectPunct(")");
         return { type: "AdvancePhase", phaseId };
       }
       case "Log": {
         const text = this.parseString();
-        this.expect("punct", ")");
+        this.expectPunct(")");
         return { type: "Log", text };
       }
       case "GiveItem": {
         const itemId = this.parseString();
-        this.expect("punct", ")");
+        this.expectPunct(")");
         return { type: "GiveItem", itemId };
       }
+      case "RemoveItem": {
+        const itemId = this.parseString();
+        this.expectPunct(")");
+        return { type: "RemoveItem", itemId };
+      }
+      case "DespawnWorldItem": {
+        const itemId = this.parseString();
+        this.expectPunct(")");
+        return { type: "DespawnWorldItem", itemId };
+      }
       case "SetFlag": {
-        this.expect("ident"); this.expect("punct", ":"); const flag = this.parseString();
+        this.expectIdent(); this.expectPunct(":"); const flag = this.parseString();
         this.tryPunct(",");
-        this.expect("ident"); this.expect("punct", ":"); const value = this.parseString();
+        this.expectIdent(); this.expectPunct(":"); const value = this.parseString();
         this.tryPunct(",");
-        this.expect("punct", ")");
+        this.expectPunct(")");
         return { type: "SetFlag", flag, value };
       }
       case "KillNpc": {
         const npcId = this.parseString();
-        this.expect("punct", ")");
+        this.expectPunct(")");
         return { type: "KillNpc", npcId };
       }
       case "Branch": {
-        // Branch 는 개별 파일에서 명시적으로 안 쓰이지만 구조는 지원
-        const branches: { condition: Condition; phaseId: string }[] = [];
-        this.expect("punct", "[");
-        while (!(this.peek()?.kind === "punct" && this.peek()?.val === "]")) {
-          this.expect("punct", "(");
-          this.parseIdent(); this.expect("punct", ":"); const cond = this.parseCondition();
-          this.tryPunct(",");
-          this.parseIdent(); this.expect("punct", ":"); const phaseId = this.parseString();
-          this.tryPunct(",");
-          this.expect("punct", ")");
-          branches.push({ condition: cond, phaseId });
+        // Branch(condition: ..., if_true: [...], if_false: [...])
+        let condition: Condition = { type: "Always" };
+        let ifTrue: Action[] = [];
+        let ifFalse: Action[] = [];
+
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          switch (key) {
+            case "condition": condition = this.parseCondition(); break;
+            case "if_true":   ifTrue   = this.parseActionList(); break;
+            case "if_false":  ifFalse  = this.parseActionList(); break;
+            default: break;
+          }
           this.tryPunct(",");
         }
-        this.expect("punct", "]");
-        this.expect("punct", ")");
-        return { type: "Branch", branches };
+        this.expectPunct(")");
+        return { type: "Branch", condition, ifTrue, ifFalse };
       }
       default:
         throw new Error(`Unknown action: ${name}`);
     }
   }
 
+  // ── AutoAdvance ───────────────────────────────────────────────────────────
+
   parseAutoAdvance(): AutoAdvance {
-    // AutoAdvance( condition: ..., next_phase: "..." )
-    this.expect("ident"); this.expect("punct", ":");
-    const condition = this.parseCondition();
-    this.tryPunct(",");
-    this.expect("ident"); this.expect("punct", ":");
-    const nextPhase = this.parseString();
-    this.tryPunct(",");
-    return { condition, nextPhase };
+    let condition: Condition = { type: "Always" };
+    let nextPhase = "";
+    let actions: Action[] | undefined;
+
+    while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+      const key = this.parseIdent();
+      this.expectPunct(":");
+      switch (key) {
+        case "condition":  condition = this.parseCondition(); break;
+        case "next_phase": nextPhase = this.parseString(); break;
+        case "actions":    actions   = this.parseActionList(); break;
+        default: break;
+      }
+      this.tryPunct(",");
+    }
+
+    const aa: AutoAdvance = { condition, nextPhase };
+    if (actions && actions.length > 0) aa.actions = actions;
+    return aa;
   }
+
+  // ── Spawn ─────────────────────────────────────────────────────────────────
 
   parseSpawnZone(): SpawnZone {
     const name = this.parseIdent();
-    this.expect("punct", "(");
+    // 괄호 없는 단순 열거형 존 (예: Forest)
+    if (!(this.peek()?.kind === "punct" && this.peek()?.val === "(")) {
+      return { type: name } as SpawnZone;
+    }
+    this.expectPunct("(");
     if (name === "Dungeon") {
       const level = this.parseNumber();
-      this.expect("punct", ")");
+      this.expectPunct(")");
       return { type: "Dungeon", level };
     }
     if (name === "World") {
       const mapId = this.parseString();
-      this.expect("punct", ")");
+      this.expectPunct(")");
       return { type: "World", mapId };
     }
-    throw new Error(`Unknown zone: ${name}`);
+    throw new Error(`Unknown zone with params: ${name}`);
   }
 
   parseSpawn(): QuestSpawn {
-    // QuestSpawn(phase: "...", item: "...", zone: Dungeon(1))
-    this.expect("ident"); this.expect("punct", ":"); const phase = this.parseString();
-    this.tryPunct(",");
-    this.expect("ident"); this.expect("punct", ":"); const item = this.parseString();
-    this.tryPunct(",");
-    this.expect("ident"); this.expect("punct", ":"); const zone = this.parseSpawnZone();
-    this.tryPunct(",");
+    let phase = "", item = "";
+    let zone: SpawnZone = { type: "Dungeon", level: 1 };
+
+    while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+      const key = this.parseIdent();
+      this.expectPunct(":");
+      switch (key) {
+        case "phase": phase = this.parseString(); break;
+        case "item":  item  = this.parseString(); break;
+        case "zone":  zone  = this.parseSpawnZone(); break;
+        default: break;
+      }
+      this.tryPunct(",");
+    }
     return { phase, item, zone };
   }
 
+  // ── PhaseDef ──────────────────────────────────────────────────────────────
+
   parsePhaseDef(): QuestPhaseDef {
-    // dialog: [...], on_interact: [...], auto_advance: [...], objective: Some(...)|None
     const def: QuestPhaseDef = {
       dialog: [],
       on_interact: [],
@@ -265,22 +352,22 @@ class Parser {
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
-      this.expect("punct", ":");
+      this.expectPunct(":");
 
       switch (key) {
         case "dialog":
           def.dialog = this.parseArray(() => this.parseString());
           break;
         case "on_interact":
-          def.on_interact = this.parseArray(() => this.parseAction());
+          def.on_interact = this.parseActionList();
           break;
         case "auto_advance":
           def.auto_advance = this.parseArray(() => {
-            const name = this.parseIdent();
-            if (name !== "AutoAdvance") throw new Error(`Expected AutoAdvance, got ${name}`);
-            this.expect("punct", "(");
+            const n = this.parseIdent();
+            if (n !== "AutoAdvance") throw new Error(`Expected AutoAdvance, got ${n}`);
+            this.expectPunct("(");
             const aa = this.parseAutoAdvance();
-            this.expect("punct", ")");
+            this.expectPunct(")");
             return aa;
           });
           break;
@@ -288,7 +375,6 @@ class Parser {
           def.objective = this.parseOptionString();
           break;
         default:
-          // 알 수 없는 필드 스킵
           break;
       }
       this.tryPunct(",");
@@ -297,13 +383,14 @@ class Parser {
     return def;
   }
 
+  // ── QuestDef ──────────────────────────────────────────────────────────────
+
   parseQuest(): QuestDef {
-    // QuestDef( id: "...", title: "...", giver_npc: "...", initial_phase: "...", phases: { ... }, spawns: [...] )
     const name = this.parseIdent();
     if (name !== "QuestDef") throw new Error(`Expected QuestDef, got ${name}`);
-    this.expect("punct", "(");
+    this.expectPunct("(");
 
-    const quest: Partial<QuestDef> & { phases: Record<string, QuestPhaseDef>; spawns: QuestSpawn[] } = {
+    const quest: QuestDef = {
       id: "",
       title: "",
       giverNpc: "",
@@ -314,45 +401,36 @@ class Parser {
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
-      this.expect("punct", ":");
+      this.expectPunct(":");
 
       switch (key) {
-        case "id":
-          quest.id = this.parseString();
-          break;
-        case "title":
-          quest.title = this.parseString();
-          break;
-        case "giver_npc":
-          quest.giverNpc = this.parseString();
-          break;
-        case "initial_phase":
-          quest.initialPhase = this.parseString();
-          break;
+        case "id":            quest.id           = this.parseString(); break;
+        case "title":         quest.title        = this.parseString(); break;
+        case "giver_npc":     quest.giverNpc     = this.parseString(); break;
+        case "initial_phase": quest.initialPhase = this.parseString(); break;
         case "phases": {
-          // { "phaseId": QuestPhaseDef(...), ... }
-          this.expect("punct", "{");
+          this.expectPunct("{");
           while (!(this.peek()?.kind === "punct" && this.peek()?.val === "}")) {
             const phaseId = this.parseString();
-            this.expect("punct", ":");
+            this.expectPunct(":");
             const phaseName = this.parseIdent();
             if (phaseName !== "QuestPhaseDef") throw new Error(`Expected QuestPhaseDef`);
-            this.expect("punct", "(");
+            this.expectPunct("(");
             const phase = this.parsePhaseDef();
-            this.expect("punct", ")");
+            this.expectPunct(")");
             quest.phases[phaseId] = phase;
             this.tryPunct(",");
           }
-          this.expect("punct", "}");
+          this.expectPunct("}");
           break;
         }
         case "spawns":
           quest.spawns = this.parseArray(() => {
             const sname = this.parseIdent();
             if (sname !== "QuestSpawn") throw new Error(`Expected QuestSpawn`);
-            this.expect("punct", "(");
+            this.expectPunct("(");
             const s = this.parseSpawn();
-            this.expect("punct", ")");
+            this.expectPunct(")");
             return s;
           });
           break;
@@ -362,8 +440,8 @@ class Parser {
       this.tryPunct(",");
     }
 
-    this.expect("punct", ")");
-    return quest as QuestDef;
+    this.expectPunct(")");
+    return quest;
   }
 }
 
@@ -381,55 +459,78 @@ export function parseRon(src: string): QuestDef {
 // Serializer
 // ─────────────────────────────────────────────────────────────────────────────
 
-function indent(n: number) { return "    ".repeat(n); }
+function ind(n: number) { return "    ".repeat(n); }
 function q(s: string) { return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"` ; }
 
 function serializeCondition(cond: Condition): string {
-  if (cond.type === "Always") return "Always";
-  if (cond.type === "FlagIs") return `FlagIs(flag: ${q(cond.flag)}, value: ${q(cond.value)})`;
-  if (cond.type === "HasItem") return `HasItem(${q(cond.itemId)})`;
-  return "Always";
+  switch (cond.type) {
+    case "Always":  return "Always";
+    case "FlagIs":  return `FlagIs(flag: ${q(cond.flag)}, value: ${q(cond.value)})`;
+    case "HasItem": return `HasItem(${q(cond.itemId)})`;
+    case "PhaseIs": return `PhaseIs(quest: ${q(cond.quest)}, phase: ${q(cond.phase)})`;
+    case "Not":     return `Not(${serializeCondition(cond.condition)})`;
+    case "And":     return `And([${cond.conditions.map(serializeCondition).join(", ")}])`;
+    case "Or":      return `Or([${cond.conditions.map(serializeCondition).join(", ")}])`;
+    case "InZone":  return `InZone(${serializeZone(cond.zone)})`;
+  }
 }
 
 function serializeAction(action: Action, depth: number): string {
-  const i = indent(depth);
+  const i = ind(depth);
   switch (action.type) {
-    case "AdvancePhase": return `${i}AdvancePhase(${q(action.phaseId)})`;
-    case "Log":          return `${i}Log(${q(action.text)})`;
-    case "GiveItem":     return `${i}GiveItem(${q(action.itemId)})`;
-    case "KillNpc":      return `${i}KillNpc(${q(action.npcId)})`;
-    case "SetFlag":      return `${i}SetFlag(flag: ${q(action.flag)}, value: ${q(action.value)})`;
+    case "AdvancePhase":     return `${i}AdvancePhase(${q(action.phaseId)})`;
+    case "Log":              return `${i}Log(${q(action.text)})`;
+    case "GiveItem":         return `${i}GiveItem(${q(action.itemId)})`;
+    case "RemoveItem":       return `${i}RemoveItem(${q(action.itemId)})`;
+    case "DespawnWorldItem": return `${i}DespawnWorldItem(${q(action.itemId)})`;
+    case "KillNpc":          return `${i}KillNpc(${q(action.npcId)})`;
+    case "SetFlag":          return `${i}SetFlag(flag: ${q(action.flag)}, value: ${q(action.value)})`;
     case "Branch": {
-      const branches = action.branches
-        .map(b => `${indent(depth + 1)}(condition: ${serializeCondition(b.condition)}, phaseId: ${q(b.phaseId)})`)
-        .join(",\n");
-      return `${i}Branch([\n${branches},\n${i}])`;
+      const lines = [
+        `${i}Branch(`,
+        `${ind(depth + 1)}condition: ${serializeCondition(action.condition)},`,
+      ];
+      if (action.ifTrue.length === 0) {
+        lines.push(`${ind(depth + 1)}if_true: [],`);
+      } else {
+        lines.push(`${ind(depth + 1)}if_true: [`);
+        for (const a of action.ifTrue) lines.push(`${serializeAction(a, depth + 2)},`);
+        lines.push(`${ind(depth + 1)}],`);
+      }
+      if (action.ifFalse.length === 0) {
+        lines.push(`${ind(depth + 1)}if_false: [],`);
+      } else {
+        lines.push(`${ind(depth + 1)}if_false: [`);
+        for (const a of action.ifFalse) lines.push(`${serializeAction(a, depth + 2)},`);
+        lines.push(`${ind(depth + 1)}],`);
+      }
+      lines.push(`${i})`);
+      return lines.join("\n");
     }
   }
 }
 
 function serializeZone(zone: SpawnZone): string {
   if (zone.type === "Dungeon") return `Dungeon(${zone.level})`;
-  return `World(${q(zone.mapId)})`;
+  if (zone.type === "World") return `World(${q(zone.mapId)})`;
+  return zone.type;
 }
 
 function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): string {
-  const i = indent(depth);
-  const i1 = indent(depth + 1);
+  const i = ind(depth);
+  const i1 = ind(depth + 1);
   const lines: string[] = [];
 
   lines.push(`${i}${q(phaseId)}: QuestPhaseDef(`);
 
-  // dialog
   if (phase.dialog.length === 0) {
     lines.push(`${i1}dialog: [],`);
   } else {
     lines.push(`${i1}dialog: [`);
-    for (const d of phase.dialog) lines.push(`${indent(depth + 2)}${q(d)},`);
+    for (const d of phase.dialog) lines.push(`${ind(depth + 2)}${q(d)},`);
     lines.push(`${i1}],`);
   }
 
-  // on_interact
   if (phase.on_interact.length === 0) {
     lines.push(`${i1}on_interact: [],`);
   } else {
@@ -438,21 +539,24 @@ function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): s
     lines.push(`${i1}],`);
   }
 
-  // auto_advance
   if (phase.auto_advance.length === 0) {
     lines.push(`${i1}auto_advance: [],`);
   } else {
     lines.push(`${i1}auto_advance: [`);
     for (const aa of phase.auto_advance) {
-      lines.push(`${indent(depth + 2)}AutoAdvance(`);
-      lines.push(`${indent(depth + 3)}condition: ${serializeCondition(aa.condition)},`);
-      lines.push(`${indent(depth + 3)}next_phase: ${q(aa.nextPhase)},`);
-      lines.push(`${indent(depth + 2)}),`);
+      lines.push(`${ind(depth + 2)}AutoAdvance(`);
+      lines.push(`${ind(depth + 3)}condition: ${serializeCondition(aa.condition)},`);
+      lines.push(`${ind(depth + 3)}next_phase: ${q(aa.nextPhase)},`);
+      if (aa.actions && aa.actions.length > 0) {
+        lines.push(`${ind(depth + 3)}actions: [`);
+        for (const a of aa.actions) lines.push(`${serializeAction(a, depth + 4)},`);
+        lines.push(`${ind(depth + 3)}],`);
+      }
+      lines.push(`${ind(depth + 2)}),`);
     }
     lines.push(`${i1}],`);
   }
 
-  // objective
   const obj = phase.objective == null ? "None" : `Some(${q(phase.objective)})`;
   lines.push(`${i1}objective: ${obj},`);
 
