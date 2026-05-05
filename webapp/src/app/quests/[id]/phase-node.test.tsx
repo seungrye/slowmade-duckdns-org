@@ -83,4 +83,11 @@ describe("PhaseNode", () => {
     const root = container.firstChild as HTMLElement;
     expect(root.className).not.toContain("border-yellow-400");
   });
+
+  it("isInitial=true이고 selected=true이면 노란색 외곽선이 파란색보다 우선한다", () => {
+    const { container } = renderNode({ ...baseData, isInitial: true }, true);
+    const root = container.firstChild as HTMLElement;
+    expect(root.className).toContain("border-yellow-400");
+    expect(root.className).not.toContain("border-blue-500");
+  });
 });

@@ -370,8 +370,6 @@ export default function QuestEditorPage() {
             }}
             onNodeDragStop={(_, __, updatedNodes) => syncPositions(updatedNodes)}
             multiSelectionKeyCode="Shift"
-            selectionKeyCode="Shift"
-            selectionOnDrag
             snapToGrid
             snapGrid={[20, 20]}
             fitView
