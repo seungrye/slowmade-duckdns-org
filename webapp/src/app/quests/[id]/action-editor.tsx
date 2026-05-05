@@ -9,6 +9,110 @@ interface Props {
   phaseIds: string[];
 }
 
+// ── Branch 체인 flatten / unflatten ─────────────────────────────────────────
+
+type BranchCase = { condition: Condition; ifTrue: Action[] };
+type FlatBranch = { cases: BranchCase[]; defaultActions: Action[] };
+
+function flattenBranch(action: Extract<Action, { type: "Branch" }>): FlatBranch {
+  const cases: BranchCase[] = [];
+  let cur: Action = action;
+  while (cur.type === "Branch") {
+    cases.push({ condition: cur.condition, ifTrue: cur.ifTrue });
+    if (cur.ifFalse.length === 1 && cur.ifFalse[0].type === "Branch") {
+      cur = cur.ifFalse[0];
+    } else {
+      return { cases, defaultActions: cur.ifFalse };
+    }
+  }
+  return { cases, defaultActions: [] };
+}
+
+function unflattenBranch(flat: FlatBranch): Extract<Action, { type: "Branch" }> {
+  let ifFalse: Action[] = flat.defaultActions;
+  for (let i = flat.cases.length - 1; i >= 0; i--) {
+    ifFalse = [{ type: "Branch", condition: flat.cases[i].condition, ifTrue: flat.cases[i].ifTrue, ifFalse }];
+  }
+  return ifFalse[0] as Extract<Action, { type: "Branch" }>;
+}
+
+// ── Switch/Case 에디터 ────────────────────────────────────────────────────────
+
+function SwitchCaseEditor({
+  action,
+  onChange,
+  phaseIds,
+}: {
+  action: Extract<Action, { type: "Branch" }>;
+  onChange: (a: Action) => void;
+  phaseIds: string[];
+}) {
+  const flat = flattenBranch(action);
+
+  function update(next: FlatBranch) {
+    if (next.cases.length === 0) {
+      // 케이스가 없으면 Branch 자체를 제거할 수 없으므로 최소 1개 유지
+      onChange(unflattenBranch({ cases: [{ condition: { type: "Always" }, ifTrue: [] }], defaultActions: next.defaultActions }));
+    } else {
+      onChange(unflattenBranch(next));
+    }
+  }
+
+  return (
+    <div className="space-y-2 pl-1 border-l-2 border-orange-300">
+      {flat.cases.map((c, i) => (
+        <div key={i} className="space-y-1 bg-orange-50 dark:bg-orange-950/20 rounded p-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-orange-500">case {i + 1}</span>
+            <button
+              onClick={() => update({ ...flat, cases: flat.cases.filter((_, j) => j !== i) })}
+              className="text-red-400 hover:text-red-600 text-[10px]"
+            >
+              ✕ 제거
+            </button>
+          </div>
+          <ConditionEditor
+            condition={c.condition}
+            onChange={(cond) => {
+              const cases = [...flat.cases];
+              cases[i] = { ...c, condition: cond };
+              update({ ...flat, cases });
+            }}
+          />
+          <div className="text-[10px] text-gray-400">→ 실행</div>
+          <ActionEditor
+            actions={c.ifTrue}
+            onChange={(acts) => {
+              const cases = [...flat.cases];
+              cases[i] = { ...c, ifTrue: acts };
+              update({ ...flat, cases });
+            }}
+            phaseIds={phaseIds}
+          />
+        </div>
+      ))}
+
+      <div className="space-y-1 bg-gray-100 dark:bg-gray-800/50 rounded p-1.5">
+        <span className="text-[10px] font-bold text-gray-500">default</span>
+        <ActionEditor
+          actions={flat.defaultActions}
+          onChange={(acts) => update({ ...flat, defaultActions: acts })}
+          phaseIds={phaseIds}
+        />
+      </div>
+
+      <button
+        onClick={() => update({ ...flat, cases: [...flat.cases, { condition: { type: "Always" }, ifTrue: [] }] })}
+        className="text-[10px] text-orange-500 hover:text-orange-700"
+      >
+        + 케이스 추가
+      </button>
+    </div>
+  );
+}
+
+// ── 액션 타입 초기값 ──────────────────────────────────────────────────────────
+
 function emptyAction(type: Action["type"]): Action {
   switch (type) {
     case "AdvancePhase":     return { type, phaseId: "" };
@@ -18,16 +122,12 @@ function emptyAction(type: Action["type"]): Action {
     case "SetFlag":          return { type, flag: "", value: "" };
     case "KillNpc":          return { type, npcId: "" };
     case "DespawnWorldItem": return { type, itemId: "" };
-    case "Branch":           return {
-      type,
-      condition: { type: "Always" } satisfies Condition,
-      ifTrue: [],
-      ifFalse: [],
-    };
+    case "Branch":           return { type, condition: { type: "Always" }, ifTrue: [], ifFalse: [] };
   }
 }
 
-// Use function declaration so ActionEditor (declared later) is accessible via hoisting
+// ── ActionRow ─────────────────────────────────────────────────────────────────
+
 function ActionRow({
   action,
   onChange,
@@ -54,7 +154,7 @@ function ActionRow({
           <option value="SetFlag">SetFlag</option>
           <option value="KillNpc">KillNpc</option>
           <option value="DespawnWorldItem">DespawnWorldItem</option>
-          <option value="Branch">Branch</option>
+          <option value="Branch">Branch (switch)</option>
         </select>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
           ✕
@@ -118,29 +218,17 @@ function ActionRow({
       )}
 
       {action.type === "Branch" && (
-        <div className="space-y-2 pl-1 border-l-2 border-orange-300">
-          <div className="text-[10px] font-semibold text-gray-500">조건</div>
-          <ConditionEditor
-            condition={action.condition}
-            onChange={(c) => onChange({ ...action, condition: c })}
-          />
-          <div className="text-[10px] font-semibold text-gray-500">참일 때 (if_true)</div>
-          <ActionEditor
-            actions={action.ifTrue}
-            onChange={(acts) => onChange({ ...action, ifTrue: acts })}
-            phaseIds={phaseIds}
-          />
-          <div className="text-[10px] font-semibold text-gray-500">거짓일 때 (if_false)</div>
-          <ActionEditor
-            actions={action.ifFalse}
-            onChange={(acts) => onChange({ ...action, ifFalse: acts })}
-            phaseIds={phaseIds}
-          />
-        </div>
+        <SwitchCaseEditor
+          action={action}
+          onChange={onChange}
+          phaseIds={phaseIds}
+        />
       )}
     </div>
   );
 }
+
+// ── ActionEditor ──────────────────────────────────────────────────────────────
 
 export function ActionEditor({ actions, onChange, phaseIds }: Props) {
   return (
