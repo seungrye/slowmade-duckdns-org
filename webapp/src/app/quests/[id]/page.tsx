@@ -22,6 +22,7 @@ import type { QuestDocument, QuestPhaseDef, AutoAdvance, Action } from "@/types/
 import { PhaseNode, type PhaseNodeData } from "./phase-node";
 import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
+import { highlightEdges } from "./edge-utils";
 
 const NODE_TYPES: NodeTypes = { phase: PhaseNode };
 
@@ -335,6 +336,11 @@ export default function QuestEditorPage() {
     [selectedEdgeId, edges]
   );
 
+  const displayEdges = useMemo(
+    () => highlightEdges(edges, selectedNodeId),
+    [edges, selectedNodeId]
+  );
+
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-gray-400">불러오는 중...</div>;
   }
@@ -398,7 +404,7 @@ export default function QuestEditorPage() {
         <div className="flex-1">
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={displayEdges}
             nodeTypes={NODE_TYPES}
             onNodesChange={(changes) => {
               onNodesChange(changes);
