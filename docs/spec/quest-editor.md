@@ -173,6 +173,25 @@ AutoAdvance(
 - ✅ `src/app/quests/[id]/action-editor.tsx` — Branch if_true/if_false UI 반영
 - ✅ 추가 발견: `InZone(zone)` 조건, `Forest` (괄호 없는) SpawnZone
 
+---
+
+## Quest 모델 / API 버그픽스
+
+### 문제 1: `giverNpc` required 검증 실패
+- 퀘스트 생성 시 `giverNpc` 미입력 → Mongoose `required` 검증 오류
+- 수정: `required: true` 제거, `default: ""`로 변경
+
+### 문제 2: Mongoose strict schema가 새 타입 필드를 strip
+- `ConditionSchema`에 `conditions`(And/Or), `condition`(Not), `quest`/`phase`(PhaseIs), `zone`(InZone) 없음
+- `ActionSchema`에 `ifTrue`, `ifFalse`(Branch), 새 액션 타입 없음
+- `AutoAdvanceSchema`에 `actions` 없음
+- Mongoose strict 모드 기본값 = 미지정 필드 silently drop → 저장 후 데이터 소실
+- 수정: `phases`와 `spawns`를 `Schema.Types.Mixed`로 변경해 arbitrary JSON 허용
+
+### 수정 파일
+- `src/models/quest.tsx` — phases/spawns Mixed 타입으로 변경, giverNpc required 제거
+- `src/app/api/quests/[id]/route.tsx` — Map 할당 방식 수정
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
