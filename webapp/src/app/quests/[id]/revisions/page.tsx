@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { QuestRevisionDocument } from "@/types/quest";
@@ -11,14 +11,14 @@ export default function RevisionsPage() {
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     const res = await fetch(`/api/quests/${id}/revisions`);
     const json = await res.json();
     setRevisions(json.data ?? []);
     setLoading(false);
-  }
+  }, [id]);
 
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => { load(); }, [load]);
 
   async function restore(version: number) {
     if (!confirm(`버전 ${version}으로 롤백하시겠습니까? 현재 상태는 자동으로 백업됩니다.`)) return;

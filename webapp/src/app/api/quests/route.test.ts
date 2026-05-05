@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/quest', () => ({
@@ -12,12 +13,12 @@ vi.mock('@/models/quest', () => ({
 import { GET, POST } from './route';
 import Quest from '@/models/quest';
 
-function makeRequest(body?: object) {
+function makeRequest(body?: object): NextRequest {
   return new Request('http://localhost/api/quests', {
     method: body ? 'POST' : 'GET',
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }) as unknown as NextRequest;
 }
 
 describe('GET /api/quests', () => {
@@ -39,13 +40,13 @@ describe('POST /api/quests', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('id나 title이 없으면 400을 반환한다', async () => {
-    const res = await POST(makeRequest({ title: '제목만' }) as any);
+    const res = await POST(makeRequest({ title: '제목만' }));
     expect(res.status).toBe(400);
   });
 
   it('이미 존재하는 id면 409를 반환한다', async () => {
     (Quest.findOne as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'existing' });
-    const res = await POST(makeRequest({ id: 'existing', title: '제목' }) as any);
+    const res = await POST(makeRequest({ id: 'existing', title: '제목' }));
     expect(res.status).toBe(409);
   });
 
@@ -54,7 +55,7 @@ describe('POST /api/quests', () => {
     const created = { id: 'new_quest', title: '새 퀘스트', giverNpc: '', version: 1 };
     (Quest.create as ReturnType<typeof vi.fn>).mockResolvedValue(created);
 
-    const res = await POST(makeRequest({ id: 'new_quest', title: '새 퀘스트' }) as any);
+    const res = await POST(makeRequest({ id: 'new_quest', title: '새 퀘스트' }));
     expect(res.status).toBe(201);
     expect(Quest.create).toHaveBeenCalledWith(expect.objectContaining({ giverNpc: '' }));
   });
@@ -63,7 +64,7 @@ describe('POST /api/quests', () => {
     (Quest.findOne as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     (Quest.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'q1', title: 'T', giverNpc: 'npc1' });
 
-    const res = await POST(makeRequest({ id: 'q1', title: 'T', giverNpc: 'npc1' }) as any);
+    const res = await POST(makeRequest({ id: 'q1', title: 'T', giverNpc: 'npc1' }));
     expect(res.status).toBe(201);
     expect(Quest.create).toHaveBeenCalledWith(expect.objectContaining({ giverNpc: 'npc1' }));
   });

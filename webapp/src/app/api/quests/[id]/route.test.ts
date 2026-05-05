@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/quest', () => ({ default: { findById: vi.fn() } }));
@@ -10,12 +11,12 @@ import QuestRevision from '@/models/quest-revision';
 
 const params = Promise.resolve({ id: 'test-id' });
 
-function makeRequest(method: string, body?: object) {
+function makeRequest(method: string, body?: object): NextRequest {
   return new Request(`http://localhost/api/quests/test-id`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
-  });
+  }) as unknown as NextRequest;
 }
 
 describe('GET /api/quests/[id]', () => {
@@ -23,12 +24,11 @@ describe('GET /api/quests/[id]', () => {
 
   it('퀘스트를 찾지 못하면 404를 반환한다', async () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
-    const res = await GET(makeRequest('GET') as any, { params });
+    const res = await GET(makeRequest('GET'), { params });
     expect(res.status).toBe(404);
   });
 
   it('lean() plain object phases를 그대로 반환한다', async () => {
-    // lean() returns plain objects, not Map instances
     (Quest.findById as ReturnType<typeof vi.fn>).mockReturnValue({
       lean: vi.fn().mockResolvedValue({
         id: 'q1', title: '퀘스트', giverNpc: '', initialPhase: 'dormant',
@@ -36,7 +36,7 @@ describe('GET /api/quests/[id]', () => {
         spawns: [], version: 1,
       }),
     });
-    const res = await GET(makeRequest('GET') as any, { params });
+    const res = await GET(makeRequest('GET'), { params });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.phases).toHaveProperty('dormant');
@@ -51,7 +51,7 @@ describe('GET /api/quests/[id]', () => {
         spawns: [], version: 1,
       }),
     });
-    const res = await GET(makeRequest('GET') as any, { params });
+    const res = await GET(makeRequest('GET'), { params });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.phases).toHaveProperty('dormant');
@@ -63,7 +63,7 @@ describe('DELETE /api/quests/[id]', () => {
 
   it('퀘스트를 찾지 못하면 404를 반환한다', async () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const res = await DELETE(makeRequest('DELETE') as any, { params });
+    const res = await DELETE(makeRequest('DELETE'), { params });
     expect(res.status).toBe(404);
   });
 
@@ -75,7 +75,7 @@ describe('DELETE /api/quests/[id]', () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
     (QuestRevision.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
-    const res = await DELETE(makeRequest('DELETE') as any, { params });
+    const res = await DELETE(makeRequest('DELETE'), { params });
     expect(res.status).toBe(200);
     expect(QuestRevision.deleteMany).toHaveBeenCalledWith({ questId: 'mongo-id' });
     expect(mockQuest.deleteOne).toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe('PUT /api/quests/[id]', () => {
 
   it('퀘스트를 찾지 못하면 404를 반환한다', async () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const res = await PUT(makeRequest('PUT', { title: '새 제목' }) as any, { params });
+    const res = await PUT(makeRequest('PUT', { title: '새 제목' }), { params });
     expect(res.status).toBe(404);
   });
 
@@ -102,7 +102,7 @@ describe('PUT /api/quests/[id]', () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
     (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
-    const res = await PUT(makeRequest('PUT', { title: '새 제목' }) as any, { params });
+    const res = await PUT(makeRequest('PUT', { title: '새 제목' }), { params });
     expect(res.status).toBe(200);
     expect(mockQuest.title).toBe('새 제목');
     expect(mockQuest.version).toBe(2);
@@ -121,7 +121,7 @@ describe('PUT /api/quests/[id]', () => {
     (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     const newPhases = { active: { dialog: ['반응'], on_interact: [], auto_advance: [], objective: null } };
-    await PUT(makeRequest('PUT', { phases: newPhases }) as any, { params });
+    await PUT(makeRequest('PUT', { phases: newPhases }), { params });
 
     expect(mockQuest.phases).toBeInstanceOf(Map);
     expect(mockQuest.phases.get('active')).toEqual(newPhases.active);

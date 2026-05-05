@@ -212,7 +212,8 @@ export default function QuestEditorPage() {
   const deletePhase = useCallback(
     (phaseId: string) => {
       if (!quest) return;
-      const { [phaseId]: _, ...restPhases } = quest.phases;
+      const restPhases = { ...quest.phases };
+      delete restPhases[phaseId];
       const updatedQuest = { ...quest, phases: restPhases };
       setQuest(updatedQuest);
       setDirty(true);
