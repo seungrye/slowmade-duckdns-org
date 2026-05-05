@@ -21,7 +21,6 @@ import type { QuestDocument, QuestPhaseDef, AutoAdvance, Action } from "@/types/
 import { PhaseNode, type PhaseNodeData } from "./phase-node";
 import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
-import { QuestInfoPanel } from "./quest-info-panel";
 import { highlightEdges } from "./edge-utils";
 
 const NODE_TYPES: NodeTypes = { phase: PhaseNode };
@@ -51,6 +50,7 @@ function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[] } {
         phaseId,
         phase,
         isInitial: phaseId === quest.initialPhase,
+        giverNpc: phaseId === quest.initialPhase ? quest.giverNpc : undefined,
       } satisfies PhaseNodeData,
     });
 
@@ -198,7 +198,7 @@ export default function QuestEditorPage() {
       setNodes((nds) =>
         nds.map((n) =>
           n.id === phaseId
-            ? { ...n, data: { ...n.data, phase: updated, isInitial: phaseId === updatedQuest.initialPhase } }
+            ? { ...n, data: { ...n.data, phase: updated, isInitial: phaseId === updatedQuest.initialPhase, giverNpc: phaseId === updatedQuest.initialPhase ? updatedQuest.giverNpc : undefined } }
             : n
         )
       );
@@ -293,6 +293,23 @@ export default function QuestEditorPage() {
       setSelectedEdgeId(null);
     },
     [quest, edges, setEdges]
+  );
+
+  const updateGiverNpc = useCallback(
+    (giverNpc: string) => {
+      if (!quest) return;
+      const updatedQuest = { ...quest, giverNpc };
+      setQuest(updatedQuest);
+      setDirty(true);
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === quest.initialPhase
+            ? { ...n, data: { ...n.data, giverNpc } }
+            : n
+        )
+      );
+    },
+    [quest, setNodes]
   );
 
   // auto_advance 조건 업데이트
@@ -442,45 +459,46 @@ export default function QuestEditorPage() {
           </ReactFlow>
         </div>
 
-        {/* 우측 편집 패널 — 항상 표시 */}
-        <div className="w-80 border-l bg-white dark:bg-gray-950 overflow-hidden flex flex-col">
-          {selectedNode && quest.phases[selectedNode.id] ? (
-            <PhasePanel
-              phaseId={selectedNode.id}
-              phase={quest.phases[selectedNode.id]}
-              isInitial={selectedNode.id === quest.initialPhase}
-              phaseIds={phaseIds}
-              onUpdate={(updated) => updatePhase(selectedNode.id, updated)}
-              onDelete={() => deletePhase(selectedNode.id)}
-              onSetInitial={() => {
-                const updated = { ...quest, initialPhase: selectedNode.id };
-                setQuest(updated);
-                setDirty(true);
-                setNodes((nds) =>
-                  nds.map((n) => ({
-                    ...n,
-                    data: { ...n.data, isInitial: n.id === selectedNode.id },
-                  }))
-                );
-              }}
-            />
-          ) : selectedEdge ? (
-            <EdgePanel
-              edge={selectedEdge}
-              phases={quest.phases}
-              onUpdateAutoAdvance={updateAutoAdvance}
-              onDeleteEdge={deleteEdge}
-            />
-          ) : (
-            <QuestInfoPanel
-              quest={quest}
-              onUpdate={(fields) => {
-                setQuest({ ...quest, ...fields });
-                setDirty(true);
-              }}
-            />
-          )}
-        </div>
+        {/* 우측 편집 패널 */}
+        {(selectedNode || selectedEdge) && (
+          <div className="w-80 border-l bg-white dark:bg-gray-950 overflow-hidden flex flex-col">
+            {selectedNode && quest.phases[selectedNode.id] && (
+              <PhasePanel
+                phaseId={selectedNode.id}
+                phase={quest.phases[selectedNode.id]}
+                isInitial={selectedNode.id === quest.initialPhase}
+                giverNpc={quest.giverNpc}
+                phaseIds={phaseIds}
+                onUpdate={(updated) => updatePhase(selectedNode.id, updated)}
+                onUpdateGiverNpc={updateGiverNpc}
+                onDelete={() => deletePhase(selectedNode.id)}
+                onSetInitial={() => {
+                  const updated = { ...quest, initialPhase: selectedNode.id };
+                  setQuest(updated);
+                  setDirty(true);
+                  setNodes((nds) =>
+                    nds.map((n) => ({
+                      ...n,
+                      data: {
+                        ...n.data,
+                        isInitial: n.id === selectedNode.id,
+                        giverNpc: n.id === selectedNode.id ? quest.giverNpc : undefined,
+                      },
+                    }))
+                  );
+                }}
+              />
+            )}
+            {selectedEdge && (
+              <EdgePanel
+                edge={selectedEdge}
+                phases={quest.phases}
+                onUpdateAutoAdvance={updateAutoAdvance}
+                onDeleteEdge={deleteEdge}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

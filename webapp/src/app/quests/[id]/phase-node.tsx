@@ -8,10 +8,11 @@ export type PhaseNodeData = {
   phaseId: string;
   phase: QuestPhaseDef;
   isInitial: boolean;
+  giverNpc?: string;
 };
 
 export const PhaseNode = memo(function PhaseNode({ data }: NodeProps) {
-  const { phaseId, phase, isInitial } = data as PhaseNodeData;
+  const { phaseId, phase, isInitial, giverNpc } = data as PhaseNodeData;
   const objective = phase.objective;
 
   return (
@@ -32,6 +33,12 @@ export const PhaseNode = memo(function PhaseNode({ data }: NodeProps) {
         {phaseId}
         {isInitial && <span className="ml-1 text-[9px] opacity-80">(시작)</span>}
       </div>
+
+      {isInitial && giverNpc && (
+        <div className="px-3 py-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950 border-b border-blue-100 dark:border-blue-900 font-mono truncate">
+          NPC: {giverNpc}
+        </div>
+      )}
 
       <div className="px-3 py-2 space-y-1">
         {objective && (

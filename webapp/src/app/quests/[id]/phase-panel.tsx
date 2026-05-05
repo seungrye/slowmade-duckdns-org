@@ -8,8 +8,10 @@ interface Props {
   phaseId: string;
   phase: QuestPhaseDef;
   isInitial: boolean;
+  giverNpc: string;
   phaseIds: string[];
   onUpdate: (phase: QuestPhaseDef) => void;
+  onUpdateGiverNpc: (v: string) => void;
   onDelete: () => void;
   onSetInitial: () => void;
 }
@@ -18,8 +20,10 @@ export function PhasePanel({
   phaseId,
   phase,
   isInitial,
+  giverNpc,
   phaseIds,
   onUpdate,
+  onUpdateGiverNpc,
   onDelete,
   onSetInitial,
 }: Props) {
@@ -51,6 +55,20 @@ export function PhasePanel({
           </button>
         </div>
       </div>
+
+      {/* Giver NPC (시작 페이즈에만 표시) */}
+      {isInitial && (
+        <section>
+          <label className="text-xs font-semibold text-gray-500 block mb-1">Giver NPC</label>
+          <input
+            type="text"
+            value={giverNpc}
+            onChange={(e) => onUpdateGiverNpc(e.target.value)}
+            className="w-full border rounded px-2 py-1 text-xs font-mono"
+            placeholder="npc_id"
+          />
+        </section>
+      )}
 
       {/* Objective */}
       <section>

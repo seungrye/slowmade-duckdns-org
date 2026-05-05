@@ -60,4 +60,14 @@ describe("PhaseNode", () => {
     renderNode({ ...baseData, isInitial: false });
     expect(screen.queryByText("(시작)")).toBeNull();
   });
+
+  it("isInitial=true이고 giverNpc가 있으면 NPC 뱃지를 렌더한다", () => {
+    renderNode({ ...baseData, isInitial: true, giverNpc: "eddard_stark" });
+    expect(screen.getByText("NPC: eddard_stark")).toBeTruthy();
+  });
+
+  it("isInitial=false이면 giverNpc가 있어도 NPC 뱃지가 없다", () => {
+    renderNode({ ...baseData, isInitial: false, giverNpc: "eddard_stark" });
+    expect(screen.queryByText("NPC: eddard_stark")).toBeNull();
+  });
 });
