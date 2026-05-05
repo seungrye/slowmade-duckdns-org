@@ -1,5 +1,5 @@
 #!/bin/bash
-# git push 전 전체 테스트 스위트를 실행합니다.
+# git push 전 빌드 + 전체 테스트 스위트를 실행합니다.
 
 REPO=$(git rev-parse --show-toplevel 2>/dev/null)
 
@@ -16,3 +16,6 @@ cd "$REPO/webapp" || deny "webapp 디렉터리를 찾을 수 없습니다."
 
 pnpm test >&2
 [ $? -ne 0 ] && deny "전체 테스트가 실패했습니다. 모든 테스트를 통과한 후 push하세요."
+
+pnpm run build >&2
+[ $? -ne 0 ] && deny "빌드가 실패했습니다. 빌드 오류를 수정한 후 push하세요."
