@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildGraph } from "./build-graph";
+import { buildGraph, syncPhasePositions } from "./build-graph";
 import type { QuestDocument } from "@/types/quest";
 
 const quest: QuestDocument = {
@@ -56,5 +56,42 @@ describe("buildGraph", () => {
   it("auto_advance 엣지를 생성한다", () => {
     const { edges } = buildGraph(quest);
     expect(edges.some((e) => e.data && (e.data as { edgeType: string }).edgeType === "auto_advance")).toBe(true);
+  });
+});
+
+describe("syncPhasePositions", () => {
+  it("여러 노드 위치를 한 번에 phases에 반영한다", () => {
+    const phases = quest.phases;
+    const updatedNodes = [
+      { id: "phase_a", position: { x: 100, y: 200 } },
+      { id: "phase_b", position: { x: 300, y: 400 } },
+    ] as Parameters<typeof syncPhasePositions>[1];
+
+    const result = syncPhasePositions(phases, updatedNodes);
+
+    expect(result.phase_a.position).toEqual({ x: 100, y: 200 });
+    expect(result.phase_b.position).toEqual({ x: 300, y: 400 });
+  });
+
+  it("원본 phases를 변경하지 않는다", () => {
+    const phases = quest.phases;
+    const updatedNodes = [
+      { id: "phase_a", position: { x: 999, y: 999 } },
+    ] as Parameters<typeof syncPhasePositions>[1];
+
+    syncPhasePositions(phases, updatedNodes);
+
+    expect(phases.phase_a.position).toEqual({ x: 0, y: 0 });
+  });
+
+  it("존재하지 않는 노드 id는 무시한다", () => {
+    const phases = quest.phases;
+    const updatedNodes = [
+      { id: "nonexistent", position: { x: 50, y: 50 } },
+    ] as Parameters<typeof syncPhasePositions>[1];
+
+    const result = syncPhasePositions(phases, updatedNodes);
+
+    expect(Object.keys(result)).toEqual(Object.keys(phases));
   });
 });

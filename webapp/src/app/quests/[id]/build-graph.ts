@@ -1,6 +1,19 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { QuestDocument, Action } from "@/types/quest";
+import type { QuestDocument, Action, QuestPhaseDef } from "@/types/quest";
 import type { PhaseNodeData } from "./phase-node";
+
+export function syncPhasePositions(
+  phases: QuestDocument["phases"],
+  updatedNodes: Node[]
+): QuestDocument["phases"] {
+  const result = { ...phases };
+  for (const node of updatedNodes) {
+    if (result[node.id]) {
+      result[node.id] = { ...result[node.id], position: node.position } as QuestPhaseDef;
+    }
+  }
+  return result;
+}
 
 function collectAdvanceTargets(actions: Action[]): string[] {
   const targets: string[] = [];

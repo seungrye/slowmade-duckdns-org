@@ -21,7 +21,7 @@ import type { QuestDocument, QuestPhaseDef, AutoAdvance } from "@/types/quest";
 import { PhaseNode, type PhaseNodeData } from "./phase-node";
 import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
-import { buildGraph } from "./build-graph";
+import { buildGraph, syncPhasePositions } from "./build-graph";
 import { highlightEdges } from "./edge-utils";
 
 const NODE_TYPES: NodeTypes = { phase: PhaseNode };
@@ -58,13 +58,7 @@ export default function QuestEditorPage() {
   const syncPositions = useCallback(
     (updatedNodes: Node[]) => {
       if (!quest) return;
-      const updatedPhases = { ...quest.phases };
-      for (const node of updatedNodes) {
-        if (updatedPhases[node.id]) {
-          updatedPhases[node.id] = { ...updatedPhases[node.id], position: node.position };
-        }
-      }
-      setQuest({ ...quest, phases: updatedPhases });
+      setQuest({ ...quest, phases: syncPhasePositions(quest.phases, updatedNodes) });
       setDirty(true);
     },
     [quest]
@@ -375,6 +369,9 @@ export default function QuestEditorPage() {
               setSelectedEdgeId(null);
             }}
             onNodeDragStop={(_, __, updatedNodes) => syncPositions(updatedNodes)}
+            multiSelectionKeyCode="Shift"
+            selectionKeyCode="Shift"
+            selectionOnDrag
             snapToGrid
             snapGrid={[20, 20]}
             fitView
