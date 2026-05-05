@@ -33,7 +33,6 @@ export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[]
       if (action.type === "AdvancePhase") {
         edges.push({
           id: `${phaseId}→${action.phaseId}→interact→${ai}`,
-          type: "smoothstep",
           source: phaseId,
           target: action.phaseId,
           label: "interact",
@@ -46,8 +45,7 @@ export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[]
         collectAdvanceTargets([...action.ifTrue, ...action.ifFalse]).forEach((target, bi) => {
           edges.push({
             id: `${phaseId}→${target}→branch→${ai}→${bi}`,
-            type: "smoothstep",
-            source: phaseId,
+              source: phaseId,
             target,
             label: "branch",
             style: { stroke: "#f97316", strokeDasharray: "4 2" },
@@ -62,7 +60,6 @@ export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[]
       if (aa.nextPhase) {
         edges.push({
           id: `${phaseId}→${aa.nextPhase}→auto→${aai}`,
-          type: "smoothstep",
           source: phaseId,
           target: aa.nextPhase,
           label: "auto",

@@ -31,10 +31,9 @@ const quest: QuestDocument = {
 };
 
 describe("buildGraph", () => {
-  it("모든 엣지의 type이 smoothstep이다", () => {
+  it("엣지가 생성된다", () => {
     const { edges } = buildGraph(quest);
     expect(edges.length).toBeGreaterThan(0);
-    expect(edges.every((e) => e.type === "smoothstep")).toBe(true);
   });
 
   it("시작 노드에 giverNpc가 설정된다", () => {

@@ -98,7 +98,6 @@ export default function QuestEditorPage() {
           {
             ...connection,
             id: edgeId,
-            type: "smoothstep",
             label: "interact",
             style: { stroke: "#3b82f6" },
             data: { edgeType: "on_interact" },
