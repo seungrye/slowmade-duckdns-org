@@ -296,6 +296,19 @@ Branch 액션을 중첩 if/else 대신 switch/case 스타일로 표시.
 - `max-w-4xl mx-auto px-4 py-8` → `mx-auto px-4 py-6` (다른 페이지와 동일 패턴)
 - 수정 파일: `src/app/quests/page.tsx`
 
+## 퀘스트 목록 반응형 그리드 레이아웃
+
+### 요구사항
+- 모바일(기본): 1열, 카드 전체 너비
+- 데스크탑(md 이상): 2열 그리드, 카드 나란히 배치
+
+### 변경 사항
+- `<ul>` 클래스: `space-y-2` → `grid grid-cols-1 md:grid-cols-2 gap-4`
+- `<li>` 클래스: `flex items-center justify-between` → `flex flex-col gap-3` (제목/정보 위, 버튼 아래)
+- 버튼 영역: `flex-wrap` 추가 (좁은 카드에서 줄바꿈 허용)
+- 수정 파일: `src/app/quests/page.tsx`
+- 테스트: `src/app/quests/page.test.tsx` — 그리드 클래스 존재 여부 확인
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
