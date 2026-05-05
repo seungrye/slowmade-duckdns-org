@@ -257,6 +257,12 @@ React Flow 캔버스에 그리드 스냅 기능 추가.
 ### 수정 파일
 - `src/app/quests/[id]/condition-editor.tsx` — 전체 재작성
 
+## 빌드 오류 수정
+
+- 테스트 파일 `as any` → `as unknown as NextRequest` (ESLint no-explicit-any)
+- `page.tsx` 미사용 변수 `_` → `delete` 연산자로 교체 (no-unused-vars)
+- `revisions/page.tsx` useEffect 의존성 누락 → `load`를 `useCallback`으로 감싸기
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
