@@ -215,6 +215,14 @@ AutoAdvance(
 ### 수정 파일
 - `src/app/quests/[id]/action-editor.tsx`
 
+## 노드 그리드 스냅
+
+React Flow 캔버스에 그리드 스냅 기능 추가.
+
+- `snapToGrid` prop 활성화
+- `snapGrid={[20, 20]}` — 20px 격자 단위로 자동 흡착
+- 수정 파일: `src/app/quests/[id]/page.tsx`
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
