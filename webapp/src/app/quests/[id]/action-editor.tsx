@@ -97,13 +97,13 @@ function ActionRow({
             value={action.flag}
             onChange={(e) => onChange({ ...action, flag: e.target.value })}
             placeholder="flag"
-            className="flex-1 border rounded px-1 py-0.5 text-xs"
+            className="flex-1 min-w-0 border rounded px-1 py-0.5 text-xs"
           />
           <input
             value={action.value}
             onChange={(e) => onChange({ ...action, value: e.target.value })}
             placeholder="value"
-            className="flex-1 border rounded px-1 py-0.5 text-xs"
+            className="flex-1 min-w-0 border rounded px-1 py-0.5 text-xs"
           />
         </div>
       )}
