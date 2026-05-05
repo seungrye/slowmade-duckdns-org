@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, act } from '@testing-library/react';
 import QuestsPage from './page';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({}) }));

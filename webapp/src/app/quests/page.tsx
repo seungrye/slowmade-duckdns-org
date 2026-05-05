@@ -169,7 +169,7 @@ export default function QuestsPage() {
           {quests.map((q) => (
             <li
               key={q._id}
-              className="flex flex-col gap-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
               <div>
                 <Link href={`/quests/${q._id}`} className="font-medium hover:text-blue-500 block">
@@ -179,7 +179,7 @@ export default function QuestsPage() {
                   {q.id} · v{q.version} · {new Date(q.updatedAt).toLocaleDateString("ko-KR")}
                 </p>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-shrink-0">
                 <label className="cursor-pointer px-2 py-1 text-xs rounded border hover:border-blue-400 hover:text-blue-500 transition-colors">
                   import
                   <input
