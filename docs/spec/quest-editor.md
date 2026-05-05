@@ -263,6 +263,34 @@ React Flow 캔버스에 그리드 스냅 기능 추가.
 - `page.tsx` 미사용 변수 `_` → `delete` 연산자로 교체 (no-unused-vars)
 - `revisions/page.tsx` useEffect 의존성 누락 → `load`를 `useCallback`으로 감싸기
 
+## Branch 액션 Switch/Case UI
+
+### 개요
+Branch 액션을 중첩 if/else 대신 switch/case 스타일로 표시.
+데이터 모델(중첩 Branch)은 변경 없음 — UI 표현만 변환.
+
+### 변환 규칙
+- **flatten**: Branch 체인(`ifFalse = [Branch(...)]`)을 재귀적으로 펼쳐 case 목록 + default 생성
+- **unflatten**: case 목록 + default를 역방향으로 접어서 중첩 Branch 재구성
+- 모든 Branch 액션에 적용 (단일 Branch도 case 1 + default로 표시)
+
+### UI 레이아웃
+```
+[Branch ▼] [✕]
+  case 1                    [✕]
+    [ConditionEditor]
+    [ActionEditor (ifTrue)]
+  case 2                    [✕]
+    [ConditionEditor]
+    [ActionEditor (ifTrue)]
+  default
+    [ActionEditor (ifFalse)]
+  [+ 케이스 추가]
+```
+
+### 수정 파일
+- `src/app/quests/[id]/action-editor.tsx` — flattenBranch/unflattenBranch 헬퍼 + SwitchCaseEditor 컴포넌트
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
