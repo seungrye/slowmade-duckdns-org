@@ -188,9 +188,20 @@ AutoAdvance(
 - Mongoose strict 모드 기본값 = 미지정 필드 silently drop → 저장 후 데이터 소실
 - 수정: `phases`와 `spawns`를 `Schema.Types.Mixed`로 변경해 arbitrary JSON 허용
 
+### 문제 3: `lean()` 반환값에 `Object.fromEntries` 호출 → TypeError
+- `lean()`은 Mongoose Map 필드를 plain object로 반환 (Map 인스턴스 아님)
+- `Object.fromEntries(plainObject)` → TypeError: not iterable
+- GET `/api/quests/[id]` 및 GET `/api/quests/[id]/export` 에서 발생
+- 수정: `instanceof Map` 분기로 Map/plain object 모두 처리
+
 ### 수정 파일
 - `src/models/quest.tsx` — phases/spawns Mixed 타입으로 변경, giverNpc required 제거
-- `src/app/api/quests/[id]/route.tsx` — Map 할당 방식 수정
+- `src/app/api/quests/[id]/route.tsx` — lean() Map 처리 + Map 할당 방식 수정
+- `src/app/api/quests/[id]/export/route.tsx` — lean() Map 처리 수정
+- `src/app/api/quests/[id]/import/route.tsx` — plain object → Map 변환 추가
+- `src/app/api/quests/[id]/revisions/[ver]/restore/route.tsx` — Map 변환 및 응답 형식 수정
+- `src/app/quests/[id]/action-editor.tsx` — Branch ifTrue/ifFalse 구조로 재설계
+- `src/app/quests/[id]/page.tsx` — Branch 엣지 생성 재설계
 
 ## 작업 목록
 
