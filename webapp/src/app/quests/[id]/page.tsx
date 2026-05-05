@@ -17,89 +17,14 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import type { QuestDocument, QuestPhaseDef, AutoAdvance, Action } from "@/types/quest";
+import type { QuestDocument, QuestPhaseDef, AutoAdvance } from "@/types/quest";
 import { PhaseNode, type PhaseNodeData } from "./phase-node";
 import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
+import { buildGraph } from "./build-graph";
 import { highlightEdges } from "./edge-utils";
 
 const NODE_TYPES: NodeTypes = { phase: PhaseNode };
-
-function collectAdvanceTargets(actions: Action[]): string[] {
-  const targets: string[] = [];
-  for (const a of actions) {
-    if (a.type === "AdvancePhase") targets.push(a.phaseId);
-    if (a.type === "Branch") targets.push(...collectAdvanceTargets([...a.ifTrue, ...a.ifFalse]));
-  }
-  return targets;
-}
-
-// ── 퀘스트 → React Flow 노드/엣지 변환 ───────────────────────────────────
-
-function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[] } {
-  const nodes: Node[] = [];
-  const edges: Edge[] = [];
-  let autoX = 0;
-
-  for (const [phaseId, phase] of Object.entries(quest.phases)) {
-    nodes.push({
-      id: phaseId,
-      type: "phase",
-      position: phase.position ?? { x: autoX++ * 240, y: 0 },
-      data: {
-        phaseId,
-        phase,
-        isInitial: phaseId === quest.initialPhase,
-        giverNpc: phaseId === quest.initialPhase ? quest.giverNpc : undefined,
-      } satisfies PhaseNodeData,
-    });
-
-    // on_interact → AdvancePhase 엣지
-    phase.on_interact.forEach((action, ai) => {
-      if (action.type === "AdvancePhase") {
-        edges.push({
-          id: `${phaseId}→${action.phaseId}→interact→${ai}`,
-          source: phaseId,
-          target: action.phaseId,
-          label: "interact",
-          style: { stroke: "#3b82f6" },
-          data: { edgeType: "on_interact" },
-          animated: false,
-        });
-      }
-      if (action.type === "Branch") {
-        collectAdvanceTargets([...action.ifTrue, ...action.ifFalse]).forEach((target, bi) => {
-          edges.push({
-            id: `${phaseId}→${target}→branch→${ai}→${bi}`,
-            source: phaseId,
-            target,
-            label: "branch",
-            style: { stroke: "#f97316", strokeDasharray: "4 2" },
-            data: { edgeType: "branch" },
-            animated: false,
-          });
-        });
-      }
-    });
-
-    // auto_advance 엣지
-    phase.auto_advance.forEach((aa, aai) => {
-      if (aa.nextPhase) {
-        edges.push({
-          id: `${phaseId}→${aa.nextPhase}→auto→${aai}`,
-          source: phaseId,
-          target: aa.nextPhase,
-          label: "auto",
-          style: { stroke: "#f59e0b", strokeDasharray: "6 3" },
-          data: { edgeType: "auto_advance", aaIndex: aai },
-          animated: true,
-        });
-      }
-    });
-  }
-
-  return { nodes, edges };
-}
 
 // ── 메인 에디터 ───────────────────────────────────────────────────────────
 
@@ -173,6 +98,7 @@ export default function QuestEditorPage() {
           {
             ...connection,
             id: edgeId,
+            type: "smoothstep",
             label: "interact",
             style: { stroke: "#3b82f6" },
             data: { edgeType: "on_interact" },
