@@ -11,15 +11,23 @@ interface Props {
 
 function emptyAction(type: Action["type"]): Action {
   switch (type) {
-    case "AdvancePhase": return { type, phaseId: "" };
-    case "Log":          return { type, text: "" };
-    case "GiveItem":     return { type, itemId: "" };
-    case "SetFlag":      return { type, flag: "", value: "" };
-    case "KillNpc":      return { type, npcId: "" };
-    case "Branch":       return { type, branches: [{ condition: { type: "Always" }, phaseId: "" }] };
+    case "AdvancePhase":     return { type, phaseId: "" };
+    case "Log":              return { type, text: "" };
+    case "GiveItem":         return { type, itemId: "" };
+    case "RemoveItem":       return { type, itemId: "" };
+    case "SetFlag":          return { type, flag: "", value: "" };
+    case "KillNpc":          return { type, npcId: "" };
+    case "DespawnWorldItem": return { type, itemId: "" };
+    case "Branch":           return {
+      type,
+      condition: { type: "Always" } satisfies Condition,
+      ifTrue: [],
+      ifFalse: [],
+    };
   }
 }
 
+// Use function declaration so ActionEditor (declared later) is accessible via hoisting
 function ActionRow({
   action,
   onChange,
@@ -42,8 +50,10 @@ function ActionRow({
           <option value="AdvancePhase">AdvancePhase</option>
           <option value="Log">Log</option>
           <option value="GiveItem">GiveItem</option>
+          <option value="RemoveItem">RemoveItem</option>
           <option value="SetFlag">SetFlag</option>
           <option value="KillNpc">KillNpc</option>
+          <option value="DespawnWorldItem">DespawnWorldItem</option>
           <option value="Branch">Branch</option>
         </select>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
@@ -72,10 +82,10 @@ function ActionRow({
         />
       )}
 
-      {action.type === "GiveItem" && (
+      {(action.type === "GiveItem" || action.type === "RemoveItem" || action.type === "DespawnWorldItem") && (
         <input
           value={action.itemId}
-          onChange={(e) => onChange({ ...action, itemId: e.target.value })}
+          onChange={(e) => onChange({ ...action, itemId: e.target.value } as Action)}
           placeholder="아이템 ID"
           className="w-full border rounded px-1 py-0.5 text-xs"
         />
@@ -108,49 +118,24 @@ function ActionRow({
       )}
 
       {action.type === "Branch" && (
-        <div className="space-y-1 pl-1 border-l-2 border-orange-300">
-          {action.branches.map((branch, bi) => (
-            <div key={bi} className="space-y-1">
-              <ConditionEditor
-                condition={branch.condition}
-                onChange={(c) => {
-                  const branches = [...action.branches];
-                  branches[bi] = { ...branch, condition: c };
-                  onChange({ ...action, branches });
-                }}
-              />
-              <select
-                value={branch.phaseId}
-                onChange={(e) => {
-                  const branches = [...action.branches];
-                  branches[bi] = { ...branch, phaseId: e.target.value };
-                  onChange({ ...action, branches });
-                }}
-                className="w-full border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
-              >
-                <option value="">이동할 페이즈</option>
-                {phaseIds.map((id) => <option key={id} value={id}>{id}</option>)}
-              </select>
-              <button
-                onClick={() => {
-                  const branches = action.branches.filter((_, i) => i !== bi);
-                  onChange({ ...action, branches });
-                }}
-                className="text-[10px] text-red-400 hover:text-red-600"
-              >
-                분기 제거
-              </button>
-            </div>
-          ))}
-          <button
-            onClick={() => onChange({
-              ...action,
-              branches: [...action.branches, { condition: { type: "Always" } satisfies Condition, phaseId: "" }],
-            })}
-            className="text-[10px] text-blue-500 hover:text-blue-700"
-          >
-            + 분기 추가
-          </button>
+        <div className="space-y-2 pl-1 border-l-2 border-orange-300">
+          <div className="text-[10px] font-semibold text-gray-500">조건</div>
+          <ConditionEditor
+            condition={action.condition}
+            onChange={(c) => onChange({ ...action, condition: c })}
+          />
+          <div className="text-[10px] font-semibold text-gray-500">참일 때 (if_true)</div>
+          <ActionEditor
+            actions={action.ifTrue}
+            onChange={(acts) => onChange({ ...action, ifTrue: acts })}
+            phaseIds={phaseIds}
+          />
+          <div className="text-[10px] font-semibold text-gray-500">거짓일 때 (if_false)</div>
+          <ActionEditor
+            actions={action.ifFalse}
+            onChange={(acts) => onChange({ ...action, ifFalse: acts })}
+            phaseIds={phaseIds}
+          />
         </div>
       )}
     </div>

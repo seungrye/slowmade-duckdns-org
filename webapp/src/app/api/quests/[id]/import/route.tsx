@@ -39,10 +39,13 @@ export async function POST(req: NextRequest, { params }: Params) {
   quest.title = def.title;
   quest.giverNpc = def.giverNpc;
   quest.initialPhase = def.initialPhase;
-  quest.phases = def.phases as never;
-  quest.spawns = def.spawns as never;
+  quest.phases = new Map(Object.entries(def.phases));
+  quest.spawns = def.spawns as unknown[];
   quest.version = (quest.version ?? 1) + 1;
 
   await quest.save();
-  return apiSuccess(quest);
+  return apiSuccess({
+    ...quest.toObject(),
+    phases: Object.fromEntries(quest.phases ?? new Map()),
+  });
 }

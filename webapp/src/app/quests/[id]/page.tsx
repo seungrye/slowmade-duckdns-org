@@ -18,12 +18,21 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import type { QuestDocument, QuestPhaseDef, AutoAdvance } from "@/types/quest";
+import type { QuestDocument, QuestPhaseDef, AutoAdvance, Action } from "@/types/quest";
 import { PhaseNode, type PhaseNodeData } from "./phase-node";
 import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
 
 const NODE_TYPES: NodeTypes = { phase: PhaseNode };
+
+function collectAdvanceTargets(actions: Action[]): string[] {
+  const targets: string[] = [];
+  for (const a of actions) {
+    if (a.type === "AdvancePhase") targets.push(a.phaseId);
+    if (a.type === "Branch") targets.push(...collectAdvanceTargets([...a.ifTrue, ...a.ifFalse]));
+  }
+  return targets;
+}
 
 // ── 퀘스트 → React Flow 노드/엣지 변환 ───────────────────────────────────
 
@@ -58,11 +67,11 @@ function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[] } {
         });
       }
       if (action.type === "Branch") {
-        action.branches.forEach((b, bi) => {
+        collectAdvanceTargets([...action.ifTrue, ...action.ifFalse]).forEach((target, bi) => {
           edges.push({
-            id: `${phaseId}→${b.phaseId}→branch→${ai}→${bi}`,
+            id: `${phaseId}→${target}→branch→${ai}→${bi}`,
             source: phaseId,
-            target: b.phaseId,
+            target,
             label: "branch",
             style: { stroke: "#f97316", strokeDasharray: "4 2" },
             data: { edgeType: "branch" },

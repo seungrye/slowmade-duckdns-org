@@ -35,10 +35,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
   quest.title = def.title as string;
   quest.giverNpc = def.giverNpc as string;
   quest.initialPhase = def.initialPhase as string;
-  quest.phases = def.phases as never;
-  quest.spawns = def.spawns as never;
+  quest.phases = new Map(Object.entries((def.phases as Record<string, unknown>) ?? {}));
+  quest.spawns = (def.spawns as unknown[]) ?? [];
   quest.version = (quest.version ?? 1) + 1;
 
   await quest.save();
-  return apiSuccess(quest, 200, `버전 ${version}으로 롤백 완료`);
+  return apiSuccess({
+    ...quest.toObject(),
+    phases: Object.fromEntries(quest.phases ?? new Map()),
+  }, 200, `버전 ${version}으로 롤백 완료`);
 }

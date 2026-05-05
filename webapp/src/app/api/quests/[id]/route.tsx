@@ -11,7 +11,15 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params;
   const quest = await Quest.findById(id).lean();
   if (!quest) return apiError("퀘스트를 찾을 수 없습니다.", 404);
-  return apiSuccess(quest);
+  // lean() returns plain objects; Map instances come from non-lean documents
+  const rawPhases = quest.phases as unknown;
+  const data = {
+    ...quest,
+    phases: rawPhases instanceof Map
+      ? Object.fromEntries(rawPhases)
+      : (rawPhases as Record<string, unknown>) ?? {},
+  };
+  return apiSuccess(data);
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
@@ -36,13 +44,21 @@ export async function PUT(req: NextRequest, { params }: Params) {
     },
   });
 
-  quest.title = body.title ?? quest.title;
-  quest.giverNpc = body.giverNpc ?? quest.giverNpc;
-  quest.initialPhase = body.initialPhase ?? quest.initialPhase;
-  quest.phases = body.phases ?? quest.phases;
-  quest.spawns = body.spawns ?? quest.spawns;
-  quest.version = (quest.version ?? 1) + 1;
+  if (body.title !== undefined) quest.title = body.title;
+  if (body.giverNpc !== undefined) quest.giverNpc = body.giverNpc;
+  if (body.initialPhase !== undefined) quest.initialPhase = body.initialPhase;
+  if (body.spawns !== undefined) quest.spawns = body.spawns;
 
+  // phases는 plain object → Map으로 변환해서 저장
+  if (body.phases !== undefined) {
+    quest.phases = new Map(Object.entries(body.phases));
+  }
+
+  quest.version = (quest.version ?? 1) + 1;
   await quest.save();
-  return apiSuccess(quest);
+
+  return apiSuccess({
+    ...quest.toObject(),
+    phases: Object.fromEntries(quest.phases ?? new Map()),
+  });
 }

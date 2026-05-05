@@ -18,8 +18,9 @@ export async function GET(_req: NextRequest, { params }: Params) {
     title: quest.title,
     giverNpc: quest.giverNpc,
     initialPhase: quest.initialPhase,
-    phases: Object.fromEntries(
-      (quest.phases as unknown as Map<string, unknown>) ?? new Map()
+    phases: (quest.phases instanceof Map
+      ? Object.fromEntries(quest.phases)
+      : (quest.phases as unknown as Record<string, unknown>) ?? {}
     ) as QuestDef["phases"],
     spawns: (quest.spawns as QuestDef["spawns"]) ?? [],
   };
