@@ -165,21 +165,21 @@ export default function QuestsPage() {
       ) : quests.length === 0 ? (
         <p className="text-gray-400">퀘스트가 없습니다.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {quests.map((q) => (
             <li
               key={q._id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+              className="flex flex-col gap-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
               <div>
-                <Link href={`/quests/${q._id}`} className="font-medium hover:text-blue-500">
+                <Link href={`/quests/${q._id}`} className="font-medium hover:text-blue-500 block">
                   {q.title}
                 </Link>
                 <p className="text-xs text-gray-500 mt-0.5">
                   {q.id} · v{q.version} · {new Date(q.updatedAt).toLocaleDateString("ko-KR")}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <label className="cursor-pointer px-2 py-1 text-xs rounded border hover:border-blue-400 hover:text-blue-500 transition-colors">
                   import
                   <input
