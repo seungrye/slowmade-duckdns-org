@@ -12,14 +12,22 @@ const firebaseConfig = {
   measurementId:     process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+const isFirebaseConfigured = Boolean(firebaseConfig.projectId && firebaseConfig.appId);
+
+if (!isFirebaseConfigured) {
+  console.warn('[Firebase] 환경 변수가 설정되지 않아 Firebase 기능이 비활성화됩니다. (NEXT_PUBLIC_FIREBASE_PROJECT_ID, NEXT_PUBLIC_FIREBASE_APP_ID 등 확인)');
+}
+
+const app = isFirebaseConfigured
+  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0])
+  : null;
 
 let analyticsPromise: Promise<Analytics | null> | null = null;
 
 let performanceInstance: FirebasePerformance | null = null;
 
 export function getFirebasePerformance(): FirebasePerformance | null {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined' || !app) return null;
   if (!performanceInstance) {
     performanceInstance = getPerformance(app);
   }
@@ -27,6 +35,7 @@ export function getFirebasePerformance(): FirebasePerformance | null {
 }
 
 export function getFirebaseAnalytics(): Promise<Analytics | null> {
+  if (!app) return Promise.resolve(null);
   if (!analyticsPromise) {
     analyticsPromise = isSupported().then((supported) => {
       if (!supported) return null;

@@ -2,6 +2,7 @@
   "name": "site",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack -p 3010",
     "build": "next build",
@@ -67,7 +68,7 @@
     "eslint": "^9.39.2",
     "eslint-config-next": "15.2.4",
     "eslint-plugin-react-hooks": "^5.2.0",
-    "jsdom": "^29.1.0",
+    "jsdom": "^26.0.0",
     "sass": "^1.97.0",
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",

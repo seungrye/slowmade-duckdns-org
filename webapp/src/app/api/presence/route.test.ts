@@ -3,6 +3,9 @@ import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('@/lib/firebase-verify-token', () => ({
+  verifyFirebaseIdToken: vi.fn(),
+}));
 vi.mock('@/models/presence', () => ({
   default: {
     create: vi.fn(),
@@ -19,6 +22,7 @@ import { POST, GET } from './route';
 import Presence from '@/models/presence';
 import User from '@/models/user';
 import { auth } from '@/auth';
+import { verifyFirebaseIdToken } from '@/lib/firebase-verify-token';
 
 function makePostRequest(body: unknown, token?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -40,6 +44,7 @@ describe('POST /api/presence', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('유효한 토큰과 enter 이벤트로 201을 반환한다', async () => {
+    (verifyFirebaseIdToken as ReturnType<typeof vi.fn>).mockResolvedValue('user@test.com');
     (User.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
       select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ email: 'user@test.com' }) }),
     });
@@ -57,6 +62,7 @@ describe('POST /api/presence', () => {
   });
 
   it('DB에 없는 토큰이면 401을 반환한다', async () => {
+    (verifyFirebaseIdToken as ReturnType<typeof vi.fn>).mockResolvedValue('user@test.com');
     (User.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
       select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(null) }),
     });
@@ -65,6 +71,7 @@ describe('POST /api/presence', () => {
   });
 
   it('event 값이 enter/exit 아니면 400을 반환한다', async () => {
+    (verifyFirebaseIdToken as ReturnType<typeof vi.fn>).mockResolvedValue('user@test.com');
     (User.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
       select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ email: 'user@test.com' }) }),
     });
