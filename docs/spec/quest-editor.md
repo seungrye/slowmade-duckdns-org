@@ -203,6 +203,18 @@ AutoAdvance(
 - `src/app/quests/[id]/action-editor.tsx` — Branch ifTrue/ifFalse 구조로 재설계
 - `src/app/quests/[id]/page.tsx` — Branch 엣지 생성 재설계
 
+## UI 버그픽스 — SetFlag 입력 필드 오버플로우
+
+### 문제
+- `action-editor.tsx`의 SetFlag 액션에서 flag/value 입력 두 개를 `flex gap-1`로 나란히 배치
+- flex 자식의 기본 `min-width: auto` 때문에 긴 값 입력 시 컨테이너 박스를 벗어남
+
+### 수정
+- 두 `<input>`에 `min-w-0` 추가 → flex 자식이 컨테이너 내로 수축 가능
+
+### 수정 파일
+- `src/app/quests/[id]/action-editor.tsx`
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
