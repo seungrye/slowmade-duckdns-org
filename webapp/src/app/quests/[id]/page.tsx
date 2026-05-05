@@ -7,7 +7,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   addEdge,
   useNodesState,
   useEdgesState,
@@ -307,6 +306,17 @@ export default function QuestEditorPage() {
     [quest, updatePhase]
   );
 
+  const handleNodesChange = useCallback(
+    (changes: Parameters<typeof onNodesChange>[0]) => {
+      onNodesChange(changes);
+      const hasDragEnd = changes.some(
+        (c) => c.type === "position" && !("dragging" in c && c.dragging)
+      );
+      if (hasDragEnd) setDirty(true);
+    },
+    [onNodesChange]
+  );
+
   // 저장
   async function save() {
     if (!quest) return;
@@ -406,17 +416,7 @@ export default function QuestEditorPage() {
             nodes={nodes}
             edges={displayEdges}
             nodeTypes={NODE_TYPES}
-            onNodesChange={(changes) => {
-              onNodesChange(changes);
-              // 드래그 종료 시 위치 동기화
-              const posChanges = changes.filter(
-                (c) => c.type === "position" && !("dragging" in c && c.dragging)
-              );
-              if (posChanges.length > 0) {
-                // 최신 nodes 기준으로 동기화는 다음 렌더에서
-                setDirty(true);
-              }
-            }}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeClick={(_, node) => {
@@ -438,7 +438,6 @@ export default function QuestEditorPage() {
           >
             <Background />
             <Controls />
-            <MiniMap />
           </ReactFlow>
         </div>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { Handle, Position, NodeProps } from "@xyflow/react";
 import type { QuestPhaseDef } from "@/types/quest";
 
@@ -9,7 +10,7 @@ export type PhaseNodeData = {
   isInitial: boolean;
 };
 
-export function PhaseNode({ data }: NodeProps) {
+export const PhaseNode = memo(function PhaseNode({ data }: NodeProps) {
   const { phaseId, phase, isInitial } = data as PhaseNodeData;
   const objective = phase.objective;
 
@@ -56,4 +57,4 @@ export function PhaseNode({ data }: NodeProps) {
       <Handle type="source" position={Position.Bottom} className="!bg-gray-400" />
     </div>
   );
-}
+});
