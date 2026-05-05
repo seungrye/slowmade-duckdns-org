@@ -265,11 +265,13 @@ export default function QuestEditorPage() {
       }
     }
     setSaving(true);
-    await fetch(`/api/quests/${id}`, {
+    const res = await fetch(`/api/quests/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...quest, phases: phasesWithPos }),
     });
+    const { data: saved } = await res.json();
+    if (saved) setQuest(saved);
     setSaving(false);
     setDirty(false);
   }

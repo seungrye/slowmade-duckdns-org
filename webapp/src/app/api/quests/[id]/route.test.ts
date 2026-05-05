@@ -109,6 +109,22 @@ describe('PUT /api/quests/[id]', () => {
     expect(QuestRevision.create).toHaveBeenCalledWith(expect.objectContaining({ questId: 'mongo-id', version: 1 }));
   });
 
+  it('응답 data에 갱신된 version이 포함된다', async () => {
+    const mockPhases = new Map([['dormant', { dialog: [] }]]);
+    const mockQuest = {
+      _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '',
+      initialPhase: 'dormant', phases: mockPhases, spawns: [], version: 3,
+      save: vi.fn().mockResolvedValue(undefined),
+      toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', spawns: [], version: 4, phases: mockPhases }),
+    };
+    (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
+    (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const res = await PUT(makeRequest('PUT', { title: 'T' }), { params });
+    const body = await res.json();
+    expect(body.data.version).toBe(4);
+  });
+
   it('body.phases를 Map으로 변환해서 저장한다', async () => {
     const mockPhases = new Map([['dormant', { dialog: [] }]]);
     const mockQuest = {
