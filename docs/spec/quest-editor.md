@@ -167,10 +167,11 @@ AutoAdvance(
 
 ### 수정 파일
 
-- `src/types/quest.ts` — Condition / Action / AutoAdvance 타입 확장
-- `src/lib/ron.ts` — 파서 + 직렬화 전체 보완
-- `src/lib/ron.test.ts` — 누락 구문 커버 테스트 추가
-- `src/app/quests/[id]/action-editor.tsx` — Branch if_true/if_false UI 반영
+- ✅ `src/types/quest.ts` — Condition / Action / AutoAdvance / SpawnZone 타입 확장
+- ✅ `src/lib/ron.ts` — 파서 + 직렬화 전체 보완
+- ✅ `src/lib/ron.test.ts` — 24개 테스트, 실제 7개 .ron 파일 전수 통과
+- ✅ `src/app/quests/[id]/action-editor.tsx` — Branch if_true/if_false UI 반영
+- ✅ 추가 발견: `InZone(zone)` 조건, `Forest` (괄호 없는) SpawnZone
 
 ## 작업 목록
 
