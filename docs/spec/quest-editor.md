@@ -223,6 +223,19 @@ React Flow 캔버스에 그리드 스냅 기능 추가.
 - `snapGrid={[20, 20]}` — 20px 격자 단위로 자동 흡착
 - 수정 파일: `src/app/quests/[id]/page.tsx`
 
+## 퀘스트 삭제
+
+### API
+- `DELETE /api/quests/[id]` — Quest + 연관 QuestRevision 전부 삭제
+
+### UI
+- `/quests` 목록 페이지 각 항목에 삭제 버튼 추가
+- 클릭 시 `confirm()` 확인 후 삭제, 성공하면 목록 재로드
+
+### 수정 파일
+- `src/app/api/quests/[id]/route.tsx` — DELETE 핸들러 추가
+- `src/app/quests/page.tsx` — 삭제 버튼 + handleDelete 추가
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
