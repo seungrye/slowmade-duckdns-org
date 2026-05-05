@@ -236,6 +236,27 @@ React Flow 캔버스에 그리드 스냅 기능 추가.
 - `src/app/api/quests/[id]/route.tsx` — DELETE 핸들러 추가
 - `src/app/quests/page.tsx` — 삭제 버튼 + handleDelete 추가
 
+## condition-editor 전체 조건 타입 지원
+
+### 문제
+`condition-editor.tsx`가 `Always`/`FlagIs`/`HasItem` 세 가지만 지원.
+`And`/`Or`/`Not`/`PhaseIs`/`InZone` 조건은 드롭다운에 없어 "Always"로 오표시됨.
+
+### 지원할 타입
+| 타입 | UI |
+|------|----|
+| `Always` | 파라미터 없음 |
+| `FlagIs` | flag, value 텍스트 입력 |
+| `HasItem` | itemId 텍스트 입력 |
+| `And` | 서브 조건 목록 (재귀, + 추가 / ✕ 제거) |
+| `Or` | 서브 조건 목록 (재귀, + 추가 / ✕ 제거) |
+| `Not` | 서브 조건 단일 (재귀) |
+| `PhaseIs` | quest, phase 텍스트 입력 |
+| `InZone` | zone 타입 선택 (Dungeon/World/Forest) + 파라미터 |
+
+### 수정 파일
+- `src/app/quests/[id]/condition-editor.tsx` — 전체 재작성
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
