@@ -120,6 +120,58 @@
 
 ---
 
+---
+
+## RON 파서 보완 (버그픽스)
+
+실제 `.ron` 파일 파싱 검증 결과 누락된 구문 발견.
+
+### 누락된 조건 타입
+
+| 구문 | 예시 |
+|------|------|
+| `And([cond, ...])` | `And([HasItem("x"), FlagIs(flag:"y", value:"z")])` |
+| `Or([cond, ...])` | `Or([HasItem("x"), PhaseIs(...)])` |
+| `Not(cond)` | `Not(HasItem("dragon_scale"))` |
+| `PhaseIs(quest: "...", phase: "...")` | 퀘스트 간 교차 참조 |
+
+### Branch 구조 완전 재설계
+
+기존 구현(잘못됨):
+```ron
+Branch([{ condition, phaseId }])
+```
+실제 파일 구조:
+```ron
+Branch(
+    condition: <condition>,
+    if_true: [actions...],
+    if_false: [actions...],
+)
+```
+
+### 누락된 액션 타입
+
+- `RemoveItem(itemId)` — 인벤토리에서 아이템 제거
+- `DespawnWorldItem(itemId)` — 월드 오브젝트 제거
+
+### AutoAdvance actions 필드
+
+```ron
+AutoAdvance(
+    condition: HasItem("x"),
+    next_phase: "y",
+    actions: [DespawnWorldItem("z")],   // 선택 필드
+)
+```
+
+### 수정 파일
+
+- `src/types/quest.ts` — Condition / Action / AutoAdvance 타입 확장
+- `src/lib/ron.ts` — 파서 + 직렬화 전체 보완
+- `src/lib/ron.test.ts` — 누락 구문 커버 테스트 추가
+- `src/app/quests/[id]/action-editor.tsx` — Branch if_true/if_false UI 반영
+
 ## 작업 목록
 
 - ✅ `src/types/quest.ts` — 타입 정의
