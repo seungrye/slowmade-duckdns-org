@@ -40,6 +40,12 @@ export default function QuestsPage() {
     }
   }
 
+  async function handleDelete(quest: QuestDocument) {
+    if (!confirm(`"${quest.title}" 퀘스트를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    await fetch(`/api/quests/${quest._id}`, { method: "DELETE" });
+    load();
+  }
+
   async function handleImport(questId: string, file: File) {
     const text = await file.text();
     const res = await fetch(`/api/quests/${questId}/import`, {
@@ -199,6 +205,12 @@ export default function QuestsPage() {
                 >
                   편집
                 </Link>
+                <button
+                  onClick={() => handleDelete(q)}
+                  className="px-2 py-1 text-xs rounded border border-red-200 text-red-400 hover:border-red-400 hover:text-red-600 transition-colors"
+                >
+                  삭제
+                </button>
               </div>
             </li>
           ))}

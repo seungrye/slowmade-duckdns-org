@@ -22,6 +22,16 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return apiSuccess(data);
 }
 
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  await connectToDB();
+  const { id } = await params;
+  const quest = await Quest.findById(id);
+  if (!quest) return apiError("퀘스트를 찾을 수 없습니다.", 404);
+  await QuestRevision.deleteMany({ questId: quest._id });
+  await quest.deleteOne();
+  return apiSuccess({ id });
+}
+
 export async function PUT(req: NextRequest, { params }: Params) {
   await connectToDB();
   const { id } = await params;

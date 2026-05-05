@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/quest', () => ({ default: { findById: vi.fn() } }));
-vi.mock('@/models/quest-revision', () => ({ default: { create: vi.fn() } }));
+vi.mock('@/models/quest-revision', () => ({ default: { create: vi.fn(), deleteMany: vi.fn() } }));
 
-import { GET, PUT } from './route';
+import { GET, PUT, DELETE } from './route';
 import Quest from '@/models/quest';
 import QuestRevision from '@/models/quest-revision';
 
@@ -55,6 +55,30 @@ describe('GET /api/quests/[id]', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.phases).toHaveProperty('dormant');
+  });
+});
+
+describe('DELETE /api/quests/[id]', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('퀘스트를 찾지 못하면 404를 반환한다', async () => {
+    (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    const res = await DELETE(makeRequest('DELETE') as any, { params });
+    expect(res.status).toBe(404);
+  });
+
+  it('퀘스트와 revision을 삭제하고 200을 반환한다', async () => {
+    const mockQuest = {
+      _id: 'mongo-id', id: 'q1',
+      deleteOne: vi.fn().mockResolvedValue(undefined),
+    };
+    (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
+    (QuestRevision.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const res = await DELETE(makeRequest('DELETE') as any, { params });
+    expect(res.status).toBe(200);
+    expect(QuestRevision.deleteMany).toHaveBeenCalledWith({ questId: 'mongo-id' });
+    expect(mockQuest.deleteOne).toHaveBeenCalled();
   });
 });
 
