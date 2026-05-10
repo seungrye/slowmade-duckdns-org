@@ -85,7 +85,7 @@ bevy-rogue `assets/quests/` 의 10개 파일을 모두:
 
 ---
 
-## B2 — 에디터 인라인 편집 UI
+## ✅ B2 — 에디터 인라인 편집 UI
 
 B1 에서 read-only 폴백으로 노출한 신규 변형을 webapp 에디터에서 직접
 인라인 편집 가능하도록 한다. 이로써 import 없이 신규 액션·조건을
@@ -94,13 +94,13 @@ B1 에서 read-only 폴백으로 노출한 신규 변형을 webapp 에디터에�
 ### 대상 변형
 
 #### `Condition`
-- [ ] `HasFlag(flag)` — flag 입력 1
+- [x] `HasFlag(flag)` — flag 입력 1
 
 #### `Action`
-- [ ] `GiveItems(item, count)` — itemId 입력 + count 숫자 입력
-- [ ] `ClearFlag(flag)` — flag 입력 1
-- [ ] `ClosePortal(zone)` — zone 입력 1
-- [ ] `OpenPortal(zone, generator, placement?)` —
+- [x] `GiveItems(item, count)` — itemId 입력 + count 숫자 입력
+- [x] `ClearFlag(flag)` — flag 입력 1
+- [x] `ClosePortal(zone)` — zone 입력 1
+- [x] `OpenPortal(zone, generator, placement?)` —
   - zone, generator 입력
   - placement select: `(기본)` / `InsideRoom` / `Border` / `Random` / `NearGiver`
   - `NearGiver` 선택 시 radius 숫자 입력 추가
