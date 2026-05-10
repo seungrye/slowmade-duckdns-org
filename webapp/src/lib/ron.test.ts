@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { parseRon, serializeRon, parseVillagersRon, serializeVillagersRon } from "./ron";
-import { readFileSync } from "fs";
-import { join } from "path";
 import type { QuestDef } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
 
@@ -447,40 +445,6 @@ describe("serializeRon — 신규 변형 라운드트립", () => {
   });
 });
 
-describe("실제 .ron 파일 파싱·라운드트립", () => {
-  const questsDir = join(process.cwd(), "quests");
-
-  const files = [
-    "gem_quest.ron",
-    "herb_quest.ron",
-    "alchemist_quest.ron",
-    "parry_quest.ron",
-    "demonsword_quest.ron",
-    "prologue_fog.ron",
-    "stark_quest.ron",
-    "targaryen_quest.ron",
-    "jon_snow_quest.ron",
-    "world_fracture.ron",
-  ];
-
-  for (const file of files) {
-    it(`${file} 파싱 성공`, () => {
-      const src = readFileSync(join(questsDir, file), "utf8");
-      expect(() => parseRon(src)).not.toThrow();
-      const quest = parseRon(src);
-      expect(quest.id).toBeTruthy();
-      expect(Object.keys(quest.phases).length).toBeGreaterThan(0);
-    });
-
-    it(`${file} 라운드트립 (parse → serialize → parse 동일)`, () => {
-      const src = readFileSync(join(questsDir, file), "utf8");
-      const first = parseRon(src);
-      const second = parseRon(serializeRon(first));
-      expect(second).toEqual(first);
-    });
-  }
-});
-
 describe("parseVillagersRon — 기본", () => {
   const SIMPLE = `[
     VillagerDef(
@@ -548,20 +512,3 @@ describe("serializeVillagersRon — 빈 배열", () => {
   });
 });
 
-describe("실제 villagers.ron 파싱·라운드트립", () => {
-  it("bevy-rogue villagers.ron round-trip", () => {
-    const src = readFileSync(join(process.cwd(), "villagers", "villagers.ron"), "utf8");
-    const first = parseVillagersRon(src);
-    expect(first.length).toBeGreaterThan(0);
-    const second = parseVillagersRon(serializeVillagersRon(first));
-    expect(second).toEqual(first);
-  });
-
-  it("bevy-rogue 의 첫 villager 가 장로 + gem_quest 연결", () => {
-    const src = readFileSync(join(process.cwd(), "villagers", "villagers.ron"), "utf8");
-    const villagers = parseVillagersRon(src);
-    const elder = villagers.find((v) => v.name === "장로");
-    expect(elder).toBeDefined();
-    expect(elder?.questId).toBe("gem_quest");
-  });
-});

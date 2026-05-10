@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { VillagerDocument } from "@/types/villager";
 
 interface FormState {
@@ -29,7 +30,7 @@ export default function VillagersPage() {
 
   async function load() {
     setLoading(true);
-    const res = await fetch("/api/villagers");
+    const res = await fetch("/api/quests/villagers");
     const json = await res.json();
     setList(json.data ?? []);
     setLoading(false);
@@ -40,7 +41,7 @@ export default function VillagersPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!createForm.name.trim()) return;
-    const res = await fetch("/api/villagers", {
+    const res = await fetch("/api/quests/villagers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -62,7 +63,7 @@ export default function VillagersPage() {
   }
 
   async function handleSave(name: string) {
-    const res = await fetch(`/api/villagers/${encodeURIComponent(name)}`, {
+    const res = await fetch(`/api/quests/villagers/${encodeURIComponent(name)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -83,13 +84,13 @@ export default function VillagersPage() {
 
   async function handleDelete(name: string) {
     if (!confirm(`"${name}" villager 를 삭제하시겠습니까?`)) return;
-    await fetch(`/api/villagers/${encodeURIComponent(name)}`, { method: "DELETE" });
+    await fetch(`/api/quests/villagers/${encodeURIComponent(name)}`, { method: "DELETE" });
     load();
   }
 
   async function handleImport(file: File) {
     const text = await file.text();
-    const res = await fetch("/api/villagers/import", {
+    const res = await fetch("/api/quests/villagers/import", {
       method: "POST",
       headers: { "Content-Type": "text/plain" },
       body: text,
@@ -133,7 +134,7 @@ export default function VillagersPage() {
             />
           </label>
           <button
-            onClick={() => { window.location.href = "/api/villagers/export"; }}
+            onClick={() => { window.location.href = "/api/quests/villagers/export"; }}
             className="px-3 py-2 text-sm rounded-lg border hover:border-green-400 hover:text-green-600 transition-colors"
           >
             내보내기
@@ -191,6 +192,12 @@ export default function VillagersPage() {
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  <Link
+                    href={`/quests/villagers/${encodeURIComponent(v.name)}/revisions`}
+                    className="px-2 py-1 text-xs rounded border hover:border-purple-400 hover:text-purple-500 transition-colors"
+                  >
+                    히스토리 (v{v.version})
+                  </Link>
                   {editingName === v.name ? (
                     <button
                       onClick={() => setEditingName(null)}

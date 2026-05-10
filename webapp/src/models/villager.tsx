@@ -14,6 +14,7 @@ const VillagerSchema = new Schema(
     dialogs: { type: [String], default: [] },
     questId: { type: String, default: null },
     speed: { type: Number, default: 1.0 },
+    version: { type: Number, default: 1 },
   },
   { timestamps: true }
 );
@@ -25,6 +26,7 @@ export interface VillagerDoc {
   dialogs: string[];
   questId: string | null;
   speed: number;
+  version: number;
   createdAt: Date;
   updatedAt: Date;
 }

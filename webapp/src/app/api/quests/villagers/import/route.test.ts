@@ -8,9 +8,15 @@ vi.mock('@/models/villager', () => ({
     create: vi.fn(),
   },
 }));
+vi.mock('@/models/villager-revision', () => ({
+  default: {
+    create: vi.fn(),
+  },
+}));
 
 import { POST } from './route';
 import Villager from '@/models/villager';
+import VillagerRevision from '@/models/villager-revision';
 
 function makeRequest(body: string): NextRequest {
   return new Request('http://localhost/api/villagers/import', {
@@ -53,27 +59,38 @@ describe('POST /api/villagers/import', () => {
     expect(body.message).toContain('x');
   });
 
-  it('신규 villager 는 create 로, 기존은 save 갱신', async () => {
+  it('신규는 create, 기존은 revision 백업 + version + 1 + save', async () => {
     // 장로 존재, 촌장 없음
     const elder = {
+      _id: 'v1',
       name: '장로', color: [0.9, 0.8, 0.5], dialogs: ['old'],
-      questId: null, speed: 1.0,
+      questId: null, speed: 1.0, version: 2,
       save: vi.fn().mockResolvedValue(undefined),
     };
     (Villager.findOne as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce(elder)   // 장로
       .mockResolvedValueOnce(null);   // 촌장
     (Villager.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (VillagerRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     const res = await POST(makeRequest(SIMPLE_RON));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data).toEqual({ created: 1, updated: 1 });
-    // 장로 갱신 — RON 의 questId 가 반영되어야 함
+
+    // 장로: revision 백업 (이전 v2 + dialogs:['old']) → 갱신
+    expect(VillagerRevision.create).toHaveBeenCalledWith(expect.objectContaining({
+      villagerId: 'v1',
+      version: 2,
+      villager: expect.objectContaining({ dialogs: ['old'], questId: null }),
+    }));
     expect(elder.questId).toBe('gem_quest');
     expect(elder.dialogs).toEqual([]);
+    expect(elder.version).toBe(3);
     expect(elder.save).toHaveBeenCalled();
-    // 촌장 신규 생성
+
+    // 촌장: 신규 생성 — revision 백업 없음 (call count 1, 장로용만)
+    expect(VillagerRevision.create).toHaveBeenCalledTimes(1);
     expect(Villager.create).toHaveBeenCalledWith(expect.objectContaining({
       name: '촌장', dialogs: ['안녕'], questId: null,
     }));

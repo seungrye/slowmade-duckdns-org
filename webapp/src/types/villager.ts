@@ -11,6 +11,15 @@ export interface VillagerDef {
 
 export interface VillagerDocument extends VillagerDef {
   _id: string;
+  version: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface VillagerRevisionDocument {
+  _id: string;
+  villagerId: string;
+  version: number;
+  villager: VillagerDef;
+  createdAt: string;
 }

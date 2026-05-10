@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { connectToDB } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import Villager from "@/models/villager";
+import VillagerRevision from "@/models/villager-revision";
 import { parseVillagersRon } from "@/lib/ron";
 import type { VillagerDef } from "@/types/villager";
 
@@ -32,10 +33,23 @@ export async function POST(req: NextRequest) {
   for (const v of defs) {
     const existing = await Villager.findOne({ name: v.name });
     if (existing) {
+      // 갱신 직전 현재 버전을 revision 으로 백업
+      await VillagerRevision.create({
+        villagerId: existing._id,
+        version: existing.version,
+        villager: {
+          name: existing.name,
+          color: existing.color,
+          dialogs: existing.dialogs,
+          questId: existing.questId,
+          speed: existing.speed,
+        },
+      });
       existing.color = v.color;
       existing.dialogs = v.dialogs;
       existing.questId = v.questId;
       existing.speed = v.speed;
+      existing.version = (existing.version ?? 1) + 1;
       await existing.save();
       updated++;
     } else {
