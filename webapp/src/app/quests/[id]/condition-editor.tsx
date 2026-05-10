@@ -1,10 +1,13 @@
 "use client";
 
 import type { Condition, SpawnZone } from "@/types/quest";
+import type { ItemDocument } from "@/types/item";
+import { ItemCombobox } from "./item-combobox";
 
 interface Props {
   condition: Condition;
   onChange: (c: Condition) => void;
+  items?: ItemDocument[];
 }
 
 function emptyCondition(type: Condition["type"]): Condition {
@@ -24,7 +27,7 @@ function emptyCondition(type: Condition["type"]): Condition {
 const inputCls = "flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 const selectCls = "w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 
-export function ConditionEditor({ condition, onChange }: Props) {
+export function ConditionEditor({ condition, onChange, items = [] }: Props) {
   const type = condition?.type ?? "Always";
 
   return (
@@ -77,11 +80,11 @@ export function ConditionEditor({ condition, onChange }: Props) {
 
       {/* HasItem */}
       {condition.type === "HasItem" && (
-        <input
+        <ItemCombobox
           value={condition.itemId}
-          onChange={(e) => onChange({ ...condition, itemId: e.target.value })}
-          placeholder="아이템 ID"
-          className={selectCls}
+          onChange={(v) => onChange({ ...condition, itemId: v })}
+          items={items}
+          placeholder="아이템 id"
         />
       )}
 
@@ -93,6 +96,7 @@ export function ConditionEditor({ condition, onChange }: Props) {
               <div className="flex-1 min-w-0">
                 <ConditionEditor
                   condition={sub}
+                  items={items}
                   onChange={(updated) => {
                     const next = [...condition.conditions];
                     next[i] = updated;
@@ -122,6 +126,7 @@ export function ConditionEditor({ condition, onChange }: Props) {
         <div className="pl-2 border-l-2 border-purple-200">
           <ConditionEditor
             condition={condition.condition}
+            items={items}
             onChange={(updated) => onChange({ ...condition, condition: updated })}
           />
         </div>

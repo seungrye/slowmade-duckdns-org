@@ -2,6 +2,7 @@
 
 import type { QuestPhaseDef, AutoAdvance } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
+import type { ItemDocument } from "@/types/item";
 import { ActionEditor } from "./action-editor";
 import { ConditionEditor } from "./condition-editor";
 import { NpcCombobox } from "./npc-combobox";
@@ -13,6 +14,7 @@ interface Props {
   giverNpc: string;
   phaseIds: string[];
   villagers?: VillagerDocument[];
+  items?: ItemDocument[];
   onUpdate: (phase: QuestPhaseDef) => void;
   onUpdateGiverNpc: (v: string) => void;
   onDelete: () => void;
@@ -26,6 +28,7 @@ export function PhasePanel({
   giverNpc,
   phaseIds,
   villagers = [],
+  items = [],
   onUpdate,
   onUpdateGiverNpc,
   onDelete,
@@ -127,6 +130,7 @@ export function PhasePanel({
           actions={phase.on_interact}
           phaseIds={phaseIds}
           villagers={villagers}
+          items={items}
           onChange={(actions) => onUpdate({ ...phase, on_interact: actions })}
         />
       </section>
@@ -153,6 +157,7 @@ export function PhasePanel({
               </div>
               <ConditionEditor
                 condition={aa.condition}
+                items={items}
                 onChange={(c) => {
                   const next = [...phase.auto_advance];
                   next[i] = { ...aa, condition: c };

@@ -45,8 +45,8 @@ describe('ConditionEditor', () => {
         onChange={noop}
       />
     );
-    const inputs = screen.getAllByRole('textbox');
-    expect(inputs.some((el) => (el as HTMLInputElement).value === 'dragon_scale')).toBe(true);
+    // HasItem 은 ItemCombobox (input list=...) 로 role=combobox
+    expect(screen.getByDisplayValue('dragon_scale')).toBeTruthy();
   });
 
   it('PhaseIs 조건의 quest/phase 입력을 렌더한다', () => {
@@ -71,5 +71,27 @@ describe('ConditionEditor', () => {
     expect(screen.getByRole('combobox')).toHaveValue('HasFlag');
     const inputs = screen.getAllByRole('textbox');
     expect(inputs.some((el) => (el as HTMLInputElement).value === 'herbalist_killed')).toBe(true);
+  });
+
+  it('HasItem 의 itemId 자리에 ItemCombobox + datalist 옵션 노출', () => {
+    const items = [
+      {
+        _id: '1', id: 'eternal_gem', kind: 'quest' as const, displayName: '영원의 보석',
+        glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆',
+        pickupMessage: '획득', imagePath: 'scene/x.png',
+        version: 1, createdAt: '', updatedAt: '',
+      },
+    ];
+    const { container } = render(
+      <ConditionEditor
+        condition={{ type: 'HasItem', itemId: 'eternal_gem' }}
+        onChange={noop}
+        items={items}
+      />
+    );
+    const opts = container.querySelectorAll('datalist option');
+    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === 'eternal_gem')).toBe(true);
+    // 매칭된 id 의 힌트 (displayName · summary)
+    expect(container.textContent).toContain('영원의 보석');
   });
 });

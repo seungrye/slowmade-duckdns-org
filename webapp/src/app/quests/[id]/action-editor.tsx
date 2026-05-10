@@ -2,14 +2,17 @@
 
 import type { Action, Condition, PortalPlacement } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
+import type { ItemDocument } from "@/types/item";
 import { ConditionEditor } from "./condition-editor";
 import { NpcCombobox } from "./npc-combobox";
+import { ItemCombobox } from "./item-combobox";
 
 interface Props {
   actions: Action[];
   onChange: (actions: Action[]) => void;
   phaseIds: string[];
   villagers?: VillagerDocument[];
+  items?: ItemDocument[];
 }
 
 // ── Branch 체인 flatten / unflatten ─────────────────────────────────────────
@@ -46,11 +49,13 @@ function SwitchCaseEditor({
   onChange,
   phaseIds,
   villagers,
+  items,
 }: {
   action: Extract<Action, { type: "Branch" }>;
   onChange: (a: Action) => void;
   phaseIds: string[];
   villagers: VillagerDocument[];
+  items: ItemDocument[];
 }) {
   const flat = flattenBranch(action);
 
@@ -78,6 +83,7 @@ function SwitchCaseEditor({
           </div>
           <ConditionEditor
             condition={c.condition}
+            items={items}
             onChange={(cond) => {
               const cases = [...flat.cases];
               cases[i] = { ...c, condition: cond };
@@ -94,6 +100,7 @@ function SwitchCaseEditor({
             }}
             phaseIds={phaseIds}
             villagers={villagers}
+            items={items}
           />
         </div>
       ))}
@@ -105,6 +112,7 @@ function SwitchCaseEditor({
           onChange={(acts) => update({ ...flat, defaultActions: acts })}
           phaseIds={phaseIds}
           villagers={villagers}
+          items={items}
         />
       </div>
 
@@ -165,12 +173,14 @@ function ActionRow({
   onRemove,
   phaseIds,
   villagers,
+  items,
 }: {
   action: Action;
   onChange: (a: Action) => void;
   onRemove: () => void;
   phaseIds: string[];
   villagers: VillagerDocument[];
+  items: ItemDocument[];
 }) {
   return (
     <div className="border rounded p-2 space-y-1 bg-gray-50 dark:bg-gray-900">
@@ -220,22 +230,24 @@ function ActionRow({
       )}
 
       {(action.type === "GiveItem" || action.type === "RemoveItem" || action.type === "DespawnWorldItem") && (
-        <input
+        <ItemCombobox
           value={action.itemId}
-          onChange={(e) => onChange({ ...action, itemId: e.target.value } as Action)}
-          placeholder="아이템 ID"
-          className={inputCls}
+          onChange={(v) => onChange({ ...action, itemId: v } as Action)}
+          items={items}
+          placeholder="아이템 id"
         />
       )}
 
       {action.type === "GiveItems" && (
-        <div className="flex gap-1">
-          <input
-            value={action.itemId}
-            onChange={(e) => onChange({ ...action, itemId: e.target.value })}
-            placeholder="아이템 ID"
-            className={halfCls}
-          />
+        <div className="flex gap-1 items-start">
+          <div className="flex-1 min-w-0">
+            <ItemCombobox
+              value={action.itemId}
+              onChange={(v) => onChange({ ...action, itemId: v })}
+              items={items}
+              placeholder="아이템 id"
+            />
+          </div>
           <input
             type="number"
             min={1}
@@ -345,6 +357,7 @@ function ActionRow({
           onChange={onChange}
           phaseIds={phaseIds}
           villagers={villagers}
+          items={items}
         />
       )}
     </div>
@@ -353,7 +366,7 @@ function ActionRow({
 
 // ── ActionEditor ──────────────────────────────────────────────────────────────
 
-export function ActionEditor({ actions, onChange, phaseIds, villagers = [] }: Props) {
+export function ActionEditor({ actions, onChange, phaseIds, villagers = [], items = [] }: Props) {
   return (
     <div className="space-y-1">
       {actions.map((action, i) => (
@@ -362,6 +375,7 @@ export function ActionEditor({ actions, onChange, phaseIds, villagers = [] }: Pr
           action={action}
           phaseIds={phaseIds}
           villagers={villagers}
+          items={items}
           onChange={(a) => {
             const next = [...actions];
             next[i] = a;

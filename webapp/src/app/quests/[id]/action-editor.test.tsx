@@ -36,7 +36,7 @@ describe('ActionEditor — SetFlag', () => {
 });
 
 describe('ActionEditor — GiveItems', () => {
-  it('GiveItems 액션의 itemId + count 입력이 렌더된다', () => {
+  it('GiveItems 액션의 itemId(ItemCombobox) + count 입력이 렌더된다', () => {
     render(
       <ActionEditor
         actions={[{ type: 'GiveItems', itemId: 'health_potion', count: 5 }]}
@@ -44,8 +44,7 @@ describe('ActionEditor — GiveItems', () => {
         phaseIds={[]}
       />
     );
-    const inputs = screen.getAllByRole('textbox');
-    expect(inputs.some((el) => (el as HTMLInputElement).value === 'health_potion')).toBe(true);
+    expect(screen.getByDisplayValue('health_potion')).toBeTruthy();
     const counts = screen.getAllByRole('spinbutton');
     expect((counts[0] as HTMLInputElement).value).toBe('5');
   });
@@ -119,6 +118,65 @@ describe('ActionEditor — OpenPortal', () => {
     expect((selects[1] as HTMLSelectElement).value).toBe('NearGiver');
     const numbers = screen.getAllByRole('spinbutton');
     expect(numbers.some((el) => (el as HTMLInputElement).value === '7')).toBe(true);
+  });
+});
+
+describe('ActionEditor — Item picker (ItemCombobox 통합)', () => {
+  const items = [
+    {
+      _id: '1', id: 'eternal_gem', kind: 'quest' as const, displayName: '영원의 보석',
+      glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆',
+      pickupMessage: '획득', imagePath: 'scene/x.png',
+      version: 1, createdAt: '', updatedAt: '',
+    },
+    {
+      _id: '2', id: 'health_potion', kind: 'consumable' as const, displayName: '체력 물약',
+      glyphAscii: '!', glyphUnicode: '❤', glyphGameIcon: '❤',
+      pickupMessage: '획득', effect: { type: 'Heal' as const, amount: 8 },
+      version: 1, createdAt: '', updatedAt: '',
+    },
+  ];
+
+  it('GiveItem 이 ItemCombobox + datalist 옵션 노출', () => {
+    const { container } = render(
+      <ActionEditor
+        actions={[{ type: 'GiveItem', itemId: 'eternal_gem' }]}
+        onChange={noop}
+        phaseIds={[]}
+        items={items}
+      />
+    );
+    expect(screen.getByDisplayValue('eternal_gem')).toBeTruthy();
+    const opts = container.querySelectorAll('datalist option');
+    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === 'eternal_gem')).toBe(true);
+  });
+
+  it('GiveItems 의 itemId 는 ItemCombobox, count 는 number input', () => {
+    const { container } = render(
+      <ActionEditor
+        actions={[{ type: 'GiveItems', itemId: 'health_potion', count: 5 }]}
+        onChange={noop}
+        phaseIds={[]}
+        items={items}
+      />
+    );
+    expect(screen.getByDisplayValue('health_potion')).toBeTruthy();
+    const opts = container.querySelectorAll('datalist option');
+    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === 'health_potion')).toBe(true);
+    const counts = screen.getAllByRole('spinbutton');
+    expect((counts[0] as HTMLInputElement).value).toBe('5');
+  });
+
+  it('RemoveItem 이 미등록 id 일 때 ? 경고', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'RemoveItem', itemId: '없는_id' }]}
+        onChange={noop}
+        phaseIds={[]}
+        items={items}
+      />
+    );
+    expect(screen.getByText('?')).toBeTruthy();
   });
 });
 
