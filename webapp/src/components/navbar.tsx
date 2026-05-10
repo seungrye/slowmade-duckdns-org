@@ -16,6 +16,10 @@ import {
     Layers,
     LogIn,
     Settings,
+    ScrollText,
+    Users,
+    Package,
+    MapPin,
 } from "lucide-react";
 
 const navLinks = [
@@ -28,6 +32,10 @@ const myPageLinks = [
     { href: "/dashboard/posts", label: "내가 올린 유머", description: "내가 업로드한 유머 보기", icon: <Archive size={20} /> },
     { href: "/dashboard/settings", label: "설정", description: "내 설정 보기", icon: <Settings size={20} /> },
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
+    { href: "/quests", label: "퀘스트", description: "퀘스트 목록·편집", icon: <ScrollText size={20} /> },
+    { href: "/quests/villagers", label: "Villager 카탈로그", description: "NPC 정의 관리", icon: <Users size={20} /> },
+    { href: "/quests/items", label: "Item 카탈로그", description: "아이템 정의 관리", icon: <Package size={20} /> },
+    { href: "/quests/zones", label: "Zone 카탈로그", description: "Named 존 정의 관리", icon: <MapPin size={20} /> },
 ];
 
 export default function Navbar() {
