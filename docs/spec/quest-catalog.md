@@ -660,3 +660,61 @@ conflict 가 있으면 사용자가 카탈로그에서 직접 확인·수정해�
 ### 비목표
 
 - OpenPortal / InZone(Named) picker — C3c
+
+---
+
+## C3c — Zone picker 통합
+
+quest editor 의 zone id 자유 입력을 카탈로그 기반 combobox 로 교체.
+
+### 대상
+
+- [ ] `action-editor.tsx` 의 `OpenPortal.zone`
+- [ ] `condition-editor.tsx` 의 `InZone({ type: "Named", id })` 의 `id`
+
+### 컴포넌트: `<ZoneCombobox>`
+
+`webapp/src/app/quests/[id]/zone-combobox.tsx` 신규.
+
+- HTML `<datalist>` 기반. NpcCombobox / ItemCombobox 와 동일 패턴.
+- 옵션 라벨: `(generator) — description`
+- 미등록 이름은 노란 `?` 마커
+- 매칭 시 hint div 에 generator 와 description 노출
+
+### OpenPortal 연동 — generator 자동 채움
+
+`OpenPortal` 은 zone 외에 generator 도 필요. zone 입력값이 카탈로그에
+존재하고 **현재 generator 가 비어있을 때만** generator 를 카탈로그값으로
+자동 채움. 이미 입력된 generator 는 보존 (사용자 의도 보호).
+
+```ts
+onZoneChange(v: string) {
+  const matched = zones.find((z) => z.name === v);
+  const next = { ...action, zone: v };
+  if (matched && !action.generator.trim()) next.generator = matched.generator;
+  onChange(next);
+}
+```
+
+### 데이터 로딩
+
+`/quests/[id]/page.tsx` 에서 `/api/quests/zones` 1회 fetch (villagers,
+items 와 동일 패턴). prop drill: page → phase-panel / edge-panel →
+ConditionEditor / ActionEditor → ActionRow / SwitchCaseEditor.
+
+### 변경 범위
+
+- [ ] `webapp/src/app/quests/[id]/zone-combobox.tsx` — 신규
+- [ ] `webapp/src/app/quests/[id]/page.tsx` — zones 1회 fetch + prop drill
+- [ ] `webapp/src/app/quests/[id]/phase-panel.tsx` — `zones` prop 전달
+- [ ] `webapp/src/app/quests/[id]/edge-panel.tsx` — `zones` prop 전달
+- [ ] `webapp/src/app/quests/[id]/condition-editor.tsx` — InZone(Named).id
+  를 ZoneCombobox 로 교체
+- [ ] `webapp/src/app/quests/[id]/action-editor.tsx` — OpenPortal.zone 을
+  ZoneCombobox + generator 자동 채움
+- [ ] `zone-combobox.test.tsx`, condition / action editor 테스트 갱신
+
+### 비목표
+
+- 카탈로그 변경 실시간 푸시 — 페이지 새로고침
+- 저장 시 ID 검증 — C4
