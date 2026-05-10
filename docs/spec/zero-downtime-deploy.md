@@ -3,7 +3,7 @@ name: zero-downtime-deploy
 description: nginx upstream + systemd Blue/Green 무중단 배포를 위한 webapp 측 사전 작업
 ---
 
-# 무중단 배포 — webapp 측 사전 작업
+# ✅ 무중단 배포 — webapp 측 사전 작업
 
 ## 배경
 
