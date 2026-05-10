@@ -614,7 +614,7 @@ bevy-rogue 의 `assets/` 에는 zones.ron 같은 파일이 없다. 게임 런타
 
 ---
 
-## C3b — Zones 페이지 + 퀘스트에서 추출
+## ✅ C3b — Zones 페이지 + 퀘스트에서 추출
 
 ### 페이지 `/quests/zones`
 
@@ -652,9 +652,9 @@ conflict 가 있으면 사용자가 카탈로그에서 직접 확인·수정해�
 
 ### 변경 범위
 
-- [ ] `webapp/src/app/api/quests/zones/extract/route.tsx` + 테스트
-- [ ] `webapp/src/app/quests/zones/page.tsx` + 테스트
-- [ ] `webapp/src/app/quests/zones/[name]/revisions/page.tsx` (villager 패턴
+- [x] `webapp/src/app/api/quests/zones/extract/route.tsx` + 테스트
+- [x] `webapp/src/app/quests/zones/page.tsx` + 테스트
+- [x] `webapp/src/app/quests/zones/[name]/revisions/page.tsx` (villager 패턴
   동일)
 
 ### 비목표
