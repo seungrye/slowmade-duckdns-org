@@ -1,4 +1,4 @@
-# 퀘스트 타입 정합 (B1)
+# ✅ 퀘스트 타입 정합 (B1)
 
 bevy-rogue `specs/quest.md` 의 데이터 모델과 webapp 의 `QuestDef` / RON
 파서를 일치시켜 import↔export 라운드트립이 손실 없이 동작하도록 한다.
@@ -15,31 +15,31 @@ webapp 의 `src/types/quest.ts` 와 `src/lib/ron.ts` 는 Rust 모델의 부분
 ## 누락 변형 — Rust → 추가 대상
 
 ### `QuestCondition`
-- [ ] `HasFlag("flag")` — 플래그 존재 여부 (값 무관)
+- [x] `HasFlag("flag")` — 플래그 존재 여부 (값 무관)
 
 ### `QuestAction`
-- [ ] `GiveItems(item: "...", count: N)` — 수량 지정 지급
-- [ ] `ClearFlag("flag")` — 플래그 해제
-- [ ] `OpenPortal(zone, generator, placement)` — Named 존 포털 스폰
-- [ ] `ClosePortal("zone")` — Named 존 포털·등록·마커 정리
+- [x] `GiveItems(item: "...", count: N)` — 수량 지정 지급
+- [x] `ClearFlag("flag")` — 플래그 해제
+- [x] `OpenPortal(zone, generator, placement)` — Named 존 포털 스폰
+- [x] `ClosePortal("zone")` — Named 존 포털·등록·마커 정리
 
 ### `PortalPlacement` — `OpenPortal.placement`
-- [ ] `InsideRoom` (기본, 미지정 시)
-- [ ] `Border`
-- [ ] `Random`
-- [ ] `NearGiver(radius: usize)`
+- [x] `InsideRoom` (기본, 미지정 시)
+- [x] `Border`
+- [x] `Random`
+- [x] `NearGiver(radius: usize)`
 
 ### `ZoneId` (webapp `SpawnZone`)
-- [ ] `Town` — 빌트인 마을 존
-- [ ] `Named("zone_id")` — 동적 퀘스트 존
-- [ ] 기존 `World(mapId)` 변형 제거 (Rust `ZoneId` 에 존재하지 않음)
+- [x] `Town` — 빌트인 마을 존
+- [x] `Named("zone_id")` — 동적 퀘스트 존
+- [x] 기존 `World(mapId)` 변형 제거 (Rust `ZoneId` 에 존재하지 않음)
 
 ### `QuestSpawn`
-- [ ] `count: u32` — 기본 1, 미지정 시 직렬화 생략
-- [ ] `condition: Option<QuestCondition>` — 추가 조건, `None` 이면 직렬화 생략
+- [x] `count: u32` — 기본 1, 미지정 시 직렬화 생략
+- [x] `condition: Option<QuestCondition>` — 추가 조건, `None` 이면 직렬화 생략
 
 ### `QuestDef`
-- [ ] `spawn_chance: f32` — 0.0~1.0, 미지정 시 1.0 (직렬화 생략)
+- [x] `spawn_chance: f32` — 0.0~1.0, 미지정 시 1.0 (직렬화 생략)
 
 ## 변경 범위
 
