@@ -562,7 +562,7 @@ bevy-rogue 의 `assets/` 에는 zones.ron 같은 파일이 없다. 게임 런타
 
 ---
 
-## C3a — Zone 스키마 + CRUD API + revisions
+## ✅ C3a — Zone 스키마 + CRUD API + revisions
 
 ### MongoDB 컬렉션 `zones`
 
@@ -597,14 +597,14 @@ bevy-rogue 의 `assets/` 에는 zones.ron 같은 파일이 없다. 게임 런타
 
 ### 변경 범위
 
-- [ ] `webapp/src/types/zone.ts` — `ZoneDef`, `ZoneDocument`, `ZoneRevisionDocument`
-- [ ] `webapp/src/models/zone.tsx` — Mongoose 스키마
-- [ ] `webapp/src/models/zone-revision.tsx` — 신규
-- [ ] `webapp/src/app/api/quests/zones/route.tsx` — GET/POST + 단위 테스트
-- [ ] `webapp/src/app/api/quests/zones/[name]/route.tsx` — GET/PUT/DELETE
+- [x] `webapp/src/types/zone.ts` — `ZoneDef`, `ZoneDocument`, `ZoneRevisionDocument`
+- [x] `webapp/src/models/zone.tsx` — Mongoose 스키마
+- [x] `webapp/src/models/zone-revision.tsx` — 신규
+- [x] `webapp/src/app/api/quests/zones/route.tsx` — GET/POST + 단위 테스트
+- [x] `webapp/src/app/api/quests/zones/[name]/route.tsx` — GET/PUT/DELETE
   + revision 백업 + 단위 테스트
-- [ ] `webapp/src/app/api/quests/zones/[name]/revisions/route.tsx` + 테스트
-- [ ] `webapp/src/app/api/quests/zones/[name]/revisions/[ver]/restore/route.tsx`
+- [x] `webapp/src/app/api/quests/zones/[name]/revisions/route.tsx` + 테스트
+- [x] `webapp/src/app/api/quests/zones/[name]/revisions/[ver]/restore/route.tsx`
   + 테스트
 
 ### 비목표 (C3b/C3c)
