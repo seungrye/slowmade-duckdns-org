@@ -179,7 +179,7 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ---
 
-## C1d — 단일 source-of-truth (DB) 정착 + Villager revisions
+## ✅ C1d — 단일 source-of-truth (DB) 정착 + Villager revisions
 
 `webapp/quests/`, `webapp/villagers/` 는 production 데이터 저장소가 아니라
 `lib/ron.test.ts` 의 "실제 .ron 라운드트립" 테스트 fixture 였다. production
@@ -192,10 +192,10 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ### fixture 디렉토리 정리
 
-- [ ] `webapp/quests/` 디렉토리 삭제
-- [ ] `webapp/villagers/` 디렉토리 삭제
-- [ ] `lib/ron.test.ts` 의 `describe("실제 .ron 파일 파싱·라운드트립", ...)` 제거
-- [ ] `lib/ron.test.ts` 의 `describe("실제 villagers.ron 파싱·라운드트립", ...)` 제거
+- [x] `webapp/quests/` 디렉토리 삭제
+- [x] `webapp/villagers/` 디렉토리 삭제
+- [x] `lib/ron.test.ts` 의 `describe("실제 .ron 파일 파싱·라운드트립", ...)` 제거
+- [x] `lib/ron.test.ts` 의 `describe("실제 villagers.ron 파싱·라운드트립", ...)` 제거
 
 ### Villager 스키마 변경
 
@@ -223,18 +223,18 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ### 신규 API
 
-- [ ] `GET /api/quests/villagers/[name]/revisions` — 버전 목록 (version 내림차순)
-- [ ] `POST /api/quests/villagers/[name]/revisions/[ver]/restore` — 롤백.
+- [x] `GET /api/quests/villagers/[name]/revisions` — 버전 목록 (version 내림차순)
+- [x] `POST /api/quests/villagers/[name]/revisions/[ver]/restore` — 롤백.
   현재 상태를 새 revision 으로 백업 후 해당 버전 데이터로 덮어씀.
 
 ### 신규 페이지
 
-- [ ] `/quests/villagers/[name]/revisions` — 버전 목록 + 롤백 버튼.
+- [x] `/quests/villagers/[name]/revisions` — 버전 목록 + 롤백 버튼.
   `/quests/[id]/revisions` 와 동일 패턴.
 
 ### 기존 페이지 변경
 
-- [ ] `/quests/villagers` 의 villager 행에 `히스토리` 링크 추가
+- [x] `/quests/villagers` 의 villager 행에 `히스토리` 링크 추가
   (`/quests/villagers/[name]/revisions` 로 이동)
 
 ### 변경 범위 요약
