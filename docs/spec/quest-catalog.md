@@ -252,15 +252,15 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ---
 
-## C1c — Villager picker 통합 (giverNpc / KillNpc)
+## ✅ C1c — Villager picker 통합 (giverNpc / KillNpc)
 
 quest editor 의 두 자리에서 villager `name` 을 free-form 으로 입력하던
 부분을 카탈로그 기반 combobox 로 교체한다.
 
 ### 대상
 
-- [ ] `phase-panel.tsx` 의 **Giver NPC** 입력 (시작 페이즈에서만 노출)
-- [ ] `action-editor.tsx` 의 **KillNpc.npcId** 입력
+- [x] `phase-panel.tsx` 의 **Giver NPC** 입력 (시작 페이즈에서만 노출)
+- [x] `action-editor.tsx` 의 **KillNpc.npcId** 입력
 
 ### 컴포넌트: `<NpcCombobox>`
 
@@ -284,13 +284,13 @@ quest editor 의 최상위 페이지(`/quests/[id]/page.tsx`)에서 villager 목
 
 ### 변경 범위
 
-- [ ] `webapp/src/app/quests/[id]/npc-combobox.tsx` — 신규
-- [ ] `webapp/src/app/quests/[id]/page.tsx` — villagers fetch + prop drill
-- [ ] `webapp/src/app/quests/[id]/phase-panel.tsx` — `villagers` prop 추가,
+- [x] `webapp/src/app/quests/[id]/npc-combobox.tsx` — 신규
+- [x] `webapp/src/app/quests/[id]/page.tsx` — villagers fetch + prop drill
+- [x] `webapp/src/app/quests/[id]/phase-panel.tsx` — `villagers` prop 추가,
   Giver NPC 입력을 NpcCombobox 로 교체
-- [ ] `webapp/src/app/quests/[id]/action-editor.tsx` — `villagers` prop 추가,
+- [x] `webapp/src/app/quests/[id]/action-editor.tsx` — `villagers` prop 추가,
   KillNpc 입력을 NpcCombobox 로 교체
-- [ ] `npc-combobox.test.tsx`, phase/action editor 테스트 갱신
+- [x] `npc-combobox.test.tsx`, phase/action editor 테스트 갱신
 
 ### 비목표
 
