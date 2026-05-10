@@ -4,10 +4,24 @@ import type { NextRequest } from 'next/server';
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/quest', () => ({ default: { findById: vi.fn() } }));
 vi.mock('@/models/quest-revision', () => ({ default: { create: vi.fn(), deleteMany: vi.fn() } }));
+vi.mock('@/models/villager', () => ({ default: { find: vi.fn() } }));
+vi.mock('@/models/item', () => ({ default: { find: vi.fn() } }));
+vi.mock('@/models/zone', () => ({ default: { find: vi.fn() } }));
 
 import { GET, PUT, DELETE } from './route';
 import Quest from '@/models/quest';
 import QuestRevision from '@/models/quest-revision';
+import Villager from '@/models/villager';
+import Item from '@/models/item';
+import Zone from '@/models/zone';
+
+// PUT 라우트는 카탈로그 3종을 fetch — 테스트에서 빈 카탈로그로 모킹
+function mockEmptyCatalogs() {
+  const empty = { lean: vi.fn().mockResolvedValue([]) };
+  (Villager.find as ReturnType<typeof vi.fn>).mockReturnValue({ select: vi.fn().mockReturnValue(empty) });
+  (Item.find as ReturnType<typeof vi.fn>).mockReturnValue({ select: vi.fn().mockReturnValue(empty) });
+  (Zone.find as ReturnType<typeof vi.fn>).mockReturnValue({ select: vi.fn().mockReturnValue(empty) });
+}
 
 const params = Promise.resolve({ id: 'test-id' });
 
@@ -83,7 +97,7 @@ describe('DELETE /api/quests/[id]', () => {
 });
 
 describe('PUT /api/quests/[id]', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); mockEmptyCatalogs(); });
 
   it('퀘스트를 찾지 못하면 404를 반환한다', async () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -141,5 +155,53 @@ describe('PUT /api/quests/[id]', () => {
 
     expect(mockQuest.phases).toBeInstanceOf(Map);
     expect(mockQuest.phases.get('active')).toEqual(newPhases.active);
+  });
+
+  it('정상 카탈로그면 응답에 warnings: [] 포함 (저장 성공)', async () => {
+    const mockPhases = new Map([['dormant', { dialog: [], on_interact: [], auto_advance: [], objective: null }]]);
+    const mockQuest = {
+      _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '장로',
+      initialPhase: 'dormant', phases: mockPhases, spawns: [], version: 1,
+      save: vi.fn().mockResolvedValue(undefined),
+      toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', giverNpc: '장로', spawns: [], version: 2 }),
+    };
+    (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
+    (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    // 장로가 등록된 카탈로그
+    (Villager.find as ReturnType<typeof vi.fn>).mockReturnValue({
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ name: '장로' }]) }),
+    });
+
+    const res = await PUT(makeRequest('PUT', {}), { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.warnings).toEqual([]);
+  });
+
+  it('끊어진 참조가 있으면 warnings 에 보고하고 저장은 성공', async () => {
+    const phases = {
+      dormant: {
+        dialog: [], on_interact: [{ type: 'GiveItem', itemId: '없는item' }],
+        auto_advance: [], objective: null,
+      },
+    };
+    const mockPhases = new Map(Object.entries(phases));
+    const mockQuest = {
+      _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '없는NPC',
+      initialPhase: 'dormant', phases: mockPhases, spawns: [], version: 1,
+      save: vi.fn().mockResolvedValue(undefined),
+      toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', giverNpc: '없는NPC', spawns: [], version: 2 }),
+    };
+    (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
+    (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const res = await PUT(makeRequest('PUT', {}), { params });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.warnings).toEqual(expect.arrayContaining([
+      { path: 'giverNpc', kind: 'villager', missing: '없는NPC' },
+      { path: 'phases.dormant.on_interact[0].itemId', kind: 'item', missing: '없는item' },
+    ]));
+    expect(mockQuest.save).toHaveBeenCalled(); // 저장 자체는 성공
   });
 });

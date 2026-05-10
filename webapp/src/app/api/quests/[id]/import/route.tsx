@@ -1,9 +1,12 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
-import { apiSuccess, apiError } from "@/lib/api-response";
+import { apiError } from "@/lib/api-response";
 import Quest from "@/models/quest";
 import QuestRevision from "@/models/quest-revision";
 import { parseRon } from "@/lib/ron";
+import { validateQuestRefs } from "@/lib/quest-validation";
+import { loadCatalogSets } from "../route";
+import type { QuestDef } from "@/types/quest";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -44,8 +47,28 @@ export async function POST(req: NextRequest, { params }: Params) {
   quest.version = (quest.version ?? 1) + 1;
 
   await quest.save();
-  return apiSuccess({
-    ...quest.toObject(),
-    phases: Object.fromEntries(quest.phases ?? new Map()),
+
+  // 참조 무결성 검증 (soft warning)
+  const catalogs = await loadCatalogSets();
+  const phasesObj = Object.fromEntries(quest.phases ?? new Map()) as QuestDef["phases"];
+  const warnings = validateQuestRefs(
+    {
+      id: quest.id,
+      title: quest.title,
+      giverNpc: quest.giverNpc,
+      initialPhase: quest.initialPhase,
+      phases: phasesObj,
+      spawns: quest.spawns as QuestDef["spawns"],
+    },
+    catalogs,
+  );
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      ...quest.toObject(),
+      phases: phasesObj,
+    },
+    warnings,
   });
 }

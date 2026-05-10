@@ -301,10 +301,17 @@ export default function QuestEditorPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...quest, phases: phasesWithPos }),
     });
-    const { data: saved } = await res.json();
-    if (saved) setQuest(saved);
+    const json = await res.json();
+    if (json.data) setQuest(json.data);
     setSaving(false);
     setDirty(false);
+
+    // 끊어진 참조 경고 (저장 자체는 성공)
+    const warnings = json.warnings as Array<{ path: string; kind: string; missing: string }> | undefined;
+    if (warnings && warnings.length > 0) {
+      const lines = warnings.map((w) => `  ${w.kind} 누락: ${w.missing} (at ${w.path})`);
+      alert(`저장 완료. 끊어진 참조 ${warnings.length}개:\n${lines.join("\n")}`);
+    }
   }
 
   const selectedNode = useMemo(
