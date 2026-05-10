@@ -3,9 +3,11 @@
 import type { Action, Condition, PortalPlacement } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
 import type { ItemDocument } from "@/types/item";
+import type { ZoneDocument } from "@/types/zone";
 import { ConditionEditor } from "./condition-editor";
 import { NpcCombobox } from "./npc-combobox";
 import { ItemCombobox } from "./item-combobox";
+import { ZoneCombobox } from "./zone-combobox";
 
 interface Props {
   actions: Action[];
@@ -13,6 +15,7 @@ interface Props {
   phaseIds: string[];
   villagers?: VillagerDocument[];
   items?: ItemDocument[];
+  zones?: ZoneDocument[];
 }
 
 // ── Branch 체인 flatten / unflatten ─────────────────────────────────────────
@@ -50,12 +53,14 @@ function SwitchCaseEditor({
   phaseIds,
   villagers,
   items,
+  zones,
 }: {
   action: Extract<Action, { type: "Branch" }>;
   onChange: (a: Action) => void;
   phaseIds: string[];
   villagers: VillagerDocument[];
   items: ItemDocument[];
+  zones: ZoneDocument[];
 }) {
   const flat = flattenBranch(action);
 
@@ -84,6 +89,7 @@ function SwitchCaseEditor({
           <ConditionEditor
             condition={c.condition}
             items={items}
+            zones={zones}
             onChange={(cond) => {
               const cases = [...flat.cases];
               cases[i] = { ...c, condition: cond };
@@ -101,6 +107,7 @@ function SwitchCaseEditor({
             phaseIds={phaseIds}
             villagers={villagers}
             items={items}
+            zones={zones}
           />
         </div>
       ))}
@@ -113,6 +120,7 @@ function SwitchCaseEditor({
           phaseIds={phaseIds}
           villagers={villagers}
           items={items}
+          zones={zones}
         />
       </div>
 
@@ -174,6 +182,7 @@ function ActionRow({
   phaseIds,
   villagers,
   items,
+  zones,
 }: {
   action: Action;
   onChange: (a: Action) => void;
@@ -181,6 +190,7 @@ function ActionRow({
   phaseIds: string[];
   villagers: VillagerDocument[];
   items: ItemDocument[];
+  zones: ZoneDocument[];
 }) {
   return (
     <div className="border rounded p-2 space-y-1 bg-gray-50 dark:bg-gray-900">
@@ -296,11 +306,17 @@ function ActionRow({
 
       {action.type === "OpenPortal" && (
         <div className="space-y-1">
-          <input
+          <ZoneCombobox
             value={action.zone}
-            onChange={(e) => onChange({ ...action, zone: e.target.value })}
+            onChange={(v) => {
+              const matched = zones.find((z) => z.name === v);
+              const next = { ...action, zone: v };
+              // 카탈로그 매칭 + 현재 generator 비어있을 때만 자동 채움
+              if (matched && !action.generator.trim()) next.generator = matched.generator;
+              onChange(next);
+            }}
+            zones={zones}
             placeholder="존 ID (예: herb_glade)"
-            className={inputCls}
           />
           <input
             value={action.generator}
@@ -358,6 +374,7 @@ function ActionRow({
           phaseIds={phaseIds}
           villagers={villagers}
           items={items}
+          zones={zones}
         />
       )}
     </div>
@@ -366,7 +383,7 @@ function ActionRow({
 
 // ── ActionEditor ──────────────────────────────────────────────────────────────
 
-export function ActionEditor({ actions, onChange, phaseIds, villagers = [], items = [] }: Props) {
+export function ActionEditor({ actions, onChange, phaseIds, villagers = [], items = [], zones = [] }: Props) {
   return (
     <div className="space-y-1">
       {actions.map((action, i) => (
@@ -376,6 +393,7 @@ export function ActionEditor({ actions, onChange, phaseIds, villagers = [], item
           phaseIds={phaseIds}
           villagers={villagers}
           items={items}
+          zones={zones}
           onChange={(a) => {
             const next = [...actions];
             next[i] = a;

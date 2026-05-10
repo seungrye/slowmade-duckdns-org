@@ -2,12 +2,15 @@
 
 import type { Condition, SpawnZone } from "@/types/quest";
 import type { ItemDocument } from "@/types/item";
+import type { ZoneDocument } from "@/types/zone";
 import { ItemCombobox } from "./item-combobox";
+import { ZoneCombobox } from "./zone-combobox";
 
 interface Props {
   condition: Condition;
   onChange: (c: Condition) => void;
   items?: ItemDocument[];
+  zones?: ZoneDocument[];
 }
 
 function emptyCondition(type: Condition["type"]): Condition {
@@ -27,7 +30,7 @@ function emptyCondition(type: Condition["type"]): Condition {
 const inputCls = "flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 const selectCls = "w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 
-export function ConditionEditor({ condition, onChange, items = [] }: Props) {
+export function ConditionEditor({ condition, onChange, items = [], zones = [] }: Props) {
   const type = condition?.type ?? "Always";
 
   return (
@@ -97,6 +100,7 @@ export function ConditionEditor({ condition, onChange, items = [] }: Props) {
                 <ConditionEditor
                   condition={sub}
                   items={items}
+                  zones={zones}
                   onChange={(updated) => {
                     const next = [...condition.conditions];
                     next[i] = updated;
@@ -127,6 +131,7 @@ export function ConditionEditor({ condition, onChange, items = [] }: Props) {
           <ConditionEditor
             condition={condition.condition}
             items={items}
+            zones={zones}
             onChange={(updated) => onChange({ ...condition, condition: updated })}
           />
         </div>
@@ -181,11 +186,11 @@ export function ConditionEditor({ condition, onChange, items = [] }: Props) {
             />
           )}
           {condition.zone.type === "Named" && (
-            <input
+            <ZoneCombobox
               value={condition.zone.id}
-              onChange={(e) => onChange({ ...condition, zone: { type: "Named", id: e.target.value } })}
+              onChange={(v) => onChange({ ...condition, zone: { type: "Named", id: v } })}
+              zones={zones}
               placeholder="존 ID (예: herb_glade)"
-              className={selectCls}
             />
           )}
         </div>

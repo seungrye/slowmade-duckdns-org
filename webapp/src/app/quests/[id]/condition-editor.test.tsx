@@ -73,6 +73,26 @@ describe('ConditionEditor', () => {
     expect(inputs.some((el) => (el as HTMLInputElement).value === 'herbalist_killed')).toBe(true);
   });
 
+  it('InZone(Named) 의 id 자리에 ZoneCombobox + datalist 옵션 노출', () => {
+    const zones = [
+      {
+        _id: '1', name: 'herb_glade', generator: 'forest', description: '약초',
+        version: 1, createdAt: '', updatedAt: '',
+      },
+    ];
+    const { container } = render(
+      <ConditionEditor
+        condition={{ type: 'InZone', zone: { type: 'Named', id: 'herb_glade' } }}
+        onChange={noop}
+        zones={zones}
+      />
+    );
+    expect(screen.getByDisplayValue('herb_glade')).toBeTruthy();
+    const opts = container.querySelectorAll('datalist option');
+    const values = Array.from(opts).map((o) => (o as HTMLOptionElement).value);
+    expect(values).toContain('herb_glade');
+  });
+
   it('HasItem 의 itemId 자리에 ItemCombobox + datalist 옵션 노출', () => {
     const items = [
       {

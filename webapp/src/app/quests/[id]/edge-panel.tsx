@@ -3,12 +3,14 @@
 import type { Edge } from "@xyflow/react";
 import type { AutoAdvance, QuestPhaseDef } from "@/types/quest";
 import type { ItemDocument } from "@/types/item";
+import type { ZoneDocument } from "@/types/zone";
 import { ConditionEditor } from "./condition-editor";
 
 interface Props {
   edge: Edge;
   phases: Record<string, QuestPhaseDef>;
   items?: ItemDocument[];
+  zones?: ZoneDocument[];
   onUpdateAutoAdvance: (
     sourcePhaseId: string,
     index: number,
@@ -17,7 +19,7 @@ interface Props {
   onDeleteEdge: (edgeId: string) => void;
 }
 
-export function EdgePanel({ edge, phases, items = [], onUpdateAutoAdvance, onDeleteEdge }: Props) {
+export function EdgePanel({ edge, phases, items = [], zones = [], onUpdateAutoAdvance, onDeleteEdge }: Props) {
   const edgeType = (edge.data as { edgeType?: string })?.edgeType ?? "on_interact";
   const sourcePhase = phases[edge.source];
 
@@ -81,6 +83,7 @@ export function EdgePanel({ edge, phases, items = [], onUpdateAutoAdvance, onDel
           <ConditionEditor
             condition={aa.condition}
             items={items}
+            zones={zones}
             onChange={(c) =>
               onUpdateAutoAdvance(edge.source, aaIndex, {
                 ...aa,

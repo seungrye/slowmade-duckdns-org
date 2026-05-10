@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ActionEditor } from './action-editor';
 // flattenBranch / unflattenBranch은 모듈 내부 함수라 UI로 간접 검증
 
@@ -79,6 +79,16 @@ describe('ActionEditor — ClosePortal', () => {
 });
 
 describe('ActionEditor — OpenPortal', () => {
+  // ZoneCombobox 의 input 도 role=combobox 라 select 만 필터해서 찾는다
+  function findPlacementSelect(): HTMLSelectElement {
+    const all = screen.getAllByRole('combobox');
+    const found = all.find((el) =>
+      el.tagName === 'SELECT'
+      && Array.from((el as HTMLSelectElement).options).some((o) => o.value === '__default__'),
+    );
+    return found as HTMLSelectElement;
+  }
+
   it('placement 미지정 시 select 가 "기본" 옵션으로 표시된다', () => {
     render(
       <ActionEditor
@@ -87,10 +97,7 @@ describe('ActionEditor — OpenPortal', () => {
         phaseIds={[]}
       />
     );
-    const selects = screen.getAllByRole('combobox');
-    // 첫 select 는 액션 타입, 두 번째는 placement
-    expect((selects[1] as HTMLSelectElement).value).toBe('__default__');
-    // radius 입력은 미렌더 (NearGiver 가 아니므로)
+    expect(findPlacementSelect().value).toBe('__default__');
     expect(screen.queryAllByRole('spinbutton')).toHaveLength(0);
   });
 
@@ -102,8 +109,7 @@ describe('ActionEditor — OpenPortal', () => {
         phaseIds={[]}
       />
     );
-    const selects = screen.getAllByRole('combobox');
-    expect((selects[1] as HTMLSelectElement).value).toBe('Border');
+    expect(findPlacementSelect().value).toBe('Border');
   });
 
   it('placement: NearGiver 일 때 radius 입력이 추가로 렌더된다', () => {
@@ -114,8 +120,7 @@ describe('ActionEditor — OpenPortal', () => {
         phaseIds={[]}
       />
     );
-    const selects = screen.getAllByRole('combobox');
-    expect((selects[1] as HTMLSelectElement).value).toBe('NearGiver');
+    expect(findPlacementSelect().value).toBe('NearGiver');
     const numbers = screen.getAllByRole('spinbutton');
     expect(numbers.some((el) => (el as HTMLInputElement).value === '7')).toBe(true);
   });
@@ -177,6 +182,63 @@ describe('ActionEditor — Item picker (ItemCombobox 통합)', () => {
       />
     );
     expect(screen.getByText('?')).toBeTruthy();
+  });
+});
+
+describe('ActionEditor — OpenPortal (ZoneCombobox + generator auto-fill)', () => {
+  const zones = [
+    {
+      _id: '1', name: 'demon_cave', generator: 'cellular_automata', description: '동굴',
+      version: 1, createdAt: '', updatedAt: '',
+    },
+  ];
+
+  it('OpenPortal.zone 이 ZoneCombobox + datalist 옵션 노출', () => {
+    const { container } = render(
+      <ActionEditor
+        actions={[{ type: 'OpenPortal', zone: 'demon_cave', generator: 'cellular_automata' }]}
+        onChange={noop}
+        phaseIds={[]}
+        zones={zones}
+      />
+    );
+    expect(screen.getByDisplayValue('demon_cave')).toBeTruthy();
+    const opts = container.querySelectorAll('datalist option');
+    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === 'demon_cave')).toBe(true);
+  });
+
+  it('zone 변경 시 generator 가 비어있으면 카탈로그값으로 자동 채움', () => {
+    const fn = vi.fn();
+    render(
+      <ActionEditor
+        actions={[{ type: 'OpenPortal', zone: '', generator: '' }]}
+        onChange={fn}
+        phaseIds={[]}
+        zones={zones}
+      />
+    );
+    const input = screen.getByPlaceholderText(/존 ID/) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'demon_cave' } });
+    expect(fn).toHaveBeenCalledWith([
+      { type: 'OpenPortal', zone: 'demon_cave', generator: 'cellular_automata' },
+    ]);
+  });
+
+  it('zone 변경 시 generator 가 이미 있으면 보존', () => {
+    const fn = vi.fn();
+    render(
+      <ActionEditor
+        actions={[{ type: 'OpenPortal', zone: '', generator: 'manual_override' }]}
+        onChange={fn}
+        phaseIds={[]}
+        zones={zones}
+      />
+    );
+    const input = screen.getByPlaceholderText(/존 ID/) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'demon_cave' } });
+    expect(fn).toHaveBeenCalledWith([
+      { type: 'OpenPortal', zone: 'demon_cave', generator: 'manual_override' },
+    ]);
   });
 });
 
