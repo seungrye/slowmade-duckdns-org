@@ -10,7 +10,8 @@ vi.mock('@/models/item', () => ({
   },
 }));
 
-import { GET, POST, validateItemForCreate } from './route';
+import { GET, POST } from './route';
+import { validateItemForCreate } from '@/lib/item-validation';
 import Item from '@/models/item';
 
 function makeRequest(url: string, body?: object): NextRequest {

@@ -3,26 +3,11 @@ import { connectToDB } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import Quest from "@/models/quest";
 import QuestRevision from "@/models/quest-revision";
-import Villager from "@/models/villager";
-import Item from "@/models/item";
-import Zone from "@/models/zone";
-import { validateQuestRefs, type CatalogSets } from "@/lib/quest-validation";
+import { validateQuestRefs } from "@/lib/quest-validation";
+import { loadCatalogSets } from "@/lib/catalog-sets";
 import type { QuestDef } from "@/types/quest";
 
 type Params = { params: Promise<{ id: string }> };
-
-export async function loadCatalogSets(): Promise<CatalogSets> {
-  const [villagers, items, zones] = await Promise.all([
-    Villager.find({}).select("name").lean(),
-    Item.find({}).select("id").lean(),
-    Zone.find({}).select("name").lean(),
-  ]);
-  return {
-    villagers: new Set(villagers.map((v) => v.name)),
-    items: new Set((items as Array<{ id: string }>).map((i) => i.id)),
-    zones: new Set(zones.map((z) => z.name)),
-  };
-}
 
 export async function GET(_req: NextRequest, { params }: Params) {
   await connectToDB();

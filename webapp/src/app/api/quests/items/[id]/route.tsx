@@ -3,7 +3,7 @@ import { connectToDB } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import Item from "@/models/item";
 import ItemRevision from "@/models/item-revision";
-import { validateKindFields } from "../route";
+import { validateKindFields } from "@/lib/item-validation";
 import type { ItemKind } from "@/types/item";
 
 type Params = { params: Promise<{ id: string }> };

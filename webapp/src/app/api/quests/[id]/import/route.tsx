@@ -5,7 +5,7 @@ import Quest from "@/models/quest";
 import QuestRevision from "@/models/quest-revision";
 import { parseRon } from "@/lib/ron";
 import { validateQuestRefs } from "@/lib/quest-validation";
-import { loadCatalogSets } from "../route";
+import { loadCatalogSets } from "@/lib/catalog-sets";
 import type { QuestDef } from "@/types/quest";
 
 type Params = { params: Promise<{ id: string }> };

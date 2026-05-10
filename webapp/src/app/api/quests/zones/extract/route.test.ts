@@ -4,7 +4,8 @@ vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/quest', () => ({ default: { find: vi.fn() } }));
 vi.mock('@/models/zone', () => ({ default: { findOne: vi.fn(), create: vi.fn() } }));
 
-import { POST, collectOpenPortals, collectFromQuest } from './route';
+import { POST } from './route';
+import { collectOpenPortals, collectFromQuest } from '@/lib/zone-extract';
 import Quest from '@/models/quest';
 import Zone from '@/models/zone';
 import type { Action, QuestPhaseDef } from '@/types/quest';
