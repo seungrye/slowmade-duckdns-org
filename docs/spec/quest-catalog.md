@@ -611,3 +611,52 @@ bevy-rogue 의 `assets/` 에는 zones.ron 같은 파일이 없다. 게임 런타
 
 - 페이지 UI / 퀘스트에서 추출 — C3b
 - OpenPortal / InZone(Named) picker — C3c
+
+---
+
+## C3b — Zones 페이지 + 퀘스트에서 추출
+
+### 페이지 `/quests/zones`
+
+- 상단 액션: `+ 새 zone` / `퀘스트에서 추출`
+- 목록 표 — name, generator, description, 히스토리 링크
+- 인라인 편집/삭제 (villagers 와 동일 패턴)
+- 새 zone 폼: name, generator (드롭다운 + 자유 입력 — `bsp`, `forest`,
+  `cellular_automata`, `bsp_indoor`, `organic_village` 추천), description
+
+### 퀘스트에서 추출 API
+
+`POST /api/quests/zones/extract` — 모든 quest 의 phases 를 스캔해 `OpenPortal`
+액션의 `(zone, generator)` 쌍을 수집, 카탈로그에 upsert.
+
+**스캔 범위**: `phase.on_interact[]` + `phase.auto_advance[].actions[]`,
+재귀로 `Branch.ifTrue` / `Branch.ifFalse` 도 모두 탐색.
+
+**동작**:
+| 케이스 | 결과 |
+|------|------|
+| 카탈로그에 없는 zone | 생성 (`created` 카운트) |
+| 카탈로그 존재 + generator 일치 | 건너뜀 (`skipped` 카운트) |
+| 카탈로그 존재 + generator 불일치 | conflict 로 보고 (변경 안 함) |
+
+**응답**:
+```ts
+{
+  created: number,
+  skipped: number,
+  conflicts: Array<{ name: string, catalogGenerator: string, foundGenerator: string }>
+}
+```
+
+conflict 가 있으면 사용자가 카탈로그에서 직접 확인·수정해야 함 (자동 갱신 X).
+
+### 변경 범위
+
+- [ ] `webapp/src/app/api/quests/zones/extract/route.tsx` + 테스트
+- [ ] `webapp/src/app/quests/zones/page.tsx` + 테스트
+- [ ] `webapp/src/app/quests/zones/[name]/revisions/page.tsx` (villager 패턴
+  동일)
+
+### 비목표
+
+- OpenPortal / InZone(Named) picker — C3c
