@@ -77,3 +77,77 @@ bevy-rogue 의 데이터 분리 구조와 일치시킨다:
 - 퀘스트 에디터 picker 통합 — C1c
 - 다른 카탈로그 — C2/C3
 - 참조 무결성 검증 — C4
+
+---
+
+## C1b — Villagers 페이지 + RON import/export
+
+### `/villagers` 페이지
+
+- 목록 표 — name, color 미리보기 (작은 색상 칩), questId, dialogs 개수, speed
+- 행별 인라인 편집/삭제 버튼
+- 상단 액션: `+ 새 villager` / `.ron 가져오기` / `내보내기`
+- 인라인 편집 패널: name (read-only — PK), color (3개 number input 0~1),
+  questId (text), speed (number), dialogs (textarea, 줄바꿈 구분)
+- 새 villager 폼: name, color (3 inputs), questId(optional), speed(default 1.0)
+
+### RON 형식
+
+bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDef>`:
+
+```ron
+[
+    VillagerDef(
+        name: "장로",
+        color: (0.9, 0.8, 0.5),
+        dialogs: [],
+        quest_id: Some("gem_quest"),
+        speed: 0.5,
+    ),
+    ...
+]
+```
+
+`color` 는 tuple `(r, g, b)` (0.0~1.0). `quest_id` 는 `Option<String>`
+(`Some("...")` / `None`).
+
+### Import API
+
+`POST /api/villagers/import` — body 는 RON 텍스트.
+
+동작 — **upsert by name**:
+- 기존 name → 필드 갱신
+- 신규 name → 생성
+- import 에 없는 기존 villager → 보존 (사용자 커스텀 보호)
+
+응답: `{ created: number, updated: number }`.
+
+오류:
+- RON 파싱 실패 → 400
+- color 검증 실패 (∉ 0~1) → 400 + 오류 villager name 명시
+
+### Export API
+
+`GET /api/villagers/export` — `Vec<VillagerDef>` RON 텍스트 반환,
+`Content-Disposition: attachment; filename="villagers.ron"`.
+
+### Seed 스냅샷
+
+`webapp/villagers/villagers.ron` — bevy-rogue 의 `assets/villagers/villagers.ron`
+사본. 사용자가 import 시 업로드할 수 있게 동봉. 자동 시드는 안 함 — 사용자
+명시적 클릭으로만.
+
+### 변경 범위
+
+- [ ] `webapp/src/lib/ron.ts` — `parseVillagersRon`, `serializeVillagersRon`
+  추가 (Parser 클래스에 `parseVillagerDef`, color tuple 헬퍼)
+- [ ] `webapp/src/lib/ron.test.ts` — villagers 라운드트립 단위 테스트
+- [ ] `webapp/src/app/api/villagers/import/route.tsx` + 테스트
+- [ ] `webapp/src/app/api/villagers/export/route.tsx` + 테스트
+- [ ] `webapp/src/app/villagers/page.tsx` + 테스트
+- [ ] `webapp/villagers/villagers.ron` — bevy-rogue 시드 스냅샷
+
+### 비목표
+
+- 퀘스트 에디터의 giverNpc/KillNpc picker — C1c
+- color picker (RGB 휠) — 일반 number input 으로 충분
