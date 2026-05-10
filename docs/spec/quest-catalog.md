@@ -331,7 +331,7 @@ revision 은 C1 처럼 별도 사이클로 빼지 않고 C2a 에 포함 — 패�
 
 ---
 
-## C2a — Items 스키마 + CRUD API + revisions
+## ✅ C2a — Items 스키마 + CRUD API + revisions
 
 ### 공통 필드 — 4 종 모두
 
@@ -388,17 +388,17 @@ PUT 직전·import 의 갱신 분기·restore 직전 자동 백업.
 
 ### 변경 범위
 
-- [ ] `webapp/src/types/item.ts` — `ItemKind`, `ItemDef`(union), `ItemDocument`,
+- [x] `webapp/src/types/item.ts` — `ItemKind`, `ItemDef`(union), `ItemDocument`,
   `ItemRevisionDocument`
-- [ ] `webapp/src/models/item.tsx` — Mongoose 스키마 (모든 옵셔널 필드 정의,
+- [x] `webapp/src/models/item.tsx` — Mongoose 스키마 (모든 옵셔널 필드 정의,
   종별 검증은 API 레벨)
-- [ ] `webapp/src/models/item-revision.tsx` — 신규
-- [ ] `webapp/src/app/api/quests/items/route.tsx` — GET/POST + 단위 테스트
-- [ ] `webapp/src/app/api/quests/items/[id]/route.tsx` — GET/PUT/DELETE +
+- [x] `webapp/src/models/item-revision.tsx` — 신규
+- [x] `webapp/src/app/api/quests/items/route.tsx` — GET/POST + 단위 테스트
+- [x] `webapp/src/app/api/quests/items/[id]/route.tsx` — GET/PUT/DELETE +
   revision 백업 + 단위 테스트
-- [ ] `webapp/src/app/api/quests/items/[id]/revisions/route.tsx` — 신규 +
+- [x] `webapp/src/app/api/quests/items/[id]/revisions/route.tsx` — 신규 +
   단위 테스트
-- [ ] `webapp/src/app/api/quests/items/[id]/revisions/[ver]/restore/route.tsx`
+- [x] `webapp/src/app/api/quests/items/[id]/revisions/[ver]/restore/route.tsx`
   — 신규 + 단위 테스트
 
 ### 비목표 (C2b/C2c)
