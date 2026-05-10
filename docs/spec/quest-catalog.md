@@ -176,3 +176,76 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 - [x] 페이지의 `fetch("/api/villagers...")` 호출들 → `/api/quests/villagers...`
 - [x] (선택) 시드 파일 `webapp/villagers/villagers.ron` 위치는 라우트와
   무관하므로 본 사이클에서는 이동하지 않음. 별도로 논의.
+
+---
+
+## C1d — 단일 source-of-truth (DB) 정착 + Villager revisions
+
+`webapp/quests/`, `webapp/villagers/` 는 production 데이터 저장소가 아니라
+`lib/ron.test.ts` 의 "실제 .ron 라운드트립" 테스트 fixture 였다. production
+데이터는 quests 컬렉션 + `QuestRevision` 으로 이미 DB 가 단일 source-of-truth.
+
+이 사이클에서:
+1. fixture 디렉토리 2개를 제거하고 해당 round-trip 테스트도 정리한다.
+   기존 synthetic 테스트들이 모든 신규 변형을 이미 커버하고 있어 손실 없음.
+2. quest 와 대칭으로 villager 도 revision 히스토리를 갖는다.
+
+### fixture 디렉토리 정리
+
+- [ ] `webapp/quests/` 디렉토리 삭제
+- [ ] `webapp/villagers/` 디렉토리 삭제
+- [ ] `lib/ron.test.ts` 의 `describe("실제 .ron 파일 파싱·라운드트립", ...)` 제거
+- [ ] `lib/ron.test.ts` 의 `describe("실제 villagers.ron 파싱·라운드트립", ...)` 제거
+
+### Villager 스키마 변경
+
+`Villager` 모델에 `version: Number` 필드 추가 (default 1). 첫 생성 시 1.
+
+### `VillagerRevision` 모델
+
+`webapp/src/models/villager-revision.tsx` 새로 작성. Quest 패턴 동일:
+
+```ts
+{
+  villagerId: ObjectId(ref: Villager),
+  version: Number,
+  villager: Object,    // 시점의 전체 VillagerDef snapshot
+  createdAt: Date,
+}
+```
+
+### Revision 생성 시점
+
+- `PUT /api/quests/villagers/[name]` — 갱신 직전 현재 버전을 `VillagerRevision`
+  으로 백업, 새 버전 += 1.
+- `POST /api/quests/villagers/import` — 각 기존 villager 가 갱신될 때 동일.
+  신규 생성은 백업 불필요 (이전 버전 없음).
+
+### 신규 API
+
+- [ ] `GET /api/quests/villagers/[name]/revisions` — 버전 목록 (version 내림차순)
+- [ ] `POST /api/quests/villagers/[name]/revisions/[ver]/restore` — 롤백.
+  현재 상태를 새 revision 으로 백업 후 해당 버전 데이터로 덮어씀.
+
+### 신규 페이지
+
+- [ ] `/quests/villagers/[name]/revisions` — 버전 목록 + 롤백 버튼.
+  `/quests/[id]/revisions` 와 동일 패턴.
+
+### 기존 페이지 변경
+
+- [ ] `/quests/villagers` 의 villager 행에 `히스토리` 링크 추가
+  (`/quests/villagers/[name]/revisions` 로 이동)
+
+### 변경 범위 요약
+
+- `webapp/src/models/villager.tsx` — `version` 필드 추가
+- `webapp/src/models/villager-revision.tsx` — 신규
+- `webapp/src/types/villager.ts` — `version`, `VillagerRevisionDocument` 추가
+- `webapp/src/app/api/quests/villagers/[name]/route.tsx` — PUT 시 revision 생성
+- `webapp/src/app/api/quests/villagers/import/route.tsx` — upsert 시 갱신 분기에 revision 생성
+- `webapp/src/app/api/quests/villagers/[name]/revisions/route.tsx` — 신규
+- `webapp/src/app/api/quests/villagers/[name]/revisions/[ver]/restore/route.tsx` — 신규
+- `webapp/src/app/quests/villagers/[name]/revisions/page.tsx` — 신규
+- `webapp/src/app/quests/villagers/page.tsx` — `히스토리` 링크 추가
+- `webapp/src/lib/ron.test.ts` — 실제-파일 라운드트립 블록 2개 제거
