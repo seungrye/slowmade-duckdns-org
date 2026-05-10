@@ -122,6 +122,37 @@ describe('ActionEditor — OpenPortal', () => {
   });
 });
 
+describe('ActionEditor — KillNpc (NpcCombobox 통합)', () => {
+  it('villagers 카탈로그가 datalist 옵션으로 노출되고 현재 npcId 가 입력값', () => {
+    const villagers = [
+      { _id: '1', name: '장로', color: [0.9, 0.8, 0.5] as [number, number, number], dialogs: [], questId: 'gem_quest', speed: 0.5, version: 1, createdAt: '', updatedAt: '' },
+    ];
+    const { container } = render(
+      <ActionEditor
+        actions={[{ type: 'KillNpc', npcId: '장로' }]}
+        onChange={noop}
+        phaseIds={[]}
+        villagers={villagers}
+      />
+    );
+    expect(screen.getByDisplayValue('장로')).toBeTruthy();
+    const opts = container.querySelectorAll('datalist option');
+    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === '장로')).toBe(true);
+  });
+
+  it('미등록 npcId 면 ? 경고 마커 표시', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'KillNpc', npcId: '없는NPC' }]}
+        onChange={noop}
+        phaseIds={[]}
+        villagers={[]}
+      />
+    );
+    expect(screen.getByText('?')).toBeTruthy();
+  });
+});
+
 describe('ActionEditor — Branch (switch/case)', () => {
   it('단일 Branch를 case 1 + default 로 렌더한다', () => {
     render(

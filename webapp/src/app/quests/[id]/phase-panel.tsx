@@ -1,8 +1,10 @@
 "use client";
 
 import type { QuestPhaseDef, AutoAdvance } from "@/types/quest";
+import type { VillagerDocument } from "@/types/villager";
 import { ActionEditor } from "./action-editor";
 import { ConditionEditor } from "./condition-editor";
+import { NpcCombobox } from "./npc-combobox";
 
 interface Props {
   phaseId: string;
@@ -10,6 +12,7 @@ interface Props {
   isInitial: boolean;
   giverNpc: string;
   phaseIds: string[];
+  villagers?: VillagerDocument[];
   onUpdate: (phase: QuestPhaseDef) => void;
   onUpdateGiverNpc: (v: string) => void;
   onDelete: () => void;
@@ -22,6 +25,7 @@ export function PhasePanel({
   isInitial,
   giverNpc,
   phaseIds,
+  villagers = [],
   onUpdate,
   onUpdateGiverNpc,
   onDelete,
@@ -60,12 +64,11 @@ export function PhasePanel({
       {isInitial && (
         <section>
           <label className="text-xs font-semibold text-gray-500 block mb-1">Giver NPC</label>
-          <input
-            type="text"
+          <NpcCombobox
             value={giverNpc}
-            onChange={(e) => onUpdateGiverNpc(e.target.value)}
-            className="w-full border rounded px-2 py-1 text-xs font-mono"
-            placeholder="npc_id"
+            onChange={onUpdateGiverNpc}
+            villagers={villagers}
+            placeholder="NPC 이름 (예: 장로)"
           />
         </section>
       )}
@@ -123,6 +126,7 @@ export function PhasePanel({
         <ActionEditor
           actions={phase.on_interact}
           phaseIds={phaseIds}
+          villagers={villagers}
           onChange={(actions) => onUpdate({ ...phase, on_interact: actions })}
         />
       </section>

@@ -18,6 +18,7 @@ import {
 import "@xyflow/react/dist/style.css";
 
 import type { QuestDocument, QuestPhaseDef, AutoAdvance } from "@/types/quest";
+import type { VillagerDocument } from "@/types/villager";
 import { PhaseNode, type PhaseNodeData } from "./phase-node";
 import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
@@ -41,6 +42,8 @@ export default function QuestEditorPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
 
+  const [villagers, setVillagers] = useState<VillagerDocument[]>([]);
+
   // 퀘스트 불러오기
   useEffect(() => {
     fetch(`/api/quests/${id}`)
@@ -53,6 +56,14 @@ export default function QuestEditorPage() {
         setLoading(false);
       });
   }, [id, setNodes, setEdges]);
+
+  // villager 카탈로그 (1회 로드)
+  useEffect(() => {
+    fetch("/api/quests/villagers")
+      .then((r) => r.json())
+      .then(({ data }) => setVillagers(data ?? []))
+      .catch(() => setVillagers([]));
+  }, []);
 
   // 노드 위치가 변경될 때 quest.phases 위치 동기화
   const syncPositions = useCallback(
@@ -391,6 +402,7 @@ export default function QuestEditorPage() {
                 isInitial={selectedNode.id === quest.initialPhase}
                 giverNpc={quest.giverNpc}
                 phaseIds={phaseIds}
+                villagers={villagers}
                 onUpdate={(updated) => updatePhase(selectedNode.id, updated)}
                 onUpdateGiverNpc={updateGiverNpc}
                 onDelete={() => deletePhase(selectedNode.id)}

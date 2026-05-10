@@ -1,12 +1,15 @@
 "use client";
 
 import type { Action, Condition, PortalPlacement } from "@/types/quest";
+import type { VillagerDocument } from "@/types/villager";
 import { ConditionEditor } from "./condition-editor";
+import { NpcCombobox } from "./npc-combobox";
 
 interface Props {
   actions: Action[];
   onChange: (actions: Action[]) => void;
   phaseIds: string[];
+  villagers?: VillagerDocument[];
 }
 
 // ── Branch 체인 flatten / unflatten ─────────────────────────────────────────
@@ -42,10 +45,12 @@ function SwitchCaseEditor({
   action,
   onChange,
   phaseIds,
+  villagers,
 }: {
   action: Extract<Action, { type: "Branch" }>;
   onChange: (a: Action) => void;
   phaseIds: string[];
+  villagers: VillagerDocument[];
 }) {
   const flat = flattenBranch(action);
 
@@ -88,6 +93,7 @@ function SwitchCaseEditor({
               update({ ...flat, cases });
             }}
             phaseIds={phaseIds}
+            villagers={villagers}
           />
         </div>
       ))}
@@ -98,6 +104,7 @@ function SwitchCaseEditor({
           actions={flat.defaultActions}
           onChange={(acts) => update({ ...flat, defaultActions: acts })}
           phaseIds={phaseIds}
+          villagers={villagers}
         />
       </div>
 
@@ -157,11 +164,13 @@ function ActionRow({
   onChange,
   onRemove,
   phaseIds,
+  villagers,
 }: {
   action: Action;
   onChange: (a: Action) => void;
   onRemove: () => void;
   phaseIds: string[];
+  villagers: VillagerDocument[];
 }) {
   return (
     <div className="border rounded p-2 space-y-1 bg-gray-50 dark:bg-gray-900">
@@ -265,11 +274,11 @@ function ActionRow({
       )}
 
       {action.type === "KillNpc" && (
-        <input
+        <NpcCombobox
           value={action.npcId}
-          onChange={(e) => onChange({ ...action, npcId: e.target.value })}
-          placeholder="NPC ID"
-          className={inputCls}
+          onChange={(v) => onChange({ ...action, npcId: v })}
+          villagers={villagers}
+          placeholder="NPC 이름"
         />
       )}
 
@@ -335,6 +344,7 @@ function ActionRow({
           action={action}
           onChange={onChange}
           phaseIds={phaseIds}
+          villagers={villagers}
         />
       )}
     </div>
@@ -343,7 +353,7 @@ function ActionRow({
 
 // ── ActionEditor ──────────────────────────────────────────────────────────────
 
-export function ActionEditor({ actions, onChange, phaseIds }: Props) {
+export function ActionEditor({ actions, onChange, phaseIds, villagers = [] }: Props) {
   return (
     <div className="space-y-1">
       {actions.map((action, i) => (
@@ -351,6 +361,7 @@ export function ActionEditor({ actions, onChange, phaseIds }: Props) {
           key={i}
           action={action}
           phaseIds={phaseIds}
+          villagers={villagers}
           onChange={(a) => {
             const next = [...actions];
             next[i] = a;
