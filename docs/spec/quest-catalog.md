@@ -80,7 +80,7 @@ bevy-rogue 의 데이터 분리 구조와 일치시킨다:
 
 ---
 
-## C1b — Villagers 페이지 + RON import/export
+## ✅ C1b — Villagers 페이지 + RON import/export
 
 ### `/villagers` 페이지
 
@@ -139,13 +139,13 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ### 변경 범위
 
-- [ ] `webapp/src/lib/ron.ts` — `parseVillagersRon`, `serializeVillagersRon`
+- [x] `webapp/src/lib/ron.ts` — `parseVillagersRon`, `serializeVillagersRon`
   추가 (Parser 클래스에 `parseVillagerDef`, color tuple 헬퍼)
-- [ ] `webapp/src/lib/ron.test.ts` — villagers 라운드트립 단위 테스트
-- [ ] `webapp/src/app/api/villagers/import/route.tsx` + 테스트
-- [ ] `webapp/src/app/api/villagers/export/route.tsx` + 테스트
-- [ ] `webapp/src/app/villagers/page.tsx` + 테스트
-- [ ] `webapp/villagers/villagers.ron` — bevy-rogue 시드 스냅샷
+- [x] `webapp/src/lib/ron.test.ts` — villagers 라운드트립 단위 테스트
+- [x] `webapp/src/app/api/villagers/import/route.tsx` + 테스트
+- [x] `webapp/src/app/api/villagers/export/route.tsx` + 테스트
+- [x] `webapp/src/app/villagers/page.tsx` + 테스트
+- [x] `webapp/villagers/villagers.ron` — bevy-rogue 시드 스냅샷
 
 ### 비목표
 
