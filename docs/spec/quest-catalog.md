@@ -794,3 +794,28 @@ warnings: Array<{
 - [x] `webapp/src/app/api/quests/[id]/import/route.tsx` — 동일
 - [x] `webapp/src/app/api/quests/[id]/route.test.ts` — warnings 시나리오
 - [x] `webapp/src/app/quests/[id]/page.tsx` — 저장 후 warnings 토스트
+
+---
+
+## C5 — 마이페이지 메뉴에 퀘스트 링크 통합
+
+전체 카탈로그 시스템 (B/C 사이클) 이 갖춰졌으나 메인 네비게이션에서 접근
+경로가 없다. 마이페이지 드롭다운에 퀘스트 관련 페이지 4개를 추가한다.
+
+### 추가 항목 (`navbar.tsx` 의 `myPageLinks`)
+
+기존 4개 (프로필 / 내 유머 / 설정 / 유머 업로드) 다음에 추가:
+
+| href | label | icon |
+|------|------|------|
+| `/quests` | 퀘스트 | `ScrollText` |
+| `/quests/villagers` | Villager 카탈로그 | `Users` |
+| `/quests/items` | Item 카탈로그 | `Package` |
+| `/quests/zones` | Zone 카탈로그 | `MapPin` |
+
+### 변경 범위
+
+- [ ] `webapp/src/components/navbar.tsx` — myPageLinks 에 4개 추가, 아이콘
+  import
+- [ ] `webapp/src/components/navbar.test.tsx` — 데스크탑 드롭다운 + 모바일
+  메뉴에서 4개 링크 렌더 확인
