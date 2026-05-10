@@ -663,14 +663,14 @@ conflict 가 있으면 사용자가 카탈로그에서 직접 확인·수정해�
 
 ---
 
-## C3c — Zone picker 통합
+## ✅ C3c — Zone picker 통합
 
 quest editor 의 zone id 자유 입력을 카탈로그 기반 combobox 로 교체.
 
 ### 대상
 
-- [ ] `action-editor.tsx` 의 `OpenPortal.zone`
-- [ ] `condition-editor.tsx` 의 `InZone({ type: "Named", id })` 의 `id`
+- [x] `action-editor.tsx` 의 `OpenPortal.zone`
+- [x] `condition-editor.tsx` 의 `InZone({ type: "Named", id })` 의 `id`
 
 ### 컴포넌트: `<ZoneCombobox>`
 
@@ -704,15 +704,15 @@ ConditionEditor / ActionEditor → ActionRow / SwitchCaseEditor.
 
 ### 변경 범위
 
-- [ ] `webapp/src/app/quests/[id]/zone-combobox.tsx` — 신규
-- [ ] `webapp/src/app/quests/[id]/page.tsx` — zones 1회 fetch + prop drill
-- [ ] `webapp/src/app/quests/[id]/phase-panel.tsx` — `zones` prop 전달
-- [ ] `webapp/src/app/quests/[id]/edge-panel.tsx` — `zones` prop 전달
-- [ ] `webapp/src/app/quests/[id]/condition-editor.tsx` — InZone(Named).id
+- [x] `webapp/src/app/quests/[id]/zone-combobox.tsx` — 신규
+- [x] `webapp/src/app/quests/[id]/page.tsx` — zones 1회 fetch + prop drill
+- [x] `webapp/src/app/quests/[id]/phase-panel.tsx` — `zones` prop 전달
+- [x] `webapp/src/app/quests/[id]/edge-panel.tsx` — `zones` prop 전달
+- [x] `webapp/src/app/quests/[id]/condition-editor.tsx` — InZone(Named).id
   를 ZoneCombobox 로 교체
-- [ ] `webapp/src/app/quests/[id]/action-editor.tsx` — OpenPortal.zone 을
+- [x] `webapp/src/app/quests/[id]/action-editor.tsx` — OpenPortal.zone 을
   ZoneCombobox + generator 자동 채움
-- [ ] `zone-combobox.test.tsx`, condition / action editor 테스트 갱신
+- [x] `zone-combobox.test.tsx`, condition / action editor 테스트 갱신
 
 ### 비목표
 
