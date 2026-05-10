@@ -797,7 +797,7 @@ warnings: Array<{
 
 ---
 
-## C5 — 마이페이지 메뉴에 퀘스트 링크 통합
+## ✅ C5 — 마이페이지 메뉴에 퀘스트 링크 통합
 
 전체 카탈로그 시스템 (B/C 사이클) 이 갖춰졌으나 메인 네비게이션에서 접근
 경로가 없다. 마이페이지 드롭다운에 퀘스트 관련 페이지 4개를 추가한다.
@@ -815,7 +815,7 @@ warnings: Array<{
 
 ### 변경 범위
 
-- [ ] `webapp/src/components/navbar.tsx` — myPageLinks 에 4개 추가, 아이콘
+- [x] `webapp/src/components/navbar.tsx` — myPageLinks 에 4개 추가, 아이콘
   import
-- [ ] `webapp/src/components/navbar.test.tsx` — 데스크탑 드롭다운 + 모바일
+- [x] `webapp/src/components/navbar.test.tsx` — 데스크탑 드롭다운 + 모바일
   메뉴에서 4개 링크 렌더 확인
