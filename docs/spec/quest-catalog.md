@@ -249,3 +249,51 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 - `webapp/src/app/quests/villagers/[name]/revisions/page.tsx` — 신규
 - `webapp/src/app/quests/villagers/page.tsx` — `히스토리` 링크 추가
 - `webapp/src/lib/ron.test.ts` — 실제-파일 라운드트립 블록 2개 제거
+
+---
+
+## C1c — Villager picker 통합 (giverNpc / KillNpc)
+
+quest editor 의 두 자리에서 villager `name` 을 free-form 으로 입력하던
+부분을 카탈로그 기반 combobox 로 교체한다.
+
+### 대상
+
+- [ ] `phase-panel.tsx` 의 **Giver NPC** 입력 (시작 페이즈에서만 노출)
+- [ ] `action-editor.tsx` 의 **KillNpc.npcId** 입력
+
+### 컴포넌트: `<NpcCombobox>`
+
+`webapp/src/app/quests/[id]/npc-combobox.tsx` 신규.
+
+- HTML `<datalist>` 기반 native combobox
+  - 자유 입력 + 등록된 villager `name` 자동완성
+  - 카탈로그에 없는 이름도 그대로 입력 가능 (free-form fallback)
+- 입력값이 카탈로그에 없을 경우 작은 경고 마커 (예: `?` 노란색) 표시 —
+  오타 발견 보조. 저장은 차단하지 않음.
+- 입력값이 villager 이고 `questId` 가 다른 quest 에 연결돼 있으면 작은
+  힌트 (`(quest: gem_quest)`) 노출.
+
+### 데이터 로딩
+
+quest editor 의 최상위 페이지(`/quests/[id]/page.tsx`)에서 villager 목록을
+한 번 fetch (`GET /api/quests/villagers`) 후 panel/editor 에 prop drilling.
+
+상태: `villagers: VillagerDocument[]`. 페이지 마운트 시 1회 로드, refresh 없음
+(편집 중 카탈로그 변경 가능성 낮음). 필요 시 사용자가 새로고침으로 갱신.
+
+### 변경 범위
+
+- [ ] `webapp/src/app/quests/[id]/npc-combobox.tsx` — 신규
+- [ ] `webapp/src/app/quests/[id]/page.tsx` — villagers fetch + prop drill
+- [ ] `webapp/src/app/quests/[id]/phase-panel.tsx` — `villagers` prop 추가,
+  Giver NPC 입력을 NpcCombobox 로 교체
+- [ ] `webapp/src/app/quests/[id]/action-editor.tsx` — `villagers` prop 추가,
+  KillNpc 입력을 NpcCombobox 로 교체
+- [ ] `npc-combobox.test.tsx`, phase/action editor 테스트 갱신
+
+### 비목표
+
+- villagers 카탈로그 변경 실시간 푸시 — 페이지 새로고침으로 충분
+- itemId picker — C2
+- zone picker — C3
