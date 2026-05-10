@@ -82,3 +82,48 @@ bevy-rogue `assets/quests/` 의 10개 파일을 모두:
 - 카탈로그 페이지 (villagers / quest_items / named zones)
 - 저장 시 참조 무결성 검증
 - 다중 파일 export
+
+---
+
+## B2 — 에디터 인라인 편집 UI
+
+B1 에서 read-only 폴백으로 노출한 신규 변형을 webapp 에디터에서 직접
+인라인 편집 가능하도록 한다. 이로써 import 없이 신규 액션·조건을
+처음부터 작성할 수 있다.
+
+### 대상 변형
+
+#### `Condition`
+- [ ] `HasFlag(flag)` — flag 입력 1
+
+#### `Action`
+- [ ] `GiveItems(item, count)` — itemId 입력 + count 숫자 입력
+- [ ] `ClearFlag(flag)` — flag 입력 1
+- [ ] `ClosePortal(zone)` — zone 입력 1
+- [ ] `OpenPortal(zone, generator, placement?)` —
+  - zone, generator 입력
+  - placement select: `(기본)` / `InsideRoom` / `Border` / `Random` / `NearGiver`
+  - `NearGiver` 선택 시 radius 숫자 입력 추가
+  - `(기본)` = `placement: undefined` (직렬화 시 placement 필드 생략)
+
+### 변경 범위
+
+- `webapp/src/app/quests/[id]/condition-editor.tsx`
+  - 타입 select 에 `HasFlag` 옵션 추가
+  - `HasFlag` 인라인 분기 추가
+  - read-only 폴백 / `ReadOnlyCondition` / `summarizeCondition` 제거
+- `webapp/src/app/quests/[id]/action-editor.tsx`
+  - 타입 select 에 `GiveItems` / `ClearFlag` / `OpenPortal` / `ClosePortal` 옵션 추가
+  - 4개 변형 인라인 분기 추가
+  - `isReadOnlyAction` / read-only 폴백 / `summarizeAction` 제거
+- `condition-editor.test.tsx` — `HasFlag` 렌더 테스트
+- `action-editor.test.tsx` — 신규 4개 변형 렌더 테스트
+  (`GiveItems`/`ClearFlag`/`OpenPortal`/`ClosePortal`, placement 분기 포함)
+
+### UX 결정
+
+- placement `undefined` ↔ 명시적 `{ type: "InsideRoom" }` 은 의미상 같지만
+  RON round-trip 보존을 위해 구분한다. 입력 측에서 사용자가 "(기본)" 을
+  명시적으로 선택하지 않는 한 import 시의 `undefined` 상태를 유지.
+- placement select 의 default 옵션 라벨은 "(기본 — InsideRoom)" 으로 의미
+  명시.
