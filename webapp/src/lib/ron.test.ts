@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { parseRon, serializeRon, parseVillagersRon, serializeVillagersRon } from "./ron";
+import {
+  parseRon, serializeRon,
+  parseVillagersRon, serializeVillagersRon,
+  parseQuestItemsRon, serializeQuestItemsRon,
+  parseWeaponsRon, serializeWeaponsRon,
+  parseArmorsRon, serializeArmorsRon,
+  parseConsumablesRon, serializeConsumablesRon,
+} from "./ron";
 import type { QuestDef } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
 
@@ -509,6 +516,130 @@ describe("serializeVillagersRon — 빈 배열", () => {
     const out = serializeVillagersRon(villagers);
     expect(out).toContain("quest_id: None");
     expect(out).toContain('quest_id: Some("q1")');
+  });
+});
+
+describe("parse/serialize QuestItemsRon", () => {
+  const SRC = `[
+    QuestItemDef(
+        id: "eternal_gem",
+        display_name: "영원의 보석",
+        glyph_ascii: "*",
+        glyph_unicode: "◆",
+        glyph_game_icon: "◆",
+        pickup_message: "영원의 보석을 획득했다!",
+        image_path: "scene/open-chest.png",
+    ),
+]`;
+
+  it("파싱 + 라운드트립", () => {
+    const items = parseQuestItemsRon(SRC);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toEqual({
+      kind: "quest",
+      id: "eternal_gem",
+      displayName: "영원의 보석",
+      glyphAscii: "*", glyphUnicode: "◆", glyphGameIcon: "◆",
+      pickupMessage: "영원의 보석을 획득했다!",
+      imagePath: "scene/open-chest.png",
+    });
+    const reparsed = parseQuestItemsRon(serializeQuestItemsRon(items));
+    expect(reparsed).toEqual(items);
+  });
+
+  it("빈 배열 직렬화", () => {
+    expect(serializeQuestItemsRon([])).toBe("[]\n");
+  });
+});
+
+describe("parse/serialize WeaponsRon", () => {
+  const SRC = `[
+    WeaponDef(
+        id: "sword",
+        display_name: "검",
+        glyph_ascii: "/",
+        glyph_unicode: "X",
+        glyph_game_icon: "X",
+        pickup_message: "검 획득",
+        attack_power: 7,
+        element: Some("fire"),
+    ),
+    WeaponDef(
+        id: "knife",
+        display_name: "단검",
+        glyph_ascii: "/",
+        glyph_unicode: "X",
+        glyph_game_icon: "X",
+        pickup_message: "단검 획득",
+        attack_power: 3,
+        element: None,
+    ),
+]`;
+
+  it("Some/None element 파싱 + 라운드트립", () => {
+    const weapons = parseWeaponsRon(SRC);
+    expect(weapons).toHaveLength(2);
+    expect(weapons[0].element).toBe("fire");
+    expect(weapons[1].element).toBeNull();
+    const reparsed = parseWeaponsRon(serializeWeaponsRon(weapons));
+    expect(reparsed).toEqual(weapons);
+  });
+
+  it("element 직렬화 — null 은 None, 값은 Some", () => {
+    const out = serializeWeaponsRon(parseWeaponsRon(SRC));
+    expect(out).toContain('element: Some("fire")');
+    expect(out).toContain("element: None");
+  });
+
+  it("알 수 없는 element 는 throw", () => {
+    const bad = `[WeaponDef(id:"x",display_name:"",glyph_ascii:"",glyph_unicode:"",glyph_game_icon:"",pickup_message:"",attack_power:1,element:Some("plasma"))]`;
+    expect(() => parseWeaponsRon(bad)).toThrow(/Unknown element/);
+  });
+});
+
+describe("parse/serialize ArmorsRon", () => {
+  const SRC = `[
+    ArmorDef(
+        id: "leather_armor",
+        display_name: "가죽 갑옷",
+        glyph_ascii: "]",
+        glyph_unicode: "X",
+        glyph_game_icon: "X",
+        pickup_message: "가죽 갑옷 획득",
+        defense_bonus: 2,
+    ),
+]`;
+
+  it("파싱 + 라운드트립", () => {
+    const armors = parseArmorsRon(SRC);
+    expect(armors[0].defenseBonus).toBe(2);
+    expect(parseArmorsRon(serializeArmorsRon(armors))).toEqual(armors);
+  });
+});
+
+describe("parse/serialize ConsumablesRon", () => {
+  const SRC = `[
+    ConsumableDef(
+        id: "health_potion",
+        display_name: "체력 물약",
+        glyph_ascii: "!",
+        glyph_unicode: "❤",
+        glyph_game_icon: "❤",
+        pickup_message: "물약 획득",
+        effect: Heal(8),
+    ),
+]`;
+
+  it("Heal(amount) effect 파싱 + 라운드트립", () => {
+    const consumables = parseConsumablesRon(SRC);
+    expect(consumables[0].effect).toEqual({ type: "Heal", amount: 8 });
+    const reparsed = parseConsumablesRon(serializeConsumablesRon(consumables));
+    expect(reparsed).toEqual(consumables);
+  });
+
+  it("Heal 외 effect 는 throw", () => {
+    const bad = `[ConsumableDef(id:"x",display_name:"",glyph_ascii:"",glyph_unicode:"",glyph_game_icon:"",pickup_message:"",effect:Burn(3))]`;
+    expect(() => parseConsumablesRon(bad)).toThrow(/Unknown consumable effect/);
   });
 });
 

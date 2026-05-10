@@ -9,6 +9,7 @@ import type {
   SpawnZone,
 } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
+import type { ItemDef, ConsumableEffect, WeaponElement } from "@/types/item";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tokenizer
@@ -144,6 +145,111 @@ class Parser {
     this.tryPunct(",");
     this.expectPunct(")");
     return [a, b, c];
+  }
+
+  // ── ItemDef (4 종) ────────────────────────────────────────────────────────
+
+  // 공통 필드를 def 객체에 채워넣고 미처리 키를 콜백으로 위임
+  parseItemCommon(handleKindKey: (key: string) => boolean): {
+    id: string; displayName: string;
+    glyphAscii: string; glyphUnicode: string; glyphGameIcon: string;
+    pickupMessage: string;
+  } {
+    let id = "", displayName = "", glyphAscii = "", glyphUnicode = "",
+      glyphGameIcon = "", pickupMessage = "";
+
+    while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+      const key = this.parseIdent();
+      this.expectPunct(":");
+      switch (key) {
+        case "id":              id = this.parseString(); break;
+        case "display_name":    displayName = this.parseString(); break;
+        case "glyph_ascii":     glyphAscii = this.parseString(); break;
+        case "glyph_unicode":   glyphUnicode = this.parseString(); break;
+        case "glyph_game_icon": glyphGameIcon = this.parseString(); break;
+        case "pickup_message":  pickupMessage = this.parseString(); break;
+        default:
+          if (!handleKindKey(key)) throw new Error(`Unknown item field: ${key}`);
+      }
+      this.tryPunct(",");
+    }
+    return { id, displayName, glyphAscii, glyphUnicode, glyphGameIcon, pickupMessage };
+  }
+
+  parseQuestItemDef(): Extract<ItemDef, { kind: "quest" }> {
+    const name = this.parseIdent();
+    if (name !== "QuestItemDef") throw new Error(`Expected QuestItemDef, got ${name}`);
+    this.expectPunct("(");
+    let imagePath = "";
+    const common = this.parseItemCommon((key) => {
+      if (key === "image_path") { imagePath = this.parseString(); return true; }
+      return false;
+    });
+    this.expectPunct(")");
+    return { kind: "quest", ...common, imagePath };
+  }
+
+  parseWeaponDef(): Extract<ItemDef, { kind: "weapon" }> {
+    const name = this.parseIdent();
+    if (name !== "WeaponDef") throw new Error(`Expected WeaponDef, got ${name}`);
+    this.expectPunct("(");
+    let attackPower = 0;
+    let element: WeaponElement | null = null;
+    const common = this.parseItemCommon((key) => {
+      if (key === "attack_power") { attackPower = this.parseNumber(); return true; }
+      if (key === "element") {
+        // Some("fire") | None
+        const peek = this.parseIdent();
+        if (peek === "None") { element = null; return true; }
+        if (peek !== "Some") throw new Error(`Expected Some/None for element, got ${peek}`);
+        this.expectPunct("(");
+        const v = this.parseString();
+        if (v !== "fire" && v !== "ice" && v !== "lightning") {
+          throw new Error(`Unknown element: ${v}`);
+        }
+        element = v;
+        this.expectPunct(")");
+        return true;
+      }
+      return false;
+    });
+    this.expectPunct(")");
+    return { kind: "weapon", ...common, attackPower, element };
+  }
+
+  parseArmorDef(): Extract<ItemDef, { kind: "armor" }> {
+    const name = this.parseIdent();
+    if (name !== "ArmorDef") throw new Error(`Expected ArmorDef, got ${name}`);
+    this.expectPunct("(");
+    let defenseBonus = 0;
+    const common = this.parseItemCommon((key) => {
+      if (key === "defense_bonus") { defenseBonus = this.parseNumber(); return true; }
+      return false;
+    });
+    this.expectPunct(")");
+    return { kind: "armor", ...common, defenseBonus };
+  }
+
+  parseConsumableEffect(): ConsumableEffect {
+    const name = this.parseIdent();
+    if (name !== "Heal") throw new Error(`Unknown consumable effect: ${name}`);
+    this.expectPunct("(");
+    const amount = this.parseNumber();
+    this.expectPunct(")");
+    return { type: "Heal", amount };
+  }
+
+  parseConsumableDef(): Extract<ItemDef, { kind: "consumable" }> {
+    const name = this.parseIdent();
+    if (name !== "ConsumableDef") throw new Error(`Expected ConsumableDef, got ${name}`);
+    this.expectPunct("(");
+    let effect: ConsumableEffect = { type: "Heal", amount: 0 };
+    const common = this.parseItemCommon((key) => {
+      if (key === "effect") { effect = this.parseConsumableEffect(); return true; }
+      return false;
+    });
+    this.expectPunct(")");
+    return { kind: "consumable", ...common, effect };
   }
 
   // ── VillagerDef ──────────────────────────────────────────────────────────
@@ -593,6 +699,26 @@ export function parseVillagersRon(src: string): VillagerDef[] {
   return parser.parseArray(() => parser.parseVillagerDef());
 }
 
+export function parseQuestItemsRon(src: string): Extract<ItemDef, { kind: "quest" }>[] {
+  const parser = new Parser(tokenize(src));
+  return parser.parseArray(() => parser.parseQuestItemDef());
+}
+
+export function parseWeaponsRon(src: string): Extract<ItemDef, { kind: "weapon" }>[] {
+  const parser = new Parser(tokenize(src));
+  return parser.parseArray(() => parser.parseWeaponDef());
+}
+
+export function parseArmorsRon(src: string): Extract<ItemDef, { kind: "armor" }>[] {
+  const parser = new Parser(tokenize(src));
+  return parser.parseArray(() => parser.parseArmorDef());
+}
+
+export function parseConsumablesRon(src: string): Extract<ItemDef, { kind: "consumable" }>[] {
+  const parser = new Parser(tokenize(src));
+  return parser.parseArray(() => parser.parseConsumableDef());
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Serializer
 // ─────────────────────────────────────────────────────────────────────────────
@@ -761,6 +887,60 @@ export function serializeVillagersRon(villagers: VillagerDef[]): string {
   for (const v of villagers) lines.push(serializeVillagerDef(v));
   lines.push("]");
   return lines.join("\n") + "\n";
+}
+
+// ── Item serializers (4 종) ──────────────────────────────────────────────────
+
+function serializeItemCommon(item: ItemDef): string[] {
+  return [
+    `        id: ${q(item.id)},`,
+    `        display_name: ${q(item.displayName)},`,
+    `        glyph_ascii: ${q(item.glyphAscii)},`,
+    `        glyph_unicode: ${q(item.glyphUnicode)},`,
+    `        glyph_game_icon: ${q(item.glyphGameIcon)},`,
+    `        pickup_message: ${q(item.pickupMessage)},`,
+  ];
+}
+
+function arrayWrap(structName: string, lines: string[][]): string {
+  if (lines.length === 0) return "[]\n";
+  const out = ["["];
+  for (const inner of lines) {
+    out.push(`    ${structName}(`);
+    out.push(...inner);
+    out.push(`    ),`);
+  }
+  out.push("]");
+  return out.join("\n") + "\n";
+}
+
+export function serializeQuestItemsRon(items: Extract<ItemDef, { kind: "quest" }>[]): string {
+  return arrayWrap("QuestItemDef", items.map((i) => [
+    ...serializeItemCommon(i),
+    `        image_path: ${q(i.imagePath)},`,
+  ]));
+}
+
+export function serializeWeaponsRon(items: Extract<ItemDef, { kind: "weapon" }>[]): string {
+  return arrayWrap("WeaponDef", items.map((i) => [
+    ...serializeItemCommon(i),
+    `        attack_power: ${i.attackPower},`,
+    `        element: ${i.element == null ? "None" : `Some(${q(i.element)})`},`,
+  ]));
+}
+
+export function serializeArmorsRon(items: Extract<ItemDef, { kind: "armor" }>[]): string {
+  return arrayWrap("ArmorDef", items.map((i) => [
+    ...serializeItemCommon(i),
+    `        defense_bonus: ${i.defenseBonus},`,
+  ]));
+}
+
+export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consumable" }>[]): string {
+  return arrayWrap("ConsumableDef", items.map((i) => [
+    ...serializeItemCommon(i),
+    `        effect: ${i.effect.type}(${i.effect.amount}),`,
+  ]));
 }
 
 export function serializeRon(quest: QuestDef): string {
