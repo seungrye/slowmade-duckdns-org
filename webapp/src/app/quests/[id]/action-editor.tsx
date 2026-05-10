@@ -1,6 +1,6 @@
 "use client";
 
-import type { Action, Condition } from "@/types/quest";
+import type { Action, Condition, PortalPlacement } from "@/types/quest";
 import { ConditionEditor } from "./condition-editor";
 
 interface Props {
@@ -130,31 +130,27 @@ function emptyAction(type: Action["type"]): Action {
   }
 }
 
-function summarizeAction(a: Action): string {
-  switch (a.type) {
-    case "GiveItems":   return `GiveItems(${a.itemId} × ${a.count})`;
-    case "ClearFlag":   return `ClearFlag(${a.flag})`;
-    case "OpenPortal": {
-      const placement = a.placement
-        ? a.placement.type === "NearGiver"
-          ? `NearGiver(${a.placement.radius})`
-          : a.placement.type
-        : "InsideRoom";
-      return `OpenPortal(${a.zone} via ${a.generator}, ${placement})`;
-    }
-    case "ClosePortal": return `ClosePortal(${a.zone})`;
-    default:            return a.type;
-  }
-}
-
-function isReadOnlyAction(a: Action): boolean {
-  return a.type === "GiveItems"
-      || a.type === "ClearFlag"
-      || a.type === "OpenPortal"
-      || a.type === "ClosePortal";
-}
-
 // ── ActionRow ─────────────────────────────────────────────────────────────────
+
+const inputCls = "w-full border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800";
+const halfCls = "flex-1 min-w-0 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800";
+
+// placement select 의 "(기본)" 옵션 — undefined 와 명시적 InsideRoom 구분
+const PLACEMENT_DEFAULT = "__default__";
+type PlacementSelectValue = typeof PLACEMENT_DEFAULT | PortalPlacement["type"];
+
+function placementSelectValue(p?: PortalPlacement): PlacementSelectValue {
+  return p ? p.type : PLACEMENT_DEFAULT;
+}
+
+function placementFromSelect(v: PlacementSelectValue, prev?: PortalPlacement): PortalPlacement | undefined {
+  if (v === PLACEMENT_DEFAULT) return undefined;
+  if (v === "NearGiver") {
+    const radius = prev && prev.type === "NearGiver" ? prev.radius : 0;
+    return { type: "NearGiver", radius };
+  }
+  return { type: v };
+}
 
 function ActionRow({
   action,
@@ -167,21 +163,6 @@ function ActionRow({
   onRemove: () => void;
   phaseIds: string[];
 }) {
-  // 미지원 변형: 객체 참조 유지로 round-trip 보장. 제거만 가능.
-  if (isReadOnlyAction(action)) {
-    return (
-      <div className="border border-dashed border-gray-400 rounded p-2 bg-gray-50 dark:bg-gray-900">
-        <div className="flex items-center justify-between gap-1">
-          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{summarizeAction(action)}</span>
-          <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
-            ✕
-          </button>
-        </div>
-        <div className="text-[10px] italic text-gray-400 mt-1">RON 가져오기/내보내기로만 편집 가능</div>
-      </div>
-    );
-  }
-
   return (
     <div className="border rounded p-2 space-y-1 bg-gray-50 dark:bg-gray-900">
       <div className="flex gap-1 items-center">
@@ -193,10 +174,14 @@ function ActionRow({
           <option value="AdvancePhase">AdvancePhase</option>
           <option value="Log">Log</option>
           <option value="GiveItem">GiveItem</option>
+          <option value="GiveItems">GiveItems (수량)</option>
           <option value="RemoveItem">RemoveItem</option>
           <option value="SetFlag">SetFlag</option>
+          <option value="ClearFlag">ClearFlag</option>
           <option value="KillNpc">KillNpc</option>
           <option value="DespawnWorldItem">DespawnWorldItem</option>
+          <option value="OpenPortal">OpenPortal (Named 존)</option>
+          <option value="ClosePortal">ClosePortal</option>
           <option value="Branch">Branch (switch)</option>
         </select>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
@@ -208,7 +193,7 @@ function ActionRow({
         <select
           value={action.phaseId}
           onChange={(e) => onChange({ ...action, phaseId: e.target.value })}
-          className="w-full border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+          className={inputCls}
         >
           <option value="">페이즈 선택</option>
           {phaseIds.map((id) => <option key={id} value={id}>{id}</option>)}
@@ -230,8 +215,27 @@ function ActionRow({
           value={action.itemId}
           onChange={(e) => onChange({ ...action, itemId: e.target.value } as Action)}
           placeholder="아이템 ID"
-          className="w-full border rounded px-1 py-0.5 text-xs"
+          className={inputCls}
         />
+      )}
+
+      {action.type === "GiveItems" && (
+        <div className="flex gap-1">
+          <input
+            value={action.itemId}
+            onChange={(e) => onChange({ ...action, itemId: e.target.value })}
+            placeholder="아이템 ID"
+            className={halfCls}
+          />
+          <input
+            type="number"
+            min={1}
+            value={action.count}
+            onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+            placeholder="수량"
+            className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+          />
+        </div>
       )}
 
       {action.type === "SetFlag" && (
@@ -240,15 +244,24 @@ function ActionRow({
             value={action.flag}
             onChange={(e) => onChange({ ...action, flag: e.target.value })}
             placeholder="flag"
-            className="flex-1 min-w-0 border rounded px-1 py-0.5 text-xs"
+            className={halfCls}
           />
           <input
             value={action.value}
             onChange={(e) => onChange({ ...action, value: e.target.value })}
             placeholder="value"
-            className="flex-1 min-w-0 border rounded px-1 py-0.5 text-xs"
+            className={halfCls}
           />
         </div>
+      )}
+
+      {action.type === "ClearFlag" && (
+        <input
+          value={action.flag}
+          onChange={(e) => onChange({ ...action, flag: e.target.value })}
+          placeholder="flag 이름"
+          className={inputCls}
+        />
       )}
 
       {action.type === "KillNpc" && (
@@ -256,7 +269,64 @@ function ActionRow({
           value={action.npcId}
           onChange={(e) => onChange({ ...action, npcId: e.target.value })}
           placeholder="NPC ID"
-          className="w-full border rounded px-1 py-0.5 text-xs"
+          className={inputCls}
+        />
+      )}
+
+      {action.type === "OpenPortal" && (
+        <div className="space-y-1">
+          <input
+            value={action.zone}
+            onChange={(e) => onChange({ ...action, zone: e.target.value })}
+            placeholder="존 ID (예: herb_glade)"
+            className={inputCls}
+          />
+          <input
+            value={action.generator}
+            onChange={(e) => onChange({ ...action, generator: e.target.value })}
+            placeholder="생성기 (bsp / forest / cellular_automata 등)"
+            className={inputCls}
+          />
+          <select
+            value={placementSelectValue(action.placement)}
+            onChange={(e) => {
+              const next = placementFromSelect(e.target.value as PlacementSelectValue, action.placement);
+              if (next === undefined) {
+                onChange({ type: "OpenPortal", zone: action.zone, generator: action.generator });
+              } else {
+                onChange({ ...action, placement: next });
+              }
+            }}
+            className={inputCls}
+          >
+            <option value={PLACEMENT_DEFAULT}>(기본 — InsideRoom, 직렬화 시 생략)</option>
+            <option value="InsideRoom">InsideRoom</option>
+            <option value="Border">Border</option>
+            <option value="Random">Random</option>
+            <option value="NearGiver">NearGiver (giver 반경)</option>
+          </select>
+          {action.placement?.type === "NearGiver" && (
+            <input
+              type="number"
+              min={0}
+              value={action.placement.radius}
+              onChange={(e) => onChange({
+                ...action,
+                placement: { type: "NearGiver", radius: Number(e.target.value) },
+              })}
+              placeholder="radius"
+              className={inputCls}
+            />
+          )}
+        </div>
+      )}
+
+      {action.type === "ClosePortal" && (
+        <input
+          value={action.zone}
+          onChange={(e) => onChange({ ...action, zone: e.target.value })}
+          placeholder="존 ID"
+          className={inputCls}
         />
       )}
 

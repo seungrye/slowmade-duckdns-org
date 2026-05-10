@@ -60,4 +60,16 @@ describe('ConditionEditor', () => {
     expect(inputs.some((el) => (el as HTMLInputElement).value === 'stark_quest')).toBe(true);
     expect(inputs.some((el) => (el as HTMLInputElement).value === 'done')).toBe(true);
   });
+
+  it('HasFlag 조건의 flag 입력을 렌더한다', () => {
+    render(
+      <ConditionEditor
+        condition={{ type: 'HasFlag', flag: 'herbalist_killed' }}
+        onChange={noop}
+      />
+    );
+    expect(screen.getByRole('combobox')).toHaveValue('HasFlag');
+    const inputs = screen.getAllByRole('textbox');
+    expect(inputs.some((el) => (el as HTMLInputElement).value === 'herbalist_killed')).toBe(true);
+  });
 });

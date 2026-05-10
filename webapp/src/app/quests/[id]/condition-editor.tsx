@@ -24,28 +24,7 @@ function emptyCondition(type: Condition["type"]): Condition {
 const inputCls = "flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 const selectCls = "w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 
-function summarizeCondition(c: Condition): string {
-  switch (c.type) {
-    case "HasFlag": return `HasFlag(${c.flag})`;
-    default:        return c.type;
-  }
-}
-
-function ReadOnlyCondition({ condition }: { condition: Condition }) {
-  return (
-    <div className="border border-dashed border-gray-400 rounded px-2 py-1 text-xs bg-gray-50 dark:bg-gray-900">
-      <div className="font-mono text-gray-600 dark:text-gray-400">{summarizeCondition(condition)}</div>
-      <div className="text-[10px] italic text-gray-400 mt-0.5">RON 가져오기/내보내기로만 편집 가능</div>
-    </div>
-  );
-}
-
 export function ConditionEditor({ condition, onChange }: Props) {
-  // 미지원 변형은 read-only — 객체 참조 유지로 round-trip 보장
-  if (condition.type === "HasFlag") {
-    return <ReadOnlyCondition condition={condition} />;
-  }
-
   const type = condition?.type ?? "Always";
 
   return (
@@ -58,6 +37,7 @@ export function ConditionEditor({ condition, onChange }: Props) {
       >
         <option value="Always">Always (무조건)</option>
         <option value="FlagIs">FlagIs (플래그 값 비교)</option>
+        <option value="HasFlag">HasFlag (플래그 존재)</option>
         <option value="HasItem">HasItem (아이템 보유)</option>
         <option value="And">And (모두 참)</option>
         <option value="Or">Or (하나 이상 참)</option>
@@ -83,6 +63,16 @@ export function ConditionEditor({ condition, onChange }: Props) {
             className={inputCls}
           />
         </div>
+      )}
+
+      {/* HasFlag */}
+      {condition.type === "HasFlag" && (
+        <input
+          value={condition.flag}
+          onChange={(e) => onChange({ ...condition, flag: e.target.value })}
+          placeholder="flag 이름"
+          className={selectCls}
+        />
       )}
 
       {/* HasItem */}

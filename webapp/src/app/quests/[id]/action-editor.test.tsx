@@ -35,6 +35,93 @@ describe('ActionEditor — SetFlag', () => {
   });
 });
 
+describe('ActionEditor — GiveItems', () => {
+  it('GiveItems 액션의 itemId + count 입력이 렌더된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'GiveItems', itemId: 'health_potion', count: 5 }]}
+        onChange={noop}
+        phaseIds={[]}
+      />
+    );
+    const inputs = screen.getAllByRole('textbox');
+    expect(inputs.some((el) => (el as HTMLInputElement).value === 'health_potion')).toBe(true);
+    const counts = screen.getAllByRole('spinbutton');
+    expect((counts[0] as HTMLInputElement).value).toBe('5');
+  });
+});
+
+describe('ActionEditor — ClearFlag', () => {
+  it('ClearFlag 액션의 flag 입력이 렌더된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'ClearFlag', flag: 'herb_quest_active' }]}
+        onChange={noop}
+        phaseIds={[]}
+      />
+    );
+    const inputs = screen.getAllByRole('textbox');
+    expect(inputs.some((el) => (el as HTMLInputElement).value === 'herb_quest_active')).toBe(true);
+  });
+});
+
+describe('ActionEditor — ClosePortal', () => {
+  it('ClosePortal 액션의 zone 입력이 렌더된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'ClosePortal', zone: 'demon_cave' }]}
+        onChange={noop}
+        phaseIds={[]}
+      />
+    );
+    const inputs = screen.getAllByRole('textbox');
+    expect(inputs.some((el) => (el as HTMLInputElement).value === 'demon_cave')).toBe(true);
+  });
+});
+
+describe('ActionEditor — OpenPortal', () => {
+  it('placement 미지정 시 select 가 "기본" 옵션으로 표시된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'OpenPortal', zone: 'cave', generator: 'bsp' }]}
+        onChange={noop}
+        phaseIds={[]}
+      />
+    );
+    const selects = screen.getAllByRole('combobox');
+    // 첫 select 는 액션 타입, 두 번째는 placement
+    expect((selects[1] as HTMLSelectElement).value).toBe('__default__');
+    // radius 입력은 미렌더 (NearGiver 가 아니므로)
+    expect(screen.queryAllByRole('spinbutton')).toHaveLength(0);
+  });
+
+  it('placement: Border 일 때 select 가 Border 로 선택된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'OpenPortal', zone: 'glade', generator: 'forest', placement: { type: 'Border' } }]}
+        onChange={noop}
+        phaseIds={[]}
+      />
+    );
+    const selects = screen.getAllByRole('combobox');
+    expect((selects[1] as HTMLSelectElement).value).toBe('Border');
+  });
+
+  it('placement: NearGiver 일 때 radius 입력이 추가로 렌더된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'OpenPortal', zone: 'z', generator: 'g', placement: { type: 'NearGiver', radius: 7 } }]}
+        onChange={noop}
+        phaseIds={[]}
+      />
+    );
+    const selects = screen.getAllByRole('combobox');
+    expect((selects[1] as HTMLSelectElement).value).toBe('NearGiver');
+    const numbers = screen.getAllByRole('spinbutton');
+    expect(numbers.some((el) => (el as HTMLInputElement).value === '7')).toBe(true);
+  });
+});
+
 describe('ActionEditor — Branch (switch/case)', () => {
   it('단일 Branch를 case 1 + default 로 렌더한다', () => {
     render(
