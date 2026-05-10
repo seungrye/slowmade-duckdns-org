@@ -83,8 +83,9 @@ main() {
     NEXT_DISTDIR=".next-${inactive}" pnpm install --frozen-lockfile
     NEXT_DISTDIR=".next-${inactive}" pnpm build
 
-    log "systemctl start webapp@${inactive}"
-    sudo systemctl start "webapp@${inactive}"
+    log "systemctl enable --now webapp@${inactive}"
+    # enable 도 함께 — 첫 배포에서 인스턴스를 부팅 자동 시작 대상에 등록.
+    sudo systemctl enable --now "webapp@${inactive}"
 
     log "health check http://127.0.0.1:${inactive}${HEALTH_PATH} (timeout=${HEALTH_TIMEOUT_SEC}s)"
     if ! health_check "$inactive"; then
