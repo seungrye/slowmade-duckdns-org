@@ -28,7 +28,7 @@ bevy-rogue 의 데이터 분리 구조와 일치시킨다:
 
 ---
 
-## C1a — Villagers 스키마 + CRUD API
+## ✅ C1a — Villagers 스키마 + CRUD API
 
 ### MongoDB 컬렉션
 
@@ -65,11 +65,11 @@ bevy-rogue 의 데이터 분리 구조와 일치시킨다:
 
 ### 변경 범위
 
-- [ ] `webapp/src/models/villager.tsx` — Mongoose 스키마
-- [ ] `webapp/src/app/api/villagers/route.tsx` — GET, POST
-- [ ] `webapp/src/app/api/villagers/[name]/route.tsx` — GET, PUT, DELETE
-- [ ] 위 API 의 단위 테스트 (`*.test.ts`)
-- [ ] `webapp/src/types/villager.ts` — TypeScript 타입
+- [x] `webapp/src/models/villager.tsx` — Mongoose 스키마
+- [x] `webapp/src/app/api/villagers/route.tsx` — GET, POST
+- [x] `webapp/src/app/api/villagers/[name]/route.tsx` — GET, PUT, DELETE
+- [x] 위 API 의 단위 테스트 (`*.test.ts`)
+- [x] `webapp/src/types/villager.ts` — TypeScript 타입
 
 ### 비목표 (다음 사이클)
 
