@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { parseRon, serializeRon } from "./ron";
+import { parseRon, serializeRon, parseVillagersRon, serializeVillagersRon } from "./ron";
 import { readFileSync } from "fs";
 import { join } from "path";
 import type { QuestDef } from "@/types/quest";
+import type { VillagerDef } from "@/types/villager";
 
 const SIMPLE_RON = `
 QuestDef(
@@ -478,4 +479,89 @@ describe("실제 .ron 파일 파싱·라운드트립", () => {
       expect(second).toEqual(first);
     });
   }
+});
+
+describe("parseVillagersRon — 기본", () => {
+  const SIMPLE = `[
+    VillagerDef(
+        name: "장로",
+        color: (0.9, 0.8, 0.5),
+        dialogs: [],
+        quest_id: Some("gem_quest"),
+        speed: 0.5,
+    ),
+    VillagerDef(
+        name: "촌장",
+        color: (1.0, 0.85, 0.0),
+        dialogs: [
+            "안녕",
+            "잘 가게.",
+        ],
+        quest_id: None,
+        speed: 1.0,
+    ),
+]`;
+
+  it("VillagerDef 2개 파싱", () => {
+    const villagers = parseVillagersRon(SIMPLE);
+    expect(villagers).toHaveLength(2);
+    expect(villagers[0]).toEqual({
+      name: "장로",
+      color: [0.9, 0.8, 0.5],
+      dialogs: [],
+      questId: "gem_quest",
+      speed: 0.5,
+    });
+    expect(villagers[1]).toEqual({
+      name: "촌장",
+      color: [1.0, 0.85, 0.0],
+      dialogs: ["안녕", "잘 가게."],
+      questId: null,
+      speed: 1.0,
+    });
+  });
+
+  it("빈 배열 파싱", () => {
+    expect(parseVillagersRon("[]")).toEqual([]);
+  });
+
+  it("라운드트립 deep equal", () => {
+    const villagers = parseVillagersRon(SIMPLE);
+    const reparsed = parseVillagersRon(serializeVillagersRon(villagers));
+    expect(reparsed).toEqual(villagers);
+  });
+});
+
+describe("serializeVillagersRon — 빈 배열", () => {
+  it("빈 배열은 \"[]\\n\"", () => {
+    expect(serializeVillagersRon([])).toBe("[]\n");
+  });
+
+  it("questId null 은 None, 값 있으면 Some", () => {
+    const villagers: VillagerDef[] = [
+      { name: "a", color: [0, 0, 0], dialogs: [], questId: null, speed: 1.0 },
+      { name: "b", color: [1, 1, 1], dialogs: [], questId: "q1", speed: 1.0 },
+    ];
+    const out = serializeVillagersRon(villagers);
+    expect(out).toContain("quest_id: None");
+    expect(out).toContain('quest_id: Some("q1")');
+  });
+});
+
+describe("실제 villagers.ron 파싱·라운드트립", () => {
+  it("bevy-rogue villagers.ron round-trip", () => {
+    const src = readFileSync(join(process.cwd(), "villagers", "villagers.ron"), "utf8");
+    const first = parseVillagersRon(src);
+    expect(first.length).toBeGreaterThan(0);
+    const second = parseVillagersRon(serializeVillagersRon(first));
+    expect(second).toEqual(first);
+  });
+
+  it("bevy-rogue 의 첫 villager 가 장로 + gem_quest 연결", () => {
+    const src = readFileSync(join(process.cwd(), "villagers", "villagers.ron"), "utf8");
+    const villagers = parseVillagersRon(src);
+    const elder = villagers.find((v) => v.name === "장로");
+    expect(elder).toBeDefined();
+    expect(elder?.questId).toBe("gem_quest");
+  });
 });

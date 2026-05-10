@@ -8,6 +8,7 @@ import type {
   QuestSpawn,
   SpawnZone,
 } from "@/types/quest";
+import type { VillagerDef } from "@/types/villager";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tokenizer
@@ -131,6 +132,50 @@ class Parser {
     const c = this.parseCondition();
     this.expectPunct(")");
     return c;
+  }
+
+  parseNumberTuple3(): [number, number, number] {
+    this.expectPunct("(");
+    const a = this.parseNumber();
+    this.tryPunct(",");
+    const b = this.parseNumber();
+    this.tryPunct(",");
+    const c = this.parseNumber();
+    this.tryPunct(",");
+    this.expectPunct(")");
+    return [a, b, c];
+  }
+
+  // ── VillagerDef ──────────────────────────────────────────────────────────
+
+  parseVillagerDef(): VillagerDef {
+    const name = this.parseIdent();
+    if (name !== "VillagerDef") throw new Error(`Expected VillagerDef, got ${name}`);
+    this.expectPunct("(");
+
+    const def: VillagerDef = {
+      name: "",
+      color: [0, 0, 0],
+      dialogs: [],
+      questId: null,
+      speed: 1.0,
+    };
+
+    while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+      const key = this.parseIdent();
+      this.expectPunct(":");
+      switch (key) {
+        case "name":     def.name    = this.parseString(); break;
+        case "color":    def.color   = this.parseNumberTuple3(); break;
+        case "dialogs":  def.dialogs = this.parseArray(() => this.parseString()); break;
+        case "quest_id": def.questId = this.parseOptionString(); break;
+        case "speed":    def.speed   = this.parseNumber(); break;
+        default: break;
+      }
+      this.tryPunct(",");
+    }
+    this.expectPunct(")");
+    return def;
   }
 
   parseArray<T>(parseItem: () => T): T[] {
@@ -542,6 +587,12 @@ export function parseRon(src: string): QuestDef {
   return parser.parseQuest();
 }
 
+export function parseVillagersRon(src: string): VillagerDef[] {
+  const tokens = tokenize(src);
+  const parser = new Parser(tokens);
+  return parser.parseArray(() => parser.parseVillagerDef());
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Serializer
 // ─────────────────────────────────────────────────────────────────────────────
@@ -683,6 +734,33 @@ function serializeSpawn(s: QuestSpawn): string {
   if (s.count !== undefined) parts.push(`count: ${s.count}`);
   if (s.condition !== undefined) parts.push(`condition: Some(${serializeCondition(s.condition)})`);
   return `        QuestSpawn(${parts.join(", ")}),`;
+}
+
+function serializeVillagerDef(v: VillagerDef): string {
+  const lines: string[] = [];
+  lines.push(`    VillagerDef(`);
+  lines.push(`        name: ${q(v.name)},`);
+  lines.push(`        color: (${v.color[0]}, ${v.color[1]}, ${v.color[2]}),`);
+  if (v.dialogs.length === 0) {
+    lines.push(`        dialogs: [],`);
+  } else {
+    lines.push(`        dialogs: [`);
+    for (const d of v.dialogs) lines.push(`            ${q(d)},`);
+    lines.push(`        ],`);
+  }
+  const qid = v.questId == null ? "None" : `Some(${q(v.questId)})`;
+  lines.push(`        quest_id: ${qid},`);
+  lines.push(`        speed: ${v.speed},`);
+  lines.push(`    ),`);
+  return lines.join("\n");
+}
+
+export function serializeVillagersRon(villagers: VillagerDef[]): string {
+  if (villagers.length === 0) return "[]\n";
+  const lines = ["["];
+  for (const v of villagers) lines.push(serializeVillagerDef(v));
+  lines.push("]");
+  return lines.join("\n") + "\n";
 }
 
 export function serializeRon(quest: QuestDef): string {
