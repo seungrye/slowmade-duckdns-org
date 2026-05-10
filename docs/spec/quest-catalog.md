@@ -408,7 +408,7 @@ PUT 직전·import 의 갱신 분기·restore 직전 자동 백업.
 
 ---
 
-## C2b — Items 페이지 + RON import/export
+## ✅ C2b — Items 페이지 + RON import/export
 
 ### 페이지 `/quests/items`
 
@@ -461,14 +461,14 @@ RON 텍스트로 직렬화. `Content-Disposition: attachment; filename="weapons.
 
 ### 변경 범위
 
-- [ ] `webapp/src/lib/ron.ts` — 4 종 parser/serializer
+- [x] `webapp/src/lib/ron.ts` — 4 종 parser/serializer
   (`parseQuestItemsRon` 등). Parser 클래스에 `parseQuestItemDef` /
   `parseWeaponDef` / `parseArmorDef` / `parseConsumableDef`.
-- [ ] `webapp/src/lib/ron.test.ts` — 4 종 라운드트립 단위 테스트
-- [ ] `webapp/src/app/api/quests/items/import/route.tsx` + 테스트
-- [ ] `webapp/src/app/api/quests/items/export/route.tsx` + 테스트
-- [ ] `webapp/src/app/quests/items/page.tsx` + 테스트
-- [ ] `webapp/src/app/quests/items/[id]/revisions/page.tsx` + 테스트
+- [x] `webapp/src/lib/ron.test.ts` — 4 종 라운드트립 단위 테스트
+- [x] `webapp/src/app/api/quests/items/import/route.tsx` + 테스트
+- [x] `webapp/src/app/api/quests/items/export/route.tsx` + 테스트
+- [x] `webapp/src/app/quests/items/page.tsx` + 테스트
+- [x] `webapp/src/app/quests/items/[id]/revisions/page.tsx` + 테스트
   (villager revisions 페이지 패턴 그대로)
 
 ### 비목표
