@@ -13,7 +13,7 @@ Environment=NEXT_DISTDIR=.next-%i
 # pnpm 경로는 corepack/nvm 환경에 따라 다르므로 PATH 를 명시.
 # nvm 사용 시 systemd 는 nvm 을 모르므로 lts/iron 의 절대 경로를 박는 편이 안전하다.
 # `which node && which pnpm` 결과에 맞춰 아래 PATH 를 환경에 맞게 조정.
-Environment=PATH=/home/seungrye/.nvm/versions/node/lts-iron/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/home/seungrye/.nvm/versions/node/v20.19.0/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/home/seungrye/site/webapp/.env.local
 ExecStart=/usr/bin/env pnpm start
 Restart=on-failure
