@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  distDir: process.env.NEXT_DISTDIR ?? '.next',
     allowedDevOrigins: [
       'http://localhost:3010',
       'http://192.168.0.11:3010',
