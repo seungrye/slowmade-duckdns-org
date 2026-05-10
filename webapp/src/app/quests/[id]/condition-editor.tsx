@@ -11,6 +11,7 @@ function emptyCondition(type: Condition["type"]): Condition {
   switch (type) {
     case "Always":  return { type: "Always" };
     case "FlagIs":  return { type: "FlagIs", flag: "", value: "" };
+    case "HasFlag": return { type: "HasFlag", flag: "" };
     case "HasItem": return { type: "HasItem", itemId: "" };
     case "And":     return { type: "And", conditions: [] };
     case "Or":      return { type: "Or", conditions: [] };
@@ -23,7 +24,28 @@ function emptyCondition(type: Condition["type"]): Condition {
 const inputCls = "flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 const selectCls = "w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
 
+function summarizeCondition(c: Condition): string {
+  switch (c.type) {
+    case "HasFlag": return `HasFlag(${c.flag})`;
+    default:        return c.type;
+  }
+}
+
+function ReadOnlyCondition({ condition }: { condition: Condition }) {
+  return (
+    <div className="border border-dashed border-gray-400 rounded px-2 py-1 text-xs bg-gray-50 dark:bg-gray-900">
+      <div className="font-mono text-gray-600 dark:text-gray-400">{summarizeCondition(condition)}</div>
+      <div className="text-[10px] italic text-gray-400 mt-0.5">RON 가져오기/내보내기로만 편집 가능</div>
+    </div>
+  );
+}
+
 export function ConditionEditor({ condition, onChange }: Props) {
+  // 미지원 변형은 read-only — 객체 참조 유지로 round-trip 보장
+  if (condition.type === "HasFlag") {
+    return <ReadOnlyCondition condition={condition} />;
+  }
+
   const type = condition?.type ?? "Always";
 
   return (
@@ -142,15 +164,17 @@ export function ConditionEditor({ condition, onChange }: Props) {
               const zoneType = e.target.value as SpawnZone["type"];
               const zone: SpawnZone =
                 zoneType === "Dungeon" ? { type: "Dungeon", level: 1 }
-                : zoneType === "World" ? { type: "World", mapId: "" }
+                : zoneType === "Named" ? { type: "Named", id: "" }
+                : zoneType === "Town" ? { type: "Town" }
                 : { type: "Forest" };
               onChange({ ...condition, zone });
             }}
             className={selectCls}
           >
+            <option value="Town">Town</option>
             <option value="Forest">Forest</option>
             <option value="Dungeon">Dungeon</option>
-            <option value="World">World</option>
+            <option value="Named">Named (퀘스트 동적 존)</option>
           </select>
           {condition.zone.type === "Dungeon" && (
             <input
@@ -161,11 +185,11 @@ export function ConditionEditor({ condition, onChange }: Props) {
               className={selectCls}
             />
           )}
-          {condition.zone.type === "World" && (
+          {condition.zone.type === "Named" && (
             <input
-              value={condition.zone.mapId}
-              onChange={(e) => onChange({ ...condition, zone: { type: "World", mapId: e.target.value } })}
-              placeholder="맵 ID"
+              value={condition.zone.id}
+              onChange={(e) => onChange({ ...condition, zone: { type: "Named", id: e.target.value } })}
+              placeholder="존 ID (예: herb_glade)"
               className={selectCls}
             />
           )}

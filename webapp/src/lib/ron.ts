@@ -4,6 +4,7 @@ import type {
   Action,
   AutoAdvance,
   Condition,
+  PortalPlacement,
   QuestSpawn,
   SpawnZone,
 } from "@/types/quest";
@@ -50,7 +51,7 @@ function tokenize(src: string): Token[] {
       tokens.push({ kind: "ident", val: s });
       continue;
     }
-    // 숫자 (음수 포함)
+    // 숫자 (음수·소수 포함)
     if (/[0-9]/.test(src[i]) || (src[i] === "-" && /[0-9]/.test(src[i + 1] ?? ""))) {
       let s = "";
       if (src[i] === "-") s += src[i++];
@@ -122,6 +123,16 @@ class Parser {
     return v;
   }
 
+  parseOptionCondition(): Condition | undefined {
+    const name = this.parseIdent();
+    if (name === "None") return undefined;
+    if (name !== "Some") throw new Error(`Expected Some/None, got ${name}`);
+    this.expectPunct("(");
+    const c = this.parseCondition();
+    this.expectPunct(")");
+    return c;
+  }
+
   parseArray<T>(parseItem: () => T): T[] {
     this.expectPunct("[");
     const items: T[] = [];
@@ -150,6 +161,13 @@ class Parser {
         this.tryPunct(",");
         this.expectPunct(")");
         return { type: "FlagIs", flag, value };
+      }
+
+      case "HasFlag": {
+        this.expectPunct("(");
+        const flag = this.parseString();
+        this.expectPunct(")");
+        return { type: "HasFlag", flag };
       }
 
       case "HasItem": {
@@ -202,7 +220,7 @@ class Parser {
     }
   }
 
-  // ── Action list (shared for on_interact, if_true, if_false) ──────────────
+  // ── Action list ──────────────────────────────────────────────────────────
 
   parseActionList(): Action[] {
     return this.parseArray(() => this.parseAction());
@@ -228,6 +246,18 @@ class Parser {
         this.expectPunct(")");
         return { type: "GiveItem", itemId };
       }
+      case "GiveItems": {
+        let itemId = "", count = 1;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "item") itemId = this.parseString();
+          else if (key === "count") count = this.parseNumber();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        return { type: "GiveItems", itemId, count };
+      }
       case "RemoveItem": {
         const itemId = this.parseString();
         this.expectPunct(")");
@@ -246,10 +276,36 @@ class Parser {
         this.expectPunct(")");
         return { type: "SetFlag", flag, value };
       }
+      case "ClearFlag": {
+        const flag = this.parseString();
+        this.expectPunct(")");
+        return { type: "ClearFlag", flag };
+      }
       case "KillNpc": {
         const npcId = this.parseString();
         this.expectPunct(")");
         return { type: "KillNpc", npcId };
+      }
+      case "OpenPortal": {
+        let zone = "", generator = "";
+        let placement: PortalPlacement | undefined;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "zone") zone = this.parseString();
+          else if (key === "generator") generator = this.parseString();
+          else if (key === "placement") placement = this.parsePlacement();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        const action: Extract<Action, { type: "OpenPortal" }> = { type: "OpenPortal", zone, generator };
+        if (placement) action.placement = placement;
+        return action;
+      }
+      case "ClosePortal": {
+        const zone = this.parseString();
+        this.expectPunct(")");
+        return { type: "ClosePortal", zone };
       }
       case "Branch": {
         // Branch(condition: ..., if_true: [...], if_false: [...])
@@ -274,6 +330,28 @@ class Parser {
       default:
         throw new Error(`Unknown action: ${name}`);
     }
+  }
+
+  // ── PortalPlacement ──────────────────────────────────────────────────────
+
+  parsePlacement(): PortalPlacement {
+    const name = this.parseIdent();
+    if (name === "InsideRoom" || name === "Border" || name === "Random") {
+      return { type: name };
+    }
+    if (name === "NearGiver") {
+      this.expectPunct("(");
+      let radius = 0;
+      while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+        const key = this.parseIdent();
+        this.expectPunct(":");
+        if (key === "radius") radius = this.parseNumber();
+        this.tryPunct(",");
+      }
+      this.expectPunct(")");
+      return { type: "NearGiver", radius };
+    }
+    throw new Error(`Unknown placement: ${name}`);
   }
 
   // ── AutoAdvance ───────────────────────────────────────────────────────────
@@ -304,9 +382,10 @@ class Parser {
 
   parseSpawnZone(): SpawnZone {
     const name = this.parseIdent();
-    // 괄호 없는 단순 열거형 존 (예: Forest)
+    // 괄호 없는 단순 변형: Town | Forest
     if (!(this.peek()?.kind === "punct" && this.peek()?.val === "(")) {
-      return { type: name } as SpawnZone;
+      if (name === "Town" || name === "Forest") return { type: name };
+      throw new Error(`Unknown bare zone: ${name}`);
     }
     this.expectPunct("(");
     if (name === "Dungeon") {
@@ -314,10 +393,10 @@ class Parser {
       this.expectPunct(")");
       return { type: "Dungeon", level };
     }
-    if (name === "World") {
-      const mapId = this.parseString();
+    if (name === "Named") {
+      const id = this.parseString();
       this.expectPunct(")");
-      return { type: "World", mapId };
+      return { type: "Named", id };
     }
     throw new Error(`Unknown zone with params: ${name}`);
   }
@@ -325,19 +404,26 @@ class Parser {
   parseSpawn(): QuestSpawn {
     let phase = "", item = "";
     let zone: SpawnZone = { type: "Dungeon", level: 1 };
+    let count: number | undefined;
+    let condition: Condition | undefined;
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
       this.expectPunct(":");
       switch (key) {
-        case "phase": phase = this.parseString(); break;
-        case "item":  item  = this.parseString(); break;
-        case "zone":  zone  = this.parseSpawnZone(); break;
+        case "phase":     phase = this.parseString(); break;
+        case "item":      item  = this.parseString(); break;
+        case "zone":      zone  = this.parseSpawnZone(); break;
+        case "count":     count = this.parseNumber(); break;
+        case "condition": condition = this.parseOptionCondition(); break;
         default: break;
       }
       this.tryPunct(",");
     }
-    return { phase, item, zone };
+    const spawn: QuestSpawn = { phase, item, zone };
+    if (count !== undefined) spawn.count = count;
+    if (condition !== undefined) spawn.condition = condition;
+    return spawn;
   }
 
   // ── PhaseDef ──────────────────────────────────────────────────────────────
@@ -408,6 +494,7 @@ class Parser {
         case "title":         quest.title        = this.parseString(); break;
         case "giver_npc":     quest.giverNpc     = this.parseString(); break;
         case "initial_phase": quest.initialPhase = this.parseString(); break;
+        case "spawn_chance":  quest.spawnChance  = this.parseNumber(); break;
         case "phases": {
           this.expectPunct("{");
           while (!(this.peek()?.kind === "punct" && this.peek()?.val === "}")) {
@@ -466,6 +553,7 @@ function serializeCondition(cond: Condition): string {
   switch (cond.type) {
     case "Always":  return "Always";
     case "FlagIs":  return `FlagIs(flag: ${q(cond.flag)}, value: ${q(cond.value)})`;
+    case "HasFlag": return `HasFlag(${q(cond.flag)})`;
     case "HasItem": return `HasItem(${q(cond.itemId)})`;
     case "PhaseIs": return `PhaseIs(quest: ${q(cond.quest)}, phase: ${q(cond.phase)})`;
     case "Not":     return `Not(${serializeCondition(cond.condition)})`;
@@ -475,16 +563,35 @@ function serializeCondition(cond: Condition): string {
   }
 }
 
+function serializePlacement(p: PortalPlacement): string {
+  switch (p.type) {
+    case "InsideRoom":
+    case "Border":
+    case "Random":
+      return p.type;
+    case "NearGiver":
+      return `NearGiver(radius: ${p.radius})`;
+  }
+}
+
 function serializeAction(action: Action, depth: number): string {
   const i = ind(depth);
   switch (action.type) {
     case "AdvancePhase":     return `${i}AdvancePhase(${q(action.phaseId)})`;
     case "Log":              return `${i}Log(${q(action.text)})`;
     case "GiveItem":         return `${i}GiveItem(${q(action.itemId)})`;
+    case "GiveItems":        return `${i}GiveItems(item: ${q(action.itemId)}, count: ${action.count})`;
     case "RemoveItem":       return `${i}RemoveItem(${q(action.itemId)})`;
     case "DespawnWorldItem": return `${i}DespawnWorldItem(${q(action.itemId)})`;
     case "KillNpc":          return `${i}KillNpc(${q(action.npcId)})`;
     case "SetFlag":          return `${i}SetFlag(flag: ${q(action.flag)}, value: ${q(action.value)})`;
+    case "ClearFlag":        return `${i}ClearFlag(${q(action.flag)})`;
+    case "OpenPortal": {
+      const parts = [`zone: ${q(action.zone)}`, `generator: ${q(action.generator)}`];
+      if (action.placement) parts.push(`placement: ${serializePlacement(action.placement)}`);
+      return `${i}OpenPortal(${parts.join(", ")})`;
+    }
+    case "ClosePortal":      return `${i}ClosePortal(${q(action.zone)})`;
     case "Branch": {
       const lines = [
         `${i}Branch(`,
@@ -511,9 +618,12 @@ function serializeAction(action: Action, depth: number): string {
 }
 
 function serializeZone(zone: SpawnZone): string {
-  if (zone.type === "Dungeon") return `Dungeon(${zone.level})`;
-  if (zone.type === "World") return `World(${q(zone.mapId)})`;
-  return zone.type;
+  switch (zone.type) {
+    case "Town":    return "Town";
+    case "Forest":  return "Forest";
+    case "Dungeon": return `Dungeon(${zone.level})`;
+    case "Named":   return `Named(${q(zone.id)})`;
+  }
 }
 
 function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): string {
@@ -564,6 +674,17 @@ function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): s
   return lines.join("\n");
 }
 
+function serializeSpawn(s: QuestSpawn): string {
+  const parts = [
+    `phase: ${q(s.phase)}`,
+    `item: ${q(s.item)}`,
+    `zone: ${serializeZone(s.zone)}`,
+  ];
+  if (s.count !== undefined) parts.push(`count: ${s.count}`);
+  if (s.condition !== undefined) parts.push(`condition: Some(${serializeCondition(s.condition)})`);
+  return `        QuestSpawn(${parts.join(", ")}),`;
+}
+
 export function serializeRon(quest: QuestDef): string {
   const lines: string[] = [];
 
@@ -572,6 +693,9 @@ export function serializeRon(quest: QuestDef): string {
   lines.push(`    title: ${q(quest.title)},`);
   lines.push(`    giver_npc: ${q(quest.giverNpc)},`);
   lines.push(`    initial_phase: ${q(quest.initialPhase)},`);
+  if (quest.spawnChance !== undefined) {
+    lines.push(`    spawn_chance: ${quest.spawnChance},`);
+  }
   lines.push(``);
   lines.push(`    phases: {`);
   lines.push(``);
@@ -588,9 +712,7 @@ export function serializeRon(quest: QuestDef): string {
     lines.push(`    spawns: [],`);
   } else {
     lines.push(`    spawns: [`);
-    for (const s of quest.spawns) {
-      lines.push(`        QuestSpawn(phase: ${q(s.phase)}, item: ${q(s.item)}, zone: ${serializeZone(s.zone)}),`);
-    }
+    for (const s of quest.spawns) lines.push(serializeSpawn(s));
     lines.push(`    ],`);
   }
 

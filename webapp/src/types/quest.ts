@@ -2,6 +2,7 @@
 
 export type Condition =
   | { type: "FlagIs"; flag: string; value: string }
+  | { type: "HasFlag"; flag: string }
   | { type: "HasItem"; itemId: string }
   | { type: "Always" }
   | { type: "And"; conditions: Condition[] }
@@ -10,16 +11,28 @@ export type Condition =
   | { type: "PhaseIs"; quest: string; phase: string }
   | { type: "InZone"; zone: SpawnZone };
 
+// ── 포털 배치 ─────────────────────────────────────────────────────────────
+
+export type PortalPlacement =
+  | { type: "InsideRoom" }
+  | { type: "Border" }
+  | { type: "Random" }
+  | { type: "NearGiver"; radius: number };
+
 // ── 액션 타입 ─────────────────────────────────────────────────────────────
 
 export type Action =
   | { type: "AdvancePhase"; phaseId: string }
   | { type: "Log"; text: string }
   | { type: "GiveItem"; itemId: string }
+  | { type: "GiveItems"; itemId: string; count: number }
   | { type: "RemoveItem"; itemId: string }
   | { type: "SetFlag"; flag: string; value: string }
+  | { type: "ClearFlag"; flag: string }
   | { type: "KillNpc"; npcId: string }
   | { type: "DespawnWorldItem"; itemId: string }
+  | { type: "OpenPortal"; zone: string; generator: string; placement?: PortalPlacement }
+  | { type: "ClosePortal"; zone: string }
   | { type: "Branch"; condition: Condition; ifTrue: Action[]; ifFalse: Action[] };
 
 // ── 자동 전진 ─────────────────────────────────────────────────────────────
@@ -33,14 +46,17 @@ export interface AutoAdvance {
 // ── 스폰 존 ───────────────────────────────────────────────────────────────
 
 export type SpawnZone =
+  | { type: "Town" }
+  | { type: "Forest" }
   | { type: "Dungeon"; level: number }
-  | { type: "World"; mapId: string }
-  | { type: "Forest" };
+  | { type: "Named"; id: string };
 
 export interface QuestSpawn {
   phase: string;
   item: string;
   zone: SpawnZone;
+  count?: number;
+  condition?: Condition;
 }
 
 // ── 페이즈 ────────────────────────────────────────────────────────────────
@@ -61,6 +77,7 @@ export interface QuestDef {
   title: string;
   giverNpc: string;
   initialPhase: string;
+  spawnChance?: number;
   phases: Record<string, QuestPhaseDef>;
   spawns: QuestSpawn[];
 }

@@ -297,16 +297,168 @@ describe("serializeRon", () => {
   });
 });
 
-describe("실제 .ron 파일 파싱", () => {
+describe("parseRon — 신규 변형 (B1)", () => {
+  it("HasFlag 조건 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],
+        auto_advance:[AutoAdvance(condition:HasFlag("seen"),next_phase:"b")],
+        objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].auto_advance[0].condition).toEqual({ type: "HasFlag", flag: "seen" });
+  });
+
+  it("GiveItems 액션 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],
+        on_interact:[GiveItems(item:"potion",count:5)],
+        auto_advance:[],objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].on_interact[0]).toEqual({ type: "GiveItems", itemId: "potion", count: 5 });
+  });
+
+  it("ClearFlag 액션 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],
+        on_interact:[ClearFlag("flag1")],
+        auto_advance:[],objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].on_interact[0]).toEqual({ type: "ClearFlag", flag: "flag1" });
+  });
+
+  it("OpenPortal 기본 (placement 생략) 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],
+        on_interact:[OpenPortal(zone:"cave",generator:"bsp")],
+        auto_advance:[],objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].on_interact[0]).toEqual({
+      type: "OpenPortal", zone: "cave", generator: "bsp",
+    });
+  });
+
+  it("OpenPortal placement: Border 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],
+        on_interact:[OpenPortal(zone:"glade",generator:"forest",placement:Border)],
+        auto_advance:[],objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].on_interact[0]).toEqual({
+      type: "OpenPortal", zone: "glade", generator: "forest",
+      placement: { type: "Border" },
+    });
+  });
+
+  it("OpenPortal placement: NearGiver(radius) 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],
+        on_interact:[OpenPortal(zone:"z",generator:"g",placement:NearGiver(radius:5))],
+        auto_advance:[],objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].on_interact[0]).toEqual({
+      type: "OpenPortal", zone: "z", generator: "g",
+      placement: { type: "NearGiver", radius: 5 },
+    });
+  });
+
+  it("ClosePortal 액션 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],
+        on_interact:[ClosePortal("cave")],
+        auto_advance:[],objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].on_interact[0]).toEqual({ type: "ClosePortal", zone: "cave" });
+  });
+
+  it("InZone(Town) / InZone(Named) 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],
+        auto_advance:[
+          AutoAdvance(condition:InZone(Town),next_phase:"b"),
+          AutoAdvance(condition:InZone(Named("herb_glade")),next_phase:"c"),
+        ],
+        objective:None)},spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.phases["a"].auto_advance[0].condition).toEqual({ type: "InZone", zone: { type: "Town" } });
+    expect(quest.phases["a"].auto_advance[1].condition).toEqual({
+      type: "InZone", zone: { type: "Named", id: "herb_glade" },
+    });
+  });
+
+  it("QuestSpawn count / condition 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],auto_advance:[],objective:None)},
+      spawns:[
+        QuestSpawn(phase:"a",item:"x",zone:Named("z"),count:3),
+        QuestSpawn(phase:"a",item:"y",zone:Forest,condition:Some(HasFlag("f"))),
+      ])`;
+    const quest = parseRon(src);
+    expect(quest.spawns[0]).toEqual({
+      phase: "a", item: "x", zone: { type: "Named", id: "z" }, count: 3,
+    });
+    expect(quest.spawns[1]).toEqual({
+      phase: "a", item: "y", zone: { type: "Forest" }, condition: { type: "HasFlag", flag: "f" },
+    });
+  });
+
+  it("QuestDef.spawn_chance 파싱", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",spawn_chance:0.7,
+      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],auto_advance:[],objective:None)},
+      spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.spawnChance).toBeCloseTo(0.7);
+  });
+});
+
+describe("serializeRon — 신규 변형 라운드트립", () => {
+  it("HasFlag / GiveItems / ClearFlag / OpenPortal / ClosePortal / Named zone / spawn count·condition / spawn_chance", () => {
+    const quest: QuestDef = {
+      id: "rt", title: "rt", giverNpc: "n", initialPhase: "a",
+      spawnChance: 0.5,
+      phases: {
+        a: {
+          dialog: [],
+          on_interact: [
+            { type: "GiveItems", itemId: "potion", count: 5 },
+            { type: "ClearFlag", flag: "f" },
+            { type: "OpenPortal", zone: "z", generator: "bsp", placement: { type: "Border" } },
+            { type: "OpenPortal", zone: "z2", generator: "forest", placement: { type: "NearGiver", radius: 3 } },
+            { type: "OpenPortal", zone: "z3", generator: "bsp" },
+            { type: "ClosePortal", zone: "z" },
+          ],
+          auto_advance: [
+            { condition: { type: "HasFlag", flag: "x" }, nextPhase: "b" },
+            { condition: { type: "InZone", zone: { type: "Named", id: "glade" } }, nextPhase: "c" },
+            { condition: { type: "InZone", zone: { type: "Town" } }, nextPhase: "d" },
+          ],
+          objective: null,
+        },
+        b: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+        c: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+        d: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+      },
+      spawns: [
+        { phase: "a", item: "x", zone: { type: "Named", id: "glade" }, count: 3 },
+        { phase: "a", item: "y", zone: { type: "Town" }, condition: { type: "HasFlag", flag: "f" } },
+      ],
+    };
+    const reparsed = parseRon(serializeRon(quest));
+    expect(reparsed).toEqual(quest);
+  });
+});
+
+describe("실제 .ron 파일 파싱·라운드트립", () => {
   const questsDir = join(process.cwd(), "quests");
 
   const files = [
     "gem_quest.ron",
-    "jon_snow_quest.ron",
+    "herb_quest.ron",
+    "alchemist_quest.ron",
+    "parry_quest.ron",
+    "demonsword_quest.ron",
+    "prologue_fog.ron",
     "stark_quest.ron",
     "targaryen_quest.ron",
-    "prologue_fog.ron",
-    "alchemist_quest.ron",
+    "jon_snow_quest.ron",
     "world_fracture.ron",
   ];
 
@@ -317,6 +469,13 @@ describe("실제 .ron 파일 파싱", () => {
       const quest = parseRon(src);
       expect(quest.id).toBeTruthy();
       expect(Object.keys(quest.phases).length).toBeGreaterThan(0);
+    });
+
+    it(`${file} 라운드트립 (parse → serialize → parse 동일)`, () => {
+      const src = readFileSync(join(questsDir, file), "utf8");
+      const first = parseRon(src);
+      const second = parseRon(serializeRon(first));
+      expect(second).toEqual(first);
     });
   }
 });

@@ -118,12 +118,40 @@ function emptyAction(type: Action["type"]): Action {
     case "AdvancePhase":     return { type, phaseId: "" };
     case "Log":              return { type, text: "" };
     case "GiveItem":         return { type, itemId: "" };
+    case "GiveItems":        return { type, itemId: "", count: 1 };
     case "RemoveItem":       return { type, itemId: "" };
     case "SetFlag":          return { type, flag: "", value: "" };
+    case "ClearFlag":        return { type, flag: "" };
     case "KillNpc":          return { type, npcId: "" };
     case "DespawnWorldItem": return { type, itemId: "" };
+    case "OpenPortal":       return { type, zone: "", generator: "" };
+    case "ClosePortal":      return { type, zone: "" };
     case "Branch":           return { type, condition: { type: "Always" }, ifTrue: [], ifFalse: [] };
   }
+}
+
+function summarizeAction(a: Action): string {
+  switch (a.type) {
+    case "GiveItems":   return `GiveItems(${a.itemId} × ${a.count})`;
+    case "ClearFlag":   return `ClearFlag(${a.flag})`;
+    case "OpenPortal": {
+      const placement = a.placement
+        ? a.placement.type === "NearGiver"
+          ? `NearGiver(${a.placement.radius})`
+          : a.placement.type
+        : "InsideRoom";
+      return `OpenPortal(${a.zone} via ${a.generator}, ${placement})`;
+    }
+    case "ClosePortal": return `ClosePortal(${a.zone})`;
+    default:            return a.type;
+  }
+}
+
+function isReadOnlyAction(a: Action): boolean {
+  return a.type === "GiveItems"
+      || a.type === "ClearFlag"
+      || a.type === "OpenPortal"
+      || a.type === "ClosePortal";
 }
 
 // ── ActionRow ─────────────────────────────────────────────────────────────────
@@ -139,6 +167,21 @@ function ActionRow({
   onRemove: () => void;
   phaseIds: string[];
 }) {
+  // 미지원 변형: 객체 참조 유지로 round-trip 보장. 제거만 가능.
+  if (isReadOnlyAction(action)) {
+    return (
+      <div className="border border-dashed border-gray-400 rounded p-2 bg-gray-50 dark:bg-gray-900">
+        <div className="flex items-center justify-between gap-1">
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">{summarizeAction(action)}</span>
+          <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
+            ✕
+          </button>
+        </div>
+        <div className="text-[10px] italic text-gray-400 mt-1">RON 가져오기/내보내기로만 편집 가능</div>
+      </div>
+    );
+  }
+
   return (
     <div className="border rounded p-2 space-y-1 bg-gray-50 dark:bg-gray-900">
       <div className="flex gap-1 items-center">
