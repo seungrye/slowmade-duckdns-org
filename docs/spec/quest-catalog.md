@@ -721,7 +721,7 @@ ConditionEditor / ActionEditor → ActionRow / SwitchCaseEditor.
 
 ---
 
-## C4 — 저장 시 참조 무결성 검증 (soft warning)
+## ✅ C4 — 저장 시 참조 무결성 검증 (soft warning)
 
 picker 가 입력을 보조하지만 저장은 무검증. 게임 런타임의 `validate_*`
 와 같은 의미의 안전망을 webapp 저장 경로에 추가한다.
@@ -785,12 +785,12 @@ warnings: Array<{
 
 ### 변경 범위
 
-- [ ] `webapp/src/lib/quest-validation.ts` — `validateQuestRefs(quest,
+- [x] `webapp/src/lib/quest-validation.ts` — `validateQuestRefs(quest,
   catalogs)` 함수 + 재귀 walker
-- [ ] `webapp/src/lib/quest-validation.test.ts` — 단위 테스트 (각 참조
+- [x] `webapp/src/lib/quest-validation.test.ts` — 단위 테스트 (각 참조
   타입별 + 재귀 + 정상 케이스)
-- [ ] `webapp/src/app/api/quests/[id]/route.tsx` — PUT 응답에 `warnings`
+- [x] `webapp/src/app/api/quests/[id]/route.tsx` — PUT 응답에 `warnings`
   포함, 카탈로그 fetch + 검증
-- [ ] `webapp/src/app/api/quests/[id]/import/route.tsx` — 동일
-- [ ] `webapp/src/app/api/quests/[id]/route.test.ts` — warnings 시나리오
-- [ ] `webapp/src/app/quests/[id]/page.tsx` — 저장 후 warnings 토스트
+- [x] `webapp/src/app/api/quests/[id]/import/route.tsx` — 동일
+- [x] `webapp/src/app/api/quests/[id]/route.test.ts` — warnings 시나리오
+- [x] `webapp/src/app/quests/[id]/page.tsx` — 저장 후 warnings 토스트
