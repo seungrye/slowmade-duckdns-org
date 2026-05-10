@@ -718,3 +718,79 @@ ConditionEditor / ActionEditor → ActionRow / SwitchCaseEditor.
 
 - 카탈로그 변경 실시간 푸시 — 페이지 새로고침
 - 저장 시 ID 검증 — C4
+
+---
+
+## C4 — 저장 시 참조 무결성 검증 (soft warning)
+
+picker 가 입력을 보조하지만 저장은 무검증. 게임 런타임의 `validate_*`
+와 같은 의미의 안전망을 webapp 저장 경로에 추가한다.
+
+### 정책: soft warning
+
+저장은 막지 않는다. 응답에 `warnings` 배열을 포함해 끊어진 참조를 보고.
+UI 가 토스트로 노출.
+
+이유: webapp 은 작성 중간 상태일 수 있어 일시적 끊어진 참조 허용 필요.
+사용자가 "퀘스트 먼저 만들고 나중에 카탈로그 채움" 같은 흐름이 가능해야.
+
+### 검증 범위
+
+webapp 의 3 카탈로그 기준 — villagers, items, zones.
+
+| 참조 | 카탈로그 |
+|------|------|
+| `quest.giverNpc` | villagers (`name`) |
+| `KillNpc.npcId` | villagers |
+| `HasItem.itemId` | items |
+| `GiveItem.itemId` / `GiveItems.itemId` / `RemoveItem.itemId` / `DespawnWorldItem.itemId` | items |
+| `OpenPortal.zone` | zones |
+| `InZone({ type: "Named", id })` | zones |
+| `QuestSpawn.item` | items |
+| `QuestSpawn.zone: Named` | zones |
+
+재귀 처리:
+- Action: Branch 의 `ifTrue` / `ifFalse` 안쪽
+- Condition: And / Or / Not 안쪽
+- Spawn: `condition` 안쪽
+
+### 비목표 — `PhaseIs.quest` 검증
+
+`PhaseIs.quest` 는 다른 quest 의 id 참조이므로 quests 컬렉션을 함께 봐야
+한다. 카탈로그가 아니므로 본 사이클 범위 밖. 추후 C5 등에서 별도.
+
+### 응답 형식
+
+```ts
+warnings: Array<{
+  path: string,           // 예: "phases.gathering.on_interact[2].itemId"
+  kind: "villager" | "item" | "zone",
+  missing: string,        // 참조된 id
+}>
+```
+
+### 적용 라우트
+
+- `PUT /api/quests/[id]` — 퀘스트 저장 (revision 자동 백업 후 검증)
+- `POST /api/quests/[id]/import` — RON 가져오기
+
+`POST /api/quests` (신규 생성) 은 빈 quest 라 검증 불필요.
+
+### UI 연동
+
+- `/quests/[id]/page.tsx` 의 저장 핸들러가 응답의 `warnings` 를 확인
+- 비어있지 않으면 토스트 (or alert 임시) 로 노출 — "끊어진 참조 N개:
+  ..." 형태로 path + missing 명시
+- 저장 자체는 성공 처리 (dirty=false 등)
+
+### 변경 범위
+
+- [ ] `webapp/src/lib/quest-validation.ts` — `validateQuestRefs(quest,
+  catalogs)` 함수 + 재귀 walker
+- [ ] `webapp/src/lib/quest-validation.test.ts` — 단위 테스트 (각 참조
+  타입별 + 재귀 + 정상 케이스)
+- [ ] `webapp/src/app/api/quests/[id]/route.tsx` — PUT 응답에 `warnings`
+  포함, 카탈로그 fetch + 검증
+- [ ] `webapp/src/app/api/quests/[id]/import/route.tsx` — 동일
+- [ ] `webapp/src/app/api/quests/[id]/route.test.ts` — warnings 시나리오
+- [ ] `webapp/src/app/quests/[id]/page.tsx` — 저장 후 warnings 토스트
