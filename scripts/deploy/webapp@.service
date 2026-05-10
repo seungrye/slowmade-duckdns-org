@@ -15,7 +15,9 @@ Environment=NEXT_DISTDIR=.next-%i
 # `which node && which pnpm` 결과에 맞춰 아래 PATH 를 환경에 맞게 조정.
 Environment=PATH=/home/seungrye/.nvm/versions/node/v20.19.0/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-/home/seungrye/site/webapp/.env.local
-ExecStart=/usr/bin/env pnpm start
+# package.json 의 "start" 스크립트가 포트를 하드코딩(-p 3010)하므로
+# 우회해서 next 를 직접 호출. %i 는 systemd 템플릿 인스턴스 이름(=포트).
+ExecStart=/usr/bin/env pnpm exec next start -p %i
 Restart=on-failure
 RestartSec=3
 # graceful shutdown — Next.js 가 SIGTERM 을 받아 in-flight 요청을 마치고 종료.
