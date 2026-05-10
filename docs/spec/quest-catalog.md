@@ -405,3 +405,73 @@ PUT 직전·import 의 갱신 분기·restore 직전 자동 백업.
 
 - 페이지 UI / RON import/export — C2b
 - quest editor picker 통합 — C2c
+
+---
+
+## C2b — Items 페이지 + RON import/export
+
+### 페이지 `/quests/items`
+
+- 상단 kind 필터: `전체` / `quest` / `weapon` / `armor` / `consumable`
+  (각 카운트 표시)
+- 상단 액션: `+ 새 item` / `.ron 가져오기` / `내보내기`
+  - 가져오기·내보내기는 kind 별로 분리 (RON 파일 형식이 종별 다름)
+  - 가져오기 = 파일 업로드 시 kind 선택 (현재 필터 또는 dialog)
+  - 내보내기 = 현재 필터에 해당하는 종으로만 export. 필터=전체면 비활성
+- 목록 표 행: glyph, id, displayName, kind 뱃지, 종별 요약 (예: weapon →
+  `ATK 7 (fire)`, consumable → `Heal +8`)
+- 행별: 히스토리 링크 (`/quests/items/[id]/revisions`), 인라인 편집, 삭제
+- 인라인 편집: 공통 필드 + 종별 필드. id·kind 는 read-only
+
+### RON 형식 — 4 종
+
+bevy-rogue `assets/items/{quest_items,weapons,armors,consumables}.ron` 와 일치.
+
+- `Vec<QuestItemDef>` — `id, display_name, glyph_*, pickup_message, image_path`
+- `Vec<WeaponDef>` — `id, display_name, glyph_*, pickup_message, attack_power, element: Option<String>`
+- `Vec<ArmorDef>` — `id, display_name, glyph_*, pickup_message, defense_bonus`
+- `Vec<ConsumableDef>` — `id, display_name, glyph_*, pickup_message, effect: ConsumableEffect`
+  (현재 `Heal(amount)` 만)
+
+### Import API
+
+`POST /api/quests/items/import?kind=weapon` — body 는 RON 텍스트
+(`Vec<KindDef>`). kind 파라미터로 어느 종을 import 할지 결정.
+
+동작 — **upsert by (id, kind)**:
+- 기존 같은 (id, kind) → 갱신 + revision 백업 + version + 1
+- 신규 id → 생성 (version 1)
+- 같은 id 가 **다른 kind** 로 이미 존재 → 409 (kind 충돌, 사용자가 명시 해결)
+- import 에 없는 기존 항목 → 보존
+
+응답: `{ created, updated }`. 오류: 검증 실패 시 400 + 해당 id 명시.
+
+### Export API
+
+`GET /api/quests/items/export?kind=weapon` — 해당 kind 의 모든 item 을
+RON 텍스트로 직렬화. `Content-Disposition: attachment; filename="weapons.ron"`.
+
+파일명 매핑:
+| kind | filename |
+|------|------|
+| `quest` | `quest_items.ron` |
+| `weapon` | `weapons.ron` |
+| `armor` | `armors.ron` |
+| `consumable` | `consumables.ron` |
+
+### 변경 범위
+
+- [ ] `webapp/src/lib/ron.ts` — 4 종 parser/serializer
+  (`parseQuestItemsRon` 등). Parser 클래스에 `parseQuestItemDef` /
+  `parseWeaponDef` / `parseArmorDef` / `parseConsumableDef`.
+- [ ] `webapp/src/lib/ron.test.ts` — 4 종 라운드트립 단위 테스트
+- [ ] `webapp/src/app/api/quests/items/import/route.tsx` + 테스트
+- [ ] `webapp/src/app/api/quests/items/export/route.tsx` + 테스트
+- [ ] `webapp/src/app/quests/items/page.tsx` + 테스트
+- [ ] `webapp/src/app/quests/items/[id]/revisions/page.tsx` + 테스트
+  (villager revisions 페이지 패턴 그대로)
+
+### 비목표
+
+- quest editor picker — C2c
+- 한 번에 4 종 일괄 import (zip) — manual 4회 import 로 충분
