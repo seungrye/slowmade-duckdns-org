@@ -478,14 +478,14 @@ RON 텍스트로 직렬화. `Content-Disposition: attachment; filename="weapons.
 
 ---
 
-## C2c — Item picker 통합
+## ✅ C2c — Item picker 통합
 
 quest editor 의 itemId 자유 입력을 모두 카탈로그 기반 combobox 로 교체.
 
 ### 대상
 
-- [ ] `condition-editor.tsx` 의 `HasItem.itemId`
-- [ ] `action-editor.tsx` 의:
+- [x] `condition-editor.tsx` 의 `HasItem.itemId`
+- [x] `action-editor.tsx` 의:
   - `GiveItem.itemId`
   - `GiveItems.itemId`
   - `RemoveItem.itemId`
@@ -512,19 +512,19 @@ ConditionEditor 도 `items` prop 받아야 (HasItem 분기). ActionEditor 도
 
 ### 변경 범위
 
-- [ ] `webapp/src/app/quests/[id]/item-combobox.tsx` — 신규
-- [ ] `webapp/src/app/quests/[id]/page.tsx` — items 1회 fetch + prop drill
-- [ ] `webapp/src/app/quests/[id]/phase-panel.tsx` — `items` prop 받아서
+- [x] `webapp/src/app/quests/[id]/item-combobox.tsx` — 신규
+- [x] `webapp/src/app/quests/[id]/page.tsx` — items 1회 fetch + prop drill
+- [x] `webapp/src/app/quests/[id]/phase-panel.tsx` — `items` prop 받아서
   ConditionEditor / ActionEditor 로 전달. auto_advance 쪽 ConditionEditor
   에도 전달.
-- [ ] `webapp/src/app/quests/[id]/condition-editor.tsx` — `items` prop 추가,
+- [x] `webapp/src/app/quests/[id]/condition-editor.tsx` — `items` prop 추가,
   HasItem 분기를 ItemCombobox 로 교체. And/Or/Not 재귀 호출 시 items 전파
-- [ ] `webapp/src/app/quests/[id]/edge-panel.tsx` — ConditionEditor 호출
+- [x] `webapp/src/app/quests/[id]/edge-panel.tsx` — ConditionEditor 호출
   시 items 전달
-- [ ] `webapp/src/app/quests/[id]/action-editor.tsx` — `items` prop 추가,
+- [x] `webapp/src/app/quests/[id]/action-editor.tsx` — `items` prop 추가,
   GiveItem / GiveItems / RemoveItem / DespawnWorldItem 의 input 을
   ItemCombobox 로 교체. SwitchCaseEditor / 재귀 ActionEditor 로 전파
-- [ ] `item-combobox.test.tsx`, condition-editor / action-editor 테스트
+- [x] `item-combobox.test.tsx`, condition-editor / action-editor 테스트
   HasItem / 아이템 액션 갱신
 
 ### 비목표
