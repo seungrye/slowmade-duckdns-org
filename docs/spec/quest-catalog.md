@@ -154,7 +154,7 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ---
 
-## C1b' — `/quests/` 하위로 라우트 이동
+## ✅ C1b' — `/quests/` 하위로 라우트 이동
 
 퀘스트 관련 라우트 일관성을 위해 villagers 페이지·API 를 모두 `/quests/`
 하위로 옮긴다.
@@ -171,8 +171,8 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 ### 변경 범위
 
-- [ ] `webapp/src/app/villagers/` → `webapp/src/app/quests/villagers/`
-- [ ] `webapp/src/app/api/villagers/` → `webapp/src/app/api/quests/villagers/`
-- [ ] 페이지의 `fetch("/api/villagers...")` 호출들 → `/api/quests/villagers...`
-- [ ] (선택) 시드 파일 `webapp/villagers/villagers.ron` 위치는 라우트와
+- [x] `webapp/src/app/villagers/` → `webapp/src/app/quests/villagers/`
+- [x] `webapp/src/app/api/villagers/` → `webapp/src/app/api/quests/villagers/`
+- [x] 페이지의 `fetch("/api/villagers...")` 호출들 → `/api/quests/villagers...`
+- [x] (선택) 시드 파일 `webapp/villagers/villagers.ron` 위치는 라우트와
   무관하므로 본 사이클에서는 이동하지 않음. 별도로 논의.
