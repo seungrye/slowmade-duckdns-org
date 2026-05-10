@@ -1,6 +1,7 @@
 # CLAUDE.md
 
 - [Development](docs/development.md) — 명령어, 작업 규칙
+- [Deployment](docs/deployment.md) — 무중단 Blue/Green 배포 절차, systemd/nginx 셋업, 롤백
 - [Hooks](docs/hooks.md) — Claude Code 훅 시스템 (spec→impl→report 순서 강제, 테스트 자동 검증)
 - [Architecture](docs/architecture.md) — 시스템 구조, 컴포넌트 다이어그램, API 엔드포인트, 환경 변수
 - [System Design (SDS)](docs/SDS.md) — DB 스키마, 데이터 흐름, 인증 설계
