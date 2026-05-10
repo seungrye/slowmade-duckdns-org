@@ -822,7 +822,7 @@ warnings: Array<{
 
 ---
 
-## C6 — 빌드 오류 수정 (route.tsx 의 비-핸들러 export 분리)
+## ✅ C6 — 빌드 오류 수정 (route.tsx 의 비-핸들러 export 분리)
 
 Next.js 15 Route 파일은 HTTP 메서드 핸들러 (`GET`/`POST`/`PUT`/`DELETE`)
 만 export 가능. C4 사이클에서 `route.tsx` 에 추가한 `loadCatalogSets`
@@ -830,6 +830,6 @@ Next.js 15 Route 파일은 HTTP 메서드 핸들러 (`GET`/`POST`/`PUT`/`DELETE`
 
 ### 변경 범위
 
-- [ ] `webapp/src/lib/catalog-sets.ts` — `loadCatalogSets` 신규 파일로 분리
-- [ ] `webapp/src/app/api/quests/[id]/route.tsx` — 헬퍼 import 로 변경
-- [ ] `webapp/src/app/api/quests/[id]/import/route.tsx` — 동일
+- [x] `webapp/src/lib/catalog-sets.ts` — `loadCatalogSets` 신규 파일로 분리
+- [x] `webapp/src/app/api/quests/[id]/route.tsx` — 헬퍼 import 로 변경
+- [x] `webapp/src/app/api/quests/[id]/import/route.tsx` — 동일
