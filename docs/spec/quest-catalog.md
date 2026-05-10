@@ -532,3 +532,82 @@ ConditionEditor 도 `items` prop 받아야 (HasItem 분기). ActionEditor 도
 - 카탈로그 변경 실시간 푸시 — 페이지 새로고침
 - zone picker — C3
 - 저장 시 ID 검증 — C4
+
+---
+
+## C3 — Named zones 카탈로그
+
+bevy-rogue 의 Named 존(`demon_cave`, `herb_glade`, `d_rank_dungeon` 등)을
+webapp 1급 카탈로그로 관리한다. 현재는 `OpenPortal` 액션마다 `zone` /
+`generator` / `placement` 가 분산돼 있어 일관성이 없다.
+
+### bevy-rogue 와의 관계
+
+bevy-rogue 의 `assets/` 에는 zones.ron 같은 파일이 없다. 게임 런타임이
+각 quest 의 `OpenPortal` 액션에서 동적으로 등록 (`NamedZoneConfig`).
+따라서 webapp 의 zone 카탈로그는 **단방향 RON import 없음**:
+
+- 카탈로그 → 게임: `OpenPortal` 액션 자체가 zone 등록이므로 별도 export
+  불필요. 카탈로그는 picker 자동완성·UX 보조 역할.
+- 게임 → 카탈로그: bevy-rogue 의 quest RON 들에 등장하는 Named 존을
+  추출해 카탈로그에 시드하는 "퀘스트에서 추출" 기능 제공.
+
+### 사이클 분할
+
+| 단계 | 범위 |
+|------|------|
+| C3a | 스키마 + CRUD API + revision (이번 사이클) |
+| C3b | 페이지 + 퀘스트에서 추출 |
+| C3c | OpenPortal / InZone(Named) picker 통합 |
+
+---
+
+## C3a — Zone 스키마 + CRUD API + revisions
+
+### MongoDB 컬렉션 `zones`
+
+| 필드 | 타입 | 제약 / 기본 |
+|------|------|------|
+| `name` | String | required, **unique** (PK 역할 — `Named("...")` 의 string 과 일치) |
+| `generator` | String | required (`bsp`, `forest`, `cellular_automata`, `bsp_indoor`, `organic_village` 등 — 자유 문자열) |
+| `description` | String | optional, 메모용 |
+| `version` | Number | default 1 |
+
+`generator` 는 enum 으로 제약하지 않음 — Rust 게임 모듈이 추후 새 알고리즘을
+추가할 수 있어야 하므로 자유 문자열. 페이지 UI 에서 알려진 값들을
+드롭다운 추천으로 노출.
+
+### API
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/quests/zones` | 목록 (name 정렬) |
+| POST | `/api/quests/zones` | 생성 (name 중복 시 409) |
+| GET | `/api/quests/zones/[name]` | 단일 조회 |
+| PUT | `/api/quests/zones/[name]` | 수정 (name 변경 불가) + revision 백업 |
+| DELETE | `/api/quests/zones/[name]` | 삭제 + revision 일괄 정리 |
+| GET | `/api/quests/zones/[name]/revisions` | 버전 목록 |
+| POST | `/api/quests/zones/[name]/revisions/[ver]/restore` | 롤백 |
+
+### 검증 (API)
+
+- `name`, `generator` 모두 비어있지 않은 문자열
+- `description` 은 string 또는 미제공
+- POST 시 name 중복 검사
+
+### 변경 범위
+
+- [ ] `webapp/src/types/zone.ts` — `ZoneDef`, `ZoneDocument`, `ZoneRevisionDocument`
+- [ ] `webapp/src/models/zone.tsx` — Mongoose 스키마
+- [ ] `webapp/src/models/zone-revision.tsx` — 신규
+- [ ] `webapp/src/app/api/quests/zones/route.tsx` — GET/POST + 단위 테스트
+- [ ] `webapp/src/app/api/quests/zones/[name]/route.tsx` — GET/PUT/DELETE
+  + revision 백업 + 단위 테스트
+- [ ] `webapp/src/app/api/quests/zones/[name]/revisions/route.tsx` + 테스트
+- [ ] `webapp/src/app/api/quests/zones/[name]/revisions/[ver]/restore/route.tsx`
+  + 테스트
+
+### 비목표 (C3b/C3c)
+
+- 페이지 UI / 퀘스트에서 추출 — C3b
+- OpenPortal / InZone(Named) picker — C3c
