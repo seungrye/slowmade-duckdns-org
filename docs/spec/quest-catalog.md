@@ -151,3 +151,28 @@ bevy-rogue `assets/villagers/villagers.ron` 형식과 일치 — `Vec<VillagerDe
 
 - 퀘스트 에디터의 giverNpc/KillNpc picker — C1c
 - color picker (RGB 휠) — 일반 number input 으로 충분
+
+---
+
+## C1b' — `/quests/` 하위로 라우트 이동
+
+퀘스트 관련 라우트 일관성을 위해 villagers 페이지·API 를 모두 `/quests/`
+하위로 옮긴다.
+
+### 경로 변경
+
+| 이전 | 이후 |
+|------|------|
+| `/villagers` | `/quests/villagers` |
+| `/api/villagers` | `/api/quests/villagers` |
+| `/api/villagers/[name]` | `/api/quests/villagers/[name]` |
+| `/api/villagers/import` | `/api/quests/villagers/import` |
+| `/api/villagers/export` | `/api/quests/villagers/export` |
+
+### 변경 범위
+
+- [ ] `webapp/src/app/villagers/` → `webapp/src/app/quests/villagers/`
+- [ ] `webapp/src/app/api/villagers/` → `webapp/src/app/api/quests/villagers/`
+- [ ] 페이지의 `fetch("/api/villagers...")` 호출들 → `/api/quests/villagers...`
+- [ ] (선택) 시드 파일 `webapp/villagers/villagers.ron` 위치는 라우트와
+  무관하므로 본 사이클에서는 이동하지 않음. 별도로 논의.
