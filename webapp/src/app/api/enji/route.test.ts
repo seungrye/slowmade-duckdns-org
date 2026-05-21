@@ -78,6 +78,8 @@ describe('/api/enji POST', () => {
     mockAuth.mockResolvedValueOnce(null);
     const res = await POST(makeRequest({ postId: 'post-id', content: '@enji 테스트' }));
     expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.message).toMatch(/로그인/);
   });
 
   it('content 없으면 400 반환', async () => {

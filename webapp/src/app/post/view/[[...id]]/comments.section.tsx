@@ -130,7 +130,11 @@ export default function Comments({ postId }: Props) {
         disabled={submitting}
         mentions={[
           ...(session ? ['enji'] : []),
-          ...new Set(comments.filter(c => !c.isDeleted && !c.isEnji).map(c => c.author)),
+          ...new Set(
+            comments
+              .filter(c => !c.isDeleted && !c.isEnji && c.authorId != null)
+              .map(c => c.author)
+          ),
         ]}
       />
     </section>

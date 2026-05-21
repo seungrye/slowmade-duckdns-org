@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { auth } from '@/auth';
-import { apiSuccess, apiError } from '@/lib/api-response';
+import { apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
 import Post from '@/models/post';
 import User from '@/models/user';
