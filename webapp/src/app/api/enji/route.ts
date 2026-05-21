@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { auth } from '@/auth';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
@@ -86,13 +86,13 @@ ${commentContext}
 
   let enjiText: string;
   try {
-    const genAI = new GoogleGenerativeAI(env.geminiApiKey);
-    const model = genAI.getGenerativeModel({
+    const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
+    const result = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
-      systemInstruction: ENJI_SYSTEM_PROMPT,
+      config: { systemInstruction: ENJI_SYSTEM_PROMPT },
+      contents: contextMessage,
     });
-    const result = await model.generateContent(contextMessage);
-    enjiText = result.response.text();
+    enjiText = result.text ?? '';
   } catch (error) {
     console.error('Gemini API error:', error);
     return NextResponse.json(

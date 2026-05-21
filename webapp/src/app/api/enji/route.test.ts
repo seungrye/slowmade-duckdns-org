@@ -11,7 +11,6 @@ vi.mock('@/lib/env', () => ({
   },
 }));
 
-const mockPostSave = vi.fn();
 const mockCommentSave = vi.fn();
 
 vi.mock('@/models/post', () => ({
@@ -45,16 +44,14 @@ vi.mock('@/models/comment', () => {
 });
 
 const mockGenerateContent = vi.fn().mockResolvedValue({
-  response: { text: () => 'enji의 테스트 응답입니다.' },
+  text: 'enji의 테스트 응답입니다.',
 });
 
-vi.mock('@google/generative-ai', () => {
-  class MockGoogleGenerativeAI {
-    getGenerativeModel() {
-      return { generateContent: mockGenerateContent };
-    }
+vi.mock('@google/genai', () => {
+  class MockGoogleGenAI {
+    models = { generateContent: mockGenerateContent };
   }
-  return { GoogleGenerativeAI: MockGoogleGenerativeAI };
+  return { GoogleGenAI: MockGoogleGenAI };
 });
 
 function makeRequest(body: object) {
