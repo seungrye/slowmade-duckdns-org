@@ -172,3 +172,13 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 ### 변경 파일
 - `webapp/src/app/api/enji/route.ts` — Gemini 호출을 void로 분리
 - `webapp/src/hooks/use-comments.ts` — @enji 제출 후 폴링 로직
+
+### 상세 동작 (서버)
+- Gemini 호출과 1.5초 타이머를 `Promise.race`
+- **429 즉시** → `enjiSleeping: true` 반환 (클라이언트 토스트 즉시 표시)
+- **1.5초 초과** → 즉시 `{ userComment }` 반환, Gemini 응답 오면 백그라운드에서 DB 저장
+- **1.5초 내 응답** → `{ userComment, enjiComment }` 반환 (기존과 동일)
+
+### Origin 제한
+`/api/enji` 는 `Referer` 또는 `Origin` 헤더가 `NEXTAUTH_URL`(사이트 도메인)과 일치할 때만 처리.
+불일치 시 403 반환.
