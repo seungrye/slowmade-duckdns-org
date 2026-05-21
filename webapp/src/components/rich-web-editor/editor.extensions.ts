@@ -20,7 +20,7 @@ import { lowlight } from "@/lib/lowlight"
 
 type JSONContent = { type?: string; attrs?: Record<string, unknown>; content?: JSONContent[]; text?: string }
 type RenderHelpers = { renderChildren: (nodes: JSONContent | JSONContent[]) => string }
-type RenderContext = { previousNode?: JSONContent }
+type RenderContext = { previousNode?: JSONContent | null }
 
 // Paragraph — textAlign 속성이 있으면 <p style="text-align: ..."> 로 직렬화
 const ParagraphWithAlign = Paragraph.extend({
