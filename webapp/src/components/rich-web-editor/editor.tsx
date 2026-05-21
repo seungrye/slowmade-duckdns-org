@@ -84,64 +84,74 @@ const MainToolbarContent = ({
         <>
             <Spacer />
 
-            <ToolbarGroup>
-                <UndoRedoButton action="undo" aria-label="Undo" />
-                <UndoRedoButton action="redo" aria-label="Redo" />
-            </ToolbarGroup>
+            <div
+                style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    flexWrap: 'nowrap',
+                    ...(isMarkdownMode ? { opacity: 0.35, pointerEvents: 'none' } : {}),
+                }}
+                aria-hidden={isMarkdownMode || undefined}
+            >
+                <ToolbarGroup>
+                    <UndoRedoButton action="undo" aria-label="Undo" />
+                    <UndoRedoButton action="redo" aria-label="Redo" />
+                </ToolbarGroup>
 
-            <ToolbarSeparator />
+                <ToolbarSeparator />
 
-            <ToolbarGroup>
-                <HeadingDropdownMenu levels={[1, 2, 3, 4]} />
-                <ListDropdownMenu types={["bulletList", "orderedList", "taskList"]} />
-                <NodeButton type="codeBlock" aria-label="Code Block" />
-                <NodeButton type="blockquote" aria-label="Blockquote" />
-            </ToolbarGroup>
+                <ToolbarGroup>
+                    <HeadingDropdownMenu levels={[1, 2, 3, 4]} />
+                    <ListDropdownMenu types={["bulletList", "orderedList", "taskList"]} />
+                    <NodeButton type="codeBlock" aria-label="Code Block" />
+                    <NodeButton type="blockquote" aria-label="Blockquote" />
+                </ToolbarGroup>
 
-            <ToolbarSeparator />
+                <ToolbarSeparator />
 
-            <ToolbarGroup>
-                <MarkButton type="bold" aria-label="Bold" />
-                <MarkButton type="italic" aria-label="Italic" />
-                <MarkButton type="strike" aria-label="Strike" />
-                <MarkButton type="code" aria-label="Code" />
-                <MarkButton type="underline" aria-label="Underline" />
-                {!isMobile ? (
-                    <HighlightPopover />
-                ) : (
-                    <HighlighterButton onClick={onHighlighterClick} aria-label="Highlighter" />
-                )}
-                {!isMobile ? <LinkPopover /> : <LinkButton onClick={onLinkClick} aria-label="Link" />}
-            </ToolbarGroup>
+                <ToolbarGroup>
+                    <MarkButton type="bold" aria-label="Bold" />
+                    <MarkButton type="italic" aria-label="Italic" />
+                    <MarkButton type="strike" aria-label="Strike" />
+                    <MarkButton type="code" aria-label="Code" />
+                    <MarkButton type="underline" aria-label="Underline" />
+                    {!isMobile ? (
+                        <HighlightPopover />
+                    ) : (
+                        <HighlighterButton onClick={onHighlighterClick} aria-label="Highlighter" />
+                    )}
+                    {!isMobile ? <LinkPopover /> : <LinkButton onClick={onLinkClick} aria-label="Link" />}
+                </ToolbarGroup>
 
-            <ToolbarSeparator />
+                <ToolbarSeparator />
 
-            <ToolbarGroup>
-                <MarkButton type="superscript" aria-label="Superscript" />
-                <MarkButton type="subscript" aira-label="Subscript" />
-            </ToolbarGroup>
+                <ToolbarGroup>
+                    <MarkButton type="superscript" aria-label="Superscript" />
+                    <MarkButton type="subscript" aira-label="Subscript" />
+                </ToolbarGroup>
 
-            <ToolbarSeparator />
+                <ToolbarSeparator />
 
-            <ToolbarGroup>
-                <TextAlignButton align="left" aria-label="Align Left" />
-                <TextAlignButton align="center" aria-label="Align Center" />
-                <TextAlignButton align="right" aria-label="Align Right" />
-                <TextAlignButton align="justify" aria-label="Align Justify" />
-            </ToolbarGroup>
+                <ToolbarGroup>
+                    <TextAlignButton align="left" aria-label="Align Left" />
+                    <TextAlignButton align="center" aria-label="Align Center" />
+                    <TextAlignButton align="right" aria-label="Align Right" />
+                    <TextAlignButton align="justify" aria-label="Align Justify" />
+                </ToolbarGroup>
 
-            <ToolbarSeparator />
+                <ToolbarSeparator />
 
-            <ToolbarGroup>
-                <ImageUploadButton text="Add" aria-label="Add Image" />
-                {!isMobile ? (
-                    <MathPopover />
-                ) : (
-                    <MathButton onClick={onMathClick} aria-label="수식 삽입" />
-                )}
-            </ToolbarGroup>
+                <ToolbarGroup>
+                    <ImageUploadButton text="Add" aria-label="Add Image" />
+                    {!isMobile ? (
+                        <MathPopover />
+                    ) : (
+                        <MathButton onClick={onMathClick} aria-label="수식 삽입" />
+                    )}
+                </ToolbarGroup>
 
-            <ToolbarSeparator />
+                <ToolbarSeparator />
+            </div>
 
             <ToolbarGroup>
                 <Button

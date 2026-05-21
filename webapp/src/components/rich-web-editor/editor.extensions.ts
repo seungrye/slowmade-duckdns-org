@@ -33,5 +33,13 @@ export const editorExtensions = [
     Link.configure({ openOnClick: false }),
     InlineMath.configure({ katexOptions: { throwOnError: false } }),
     BlockMath.configure({ katexOptions: { throwOnError: false } }),
-    Markdown,
+    Markdown.configure({
+        serializer: {
+            marks: {
+                superscript: { open: '<sup>', close: '</sup>', mixable: true, expelEnclosingWhitespace: true },
+                subscript:   { open: '<sub>', close: '</sub>', mixable: true, expelEnclosingWhitespace: true },
+            },
+            nodes: {},
+        },
+    }),
 ];

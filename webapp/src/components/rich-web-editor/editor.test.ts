@@ -38,6 +38,25 @@ describe('editorExtensions', () => {
     });
 });
 
+// Markdown 익스텐션 커스텀 serializer 검증
+describe('Markdown serializer 설정', () => {
+    it('superscript serializer 가 <sup> 태그로 설정되어 있다', () => {
+        const md = editorExtensions.find(e => e.name === 'markdown');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const config = (md as any)?.options?.serializer?.marks?.superscript;
+        expect(config?.open).toBe('<sup>');
+        expect(config?.close).toBe('</sup>');
+    });
+
+    it('subscript serializer 가 <sub> 태그로 설정되어 있다', () => {
+        const md = editorExtensions.find(e => e.name === 'markdown');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const config = (md as any)?.options?.serializer?.marks?.subscript;
+        expect(config?.open).toBe('<sub>');
+        expect(config?.close).toBe('</sub>');
+    });
+});
+
 // markdown 정규화 헬퍼 — Code→Visual 복귀 시 코드블록 닫는 ``` 파싱 오류 방지
 describe('markdown normalizeForParsing', () => {
     const normalize = (md: string) => md.endsWith('\n') ? md : md + '\n';
