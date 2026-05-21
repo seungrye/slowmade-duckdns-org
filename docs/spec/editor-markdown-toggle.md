@@ -59,15 +59,24 @@ Code 모드 진입 시 Code/Visual 토글 버튼을 제외한 모든 툴바 버�
 
 ---
 
-## superscript / subscript 포맷 보존 ✅
+## superscript / subscript / textAlign 포맷 보존
 
 ### 문제
-Visual 모드에서 sup/sub 적용 후 Code 모드로 전환 시 Markdown 포맷이 없어 포맷이 날아감.
+Visual 모드에서 sup/sub/align 적용 후 Code 모드로 전환 시 Markdown 포맷이 없어 포맷이 날아감.
+
+### `@tiptap/markdown` renderMarkdown API
+각 TipTap extension에 `renderMarkdown(node, helpers, ctx)` 필드를 정의하면 Markdown 직렬화 시 사용됨.
+`helpers.renderChildren(node)` 로 자식 노드를 재귀 직렬화.
 
 ### 해결
-`Markdown.configure({ serializer: { marks: { superscript, subscript } } })` 로
-커스텀 serializer 등록 → `<sup>`, `<sub>` 인라인 HTML로 직렬화.
-Markdown 파서는 인라인 HTML을 그대로 처리하므로 왕복 손실 없음.
+- `Superscript.extend({ renderMarkdown: (node, h) => '<sup>' + h.renderChildren(node) + '</sup>' })`
+- `Subscript.extend({ renderMarkdown: (node, h) => '<sub>' + h.renderChildren(node) + '</sub>' })`
+- `Paragraph.extend({ renderMarkdown: ... })` — textAlign 있으면 `<p style="text-align: ...">` 출력
+- `Heading.extend({ renderMarkdown: ... })` — textAlign 있으면 `<hN style="text-align: ...">` 출력
+- StarterKit에서 paragraph/heading 제외 후 커스텀 버전으로 교체
+  (nodeTypeRegistry는 첫 등록이 우선이므로 StarterKit 내부 paragraph보다 먼저 등록해야 함)
+- Markdown 파서는 인라인 HTML을 그대로 TipTap HTML 파서에 전달 → 왕복 손실 없음
+- 기존 `Markdown.configure({ serializer: ... })` 제거 (해당 옵션 없음)
 
 ### 문제
 Code 모드에서 수정 후 Visual 로 복귀 시 문서 끝에 ``` 가 텍스트로 남는다.
