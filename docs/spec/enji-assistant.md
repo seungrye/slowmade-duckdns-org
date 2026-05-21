@@ -121,7 +121,7 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 
 ---
 
-## 모델 변경 — gemini-2.0-flash → gemini-flash-latest
+## 모델 변경 — gemini-2.0-flash → gemini-flash-latest ✅
 
 `gemini-2.0-flash`는 Spark 플랜 무료 쿼터가 0이라 동작하지 않음.
 `gemini-flash-latest`로 변경하면 무료 쿼터 사용 가능.
