@@ -31,11 +31,13 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    ".next-3011/types/**/*.ts",
+    ".next-dev/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
     "src/types/*.tsx",
     "vitest.d.ts",
-    ".next-3011/types/**/*.ts"
+    ".next-3010/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -124,6 +124,45 @@ describe('useComments', () => {
       expect(body.parentId).toBe('parent123');
       expect(body.postId).toBe('post1');
     });
+
+    it('@enji 포함 댓글은 /api/enji로 제출한다', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: { userComment: { _id: 'uc1' } } }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.submitComment(null, '@enji 안녕!');
+      });
+
+      expect(ok!).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
+    });
+
+    it('@enji 제출 후 enjiComment 없으면 폴링하여 댓글 업데이트', async () => {
+      vi.useFakeTimers();
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ data: { userComment: { _id: 'uc1' } } }),
+      });
+      const enjiComment = { _id: 'ec1', isEnji: true, parent: { _id: 'uc1', author: 'user' } };
+      mockFetch.mockResolvedValue({
+        json: () => Promise.resolve({ data: [enjiComment] }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      await act(async () => { await result.current.submitComment(null, '@enji 안녕!'); });
+      await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
+
+      expect(result.current.comments).toContain(enjiComment);
+
+      vi.useRealTimers();
+    });
   });
 
   describe('deleteComment', () => {

@@ -19,7 +19,41 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function isAllowedOrigin(req: NextRequest): boolean {
+  const siteUrl = env.siteUrl.replace(/\/$/, '');
+  const origin = req.headers.get('origin') ?? '';
+  const referer = req.headers.get('referer') ?? '';
+  return origin.startsWith(siteUrl) || referer.startsWith(siteUrl);
+}
+
+async function callGemini(contextMessage: string): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
+  const result = await ai.models.generateContent({
+    model: 'gemini-flash-latest',
+    config: { systemInstruction: ENJI_SYSTEM_PROMPT },
+    contents: contextMessage,
+  });
+  return result.text ?? '';
+}
+
+async function saveEnjiComment(postId: string, parentId: string, text: string) {
+  const enjiComment = new Comment({
+    post: postId,
+    parent: parentId,
+    content: text,
+    author: 'enji',
+    authorId: null,
+    isEnji: true,
+  });
+  await enjiComment.save();
+  return enjiComment;
+}
+
 export async function POST(req: NextRequest) {
+  if (!isAllowedOrigin(req)) {
+    return apiError('허용되지 않은 요청입니다.', 403);
+  }
+
   if (!env.geminiApiKey) {
     return apiError('Gemini API 키가 설정되지 않았습니다.', 503);
   }
@@ -74,45 +108,11 @@ export async function POST(req: NextRequest) {
 
   const postText = stripHtml(post.htmlContent).slice(0, 3000);
   const query = content.replace(/@enji/gi, '').trim() || '안녕하세요!';
+  const contextMessage = `[게시글 제목]: ${post.title}\n[게시글 내용]: ${postText}\n[최근 댓글]:\n${commentContext}\n\n[사용자 질문]: ${query}`;
 
-  const contextMessage = `
-[게시글 제목]: ${post.title}
-[게시글 내용]: ${postText}
-[최근 댓글]:
-${commentContext}
+  void callGemini(contextMessage)
+    .then((text) => saveEnjiComment(postId, String(userComment._id), text))
+    .catch((err) => console.error('Background enji error:', err));
 
-[사용자 질문]: ${query}
-`.trim();
-
-  let enjiText: string;
-  let enjiSleeping = false;
-  try {
-    const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
-    const result = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
-      config: { systemInstruction: ENJI_SYSTEM_PROMPT },
-      contents: contextMessage,
-    });
-    enjiText = result.text ?? '';
-  } catch (error: unknown) {
-    console.error('Gemini API error:', error);
-    const isQuotaError = error instanceof Error && error.message.includes('429');
-    enjiSleeping = isQuotaError;
-    return NextResponse.json(
-      { success: true, data: { userComment, enjiComment: null, enjiSleeping } },
-      { status: 201 }
-    );
-  }
-
-  const enjiComment = new Comment({
-    post: postId,
-    parent: userComment._id,
-    content: enjiText,
-    author: 'enji',
-    authorId: null,
-    isEnji: true,
-  });
-  await enjiComment.save();
-
-  return apiSuccess({ userComment, enjiComment }, 201);
+  return NextResponse.json({ success: true, data: { userComment } }, { status: 201 });
 }

@@ -42,44 +42,28 @@ export default function Comments({ postId }: Props) {
     }
   }, []);
 
-  const handleEnjiResult = useCallback((result: boolean | 'sleeping') => {
-    if (result === 'sleeping') {
-      toast("enji가 잠시 쉬고 있어요 😴 조금 뒤에 다시 불러주세요!", {
-        duration: 4000,
-        position: 'bottom-right',
-        style: { background: '#f3e8ff', color: '#6b21a8' },
-      });
-    }
-  }, []);
-
   const handleReplySubmit = useCallback(async (parentId: string, content: string) => {
     const ok = await submitComment(parentId, content);
     if (ok) {
       toast.success("덧글이 성공적으로 작성되었습니다!");
       setOpenReplyFor(null);
       fetchComments();
-    } else if (ok === 'sleeping') {
-      handleEnjiResult(ok);
-      fetchComments();
     } else {
       toast.error("덧글 작성에 실패했습니다.");
     }
     return !!ok;
-  }, [submitComment, fetchComments, handleEnjiResult]);
+  }, [submitComment, fetchComments]);
 
   const handleTopLevelSubmit = useCallback(async (content: string) => {
     const ok = await submitComment(null, content);
-    if (ok === 'sleeping') {
-      handleEnjiResult(ok);
-      fetchComments();
-    } else if (ok) {
+    if (ok) {
       toast.success("덧글이 성공적으로 작성되었습니다!");
       fetchComments();
     } else {
       toast.error("덧글을 입력해주세요.");
     }
     return !!ok;
-  }, [submitComment, fetchComments, handleEnjiResult]);
+  }, [submitComment, fetchComments]);
 
   const handleDelete = useCallback(async (commentId: string) => {
     if (!confirm("정말로 이 댓글을 삭제하시겠습니까?")) return;

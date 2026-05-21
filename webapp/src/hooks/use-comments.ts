@@ -1,11 +1,15 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { nanoid } from "nanoid";
 import { showAchievementToasts } from "@/lib/show-achievement-toast";
 import type { Comment } from "@/types/comment.d";
 
+const ENJI_POLL_INTERVAL_MS = 2000;
+const ENJI_POLL_DEADLINE_MS = 30_000;
+
 export function useComments(postId: string) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchComments = useCallback(async () => {
     try {
@@ -17,10 +21,37 @@ export function useComments(postId: string) {
     }
   }, [postId]);
 
+  const startEnjiPolling = useCallback((userCommentId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    const deadline = Date.now() + ENJI_POLL_DEADLINE_MS;
+
+    pollingRef.current = setInterval(async () => {
+      if (Date.now() > deadline) {
+        clearInterval(pollingRef.current!);
+        pollingRef.current = null;
+        return;
+      }
+      try {
+        const res = await fetch(`/api/comments?postId=${postId}`);
+        const { data } = await res.json();
+        setComments(data);
+        const found = (data as Comment[]).some(
+          (c) => c.isEnji && c.parent?._id === userCommentId
+        );
+        if (found) {
+          clearInterval(pollingRef.current!);
+          pollingRef.current = null;
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, ENJI_POLL_INTERVAL_MS);
+  }, [postId]);
+
   const submitComment = useCallback(async (
     parentId: string | null,
     content: string,
-  ): Promise<boolean | 'sleeping'> => {
+  ): Promise<boolean> => {
     if (!content.trim()) return false;
 
     setSubmitting(true);
@@ -44,8 +75,14 @@ export function useComments(postId: string) {
       if (!response.ok) return false;
 
       const result = await response.json();
-      if (!isEnjiCall) showAchievementToasts(result.data);
-      if (isEnjiCall && result.data?.enjiSleeping) return 'sleeping' as const;
+
+      if (!isEnjiCall) {
+        showAchievementToasts(result.data);
+        return true;
+      }
+
+      const userCommentId = String(result.data?.userComment?._id ?? '');
+      if (userCommentId) startEnjiPolling(userCommentId);
       return true;
     } catch (error) {
       console.error("Error:", error);
@@ -53,7 +90,7 @@ export function useComments(postId: string) {
     } finally {
       setSubmitting(false);
     }
-  }, [postId]);
+  }, [postId, startEnjiPolling]);
 
   const deleteComment = useCallback(async (commentId: string): Promise<boolean> => {
     try {
