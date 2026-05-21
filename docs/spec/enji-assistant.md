@@ -99,7 +99,7 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 
 ---
 
-## enji 댓글에 Reply — 대화 이어가기
+## enji 댓글에 Reply — 대화 이어가기 ✅
 
 enji가 남긴 댓글에 Reply 버튼을 노출하여 대화를 이어갈 수 있게 한다.
 
@@ -116,7 +116,7 @@ enji가 남긴 댓글에 Reply 버튼을 노출하여 대화를 이어갈 수 �
 
 ---
 
-## enji 호출 — 로그인 사용자 전용
+## enji 호출 — 로그인 사용자 전용 ✅
 
 Gemini API 쿼터 보호를 위해 @enji 호출은 로그인한 사용자만 가능하게 한다.
 
