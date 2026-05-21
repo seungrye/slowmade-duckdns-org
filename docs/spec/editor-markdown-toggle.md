@@ -10,7 +10,7 @@
 
 1. 툴바 우측에 **Code / Visual** 토글 버튼 추가
 2. **Visual → Code**: `editor.storage.markdown.getMarkdown()` → `<textarea>` 표시
-3. **Code → Visual**: textarea 내용 → `editor.commands.setContent(md, false, { contentType: 'markdown' })` → TipTap 렌더링
+3. **Code → Visual**: textarea 내용 → `editor.commands.setContent(md, { contentType: 'markdown' })` → TipTap 렌더링 (시그니처: `(content, options)`, `false` 인자 없음)
 4. 에디터 핸들 `getContent()`: Code 모드일 때도 정확한 HTML 반환 (내부적으로 md → editor 파싱 후 getHTML)
 
 ## 커스텀 Markdown 직렬화 (수식)
