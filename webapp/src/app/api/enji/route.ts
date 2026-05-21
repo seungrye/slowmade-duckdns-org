@@ -85,18 +85,21 @@ ${commentContext}
 `.trim();
 
   let enjiText: string;
+  let enjiSleeping = false;
   try {
     const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
     const result = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-flash-latest',
       config: { systemInstruction: ENJI_SYSTEM_PROMPT },
       contents: contextMessage,
     });
     enjiText = result.text ?? '';
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Gemini API error:', error);
+    const isQuotaError = error instanceof Error && error.message.includes('429');
+    enjiSleeping = isQuotaError;
     return NextResponse.json(
-      { success: true, data: { userComment, enjiComment: null } },
+      { success: true, data: { userComment, enjiComment: null, enjiSleeping } },
       { status: 201 }
     );
   }

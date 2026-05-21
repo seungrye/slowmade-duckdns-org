@@ -103,4 +103,18 @@ describe('/api/enji POST', () => {
     expect(json.data.enjiComment).toBeNull();
     expect(mockCommentSave).toHaveBeenCalledTimes(1);
   });
+
+  it('429 쿼터 초과 시 enjiSleeping: true 반환', async () => {
+    mockGenerateContent.mockRejectedValueOnce(new Error('[429] quota exceeded'));
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '@enji 테스트',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.data.enjiSleeping).toBe(true);
+    expect(json.data.enjiComment).toBeNull();
+  });
 });

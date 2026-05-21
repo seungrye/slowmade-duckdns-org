@@ -20,7 +20,7 @@ export function useComments(postId: string) {
   const submitComment = useCallback(async (
     parentId: string | null,
     content: string,
-  ): Promise<boolean> => {
+  ): Promise<boolean | 'sleeping'> => {
     if (!content.trim()) return false;
 
     setSubmitting(true);
@@ -45,6 +45,7 @@ export function useComments(postId: string) {
 
       const result = await response.json();
       if (!isEnjiCall) showAchievementToasts(result.data);
+      if (isEnjiCall && result.data?.enjiSleeping) return 'sleeping' as const;
       return true;
     } catch (error) {
       console.error("Error:", error);
