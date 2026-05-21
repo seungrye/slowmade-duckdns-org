@@ -43,6 +43,20 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 
 ## 코드블록 닫는 ``` 파싱 오류 수정 ✅
 
+---
+
+## Code 모드에서 사용 불가 툴바 버튼 비활성화
+
+### 동작
+Code 모드 진입 시 Code/Visual 토글 버튼을 제외한 모든 툴바 버튼 비활성화.
+- 시각: `opacity: 0.35`
+- 상호작용: `pointer-events: none`
+- 접근성: `aria-hidden="true"`
+
+### 구현
+`MainToolbarContent` 에서 토글 버튼 ToolbarGroup을 제외한 나머지를 `<div>` 로 감싸고,
+`isMarkdownMode` 일 때 disabled 스타일 적용. 개별 컴포넌트 수정 없이 CSS로 처리.
+
 ### 문제
 Code 모드에서 수정 후 Visual 로 복귀 시 문서 끝에 ``` 가 텍스트로 남는다.
 마크다운 코드블록 닫는 ``` 뒤에 개행이 없으면 파서가 코드블록 종료로 인식하지 못하기 때문.
