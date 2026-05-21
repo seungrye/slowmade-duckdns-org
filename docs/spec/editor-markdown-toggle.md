@@ -35,6 +35,10 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 
 ## 왕복 손실 방지 — Code 모드 무변경 시 원본 복원 ✅
 
+---
+
+## 빌드 오류 수정 — autoResizeTextarea 선언 순서
+
 ### 문제
 Visual → Code → Visual (아무것도 안 고침) 시 content 가 바뀜.  
 HTML → Markdown → HTML 변환이 손실 없는 왕복(round-trip)이 아니기 때문.
