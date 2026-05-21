@@ -99,6 +99,38 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 
 ---
 
+## enji 댓글에 Reply — 대화 이어가기
+
+enji가 남긴 댓글에 Reply 버튼을 노출하여 대화를 이어갈 수 있게 한다.
+
+### 동작
+1. enji 댓글 블록에 **Reply** 버튼 추가
+2. 버튼 클릭 시 CommentInput 표시
+3. 사용자가 내용 입력 후 제출 → 서버는 해당 댓글을 enji에게 보내는 것으로 처리
+4. 클라이언트는 폴링으로 enji 응답 대기
+
+### 구현 포인트
+- `comment-item.tsx`: enji 블록에 Reply 버튼 + `openReplyFor` 처리 추가
+- `use-comments.ts`: `submitComment(parentId, content, parentIsEnji?)` — `parentIsEnji=true` 이면 content에 `@enji` 유무와 무관하게 `/api/enji` 호출
+- `comments.section.tsx`: `handleReplySubmit` 에서 부모 댓글이 enji면 `parentIsEnji=true` 전달
+
+---
+
+## enji 호출 — 로그인 사용자 전용
+
+Gemini API 쿼터 보호를 위해 @enji 호출은 로그인한 사용자만 가능하게 한다.
+
+### 변경 동작
+- **BE**: `POST /api/enji` 에서 session 확인 → 미로그인 시 401 반환
+- **FE 멘션 목록**: `CommentInput`에 전달하는 mentions 배열에서 `session`이 없으면 `enji` 제외
+- **FE submitComment**: 로그인 여부 체크는 BE에 위임 (FE에서 별도 처리 없음)
+
+### 변경 파일
+- `webapp/src/app/api/enji/route.ts`: session 없으면 401
+- `webapp/src/app/post/view/[[...id]]/comments.section.tsx`: session 없으면 mentions에서 enji 제외
+
+---
+
 ## 구현 범위 외 (v1 제외)
 
 - 스트리밍 응답 (SSE)
