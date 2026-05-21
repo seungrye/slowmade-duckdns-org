@@ -1,4 +1,4 @@
-# 에디터 UI ↔ Markdown 토글
+# 에디터 UI ↔ Markdown 토글 ✅
 
 게시글 작성 에디터에서 WYSIWYG 모드와 순수 Markdown 소스 모드를 전환할 수 있다.
 
