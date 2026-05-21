@@ -10,6 +10,7 @@ const CommentSchema = new mongoose.Schema(
       likes: { type: Number, default: 0 }, // 좋아요 수
       createdAt: { type: Date, default: Date.now }, // 작성일
       isDeleted: { type: Boolean, default: false },  // 삭제 플래그 추가
+      isEnji: { type: Boolean, default: false },
     },
     { timestamps: true }
   );

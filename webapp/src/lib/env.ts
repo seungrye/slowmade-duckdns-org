@@ -44,6 +44,7 @@ export const env = {
   },
 
   siteUrl: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
+  geminiApiKey: process.env.GEMINI_API_KEY ?? '',
 } as const;
 
 export function validateEnv(): void {

@@ -47,6 +47,26 @@ export default function CommentItem({
         >
           <p className="text-gray-500 italic">{c.content}</p>
         </div>
+      ) : c.isEnji ? (
+        <div
+          id={`comment-${c._id}`}
+          ref={onRef}
+          className={`${indentClass}flex items-start gap-4 border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/30 rounded-lg rounded-br-none p-4 transition-all duration-300`}
+        >
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-lg" aria-label="enji">✨</span>
+              <h3 className={`font-medium text-purple-700 dark:text-purple-300 tracking-tighter ${manrope.className}`}>
+                {c.author}
+              </h3>
+              <span className="text-sm text-gray-500">·</span>
+              <span className="text-sm text-gray-500">
+                {new Date(c.createdAt).toLocaleString()}
+              </span>
+            </div>
+            <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{c.content}</p>
+          </div>
+        </div>
       ) : (
         <div
           id={`comment-${c._id}`}

@@ -31,8 +31,11 @@ export function useComments(postId: string) {
       localStorage.setItem('anonid-token', anonidToken);
     }
 
+    const isEnjiCall = /@enji/i.test(content);
+    const endpoint = isEnjiCall ? '/api/enji' : '/api/comments';
+
     try {
-      const response = await fetch("/api/comments", {
+      const response = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId, parentId, content, anonid: anonidToken }),
@@ -41,7 +44,7 @@ export function useComments(postId: string) {
       if (!response.ok) return false;
 
       const result = await response.json();
-      showAchievementToasts(result.data);
+      if (!isEnjiCall) showAchievementToasts(result.data);
       return true;
     } catch (error) {
       console.error("Error:", error);
