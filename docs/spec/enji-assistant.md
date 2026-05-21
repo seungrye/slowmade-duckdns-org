@@ -108,7 +108,7 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 
 ---
 
-## SDK 마이그레이션 — @google/generative-ai → @google/genai
+## SDK 마이그레이션 — @google/generative-ai → @google/genai ✅
 
 구 SDK(`@google/generative-ai`)를 신 SDK(`@google/genai`)로 교체한다.
 
@@ -118,3 +118,10 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 - `genAI.getGenerativeModel(...)` → `ai.models.generateContent(...)`
 - `result.response.text()` → `response.text`
 - 테스트 모킹 방식 동일하게 업데이트
+
+---
+
+## 모델 변경 — gemini-2.0-flash → gemini-flash-latest
+
+`gemini-2.0-flash`는 Spark 플랜 무료 쿼터가 0이라 동작하지 않음.
+`gemini-flash-latest`로 변경하면 무료 쿼터 사용 가능.
