@@ -1,5 +1,14 @@
 # 에디터 UI ↔ Markdown 토글 ✅
 
+## 토글 버튼 아이콘 변경
+
+Visual / Code 텍스트 대신 아이콘으로 교체한다.
+
+- Visual 모드일 때 → `EyeIcon` (눈) 표시 — 클릭 시 Code 모드로 전환
+- Code 모드일 때 → `Code2Icon` (`</>`) 표시 — 클릭 시 Visual 모드로 전환
+- `docs/tiptap-icons/eye-icon.tsx` 신규 생성 (기존 아이콘과 동일한 SVG 스타일)
+- 버튼 크기/스타일 유지, `title`/`aria-label` 유지
+
 게시글 작성 에디터에서 WYSIWYG 모드와 순수 Markdown 소스 모드를 전환할 수 있다.
 
 ## 패키지
