@@ -26,7 +26,7 @@ type RenderContext = { previousNode?: JSONContent | null }
 const ParagraphWithAlign = Paragraph.extend({
     renderMarkdown(node: JSONContent, h: RenderHelpers, ctx: RenderContext) {
         const content = Array.isArray(node.content) ? node.content : [];
-        const align: string | undefined = node.attrs?.textAlign;
+        const align: string | undefined = node.attrs?.textAlign as string | undefined;
         const children = content.length === 0 ? '' : h.renderChildren(node);
         if (align && align !== 'left') {
             return `<p style="text-align: ${align}">${children}</p>`;
@@ -44,7 +44,7 @@ const ParagraphWithAlign = Paragraph.extend({
 const HeadingWithAlign = Heading.extend({
     renderMarkdown(node: JSONContent, h: RenderHelpers) {
         const level = node.attrs?.level ? parseInt(String(node.attrs.level), 10) : 1;
-        const align: string | undefined = node.attrs?.textAlign;
+        const align: string | undefined = node.attrs?.textAlign as string | undefined;
         if (!node.content) return '';
         const children = h.renderChildren(node.content as JSONContent[]);
         if (align && align !== 'left') {

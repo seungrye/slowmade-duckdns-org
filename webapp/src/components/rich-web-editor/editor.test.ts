@@ -72,7 +72,7 @@ describe('renderMarkdown 커스텀 직렬화', () => {
         expect(result).toBe('hi');
     });
 
-    it('heading 에 textAlign center 이면 <hN style> 로 직렬화된다', () => {
+    it('heading 에 textAlign right 이면 <hN style> 로 직렬화된다', () => {
         const ext = editorExtensions.find(e => e.name === 'heading');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const render = (ext as any)?.config?.renderMarkdown;
