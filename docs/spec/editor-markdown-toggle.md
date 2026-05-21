@@ -37,7 +37,7 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 
 ---
 
-## 빌드 오류 수정 — autoResizeTextarea 선언 순서
+## 빌드 오류 수정 — autoResizeTextarea 선언 순서 ✅
 
 ### 문제
 Visual → Code → Visual (아무것도 안 고침) 시 content 가 바뀜.  
