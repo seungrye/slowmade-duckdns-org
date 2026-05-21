@@ -155,3 +155,20 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 - `↑` / `↓`: 항목 이동
 - `Enter`: 선택
 - `Escape`: 닫기
+
+---
+
+## 비동기 응답 — 댓글 즉시 노출
+
+### 문제
+`/api/enji` 가 Gemini 응답을 기다린 뒤 반환해서 체감 응답이 느림.
+
+### 변경 동작
+1. `/api/enji` → 사용자 댓글 저장 후 **즉시** `{ userComment }` 반환
+2. Gemini 호출은 서버에서 fire-and-forget (void)
+3. 클라이언트: 즉시 `fetchComments()` → 사용자 댓글 노출
+4. 클라이언트: 2초 간격으로 최대 30초간 폴링 → enji 답변 나타나면 중단
+
+### 변경 파일
+- `webapp/src/app/api/enji/route.ts` — Gemini 호출을 void로 분리
+- `webapp/src/hooks/use-comments.ts` — @enji 제출 후 폴링 로직
