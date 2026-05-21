@@ -105,3 +105,16 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 - @enji 멘션 자동완성 UI
 - enji 댓글 좋아요/신고
 - 컨텍스트에 타 게시글 검색 (RAG)
+
+---
+
+## SDK 마이그레이션 — @google/generative-ai → @google/genai
+
+구 SDK(`@google/generative-ai`)를 신 SDK(`@google/genai`)로 교체한다.
+
+### 변경 사항
+- `@google/generative-ai` 제거, `@google/genai` 설치
+- `GoogleGenerativeAI` → `GoogleGenAI`
+- `genAI.getGenerativeModel(...)` → `ai.models.generateContent(...)`
+- `result.response.text()` → `response.text`
+- 테스트 모킹 방식 동일하게 업데이트
