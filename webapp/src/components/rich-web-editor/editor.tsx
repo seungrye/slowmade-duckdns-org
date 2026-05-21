@@ -5,25 +5,8 @@
 import * as React from "react"
 import { EditorContent, EditorContext, HTMLContent, JSONContent, useEditor } from "@tiptap/react"
 
-// --- Tiptap Core Extensions ---
-import { StarterKit } from "@tiptap/starter-kit"
-import { Image } from "@tiptap/extension-image"
-import { TaskItem } from "@tiptap/extension-task-item"
-import { TaskList } from "@tiptap/extension-task-list"
-import { TextAlign } from "@tiptap/extension-text-align"
-import { Typography } from "@tiptap/extension-typography"
-import { Highlight } from "@tiptap/extension-highlight"
-import { Subscript } from "@tiptap/extension-subscript"
-import { Superscript } from "@tiptap/extension-superscript"
-import { Underline } from "@tiptap/extension-underline"
-import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
-import { InlineMath, BlockMath } from "@tiptap/extension-mathematics"
+// --- Extensions ---
 import "katex/dist/katex.min.css"
-
-// --- Custom Extensions ---
-import { Link } from "@/components/tiptap-extension/link-extension"
-import { Selection } from "@/components/tiptap-extension/selection-extension"
-import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
 
 // --- UI Primitives ---
 import { Button } from "@/components/tiptap-ui-primitive/button"
@@ -74,60 +57,28 @@ import { useWindowSize } from "@/hooks/use-window-size"
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 import { uploadImage } from "./editor.upload"
-import { lowlight } from "@/lib/lowlight"
 
 // --- Styles ---
 import "./editor.scss"
 import { ImageUrlType } from "@/models/post"
+import { editorExtensions } from "./editor.extensions"
 
-// function ThemeToggle() {
-//     const [isDarkMode, setIsDarkMode] = React.useState<boolean>(false)
-
-//     React.useEffect(() => {
-//         const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)")
-//         const handleChange = () => setIsDarkMode(mediaQuery.matches)
-//         mediaQuery.addEventListener("change", handleChange)
-//         return () => mediaQuery.removeEventListener("change", handleChange)
-//     }, [])
-
-//     React.useEffect(() => {
-//         const initialDarkMode =
-//             !!document.querySelector('meta[name="color-scheme"][content="dark"]') ||
-//             window.matchMedia("(prefers-color-scheme: dark)").matches
-//         setIsDarkMode(initialDarkMode)
-//     }, [])
-
-//     React.useEffect(() => {
-//         document.documentElement.classList.toggle("dark", isDarkMode)
-//     }, [isDarkMode])
-
-//     const toggleDarkMode = () => setIsDarkMode((isDark) => !isDark)
-
-//     return (
-//         <Button
-//             onClick={toggleDarkMode}
-//             aria-label={`Switch to ${isDarkMode ? "light" : "dark"} mode`}
-//             data-style="ghost"
-//         >
-//             {isDarkMode ? (
-//                 <MoonStarIcon className="tiptap-button-icon" />
-//             ) : (
-//                 <SunIcon className="tiptap-button-icon" />
-//             )}
-//         </Button>
-//     )
-// }
+export { editorExtensions }
 
 const MainToolbarContent = ({
     onHighlighterClick,
     onLinkClick,
     onMathClick,
     isMobile,
+    isMarkdownMode,
+    onToggleMarkdown,
 }: {
     onHighlighterClick: () => void
     onLinkClick: () => void
     onMathClick: () => void
     isMobile: boolean
+    isMarkdownMode: boolean
+    onToggleMarkdown: () => void
 }) => {
     return (
         <>
@@ -188,6 +139,21 @@ const MainToolbarContent = ({
                 ) : (
                     <MathButton onClick={onMathClick} aria-label="수식 삽입" />
                 )}
+            </ToolbarGroup>
+
+            <ToolbarSeparator />
+
+            <ToolbarGroup>
+                <Button
+                    data-style="ghost"
+                    onClick={onToggleMarkdown}
+                    aria-label={isMarkdownMode ? "Switch to Visual editor" : "Switch to Markdown source"}
+                    title={isMarkdownMode ? "Visual 모드로 전환" : "Markdown 소스 편집"}
+                >
+                    <span style={{ fontSize: "0.75rem", fontFamily: "monospace", fontWeight: 600 }}>
+                        {isMarkdownMode ? "Visual" : "Code"}
+                    </span>
+                </Button>
             </ToolbarGroup>
 
             <Spacer />
@@ -257,6 +223,13 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     const toolbarRef = React.useRef<HTMLDivElement>(null)
     const uploadedImageUrlsRef = React.useRef<ImageUrlType[]>([]);
 
+    // Markdown mode state
+    const [isMarkdownMode, setIsMarkdownMode] = React.useState(false);
+    const isMarkdownModeRef = React.useRef(false);
+    const [markdownContent, setMarkdownContent] = React.useState('');
+    const markdownContentRef = React.useRef('');
+    const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+
     React.useEffect(() => {
         const updateRect = () => {
             setRect(document.body.getBoundingClientRect())
@@ -287,38 +260,20 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             },
         },
         extensions: [
-            StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
-            CodeBlockLowlight.configure({ lowlight }),
-            TextAlign.configure({ types: ["heading", "paragraph"] }),
-            Underline,
-            TaskList,
-            TaskItem.configure({ nested: true }),
-            Highlight.configure({ multicolor: true }),
-            Image,
-            Typography,
-            Superscript,
-            Subscript,
-
-            Selection,
+            ...editorExtensions,
             ImageUploadNode.configure({
                 accept: "image/*",
                 maxSize: MAX_FILE_SIZE,
                 limit: 32,
                 upload: async (file, onProgress?, abortSignal?) => {
                     const {url, thumbnailUrl} = await uploadImage(file, onProgress, abortSignal);
-
                     if (uploadedImageUrlsRef.current.findIndex(x => x.url === url) < 0) {
-                        uploadedImageUrlsRef.current.push({url, thumbnailUrl}); // 중복 방지 후 저장
+                        uploadedImageUrlsRef.current.push({url, thumbnailUrl});
                     }
-
                     return url;
                 },
                 onError: (error) => console.error("Upload failed:", error),
             }),
-            TrailingNode,
-            Link.configure({ openOnClick: false }),
-            InlineMath.configure({ katexOptions: { throwOnError: false } }),
-            BlockMath.configure({ katexOptions: { throwOnError: false } }),
         ],
         content: "",
     })
@@ -340,7 +295,6 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                     const isEnoughSpace =
                         windowSize.height - cursorCoords.top - toolbarHeight > 0
 
-                    // If not enough space, scroll until the cursor is the middle of the screen
                     if (!isEnoughSpace) {
                         const scrollY =
                             cursorCoords.top - windowSize.height / 2 + toolbarHeight
@@ -362,24 +316,60 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         }
     }, [isMobile, mobileView])
 
+    const handleToggleMarkdown = React.useCallback(() => {
+        if (!editor) return;
+        if (!isMarkdownModeRef.current) {
+            // Visual → Code
+            const md = editor.getMarkdown();
+            markdownContentRef.current = md;
+            setMarkdownContent(md);
+            isMarkdownModeRef.current = true;
+            setIsMarkdownMode(true);
+        } else {
+            // Code → Visual
+            editor.commands.setContent(markdownContentRef.current, false, { contentType: 'markdown' });
+            isMarkdownModeRef.current = false;
+            setIsMarkdownMode(false);
+        }
+    }, [editor]);
+
+    const handleMarkdownChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        markdownContentRef.current = e.target.value;
+        setMarkdownContent(e.target.value);
+    }, []);
+
     React.useImperativeHandle(ref, () => ({
-        getContent: () => ({
-            jsonContent: editor?.getJSON(),
-            htmlContent: editor?.getHTML(),
-            uploadImageUrls: uploadedImageUrlsRef.current,
-        }),
+        getContent: () => {
+            if (isMarkdownModeRef.current && editor) {
+                editor.commands.setContent(markdownContentRef.current, false, { contentType: 'markdown' });
+            }
+            return {
+                jsonContent: editor?.getJSON(),
+                htmlContent: editor?.getHTML(),
+                uploadImageUrls: uploadedImageUrlsRef.current,
+            };
+        },
         setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => {
             if (!editor) return console.warn("Editor is not initialized");
             uploadedImageUrlsRef.current = uploadImageUrls || [];
-            editor?.commands.setContent(content)
+            editor.commands.setContent(content);
+            if (isMarkdownModeRef.current) {
+                const md = editor.getMarkdown();
+                markdownContentRef.current = md;
+                setMarkdownContent(md);
+            }
         },
         focus: () => {
-            editor?.commands.focus();
+            if (isMarkdownModeRef.current) {
+                textareaRef.current?.focus();
+            } else {
+                editor?.commands.focus();
+            }
         },
     }), [editor])
 
     return (
-        <EditorContext.Provider value={{ editor }}>
+        <EditorContext.Provider value={{ editor: editor }}>
             <Toolbar
                 ref={toolbarRef}
                 style={
@@ -396,6 +386,8 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                         onLinkClick={() => setMobileView("link")}
                         onMathClick={() => setMobileView("math")}
                         isMobile={isMobile}
+                        isMarkdownMode={isMarkdownMode}
+                        onToggleMarkdown={handleToggleMarkdown}
                     />
                 ) : (
                     <MobileToolbarContent
@@ -406,11 +398,22 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             </Toolbar>
 
             <div className="rich-web-content-wrapper">
-                <EditorContent
-                    editor={editor}
-                    role="presentation"
-                    className="rich-web-editor-content"
-                />
+                {isMarkdownMode ? (
+                    <textarea
+                        ref={textareaRef}
+                        value={markdownContent}
+                        onChange={handleMarkdownChange}
+                        className="rich-web-editor-markdown"
+                        spellCheck={false}
+                        aria-label="Markdown source editor"
+                    />
+                ) : (
+                    <EditorContent
+                        editor={editor}
+                        role="presentation"
+                        className="rich-web-editor-content"
+                    />
+                )}
             </div>
         </EditorContext.Provider>
     )
