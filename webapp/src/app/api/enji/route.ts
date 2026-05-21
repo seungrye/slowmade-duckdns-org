@@ -59,6 +59,10 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await auth();
+  if (!session?.user) {
+    return apiError('로그인이 필요합니다.', 401);
+  }
+
   const { postId, parentId = null, content, anonid } = await req.json();
 
   if (!content?.trim()) return apiError('댓글 내용이 없습니다.', 400);

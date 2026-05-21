@@ -65,6 +65,23 @@ export default function CommentItem({
               </span>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{c.content}</p>
+            {session?.user && (
+              <button
+                className="text-sm text-purple-600 hover:underline mt-2"
+                onClick={() => onReplyToggle(c._id)}
+                aria-label="Open reply form"
+              >
+                Reply
+              </button>
+            )}
+            {openReplyFor === c._id && (
+              <CommentInput
+                inputId={`reply-${c._id}`}
+                onSubmit={(content) => onReplySubmit(c._id, content)}
+                disabled={submitting}
+                placeholder="enji에게 답장..."
+              />
+            )}
           </div>
         </div>
       ) : (

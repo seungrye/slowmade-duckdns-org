@@ -43,7 +43,8 @@ export default function Comments({ postId }: Props) {
   }, []);
 
   const handleReplySubmit = useCallback(async (parentId: string, content: string) => {
-    const ok = await submitComment(parentId, content);
+    const parentIsEnji = comments.some(c => c._id === parentId && c.isEnji);
+    const ok = await submitComment(parentId, content, parentIsEnji);
     if (ok) {
       toast.success("덧글이 성공적으로 작성되었습니다!");
       setOpenReplyFor(null);
@@ -52,7 +53,7 @@ export default function Comments({ postId }: Props) {
       toast.error("덧글 작성에 실패했습니다.");
     }
     return !!ok;
-  }, [submitComment, fetchComments]);
+  }, [submitComment, fetchComments, comments]);
 
   const handleTopLevelSubmit = useCallback(async (content: string) => {
     const ok = await submitComment(null, content);
@@ -127,11 +128,10 @@ export default function Comments({ postId }: Props) {
       <CommentInput
         onSubmit={handleTopLevelSubmit}
         disabled={submitting}
-        mentions={[...new Set(
-          comments
-            .filter(c => !c.isDeleted && !c.isEnji)
-            .map(c => c.author)
-        )]}
+        mentions={[
+          ...(session ? ['enji'] : []),
+          ...new Set(comments.filter(c => !c.isDeleted && !c.isEnji).map(c => c.author)),
+        ]}
       />
     </section>
   );

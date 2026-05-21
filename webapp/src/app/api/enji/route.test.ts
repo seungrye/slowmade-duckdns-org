@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { POST } from './route';
 
-vi.mock('@/auth', () => ({ auth: vi.fn().mockResolvedValue(null) }));
+const mockAuth = vi.hoisted(() => vi.fn());
+vi.mock('@/auth', () => ({ auth: mockAuth }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/lib/env', () => ({
   env: {
@@ -70,6 +71,13 @@ describe('/api/enji POST', () => {
     vi.clearAllMocks();
     mockCommentSave.mockResolvedValue(undefined);
     mockGenerateContent.mockResolvedValue({ text: 'enji 테스트 응답' });
+    mockAuth.mockResolvedValue({ user: { name: 'Test', email: 'test@test.com' } });
+  });
+
+  it('미로그인 사용자면 401 반환', async () => {
+    mockAuth.mockResolvedValueOnce(null);
+    const res = await POST(makeRequest({ postId: 'post-id', content: '@enji 테스트' }));
+    expect(res.status).toBe(401);
   });
 
   it('content 없으면 400 반환', async () => {

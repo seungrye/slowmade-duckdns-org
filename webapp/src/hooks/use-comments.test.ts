@@ -142,6 +142,23 @@ describe('useComments', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
     });
 
+    it('parentIsEnji=true면 @enji 없어도 /api/enji로 제출한다', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { userComment: { _id: 'uc1' } } }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.submitComment('parent-id', '계속 대화해요', true);
+      });
+
+      expect(ok!).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
+    });
+
     it('@enji 제출 후 enjiComment 없으면 폴링하여 댓글 업데이트', async () => {
       vi.useFakeTimers();
 

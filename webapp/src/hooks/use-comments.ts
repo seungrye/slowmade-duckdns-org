@@ -51,6 +51,7 @@ export function useComments(postId: string) {
   const submitComment = useCallback(async (
     parentId: string | null,
     content: string,
+    parentIsEnji?: boolean,
   ): Promise<boolean> => {
     if (!content.trim()) return false;
 
@@ -62,7 +63,7 @@ export function useComments(postId: string) {
       localStorage.setItem('anonid-token', anonidToken);
     }
 
-    const isEnjiCall = /@enji/i.test(content);
+    const isEnjiCall = parentIsEnji === true || /@enji/i.test(content);
     const endpoint = isEnjiCall ? '/api/enji' : '/api/comments';
 
     try {

@@ -48,8 +48,7 @@ export default function CommentInput({
     const match = text.match(/@(\w*)$/);
     if (match) {
       const query = match[1].toLowerCase();
-      const filtered = ['enji', ...mentions.filter(m => m !== 'enji')]
-        .filter(m => m.toLowerCase().startsWith(query));
+      const filtered = mentions.filter(m => m.toLowerCase().startsWith(query));
       setSuggestions(filtered);
       setActiveIndex(0);
       setMentionStart(cursor - match[0].length);
