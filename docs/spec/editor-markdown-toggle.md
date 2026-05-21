@@ -59,7 +59,7 @@ Code 모드 진입 시 Code/Visual 토글 버튼을 제외한 모든 툴바 버�
 
 ---
 
-## superscript / subscript / textAlign 포맷 보존
+## superscript / subscript / textAlign 포맷 보존 ✅
 
 ### 문제
 Visual 모드에서 sup/sub/align 적용 후 Code 모드로 전환 시 Markdown 포맷이 없어 포맷이 날아감.
