@@ -33,7 +33,7 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 
 ---
 
-## 왕복 손실 방지 — Code 모드 무변경 시 원본 복원
+## 왕복 손실 방지 — Code 모드 무변경 시 원본 복원 ✅
 
 ### 문제
 Visual → Code → Visual (아무것도 안 고침) 시 content 가 바뀜.  
