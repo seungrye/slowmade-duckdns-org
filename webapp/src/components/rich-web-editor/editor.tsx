@@ -46,9 +46,11 @@ import { MathPopover, MathButton, MathContent } from "@/components/tiptap-ui/mat
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
+import { EyeIcon } from "@/components/tiptap-icons/eye-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
 import { SigmaIcon } from "@/components/tiptap-icons/sigma-icon"
+import { FaPenToSquare } from "react-icons/fa6"
 
 // --- Hooks ---
 import { useMobile } from "@/hooks/use-mobile"
@@ -160,9 +162,10 @@ const MainToolbarContent = ({
                     aria-label={isMarkdownMode ? "Switch to Visual editor" : "Switch to Markdown source"}
                     title={isMarkdownMode ? "Visual 모드로 전환" : "Markdown 소스 편집"}
                 >
-                    <span style={{ fontSize: "0.75rem", fontFamily: "monospace", fontWeight: 600 }}>
-                        {isMarkdownMode ? "Visual" : "Code"}
-                    </span>
+                    {isMarkdownMode
+                        ? <FaPenToSquare className="tiptap-button-icon" />
+                        : <EyeIcon className="tiptap-button-icon" />
+                    }
                 </Button>
             </ToolbarGroup>
 
