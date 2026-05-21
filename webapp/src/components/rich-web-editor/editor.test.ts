@@ -71,6 +71,14 @@ describe('renderMarkdown 커스텀 직렬화', () => {
         const result = render?.({ content: [{ type: 'text', text: 'hi' }], attrs: { textAlign: 'left' } }, mockH('hi'), {});
         expect(result).toBe('hi');
     });
+
+    it('heading 에 textAlign 이 있으면 <hN style> 로 직렬화된다', () => {
+        const ext = editorExtensions.find(e => e.name === 'heading');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const render = (ext as any)?.config?.renderMarkdown;
+        const result = render?.({ content: [{ type: 'text', text: 'title' }], attrs: { level: 2, textAlign: 'right' } }, mockH('title'), {});
+        expect(result).toBe('<h2 style="text-align: right">title</h2>');
+    });
 });
 
 // markdown 정규화 헬퍼 — Code→Visual 복귀 시 코드블록 닫는 ``` 파싱 오류 방지

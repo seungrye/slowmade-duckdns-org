@@ -17,14 +17,10 @@ import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
 import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
 import { lowlight } from "@/lib/lowlight"
-import type { JSONContent } from "@tiptap/core"
 
-type RenderHelpers = {
-    renderChildren: (nodes: JSONContent | JSONContent[]) => string
-}
-type RenderContext = {
-    previousNode?: JSONContent
-}
+type JSONContent = { type?: string; attrs?: Record<string, unknown>; content?: JSONContent[]; text?: string }
+type RenderHelpers = { renderChildren: (nodes: JSONContent | JSONContent[]) => string }
+type RenderContext = { previousNode?: JSONContent }
 
 // Paragraph — textAlign 속성이 있으면 <p style="text-align: ..."> 로 직렬화
 const ParagraphWithAlign = Paragraph.extend({
