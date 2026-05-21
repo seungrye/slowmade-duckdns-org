@@ -158,7 +158,7 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 
 ---
 
-## 비동기 응답 — 댓글 즉시 노출
+## 비동기 응답 — 댓글 즉시 노출 ✅
 
 ### 문제
 `/api/enji` 가 Gemini 응답을 기다린 뒤 반환해서 체감 응답이 느림.
@@ -179,6 +179,6 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 - **1.5초 초과** → 즉시 `{ userComment }` 반환, Gemini 응답 오면 백그라운드에서 DB 저장
 - **1.5초 내 응답** → `{ userComment, enjiComment }` 반환 (기존과 동일)
 
-### Origin 제한
+### Origin 제한 ✅
 `/api/enji` 는 `Referer` 또는 `Origin` 헤더가 `NEXTAUTH_URL`(사이트 도메인)과 일치할 때만 처리.
 불일치 시 403 반환.
