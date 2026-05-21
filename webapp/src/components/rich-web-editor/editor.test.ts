@@ -25,4 +25,9 @@ describe('editorExtensions', () => {
         // 최소한 배열이 비어있지 않아야 함
         expect(names.length).toBeGreaterThan(5);
     });
+
+    it('CodeBlockLowlight 가 포함되어 있다 (코드블록 왕복 손실 방지에 필요)', () => {
+        const names = editorExtensions.map(e => e.name);
+        expect(names).toContain('codeBlock');
+    });
 });

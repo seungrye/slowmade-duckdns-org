@@ -228,6 +228,8 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     const isMarkdownModeRef = React.useRef(false);
     const [markdownContent, setMarkdownContent] = React.useState('');
     const markdownContentRef = React.useRef('');
+    const savedJsonRef = React.useRef<JSONContent | null>(null);
+    const savedMarkdownRef = React.useRef('');
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
     React.useEffect(() => {
@@ -316,32 +318,55 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         }
     }, [isMobile, mobileView])
 
+    // Code 모드 진입 시 textarea 초기 높이 조절
+    React.useEffect(() => {
+        if (isMarkdownMode && textareaRef.current) {
+            autoResizeTextarea(textareaRef.current);
+        }
+    }, [isMarkdownMode, autoResizeTextarea])
+
     const handleToggleMarkdown = React.useCallback(() => {
         if (!editor) return;
         if (!isMarkdownModeRef.current) {
-            // Visual → Code
+            // Visual → Code: 원본 JSON 저장 후 Markdown 직렬화
+            savedJsonRef.current = editor.getJSON();
             const md = editor.getMarkdown();
+            savedMarkdownRef.current = md;
             markdownContentRef.current = md;
             setMarkdownContent(md);
             isMarkdownModeRef.current = true;
             setIsMarkdownMode(true);
         } else {
-            // Code → Visual
-            editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
+            // Code → Visual: 변경 없으면 원본 JSON 복원, 변경 있으면 Markdown 파싱
+            if (markdownContentRef.current === savedMarkdownRef.current && savedJsonRef.current) {
+                editor.commands.setContent(savedJsonRef.current);
+            } else {
+                editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
+            }
             isMarkdownModeRef.current = false;
             setIsMarkdownMode(false);
         }
     }, [editor]);
 
+    const autoResizeTextarea = React.useCallback((el: HTMLTextAreaElement) => {
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    }, []);
+
     const handleMarkdownChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         markdownContentRef.current = e.target.value;
         setMarkdownContent(e.target.value);
-    }, []);
+        autoResizeTextarea(e.target);
+    }, [autoResizeTextarea]);
 
     React.useImperativeHandle(ref, () => ({
         getContent: () => {
             if (isMarkdownModeRef.current && editor) {
-                editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
+                if (markdownContentRef.current === savedMarkdownRef.current && savedJsonRef.current) {
+                    editor.commands.setContent(savedJsonRef.current);
+                } else {
+                    editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
+                }
             }
             return {
                 jsonContent: editor?.getJSON(),
