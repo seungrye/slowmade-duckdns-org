@@ -346,7 +346,9 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             if (markdownContentRef.current === savedMarkdownRef.current && savedJsonRef.current) {
                 editor.commands.setContent(savedJsonRef.current);
             } else {
-                editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
+                const md = markdownContentRef.current;
+                const normalized = md.endsWith('\n') ? md : md + '\n';
+                editor.commands.setContent(normalized, { contentType: 'markdown' });
             }
             isMarkdownModeRef.current = false;
             setIsMarkdownMode(false);
@@ -365,7 +367,9 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                 if (markdownContentRef.current === savedMarkdownRef.current && savedJsonRef.current) {
                     editor.commands.setContent(savedJsonRef.current);
                 } else {
-                    editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
+                    const md = markdownContentRef.current;
+                    const normalized = md.endsWith('\n') ? md : md + '\n';
+                    editor.commands.setContent(normalized, { contentType: 'markdown' });
                 }
             }
             return {

@@ -37,3 +37,17 @@ describe('editorExtensions', () => {
         expect(names).toContain('blockMath');
     });
 });
+
+// markdown 정규화 헬퍼 — Code→Visual 복귀 시 코드블록 닫는 ``` 파싱 오류 방지
+describe('markdown normalizeForParsing', () => {
+    const normalize = (md: string) => md.endsWith('\n') ? md : md + '\n';
+
+    it('개행으로 끝나지 않으면 개행을 추가한다', () => {
+        expect(normalize('```\ncode\n```')).toBe('```\ncode\n```\n');
+    });
+
+    it('이미 개행으로 끝나면 변경하지 않는다', () => {
+        expect(normalize('hello\n')).toBe('hello\n');
+    });
+});
+
