@@ -30,4 +30,10 @@ describe('editorExtensions', () => {
         const names = editorExtensions.map(e => e.name);
         expect(names).toContain('codeBlock');
     });
+
+    it('InlineMath, BlockMath 가 포함되어 있다', () => {
+        const names = editorExtensions.map(e => e.name);
+        expect(names).toContain('inlineMath');
+        expect(names).toContain('blockMath');
+    });
 });
