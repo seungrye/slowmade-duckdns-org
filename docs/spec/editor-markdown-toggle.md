@@ -30,3 +30,17 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 ## 변경 파일
 
 - `webapp/src/components/rich-web-editor/editor.tsx` — Markdown 익스텐션 추가 + 토글 UI
+
+---
+
+## 왕복 손실 방지 — Code 모드 무변경 시 원본 복원
+
+### 문제
+Visual → Code → Visual (아무것도 안 고침) 시 content 가 바뀜.  
+HTML → Markdown → HTML 변환이 손실 없는 왕복(round-trip)이 아니기 때문.
+
+### 해결
+- Visual → Code 진입 시 `editor.getJSON()` 으로 원본 상태 저장
+- Code → Visual 복귀 시:
+  - 마크다운 텍스트가 **변경 없음** → 저장된 JSON으로 `setContent` (원본 완전 복원)
+  - 마크다운 텍스트가 **변경됨** → `setContent(md, { contentType: 'markdown' })` 으로 파싱
