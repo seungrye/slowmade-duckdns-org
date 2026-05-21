@@ -125,3 +125,33 @@ GEMINI_API_KEY=<Google AI Studio에서 발급>
 
 `gemini-2.0-flash`는 Spark 플랜 무료 쿼터가 0이라 동작하지 않음.
 `gemini-flash-latest`로 변경하면 무료 쿼터 사용 가능.
+
+---
+
+## @ 멘션 자동완성
+
+댓글 입력창에서 `@`를 입력하면 드롭다운이 뜨고, 이름을 선택하면 자동 삽입된다.
+
+### 동작
+1. textarea에서 `@` 입력 → 드롭다운 표시
+2. `@` 뒤 텍스트로 목록 필터링 (대소문자 무시)
+3. 항목 클릭 또는 Enter/↑↓ 키 → `@이름 ` 삽입 후 드롭다운 닫힘
+4. Escape 또는 포커스 이탈 → 드롭다운 닫힘
+
+### 목록 구성
+- **@enji** — 항상 첫 번째
+- 현재 게시글 댓글 작성자 (중복 제거, isEnji 제외, isDeleted 제외)
+
+### 컴포넌트 변경
+
+#### `CommentInput`
+- `mentions?: string[]` prop 추가
+- `@` 감지 후 드롭다운 렌더링 (textarea 아래 absolute 위치)
+
+#### `comments.section.tsx`
+- `['enji', ...유니크댓글작성자]` 를 CommentInput에 전달
+
+### 키보드 지원
+- `↑` / `↓`: 항목 이동
+- `Enter`: 선택
+- `Escape`: 닫기
