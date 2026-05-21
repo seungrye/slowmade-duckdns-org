@@ -38,22 +38,38 @@ describe('editorExtensions', () => {
     });
 });
 
-// Markdown 익스텐션 커스텀 serializer 검증
-describe('Markdown serializer 설정', () => {
-    it('superscript serializer 가 <sup> 태그로 설정되어 있다', () => {
-        const md = editorExtensions.find(e => e.name === 'markdown');
+// renderMarkdown 커스텀 직렬화 검증 — <sup>/<sub>/<p style> 로 포맷 보존
+describe('renderMarkdown 커스텀 직렬화', () => {
+    const mockH = (children: string) => ({ renderChildren: () => children });
+
+    it('superscript 는 <sup> 태그로 직렬화된다', () => {
+        const ext = editorExtensions.find(e => e.name === 'superscript');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const config = (md as any)?.options?.serializer?.marks?.superscript;
-        expect(config?.open).toBe('<sup>');
-        expect(config?.close).toBe('</sup>');
+        const render = (ext as any)?.config?.renderMarkdown;
+        expect(render?.({ content: [] }, mockH('hello'))).toBe('<sup>hello</sup>');
     });
 
-    it('subscript serializer 가 <sub> 태그로 설정되어 있다', () => {
-        const md = editorExtensions.find(e => e.name === 'markdown');
+    it('subscript 는 <sub> 태그로 직렬화된다', () => {
+        const ext = editorExtensions.find(e => e.name === 'subscript');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const config = (md as any)?.options?.serializer?.marks?.subscript;
-        expect(config?.open).toBe('<sub>');
-        expect(config?.close).toBe('</sub>');
+        const render = (ext as any)?.config?.renderMarkdown;
+        expect(render?.({ content: [] }, mockH('hello'))).toBe('<sub>hello</sub>');
+    });
+
+    it('paragraph 에 textAlign 이 있으면 <p style> 로 직렬화된다', () => {
+        const ext = editorExtensions.find(e => e.name === 'paragraph');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const render = (ext as any)?.config?.renderMarkdown;
+        const result = render?.({ content: [{ type: 'text', text: 'hi' }], attrs: { textAlign: 'center' } }, mockH('hi'), {});
+        expect(result).toBe('<p style="text-align: center">hi</p>');
+    });
+
+    it('paragraph textAlign 이 left 면 일반 텍스트로 직렬화된다', () => {
+        const ext = editorExtensions.find(e => e.name === 'paragraph');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const render = (ext as any)?.config?.renderMarkdown;
+        const result = render?.({ content: [{ type: 'text', text: 'hi' }], attrs: { textAlign: 'left' } }, mockH('hi'), {});
+        expect(result).toBe('hi');
     });
 });
 
