@@ -39,6 +39,21 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 
 ## 빌드 오류 수정 — autoResizeTextarea 선언 순서 ✅
 
+---
+
+## 코드블록 닫는 ``` 파싱 오류 수정
+
+### 문제
+Code 모드에서 수정 후 Visual 로 복귀 시 문서 끝에 ``` 가 텍스트로 남는다.
+마크다운 코드블록 닫는 ``` 뒤에 개행이 없으면 파서가 코드블록 종료로 인식하지 못하기 때문.
+
+### 해결
+`setContent` 호출 전 markdown 문자열이 개행으로 끝나도록 보장.
+```typescript
+const md = content.endsWith('\n') ? content : content + '\n';
+editor.commands.setContent(md, { contentType: 'markdown' });
+```
+
 ### 문제
 Visual → Code → Visual (아무것도 안 고침) 시 content 가 바뀜.  
 HTML → Markdown → HTML 변환이 손실 없는 왕복(round-trip)이 아니기 때문.
