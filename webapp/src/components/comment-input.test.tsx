@@ -62,4 +62,43 @@ describe('CommentInput', () => {
     render(<CommentInput onSubmit={vi.fn()} disabled />);
     expect(screen.getByRole('button', { name: /post comment/i })).toBeDisabled();
   });
+
+  it('@를 입력하면 mentions 드롭다운이 표시된다', async () => {
+    render(<CommentInput onSubmit={vi.fn()} mentions={['alice', 'bob']} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: '@' } });
+    await waitFor(() => {
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      expect(screen.getByText('@enji')).toBeInTheDocument();
+      expect(screen.getByText('@alice')).toBeInTheDocument();
+    });
+  });
+
+  it('@뒤 텍스트로 목록을 필터링한다', async () => {
+    render(<CommentInput onSubmit={vi.fn()} mentions={['alice', 'bob']} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: '@al' } });
+    await waitFor(() => {
+      expect(screen.getByText('@alice')).toBeInTheDocument();
+      expect(screen.queryByText('@bob')).not.toBeInTheDocument();
+    });
+  });
+
+  it('항목 클릭 시 @이름이 textarea에 삽입된다', async () => {
+    render(<CommentInput onSubmit={vi.fn()} mentions={['alice']} />);
+    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: '@' } });
+    await waitFor(() => screen.getByText('@alice'));
+    fireEvent.mouseDown(screen.getByText('@alice'));
+    expect(textarea.value).toBe('@alice ');
+  });
+
+  it('Escape 키로 드롭다운을 닫는다', async () => {
+    render(<CommentInput onSubmit={vi.fn()} mentions={['alice']} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: '@' } });
+    await waitFor(() => screen.getByRole('listbox'));
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
 });

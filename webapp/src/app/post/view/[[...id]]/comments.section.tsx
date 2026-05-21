@@ -140,7 +140,15 @@ export default function Comments({ postId }: Props) {
         {renderComments(null)}
       </div>
 
-      <CommentInput onSubmit={handleTopLevelSubmit} disabled={submitting} />
+      <CommentInput
+        onSubmit={handleTopLevelSubmit}
+        disabled={submitting}
+        mentions={[...new Set(
+          comments
+            .filter(c => !c.isDeleted && !c.isEnji)
+            .map(c => c.author)
+        )]}
+      />
     </section>
   );
 }
