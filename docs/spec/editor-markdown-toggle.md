@@ -45,7 +45,7 @@ TaskList, Highlight 등 표준 GFM 노드는 `@tiptap/markdown`이 자동 처리
 
 ---
 
-## Code 모드에서 사용 불가 툴바 버튼 비활성화
+## Code 모드에서 사용 불가 툴바 버튼 비활성화 ✅
 
 ### 동작
 Code 모드 진입 시 Code/Visual 토글 버튼을 제외한 모든 툴바 버튼 비활성화.
@@ -56,6 +56,18 @@ Code 모드 진입 시 Code/Visual 토글 버튼을 제외한 모든 툴바 버�
 ### 구현
 `MainToolbarContent` 에서 토글 버튼 ToolbarGroup을 제외한 나머지를 `<div>` 로 감싸고,
 `isMarkdownMode` 일 때 disabled 스타일 적용. 개별 컴포넌트 수정 없이 CSS로 처리.
+
+---
+
+## superscript / subscript 포맷 보존 ✅
+
+### 문제
+Visual 모드에서 sup/sub 적용 후 Code 모드로 전환 시 Markdown 포맷이 없어 포맷이 날아감.
+
+### 해결
+`Markdown.configure({ serializer: { marks: { superscript, subscript } } })` 로
+커스텀 serializer 등록 → `<sup>`, `<sub>` 인라인 HTML로 직렬화.
+Markdown 파서는 인라인 HTML을 그대로 처리하므로 왕복 손실 없음.
 
 ### 문제
 Code 모드에서 수정 후 Visual 로 복귀 시 문서 끝에 ``` 가 텍스트로 남는다.
