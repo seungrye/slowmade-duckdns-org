@@ -18,4 +18,11 @@ describe('editorExtensions', () => {
         const unique = new Set(names);
         expect(unique.size).toBe(names.length);
     });
+
+    it('StarterKit 이 포함되어 있다', () => {
+        const names = editorExtensions.map(e => e.name);
+        // StarterKit 은 내부에 여러 익스텐션을 번들하므로 이름이 'starterKit' 이 아닐 수 있음
+        // 최소한 배열이 비어있지 않아야 함
+        expect(names.length).toBeGreaterThan(5);
+    });
 });

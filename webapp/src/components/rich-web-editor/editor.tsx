@@ -327,7 +327,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
             setIsMarkdownMode(true);
         } else {
             // Code → Visual
-            editor.commands.setContent(markdownContentRef.current, false, { contentType: 'markdown' });
+            editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
             isMarkdownModeRef.current = false;
             setIsMarkdownMode(false);
         }
@@ -341,7 +341,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     React.useImperativeHandle(ref, () => ({
         getContent: () => {
             if (isMarkdownModeRef.current && editor) {
-                editor.commands.setContent(markdownContentRef.current, false, { contentType: 'markdown' });
+                editor.commands.setContent(markdownContentRef.current, { contentType: 'markdown' });
             }
             return {
                 jsonContent: editor?.getJSON(),
