@@ -75,3 +75,9 @@ export interface QuestStructError {
 - `ron.test.ts`: `Always` 조건 → `And([])` 직렬화 검증
 - `quest-validation.test.ts`: 각 구조 에러 케이스 검증 (5종)
 - export route test: `structErrors` 있을 때 400 반환 검증
+
+## 테스트 픽스처 수정
+
+`export/route.test.ts` 의 `baseQuest.phases` 가 빈 객체였으나,
+`validateQuestStructure` 가 추가된 후 `initialPhase: 'phase_start'` 가
+phases 에 없어 400 을 반환. 픽스처에 `phase_start` 페이즈 추가.
