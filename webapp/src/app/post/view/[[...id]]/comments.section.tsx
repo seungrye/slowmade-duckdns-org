@@ -129,7 +129,7 @@ export default function Comments({ postId }: Props) {
         onSubmit={handleTopLevelSubmit}
         disabled={submitting}
         mentions={[
-          ...(session ? ['enji'] : []),
+          ...(session ? ['enji-bot'] : []),
           ...new Set(
             comments
               .filter(c => !c.isDeleted && !c.isEnji && c.authorId != null)

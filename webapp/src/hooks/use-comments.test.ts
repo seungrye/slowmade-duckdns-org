@@ -125,7 +125,7 @@ describe('useComments', () => {
       expect(body.postId).toBe('post1');
     });
 
-    it('@enji 포함 댓글은 /api/enji로 제출한다', async () => {
+    it('@enji-bot 포함 댓글은 /api/enji로 제출한다', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true, data: { userComment: { _id: 'uc1' } } }),
@@ -135,14 +135,14 @@ describe('useComments', () => {
 
       let ok: boolean;
       await act(async () => {
-        ok = await result.current.submitComment(null, '@enji 안녕!');
+        ok = await result.current.submitComment(null, '@enji-bot 안녕!');
       });
 
       expect(ok!).toBe(true);
       expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
     });
 
-    it('parentIsEnji=true면 @enji 없어도 /api/enji로 제출한다', async () => {
+    it('parentIsEnji=true면 @enji-bot 없어도 /api/enji로 제출한다', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ data: { userComment: { _id: 'uc1' } } }),
@@ -159,7 +159,7 @@ describe('useComments', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
     });
 
-    it('@enji 제출 후 enjiComment 없으면 폴링하여 댓글 업데이트', async () => {
+    it('@enji-bot 제출 후 enjiComment 없으면 폴링하여 댓글 업데이트', async () => {
       vi.useFakeTimers();
 
       mockFetch.mockResolvedValueOnce({
@@ -173,7 +173,7 @@ describe('useComments', () => {
 
       const { result } = renderHook(() => useComments('post1'));
 
-      await act(async () => { await result.current.submitComment(null, '@enji 안녕!'); });
+      await act(async () => { await result.current.submitComment(null, '@enji-bot 안녕!'); });
       await act(async () => { await vi.advanceTimersByTimeAsync(2100); });
 
       expect(result.current.comments).toContain(enjiComment);

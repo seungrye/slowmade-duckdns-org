@@ -9,7 +9,7 @@ import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
 import { nanoid } from 'nanoid';
 
-const ENJI_SYSTEM_PROMPT = `당신은 "enji"입니다. 유머 콘텐츠 사이트의 AI 비서입니다.
+const ENJI_SYSTEM_PROMPT = `당신은 "enji-bot"입니다. 유머 콘텐츠 사이트의 AI 비서입니다.
 - 친근하고 유쾌한 말투로 한국어로 답변합니다.
 - 게시글과 댓글 컨텍스트를 참고하여 답변합니다.
 - 간결하게 (3~5문장 이내) 답변합니다.
@@ -41,7 +41,7 @@ async function saveEnjiComment(postId: string, parentId: string, text: string) {
     post: postId,
     parent: parentId,
     content: text,
-    author: 'enji',
+    author: 'enji-bot',
     authorId: null,
     isEnji: true,
   });
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     .join('\n');
 
   const postText = stripHtml(post.htmlContent).slice(0, 3000);
-  const query = content.replace(/@enji/gi, '').trim() || '안녕하세요!';
+  const query = content.replace(/@enji-bot/gi, '').trim() || '안녕하세요!';
   const contextMessage = `[게시글 제목]: ${post.title}\n[게시글 내용]: ${postText}\n[최근 댓글]:\n${commentContext}\n\n[사용자 질문]: ${query}`;
 
   void callGemini(contextMessage)

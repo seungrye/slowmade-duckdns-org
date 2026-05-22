@@ -76,7 +76,7 @@ describe('/api/enji POST', () => {
 
   it('미로그인 사용자면 401 반환', async () => {
     mockAuth.mockResolvedValueOnce(null);
-    const res = await POST(makeRequest({ postId: 'post-id', content: '@enji 테스트' }));
+    const res = await POST(makeRequest({ postId: 'post-id', content: '@enji-bot 테스트' }));
     expect(res.status).toBe(401);
     const json = await res.json();
     expect(json.message).toMatch(/로그인/);
@@ -88,14 +88,14 @@ describe('/api/enji POST', () => {
   });
 
   it('postId 없으면 400 반환', async () => {
-    const res = await POST(makeRequest({ content: '@enji 안녕' }));
+    const res = await POST(makeRequest({ content: '@enji-bot 안녕' }));
     expect(res.status).toBe(400);
   });
 
   it('허용되지 않은 origin이면 403 반환', async () => {
     const req = new NextRequest('http://localhost/api/enji', {
       method: 'POST',
-      body: JSON.stringify({ postId: 'post-id', content: '@enji 테스트' }),
+      body: JSON.stringify({ postId: 'post-id', content: '@enji-bot 테스트' }),
       headers: {
         'Content-Type': 'application/json',
         'origin': 'https://attacker.com',
@@ -110,7 +110,7 @@ describe('/api/enji POST', () => {
 
     const res = await POST(makeRequest({
       postId: 'post-id',
-      content: '@enji 이 글 요약해줘',
+      content: '@enji-bot 이 글 요약해줘',
       anonid: 'test1234',
     }));
 
@@ -128,7 +128,7 @@ describe('/api/enji POST', () => {
 
     const resPromise = POST(makeRequest({
       postId: 'post-id',
-      content: '@enji 테스트',
+      content: '@enji-bot 테스트',
       anonid: 'test1234',
     }));
 

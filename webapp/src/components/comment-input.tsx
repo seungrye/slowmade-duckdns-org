@@ -119,7 +119,7 @@ export default function CommentInput({
                 }`}
                 onMouseDown={(e) => { e.preventDefault(); insertMention(name); }}
               >
-                {name === 'enji' && <span>✨</span>}
+                {name === 'enji-bot' && <span>✨</span>}
                 <span>@{name}</span>
               </li>
             ))}
