@@ -3,7 +3,7 @@ import { connectToDB } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import Quest from "@/models/quest";
 import QuestRevision from "@/models/quest-revision";
-import { validateQuestRefs } from "@/lib/quest-validation";
+import { validateQuestRefs, validateQuestStructure } from "@/lib/quest-validation";
 import { loadCatalogSets } from "@/lib/catalog-sets";
 import type { QuestDef } from "@/types/quest";
 
@@ -85,6 +85,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     catalogs,
   );
 
+  const questDefForValidation: QuestDef = {
+    id: quest.id,
+    title: quest.title,
+    giverNpc: quest.giverNpc,
+    initialPhase: quest.initialPhase,
+    phases: phasesObj,
+    spawns: quest.spawns as QuestDef["spawns"],
+  };
+  const structErrors = validateQuestStructure(questDefForValidation);
+
   return NextResponse.json({
     success: true,
     data: {
@@ -92,5 +102,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
       phases: phasesObj,
     },
     warnings,
+    structErrors,
   });
 }

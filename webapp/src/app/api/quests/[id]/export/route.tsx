@@ -3,6 +3,7 @@ import { connectToDB } from "@/lib/db";
 import { apiError } from "@/lib/api-response";
 import Quest from "@/models/quest";
 import { serializeRon } from "@/lib/ron";
+import { validateQuestStructure } from "@/lib/quest-validation";
 import type { QuestDef } from "@/types/quest";
 
 type Params = { params: Promise<{ id: string }> };
@@ -24,6 +25,11 @@ export async function GET(_req: NextRequest, { params }: Params) {
     ) as QuestDef["phases"],
     spawns: (quest.spawns as QuestDef["spawns"]) ?? [],
   };
+
+  const structErrors = validateQuestStructure(def);
+  if (structErrors.length > 0) {
+    return apiError(`구조 오류로 export 불가:\n${structErrors.map(e => `  ${e.path}: ${e.message}`).join("\n")}`, 400);
+  }
 
   const ron = serializeRon(def);
   const encodedFilename = encodeURIComponent(`${def.id}.ron`);

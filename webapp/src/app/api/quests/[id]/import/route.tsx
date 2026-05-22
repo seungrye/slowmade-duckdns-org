@@ -4,7 +4,7 @@ import { apiError } from "@/lib/api-response";
 import Quest from "@/models/quest";
 import QuestRevision from "@/models/quest-revision";
 import { parseRon } from "@/lib/ron";
-import { validateQuestRefs } from "@/lib/quest-validation";
+import { validateQuestRefs, validateQuestStructure } from "@/lib/quest-validation";
 import { loadCatalogSets } from "@/lib/catalog-sets";
 import type { QuestDef } from "@/types/quest";
 
@@ -23,6 +23,11 @@ export async function POST(req: NextRequest, { params }: Params) {
     def = parseRon(body);
   } catch (e) {
     return apiError(`RON 파싱 오류: ${(e as Error).message}`, 400);
+  }
+
+  const structErrors = validateQuestStructure(def);
+  if (structErrors.length > 0) {
+    return apiError(`구조 오류로 import 불가:\n${structErrors.map(e => `  ${e.path}: ${e.message}`).join("\n")}`, 400);
   }
 
   // 현재 버전 revision 백업

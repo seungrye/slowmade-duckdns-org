@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateQuestRefs, type CatalogSets } from "./quest-validation";
+import { validateQuestRefs, validateQuestStructure, type CatalogSets } from "./quest-validation";
 import type { QuestDef } from "@/types/quest";
 
 const empty: CatalogSets = {
@@ -334,5 +334,115 @@ describe("validateQuestRefs — 정상 퀘스트 (모든 참조 등록)", () => 
       ],
     });
     expect(validateQuestRefs(q, full)).toEqual([]);
+  });
+});
+
+// ── validateQuestStructure ────────────────────────────────────────────────────
+
+function makeQuest(overrides: Partial<QuestDef> = {}): QuestDef {
+  return {
+    id: "q", title: "q", giverNpc: "", initialPhase: "a",
+    phases: {
+      a: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+      b: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+    },
+    spawns: [],
+    ...overrides,
+  };
+}
+
+describe("validateQuestStructure — initialPhase 검증", () => {
+  it("initialPhase 가 phases 에 없으면 오류", () => {
+    const errors = validateQuestStructure(makeQuest({ initialPhase: "missing" }));
+    expect(errors.some(e => e.path === "initialPhase")).toBe(true);
+  });
+
+  it("initialPhase 가 phases 에 있으면 통과", () => {
+    const errors = validateQuestStructure(makeQuest({ initialPhase: "a" }));
+    expect(errors).toEqual([]);
+  });
+});
+
+describe("validateQuestStructure — AdvancePhase 타겟 검증", () => {
+  it("AdvancePhase 가 없는 phase 를 참조하면 오류", () => {
+    const q = makeQuest();
+    q.phases.a.on_interact = [{ type: "AdvancePhase", phaseId: "nonexistent" }];
+    const errors = validateQuestStructure(q);
+    expect(errors.some(e => e.message.includes("nonexistent"))).toBe(true);
+  });
+
+  it("Branch 내부 AdvancePhase 도 재귀 검증", () => {
+    const q = makeQuest();
+    q.phases.a.on_interact = [{
+      type: "Branch",
+      condition: { type: "Always" },
+      ifTrue: [{ type: "AdvancePhase", phaseId: "ghost" }],
+      ifFalse: [],
+    }];
+    const errors = validateQuestStructure(q);
+    expect(errors.some(e => e.message.includes("ghost"))).toBe(true);
+  });
+
+  it("존재하는 phase 로 AdvancePhase 는 통과", () => {
+    const q = makeQuest();
+    q.phases.a.on_interact = [{ type: "AdvancePhase", phaseId: "b" }];
+    expect(validateQuestStructure(q)).toEqual([]);
+  });
+});
+
+describe("validateQuestStructure — auto_advance nextPhase 검증", () => {
+  it("nextPhase 가 없는 phase 이면 오류", () => {
+    const q = makeQuest();
+    q.phases.a.auto_advance = [{ condition: { type: "HasFlag", flag: "x" }, nextPhase: "nowhere" }];
+    const errors = validateQuestStructure(q);
+    expect(errors.some(e => e.message.includes("nowhere"))).toBe(true);
+  });
+
+  it("nextPhase 가 존재하면 통과", () => {
+    const q = makeQuest();
+    q.phases.a.auto_advance = [{ condition: { type: "HasFlag", flag: "x" }, nextPhase: "b" }];
+    expect(validateQuestStructure(q)).toEqual([]);
+  });
+});
+
+describe("validateQuestStructure — auto_advance actions 타입 제한", () => {
+  it("허용되지 않는 액션(GiveItem)이 있으면 오류", () => {
+    const q = makeQuest();
+    q.phases.a.auto_advance = [{
+      condition: { type: "HasFlag", flag: "x" },
+      nextPhase: "b",
+      actions: [{ type: "GiveItem", itemId: "sword" }],
+    }];
+    const errors = validateQuestStructure(q);
+    expect(errors.some(e => e.message.includes("GiveItem"))).toBe(true);
+  });
+
+  it("허용된 액션(DespawnWorldItem/RemoveItem/SetFlag)은 통과", () => {
+    const q = makeQuest();
+    q.phases.a.auto_advance = [{
+      condition: { type: "HasFlag", flag: "x" },
+      nextPhase: "b",
+      actions: [
+        { type: "DespawnWorldItem", itemId: "i" },
+        { type: "RemoveItem", itemId: "i" },
+        { type: "SetFlag", flag: "f", value: "v" },
+      ],
+    }];
+    expect(validateQuestStructure(q)).toEqual([]);
+  });
+});
+
+describe("validateQuestStructure — spawns phase 검증", () => {
+  it("spawn phase 가 없으면 오류", () => {
+    const q = makeQuest();
+    q.spawns = [{ phase: "phantom", item: "gem", zone: { type: "Town" } }];
+    const errors = validateQuestStructure(q);
+    expect(errors.some(e => e.message.includes("phantom"))).toBe(true);
+  });
+
+  it("spawn phase 가 존재하면 통과", () => {
+    const q = makeQuest();
+    q.spawns = [{ phase: "a", item: "gem", zone: { type: "Town" } }];
+    expect(validateQuestStructure(q)).toEqual([]);
   });
 });

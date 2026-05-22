@@ -1,5 +1,59 @@
 import type { Action, Condition, QuestDef, QuestPhaseDef, QuestSpawn } from "@/types/quest";
 
+// ── 구조적 검증 (Rust validate_quest_def 와 동일 기준) ───────────────────────
+
+export interface QuestStructError {
+  path: string;
+  message: string;
+}
+
+const ALLOWED_AUTO_ADVANCE_ACTIONS = new Set(["DespawnWorldItem", "RemoveItem", "SetFlag"]);
+
+export function validateQuestStructure(quest: QuestDef): QuestStructError[] {
+  const out: QuestStructError[] = [];
+  const phaseKeys = new Set(Object.keys(quest.phases ?? {}));
+
+  if (quest.initialPhase && !phaseKeys.has(quest.initialPhase)) {
+    out.push({ path: "initialPhase", message: `initialPhase "${quest.initialPhase}" 이 phases 에 없습니다` });
+  }
+
+  for (const [phaseId, phase] of Object.entries(quest.phases ?? {})) {
+    const base = `phases.${phaseId}`;
+    (phase.on_interact ?? []).forEach((a, i) => {
+      checkActionPhaseRefs(a, `${base}.on_interact[${i}]`, phaseKeys, out);
+    });
+    (phase.auto_advance ?? []).forEach((aa, i) => {
+      const aaPath = `${base}.auto_advance[${i}]`;
+      if (aa.nextPhase && !phaseKeys.has(aa.nextPhase)) {
+        out.push({ path: `${aaPath}.nextPhase`, message: `next_phase "${aa.nextPhase}" 이 phases 에 없습니다` });
+      }
+      (aa.actions ?? []).forEach((a, j) => {
+        if (!ALLOWED_AUTO_ADVANCE_ACTIONS.has(a.type)) {
+          out.push({ path: `${aaPath}.actions[${j}]`, message: `auto_advance 에서 "${a.type}" 은 지원하지 않습니다 (DespawnWorldItem / RemoveItem / SetFlag 만 가능)` });
+        }
+      });
+    });
+  }
+
+  (quest.spawns ?? []).forEach((s, i) => {
+    if (s.phase && !phaseKeys.has(s.phase)) {
+      out.push({ path: `spawns[${i}].phase`, message: `spawn phase "${s.phase}" 이 phases 에 없습니다` });
+    }
+  });
+
+  return out;
+}
+
+function checkActionPhaseRefs(action: Action, path: string, phaseKeys: Set<string>, out: QuestStructError[]) {
+  if (action.type === "AdvancePhase" && action.phaseId && !phaseKeys.has(action.phaseId)) {
+    out.push({ path: `${path}.phaseId`, message: `AdvancePhase "${action.phaseId}" 이 phases 에 없습니다` });
+  }
+  if (action.type === "Branch") {
+    action.ifTrue.forEach((a, i) => checkActionPhaseRefs(a, `${path}.ifTrue[${i}]`, phaseKeys, out));
+    action.ifFalse.forEach((a, i) => checkActionPhaseRefs(a, `${path}.ifFalse[${i}]`, phaseKeys, out));
+  }
+}
+
 export interface QuestRefWarning {
   path: string;
   kind: "villager" | "item" | "zone";

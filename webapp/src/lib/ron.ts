@@ -728,7 +728,7 @@ function q(s: string) { return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')
 
 function serializeCondition(cond: Condition): string {
   switch (cond.type) {
-    case "Always":  return "Always";
+    case "Always":  return "And([])";
     case "FlagIs":  return `FlagIs(flag: ${q(cond.flag)}, value: ${q(cond.value)})`;
     case "HasFlag": return `HasFlag(${q(cond.flag)})`;
     case "HasItem": return `HasItem(${q(cond.itemId)})`;

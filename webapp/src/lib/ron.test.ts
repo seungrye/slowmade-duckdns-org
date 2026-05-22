@@ -452,6 +452,33 @@ describe("serializeRon — 신규 변형 라운드트립", () => {
   });
 });
 
+describe("serializeRon — Always 조건", () => {
+  it("Always 조건은 And([]) 로 직렬화되어 Rust가 파싱 가능한 형태를 출력한다", () => {
+    const quest: QuestDef = {
+      id: "t", title: "t", giverNpc: "", initialPhase: "a",
+      phases: {
+        a: {
+          dialog: [],
+          on_interact: [
+            {
+              type: "Branch",
+              condition: { type: "Always" },
+              ifTrue: [{ type: "Log", text: "yes" }],
+              ifFalse: [],
+            },
+          ],
+          auto_advance: [{ condition: { type: "Always" }, nextPhase: "a" }],
+          objective: null,
+        },
+      },
+      spawns: [],
+    };
+    const ron = serializeRon(quest);
+    expect(ron).toContain("And([])");
+    expect(ron).not.toContain("Always");
+  });
+});
+
 describe("parseVillagersRon — 기본", () => {
   const SIMPLE = `[
     VillagerDef(
