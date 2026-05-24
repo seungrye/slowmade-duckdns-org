@@ -18,3 +18,6 @@ node_modules/
 tsconfig.tsbuildinfo
 next-env.d.ts
 coverage/
+
+# 포트별 next 빌드 캐시
+.next-*/

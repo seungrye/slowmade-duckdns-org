@@ -59,6 +59,39 @@ describe('ActionEditor — ClosePortal', () => {
   });
 });
 
+describe('ActionEditor — SpawnGuards', () => {
+  it('SpawnGuards 액션의 count(number) 입력이 렌더된다', () => {
+    render(
+      <ActionEditor
+        actions={[{ type: 'SpawnGuards', count: 6 }]}
+        onChange={noop}
+      />
+    );
+    const counts = screen.getAllByRole('spinbutton');
+    expect(counts.some((el) => (el as HTMLInputElement).value === '6')).toBe(true);
+  });
+
+  it('count 변경 시 onChange 가 갱신된 액션을 전달한다', () => {
+    const fn = vi.fn();
+    render(
+      <ActionEditor
+        actions={[{ type: 'SpawnGuards', count: 1 }]}
+        onChange={fn}
+      />
+    );
+    const input = screen.getByPlaceholderText('경비병 수') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '4' } });
+    expect(fn).toHaveBeenCalledWith([{ type: 'SpawnGuards', count: 4 }]);
+  });
+
+  it('타입 select 에 SpawnGuards 옵션이 있다', () => {
+    render(<ActionEditor actions={[{ type: 'Log', text: '' }]} onChange={noop} />);
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toContain('SpawnGuards');
+  });
+});
+
 describe('ActionEditor — 액션 타입에 AdvancePhase/Branch 없음', () => {
   it('타입 select 에 AdvancePhase / Branch 옵션이 없다', () => {
     render(<ActionEditor actions={[{ type: 'Log', text: '' }]} onChange={noop} />);

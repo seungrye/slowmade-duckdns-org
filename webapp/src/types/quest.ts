@@ -31,7 +31,8 @@ export type Action =
   | { type: "KillNpc"; npcId: string }
   | { type: "DespawnWorldItem"; itemId: string }
   | { type: "OpenPortal"; zone: string; generator: string; placement?: PortalPlacement }
-  | { type: "ClosePortal"; zone: string };
+  | { type: "ClosePortal"; zone: string }
+  | { type: "SpawnGuards"; count: number };
 
 // ── 상태 전환 ─────────────────────────────────────────────────────────────
 

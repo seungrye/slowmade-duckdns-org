@@ -463,6 +463,17 @@ class Parser {
         this.expectPunct(")");
         return { type: "ClosePortal", zone };
       }
+      case "SpawnGuards": {
+        let count = 1;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "count") count = this.parseNumber();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        return { type: "SpawnGuards", count };
+      }
       default:
         throw new Error(`Unknown action: ${name}`);
     }
@@ -767,6 +778,7 @@ function serializeAction(action: Action, depth: number): string {
       return `${i}OpenPortal(${parts.join(", ")})`;
     }
     case "ClosePortal":      return `${i}ClosePortal(${q(action.zone)})`;
+    case "SpawnGuards":      return `${i}SpawnGuards(count: ${action.count})`;
   }
 }
 

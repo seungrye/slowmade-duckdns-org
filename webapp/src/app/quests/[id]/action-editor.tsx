@@ -30,6 +30,7 @@ function emptyAction(type: Action["type"]): Action {
     case "DespawnWorldItem": return { type, itemId: "" };
     case "OpenPortal":       return { type, zone: "", generator: "" };
     case "ClosePortal":      return { type, zone: "" };
+    case "SpawnGuards":      return { type, count: 1 };
   }
 }
 
@@ -88,6 +89,7 @@ function ActionRow({
           <option value="DespawnWorldItem">DespawnWorldItem</option>
           <option value="OpenPortal">OpenPortal (Named 존)</option>
           <option value="ClosePortal">ClosePortal</option>
+          <option value="SpawnGuards">SpawnGuards (경비병 스폰)</option>
         </select>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
           ✕
@@ -228,6 +230,17 @@ function ActionRow({
           value={action.zone}
           onChange={(e) => onChange({ ...action, zone: e.target.value })}
           placeholder="존 ID"
+          className={inputCls}
+        />
+      )}
+
+      {action.type === "SpawnGuards" && (
+        <input
+          type="number"
+          min={1}
+          value={action.count}
+          onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+          placeholder="경비병 수"
           className={inputCls}
         />
       )}

@@ -339,6 +339,11 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
     expect(quest.transitions[0].actions[0]).toEqual({ type: "ClosePortal", zone: "cave" });
   });
 
+  it("SpawnGuards 액션 파싱 (count 필드)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[SpawnGuards(count:6)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "SpawnGuards", count: 6 });
+  });
+
   it("InZone(Town) / InZone(Named) when 파싱", () => {
     const quest = parseRon(wrap(
       `Transition(from:"a",trigger:Auto,when:InZone(Town),to:"b"),Transition(from:"a",trigger:Auto,when:InZone(Named("herb_glade")),to:"b")`
@@ -399,6 +404,30 @@ describe("serializeRon — 신규 변형 라운드트립", () => {
       ],
     };
     const reparsed = parseRon(serializeRon(quest));
+    expect(reparsed).toEqual(quest);
+  });
+});
+
+describe("serializeRon — SpawnGuards 라운드트립", () => {
+  it("SpawnGuards(count: N) 직렬화 후 재파싱하면 동일 구조 반환", () => {
+    const quest: QuestDef = {
+      id: "guard_quest", title: "잠입", giverNpc: "n", initialPhase: "a",
+      phases: {
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "a", trigger: "Interact",
+          actions: [{ type: "SpawnGuards", count: 6 }],
+          to: "b",
+        },
+      ],
+      spawns: [],
+    };
+    const ron = serializeRon(quest);
+    expect(ron).toContain("SpawnGuards(count: 6)");
+    const reparsed = parseRon(ron);
     expect(reparsed).toEqual(quest);
   });
 });
