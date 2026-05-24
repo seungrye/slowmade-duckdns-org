@@ -11,6 +11,7 @@ import type {
 } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
 import type { ItemDef, ConsumableEffect, WeaponElement } from "@/types/item";
+import type { MonsterDef, MonsterElement } from "@/types/monster";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tokenizer
@@ -292,6 +293,80 @@ class Parser {
     }
     this.expectPunct(")");
     return def;
+  }
+
+  // ── MonsterDef ─────────────────────────────────────────────────────────────
+
+  parseMonsterDef(): MonsterDef {
+    const name = this.parseIdent();
+    if (name !== "MonsterDef") throw new Error(`Expected MonsterDef, got ${name}`);
+    this.expectPunct("(");
+
+    const def: MonsterDef = {
+      id: "",
+      displayName: "",
+      glyph: "",
+      color: [0, 0, 0],
+      hp: 0,
+      attack: 0,
+      defense: 0,
+      visionRadius: 0,
+      speed: 1.0,
+      element: null,
+      spawnWeight: 1.0,
+      zones: [],
+      questOnly: false,
+    };
+
+    while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+      const key = this.parseIdent();
+      this.expectPunct(":");
+      switch (key) {
+        case "id":             def.id           = this.parseString(); break;
+        case "display_name":   def.displayName  = this.parseString(); break;
+        case "glyph":          def.glyph        = this.parseString(); break;
+        case "color":          def.color        = this.parseNumberTuple3(); break;
+        case "hp":             def.hp           = this.parseNumber(); break;
+        case "attack":         def.attack       = this.parseNumber(); break;
+        case "defense":        def.defense      = this.parseNumber(); break;
+        case "vision_radius":  def.visionRadius = this.parseNumber(); break;
+        case "speed":          def.speed        = this.parseNumber(); break;
+        case "element":        def.element      = this.parseMonsterElement(); break;
+        case "spawn_weight":   def.spawnWeight  = this.parseNumber(); break;
+        case "zones":          def.zones        = this.parseArray(() => this.parseSpawnZone()); break;
+        case "spawn_condition": {
+          const c = this.parseOptionCondition();
+          if (c !== undefined) def.spawnCondition = c;
+          break;
+        }
+        case "quest_only":     def.questOnly    = this.parseBool(); break;
+        default: break;
+      }
+      this.tryPunct(",");
+    }
+    this.expectPunct(")");
+    return def;
+  }
+
+  /** Some("fire") | None — 몬스터 원소 (poison 포함). */
+  parseMonsterElement(): MonsterElement | null {
+    const peek = this.parseIdent();
+    if (peek === "None") return null;
+    if (peek !== "Some") throw new Error(`Expected Some/None for element, got ${peek}`);
+    this.expectPunct("(");
+    const v = this.parseString();
+    this.expectPunct(")");
+    if (v !== "fire" && v !== "ice" && v !== "poison" && v !== "lightning") {
+      throw new Error(`Unknown monster element: ${v}`);
+    }
+    return v;
+  }
+
+  parseBool(): boolean {
+    const v = this.parseIdent();
+    if (v === "true") return true;
+    if (v === "false") return false;
+    throw new Error(`Expected bool, got ${v}`);
   }
 
   parseArray<T>(parseItem: () => T): T[] {
@@ -729,6 +804,11 @@ export function parseConsumablesRon(src: string): Extract<ItemDef, { kind: "cons
   return parser.parseArray(() => parser.parseConsumableDef());
 }
 
+export function parseMonstersRon(src: string): MonsterDef[] {
+  const parser = new Parser(tokenize(src));
+  return parser.parseArray(() => parser.parseMonsterDef());
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Serializer
 // ─────────────────────────────────────────────────────────────────────────────
@@ -871,6 +951,44 @@ export function serializeVillagersRon(villagers: VillagerDef[]): string {
   if (villagers.length === 0) return "[]\n";
   const lines = ["["];
   for (const v of villagers) lines.push(serializeVillagerDef(v));
+  lines.push("]");
+  return lines.join("\n") + "\n";
+}
+
+// ── Monster serializer ───────────────────────────────────────────────────────
+
+function serializeMonsterDef(m: MonsterDef): string {
+  const lines: string[] = [];
+  lines.push(`    MonsterDef(`);
+  lines.push(`        id: ${q(m.id)},`);
+  lines.push(`        display_name: ${q(m.displayName)},`);
+  lines.push(`        glyph: ${q(m.glyph)},`);
+  lines.push(`        color: (${m.color[0]}, ${m.color[1]}, ${m.color[2]}),`);
+  lines.push(`        hp: ${m.hp},`);
+  lines.push(`        attack: ${m.attack},`);
+  lines.push(`        defense: ${m.defense},`);
+  lines.push(`        vision_radius: ${m.visionRadius},`);
+  lines.push(`        speed: ${m.speed},`);
+  lines.push(`        element: ${m.element == null ? "None" : `Some(${q(m.element)})`},`);
+  lines.push(`        spawn_weight: ${m.spawnWeight},`);
+  if (m.zones.length === 0) {
+    lines.push(`        zones: [],`);
+  } else {
+    lines.push(`        zones: [${m.zones.map(serializeZone).join(", ")}],`);
+  }
+  const cond = m.spawnCondition === undefined
+    ? "None"
+    : `Some(${serializeCondition(m.spawnCondition)})`;
+  lines.push(`        spawn_condition: ${cond},`);
+  lines.push(`        quest_only: ${m.questOnly},`);
+  lines.push(`    ),`);
+  return lines.join("\n");
+}
+
+export function serializeMonstersRon(monsters: MonsterDef[]): string {
+  if (monsters.length === 0) return "[]\n";
+  const lines = ["["];
+  for (const m of monsters) lines.push(serializeMonsterDef(m));
   lines.push("]");
   return lines.join("\n") + "\n";
 }

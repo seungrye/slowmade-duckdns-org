@@ -20,6 +20,7 @@ import {
     Users,
     Package,
     MapPin,
+    Skull,
 } from "lucide-react";
 
 const navLinks = [
@@ -36,6 +37,7 @@ const myPageLinks = [
     { href: "/quests/villagers", label: "Villager 카탈로그", description: "NPC 정의 관리", icon: <Users size={20} /> },
     { href: "/quests/items", label: "Item 카탈로그", description: "아이템 정의 관리", icon: <Package size={20} /> },
     { href: "/quests/zones", label: "Zone 카탈로그", description: "Named 존 정의 관리", icon: <MapPin size={20} /> },
+    { href: "/quests/monsters", label: "Monster 카탈로그", description: "몬스터 정의 관리", icon: <Skull size={20} /> },
 ];
 
 export default function Navbar() {

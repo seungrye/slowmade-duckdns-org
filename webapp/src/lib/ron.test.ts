@@ -6,9 +6,11 @@ import {
   parseWeaponsRon, serializeWeaponsRon,
   parseArmorsRon, serializeArmorsRon,
   parseConsumablesRon, serializeConsumablesRon,
+  parseMonstersRon, serializeMonstersRon,
 } from "./ron";
 import type { QuestDef } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
+import type { MonsterDef } from "@/types/monster";
 
 const SIMPLE_RON = `
 #![enable(implicit_some)]
@@ -644,6 +646,170 @@ describe("parse/serialize ConsumablesRon", () => {
   it("Heal 외 effect 는 throw", () => {
     const bad = `[ConsumableDef(id:"x",display_name:"",glyph_ascii:"",glyph_unicode:"",glyph_game_icon:"",pickup_message:"",effect:Burn(3))]`;
     expect(() => parseConsumablesRon(bad)).toThrow(/Unknown consumable effect/);
+  });
+});
+
+describe("parse/serialize MonstersRon — 기본 (실제 monsters.ron 형식)", () => {
+  // bevy-rogue 의 assets/monsters/monsters.ron 미러
+  const SRC = `[
+    MonsterDef(
+        id: "goblin",
+        display_name: "고블린",
+        glyph: "g",
+        color: (0.2, 0.8, 0.2),
+        hp: 6,
+        attack: 3,
+        defense: 0,
+        vision_radius: 6,
+        speed: 1.5,
+        element: Some("poison"),
+        spawn_weight: 1.0,
+        zones: [],
+        spawn_condition: None,
+        quest_only: false,
+    ),
+    MonsterDef(
+        id: "orc",
+        display_name: "오크",
+        glyph: "O",
+        color: (0.9, 0.5, 0.1),
+        hp: 10,
+        attack: 5,
+        defense: 2,
+        vision_radius: 8,
+        speed: 1.0,
+        element: Some("fire"),
+        spawn_weight: 1.0,
+        zones: [],
+        spawn_condition: None,
+        quest_only: false,
+    ),
+]`;
+
+  it("MonsterDef 2개 파싱", () => {
+    const monsters = parseMonstersRon(SRC);
+    expect(monsters).toHaveLength(2);
+    expect(monsters[0]).toEqual({
+      id: "goblin",
+      displayName: "고블린",
+      glyph: "g",
+      color: [0.2, 0.8, 0.2],
+      hp: 6,
+      attack: 3,
+      defense: 0,
+      visionRadius: 6,
+      speed: 1.5,
+      element: "poison",
+      spawnWeight: 1.0,
+      zones: [],
+      questOnly: false,
+    });
+    // element: fire / glyph 대문자도 보존
+    expect(monsters[1].element).toBe("fire");
+    expect(monsters[1].glyph).toBe("O");
+    // spawn_condition: None 은 키가 없어야 한다 (undefined)
+    expect("spawnCondition" in monsters[0]).toBe(false);
+  });
+
+  it("빈 배열 파싱", () => {
+    expect(parseMonstersRon("[]")).toEqual([]);
+  });
+
+  it("라운드트립 deep equal", () => {
+    const monsters = parseMonstersRon(SRC);
+    const reparsed = parseMonstersRon(serializeMonstersRon(monsters));
+    expect(reparsed).toEqual(monsters);
+  });
+
+  it("빈 배열 직렬화", () => {
+    expect(serializeMonstersRon([])).toBe("[]\n");
+  });
+});
+
+describe("parse/serialize MonstersRon — zones·중첩 spawn_condition·quest_only", () => {
+  // quest_only 보스 + zones(ZoneId 변형) + 중첩 And/Or/Not/HasFlag/PhaseIs 조건
+  const SRC = `[
+    MonsterDef(
+        id: "shadow_lord",
+        display_name: "그림자 군주",
+        glyph: "L",
+        color: (0.1, 0.0, 0.2),
+        hp: 40,
+        attack: 12,
+        defense: 5,
+        vision_radius: 10,
+        speed: 0.8,
+        element: Some("lightning"),
+        spawn_weight: 0.5,
+        zones: [Dungeon(3), Forest, Named("desert")],
+        spawn_condition: Some(And([
+            HasFlag("boss_unlocked"),
+            Not(PhaseIs(quest: "main", phase: "done")),
+            Or([InZone(Town), HasItem("key")]),
+        ])),
+        quest_only: true,
+    ),
+]`;
+
+  it("zones (Dungeon/Forest/Named) 와 중첩 조건을 파싱", () => {
+    const monsters = parseMonstersRon(SRC);
+    expect(monsters[0].zones).toEqual([
+      { type: "Dungeon", level: 3 },
+      { type: "Forest" },
+      { type: "Named", id: "desert" },
+    ]);
+    expect(monsters[0].questOnly).toBe(true);
+    expect(monsters[0].spawnWeight).toBe(0.5);
+    expect(monsters[0].spawnCondition).toEqual({
+      type: "And",
+      conditions: [
+        { type: "HasFlag", flag: "boss_unlocked" },
+        { type: "Not", condition: { type: "PhaseIs", quest: "main", phase: "done" } },
+        {
+          type: "Or",
+          conditions: [
+            { type: "InZone", zone: { type: "Town" } },
+            { type: "HasItem", itemId: "key" },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("zones·중첩 조건·quest_only 라운드트립", () => {
+    const monsters = parseMonstersRon(SRC);
+    const reparsed = parseMonstersRon(serializeMonstersRon(monsters));
+    expect(reparsed).toEqual(monsters);
+  });
+
+  it("element None 과 spawn_condition None 직렬화", () => {
+    const m: MonsterDef = {
+      id: "slime",
+      displayName: "슬라임",
+      glyph: "s",
+      color: [0, 0.5, 0],
+      hp: 3,
+      attack: 1,
+      defense: 0,
+      visionRadius: 4,
+      speed: 1.0,
+      element: null,
+      spawnWeight: 2.0,
+      zones: [],
+      questOnly: false,
+    };
+    const out = serializeMonstersRon([m]);
+    expect(out).toContain("element: None");
+    expect(out).toContain("spawn_condition: None");
+    expect(out).toContain("quest_only: false");
+    expect(out).not.toContain("Some(");
+    // 라운드트립으로 정합성 확인
+    expect(parseMonstersRon(out)).toEqual([m]);
+  });
+
+  it("알 수 없는 element 는 throw", () => {
+    const bad = `[MonsterDef(id:"x",display_name:"",glyph:"x",color:(0,0,0),hp:1,attack:0,defense:0,vision_radius:1,speed:1.0,element:Some("holy"),spawn_weight:1.0,zones:[],spawn_condition:None,quest_only:false)]`;
+    expect(() => parseMonstersRon(bad)).toThrow(/Unknown monster element/);
   });
 });
 
