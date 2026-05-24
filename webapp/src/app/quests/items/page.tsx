@@ -40,9 +40,12 @@ export default function ItemsPage() {
   const [createForm, setCreateForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
 
   async function load() {
     setLoading(true);
+    setSelectedIds(new Set());
     const res = await fetch("/api/quests/items");
     const json = await res.json();
     setList(json.data ?? []);
@@ -127,6 +130,45 @@ export default function ItemsPage() {
     load();
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const visibleIds = useMemo(() => visible.map((it) => it.id), [visible]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.has(id));
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        for (const id of visibleIds) next.delete(id);
+      } else {
+        for (const id of visibleIds) next.add(id);
+      }
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}개 item 을 삭제하시겠습니까?`)) return;
+    setDeleting(true);
+    const res = await fetch("/api/quests/items/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    });
+    setDeleting(false);
+    if (res.ok) load();
+    else alert((await res.json()).message);
+  }
+
   async function handleImport(file: File, kind: ItemKind) {
     const text = await file.text();
     const res = await fetch(`/api/quests/items/import?kind=${kind}`, {
@@ -207,11 +249,43 @@ export default function ItemsPage() {
           {filter === "all" ? "등록된 item 이 없습니다." : `${filter} 카테고리에 item 이 없습니다.`}
         </p>
       ) : (
-        <ul className="space-y-2">
+        <>
+          {/* 선택 삭제 툴바 */}
+          <div className="flex items-center gap-3 mb-2 text-sm">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                aria-label="전체 선택"
+                checked={allVisibleSelected}
+                ref={(el) => { if (el) el.indeterminate = someVisibleSelected && !allVisibleSelected; }}
+                onChange={toggleSelectAll}
+              />
+              <span className="text-gray-500">전체 선택</span>
+            </label>
+            <button
+              onClick={handleBulkDelete}
+              disabled={selectedIds.size === 0 || deleting}
+              className={`px-3 py-1 text-xs rounded border transition-colors ${
+                selectedIds.size === 0 || deleting
+                  ? "opacity-50 cursor-not-allowed border-gray-300 text-gray-400"
+                  : "border-red-300 text-red-500 hover:bg-red-50"
+              }`}
+            >
+              {deleting ? "삭제 중..." : `선택 삭제 (${selectedIds.size})`}
+            </button>
+          </div>
+          <ul className="space-y-2">
           {visible.map((item) => (
             <li key={item.id} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900">
                 <div className="flex items-center gap-3 min-w-0">
+                  <input
+                    type="checkbox"
+                    aria-label={`${item.id} 선택`}
+                    checked={selectedIds.has(item.id)}
+                    onChange={() => toggleSelect(item.id)}
+                    className="shrink-0"
+                  />
                   <span className="font-mono text-lg w-7 text-center">{item.glyphAscii}</span>
                   <div className="min-w-0">
                     <div className="font-medium truncate">{item.displayName}</div>
@@ -259,7 +333,8 @@ export default function ItemsPage() {
               )}
             </li>
           ))}
-        </ul>
+          </ul>
+        </>
       )}
     </div>
   );

@@ -85,6 +85,62 @@ describe('ItemsPage 빈 상태', () => {
   });
 });
 
+describe('ItemsPage 다중 선택 삭제', () => {
+  it('선택 삭제 버튼은 선택이 없으면 비활성', async () => {
+    render(<ItemsPage />);
+    await act(async () => {});
+    const btn = screen.getByText('선택 삭제 (0)') as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it('행 체크박스를 누르면 선택 수가 늘어난다', async () => {
+    render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByLabelText('eternal_gem 선택'));
+    expect(screen.getByText('선택 삭제 (1)')).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('sword 선택'));
+    expect(screen.getByText('선택 삭제 (2)')).toBeTruthy();
+  });
+
+  it('전체 선택을 누르면 보이는 항목이 모두 선택된다', async () => {
+    render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByLabelText('전체 선택'));
+    expect(screen.getByText('선택 삭제 (4)')).toBeTruthy();
+  });
+
+  it('전체 선택은 현재 필터로 보이는 항목만 대상', async () => {
+    render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByText('weapon (1)'));
+    fireEvent.click(screen.getByLabelText('전체 선택'));
+    expect(screen.getByText('선택 삭제 (1)')).toBeTruthy();
+  });
+
+  it('선택 삭제 시 bulk-delete API 를 호출하고 목록을 재로드한다', async () => {
+    const fetchMock = vi.spyOn(global, 'fetch').mockResolvedValue({
+      json: async () => ({ data: mockItems }),
+      ok: true,
+    } as Response);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByLabelText('eternal_gem 선택'));
+    fireEvent.click(screen.getByLabelText('sword 선택'));
+
+    await act(async () => { fireEvent.click(screen.getByText('선택 삭제 (2)')); });
+
+    const bulkCall = fetchMock.mock.calls.find(
+      ([url]) => url === '/api/quests/items/bulk-delete',
+    );
+    expect(bulkCall).toBeTruthy();
+    const init = bulkCall![1] as RequestInit;
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ ids: ['eternal_gem', 'sword'] });
+  });
+});
+
 describe('ItemsPage 내보내기 버튼', () => {
   it('전체 필터에서는 내보내기 비활성', async () => {
     render(<ItemsPage />);
