@@ -19,6 +19,8 @@ interface Props {
   onUpdateTransition: (index: number, updated: QuestTransition) => void;
   onDeleteEdge: (edgeId: string) => void;
   onClose?: () => void;
+  /** 출발 phase 패널로 돌아가기 */
+  onBack?: (phaseId: string) => void;
 }
 
 export function EdgePanel({
@@ -31,6 +33,7 @@ export function EdgePanel({
   onUpdateTransition,
   onDeleteEdge,
   onClose,
+  onBack,
 }: Props) {
   const idx = (edge.data as { transitionIndex?: number })?.transitionIndex ?? -1;
   const t = idx >= 0 ? transitions[idx] : undefined;
@@ -62,6 +65,14 @@ export function EdgePanel({
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 text-sm">
+      {onBack && (
+        <button
+          onClick={() => onBack(tx.from)}
+          className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+        >
+          ← <span className="font-mono">{tx.from}</span> 페이즈로
+        </button>
+      )}
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">전환 편집</h2>
         <div className="flex gap-1">

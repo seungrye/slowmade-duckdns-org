@@ -443,6 +443,7 @@ export default function QuestEditorPage() {
                 onUpdateTransition={updateTransition}
                 onDeleteEdge={deleteEdge}
                 onClose={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
+                onBack={(phaseId) => { setSelectedEdgeId(null); setSelectedNodeId(phaseId); }}
               />
             )}
           </div>
