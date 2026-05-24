@@ -129,16 +129,16 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 
 ---
 
-# 후속: 편집 패널 닫기 버튼
+# 후속: 편집 패널 닫기 버튼 ✅
 
 페이즈/전환 편집 패널에 들어가면 빈 캔버스를 클릭하는 것 외에 패널을 닫고
 선택을 해제할 방법이 없다.
 
 ## 동작 명세
 
-- [ ] `PhasePanel` 헤더에 닫기(✕) 버튼 — 클릭 시 선택 해제(패널 닫힘)
-- [ ] `EdgePanel` 헤더에 닫기(✕) 버튼 — 전환 정보 없음 케이스 포함
-- [ ] `page.tsx` 가 `onClose` 로 `selectedNodeId`/`selectedEdgeId` 모두 null 처리
+- [x] `PhasePanel` 헤더에 닫기(✕) 버튼 — 클릭 시 선택 해제(패널 닫힘)
+- [x] `EdgePanel` 헤더에 닫기(✕) 버튼 — 전환 정보 없음 케이스 포함
+- [x] `page.tsx` 가 `onClose` 로 `selectedNodeId`/`selectedEdgeId` 모두 null 처리
 
 ## 영향 파일
 
