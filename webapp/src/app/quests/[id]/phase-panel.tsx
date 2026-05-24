@@ -1,8 +1,9 @@
 "use client";
 
-import type { QuestPhaseDef } from "@/types/quest";
+import type { QuestPhaseDef, QuestTransition } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
 import { NpcCombobox } from "./npc-combobox";
+import { conditionSummary } from "@/lib/condition-summary";
 
 interface Props {
   phaseId: string;
@@ -10,10 +11,14 @@ interface Props {
   isInitial: boolean;
   giverNpc: string;
   villagers?: VillagerDocument[];
+  /** 전체 transition 목록 (이 phase 에서 나가는 것만 추려서 표시) */
+  transitions?: QuestTransition[];
   onUpdate: (phase: QuestPhaseDef) => void;
   onUpdateGiverNpc: (v: string) => void;
   onDelete: () => void;
   onSetInitial: () => void;
+  /** 나가는 전환 행 클릭 시 해당 transition 편집(EdgePanel)으로 전환 */
+  onEditTransition?: (index: number) => void;
 }
 
 export function PhasePanel({
@@ -22,13 +27,20 @@ export function PhasePanel({
   isInitial,
   giverNpc,
   villagers = [],
+  transitions = [],
   onUpdate,
   onUpdateGiverNpc,
   onDelete,
   onSetInitial,
+  onEditTransition,
 }: Props) {
   function setDialog(lines: string[]) { onUpdate({ ...phase, dialog: lines }); }
   function setObjective(v: string) { onUpdate({ ...phase, objective: v || null }); }
+
+  // 이 phase 에서 나가는 전환 (배열 순서 유지 — 같은 트리거끼리 위에서부터 첫 매칭)
+  const outgoing = transitions
+    .map((t, index) => ({ t, index }))
+    .filter(({ t }) => t.from === phaseId);
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 text-sm">
@@ -114,9 +126,55 @@ export function PhasePanel({
         </div>
       </section>
 
-      <p className="text-[10px] text-gray-400 leading-relaxed">
-        상태 전환(트리거·조건·액션)은 페이즈를 연결한 엣지를 선택해 편집합니다.
-      </p>
+      {/* 이 페이즈에서 나가는 전환 */}
+      <section>
+        <label className="text-xs font-semibold text-gray-500 block mb-1">
+          나가는 전환 {outgoing.length > 0 && `(${outgoing.length})`}
+        </label>
+        {outgoing.length === 0 ? (
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            이 페이즈에서 나가는 전환이 없습니다 (terminal). 다른 페이즈로
+            드래그해 연결하면 전환이 추가됩니다.
+          </p>
+        ) : (
+          <div className="space-y-1">
+            {outgoing.map(({ t, index }) => {
+              const isAuto = t.trigger === "Auto";
+              const selfLoop = t.to === phaseId;
+              return (
+                <button
+                  key={index}
+                  onClick={() => onEditTransition?.(index)}
+                  className="w-full text-left border rounded p-1.5 hover:border-blue-400 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span
+                      className={`text-[9px] font-mono px-1 py-0.5 rounded ${
+                        isAuto
+                          ? "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+                      }`}
+                    >
+                      {isAuto ? "자동" : "대화"}
+                    </span>
+                    <span className="text-[11px] text-gray-400">→</span>
+                    <span className="text-[11px] font-mono font-medium truncate">
+                      {t.to}{selfLoop && " (제자리)"}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-gray-500 truncate">
+                    조건: {conditionSummary(t.when)}
+                  </div>
+                </button>
+              );
+            })}
+            <p className="text-[9px] text-gray-400 leading-relaxed pt-0.5">
+              같은 트리거(자동/대화)끼리 위에서부터 조건이 맞는 첫 전환만
+              실행됩니다. 행을 클릭하면 편집합니다.
+            </p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

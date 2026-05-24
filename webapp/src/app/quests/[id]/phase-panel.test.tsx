@@ -2,7 +2,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { PhasePanel } from "./phase-panel";
-import type { QuestPhaseDef } from "@/types/quest";
+import type { QuestPhaseDef, QuestTransition } from "@/types/quest";
 
 const phase: QuestPhaseDef = {
   dialog: [],
@@ -45,5 +45,37 @@ describe("PhasePanel — giverNpc", () => {
     const { container } = render(<PhasePanel {...baseProps} isInitial={true} villagers={villagers} />);
     const opts = container.querySelectorAll("datalist option");
     expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === '장로')).toBe(true);
+  });
+});
+
+describe("PhasePanel — 나가는 전환 목록", () => {
+  const transitions: QuestTransition[] = [
+    { from: "phase_start", trigger: "Interact", actions: [], to: "active" },
+    { from: "phase_start", trigger: "Auto", when: { type: "HasItem", itemId: "eternal_gem" }, actions: [], to: "ready" },
+    { from: "other", trigger: "Interact", actions: [], to: "x" },
+  ];
+
+  it("이 phase 에서 나가는 전환만 도착 phase + 조건과 함께 표시", () => {
+    render(<PhasePanel {...baseProps} isInitial={false} transitions={transitions} />);
+    expect(screen.getByText("나가는 전환 (2)")).toBeTruthy();
+    expect(screen.getByText("active")).toBeTruthy();
+    expect(screen.getByText("ready")).toBeTruthy();
+    expect(screen.getByText("조건: 무조건")).toBeTruthy();
+    expect(screen.getByText("조건: eternal_gem 보유")).toBeTruthy();
+    // 다른 phase 의 전환(other→x)은 안 보임
+    expect(screen.queryByText("x")).toBeNull();
+  });
+
+  it("나가는 전환 행 클릭 시 onEditTransition(index) 호출", () => {
+    const onEditTransition = vi.fn();
+    render(<PhasePanel {...baseProps} isInitial={false} transitions={transitions} onEditTransition={onEditTransition} />);
+    fireEvent.click(screen.getByText("ready"));
+    // transitions[1] 이 ready 로 가는 전환
+    expect(onEditTransition).toHaveBeenCalledWith(1);
+  });
+
+  it("나가는 전환이 없으면 terminal 안내", () => {
+    render(<PhasePanel {...baseProps} isInitial={false} transitions={[{ from: "other", trigger: "Interact", actions: [], to: "x" }]} />);
+    expect(screen.getByText(/terminal/)).toBeTruthy();
   });
 });

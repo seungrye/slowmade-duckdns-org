@@ -1,6 +1,7 @@
 import type { Node, Edge } from "@xyflow/react";
 import type { QuestDocument, QuestPhaseDef } from "@/types/quest";
 import type { PhaseNodeData } from "./phase-node";
+import { transitionLabel } from "@/lib/condition-summary";
 
 export function syncPhasePositions(
   phases: QuestDocument["phases"],
@@ -42,7 +43,9 @@ export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[]
       id: `t${ti}:${t.from}→${t.to}`,
       source: t.from,
       target: t.to,
-      label: isAuto ? "auto" : "interact",
+      label: transitionLabel(t.trigger, t.when),
+      labelBgPadding: [4, 2],
+      labelBgStyle: { fill: isAuto ? "#fff7ed" : "#eff6ff" },
       style: isAuto
         ? { stroke: "#f59e0b", strokeDasharray: "6 3" }
         : { stroke: "#3b82f6" },

@@ -404,9 +404,16 @@ export default function QuestEditorPage() {
                 isInitial={selectedNode.id === quest.initialPhase}
                 giverNpc={quest.giverNpc}
                 villagers={villagers}
+                transitions={quest.transitions}
                 onUpdate={(updated) => updatePhase(selectedNode.id, updated)}
                 onUpdateGiverNpc={updateGiverNpc}
                 onDelete={() => deletePhase(selectedNode.id)}
+                onEditTransition={(index) => {
+                  const t = quest.transitions[index];
+                  if (!t) return;
+                  setSelectedNodeId(null);
+                  setSelectedEdgeId(`t${index}:${t.from}→${t.to}`);
+                }}
                 onSetInitial={() => {
                   const updated = { ...quest, initialPhase: selectedNode.id };
                   setQuest(updated);

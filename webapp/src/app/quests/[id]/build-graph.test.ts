@@ -54,10 +54,21 @@ describe("buildGraph", () => {
     expect(edges.map((e) => (e.data as { transitionIndex: number }).transitionIndex)).toEqual([0, 1]);
   });
 
-  it("Interact 는 interact, Auto 는 auto 라벨", () => {
+  it("엣지 라벨에 트리거 + 조건 요약을 표시한다", () => {
     const { edges } = buildGraph(quest);
-    expect(edges[0].label).toBe("interact");
-    expect(edges[1].label).toBe("auto");
+    expect(edges[0].label).toBe("대화: 무조건");   // Interact, when 없음
+    expect(edges[1].label).toBe("자동: 무조건");   // Auto, when: Always
+  });
+
+  it("조건이 있으면 라벨에 조건 요약이 들어간다", () => {
+    const q = {
+      ...quest,
+      transitions: [
+        { from: "phase_a", trigger: "Auto" as const, when: { type: "HasItem" as const, itemId: "gem" }, actions: [], to: "phase_b" },
+      ],
+    };
+    const { edges } = buildGraph(q);
+    expect(edges[0].label).toBe("자동: gem 보유");
   });
 });
 
