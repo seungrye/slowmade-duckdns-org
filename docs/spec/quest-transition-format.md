@@ -1,8 +1,12 @@
-# 퀘스트 Transition 포맷 (bevy-rogue 동기화)
+# 퀘스트 Transition 포맷 (bevy-rogue 동기화) ✅
 
 bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interact` +
 `auto_advance` + `Branch` 중첩 → 평탄한 `transitions` 목록). 사이트의 퀘스트
 에디터/직렬화/검증도 동일 포맷으로 맞춘다.
+
+> **완료** — 타입/직렬화/검증/에디터/모델/API/테스트 모두 구현됨.
+> 검증: `pnpm test` 559 passed, `tsc` 통과, 실제 게임 RON 10종을 site
+> 파서로 round-trip + site 직렬화 출력을 bevy-rogue Rust 파서로 교차검증 통과.
 
 ## 배경 / 문제
 
@@ -13,63 +17,63 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 
 ## 데이터 모델 변경 (`src/types/quest.ts`)
 
-- [ ] `QuestPhaseDef` 에서 `on_interact`, `auto_advance` 제거 → `dialog`,
+- [x] `QuestPhaseDef` 에서 `on_interact`, `auto_advance` 제거 → `dialog`,
   `objective`, `position?` 만 유지
-- [ ] `QuestDef` 에 `transitions: QuestTransition[]` 추가
-- [ ] `QuestTransition` 신규: `{ from: string; trigger: TriggerKind;
+- [x] `QuestDef` 에 `transitions: QuestTransition[]` 추가
+- [x] `QuestTransition` 신규: `{ from: string; trigger: TriggerKind;
   when?: Condition; actions: Action[]; to: string }`
-- [ ] `TriggerKind = "Interact" | "Auto"`
-- [ ] `Action` 유니온에서 `AdvancePhase`, `Branch` 제거
-- [ ] `AutoAdvance` 타입 제거
+- [x] `TriggerKind = "Interact" | "Auto"`
+- [x] `Action` 유니온에서 `AdvancePhase`, `Branch` 제거
+- [x] `AutoAdvance` 타입 제거
 
 ## RON 직렬화/파싱 (`src/lib/ron.ts`)
 
-- [ ] phase 직렬화는 `dialog` + `objective` 만 출력
-- [ ] `transitions` 직렬화: `Transition(from: "..", trigger: Interact|Auto,
+- [x] phase 직렬화는 `dialog` + `objective` 만 출력
+- [x] `transitions` 직렬화: `Transition(from: "..", trigger: Interact|Auto,
   when: <cond>, actions: [..], to: "..")`. `when`/`actions` 는 비어있으면 생략
-- [ ] 파일 첫 줄에 `#![enable(implicit_some)]` 출력 → `when`/`objective` 를
+- [x] 파일 첫 줄에 `#![enable(implicit_some)]` 출력 → `when`/`objective` 를
   `Some()` 없이 bare 로 표기. 파서는 directive·bare·`Some(..)` 모두 수용
-- [ ] phase 파서에서 `on_interact`/`auto_advance` 파싱 제거
-- [ ] `transitions` 파서 추가 (`Transition(..)` 항목, `when` 은 optional)
-- [ ] Action 파서/직렬화에서 `AdvancePhase`, `Branch` 제거
-- [ ] `Always` 조건 → `And([])` 직렬화 (기존 동작 유지)
+- [x] phase 파서에서 `on_interact`/`auto_advance` 파싱 제거
+- [x] `transitions` 파서 추가 (`Transition(..)` 항목, `when` 은 optional)
+- [x] Action 파서/직렬화에서 `AdvancePhase`, `Branch` 제거
+- [x] `Always` 조건 → `And([])` 직렬화 (기존 동작 유지)
 
 ## 구조 검증 (`src/lib/quest-validation.ts`)
 
-- [ ] `validateQuestStructure`: `transitions` 순회로 변경
+- [x] `validateQuestStructure`: `transitions` 순회로 변경
   - `from`/`to` 가 phases 에 존재하는지
   - `trigger: "Auto"` 의 `actions` 는 `DespawnWorldItem`/`RemoveItem`/`SetFlag`
     만 허용 (Rust `is_auto_action_supported` 동일)
-- [ ] `validateQuestRefs`: transition 의 `when` 조건과 `actions` 의 카탈로그
+- [x] `validateQuestRefs`: transition 의 `when` 조건과 `actions` 의 카탈로그
   참조(item/villager/zone) 검증
-- [ ] `on_interact`/`auto_advance`/`AdvancePhase`/`Branch` 검증 경로 제거
+- [x] `on_interact`/`auto_advance`/`AdvancePhase`/`Branch` 검증 경로 제거
 
 ## 에디터 UI (`src/app/quests/[id]/`)
 
-- [ ] `build-graph.ts`: 엣지를 `transitions` 에서 생성 (transition 1개 = 엣지
+- [x] `build-graph.ts`: 엣지를 `transitions` 에서 생성 (transition 1개 = 엣지
   1개, label = trigger, data 에 transitionIndex)
-- [ ] `page.tsx` `onConnect`: 새 transition `{ from, trigger: "Interact",
+- [x] `page.tsx` `onConnect`: 새 transition `{ from, trigger: "Interact",
   actions: [], to }` 추가
-- [ ] `edge-panel.tsx`: 선택한 transition 편집 (trigger 토글, `when` 조건,
+- [x] `edge-panel.tsx`: 선택한 transition 편집 (trigger 토글, `when` 조건,
   `actions`, 삭제)
-- [ ] `phase-panel.tsx`: dialog + objective 만 편집 (on_interact/auto_advance
+- [x] `phase-panel.tsx`: dialog + objective 만 편집 (on_interact/auto_advance
   섹션 제거)
-- [ ] `phase-node.tsx`: on_interact/auto_advance 카운트 표시 제거
-- [ ] `action-editor.tsx`: `AdvancePhase`/`Branch` 액션 타입·관련 UI 제거
+- [x] `phase-node.tsx`: on_interact/auto_advance 카운트 표시 제거
+- [x] `action-editor.tsx`: `AdvancePhase`/`Branch` 액션 타입·관련 UI 제거
   (Branch flatten/unflatten 로직 삭제)
 
 ## 기타 유틸
 
-- [ ] `src/lib/zone-extract.ts`: `collectFromPhase` → `collectFromQuest` 가
+- [x] `src/lib/zone-extract.ts`: `collectFromPhase` → `collectFromQuest` 가
   `transitions[].actions` 를 순회 (Branch 재귀 제거)
 
 ## 테스트
 
-- [ ] `ron.test.ts`: 신규 포맷 직렬화/파싱 round-trip, implicit_some
-- [ ] `quest-validation.test.ts`: transition 구조/참조 검증 케이스
-- [ ] `action-editor.test.tsx`, `phase-panel.test.tsx`, `phase-node.test.tsx`,
+- [x] `ron.test.ts`: 신규 포맷 직렬화/파싱 round-trip, implicit_some
+- [x] `quest-validation.test.ts`: transition 구조/참조 검증 케이스
+- [x] `action-editor.test.tsx`, `phase-panel.test.tsx`, `phase-node.test.tsx`,
   `build-graph.test.ts`: 신규 포맷 픽스처로 갱신
-- [ ] API route 테스트(`route.test.ts`, `export/route.test.ts`,
+- [x] API route 테스트(`route.test.ts`, `export/route.test.ts`,
   `zones/extract/route.test.ts`): 신규 포맷 픽스처로 갱신
 
 ## 검증 방법
