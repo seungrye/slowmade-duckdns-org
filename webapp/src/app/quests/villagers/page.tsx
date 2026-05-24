@@ -20,6 +20,24 @@ const emptyForm: FormState = {
   speed: 1.0,
 };
 
+// ── 색상 유틸 (RON 은 0~1 RGB, <input type=color> 는 #rrggbb) ──
+function randomColor(): [number, number, number] {
+  return [Math.random(), Math.random(), Math.random()];
+}
+
+function rgb01ToHex(c: [number, number, number]): string {
+  const h = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n * 255))).toString(16).padStart(2, "0");
+  return `#${h(c[0])}${h(c[1])}${h(c[2])}`;
+}
+
+function hexToRgb01(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec(hex.trim());
+  if (!m) return [0, 0, 0];
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
 export default function VillagersPage() {
   const [list, setList] = useState<VillagerDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +158,7 @@ export default function VillagersPage() {
             내보내기
           </button>
           <button
-            onClick={() => setCreating(true)}
+            onClick={() => { setCreateForm({ ...emptyForm, color: randomColor() }); setCreating(true); }}
             className="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
           >
             + 새 villager
@@ -289,28 +307,18 @@ function FormFields({
           />
         </label>
       </div>
-      <div className="flex gap-2 items-end">
-        <span className="text-xs text-gray-500 self-end mb-1">color (RGB 0~1)</span>
-        {[0, 1, 2].map((i) => (
-          <input
-            key={i}
-            type="number"
-            step={0.05}
-            min={0}
-            max={1}
-            value={form.color[i]}
-            onChange={(e) => {
-              const c = [...form.color] as [number, number, number];
-              c[i] = Number(e.target.value);
-              setForm({ ...form, color: c });
-            }}
-            className={`${inputCls} w-20`}
-          />
-        ))}
-        <span
-          className="w-7 h-7 rounded border border-gray-300 ml-1 self-end"
-          style={{ background: `rgb(${form.color[0] * 255}, ${form.color[1] * 255}, ${form.color[2] * 255})` }}
+      <div className="flex gap-2 items-center">
+        <span className="text-xs text-gray-500">color</span>
+        <input
+          type="color"
+          aria-label="color"
+          value={rgb01ToHex(form.color)}
+          onChange={(e) => setForm({ ...form, color: hexToRgb01(e.target.value) })}
+          className="h-8 w-12 rounded border border-gray-300 bg-white dark:bg-gray-800 cursor-pointer p-0.5"
         />
+        <span className="text-[10px] text-gray-400 font-mono">
+          ({form.color.map((c) => c.toFixed(2)).join(", ")})
+        </span>
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-500">dialogs (한 줄 = 한 대사, 빈 줄 무시)</span>

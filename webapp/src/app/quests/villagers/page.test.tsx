@@ -56,6 +56,16 @@ describe('VillagersPage 신규 폼', () => {
     fireEvent.click(screen.getByText('+ 새 villager'));
     expect(screen.getByText('생성')).toBeTruthy();
   });
+
+  it('생성 폼에 컬러 피커(input type=color)가 렌더된다', async () => {
+    const { container } = render(<VillagersPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByText('+ 새 villager'));
+    const colorInput = container.querySelector('input[type="color"]') as HTMLInputElement | null;
+    expect(colorInput).toBeTruthy();
+    // 랜덤 기본값이라 흰색 고정이 아님 (유효한 hex)
+    expect(colorInput!.value).toMatch(/^#[0-9a-f]{6}$/);
+  });
 });
 
 describe('VillagersPage 빈 상태', () => {
