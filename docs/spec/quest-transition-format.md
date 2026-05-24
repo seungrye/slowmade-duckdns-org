@@ -153,7 +153,7 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 
 ---
 
-# 후속: 전환 편집 패널에서 페이즈로 돌아가기
+# 후속: 전환 편집 패널에서 페이즈로 돌아가기 ✅
 
 전환 편집 패널(EdgePanel)에 닫기(✕)만 있어서, 페이즈 패널에서 전환 행을
 클릭해 들어온 뒤 다시 그 페이즈 패널로 돌아갈 방법이 없다 (✕ 는 전체 선택
@@ -161,11 +161,11 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 
 ## 동작 명세
 
-- [ ] `EdgePanel` 헤더에 "← {from}" 형태의 뒤로 가기 버튼 — 클릭 시 해당
+- [x] `EdgePanel` 헤더에 "← {from}" 형태의 뒤로 가기 버튼 — 클릭 시 해당
   전환의 `from` 페이즈 패널(PhasePanel)로 이동
-- [ ] `page.tsx` 가 `onBack(phaseId)` 으로 selectedEdgeId 해제 +
+- [x] `page.tsx` 가 `onBack(phaseId)` 으로 selectedEdgeId 해제 +
   selectedNodeId = phaseId 설정
-- [ ] 기존 ✕ 닫기 버튼은 유지 (전체 해제용)
+- [x] 기존 ✕ 닫기 버튼은 유지 (전체 해제용)
 
 ## 영향 파일
 
