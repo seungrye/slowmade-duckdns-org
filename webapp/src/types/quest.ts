@@ -21,6 +21,9 @@ export type PortalPlacement =
 
 // ── 액션 타입 ─────────────────────────────────────────────────────────────
 
+/** 함정 종류 (bevy-rogue trap::TrapKind 미러). */
+export type TrapKind = "Spike" | "Poison" | "Alarm" | "Teleport";
+
 export type Action =
   | { type: "Log"; text: string }
   | { type: "GiveItem"; itemId: string }
@@ -32,7 +35,10 @@ export type Action =
   | { type: "DespawnWorldItem"; itemId: string }
   | { type: "OpenPortal"; zone: string; generator: string; placement?: PortalPlacement }
   | { type: "ClosePortal"; zone: string }
-  | { type: "SpawnGuards"; count: number };
+  | { type: "SpawnGuards"; count: number }
+  | { type: "PlaceTraps"; kind: TrapKind; count: number; hidden: boolean }
+  | { type: "Explode"; radius: number; terrain: boolean; entityDamage: number }
+  | { type: "SpawnMonster"; monsterId: string; count: number };
 
 // ── 상태 전환 ─────────────────────────────────────────────────────────────
 

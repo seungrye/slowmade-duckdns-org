@@ -8,6 +8,7 @@ import type {
   PortalPlacement,
   QuestSpawn,
   SpawnZone,
+  TrapKind,
 } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
 import type { ItemDef, ConsumableEffect, WeaponElement } from "@/types/item";
@@ -369,6 +370,13 @@ class Parser {
     throw new Error(`Expected bool, got ${v}`);
   }
 
+  /** TrapKind enum — bare ident (Spike | Poison | Alarm | Teleport). */
+  parseTrapKind(): TrapKind {
+    const v = this.parseIdent();
+    if (v === "Spike" || v === "Poison" || v === "Alarm" || v === "Teleport") return v;
+    throw new Error(`Unknown trap kind: ${v}`);
+  }
+
   parseArray<T>(parseItem: () => T): T[] {
     this.expectPunct("[");
     const items: T[] = [];
@@ -548,6 +556,48 @@ class Parser {
         }
         this.expectPunct(")");
         return { type: "SpawnGuards", count };
+      }
+      case "PlaceTraps": {
+        let kind: TrapKind = "Spike";
+        let count = 1;
+        // hidden 미지정 시 serde default = true (게임 측 default_trap_hidden)
+        let hidden = true;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "kind") kind = this.parseTrapKind();
+          else if (key === "count") count = this.parseNumber();
+          else if (key === "hidden") hidden = this.parseBool();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        return { type: "PlaceTraps", kind, count, hidden };
+      }
+      case "Explode": {
+        let radius = 0, entityDamage = 0;
+        let terrain = false;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "radius") radius = this.parseNumber();
+          else if (key === "terrain") terrain = this.parseBool();
+          else if (key === "entity_damage") entityDamage = this.parseNumber();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        return { type: "Explode", radius, terrain, entityDamage };
+      }
+      case "SpawnMonster": {
+        let monsterId = "", count = 1;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "id") monsterId = this.parseString();
+          else if (key === "count") count = this.parseNumber();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        return { type: "SpawnMonster", monsterId, count };
       }
       default:
         throw new Error(`Unknown action: ${name}`);
@@ -859,6 +909,9 @@ function serializeAction(action: Action, depth: number): string {
     }
     case "ClosePortal":      return `${i}ClosePortal(${q(action.zone)})`;
     case "SpawnGuards":      return `${i}SpawnGuards(count: ${action.count})`;
+    case "PlaceTraps":       return `${i}PlaceTraps(kind: ${action.kind}, count: ${action.count}, hidden: ${action.hidden})`;
+    case "Explode":          return `${i}Explode(radius: ${action.radius}, terrain: ${action.terrain}, entity_damage: ${action.entityDamage})`;
+    case "SpawnMonster":     return `${i}SpawnMonster(id: ${q(action.monsterId)}, count: ${action.count})`;
   }
 }
 

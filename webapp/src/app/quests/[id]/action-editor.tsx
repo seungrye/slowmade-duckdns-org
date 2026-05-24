@@ -1,6 +1,6 @@
 "use client";
 
-import type { Action, PortalPlacement } from "@/types/quest";
+import type { Action, PortalPlacement, TrapKind } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
 import type { ItemDocument } from "@/types/item";
 import type { ZoneDocument } from "@/types/zone";
@@ -31,6 +31,9 @@ function emptyAction(type: Action["type"]): Action {
     case "OpenPortal":       return { type, zone: "", generator: "" };
     case "ClosePortal":      return { type, zone: "" };
     case "SpawnGuards":      return { type, count: 1 };
+    case "PlaceTraps":       return { type, kind: "Spike", count: 1, hidden: true };
+    case "Explode":          return { type, radius: 1, terrain: true, entityDamage: 0 };
+    case "SpawnMonster":     return { type, monsterId: "", count: 1 };
   }
 }
 
@@ -90,6 +93,9 @@ function ActionRow({
           <option value="OpenPortal">OpenPortal (Named 존)</option>
           <option value="ClosePortal">ClosePortal</option>
           <option value="SpawnGuards">SpawnGuards (경비병 스폰)</option>
+          <option value="PlaceTraps">PlaceTraps (함정 배치)</option>
+          <option value="Explode">Explode (폭발)</option>
+          <option value="SpawnMonster">SpawnMonster (몬스터 스폰)</option>
         </select>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
           ✕
@@ -243,6 +249,85 @@ function ActionRow({
           placeholder="경비병 수"
           className={inputCls}
         />
+      )}
+
+      {action.type === "PlaceTraps" && (
+        <div className="space-y-1">
+          <div className="flex gap-1 items-center">
+            <select
+              value={action.kind}
+              onChange={(e) => onChange({ ...action, kind: e.target.value as TrapKind })}
+              className={halfCls}
+            >
+              <option value="Spike">Spike</option>
+              <option value="Poison">Poison</option>
+              <option value="Alarm">Alarm</option>
+              <option value="Teleport">Teleport</option>
+            </select>
+            <input
+              type="number"
+              min={1}
+              value={action.count}
+              onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+              placeholder="개수"
+              className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+            />
+          </div>
+          <label className="flex gap-1 items-center text-xs text-gray-600 dark:text-gray-300">
+            <input
+              type="checkbox"
+              checked={action.hidden}
+              onChange={(e) => onChange({ ...action, hidden: e.target.checked })}
+            />
+            hidden (숨김 함정)
+          </label>
+        </div>
+      )}
+
+      {action.type === "Explode" && (
+        <div className="flex gap-1 items-center">
+          <input
+            type="number"
+            value={action.radius}
+            onChange={(e) => onChange({ ...action, radius: Number(e.target.value) })}
+            placeholder="반경"
+            className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+          />
+          <label className="flex gap-1 items-center text-xs text-gray-600 dark:text-gray-300 whitespace-nowrap">
+            <input
+              type="checkbox"
+              checked={action.terrain}
+              onChange={(e) => onChange({ ...action, terrain: e.target.checked })}
+            />
+            지형 파괴
+          </label>
+          <input
+            type="number"
+            value={action.entityDamage}
+            onChange={(e) => onChange({ ...action, entityDamage: Number(e.target.value) })}
+            placeholder="피해"
+            className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+          />
+        </div>
+      )}
+
+      {action.type === "SpawnMonster" && (
+        <div className="flex gap-1 items-center">
+          <input
+            value={action.monsterId}
+            onChange={(e) => onChange({ ...action, monsterId: e.target.value })}
+            placeholder="몬스터 id (예: frost_wyrm)"
+            className={halfCls}
+          />
+          <input
+            type="number"
+            min={1}
+            value={action.count}
+            onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+            placeholder="수량"
+            className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+          />
+        </div>
       )}
     </div>
   );

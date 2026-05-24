@@ -346,6 +346,41 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
     expect(quest.transitions[0].actions[0]).toEqual({ type: "SpawnGuards", count: 6 });
   });
 
+  it("PlaceTraps 액션 파싱 (kind enum / count / hidden)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[PlaceTraps(kind:Alarm,count:4,hidden:true)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "PlaceTraps", kind: "Alarm", count: 4, hidden: true });
+  });
+
+  it("PlaceTraps hidden 생략 시 기본값 true (serde default 미러)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[PlaceTraps(kind:Spike,count:6)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "PlaceTraps", kind: "Spike", count: 6, hidden: true });
+  });
+
+  it("PlaceTraps hidden:false 명시 파싱", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[PlaceTraps(kind:Poison,count:2,hidden:false)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "PlaceTraps", kind: "Poison", count: 2, hidden: false });
+  });
+
+  it("PlaceTraps 필드 순서 무관 파싱", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[PlaceTraps(count:3,hidden:false,kind:Teleport)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "PlaceTraps", kind: "Teleport", count: 3, hidden: false });
+  });
+
+  it("PlaceTraps 알 수 없는 kind 는 throw", () => {
+    expect(() => parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[PlaceTraps(kind:Fire,count:1)],to:"b")`)))
+      .toThrow(/Unknown trap kind/);
+  });
+
+  it("Explode 액션 파싱 (radius / terrain / entity_damage)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[Explode(radius:4,terrain:true,entity_damage:8)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "Explode", radius: 4, terrain: true, entityDamage: 8 });
+  });
+
+  it("SpawnMonster 액션 파싱 (id / count)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[SpawnMonster(id:"frost_wyrm",count:1)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "SpawnMonster", monsterId: "frost_wyrm", count: 1 });
+  });
+
   it("InZone(Town) / InZone(Named) when 파싱", () => {
     const quest = parseRon(wrap(
       `Transition(from:"a",trigger:Auto,when:InZone(Town),to:"b"),Transition(from:"a",trigger:Auto,when:InZone(Named("herb_glade")),to:"b")`
@@ -431,6 +466,67 @@ describe("serializeRon — SpawnGuards 라운드트립", () => {
     expect(ron).toContain("SpawnGuards(count: 6)");
     const reparsed = parseRon(ron);
     expect(reparsed).toEqual(quest);
+  });
+});
+
+describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립", () => {
+  it("3종 액션 직렬화 후 재파싱하면 동일 구조 반환 (게임 RON 문법 호환)", () => {
+    const quest: QuestDef = {
+      id: "new_actions", title: "신규 액션", giverNpc: "n", initialPhase: "a",
+      phases: {
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "a", trigger: "Interact",
+          actions: [
+            { type: "PlaceTraps", kind: "Alarm", count: 4, hidden: true },
+            { type: "PlaceTraps", kind: "Spike", count: 6, hidden: false },
+            { type: "Explode", radius: 4, terrain: true, entityDamage: 8 },
+            { type: "SpawnMonster", monsterId: "frost_wyrm", count: 1 },
+          ],
+          to: "b",
+        },
+      ],
+      spawns: [],
+    };
+    const ron = serializeRon(quest);
+    // 게임이 export 하는 표기와 정확히 일치하는지 확인
+    expect(ron).toContain("PlaceTraps(kind: Alarm, count: 4, hidden: true)");
+    expect(ron).toContain("PlaceTraps(kind: Spike, count: 6, hidden: false)");
+    expect(ron).toContain("Explode(radius: 4, terrain: true, entity_damage: 8)");
+    expect(ron).toContain(`SpawnMonster(id: "frost_wyrm", count: 1)`);
+    const reparsed = parseRon(ron);
+    expect(reparsed).toEqual(quest);
+  });
+
+  it("bevy-rogue assets 미러 — 게임 .ron 의 액션 라인을 import→재export 하면 동일", () => {
+    // 실제 assets/quests/*.ron 에서 그대로 가져온 액션 라인들
+    const src = `QuestDef(id:"m",title:"m",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],objective:None),"b":QuestPhaseDef(dialog:[],objective:None)},
+      transitions:[Transition(from:"a",trigger:Interact,actions:[
+        SpawnGuards(count: 5),
+        PlaceTraps(kind: Alarm, count: 4, hidden: true),
+        PlaceTraps(kind: Spike, count: 6, hidden: true),
+        PlaceTraps(kind: Poison, count: 4, hidden: true),
+        Explode(radius: 4, terrain: true, entity_damage: 8),
+        SpawnMonster(id: "frost_wyrm", count: 1),
+        SpawnMonster(id: "troll", count: 2),
+      ],to:"b")],spawns:[])`;
+    const quest = parseRon(src);
+    // import 후 재export → 재import 라운드트립 정합성
+    expect(parseRon(serializeRon(quest))).toEqual(quest);
+    // 액션 구조 확인
+    expect(quest.transitions[0].actions).toEqual([
+      { type: "SpawnGuards", count: 5 },
+      { type: "PlaceTraps", kind: "Alarm", count: 4, hidden: true },
+      { type: "PlaceTraps", kind: "Spike", count: 6, hidden: true },
+      { type: "PlaceTraps", kind: "Poison", count: 4, hidden: true },
+      { type: "Explode", radius: 4, terrain: true, entityDamage: 8 },
+      { type: "SpawnMonster", monsterId: "frost_wyrm", count: 1 },
+      { type: "SpawnMonster", monsterId: "troll", count: 2 },
+    ]);
   });
 });
 
