@@ -268,10 +268,10 @@ class Parser {
     this.expectPunct("(");
 
     const def: VillagerDef = {
+      id: "",
       name: "",
       color: [0, 0, 0],
       dialogs: [],
-      questId: null,
       speed: 1.0,
     };
 
@@ -279,10 +279,12 @@ class Parser {
       const key = this.parseIdent();
       this.expectPunct(":");
       switch (key) {
+        case "id":       def.id      = this.parseString(); break;
         case "name":     def.name    = this.parseString(); break;
         case "color":    def.color   = this.parseNumberTuple3(); break;
         case "dialogs":  def.dialogs = this.parseArray(() => this.parseString()); break;
-        case "quest_id": def.questId = this.parseOptionString(); break;
+        // 하위호환: 구 형식의 quest_id 는 소비 후 무시
+        case "quest_id": this.parseOptionString(); break;
         case "speed":    def.speed   = this.parseNumber(); break;
         default: break;
       }
@@ -838,6 +840,7 @@ function serializeSpawn(s: QuestSpawn): string {
 function serializeVillagerDef(v: VillagerDef): string {
   const lines: string[] = [];
   lines.push(`    VillagerDef(`);
+  lines.push(`        id: ${q(v.id)},`);
   lines.push(`        name: ${q(v.name)},`);
   lines.push(`        color: (${v.color[0]}, ${v.color[1]}, ${v.color[2]}),`);
   if (v.dialogs.length === 0) {
@@ -847,8 +850,6 @@ function serializeVillagerDef(v: VillagerDef): string {
     for (const d of v.dialogs) lines.push(`            ${q(d)},`);
     lines.push(`        ],`);
   }
-  const qid = v.questId == null ? "None" : `Some(${q(v.questId)})`;
-  lines.push(`        quest_id: ${qid},`);
   lines.push(`        speed: ${v.speed},`);
   lines.push(`    ),`);
   return lines.join("\n");

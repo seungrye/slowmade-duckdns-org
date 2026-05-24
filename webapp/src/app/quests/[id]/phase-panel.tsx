@@ -80,7 +80,7 @@ export function PhasePanel({
             value={giverNpc}
             onChange={onUpdateGiverNpc}
             villagers={villagers}
-            placeholder="NPC 이름 (예: 장로)"
+            placeholder="NPC id (예: elder)"
           />
         </section>
       )}

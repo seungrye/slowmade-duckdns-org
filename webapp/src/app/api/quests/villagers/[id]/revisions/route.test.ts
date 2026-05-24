@@ -9,13 +9,13 @@ import { GET } from './route';
 import Villager from '@/models/villager';
 import VillagerRevision from '@/models/villager-revision';
 
-const params = Promise.resolve({ name: encodeURIComponent('장로') });
+const params = Promise.resolve({ id: 'elder' });
 
 function makeRequest(): NextRequest {
   return new Request('http://localhost/api/quests/villagers/x/revisions') as unknown as NextRequest;
 }
 
-describe('GET /api/quests/villagers/[name]/revisions', () => {
+describe('GET /api/quests/villagers/[id]/revisions', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('villager 가 없으면 404', async () => {

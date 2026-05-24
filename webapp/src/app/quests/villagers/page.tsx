@@ -5,18 +5,18 @@ import Link from "next/link";
 import type { VillagerDocument } from "@/types/villager";
 
 interface FormState {
+  id: string;
   name: string;
   color: [number, number, number];
   dialogs: string;
-  questId: string;
   speed: number;
 }
 
 const emptyForm: FormState = {
+  id: "",
   name: "",
   color: [1.0, 1.0, 1.0],
   dialogs: "",
-  questId: "",
   speed: 1.0,
 };
 
@@ -25,7 +25,7 @@ export default function VillagersPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState<FormState>(emptyForm);
-  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
 
   async function load() {
@@ -40,15 +40,15 @@ export default function VillagersPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!createForm.name.trim()) return;
+    if (!createForm.id.trim() || !createForm.name.trim()) return;
     const res = await fetch("/api/quests/villagers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        id: createForm.id.trim(),
         name: createForm.name.trim(),
         color: createForm.color,
         dialogs: parseDialogs(createForm.dialogs),
-        questId: createForm.questId.trim() || null,
         speed: createForm.speed,
       }),
     });
@@ -62,19 +62,19 @@ export default function VillagersPage() {
     }
   }
 
-  async function handleSave(name: string) {
-    const res = await fetch(`/api/quests/villagers/${encodeURIComponent(name)}`, {
+  async function handleSave(id: string) {
+    const res = await fetch(`/api/quests/villagers/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        name: editForm.name.trim(),
         color: editForm.color,
         dialogs: parseDialogs(editForm.dialogs),
-        questId: editForm.questId.trim() || null,
         speed: editForm.speed,
       }),
     });
     if (res.ok) {
-      setEditingName(null);
+      setEditingId(null);
       load();
     } else {
       const json = await res.json();
@@ -82,9 +82,9 @@ export default function VillagersPage() {
     }
   }
 
-  async function handleDelete(name: string) {
-    if (!confirm(`"${name}" villager 를 삭제하시겠습니까?`)) return;
-    await fetch(`/api/quests/villagers/${encodeURIComponent(name)}`, { method: "DELETE" });
+  async function handleDelete(id: string) {
+    if (!confirm(`"${id}" villager 를 삭제하시겠습니까?`)) return;
+    await fetch(`/api/quests/villagers/${encodeURIComponent(id)}`, { method: "DELETE" });
     load();
   }
 
@@ -105,12 +105,12 @@ export default function VillagersPage() {
   }
 
   function startEdit(v: VillagerDocument) {
-    setEditingName(v.name);
+    setEditingId(v.id);
     setEditForm({
+      id: v.id,
       name: v.name,
       color: [v.color[0], v.color[1], v.color[2]],
       dialogs: v.dialogs.join("\n"),
-      questId: v.questId ?? "",
       speed: v.speed,
     });
   }
@@ -153,7 +153,7 @@ export default function VillagersPage() {
           onSubmit={handleCreate}
           className="mb-6 p-4 border rounded-lg bg-gray-50 dark:bg-gray-900 space-y-2"
         >
-          <FormFields form={createForm} setForm={setCreateForm} nameEditable />
+          <FormFields form={createForm} setForm={setCreateForm} idEditable />
           <div className="flex gap-2">
             <button type="submit" className="px-3 py-1 text-sm rounded bg-blue-600 text-white">
               생성
@@ -176,7 +176,7 @@ export default function VillagersPage() {
       ) : (
         <ul className="space-y-2">
           {list.map((v) => (
-            <li key={v.name} className="border rounded-lg overflow-hidden">
+            <li key={v.id} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900">
                 <div className="flex items-center gap-3 min-w-0">
                   <span
@@ -185,22 +185,24 @@ export default function VillagersPage() {
                     title={`(${v.color.join(", ")})`}
                   />
                   <div className="min-w-0">
-                    <div className="font-medium truncate">{v.name}</div>
+                    <div className="font-medium truncate">
+                      {v.name} <span className="font-mono text-xs text-gray-400">{v.id}</span>
+                    </div>
                     <div className="text-xs text-gray-500 truncate">
-                      {v.questId ? `quest: ${v.questId}` : "일반"} · 대사 {v.dialogs.length}줄 · speed {v.speed}
+                      대사 {v.dialogs.length}줄 · speed {v.speed}
                     </div>
                   </div>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Link
-                    href={`/quests/villagers/${encodeURIComponent(v.name)}/revisions`}
+                    href={`/quests/villagers/${encodeURIComponent(v.id)}/revisions`}
                     className="px-2 py-1 text-xs rounded border hover:border-purple-400 hover:text-purple-500 transition-colors"
                   >
                     히스토리 (v{v.version})
                   </Link>
-                  {editingName === v.name ? (
+                  {editingId === v.id ? (
                     <button
-                      onClick={() => setEditingName(null)}
+                      onClick={() => setEditingId(null)}
                       className="px-2 py-1 text-xs rounded border"
                     >
                       취소
@@ -214,18 +216,18 @@ export default function VillagersPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => handleDelete(v.name)}
+                    onClick={() => handleDelete(v.id)}
                     className="px-2 py-1 text-xs rounded border border-red-200 text-red-400 hover:border-red-400 hover:text-red-600 transition-colors"
                   >
                     삭제
                   </button>
                 </div>
               </div>
-              {editingName === v.name && (
+              {editingId === v.id && (
                 <div className="p-3 bg-white dark:bg-gray-950 space-y-2">
-                  <FormFields form={editForm} setForm={setEditForm} nameEditable={false} />
+                  <FormFields form={editForm} setForm={setEditForm} idEditable={false} />
                   <button
-                    onClick={() => handleSave(v.name)}
+                    onClick={() => handleSave(v.id)}
                     className="px-3 py-1 text-sm rounded bg-blue-600 text-white"
                   >
                     저장
@@ -247,32 +249,32 @@ function parseDialogs(s: string): string[] {
 function FormFields({
   form,
   setForm,
-  nameEditable,
+  idEditable,
 }: {
   form: FormState;
   setForm: (f: FormState) => void;
-  nameEditable: boolean;
+  idEditable: boolean;
 }) {
   const inputCls = "border rounded px-2 py-1 text-sm w-full bg-white dark:bg-gray-800";
   return (
     <div className="space-y-2">
       <div className="flex gap-2 flex-wrap items-end">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">name</span>
+          <span className="text-xs text-gray-500">id (퀘스트 giver_npc 가 참조)</span>
           <input
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            disabled={!nameEditable}
-            placeholder="장로"
-            className={`${inputCls} w-40 ${!nameEditable ? "opacity-60" : ""}`}
+            value={form.id}
+            onChange={(e) => setForm({ ...form, id: e.target.value })}
+            disabled={!idEditable}
+            placeholder="elder"
+            className={`${inputCls} w-40 font-mono ${!idEditable ? "opacity-60" : ""}`}
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">questId (없으면 빈 값)</span>
+          <span className="text-xs text-gray-500">name (표시용)</span>
           <input
-            value={form.questId}
-            onChange={(e) => setForm({ ...form, questId: e.target.value })}
-            placeholder="gem_quest"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="장로"
             className={`${inputCls} w-40`}
           />
         </label>

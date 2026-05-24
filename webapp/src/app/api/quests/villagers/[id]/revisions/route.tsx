@@ -4,14 +4,14 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 import Villager from "@/models/villager";
 import VillagerRevision from "@/models/villager-revision";
 
-type Params = { params: Promise<{ name: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 export async function GET(_req: NextRequest, { params }: Params) {
   await connectToDB();
-  const { name } = await params;
-  const decoded = decodeURIComponent(name);
+  const { id } = await params;
+  const decoded = decodeURIComponent(id);
 
-  const villager = await Villager.findOne({ name: decoded }).select("_id").lean();
+  const villager = await Villager.findOne({ id: decoded }).select("_id").lean();
   if (!villager) return apiError("villager 를 찾을 수 없습니다.", 404);
 
   const revisions = await VillagerRevision.find({ villagerId: villager._id })

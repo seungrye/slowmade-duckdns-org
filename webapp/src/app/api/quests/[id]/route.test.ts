@@ -176,16 +176,16 @@ describe('PUT /api/quests/[id]', () => {
   it('정상 카탈로그면 응답에 warnings: [] 포함 (저장 성공)', async () => {
     const mockPhases = new Map([['dormant', { dialog: [], objective: null }]]);
     const mockQuest = {
-      _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '장로',
+      _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: 'elder',
       initialPhase: 'dormant', phases: mockPhases, transitions: [], spawns: [], version: 1,
       save: vi.fn().mockResolvedValue(undefined),
-      toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', giverNpc: '장로', spawns: [], version: 2 }),
+      toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', giverNpc: 'elder', spawns: [], version: 2 }),
     };
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
     (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
-    // 장로가 등록된 카탈로그
+    // elder 가 등록된 villager 카탈로그 (id 기준)
     (Villager.find as ReturnType<typeof vi.fn>).mockReturnValue({
-      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ name: '장로' }]) }),
+      select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue([{ id: 'elder' }]) }),
     });
 
     const res = await PUT(makeRequest('PUT', {}), { params });

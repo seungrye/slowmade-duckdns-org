@@ -17,7 +17,7 @@ describe('GET /api/villagers/export', () => {
     (Villager.find as ReturnType<typeof vi.fn>).mockReturnValue({
       sort: vi.fn().mockReturnValue({
         lean: vi.fn().mockResolvedValue([
-          { name: '장로', color: [0.9, 0.8, 0.5], dialogs: [], questId: 'gem_quest', speed: 0.5 },
+          { id: 'elder', name: '장로', color: [0.9, 0.8, 0.5], dialogs: [], speed: 0.5 },
         ]),
       }),
     });
@@ -28,8 +28,9 @@ describe('GET /api/villagers/export', () => {
     expect(res.headers.get('Content-Disposition')).toContain('villagers.ron');
     const text = await res.text();
     expect(text).toContain('VillagerDef(');
+    expect(text).toContain('id: "elder"');
     expect(text).toContain('name: "장로"');
-    expect(text).toContain('quest_id: Some("gem_quest")');
+    expect(text).not.toContain('quest_id');
   });
 
   it('빈 카탈로그도 빈 RON 으로 반환한다', async () => {

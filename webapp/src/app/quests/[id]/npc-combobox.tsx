@@ -15,13 +15,14 @@ export function NpcCombobox({
   value,
   onChange,
   villagers,
-  placeholder = "NPC 이름",
+  placeholder = "NPC id",
   className = "",
 }: Props) {
   const listId = useId();
   const trimmed = value.trim();
+  // 값은 villager id (퀘스트 giver_npc / KillNpc 가 참조하는 식별자)
   const matched = trimmed.length > 0
-    ? villagers.find((v) => v.name === trimmed)
+    ? villagers.find((v) => v.id === trimmed)
     : undefined;
 
   const isUnknown = trimmed.length > 0 && !matched;
@@ -39,7 +40,7 @@ export function NpcCombobox({
         {isUnknown && (
           <span
             className="text-yellow-500 text-xs"
-            title="카탈로그에 등록되지 않은 이름 — 오타가 아닌지 확인하세요"
+            title="카탈로그에 등록되지 않은 id — 오타가 아닌지 확인하세요"
           >
             ?
           </span>
@@ -47,13 +48,13 @@ export function NpcCombobox({
       </div>
       <datalist id={listId}>
         {villagers.map((v) => (
-          <option key={v.name} value={v.name}>
-            {v.questId ? `(quest: ${v.questId})` : "일반"}
+          <option key={v.id} value={v.id}>
+            {v.name}
           </option>
         ))}
       </datalist>
-      {matched?.questId && (
-        <div className="text-[10px] text-gray-400">quest: {matched.questId}</div>
+      {matched && (
+        <div className="text-[10px] text-gray-400">{matched.name}</div>
       )}
     </div>
   );

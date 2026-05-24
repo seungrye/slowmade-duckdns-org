@@ -4,15 +4,15 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 import Villager from "@/models/villager";
 import VillagerRevision from "@/models/villager-revision";
 
-type Params = { params: Promise<{ name: string; ver: string }> };
+type Params = { params: Promise<{ id: string; ver: string }> };
 
 export async function POST(_req: NextRequest, { params }: Params) {
   await connectToDB();
-  const { name, ver } = await params;
-  const decoded = decodeURIComponent(name);
+  const { id, ver } = await params;
+  const decoded = decodeURIComponent(id);
   const version = Number(ver);
 
-  const villager = await Villager.findOne({ name: decoded });
+  const villager = await Villager.findOne({ id: decoded });
   if (!villager) return apiError("villager 를 찾을 수 없습니다.", 404);
 
   const revision = await VillagerRevision.findOne({ villagerId: villager._id, version })
@@ -24,18 +24,18 @@ export async function POST(_req: NextRequest, { params }: Params) {
     villagerId: villager._id,
     version: villager.version,
     villager: {
+      id: villager.id,
       name: villager.name,
       color: villager.color,
       dialogs: villager.dialogs,
-      questId: villager.questId,
       speed: villager.speed,
     },
   });
 
   const def = revision.villager as Record<string, unknown>;
+  villager.name = (def.name as string) ?? villager.name;
   villager.color = (def.color as number[]) ?? villager.color;
   villager.dialogs = (def.dialogs as string[]) ?? villager.dialogs;
-  villager.questId = (def.questId as string | null) ?? null;
   villager.speed = typeof def.speed === "number" ? def.speed : villager.speed;
   villager.version = (villager.version ?? 1) + 1;
 

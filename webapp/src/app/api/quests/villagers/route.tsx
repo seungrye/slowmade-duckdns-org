@@ -11,7 +11,7 @@ function isValidColor(c: unknown): c is [number, number, number] {
 
 export async function GET() {
   await connectToDB();
-  const villagers = await Villager.find({}).sort({ name: 1 }).lean();
+  const villagers = await Villager.find({}).sort({ id: 1 }).lean();
   return apiSuccess(villagers);
 }
 
@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
   await connectToDB();
   const body = await req.json();
 
+  if (typeof body.id !== "string" || !body.id.trim()) {
+    return apiError("id 는 필수입니다.", 400);
+  }
   if (typeof body.name !== "string" || !body.name.trim()) {
     return apiError("name 은 필수입니다.", 400);
   }
@@ -26,14 +29,14 @@ export async function POST(req: NextRequest) {
     return apiError("color 는 [r, g, b] (각 0.0~1.0) 형식이어야 합니다.", 400);
   }
 
-  const existing = await Villager.findOne({ name: body.name });
-  if (existing) return apiError(`이미 존재하는 villager 입니다: ${body.name}`, 409);
+  const existing = await Villager.findOne({ id: body.id });
+  if (existing) return apiError(`이미 존재하는 villager id 입니다: ${body.id}`, 409);
 
   const villager = await Villager.create({
+    id: body.id,
     name: body.name,
     color: body.color,
     dialogs: body.dialogs ?? [],
-    questId: body.questId ?? null,
     speed: body.speed ?? 1.0,
   });
 

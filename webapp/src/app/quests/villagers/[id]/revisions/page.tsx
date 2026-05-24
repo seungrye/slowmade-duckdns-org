@@ -6,25 +6,25 @@ import Link from "next/link";
 import type { VillagerRevisionDocument } from "@/types/villager";
 
 export default function VillagerRevisionsPage() {
-  const { name } = useParams<{ name: string }>();
-  const decoded = decodeURIComponent(name);
+  const { id } = useParams<{ id: string }>();
+  const decoded = decodeURIComponent(id);
   const [revisions, setRevisions] = useState<VillagerRevisionDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
 
   const load = useCallback(async () => {
-    const res = await fetch(`/api/quests/villagers/${name}/revisions`);
+    const res = await fetch(`/api/quests/villagers/${id}/revisions`);
     const json = await res.json();
     setRevisions(json.data ?? []);
     setLoading(false);
-  }, [name]);
+  }, [id]);
 
   useEffect(() => { load(); }, [load]);
 
   async function restore(version: number) {
     if (!confirm(`버전 ${version}으로 롤백하시겠습니까? 현재 상태는 자동으로 백업됩니다.`)) return;
     setRestoring(version);
-    const res = await fetch(`/api/quests/villagers/${name}/revisions/${version}/restore`, {
+    const res = await fetch(`/api/quests/villagers/${id}/revisions/${version}/restore`, {
       method: "POST",
     });
     setRestoring(null);
@@ -60,8 +60,8 @@ export default function VillagerRevisionsPage() {
                   {new Date(rev.createdAt).toLocaleString("ko-KR")}
                 </span>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  대사 {rev.villager.dialogs?.length ?? 0}줄
-                  · {rev.villager.questId ? `quest: ${rev.villager.questId}` : "일반"}
+                  {rev.villager.name}
+                  · 대사 {rev.villager.dialogs?.length ?? 0}줄
                   · speed {rev.villager.speed}
                 </p>
               </div>

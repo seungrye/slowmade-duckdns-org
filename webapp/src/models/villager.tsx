@@ -2,7 +2,9 @@ import { Schema, model, models, Model } from "mongoose";
 
 const VillagerSchema = new Schema(
   {
-    name: { type: String, required: true, unique: true },
+    // 정체성 키 — 퀘스트 giver_npc / KillNpc 가 참조. name 은 표시용(unique X).
+    id: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
     color: {
       type: [Number],
       required: true,
@@ -12,7 +14,6 @@ const VillagerSchema = new Schema(
       },
     },
     dialogs: { type: [String], default: [] },
-    questId: { type: String, default: null },
     speed: { type: Number, default: 1.0 },
     version: { type: Number, default: 1 },
   },
@@ -21,10 +22,10 @@ const VillagerSchema = new Schema(
 
 export interface VillagerDoc {
   _id: unknown;
+  id: string;
   name: string;
   color: number[];
   dialogs: string[];
-  questId: string | null;
   speed: number;
   version: number;
   createdAt: Date;

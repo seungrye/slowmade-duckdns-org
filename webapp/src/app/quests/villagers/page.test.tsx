@@ -6,8 +6,8 @@ import VillagersPage from './page';
 vi.mock('next/navigation', () => ({ useRouter: () => ({}) }));
 
 const mockVillagers = [
-  { _id: '1', name: '장로', color: [0.9, 0.8, 0.5], dialogs: [], questId: 'gem_quest', speed: 0.5, version: 1 },
-  { _id: '2', name: '촌장', color: [1.0, 0.85, 0.0], dialogs: ['안녕', '잘가'], questId: null, speed: 1.0, version: 3 },
+  { _id: '1', id: 'elder', name: '장로', color: [0.9, 0.8, 0.5], dialogs: [], speed: 0.5, version: 1 },
+  { _id: '2', id: 'burgomaster', name: '촌장', color: [1.0, 0.85, 0.0], dialogs: ['안녕', '잘가'], speed: 1.0, version: 3 },
 ];
 
 beforeEach(() => {
@@ -31,12 +31,12 @@ describe('VillagersPage 렌더', () => {
     expect(screen.getByText('촌장')).toBeTruthy();
   });
 
-  it('퀘스트 NPC 와 일반 NPC 의 메타 정보가 다르게 표시된다', async () => {
+  it('id 와 대사 수 메타 정보가 표시된다', async () => {
     const { container } = render(<VillagersPage />);
     await act(async () => {});
     const text = container.textContent ?? '';
-    expect(text).toContain('quest: gem_quest');
-    expect(text).toContain('일반');
+    expect(text).toContain('elder');
+    expect(text).toContain('burgomaster');
     expect(text).toContain('대사 0줄');
     expect(text).toContain('대사 2줄');
   });

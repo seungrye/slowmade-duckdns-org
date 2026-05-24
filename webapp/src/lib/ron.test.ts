@@ -422,20 +422,20 @@ describe("serializeRon — Always 조건", () => {
 describe("parseVillagersRon — 기본", () => {
   const SIMPLE = `[
     VillagerDef(
+        id: "elder",
         name: "장로",
         color: (0.9, 0.8, 0.5),
         dialogs: [],
-        quest_id: Some("gem_quest"),
         speed: 0.5,
     ),
     VillagerDef(
+        id: "burgomaster",
         name: "촌장",
         color: (1.0, 0.85, 0.0),
         dialogs: [
             "안녕",
             "잘 가게.",
         ],
-        quest_id: None,
         speed: 1.0,
     ),
 ]`;
@@ -444,19 +444,28 @@ describe("parseVillagersRon — 기본", () => {
     const villagers = parseVillagersRon(SIMPLE);
     expect(villagers).toHaveLength(2);
     expect(villagers[0]).toEqual({
+      id: "elder",
       name: "장로",
       color: [0.9, 0.8, 0.5],
       dialogs: [],
-      questId: "gem_quest",
       speed: 0.5,
     });
     expect(villagers[1]).toEqual({
+      id: "burgomaster",
       name: "촌장",
       color: [1.0, 0.85, 0.0],
       dialogs: ["안녕", "잘 가게."],
-      questId: null,
       speed: 1.0,
     });
+  });
+
+  it("구 형식의 quest_id 는 소비 후 무시된다 (하위호환)", () => {
+    const old = `[VillagerDef(id: "elder", name: "장로", color: (0.9, 0.8, 0.5), dialogs: [], quest_id: Some("gem_quest"), speed: 0.5)]`;
+    const villagers = parseVillagersRon(old);
+    expect(villagers[0]).toEqual({
+      id: "elder", name: "장로", color: [0.9, 0.8, 0.5], dialogs: [], speed: 0.5,
+    });
+    expect("questId" in villagers[0]).toBe(false);
   });
 
   it("빈 배열 파싱", () => {
@@ -475,14 +484,13 @@ describe("serializeVillagersRon — 빈 배열", () => {
     expect(serializeVillagersRon([])).toBe("[]\n");
   });
 
-  it("questId null 은 None, 값 있으면 Some", () => {
+  it("id 를 출력하고 quest_id 는 출력하지 않는다", () => {
     const villagers: VillagerDef[] = [
-      { name: "a", color: [0, 0, 0], dialogs: [], questId: null, speed: 1.0 },
-      { name: "b", color: [1, 1, 1], dialogs: [], questId: "q1", speed: 1.0 },
+      { id: "a", name: "에이", color: [0, 0, 0], dialogs: [], speed: 1.0 },
     ];
     const out = serializeVillagersRon(villagers);
-    expect(out).toContain("quest_id: None");
-    expect(out).toContain('quest_id: Some("q1")');
+    expect(out).toContain('id: "a"');
+    expect(out).not.toContain("quest_id");
   });
 });
 

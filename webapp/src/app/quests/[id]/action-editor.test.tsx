@@ -226,20 +226,20 @@ describe('ActionEditor — OpenPortal (ZoneCombobox + generator auto-fill)', () 
 });
 
 describe('ActionEditor — KillNpc (NpcCombobox 통합)', () => {
-  it('villagers 카탈로그가 datalist 옵션으로 노출되고 현재 npcId 가 입력값', () => {
+  it('villagers 카탈로그가 datalist 옵션으로 노출되고 현재 npcId(id) 가 입력값', () => {
     const villagers = [
-      { _id: '1', name: '장로', color: [0.9, 0.8, 0.5] as [number, number, number], dialogs: [], questId: 'gem_quest', speed: 0.5, version: 1, createdAt: '', updatedAt: '' },
+      { _id: '1', id: 'elder', name: '장로', color: [0.9, 0.8, 0.5] as [number, number, number], dialogs: [], speed: 0.5, version: 1, createdAt: '', updatedAt: '' },
     ];
     const { container } = render(
       <ActionEditor
-        actions={[{ type: 'KillNpc', npcId: '장로' }]}
+        actions={[{ type: 'KillNpc', npcId: 'elder' }]}
         onChange={noop}
         villagers={villagers}
       />
     );
-    expect(screen.getByDisplayValue('장로')).toBeTruthy();
+    expect(screen.getByDisplayValue('elder')).toBeTruthy();
     const opts = container.querySelectorAll('datalist option');
-    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === '장로')).toBe(true);
+    expect(Array.from(opts).some((o) => (o as HTMLOptionElement).value === 'elder')).toBe(true);
   });
 
   it('미등록 npcId 면 ? 경고 마커 표시', () => {

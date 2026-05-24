@@ -4,7 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api-response";
 import Villager from "@/models/villager";
 import VillagerRevision from "@/models/villager-revision";
 
-type Params = { params: Promise<{ name: string }> };
+type Params = { params: Promise<{ id: string }> };
 
 function isValidColor(c: unknown): c is [number, number, number] {
   return Array.isArray(c)
@@ -14,19 +14,19 @@ function isValidColor(c: unknown): c is [number, number, number] {
 
 export async function GET(_req: NextRequest, { params }: Params) {
   await connectToDB();
-  const { name } = await params;
-  const villager = await Villager.findOne({ name: decodeURIComponent(name) }).lean();
+  const { id } = await params;
+  const villager = await Villager.findOne({ id: decodeURIComponent(id) }).lean();
   if (!villager) return apiError("villager 를 찾을 수 없습니다.", 404);
   return apiSuccess(villager);
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
   await connectToDB();
-  const { name } = await params;
-  const decoded = decodeURIComponent(name);
+  const { id } = await params;
+  const decoded = decodeURIComponent(id);
   const body = await req.json();
 
-  const villager = await Villager.findOne({ name: decoded });
+  const villager = await Villager.findOne({ id: decoded });
   if (!villager) return apiError("villager 를 찾을 수 없습니다.", 404);
 
   if (body.color !== undefined && !isValidColor(body.color)) {
@@ -38,17 +38,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
     villagerId: villager._id,
     version: villager.version,
     villager: {
+      id: villager.id,
       name: villager.name,
       color: villager.color,
       dialogs: villager.dialogs,
-      questId: villager.questId,
       speed: villager.speed,
     },
   });
 
+  if (body.name !== undefined) villager.name = body.name;
   if (body.color !== undefined) villager.color = body.color;
   if (body.dialogs !== undefined) villager.dialogs = body.dialogs;
-  if (body.questId !== undefined) villager.questId = body.questId;
   if (body.speed !== undefined) villager.speed = body.speed;
   villager.version = (villager.version ?? 1) + 1;
 
@@ -58,11 +58,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
   await connectToDB();
-  const { name } = await params;
-  const decoded = decodeURIComponent(name);
-  const villager = await Villager.findOne({ name: decoded });
+  const { id } = await params;
+  const decoded = decodeURIComponent(id);
+  const villager = await Villager.findOne({ id: decoded });
   if (!villager) return apiError("villager 를 찾을 수 없습니다.", 404);
   await VillagerRevision.deleteMany({ villagerId: villager._id });
   await villager.deleteOne();
-  return apiSuccess({ name: decoded });
+  return apiSuccess({ id: decoded });
 }

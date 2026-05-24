@@ -165,7 +165,7 @@ function ActionRow({
           value={action.npcId}
           onChange={(v) => onChange({ ...action, npcId: v })}
           villagers={villagers}
-          placeholder="NPC 이름"
+          placeholder="NPC id"
         />
       )}
 
