@@ -180,17 +180,17 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 
 ---
 
-# 후속: 중복 닫기(✕) 버튼 제거
+# 후속: 중복 닫기(✕) 버튼 제거 ✅
 
 캔버스 빈 곳 클릭(onPaneClick)으로 패널이 닫히므로 ✕ 닫기 버튼은 중복이다.
 제거하고 EdgePanel 의 "← 뒤로 가기" 만 남긴다.
 
 ## 동작 명세
 
-- [ ] `PhasePanel` / `EdgePanel` 헤더의 ✕ 닫기 버튼 제거
-- [ ] 사용하지 않게 된 `onClose` prop 및 `CloseButton` 컴포넌트 삭제
-- [ ] EdgePanel 의 "← {from} 페이즈로" 뒤로 가기 버튼은 유지
-- [ ] 패널 닫기는 캔버스 빈 곳 클릭으로 (기존 onPaneClick)
+- [x] `PhasePanel` / `EdgePanel` 헤더의 ✕ 닫기 버튼 제거
+- [x] 사용하지 않게 된 `onClose` prop 및 `CloseButton` 컴포넌트 삭제
+- [x] EdgePanel 의 "← {from} 페이즈로" 뒤로 가기 버튼은 유지
+- [x] 패널 닫기는 캔버스 빈 곳 클릭으로 (기존 onPaneClick)
 
 ## 영향 파일
 
