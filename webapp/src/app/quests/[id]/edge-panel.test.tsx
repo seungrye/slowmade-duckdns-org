@@ -40,13 +40,6 @@ describe("EdgePanel — 뒤로 가기", () => {
     render(<EdgePanel {...baseProps} />);
     expect(screen.queryByText(/페이즈로/)).toBeNull();
   });
-
-  it("onClose 로 ✕ 닫기 버튼도 함께 제공된다", () => {
-    const onClose = vi.fn();
-    render(<EdgePanel {...baseProps} onClose={onClose} onBack={vi.fn()} />);
-    fireEvent.click(screen.getByLabelText("패널 닫기"));
-    expect(onClose).toHaveBeenCalled();
-  });
 });
 
 describe("EdgePanel — 편집", () => {

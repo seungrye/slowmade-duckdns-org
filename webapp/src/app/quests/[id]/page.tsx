@@ -414,7 +414,6 @@ export default function QuestEditorPage() {
                   setSelectedNodeId(null);
                   setSelectedEdgeId(`t${index}:${t.from}→${t.to}`);
                 }}
-                onClose={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
                 onSetInitial={() => {
                   const updated = { ...quest, initialPhase: selectedNode.id };
                   setQuest(updated);
@@ -442,7 +441,6 @@ export default function QuestEditorPage() {
                 zones={zones}
                 onUpdateTransition={updateTransition}
                 onDeleteEdge={deleteEdge}
-                onClose={() => { setSelectedNodeId(null); setSelectedEdgeId(null); }}
                 onBack={(phaseId) => { setSelectedEdgeId(null); setSelectedNodeId(phaseId); }}
               />
             )}
