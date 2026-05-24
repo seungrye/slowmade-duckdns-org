@@ -7,6 +7,7 @@ import type { ItemDocument } from "@/types/item";
 import type { ZoneDocument } from "@/types/zone";
 import { ConditionEditor } from "./condition-editor";
 import { ActionEditor } from "./action-editor";
+import { CloseButton } from "./close-button";
 
 interface Props {
   edge: Edge;
@@ -17,6 +18,7 @@ interface Props {
   zones?: ZoneDocument[];
   onUpdateTransition: (index: number, updated: QuestTransition) => void;
   onDeleteEdge: (edgeId: string) => void;
+  onClose?: () => void;
 }
 
 export function EdgePanel({
@@ -28,6 +30,7 @@ export function EdgePanel({
   zones = [],
   onUpdateTransition,
   onDeleteEdge,
+  onClose,
 }: Props) {
   const idx = (edge.data as { transitionIndex?: number })?.transitionIndex ?? -1;
   const t = idx >= 0 ? transitions[idx] : undefined;
@@ -35,14 +38,17 @@ export function EdgePanel({
   if (!t) {
     return (
       <div className="h-full overflow-y-auto p-4 space-y-4 text-sm">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">전환 편집</h2>
-          <button
-            onClick={() => onDeleteEdge(edge.id)}
-            className="px-2 py-0.5 text-xs rounded border border-red-300 text-red-500 hover:bg-red-50"
-          >
-            연결 삭제
-          </button>
+          <div className="flex gap-1">
+            <button
+              onClick={() => onDeleteEdge(edge.id)}
+              className="px-2 py-0.5 text-xs rounded border border-red-300 text-red-500 hover:bg-red-50"
+            >
+              연결 삭제
+            </button>
+            <CloseButton onClose={onClose} />
+          </div>
         </div>
         <p className="text-xs text-gray-400">전환 정보를 찾을 수 없습니다.</p>
       </div>
@@ -56,14 +62,17 @@ export function EdgePanel({
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 text-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="font-semibold">전환 편집</h2>
-        <button
-          onClick={() => onDeleteEdge(edge.id)}
-          className="px-2 py-0.5 text-xs rounded border border-red-300 text-red-500 hover:bg-red-50"
-        >
-          연결 삭제
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={() => onDeleteEdge(edge.id)}
+            className="px-2 py-0.5 text-xs rounded border border-red-300 text-red-500 hover:bg-red-50"
+          >
+            연결 삭제
+          </button>
+          <CloseButton onClose={onClose} />
+        </div>
       </div>
 
       {/* from / to */}

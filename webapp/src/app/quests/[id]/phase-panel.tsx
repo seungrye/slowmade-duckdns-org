@@ -3,6 +3,7 @@
 import type { QuestPhaseDef, QuestTransition } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
 import { NpcCombobox } from "./npc-combobox";
+import { CloseButton } from "./close-button";
 import { conditionSummary } from "@/lib/condition-summary";
 
 interface Props {
@@ -19,6 +20,7 @@ interface Props {
   onSetInitial: () => void;
   /** 나가는 전환 행 클릭 시 해당 transition 편집(EdgePanel)으로 전환 */
   onEditTransition?: (index: number) => void;
+  onClose?: () => void;
 }
 
 export function PhasePanel({
@@ -33,6 +35,7 @@ export function PhasePanel({
   onDelete,
   onSetInitial,
   onEditTransition,
+  onClose,
 }: Props) {
   function setDialog(lines: string[]) { onUpdate({ ...phase, dialog: lines }); }
   function setObjective(v: string) { onUpdate({ ...phase, objective: v || null }); }
@@ -65,6 +68,7 @@ export function PhasePanel({
           >
             삭제
           </button>
+          <CloseButton onClose={onClose} />
         </div>
       </div>
 

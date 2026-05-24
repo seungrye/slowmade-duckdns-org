@@ -79,3 +79,17 @@ describe("PhasePanel — 나가는 전환 목록", () => {
     expect(screen.getByText(/terminal/)).toBeTruthy();
   });
 });
+
+describe("PhasePanel — 닫기 버튼", () => {
+  it("onClose 가 있으면 ✕ 버튼이 렌더되고 클릭 시 호출", () => {
+    const onClose = vi.fn();
+    render(<PhasePanel {...baseProps} isInitial={false} onClose={onClose} />);
+    fireEvent.click(screen.getByLabelText("패널 닫기"));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("onClose 가 없으면 ✕ 버튼이 없다", () => {
+    render(<PhasePanel {...baseProps} isInitial={false} />);
+    expect(screen.queryByLabelText("패널 닫기")).toBeNull();
+  });
+});
