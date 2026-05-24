@@ -1,5 +1,5 @@
 import type { Node, Edge } from "@xyflow/react";
-import type { QuestDocument, Action, QuestPhaseDef } from "@/types/quest";
+import type { QuestDocument, QuestPhaseDef } from "@/types/quest";
 import type { PhaseNodeData } from "./phase-node";
 
 export function syncPhasePositions(
@@ -13,15 +13,6 @@ export function syncPhasePositions(
     }
   }
   return result;
-}
-
-function collectAdvanceTargets(actions: Action[]): string[] {
-  const targets: string[] = [];
-  for (const a of actions) {
-    if (a.type === "AdvancePhase") targets.push(a.phaseId);
-    if (a.type === "Branch") targets.push(...collectAdvanceTargets([...a.ifTrue, ...a.ifFalse]));
-  }
-  return targets;
 }
 
 export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[] } {
@@ -41,48 +32,24 @@ export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[]
         giverNpc: phaseId === quest.initialPhase ? quest.giverNpc : undefined,
       } satisfies PhaseNodeData,
     });
-
-    phase.on_interact.forEach((action, ai) => {
-      if (action.type === "AdvancePhase") {
-        edges.push({
-          id: `${phaseId}→${action.phaseId}→interact→${ai}`,
-          source: phaseId,
-          target: action.phaseId,
-          label: "interact",
-          style: { stroke: "#3b82f6" },
-          data: { edgeType: "on_interact" },
-          animated: false,
-        });
-      }
-      if (action.type === "Branch") {
-        collectAdvanceTargets([...action.ifTrue, ...action.ifFalse]).forEach((target, bi) => {
-          edges.push({
-            id: `${phaseId}→${target}→branch→${ai}→${bi}`,
-              source: phaseId,
-            target,
-            label: "branch",
-            style: { stroke: "#f97316", strokeDasharray: "4 2" },
-            data: { edgeType: "branch" },
-            animated: false,
-          });
-        });
-      }
-    });
-
-    phase.auto_advance.forEach((aa, aai) => {
-      if (aa.nextPhase) {
-        edges.push({
-          id: `${phaseId}→${aa.nextPhase}→auto→${aai}`,
-          source: phaseId,
-          target: aa.nextPhase,
-          label: "auto",
-          style: { stroke: "#f59e0b", strokeDasharray: "6 3" },
-          data: { edgeType: "auto_advance", aaIndex: aai },
-          animated: true,
-        });
-      }
-    });
   }
+
+  // transition 1개 = 엣지 1개. Interact 는 파랑, Auto 는 주황 점선.
+  (quest.transitions ?? []).forEach((t, ti) => {
+    if (!t.from || !t.to) return;
+    const isAuto = t.trigger === "Auto";
+    edges.push({
+      id: `t${ti}:${t.from}→${t.to}`,
+      source: t.from,
+      target: t.to,
+      label: isAuto ? "auto" : "interact",
+      style: isAuto
+        ? { stroke: "#f59e0b", strokeDasharray: "6 3" }
+        : { stroke: "#3b82f6" },
+      data: { edgeType: "transition", transitionIndex: ti },
+      animated: isAuto,
+    });
+  });
 
   return { nodes, edges };
 }

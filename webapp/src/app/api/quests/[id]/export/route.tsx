@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       ? Object.fromEntries(quest.phases)
       : (quest.phases as unknown as Record<string, unknown>) ?? {}
     ) as QuestDef["phases"],
+    transitions: (quest.transitions as QuestDef["transitions"]) ?? [],
     spawns: (quest.spawns as QuestDef["spawns"]) ?? [],
   };
 

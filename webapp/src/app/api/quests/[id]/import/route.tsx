@@ -40,6 +40,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       giverNpc: quest.giverNpc,
       initialPhase: quest.initialPhase,
       phases: Object.fromEntries(quest.phases ?? new Map()),
+      transitions: quest.transitions,
       spawns: quest.spawns,
     },
   });
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   quest.giverNpc = def.giverNpc;
   quest.initialPhase = def.initialPhase;
   quest.phases = new Map(Object.entries(def.phases));
+  quest.transitions = def.transitions as unknown[];
   quest.spawns = def.spawns as unknown[];
   quest.version = (quest.version ?? 1) + 1;
 
@@ -63,6 +65,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       giverNpc: quest.giverNpc,
       initialPhase: quest.initialPhase,
       phases: phasesObj,
+      transitions: (quest.transitions ?? []) as QuestDef["transitions"],
       spawns: quest.spawns as QuestDef["spawns"],
     },
     catalogs,

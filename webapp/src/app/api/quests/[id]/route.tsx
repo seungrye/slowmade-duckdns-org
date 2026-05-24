@@ -53,6 +53,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       giverNpc: quest.giverNpc,
       initialPhase: quest.initialPhase,
       phases: Object.fromEntries(quest.phases ?? new Map()),
+      transitions: quest.transitions,
       spawns: quest.spawns,
     },
   });
@@ -60,6 +61,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.title !== undefined) quest.title = body.title;
   if (body.giverNpc !== undefined) quest.giverNpc = body.giverNpc;
   if (body.initialPhase !== undefined) quest.initialPhase = body.initialPhase;
+  if (body.transitions !== undefined) quest.transitions = body.transitions;
   if (body.spawns !== undefined) quest.spawns = body.spawns;
 
   // phases는 plain object → Map으로 변환해서 저장
@@ -73,6 +75,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   // 참조 무결성 검증 (soft warning)
   const catalogs = await loadCatalogSets();
   const phasesObj = Object.fromEntries(quest.phases ?? new Map()) as QuestDef["phases"];
+  const transitions = (quest.transitions ?? []) as QuestDef["transitions"];
   const warnings = validateQuestRefs(
     {
       id: quest.id,
@@ -80,6 +83,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       giverNpc: quest.giverNpc,
       initialPhase: quest.initialPhase,
       phases: phasesObj,
+      transitions,
       spawns: quest.spawns as QuestDef["spawns"],
     },
     catalogs,
@@ -91,6 +95,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     giverNpc: quest.giverNpc,
     initialPhase: quest.initialPhase,
     phases: phasesObj,
+    transitions,
     spawns: quest.spawns as QuestDef["spawns"],
   };
   const structErrors = validateQuestStructure(questDefForValidation);

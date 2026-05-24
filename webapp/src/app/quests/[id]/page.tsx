@@ -7,7 +7,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  addEdge,
   useNodesState,
   useEdgesState,
   type Node,
@@ -17,7 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import type { QuestDocument, QuestPhaseDef, AutoAdvance } from "@/types/quest";
+import type { QuestDocument, QuestPhaseDef, QuestTransition } from "@/types/quest";
 import type { VillagerDocument } from "@/types/villager";
 import type { ItemDocument } from "@/types/item";
 import type { ZoneDocument } from "@/types/zone";
@@ -95,41 +94,24 @@ export default function QuestEditorPage() {
     [quest]
   );
 
-  // 엣지 연결: 새 AdvancePhase 또는 auto_advance 추가
+  // 엣지 연결: 새 Interact transition 추가
   const onConnect = useCallback(
     (connection: Connection) => {
       if (!quest || !connection.source || !connection.target) return;
-      const source = connection.source;
-      const target = connection.target;
-      const phase = quest.phases[source];
-      if (!phase) return;
-
-      // 기본: on_interact AdvancePhase로 추가
-      const newAction = { type: "AdvancePhase" as const, phaseId: target };
-      const updatedPhase: QuestPhaseDef = {
-        ...phase,
-        on_interact: [...phase.on_interact, newAction],
+      const newTransition: QuestTransition = {
+        from: connection.source,
+        trigger: "Interact",
+        actions: [],
+        to: connection.target,
       };
       const updatedQuest = {
         ...quest,
-        phases: { ...quest.phases, [source]: updatedPhase },
+        transitions: [...(quest.transitions ?? []), newTransition],
       };
       setQuest(updatedQuest);
       setDirty(true);
-
-      const edgeId = `${source}→${target}→interact→${phase.on_interact.length}`;
-      setEdges((eds) =>
-        addEdge(
-          {
-            ...connection,
-            id: edgeId,
-            label: "interact",
-            style: { stroke: "#3b82f6" },
-            data: { edgeType: "on_interact" },
-          },
-          eds
-        )
-      );
+      const { edges: newEdges } = buildGraph(updatedQuest);
+      setEdges(newEdges);
     },
     [quest, setEdges]
   );
@@ -152,24 +134,28 @@ export default function QuestEditorPage() {
             : n
         )
       );
-      // 엣지 재구성 (on_interact / auto_advance 변경 반영)
+      // 엣지 재구성 (phase 메타 변경 반영)
       const { edges: newEdges } = buildGraph(updatedQuest);
       setEdges(newEdges);
     },
     [quest, setNodes, setEdges]
   );
 
-  // 페이즈 삭제
+  // 페이즈 삭제 (해당 phase 를 참조하는 transition 도 함께 제거)
   const deletePhase = useCallback(
     (phaseId: string) => {
       if (!quest) return;
       const restPhases = { ...quest.phases };
       delete restPhases[phaseId];
-      const updatedQuest = { ...quest, phases: restPhases };
+      const restTransitions = (quest.transitions ?? []).filter(
+        (t) => t.from !== phaseId && t.to !== phaseId
+      );
+      const updatedQuest = { ...quest, phases: restPhases, transitions: restTransitions };
       setQuest(updatedQuest);
       setDirty(true);
       setNodes((nds) => nds.filter((n) => n.id !== phaseId));
-      setEdges((eds) => eds.filter((e) => e.source !== phaseId && e.target !== phaseId));
+      const { edges: newEdges } = buildGraph(updatedQuest);
+      setEdges(newEdges);
       if (selectedNodeId === phaseId) setSelectedNodeId(null);
     },
     [quest, setNodes, setEdges, selectedNodeId]
@@ -181,8 +167,6 @@ export default function QuestEditorPage() {
     const newId = `phase_${Date.now()}`;
     const newPhase: QuestPhaseDef = {
       dialog: [],
-      on_interact: [],
-      auto_advance: [],
       objective: null,
       position: { x: Object.keys(quest.phases).length * 240, y: 200 },
     };
@@ -204,37 +188,23 @@ export default function QuestEditorPage() {
     setSelectedNodeId(newId);
   }, [quest, setNodes]);
 
-  // 엣지 삭제 (on_interact AdvancePhase 액션 제거)
+  // 엣지 삭제 (해당 transition 제거)
   const deleteEdge = useCallback(
     (edgeId: string) => {
       if (!quest) return;
       const edge = edges.find((e) => e.id === edgeId);
       if (!edge) return;
 
-      const phase = quest.phases[edge.source];
-      if (!phase) { setEdges((eds) => eds.filter((e) => e.id !== edgeId)); return; }
-
-      const edgeType = (edge.data as { edgeType?: string })?.edgeType;
-      let updatedPhase = phase;
-
-      if (edgeType === "on_interact") {
-        updatedPhase = {
-          ...phase,
-          on_interact: phase.on_interact.filter(
-            (a) => !(a.type === "AdvancePhase" && a.phaseId === edge.target)
-          ),
-        };
-      } else if (edgeType === "auto_advance") {
-        const aaIndex = (edge.data as { aaIndex?: number })?.aaIndex ?? -1;
-        updatedPhase = {
-          ...phase,
-          auto_advance: phase.auto_advance.filter((_, i) => i !== aaIndex),
-        };
+      const idx = (edge.data as { transitionIndex?: number })?.transitionIndex;
+      if (idx === undefined || idx < 0) {
+        setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+        setSelectedEdgeId(null);
+        return;
       }
 
       const updatedQuest = {
         ...quest,
-        phases: { ...quest.phases, [edge.source]: updatedPhase },
+        transitions: (quest.transitions ?? []).filter((_, i) => i !== idx),
       };
       setQuest(updatedQuest);
       setDirty(true);
@@ -262,16 +232,21 @@ export default function QuestEditorPage() {
     [quest, setNodes]
   );
 
-  // auto_advance 조건 업데이트
-  const updateAutoAdvance = useCallback(
-    (sourcePhaseId: string, index: number, updated: AutoAdvance) => {
+  // transition 업데이트
+  const updateTransition = useCallback(
+    (index: number, updated: QuestTransition) => {
       if (!quest) return;
-      const phase = quest.phases[sourcePhaseId];
-      const next = [...phase.auto_advance];
+      const next = [...(quest.transitions ?? [])];
       next[index] = updated;
-      updatePhase(sourcePhaseId, { ...phase, auto_advance: next });
+      const updatedQuest = { ...quest, transitions: next };
+      setQuest(updatedQuest);
+      setDirty(true);
+      const { edges: newEdges } = buildGraph(updatedQuest);
+      setEdges(newEdges);
+      // from/to 변경 시 엣지 id 가 바뀌므로 선택 유지
+      setSelectedEdgeId(`t${index}:${updated.from}→${updated.to}`);
     },
-    [quest, updatePhase]
+    [quest, setEdges]
   );
 
   const handleNodesChange = useCallback(
@@ -428,10 +403,7 @@ export default function QuestEditorPage() {
                 phase={quest.phases[selectedNode.id]}
                 isInitial={selectedNode.id === quest.initialPhase}
                 giverNpc={quest.giverNpc}
-                phaseIds={phaseIds}
                 villagers={villagers}
-                items={items}
-                zones={zones}
                 onUpdate={(updated) => updatePhase(selectedNode.id, updated)}
                 onUpdateGiverNpc={updateGiverNpc}
                 onDelete={() => deletePhase(selectedNode.id)}
@@ -455,10 +427,12 @@ export default function QuestEditorPage() {
             {selectedEdge && (
               <EdgePanel
                 edge={selectedEdge}
-                phases={quest.phases}
+                transitions={quest.transitions}
+                phaseIds={phaseIds}
+                villagers={villagers}
                 items={items}
                 zones={zones}
-                onUpdateAutoAdvance={updateAutoAdvance}
+                onUpdateTransition={updateTransition}
                 onDeleteEdge={deleteEdge}
               />
             )}

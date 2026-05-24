@@ -22,7 +22,6 @@ export type PortalPlacement =
 // ── 액션 타입 ─────────────────────────────────────────────────────────────
 
 export type Action =
-  | { type: "AdvancePhase"; phaseId: string }
   | { type: "Log"; text: string }
   | { type: "GiveItem"; itemId: string }
   | { type: "GiveItems"; itemId: string; count: number }
@@ -32,15 +31,26 @@ export type Action =
   | { type: "KillNpc"; npcId: string }
   | { type: "DespawnWorldItem"; itemId: string }
   | { type: "OpenPortal"; zone: string; generator: string; placement?: PortalPlacement }
-  | { type: "ClosePortal"; zone: string }
-  | { type: "Branch"; condition: Condition; ifTrue: Action[]; ifFalse: Action[] };
+  | { type: "ClosePortal"; zone: string };
 
-// ── 자동 전진 ─────────────────────────────────────────────────────────────
+// ── 상태 전환 ─────────────────────────────────────────────────────────────
 
-export interface AutoAdvance {
-  condition: Condition;
-  nextPhase: string;
-  actions?: Action[];
+/** NPC 상호작용(Interact) 또는 매 프레임 자동 조건(Auto) 트리거. */
+export type TriggerKind = "Interact" | "Auto";
+
+/**
+ * 순서형 상태 전환 규칙. 같은 (from, trigger) 그룹에서 RON 목록 순서대로
+ * 평가하여 첫 번째 매칭(when 충족)만 실행한다. `to === from` 이면 같은 phase
+ * 에 머문다 (Log 전용 등).
+ */
+export interface QuestTransition {
+  from: string;
+  trigger: TriggerKind;
+  /** 없으면 항상 매칭 (unconditional) */
+  when?: Condition;
+  /** Auto trigger 는 DespawnWorldItem/RemoveItem/SetFlag 만 허용 */
+  actions: Action[];
+  to: string;
 }
 
 // ── 스폰 존 ───────────────────────────────────────────────────────────────
@@ -63,8 +73,6 @@ export interface QuestSpawn {
 
 export interface QuestPhaseDef {
   dialog: string[];
-  on_interact: Action[];
-  auto_advance: AutoAdvance[];
   objective: string | null;
   /** React Flow 캔버스 위치 (에디터 전용) */
   position?: { x: number; y: number };
@@ -79,6 +87,8 @@ export interface QuestDef {
   initialPhase: string;
   spawnChance?: number;
   phases: Record<string, QuestPhaseDef>;
+  /** 순서형 상태 전환 규칙 목록 */
+  transitions: QuestTransition[];
   spawns: QuestSpawn[];
 }
 

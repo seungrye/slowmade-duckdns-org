@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateQuestRefs, validateQuestStructure, type CatalogSets } from "./quest-validation";
-import type { QuestDef } from "@/types/quest";
+import type { QuestDef, QuestTransition } from "@/types/quest";
 
 const empty: CatalogSets = {
   villagers: new Set(),
@@ -20,10 +20,22 @@ function quest(partial: Partial<QuestDef> = {}): QuestDef {
     title: "퀘스트",
     giverNpc: "",
     initialPhase: "dormant",
-    phases: { dormant: { dialog: [], on_interact: [], auto_advance: [], objective: null } },
+    phases: { dormant: { dialog: [], objective: null } },
+    transitions: [],
     spawns: [],
     ...partial,
   };
+}
+
+/** dormant 에서 시작하는 단일 transition 을 가진 quest 헬퍼 */
+function questWithTransition(t: Partial<QuestTransition>): QuestDef {
+  return quest({
+    phases: {
+      dormant: { dialog: [], objective: null },
+      next: { dialog: [], objective: null },
+    },
+    transitions: [{ from: "dormant", trigger: "Interact", actions: [], to: "next", ...t }],
+  });
 }
 
 describe("validateQuestRefs — giverNpc", () => {
@@ -42,214 +54,113 @@ describe("validateQuestRefs — giverNpc", () => {
   });
 });
 
-describe("validateQuestRefs — Action 참조", () => {
+describe("validateQuestRefs — transition actions 참조", () => {
   it("GiveItem 의 미등록 itemId", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [{ type: "GiveItem", itemId: "없는item" }],
-        },
-      },
-    });
-    const w = validateQuestRefs(q, full);
-    expect(w).toEqual([
-      { path: "phases.dormant.on_interact[0].itemId", kind: "item", missing: "없는item" },
+    const q = questWithTransition({ actions: [{ type: "GiveItem", itemId: "없는item" }] });
+    expect(validateQuestRefs(q, full)).toEqual([
+      { path: "transitions[0].actions[0].itemId", kind: "item", missing: "없는item" },
     ]);
   });
 
   it("KillNpc 의 미등록 npcId", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [{ type: "KillNpc", npcId: "없는NPC" }],
-        },
-      },
-    });
+    const q = questWithTransition({ actions: [{ type: "KillNpc", npcId: "없는NPC" }] });
     expect(validateQuestRefs(q, full)).toEqual([
-      { path: "phases.dormant.on_interact[0].npcId", kind: "villager", missing: "없는NPC" },
+      { path: "transitions[0].actions[0].npcId", kind: "villager", missing: "없는NPC" },
     ]);
   });
 
   it("OpenPortal 미등록 zone", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [{ type: "OpenPortal", zone: "없는존", generator: "bsp" }],
-        },
-      },
-    });
+    const q = questWithTransition({ actions: [{ type: "OpenPortal", zone: "없는존", generator: "bsp" }] });
     expect(validateQuestRefs(q, full)).toEqual([
-      { path: "phases.dormant.on_interact[0].zone", kind: "zone", missing: "없는존" },
+      { path: "transitions[0].actions[0].zone", kind: "zone", missing: "없는존" },
     ]);
   });
 
   it("ClosePortal 미등록 zone", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [{ type: "ClosePortal", zone: "없는존" }],
-        },
-      },
-    });
+    const q = questWithTransition({ actions: [{ type: "ClosePortal", zone: "없는존" }] });
     expect(validateQuestRefs(q, full)).toEqual([
-      { path: "phases.dormant.on_interact[0].zone", kind: "zone", missing: "없는존" },
+      { path: "transitions[0].actions[0].zone", kind: "zone", missing: "없는존" },
     ]);
   });
 
   it("GiveItems / RemoveItem / DespawnWorldItem 모두 itemId 검증", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [
-            { type: "GiveItems", itemId: "sword", count: 1 },
-            { type: "RemoveItem", itemId: "없는1" },
-            { type: "DespawnWorldItem", itemId: "없는2" },
-          ],
-        },
-      },
+    const q = questWithTransition({
+      actions: [
+        { type: "GiveItems", itemId: "sword", count: 1 },
+        { type: "RemoveItem", itemId: "없는1" },
+        { type: "DespawnWorldItem", itemId: "없는2" },
+      ],
     });
     const w = validateQuestRefs(q, full);
     expect(w.map((x) => x.missing)).toEqual(["없는1", "없는2"]);
   });
 
-  it("Branch 의 ifTrue/ifFalse 재귀 검사", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [
-            {
-              type: "Branch",
-              condition: { type: "HasItem", itemId: "없는조건" },
-              ifTrue: [{ type: "GiveItem", itemId: "없는true" }],
-              ifFalse: [{ type: "GiveItem", itemId: "없는false" }],
-            },
-          ],
-        },
-      },
+  it("transition 의 when 조건 + actions 모두 검사", () => {
+    const q = questWithTransition({
+      trigger: "Auto",
+      when: { type: "HasItem", itemId: "없는cond" },
+      actions: [{ type: "DespawnWorldItem", itemId: "없는act" }],
     });
     const w = validateQuestRefs(q, full);
     const paths = w.map((x) => x.path);
-    expect(paths).toContain("phases.dormant.on_interact[0].condition.itemId");
-    expect(paths).toContain("phases.dormant.on_interact[0].if_true[0].itemId");
-    expect(paths).toContain("phases.dormant.on_interact[0].if_false[0].itemId");
+    expect(paths).toContain("transitions[0].when.itemId");
+    expect(paths).toContain("transitions[0].actions[0].itemId");
   });
 
-  it("auto_advance 의 condition + actions 모두 검사", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], on_interact: [], objective: null,
-          auto_advance: [{
-            condition: { type: "HasItem", itemId: "없는cond" },
-            nextPhase: "next",
-            actions: [{ type: "DespawnWorldItem", itemId: "없는act" }],
-          }],
-        },
-      },
-    });
-    const w = validateQuestRefs(q, full);
-    const paths = w.map((x) => x.path);
-    expect(paths).toContain("phases.dormant.auto_advance[0].condition.itemId");
-    expect(paths).toContain("phases.dormant.auto_advance[0].actions[0].itemId");
-  });
-
-  it("AdvancePhase, Log, SetFlag, ClearFlag 는 검증 대상 없음", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], auto_advance: [], objective: null,
-          on_interact: [
-            { type: "AdvancePhase", phaseId: "x" },
-            { type: "Log", text: "hi" },
-            { type: "SetFlag", flag: "f", value: "v" },
-            { type: "ClearFlag", flag: "f" },
-          ],
-        },
-      },
+  it("Log, SetFlag, ClearFlag 는 검증 대상 없음", () => {
+    const q = questWithTransition({
+      actions: [
+        { type: "Log", text: "hi" },
+        { type: "SetFlag", flag: "f", value: "v" },
+        { type: "ClearFlag", flag: "f" },
+      ],
     });
     expect(validateQuestRefs(q, empty)).toEqual([]);
   });
 });
 
-describe("validateQuestRefs — Condition 참조", () => {
+describe("validateQuestRefs — transition when 조건 참조", () => {
   it("HasItem 미등록", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], on_interact: [], objective: null,
-          auto_advance: [{ condition: { type: "HasItem", itemId: "없는" }, nextPhase: "x" }],
-        },
-      },
-    });
+    const q = questWithTransition({ trigger: "Auto", when: { type: "HasItem", itemId: "없는" } });
     const w = validateQuestRefs(q, full);
-    expect(w[0]).toEqual({
-      path: "phases.dormant.auto_advance[0].condition.itemId",
-      kind: "item",
-      missing: "없는",
-    });
+    expect(w[0]).toEqual({ path: "transitions[0].when.itemId", kind: "item", missing: "없는" });
   });
 
   it("InZone(Named) 미등록", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], on_interact: [], objective: null,
-          auto_advance: [{
-            condition: { type: "InZone", zone: { type: "Named", id: "없는존" } },
-            nextPhase: "x",
-          }],
-        },
-      },
+    const q = questWithTransition({
+      trigger: "Auto",
+      when: { type: "InZone", zone: { type: "Named", id: "없는존" } },
     });
-    expect(validateQuestRefs(q, full)[0].path).toBe(
-      "phases.dormant.auto_advance[0].condition.zone.id",
-    );
+    expect(validateQuestRefs(q, full)[0].path).toBe("transitions[0].when.zone.id");
   });
 
   it("InZone(Town/Forest/Dungeon) 은 검증 안 함", () => {
     const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], on_interact: [], objective: null,
-          auto_advance: [
-            { condition: { type: "InZone", zone: { type: "Town" } }, nextPhase: "x" },
-            { condition: { type: "InZone", zone: { type: "Forest" } }, nextPhase: "y" },
-            { condition: { type: "InZone", zone: { type: "Dungeon", level: 1 } }, nextPhase: "z" },
-          ],
-        },
-      },
+      phases: { dormant: { dialog: [], objective: null }, x: { dialog: [], objective: null } },
+      transitions: [
+        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Town" } }, actions: [], to: "x" },
+        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Forest" } }, actions: [], to: "x" },
+        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Dungeon", level: 1 } }, actions: [], to: "x" },
+      ],
     });
     expect(validateQuestRefs(q, empty)).toEqual([]);
   });
 
   it("And/Or/Not 재귀", () => {
-    const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], on_interact: [], objective: null,
-          auto_advance: [{
-            condition: {
-              type: "And",
-              conditions: [
-                { type: "HasItem", itemId: "없는1" },
-                {
-                  type: "Or",
-                  conditions: [
-                    { type: "Not", condition: { type: "HasItem", itemId: "없는2" } },
-                    { type: "HasItem", itemId: "sword" },
-                  ],
-                },
-              ],
-            },
-            nextPhase: "x",
-          }],
-        },
+    const q = questWithTransition({
+      trigger: "Auto",
+      when: {
+        type: "And",
+        conditions: [
+          { type: "HasItem", itemId: "없는1" },
+          {
+            type: "Or",
+            conditions: [
+              { type: "Not", condition: { type: "HasItem", itemId: "없는2" } },
+              { type: "HasItem", itemId: "sword" },
+            ],
+          },
+        ],
       },
     });
     const w = validateQuestRefs(q, full);
@@ -258,16 +169,12 @@ describe("validateQuestRefs — Condition 참조", () => {
 
   it("FlagIs, HasFlag, Always 는 검증 안 함", () => {
     const q = quest({
-      phases: {
-        dormant: {
-          dialog: [], on_interact: [], objective: null,
-          auto_advance: [
-            { condition: { type: "Always" }, nextPhase: "a" },
-            { condition: { type: "FlagIs", flag: "f", value: "v" }, nextPhase: "b" },
-            { condition: { type: "HasFlag", flag: "f" }, nextPhase: "c" },
-          ],
-        },
-      },
+      phases: { dormant: { dialog: [], objective: null }, x: { dialog: [], objective: null } },
+      transitions: [
+        { from: "dormant", trigger: "Auto", when: { type: "Always" }, actions: [], to: "x" },
+        { from: "dormant", trigger: "Auto", when: { type: "FlagIs", flag: "f", value: "v" }, actions: [], to: "x" },
+        { from: "dormant", trigger: "Auto", when: { type: "HasFlag", flag: "f" }, actions: [], to: "x" },
+      ],
     });
     expect(validateQuestRefs(q, empty)).toEqual([]);
   });
@@ -275,18 +182,14 @@ describe("validateQuestRefs — Condition 참조", () => {
 
 describe("validateQuestRefs — Spawns", () => {
   it("spawn.item 미등록", () => {
-    const q = quest({
-      spawns: [{ phase: "p", item: "없는", zone: { type: "Forest" } }],
-    });
+    const q = quest({ spawns: [{ phase: "p", item: "없는", zone: { type: "Forest" } }] });
     expect(validateQuestRefs(q, full)).toEqual([
       { path: "spawns[0].item", kind: "item", missing: "없는" },
     ]);
   });
 
   it("spawn.zone Named 미등록", () => {
-    const q = quest({
-      spawns: [{ phase: "p", item: "sword", zone: { type: "Named", id: "없는존" } }],
-    });
+    const q = quest({ spawns: [{ phase: "p", item: "sword", zone: { type: "Named", id: "없는존" } }] });
     expect(validateQuestRefs(q, full)).toEqual([
       { path: "spawns[0].zone.id", kind: "zone", missing: "없는존" },
     ]);
@@ -310,25 +213,25 @@ describe("validateQuestRefs — 정상 퀘스트 (모든 참조 등록)", () => 
     const q = quest({
       giverNpc: "장로",
       phases: {
-        dormant: {
-          dialog: [],
-          on_interact: [
+        dormant: { dialog: [], objective: null },
+        next: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "dormant", trigger: "Interact",
+          actions: [
             { type: "GiveItem", itemId: "sword" },
             { type: "OpenPortal", zone: "demon_cave", generator: "cellular_automata" },
-            {
-              type: "Branch",
-              condition: { type: "HasItem", itemId: "eternal_gem" },
-              ifTrue: [{ type: "ClosePortal", zone: "herb_glade" }],
-              ifFalse: [],
-            },
+            { type: "ClosePortal", zone: "herb_glade" },
           ],
-          auto_advance: [{
-            condition: { type: "InZone", zone: { type: "Named", id: "demon_cave" } },
-            nextPhase: "next",
-          }],
-          objective: null,
+          to: "next",
         },
-      },
+        {
+          from: "dormant", trigger: "Auto",
+          when: { type: "InZone", zone: { type: "Named", id: "demon_cave" } },
+          actions: [], to: "next",
+        },
+      ],
       spawns: [
         { phase: "dormant", item: "health_potion", zone: { type: "Named", id: "herb_glade" } },
       ],
@@ -343,9 +246,10 @@ function makeQuest(overrides: Partial<QuestDef> = {}): QuestDef {
   return {
     id: "q", title: "q", giverNpc: "", initialPhase: "a",
     phases: {
-      a: { dialog: [], on_interact: [], auto_advance: [], objective: null },
-      b: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+      a: { dialog: [], objective: null },
+      b: { dialog: [], objective: null },
     },
+    transitions: [],
     spawns: [],
     ...overrides,
   };
@@ -363,86 +267,73 @@ describe("validateQuestStructure — initialPhase 검증", () => {
   });
 });
 
-describe("validateQuestStructure — AdvancePhase 타겟 검증", () => {
-  it("AdvancePhase 가 없는 phase 를 참조하면 오류", () => {
-    const q = makeQuest();
-    q.phases.a.on_interact = [{ type: "AdvancePhase", phaseId: "nonexistent" }];
+describe("validateQuestStructure — transition from/to 검증", () => {
+  it("transition to 가 없는 phase 면 오류", () => {
+    const q = makeQuest({ transitions: [{ from: "a", trigger: "Interact", actions: [], to: "nonexistent" }] });
     const errors = validateQuestStructure(q);
     expect(errors.some(e => e.message.includes("nonexistent"))).toBe(true);
   });
 
-  it("Branch 내부 AdvancePhase 도 재귀 검증", () => {
-    const q = makeQuest();
-    q.phases.a.on_interact = [{
-      type: "Branch",
-      condition: { type: "Always" },
-      ifTrue: [{ type: "AdvancePhase", phaseId: "ghost" }],
-      ifFalse: [],
-    }];
+  it("transition from 이 없는 phase 면 오류", () => {
+    const q = makeQuest({ transitions: [{ from: "ghost", trigger: "Interact", actions: [], to: "b" }] });
     const errors = validateQuestStructure(q);
     expect(errors.some(e => e.message.includes("ghost"))).toBe(true);
   });
 
-  it("존재하는 phase 로 AdvancePhase 는 통과", () => {
-    const q = makeQuest();
-    q.phases.a.on_interact = [{ type: "AdvancePhase", phaseId: "b" }];
+  it("존재하는 phase 사이 transition 은 통과", () => {
+    const q = makeQuest({ transitions: [{ from: "a", trigger: "Interact", actions: [], to: "b" }] });
     expect(validateQuestStructure(q)).toEqual([]);
   });
 });
 
-describe("validateQuestStructure — auto_advance nextPhase 검증", () => {
-  it("nextPhase 가 없는 phase 이면 오류", () => {
-    const q = makeQuest();
-    q.phases.a.auto_advance = [{ condition: { type: "HasFlag", flag: "x" }, nextPhase: "nowhere" }];
-    const errors = validateQuestStructure(q);
-    expect(errors.some(e => e.message.includes("nowhere"))).toBe(true);
-  });
-
-  it("nextPhase 가 존재하면 통과", () => {
-    const q = makeQuest();
-    q.phases.a.auto_advance = [{ condition: { type: "HasFlag", flag: "x" }, nextPhase: "b" }];
-    expect(validateQuestStructure(q)).toEqual([]);
-  });
-});
-
-describe("validateQuestStructure — auto_advance actions 타입 제한", () => {
-  it("허용되지 않는 액션(GiveItem)이 있으면 오류", () => {
-    const q = makeQuest();
-    q.phases.a.auto_advance = [{
-      condition: { type: "HasFlag", flag: "x" },
-      nextPhase: "b",
-      actions: [{ type: "GiveItem", itemId: "sword" }],
-    }];
+describe("validateQuestStructure — Auto transition actions 타입 제한", () => {
+  it("허용되지 않는 액션(GiveItem)이 Auto 에 있으면 오류", () => {
+    const q = makeQuest({
+      transitions: [{
+        from: "a", trigger: "Auto", when: { type: "HasFlag", flag: "x" },
+        actions: [{ type: "GiveItem", itemId: "sword" }], to: "b",
+      }],
+    });
     const errors = validateQuestStructure(q);
     expect(errors.some(e => e.message.includes("GiveItem"))).toBe(true);
   });
 
-  it("허용된 액션(DespawnWorldItem/RemoveItem/SetFlag)은 통과", () => {
-    const q = makeQuest();
-    q.phases.a.auto_advance = [{
-      condition: { type: "HasFlag", flag: "x" },
-      nextPhase: "b",
-      actions: [
-        { type: "DespawnWorldItem", itemId: "i" },
-        { type: "RemoveItem", itemId: "i" },
-        { type: "SetFlag", flag: "f", value: "v" },
-      ],
-    }];
+  it("허용된 액션(DespawnWorldItem/RemoveItem/SetFlag)은 Auto 에서 통과", () => {
+    const q = makeQuest({
+      transitions: [{
+        from: "a", trigger: "Auto", when: { type: "HasFlag", flag: "x" },
+        actions: [
+          { type: "DespawnWorldItem", itemId: "i" },
+          { type: "RemoveItem", itemId: "i" },
+          { type: "SetFlag", flag: "f", value: "v" },
+        ],
+        to: "b",
+      }],
+    });
+    expect(validateQuestStructure(q)).toEqual([]);
+  });
+
+  it("Interact transition 은 모든 액션 허용", () => {
+    const q = makeQuest({
+      transitions: [{
+        from: "a", trigger: "Interact",
+        actions: [{ type: "GiveItem", itemId: "sword" }, { type: "OpenPortal", zone: "z", generator: "bsp" }],
+        to: "b",
+      }],
+    });
     expect(validateQuestStructure(q)).toEqual([]);
   });
 });
 
 describe("validateQuestStructure — spawns phase 검증", () => {
   it("spawn phase 가 없으면 오류", () => {
-    const q = makeQuest();
-    q.spawns = [{ phase: "phantom", item: "gem", zone: { type: "Town" } }];
+    const q = makeQuest({ spawns: [{ phase: "phantom", item: "gem", zone: { type: "Town" } }] });
     const errors = validateQuestStructure(q);
     expect(errors.some(e => e.message.includes("phantom"))).toBe(true);
   });
 
   it("spawn phase 가 존재하면 통과", () => {
-    const q = makeQuest();
-    q.spawns = [{ phase: "a", item: "gem", zone: { type: "Town" } }];
+    const q = makeQuest({ spawns: [{ phase: "a", item: "gem", zone: { type: "Town" } }] });
     expect(validateQuestStructure(q)).toEqual([]);
   });
 });

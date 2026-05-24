@@ -1,7 +1,7 @@
 import { Schema, model, models, Model } from "mongoose";
 
-// phases와 spawns는 구조가 복잡하고 변형이 많아 Mixed로 저장
-// (Condition: And/Or/Not/PhaseIs/InZone, Action: Branch ifTrue/ifFalse 등)
+// phases, transitions, spawns 는 구조가 복잡하고 변형이 많아 Mixed로 저장
+// (Condition: And/Or/Not/PhaseIs/InZone, Transition: from/trigger/when/actions/to 등)
 const QuestSchema = new Schema(
   {
     id: { type: String, required: true, unique: true },
@@ -9,6 +9,7 @@ const QuestSchema = new Schema(
     giverNpc: { type: String, default: "" },
     initialPhase: { type: String, default: "dormant" },
     phases: { type: Map, of: Schema.Types.Mixed, default: {} },
+    transitions: { type: [Schema.Types.Mixed], default: [] },
     spawns: { type: [Schema.Types.Mixed], default: [] },
     version: { type: Number, default: 1 },
   },
@@ -22,6 +23,7 @@ export interface QuestDoc {
   giverNpc: string;
   initialPhase: string;
   phases: Map<string, unknown>;
+  transitions: unknown[];
   spawns: unknown[];
   version: number;
   createdAt: Date;

@@ -1,8 +1,9 @@
 import type {
   QuestDef,
   QuestPhaseDef,
+  QuestTransition,
+  TriggerKind,
   Action,
-  AutoAdvance,
   Condition,
   PortalPlacement,
   QuestSpawn,
@@ -28,6 +29,11 @@ function tokenize(src: string): Token[] {
   while (i < src.length) {
     // 라인 주석
     if (src[i] === "/" && src[i + 1] === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+      continue;
+    }
+    // RON 확장 directive (예: #![enable(implicit_some)]) — 라인 스킵
+    if (src[i] === "#") {
       while (i < src.length && src[i] !== "\n") i++;
       continue;
     }
@@ -117,6 +123,8 @@ class Parser {
   }
 
   parseOptionString(): string | null {
+    // implicit_some: bare 문자열도 수용
+    if (this.peek()?.kind === "str") return this.parseString();
     const name = this.parseIdent();
     if (name === "None") return null;
     this.expectPunct("(");
@@ -382,11 +390,6 @@ class Parser {
     this.expectPunct("(");
 
     switch (name) {
-      case "AdvancePhase": {
-        const phaseId = this.parseString();
-        this.expectPunct(")");
-        return { type: "AdvancePhase", phaseId };
-      }
       case "Log": {
         const text = this.parseString();
         this.expectPunct(")");
@@ -458,26 +461,6 @@ class Parser {
         this.expectPunct(")");
         return { type: "ClosePortal", zone };
       }
-      case "Branch": {
-        // Branch(condition: ..., if_true: [...], if_false: [...])
-        let condition: Condition = { type: "Always" };
-        let ifTrue: Action[] = [];
-        let ifFalse: Action[] = [];
-
-        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
-          const key = this.parseIdent();
-          this.expectPunct(":");
-          switch (key) {
-            case "condition": condition = this.parseCondition(); break;
-            case "if_true":   ifTrue   = this.parseActionList(); break;
-            case "if_false":  ifFalse  = this.parseActionList(); break;
-            default: break;
-          }
-          this.tryPunct(",");
-        }
-        this.expectPunct(")");
-        return { type: "Branch", condition, ifTrue, ifFalse };
-      }
       default:
         throw new Error(`Unknown action: ${name}`);
     }
@@ -505,28 +488,46 @@ class Parser {
     throw new Error(`Unknown placement: ${name}`);
   }
 
-  // ── AutoAdvance ───────────────────────────────────────────────────────────
+  // ── Transition ─────────────────────────────────────────────────────────────
 
-  parseAutoAdvance(): AutoAdvance {
-    let condition: Condition = { type: "Always" };
-    let nextPhase = "";
-    let actions: Action[] | undefined;
+  /** `when:` 값을 파싱한다. bare 조건(implicit_some), Some(..), None 모두 수용. */
+  parseWhenValue(): Condition | undefined {
+    const t = this.peek();
+    if (t?.kind === "ident" && (t.val === "Some" || t.val === "None")) {
+      return this.parseOptionCondition();
+    }
+    return this.parseCondition();
+  }
+
+  parseTransition(): QuestTransition {
+    let from = "";
+    let to = "";
+    let trigger: TriggerKind = "Interact";
+    let when: Condition | undefined;
+    let actions: Action[] = [];
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
       this.expectPunct(":");
       switch (key) {
-        case "condition":  condition = this.parseCondition(); break;
-        case "next_phase": nextPhase = this.parseString(); break;
-        case "actions":    actions   = this.parseActionList(); break;
+        case "from":    from = this.parseString(); break;
+        case "to":      to = this.parseString(); break;
+        case "trigger": {
+          const v = this.parseIdent();
+          if (v !== "Interact" && v !== "Auto") throw new Error(`Unknown trigger: ${v}`);
+          trigger = v;
+          break;
+        }
+        case "when":    when = this.parseWhenValue(); break;
+        case "actions": actions = this.parseActionList(); break;
         default: break;
       }
       this.tryPunct(",");
     }
 
-    const aa: AutoAdvance = { condition, nextPhase };
-    if (actions && actions.length > 0) aa.actions = actions;
-    return aa;
+    const t: QuestTransition = { from, trigger, actions, to };
+    if (when !== undefined) t.when = when;
+    return t;
   }
 
   // ── Spawn ─────────────────────────────────────────────────────────────────
@@ -582,8 +583,6 @@ class Parser {
   parsePhaseDef(): QuestPhaseDef {
     const def: QuestPhaseDef = {
       dialog: [],
-      on_interact: [],
-      auto_advance: [],
       objective: null,
     };
 
@@ -594,19 +593,6 @@ class Parser {
       switch (key) {
         case "dialog":
           def.dialog = this.parseArray(() => this.parseString());
-          break;
-        case "on_interact":
-          def.on_interact = this.parseActionList();
-          break;
-        case "auto_advance":
-          def.auto_advance = this.parseArray(() => {
-            const n = this.parseIdent();
-            if (n !== "AutoAdvance") throw new Error(`Expected AutoAdvance, got ${n}`);
-            this.expectPunct("(");
-            const aa = this.parseAutoAdvance();
-            this.expectPunct(")");
-            return aa;
-          });
           break;
         case "objective":
           def.objective = this.parseOptionString();
@@ -633,6 +619,7 @@ class Parser {
       giverNpc: "",
       initialPhase: "",
       phases: {},
+      transitions: [],
       spawns: [],
     };
 
@@ -662,6 +649,16 @@ class Parser {
           this.expectPunct("}");
           break;
         }
+        case "transitions":
+          quest.transitions = this.parseArray(() => {
+            const tname = this.parseIdent();
+            if (tname !== "Transition") throw new Error(`Expected Transition, got ${tname}`);
+            this.expectPunct("(");
+            const t = this.parseTransition();
+            this.expectPunct(")");
+            return t;
+          });
+          break;
         case "spawns":
           quest.spawns = this.parseArray(() => {
             const sname = this.parseIdent();
@@ -754,7 +751,6 @@ function serializePlacement(p: PortalPlacement): string {
 function serializeAction(action: Action, depth: number): string {
   const i = ind(depth);
   switch (action.type) {
-    case "AdvancePhase":     return `${i}AdvancePhase(${q(action.phaseId)})`;
     case "Log":              return `${i}Log(${q(action.text)})`;
     case "GiveItem":         return `${i}GiveItem(${q(action.itemId)})`;
     case "GiveItems":        return `${i}GiveItems(item: ${q(action.itemId)}, count: ${action.count})`;
@@ -769,28 +765,6 @@ function serializeAction(action: Action, depth: number): string {
       return `${i}OpenPortal(${parts.join(", ")})`;
     }
     case "ClosePortal":      return `${i}ClosePortal(${q(action.zone)})`;
-    case "Branch": {
-      const lines = [
-        `${i}Branch(`,
-        `${ind(depth + 1)}condition: ${serializeCondition(action.condition)},`,
-      ];
-      if (action.ifTrue.length === 0) {
-        lines.push(`${ind(depth + 1)}if_true: [],`);
-      } else {
-        lines.push(`${ind(depth + 1)}if_true: [`);
-        for (const a of action.ifTrue) lines.push(`${serializeAction(a, depth + 2)},`);
-        lines.push(`${ind(depth + 1)}],`);
-      }
-      if (action.ifFalse.length === 0) {
-        lines.push(`${ind(depth + 1)}if_false: [],`);
-      } else {
-        lines.push(`${ind(depth + 1)}if_false: [`);
-        for (const a of action.ifFalse) lines.push(`${serializeAction(a, depth + 2)},`);
-        lines.push(`${ind(depth + 1)}],`);
-      }
-      lines.push(`${i})`);
-      return lines.join("\n");
-    }
   }
 }
 
@@ -818,36 +792,35 @@ function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): s
     lines.push(`${i1}],`);
   }
 
-  if (phase.on_interact.length === 0) {
-    lines.push(`${i1}on_interact: [],`);
-  } else {
-    lines.push(`${i1}on_interact: [`);
-    for (const a of phase.on_interact) lines.push(`${serializeAction(a, depth + 2)},`);
-    lines.push(`${i1}],`);
-  }
-
-  if (phase.auto_advance.length === 0) {
-    lines.push(`${i1}auto_advance: [],`);
-  } else {
-    lines.push(`${i1}auto_advance: [`);
-    for (const aa of phase.auto_advance) {
-      lines.push(`${ind(depth + 2)}AutoAdvance(`);
-      lines.push(`${ind(depth + 3)}condition: ${serializeCondition(aa.condition)},`);
-      lines.push(`${ind(depth + 3)}next_phase: ${q(aa.nextPhase)},`);
-      if (aa.actions && aa.actions.length > 0) {
-        lines.push(`${ind(depth + 3)}actions: [`);
-        for (const a of aa.actions) lines.push(`${serializeAction(a, depth + 4)},`);
-        lines.push(`${ind(depth + 3)}],`);
-      }
-      lines.push(`${ind(depth + 2)}),`);
-    }
-    lines.push(`${i1}],`);
-  }
-
   const obj = phase.objective == null ? "None" : `Some(${q(phase.objective)})`;
   lines.push(`${i1}objective: ${obj},`);
 
   lines.push(`${i}),`);
+  return lines.join("\n");
+}
+
+function serializeTransition(t: QuestTransition, depth: number): string {
+  const i = ind(depth);
+  const i1 = ind(depth + 1);
+  const head = `from: ${q(t.from)}, trigger: ${t.trigger}`;
+  const whenPart = t.when ? `when: ${serializeCondition(t.when)}` : null;
+
+  // actions 가 없으면 한 줄로
+  if (t.actions.length === 0) {
+    const parts = [head];
+    if (whenPart) parts.push(whenPart);
+    parts.push(`to: ${q(t.to)}`);
+    return `${i}Transition(${parts.join(", ")}),`;
+  }
+
+  // actions 가 있으면 여러 줄
+  const headParts = [head];
+  if (whenPart) headParts.push(whenPart);
+  const lines: string[] = [`${i}Transition(${headParts.join(", ")},`];
+  lines.push(`${i1}actions: [`);
+  for (const a of t.actions) lines.push(`${serializeAction(a, depth + 2)},`);
+  lines.push(`${i1}],`);
+  lines.push(`${i1}to: ${q(t.to)}),`);
   return lines.join("\n");
 }
 
@@ -946,6 +919,9 @@ export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consuma
 export function serializeRon(quest: QuestDef): string {
   const lines: string[] = [];
 
+  // when/objective 을 Some() 없이 표기하기 위한 RON 확장 directive
+  lines.push(`#![enable(implicit_some)]`);
+  lines.push(``);
   lines.push(`QuestDef(`);
   lines.push(`    id: ${q(quest.id)},`);
   lines.push(`    title: ${q(quest.title)},`);
@@ -964,6 +940,15 @@ export function serializeRon(quest: QuestDef): string {
   }
 
   lines.push(`    },`);
+  lines.push(``);
+
+  if (quest.transitions.length === 0) {
+    lines.push(`    transitions: [],`);
+  } else {
+    lines.push(`    transitions: [`);
+    for (const t of quest.transitions) lines.push(serializeTransition(t, 2));
+    lines.push(`    ],`);
+  }
   lines.push(``);
 
   if (quest.spawns.length === 0) {

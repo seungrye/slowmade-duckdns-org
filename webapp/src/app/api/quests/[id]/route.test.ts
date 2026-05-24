@@ -46,8 +46,8 @@ describe('GET /api/quests/[id]', () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockReturnValue({
       lean: vi.fn().mockResolvedValue({
         id: 'q1', title: '퀘스트', giverNpc: '', initialPhase: 'dormant',
-        phases: { dormant: { dialog: ['안녕'], on_interact: [], auto_advance: [], objective: null } },
-        spawns: [], version: 1,
+        phases: { dormant: { dialog: ['안녕'], objective: null } },
+        transitions: [], spawns: [], version: 1,
       }),
     });
     const res = await GET(makeRequest('GET'), { params });
@@ -61,8 +61,8 @@ describe('GET /api/quests/[id]', () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockReturnValue({
       lean: vi.fn().mockResolvedValue({
         id: 'q1', title: '퀘스트', giverNpc: '', initialPhase: 'dormant',
-        phases: new Map([['dormant', { dialog: [], on_interact: [], auto_advance: [], objective: null }]]),
-        spawns: [], version: 1,
+        phases: new Map([['dormant', { dialog: [], objective: null }]]),
+        transitions: [], spawns: [], version: 1,
       }),
     });
     const res = await GET(makeRequest('GET'), { params });
@@ -150,18 +150,34 @@ describe('PUT /api/quests/[id]', () => {
     (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
     (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
-    const newPhases = { active: { dialog: ['반응'], on_interact: [], auto_advance: [], objective: null } };
+    const newPhases = { active: { dialog: ['반응'], objective: null } };
     await PUT(makeRequest('PUT', { phases: newPhases }), { params });
 
     expect(mockQuest.phases).toBeInstanceOf(Map);
     expect(mockQuest.phases.get('active')).toEqual(newPhases.active);
   });
 
+  it('body.transitions를 저장한다', async () => {
+    const mockQuest = {
+      _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '',
+      initialPhase: 'a', phases: new Map([['a', { dialog: [] }]]), transitions: [], spawns: [], version: 1,
+      save: vi.fn().mockResolvedValue(undefined),
+      toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', spawns: [], version: 2 }),
+    };
+    (Quest.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockQuest);
+    (QuestRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const transitions = [{ from: 'a', trigger: 'Interact', actions: [], to: 'a' }];
+    await PUT(makeRequest('PUT', { transitions }), { params });
+
+    expect(mockQuest.transitions).toEqual(transitions);
+  });
+
   it('정상 카탈로그면 응답에 warnings: [] 포함 (저장 성공)', async () => {
-    const mockPhases = new Map([['dormant', { dialog: [], on_interact: [], auto_advance: [], objective: null }]]);
+    const mockPhases = new Map([['dormant', { dialog: [], objective: null }]]);
     const mockQuest = {
       _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '장로',
-      initialPhase: 'dormant', phases: mockPhases, spawns: [], version: 1,
+      initialPhase: 'dormant', phases: mockPhases, transitions: [], spawns: [], version: 1,
       save: vi.fn().mockResolvedValue(undefined),
       toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', giverNpc: '장로', spawns: [], version: 2 }),
     };
@@ -179,16 +195,16 @@ describe('PUT /api/quests/[id]', () => {
   });
 
   it('끊어진 참조가 있으면 warnings 에 보고하고 저장은 성공', async () => {
-    const phases = {
-      dormant: {
-        dialog: [], on_interact: [{ type: 'GiveItem', itemId: '없는item' }],
-        auto_advance: [], objective: null,
-      },
-    };
-    const mockPhases = new Map(Object.entries(phases));
+    const mockPhases = new Map([
+      ['dormant', { dialog: [], objective: null }],
+      ['next', { dialog: [], objective: null }],
+    ]);
+    const transitions = [
+      { from: 'dormant', trigger: 'Interact', actions: [{ type: 'GiveItem', itemId: '없는item' }], to: 'next' },
+    ];
     const mockQuest = {
       _id: 'mongo-id', id: 'q1', title: 'T', giverNpc: '없는NPC',
-      initialPhase: 'dormant', phases: mockPhases, spawns: [], version: 1,
+      initialPhase: 'dormant', phases: mockPhases, transitions, spawns: [], version: 1,
       save: vi.fn().mockResolvedValue(undefined),
       toObject: vi.fn().mockReturnValue({ id: 'q1', title: 'T', giverNpc: '없는NPC', spawns: [], version: 2 }),
     };
@@ -200,7 +216,7 @@ describe('PUT /api/quests/[id]', () => {
     const body = await res.json();
     expect(body.warnings).toEqual(expect.arrayContaining([
       { path: 'giverNpc', kind: 'villager', missing: '없는NPC' },
-      { path: 'phases.dormant.on_interact[0].itemId', kind: 'item', missing: '없는item' },
+      { path: 'transitions[0].actions[0].itemId', kind: 'item', missing: '없는item' },
     ]));
     expect(mockQuest.save).toHaveBeenCalled(); // 저장 자체는 성공
   });

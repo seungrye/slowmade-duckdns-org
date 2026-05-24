@@ -18,7 +18,8 @@ const baseQuest = {
   title: '스타크 퀘스트',
   giverNpc: 'eddard',
   initialPhase: 'phase_start',
-  phases: { phase_start: { dialog: [], on_interact: [], auto_advance: [], objective: null } },
+  phases: { phase_start: { dialog: [], objective: null } },
+  transitions: [],
   spawns: [],
 };
 

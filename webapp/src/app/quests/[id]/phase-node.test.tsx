@@ -15,8 +15,6 @@ const baseData: PhaseNodeData = {
   phaseId: "phase_start",
   phase: {
     dialog: ["안녕하세요"],
-    on_interact: [{ type: "AdvancePhase", phaseId: "phase_next" }],
-    auto_advance: [],
     objective: "목표 텍스트",
     position: { x: 0, y: 0 },
   },
@@ -44,11 +42,6 @@ describe("PhaseNode", () => {
   it("dialog 첫 줄을 렌더한다", () => {
     renderNode(baseData);
     expect(screen.getByText(/안녕하세요/)).toBeTruthy();
-  });
-
-  it("on_interact 수를 렌더한다", () => {
-    renderNode(baseData);
-    expect(screen.getByText("액션 1")).toBeTruthy();
   });
 
   it("isInitial=true 이면 (시작) 표시를 렌더한다", () => {

@@ -6,8 +6,6 @@ import type { QuestPhaseDef } from "@/types/quest";
 
 const phase: QuestPhaseDef = {
   dialog: [],
-  on_interact: [],
-  auto_advance: [],
   objective: null,
   position: { x: 0, y: 0 },
 };
@@ -15,7 +13,6 @@ const phase: QuestPhaseDef = {
 const baseProps = {
   phaseId: "phase_start",
   phase,
-  phaseIds: ["phase_start"],
   giverNpc: "eddard_stark",
   onUpdate: vi.fn(),
   onUpdateGiverNpc: vi.fn(),

@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     giverNpc: body.giverNpc ?? "",
     initialPhase: body.initialPhase ?? "dormant",
     phases: body.phases ?? {},
+    transitions: body.transitions ?? [],
     spawns: body.spawns ?? [],
     version: 1,
   });

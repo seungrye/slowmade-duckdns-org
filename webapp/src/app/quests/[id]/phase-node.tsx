@@ -55,14 +55,6 @@ export const PhaseNode = memo(function PhaseNode({ data, selected }: NodeProps) 
             &ldquo;{phase.dialog[0]}&rdquo;
           </p>
         )}
-        <div className="flex gap-2 text-[10px] text-gray-400 pt-0.5">
-          {phase.on_interact.length > 0 && (
-            <span>액션 {phase.on_interact.length}</span>
-          )}
-          {phase.auto_advance.length > 0 && (
-            <span>자동 {phase.auto_advance.length}</span>
-          )}
-        </div>
       </div>
 
       <Handle type="source" position={Position.Bottom} className="!bg-gray-400" />

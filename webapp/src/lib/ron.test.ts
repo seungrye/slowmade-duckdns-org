@@ -11,6 +11,7 @@ import type { QuestDef } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
 
 const SIMPLE_RON = `
+#![enable(implicit_some)]
 QuestDef(
     id: "test_quest",
     title: "테스트 퀘스트",
@@ -24,8 +25,6 @@ QuestDef(
                 "안녕하세요.",
                 "시작해볼까요?",
             ],
-            on_interact: [AdvancePhase("active")],
-            auto_advance: [],
             objective: Some("병사와 대화하라."),
         ),
 
@@ -33,26 +32,22 @@ QuestDef(
             dialog: [
                 "아이템을 찾아오세요.",
             ],
-            on_interact: [],
-            auto_advance: [
-                AutoAdvance(
-                    condition: HasItem("key_item"),
-                    next_phase: "done",
-                ),
-            ],
             objective: Some("던전에서 아이템을 가져와라."),
         ),
 
         "done": QuestPhaseDef(
             dialog: [],
-            on_interact: [
-                GiveItem("reward"),
-                SetFlag(flag: "quest_done", value: "true"),
-            ],
-            auto_advance: [],
             objective: None,
         ),
     },
+
+    transitions: [
+        Transition(from: "dormant", trigger: Interact, to: "active"),
+        Transition(from: "active", trigger: Auto, when: HasItem("key_item"), to: "done"),
+        Transition(from: "done", trigger: Interact,
+            actions: [GiveItem("reward"), SetFlag(flag: "quest_done", value: "true")],
+            to: "done"),
+    ],
 
     spawns: [
         QuestSpawn(phase: "active", item: "key_item", zone: Dungeon(1)),
@@ -79,23 +74,34 @@ describe("parseRon — 기본", () => {
     expect(quest.phases["dormant"].dialog).toEqual(["안녕하세요.", "시작해볼까요?"]);
   });
 
-  it("on_interact AdvancePhase 파싱", () => {
+  it("Interact transition 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
-    expect(quest.phases["dormant"].on_interact[0]).toEqual({ type: "AdvancePhase", phaseId: "active" });
+    expect(quest.transitions[0]).toEqual({
+      from: "dormant", trigger: "Interact", actions: [], to: "active",
+    });
   });
 
-  it("auto_advance HasItem 조건 파싱", () => {
+  it("Auto transition when 조건 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
-    const aa = quest.phases["active"].auto_advance[0];
-    expect(aa.condition).toEqual({ type: "HasItem", itemId: "key_item" });
-    expect(aa.nextPhase).toBe("done");
+    const t = quest.transitions[1];
+    expect(t.trigger).toBe("Auto");
+    expect(t.when).toEqual({ type: "HasItem", itemId: "key_item" });
+    expect(t.to).toBe("done");
   });
 
-  it("GiveItem / SetFlag 액션 파싱", () => {
+  it("transition actions (GiveItem / SetFlag) 파싱", () => {
     const quest = parseRon(SIMPLE_RON);
-    const actions = quest.phases["done"].on_interact;
+    const actions = quest.transitions[2].actions;
     expect(actions[0]).toEqual({ type: "GiveItem", itemId: "reward" });
     expect(actions[1]).toEqual({ type: "SetFlag", flag: "quest_done", value: "true" });
+  });
+
+  it("phases 는 dialog/objective 만 가진다", () => {
+    const quest = parseRon(SIMPLE_RON);
+    expect(quest.phases["dormant"]).toEqual({
+      dialog: ["안녕하세요.", "시작해볼까요?"],
+      objective: "병사와 대화하라.",
+    });
   });
 
   it("objective Some/None 파싱", () => {
@@ -109,38 +115,39 @@ describe("parseRon — 기본", () => {
     expect(quest.spawns).toHaveLength(1);
     expect(quest.spawns[0]).toEqual({ phase: "active", item: "key_item", zone: { type: "Dungeon", level: 1 } });
   });
+
+  it("implicit_some directive 가 있어도 파싱된다", () => {
+    const quest = parseRon(SIMPLE_RON);
+    expect(quest.id).toBe("test_quest");
+  });
 });
 
-describe("parseRon — 복합 조건", () => {
+describe("parseRon — transition when 복합 조건", () => {
   const COMPLEX_COND_RON = `
+#![enable(implicit_some)]
 QuestDef(
     id: "cond_test",
     title: "조건 테스트",
     giver_npc: "NPC",
     initial_phase: "a",
     phases: {
-        "a": QuestPhaseDef(
-            dialog: [],
-            on_interact: [],
-            auto_advance: [
-                AutoAdvance(condition: And([HasItem("x"), FlagIs(flag: "f", value: "v")]), next_phase: "b"),
-                AutoAdvance(condition: Or([HasItem("y"), PhaseIs(quest: "q2", phase: "done")]), next_phase: "c"),
-                AutoAdvance(condition: Not(HasItem("z")), next_phase: "d"),
-            ],
-            objective: None,
-        ),
-        "b": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
-        "c": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
-        "d": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+        "a": QuestPhaseDef(dialog: [], objective: None),
+        "b": QuestPhaseDef(dialog: [], objective: None),
+        "c": QuestPhaseDef(dialog: [], objective: None),
+        "d": QuestPhaseDef(dialog: [], objective: None),
     },
+    transitions: [
+        Transition(from: "a", trigger: Auto, when: And([HasItem("x"), FlagIs(flag: "f", value: "v")]), to: "b"),
+        Transition(from: "a", trigger: Auto, when: Or([HasItem("y"), PhaseIs(quest: "q2", phase: "done")]), to: "c"),
+        Transition(from: "a", trigger: Auto, when: Not(HasItem("z")), to: "d"),
+    ],
     spawns: [],
 )
 `;
 
   it("And 조건 파싱", () => {
     const quest = parseRon(COMPLEX_COND_RON);
-    const cond = quest.phases["a"].auto_advance[0].condition;
-    expect(cond).toEqual({
+    expect(quest.transitions[0].when).toEqual({
       type: "And",
       conditions: [
         { type: "HasItem", itemId: "x" },
@@ -151,8 +158,7 @@ QuestDef(
 
   it("Or + PhaseIs 조건 파싱", () => {
     const quest = parseRon(COMPLEX_COND_RON);
-    const cond = quest.phases["a"].auto_advance[1].condition;
-    expect(cond).toEqual({
+    expect(quest.transitions[1].when).toEqual({
       type: "Or",
       conditions: [
         { type: "HasItem", itemId: "y" },
@@ -163,83 +169,74 @@ QuestDef(
 
   it("Not 조건 파싱", () => {
     const quest = parseRon(COMPLEX_COND_RON);
-    const cond = quest.phases["a"].auto_advance[2].condition;
-    expect(cond).toEqual({ type: "Not", condition: { type: "HasItem", itemId: "z" } });
+    expect(quest.transitions[2].when).toEqual({ type: "Not", condition: { type: "HasItem", itemId: "z" } });
   });
 });
 
-describe("parseRon — Branch / 새 액션", () => {
-  const BRANCH_RON = `
+describe("parseRon — transition 변형", () => {
+  const TX_RON = `
+#![enable(implicit_some)]
 QuestDef(
-    id: "branch_test",
-    title: "분기 테스트",
+    id: "tx_test",
+    title: "전환 테스트",
     giver_npc: "NPC",
     initial_phase: "a",
     phases: {
-        "a": QuestPhaseDef(
-            dialog: [],
-            on_interact: [
-                Branch(
-                    condition: FlagIs(flag: "hero", value: "stark"),
-                    if_true: [AdvancePhase("stark_path")],
-                    if_false: [
-                        RemoveItem("old_item"),
-                        AdvancePhase("other_path"),
-                    ],
-                ),
-            ],
-            auto_advance: [
-                AutoAdvance(
-                    condition: HasItem("trigger"),
-                    next_phase: "b",
-                    actions: [DespawnWorldItem("world_obj")],
-                ),
-            ],
-            objective: None,
-        ),
-        "stark_path": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
-        "other_path": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
-        "b": QuestPhaseDef(dialog: [], on_interact: [], auto_advance: [], objective: None),
+        "a": QuestPhaseDef(dialog: [], objective: None),
+        "b": QuestPhaseDef(dialog: [], objective: None),
     },
+    transitions: [
+        Transition(from: "a", trigger: Auto, when: HasItem("trigger"),
+            actions: [DespawnWorldItem("world_obj")], to: "b"),
+        Transition(from: "a", trigger: Interact,
+            actions: [RemoveItem("old_item")], to: "a"),
+    ],
     spawns: [],
 )
 `;
 
-  it("Branch(condition, if_true, if_false) 파싱", () => {
-    const quest = parseRon(BRANCH_RON);
-    const action = quest.phases["a"].on_interact[0];
-    expect(action.type).toBe("Branch");
-    if (action.type !== "Branch") return;
-    expect(action.condition).toEqual({ type: "FlagIs", flag: "hero", value: "stark" });
-    expect(action.ifTrue).toEqual([{ type: "AdvancePhase", phaseId: "stark_path" }]);
-    expect(action.ifFalse).toEqual([
-      { type: "RemoveItem", itemId: "old_item" },
-      { type: "AdvancePhase", phaseId: "other_path" },
-    ]);
+  it("Auto transition actions 파싱", () => {
+    const quest = parseRon(TX_RON);
+    expect(quest.transitions[0].actions).toEqual([{ type: "DespawnWorldItem", itemId: "world_obj" }]);
   });
 
-  it("AutoAdvance actions 필드 파싱", () => {
-    const quest = parseRon(BRANCH_RON);
-    const aa = quest.phases["a"].auto_advance[0];
-    expect(aa.actions).toEqual([{ type: "DespawnWorldItem", itemId: "world_obj" }]);
+  it("self-loop Interact transition (to == from) 파싱", () => {
+    const quest = parseRon(TX_RON);
+    const t = quest.transitions[1];
+    expect(t.from).toBe("a");
+    expect(t.to).toBe("a");
+    expect(t.actions[0]).toEqual({ type: "RemoveItem", itemId: "old_item" });
   });
 
-  it("RemoveItem 액션 파싱", () => {
-    const quest = parseRon(BRANCH_RON);
-    const branch = quest.phases["a"].on_interact[0];
-    if (branch.type !== "Branch") return;
-    expect(branch.ifFalse[0]).toEqual({ type: "RemoveItem", itemId: "old_item" });
+  it("when 을 Some() 으로 감싸도 파싱된다", () => {
+    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{"a":QuestPhaseDef(dialog:[],objective:None),"b":QuestPhaseDef(dialog:[],objective:None)},
+      transitions:[Transition(from:"a",trigger:Auto,when:Some(HasFlag("seen")),to:"b")],spawns:[])`;
+    const quest = parseRon(src);
+    expect(quest.transitions[0].when).toEqual({ type: "HasFlag", flag: "seen" });
   });
 });
 
 describe("serializeRon", () => {
+  it("implicit_some directive 를 출력한다", () => {
+    const quest = parseRon(SIMPLE_RON);
+    const ron = serializeRon(quest);
+    expect(ron).toContain("#![enable(implicit_some)]");
+  });
+
+  it("when 을 Some() 없이 bare 로 출력한다", () => {
+    const quest = parseRon(SIMPLE_RON);
+    const ron = serializeRon(quest);
+    expect(ron).toContain(`when: HasItem("key_item")`);
+  });
+
   it("직렬화 후 재파싱하면 동일 구조 반환", () => {
     const quest = parseRon(SIMPLE_RON);
     const reparsed = parseRon(serializeRon(quest));
     expect(reparsed.id).toBe(quest.id);
     expect(reparsed.title).toBe(quest.title);
     expect(reparsed.phases["dormant"].dialog).toEqual(quest.phases["dormant"].dialog);
-    expect(reparsed.phases["active"].auto_advance).toEqual(quest.phases["active"].auto_advance);
+    expect(reparsed.transitions).toEqual(quest.transitions);
     expect(reparsed.phases["done"].objective).toBeNull();
     expect(reparsed.spawns).toEqual(quest.spawns);
   });
@@ -251,197 +248,151 @@ describe("serializeRon", () => {
       giverNpc: "NPC",
       initialPhase: "dormant",
       phases: {
-        dormant: {
-          dialog: [],
-          on_interact: [],
-          auto_advance: [{ condition: { type: "FlagIs", flag: "character", value: "stark" }, nextPhase: "active" }],
-          objective: null,
-        },
-        active: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+        dormant: { dialog: [], objective: null },
+        active: { dialog: [], objective: null },
       },
+      transitions: [
+        { from: "dormant", trigger: "Auto", when: { type: "FlagIs", flag: "character", value: "stark" }, actions: [], to: "active" },
+      ],
       spawns: [],
     };
     const reparsed = parseRon(serializeRon(quest));
-    expect(reparsed.phases["dormant"].auto_advance[0].condition).toEqual({
+    expect(reparsed.transitions[0].when).toEqual({
       type: "FlagIs", flag: "character", value: "stark",
     });
   });
 
-  it("Branch 직렬화/재파싱", () => {
+  it("순서형 transition (옛 Branch 대체) 직렬화/재파싱", () => {
     const quest: QuestDef = {
-      id: "branch_serial",
-      title: "분기 직렬화",
+      id: "ordered",
+      title: "순서형",
       giverNpc: "NPC",
       initialPhase: "a",
       phases: {
-        a: {
-          dialog: [],
-          on_interact: [
-            {
-              type: "Branch",
-              condition: { type: "And", conditions: [{ type: "HasItem", itemId: "x" }, { type: "FlagIs", flag: "f", value: "v" }] },
-              ifTrue: [{ type: "AdvancePhase", phaseId: "b" }],
-              ifFalse: [{ type: "Log", text: "실패" }],
-            },
-          ],
-          auto_advance: [],
-          objective: null,
-        },
-        b: { dialog: [], on_interact: [], auto_advance: [], objective: null },
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
       },
+      transitions: [
+        {
+          from: "a",
+          trigger: "Interact",
+          when: { type: "And", conditions: [{ type: "HasItem", itemId: "x" }, { type: "FlagIs", flag: "f", value: "v" }] },
+          actions: [{ type: "RemoveItem", itemId: "x" }],
+          to: "b",
+        },
+        { from: "a", trigger: "Interact", actions: [{ type: "Log", text: "실패" }], to: "a" },
+      ],
       spawns: [],
     };
     const reparsed = parseRon(serializeRon(quest));
-    const branch = reparsed.phases["a"].on_interact[0];
-    expect(branch.type).toBe("Branch");
-    if (branch.type !== "Branch") return;
-    expect(branch.condition).toEqual({
+    expect(reparsed.transitions[0].when).toEqual({
       type: "And",
       conditions: [{ type: "HasItem", itemId: "x" }, { type: "FlagIs", flag: "f", value: "v" }],
     });
-    expect(branch.ifTrue).toEqual([{ type: "AdvancePhase", phaseId: "b" }]);
+    expect(reparsed.transitions[0].to).toBe("b");
+    expect(reparsed.transitions[1].when).toBeUndefined();
   });
 });
 
-describe("parseRon — 신규 변형 (B1)", () => {
+describe("parseRon — 액션/조건 변형 (B1)", () => {
+  function wrap(transitions: string, phases = `"a":QuestPhaseDef(dialog:[],objective:None),"b":QuestPhaseDef(dialog:[],objective:None)`) {
+    return `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{${phases}},transitions:[${transitions}],spawns:[])`;
+  }
+
   it("HasFlag 조건 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],
-        auto_advance:[AutoAdvance(condition:HasFlag("seen"),next_phase:"b")],
-        objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].auto_advance[0].condition).toEqual({ type: "HasFlag", flag: "seen" });
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Auto,when:HasFlag("seen"),to:"b")`));
+    expect(quest.transitions[0].when).toEqual({ type: "HasFlag", flag: "seen" });
   });
 
   it("GiveItems 액션 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],
-        on_interact:[GiveItems(item:"potion",count:5)],
-        auto_advance:[],objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].on_interact[0]).toEqual({ type: "GiveItems", itemId: "potion", count: 5 });
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[GiveItems(item:"potion",count:5)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "GiveItems", itemId: "potion", count: 5 });
   });
 
   it("ClearFlag 액션 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],
-        on_interact:[ClearFlag("flag1")],
-        auto_advance:[],objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].on_interact[0]).toEqual({ type: "ClearFlag", flag: "flag1" });
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[ClearFlag("flag1")],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "ClearFlag", flag: "flag1" });
   });
 
   it("OpenPortal 기본 (placement 생략) 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],
-        on_interact:[OpenPortal(zone:"cave",generator:"bsp")],
-        auto_advance:[],objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].on_interact[0]).toEqual({
-      type: "OpenPortal", zone: "cave", generator: "bsp",
-    });
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[OpenPortal(zone:"cave",generator:"bsp")],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "OpenPortal", zone: "cave", generator: "bsp" });
   });
 
   it("OpenPortal placement: Border 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],
-        on_interact:[OpenPortal(zone:"glade",generator:"forest",placement:Border)],
-        auto_advance:[],objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].on_interact[0]).toEqual({
-      type: "OpenPortal", zone: "glade", generator: "forest",
-      placement: { type: "Border" },
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[OpenPortal(zone:"glade",generator:"forest",placement:Border)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "OpenPortal", zone: "glade", generator: "forest", placement: { type: "Border" },
     });
   });
 
   it("OpenPortal placement: NearGiver(radius) 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],
-        on_interact:[OpenPortal(zone:"z",generator:"g",placement:NearGiver(radius:5))],
-        auto_advance:[],objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].on_interact[0]).toEqual({
-      type: "OpenPortal", zone: "z", generator: "g",
-      placement: { type: "NearGiver", radius: 5 },
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[OpenPortal(zone:"z",generator:"g",placement:NearGiver(radius:5))],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "OpenPortal", zone: "z", generator: "g", placement: { type: "NearGiver", radius: 5 },
     });
   });
 
   it("ClosePortal 액션 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],
-        on_interact:[ClosePortal("cave")],
-        auto_advance:[],objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].on_interact[0]).toEqual({ type: "ClosePortal", zone: "cave" });
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[ClosePortal("cave")],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "ClosePortal", zone: "cave" });
   });
 
-  it("InZone(Town) / InZone(Named) 파싱", () => {
-    const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],
-        auto_advance:[
-          AutoAdvance(condition:InZone(Town),next_phase:"b"),
-          AutoAdvance(condition:InZone(Named("herb_glade")),next_phase:"c"),
-        ],
-        objective:None)},spawns:[])`;
-    const quest = parseRon(src);
-    expect(quest.phases["a"].auto_advance[0].condition).toEqual({ type: "InZone", zone: { type: "Town" } });
-    expect(quest.phases["a"].auto_advance[1].condition).toEqual({
-      type: "InZone", zone: { type: "Named", id: "herb_glade" },
-    });
+  it("InZone(Town) / InZone(Named) when 파싱", () => {
+    const quest = parseRon(wrap(
+      `Transition(from:"a",trigger:Auto,when:InZone(Town),to:"b"),Transition(from:"a",trigger:Auto,when:InZone(Named("herb_glade")),to:"b")`
+    ));
+    expect(quest.transitions[0].when).toEqual({ type: "InZone", zone: { type: "Town" } });
+    expect(quest.transitions[1].when).toEqual({ type: "InZone", zone: { type: "Named", id: "herb_glade" } });
   });
 
   it("QuestSpawn count / condition 파싱", () => {
     const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
-      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],auto_advance:[],objective:None)},
+      phases:{"a":QuestPhaseDef(dialog:[],objective:None)},transitions:[],
       spawns:[
         QuestSpawn(phase:"a",item:"x",zone:Named("z"),count:3),
         QuestSpawn(phase:"a",item:"y",zone:Forest,condition:Some(HasFlag("f"))),
       ])`;
     const quest = parseRon(src);
-    expect(quest.spawns[0]).toEqual({
-      phase: "a", item: "x", zone: { type: "Named", id: "z" }, count: 3,
-    });
-    expect(quest.spawns[1]).toEqual({
-      phase: "a", item: "y", zone: { type: "Forest" }, condition: { type: "HasFlag", flag: "f" },
-    });
+    expect(quest.spawns[0]).toEqual({ phase: "a", item: "x", zone: { type: "Named", id: "z" }, count: 3 });
+    expect(quest.spawns[1]).toEqual({ phase: "a", item: "y", zone: { type: "Forest" }, condition: { type: "HasFlag", flag: "f" } });
   });
 
   it("QuestDef.spawn_chance 파싱", () => {
     const src = `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",spawn_chance:0.7,
-      phases:{"a":QuestPhaseDef(dialog:[],on_interact:[],auto_advance:[],objective:None)},
-      spawns:[])`;
+      phases:{"a":QuestPhaseDef(dialog:[],objective:None)},transitions:[],spawns:[])`;
     const quest = parseRon(src);
     expect(quest.spawnChance).toBeCloseTo(0.7);
   });
 });
 
 describe("serializeRon — 신규 변형 라운드트립", () => {
-  it("HasFlag / GiveItems / ClearFlag / OpenPortal / ClosePortal / Named zone / spawn count·condition / spawn_chance", () => {
+  it("HasFlag / GiveItems / ClearFlag / OpenPortal / ClosePortal / Named zone / spawn count·condition / spawn_chance / transitions", () => {
     const quest: QuestDef = {
       id: "rt", title: "rt", giverNpc: "n", initialPhase: "a",
       spawnChance: 0.5,
       phases: {
-        a: {
-          dialog: [],
-          on_interact: [
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+        c: { dialog: [], objective: null },
+        d: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "a", trigger: "Interact", actions: [
             { type: "GiveItems", itemId: "potion", count: 5 },
             { type: "ClearFlag", flag: "f" },
             { type: "OpenPortal", zone: "z", generator: "bsp", placement: { type: "Border" } },
             { type: "OpenPortal", zone: "z2", generator: "forest", placement: { type: "NearGiver", radius: 3 } },
             { type: "OpenPortal", zone: "z3", generator: "bsp" },
             { type: "ClosePortal", zone: "z" },
-          ],
-          auto_advance: [
-            { condition: { type: "HasFlag", flag: "x" }, nextPhase: "b" },
-            { condition: { type: "InZone", zone: { type: "Named", id: "glade" } }, nextPhase: "c" },
-            { condition: { type: "InZone", zone: { type: "Town" } }, nextPhase: "d" },
-          ],
-          objective: null,
+          ], to: "b",
         },
-        b: { dialog: [], on_interact: [], auto_advance: [], objective: null },
-        c: { dialog: [], on_interact: [], auto_advance: [], objective: null },
-        d: { dialog: [], on_interact: [], auto_advance: [], objective: null },
-      },
+        { from: "a", trigger: "Auto", when: { type: "HasFlag", flag: "x" }, actions: [], to: "b" },
+        { from: "a", trigger: "Auto", when: { type: "InZone", zone: { type: "Named", id: "glade" } }, actions: [], to: "c" },
+        { from: "a", trigger: "Auto", when: { type: "InZone", zone: { type: "Town" } }, actions: [], to: "d" },
+      ],
       spawns: [
         { phase: "a", item: "x", zone: { type: "Named", id: "glade" }, count: 3 },
         { phase: "a", item: "y", zone: { type: "Town" }, condition: { type: "HasFlag", flag: "f" } },
@@ -456,21 +407,10 @@ describe("serializeRon — Always 조건", () => {
   it("Always 조건은 And([]) 로 직렬화되어 Rust가 파싱 가능한 형태를 출력한다", () => {
     const quest: QuestDef = {
       id: "t", title: "t", giverNpc: "", initialPhase: "a",
-      phases: {
-        a: {
-          dialog: [],
-          on_interact: [
-            {
-              type: "Branch",
-              condition: { type: "Always" },
-              ifTrue: [{ type: "Log", text: "yes" }],
-              ifFalse: [],
-            },
-          ],
-          auto_advance: [{ condition: { type: "Always" }, nextPhase: "a" }],
-          objective: null,
-        },
-      },
+      phases: { a: { dialog: [], objective: null }, b: { dialog: [], objective: null } },
+      transitions: [
+        { from: "a", trigger: "Interact", when: { type: "Always" }, actions: [{ type: "Log", text: "yes" }], to: "b" },
+      ],
       spawns: [],
     };
     const ron = serializeRon(quest);

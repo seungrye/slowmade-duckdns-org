@@ -15,25 +15,25 @@ const quest: QuestDocument = {
   phases: {
     phase_a: {
       dialog: [],
-      on_interact: [{ type: "AdvancePhase", phaseId: "phase_b" }],
-      auto_advance: [{ condition: { type: "Always" }, nextPhase: "phase_b" }],
       objective: null,
       position: { x: 0, y: 0 },
     },
     phase_b: {
       dialog: [],
-      on_interact: [],
-      auto_advance: [],
       objective: null,
       position: { x: 240, y: 0 },
     },
   },
+  transitions: [
+    { from: "phase_a", trigger: "Interact", actions: [], to: "phase_b" },
+    { from: "phase_a", trigger: "Auto", when: { type: "Always" }, actions: [], to: "phase_b" },
+  ],
 };
 
 describe("buildGraph", () => {
   it("엣지가 생성된다", () => {
     const { edges } = buildGraph(quest);
-    expect(edges.length).toBeGreaterThan(0);
+    expect(edges.length).toBe(2);
   });
 
   it("시작 노드에 giverNpc가 설정된다", () => {
@@ -48,14 +48,16 @@ describe("buildGraph", () => {
     expect((other?.data as { giverNpc?: string }).giverNpc).toBeUndefined();
   });
 
-  it("on_interact AdvancePhase 엣지를 생성한다", () => {
+  it("transition 마다 엣지를 생성하고 transitionIndex 를 부여한다", () => {
     const { edges } = buildGraph(quest);
-    expect(edges.some((e) => e.data && (e.data as { edgeType: string }).edgeType === "on_interact")).toBe(true);
+    expect(edges.every((e) => (e.data as { edgeType: string }).edgeType === "transition")).toBe(true);
+    expect(edges.map((e) => (e.data as { transitionIndex: number }).transitionIndex)).toEqual([0, 1]);
   });
 
-  it("auto_advance 엣지를 생성한다", () => {
+  it("Interact 는 interact, Auto 는 auto 라벨", () => {
     const { edges } = buildGraph(quest);
-    expect(edges.some((e) => e.data && (e.data as { edgeType: string }).edgeType === "auto_advance")).toBe(true);
+    expect(edges[0].label).toBe("interact");
+    expect(edges[1].label).toBe("auto");
   });
 });
 
