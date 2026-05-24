@@ -126,3 +126,27 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 - 에디터에서 분기 있는 퀘스트(예: alchemist_quest, world_fracture) 로드 →
   페이즈 선택 시 나가는 전환·조건이 우선순위 순으로 보이는지, 엣지 라벨에
   조건이 보이는지 확인
+
+---
+
+# 후속: 편집 패널 닫기 버튼
+
+페이즈/전환 편집 패널에 들어가면 빈 캔버스를 클릭하는 것 외에 패널을 닫고
+선택을 해제할 방법이 없다.
+
+## 동작 명세
+
+- [ ] `PhasePanel` 헤더에 닫기(✕) 버튼 — 클릭 시 선택 해제(패널 닫힘)
+- [ ] `EdgePanel` 헤더에 닫기(✕) 버튼 — 전환 정보 없음 케이스 포함
+- [ ] `page.tsx` 가 `onClose` 로 `selectedNodeId`/`selectedEdgeId` 모두 null 처리
+
+## 영향 파일
+
+- `src/app/quests/[id]/phase-panel.tsx`
+- `src/app/quests/[id]/edge-panel.tsx`
+- `src/app/quests/[id]/page.tsx`
+
+## 검증 방법
+
+- 페이즈/엣지 선택 → 패널의 ✕ 버튼으로 닫히는지 확인
+- `pnpm vitest run` 전체 통과
