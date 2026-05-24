@@ -81,3 +81,48 @@ bevy-rogue 게임 측에서 RON 퀘스트 포맷을 재설계했다 (`on_interac
 - `pnpm vitest run` 전체 통과
 - 에디터에서 퀘스트 로드 → 전환 엣지 표시·편집 → RON export 가
   bevy-rogue 가 파싱 가능한 포맷인지 (Transition(..), implicit_some) 확인
+
+---
+
+# 후속: 에디터 전환 조건 가시성
+
+전환 조건/분기가 에디터에서 보이지 않는 문제. 엣지 라벨이 `auto`/`interact`
+로만 떠서 "어떤 조건에 어떤 페이즈로 가는지" 알 수 없고, 페이즈를 선택해도
+오른쪽 패널에 나가는 전환 목록이 없다.
+
+## 동작 명세
+
+### 조건 요약 유틸 (`src/lib/condition-summary.ts`)
+
+- [ ] `conditionSummary(cond?: Condition): string` — 조건을 사람이 읽을 수
+  있는 짧은 한글 문구로. `undefined`/`Always`/`And([])` → "무조건",
+  `HasItem(x)` → "x 보유", `FlagIs(f,v)` → "f=v", `PhaseIs(q,p)` → "q=p",
+  `HasFlag(f)` → "플래그 f", `InZone(zone)` → 존 라벨, `And`/`Or` → 재귀
+  결합, `Not` → "!(...)"
+- [ ] `zoneLabel(zone)` — Town/Forest/Dungeon(n)/Named(id) 한글 라벨
+
+### 엣지 라벨 (`build-graph.ts`)
+
+- [ ] 엣지 라벨에 트리거 + 조건 요약 표시 (예: "자동: gem 보유",
+  "대화: 무조건"). 너무 길면 말줄임
+
+### 페이즈 패널 나가는 전환 목록 (`phase-panel.tsx`)
+
+- [ ] 페이즈 선택 시 "이 페이즈에서 나가는 전환" 목록을 **배열 순서대로**
+  표시 (트리거 배지 + 조건 요약 + → 도착 phase)
+- [ ] 같은 트리거끼리 위에서부터 첫 매칭이 실행됨을 안내
+- [ ] 각 행 클릭 시 해당 전환 편집(EdgePanel) 으로 전환
+
+## 영향 파일
+
+- `src/lib/condition-summary.ts` (신규) + 테스트
+- `src/app/quests/[id]/build-graph.ts`
+- `src/app/quests/[id]/phase-panel.tsx`
+- `src/app/quests/[id]/page.tsx` (PhasePanel 에 transitions + 편집 콜백 전달)
+
+## 검증 방법
+
+- `pnpm vitest run` 전체 통과
+- 에디터에서 분기 있는 퀘스트(예: alchemist_quest, world_fracture) 로드 →
+  페이즈 선택 시 나가는 전환·조건이 우선순위 순으로 보이는지, 엣지 라벨에
+  조건이 보이는지 확인
