@@ -77,25 +77,21 @@ export default function BevyRogueClient() {
               window 크기로 인식하지만 카메라/world 는 lib.rs 의 고정 resolution
               기준이라 게임이 캔버스 왼쪽에만 그려졌다.
       */}
-      <div className="relative inline-block bg-black rounded-lg overflow-hidden shadow-2xl">
+      {/*
+        canvas 는 Bevy/winit 이 자기 resolution(640x496)으로 attribute·CSS 모두 관리한다.
+        CSS 로 stretch 시키려 하면 winit 이 다시 attribute 를 덮어써 경합이 일어남.
+        그래서 자연 사이즈를 받아들이고 박스를 가운데 정렬만 한다(mx-auto + inline-block).
+        픽셀 아트 보존을 위해 image-rendering: pixelated.
+      */}
+      <div className="relative inline-block bg-black rounded-lg overflow-hidden shadow-2xl mx-auto">
         <canvas
           id="bevy-canvas"
           ref={canvasRef}
-          // attribute(=drawing buffer)는 Bevy resolution(640x496) 그대로 둔다.
-          // winit 의 wasm 백엔드는 ResizeObserver 를 쓰지 않아 attribute 기준 그림.
           width={640}
           height={496}
           tabIndex={0}
-          // CSS 만 키워 display 사이즈를 확대(픽셀 1:1 정수배). 게임 자체는
-          // 변하지 않지만 시각적으로 페이지를 더 차지해 카메라 viewport 가
-          // 한쪽에 작게 보이는 느낌을 줄인다. 픽셀 아트라 pixelated 유지.
           className="block bg-black outline-none"
-          style={{
-            imageRendering: "pixelated",
-            width: "min(1024px, 95vw)",
-            height: "auto",
-            aspectRatio: "640 / 496",
-          }}
+          style={{ imageRendering: "pixelated" }}
           aria-label="bevy-rogue 게임 캔버스"
         />
 
