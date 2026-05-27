@@ -26,6 +26,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     transitions: (quest.transitions as QuestDef["transitions"]) ?? [],
     spawns: (quest.spawns as QuestDef["spawns"]) ?? [],
   };
+  if (typeof quest.spawnChance === "number") def.spawnChance = quest.spawnChance;
 
   const structErrors = validateQuestStructure(def);
   if (structErrors.length > 0) {

@@ -31,8 +31,19 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
   };
   switch (item.kind) {
     case "quest":      snap.imagePath = item.imagePath; break;
-    case "weapon":     snap.attackPower = item.attackPower; snap.element = item.element ?? null; break;
-    case "armor":      snap.defenseBonus = item.defenseBonus; break;
+    case "weapon":
+      snap.attackPower = item.attackPower;
+      if (item.attackPowerMin !== undefined) snap.attackPowerMin = item.attackPowerMin;
+      if (item.attackPowerMax !== undefined) snap.attackPowerMax = item.attackPowerMax;
+      if (item.tier !== undefined) snap.tier = item.tier;
+      snap.element = item.element ?? null;
+      break;
+    case "armor":
+      snap.defenseBonus = item.defenseBonus;
+      if (item.defenseBonusMin !== undefined) snap.defenseBonusMin = item.defenseBonusMin;
+      if (item.defenseBonusMax !== undefined) snap.defenseBonusMax = item.defenseBonusMax;
+      if (item.tier !== undefined) snap.tier = item.tier;
+      break;
     case "consumable": snap.effect = item.effect; break;
   }
   return snap;
@@ -75,8 +86,19 @@ export async function POST(req: NextRequest) {
       existing.pickupMessage = def.pickupMessage;
       // 종별 필드
       if (def.kind === "quest")           existing.imagePath = def.imagePath;
-      else if (def.kind === "weapon")     { existing.attackPower = def.attackPower; existing.element = def.element ?? null; }
-      else if (def.kind === "armor")      existing.defenseBonus = def.defenseBonus;
+      else if (def.kind === "weapon") {
+        existing.attackPower = def.attackPower;
+        existing.attackPowerMin = def.attackPowerMin;
+        existing.attackPowerMax = def.attackPowerMax;
+        existing.tier = def.tier;
+        existing.element = def.element ?? null;
+      }
+      else if (def.kind === "armor") {
+        existing.defenseBonus = def.defenseBonus;
+        existing.defenseBonusMin = def.defenseBonusMin;
+        existing.defenseBonusMax = def.defenseBonusMax;
+        existing.tier = def.tier;
+      }
       else if (def.kind === "consumable") existing.effect = def.effect;
       existing.version = (existing.version ?? 1) + 1;
       await existing.save();
@@ -91,9 +113,20 @@ export async function POST(req: NextRequest) {
         glyphGameIcon: def.glyphGameIcon,
         pickupMessage: def.pickupMessage,
       };
-      if (def.kind === "quest")           doc.imagePath = def.imagePath;
-      else if (def.kind === "weapon")     { doc.attackPower = def.attackPower; doc.element = def.element ?? null; }
-      else if (def.kind === "armor")      doc.defenseBonus = def.defenseBonus;
+      if (def.kind === "quest") doc.imagePath = def.imagePath;
+      else if (def.kind === "weapon") {
+        doc.attackPower = def.attackPower;
+        if (def.attackPowerMin !== undefined) doc.attackPowerMin = def.attackPowerMin;
+        if (def.attackPowerMax !== undefined) doc.attackPowerMax = def.attackPowerMax;
+        if (def.tier !== undefined) doc.tier = def.tier;
+        doc.element = def.element ?? null;
+      }
+      else if (def.kind === "armor") {
+        doc.defenseBonus = def.defenseBonus;
+        if (def.defenseBonusMin !== undefined) doc.defenseBonusMin = def.defenseBonusMin;
+        if (def.defenseBonusMax !== undefined) doc.defenseBonusMax = def.defenseBonusMax;
+        if (def.tier !== undefined) doc.tier = def.tier;
+      }
       else if (def.kind === "consumable") doc.effect = def.effect;
       await Item.create(doc);
       created++;

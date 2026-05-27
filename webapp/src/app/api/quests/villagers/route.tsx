@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
     color: body.color,
     dialogs: body.dialogs ?? [],
     speed: body.speed ?? 1.0,
+    stationary: body.stationary ?? false,
+    vendor: body.vendor ?? false,
   });
 
   return apiSuccess(villager, 201);

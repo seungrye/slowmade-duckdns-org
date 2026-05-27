@@ -43,6 +43,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
       color: villager.color,
       dialogs: villager.dialogs,
       speed: villager.speed,
+      stationary: villager.stationary,
+      vendor: villager.vendor,
     },
   });
 
@@ -50,6 +52,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.color !== undefined) villager.color = body.color;
   if (body.dialogs !== undefined) villager.dialogs = body.dialogs;
   if (body.speed !== undefined) villager.speed = body.speed;
+  if (body.stationary !== undefined) villager.stationary = body.stationary;
+  if (body.vendor !== undefined) villager.vendor = body.vendor;
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();

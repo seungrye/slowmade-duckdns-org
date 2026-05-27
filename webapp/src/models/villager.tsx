@@ -15,6 +15,9 @@ const VillagerSchema = new Schema(
     },
     dialogs: { type: [String], default: [] },
     speed: { type: Number, default: 1.0 },
+    // 게임 RON 의 stationary/vendor 미러 — #[serde(default)] 이므로 기본 false.
+    stationary: { type: Boolean, default: false },
+    vendor: { type: Boolean, default: false },
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -27,6 +30,8 @@ export interface VillagerDoc {
   color: number[];
   dialogs: string[];
   speed: number;
+  stationary: boolean;
+  vendor: boolean;
   version: number;
   createdAt: Date;
   updatedAt: Date;

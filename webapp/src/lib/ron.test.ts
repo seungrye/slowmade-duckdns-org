@@ -654,6 +654,130 @@ describe("parse/serialize QuestItemsRon", () => {
   });
 });
 
+describe("parse/serialize WeaponsRon — 신규 random-stat 필드 (게임 RON 형식)", () => {
+  // bevy-rogue 의 assets/items/weapons.ron 미러 — attack_power_min/max + tier
+  const NEW_SRC = `[
+    WeaponDef(
+        id: "dagger",
+        display_name: "단검",
+        glyph_ascii: "/",
+        glyph_unicode: "X",
+        glyph_game_icon: "X",
+        pickup_message: "단검을 획득했다!",
+        attack_power_min: 3,
+        attack_power_max: 6,
+        tier: 1,
+        element: None,
+    ),
+    WeaponDef(
+        id: "sword",
+        display_name: "검",
+        glyph_ascii: "/",
+        glyph_unicode: "X",
+        glyph_game_icon: "X",
+        pickup_message: "검을 획득했다!",
+        attack_power_min: 5,
+        attack_power_max: 9,
+        tier: 1,
+        element: Some("fire"),
+    ),
+]`;
+
+  it("attack_power_min/max + tier 를 파싱하고 attackPower 는 평균으로 추론", () => {
+    const weapons = parseWeaponsRon(NEW_SRC);
+    expect(weapons[0].attackPowerMin).toBe(3);
+    expect(weapons[0].attackPowerMax).toBe(6);
+    expect(weapons[0].tier).toBe(1);
+    expect(weapons[0].attackPower).toBe(5); // round((3+6)/2)=5 (Math.round 사용)
+    expect(weapons[1].element).toBe("fire");
+    expect(weapons[1].tier).toBe(1);
+  });
+
+  it("라운드트립: random-stat 모드는 min/max + tier 로 직렬화", () => {
+    const weapons = parseWeaponsRon(NEW_SRC);
+    const out = serializeWeaponsRon(weapons);
+    expect(out).toContain("attack_power_min: 3");
+    expect(out).toContain("attack_power_max: 6");
+    expect(out).toContain("tier: 1");
+    // 단일값 라인은 출력되지 않아야 함 (random-stat 모드)
+    expect(out).not.toMatch(/^\s*attack_power:\s/m);
+    const reparsed = parseWeaponsRon(out);
+    expect(reparsed).toEqual(weapons);
+  });
+});
+
+describe("parse/serialize ArmorsRon — 신규 random-stat 필드", () => {
+  const NEW_SRC = `[
+    ArmorDef(
+        id: "cloth_armor",
+        display_name: "천 갑옷",
+        glyph_ascii: "]",
+        glyph_unicode: "X",
+        glyph_game_icon: "X",
+        pickup_message: "천 갑옷을 획득했다!",
+        defense_bonus_min: 1,
+        defense_bonus_max: 2,
+        tier: 1,
+    ),
+]`;
+
+  it("defense_bonus_min/max + tier 파싱 + 라운드트립 (random-stat 모드)", () => {
+    const armors = parseArmorsRon(NEW_SRC);
+    expect(armors[0].defenseBonusMin).toBe(1);
+    expect(armors[0].defenseBonusMax).toBe(2);
+    expect(armors[0].tier).toBe(1);
+    const out = serializeArmorsRon(armors);
+    expect(out).toContain("defense_bonus_min: 1");
+    expect(out).toContain("defense_bonus_max: 2");
+    expect(out).toContain("tier: 1");
+    expect(out).not.toMatch(/^\s*defense_bonus:\s/m);
+    expect(parseArmorsRon(out)).toEqual(armors);
+  });
+});
+
+describe("parseVillagersRon — stationary / vendor 신규 필드", () => {
+  const SRC = `[
+    VillagerDef(
+        id: "merchant",
+        name: "상인",
+        color: (0.3, 0.9, 0.3),
+        stationary: true,
+        vendor: true,
+        dialogs: [],
+        speed: 1.0,
+    ),
+    VillagerDef(
+        id: "elder",
+        name: "장로",
+        color: (0.9, 0.8, 0.5),
+        dialogs: [],
+        speed: 0.5,
+    ),
+]`;
+
+  it("stationary / vendor 파싱", () => {
+    const villagers = parseVillagersRon(SRC);
+    expect(villagers[0].stationary).toBe(true);
+    expect(villagers[0].vendor).toBe(true);
+    // 미지정은 undefined (또는 false 와 동등)
+    expect(villagers[1].stationary ?? false).toBe(false);
+    expect(villagers[1].vendor ?? false).toBe(false);
+  });
+
+  it("라운드트립: true 만 출력, false/미지정은 생략", () => {
+    const villagers = parseVillagersRon(SRC);
+    const out = serializeVillagersRon(villagers);
+    expect(out).toContain("stationary: true");
+    expect(out).toContain("vendor: true");
+    // 두 번째 villager 줄에는 stationary/vendor 라인이 없어야 함
+    const elderBlock = out.slice(out.indexOf("elder"));
+    expect(elderBlock).not.toContain("stationary");
+    expect(elderBlock).not.toContain("vendor");
+    // 라운드트립 정합
+    expect(parseVillagersRon(out)).toEqual(villagers);
+  });
+});
+
 describe("parse/serialize WeaponsRon", () => {
   const SRC = `[
     WeaponDef(

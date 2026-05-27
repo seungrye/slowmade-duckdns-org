@@ -325,6 +325,22 @@ export default function QuestEditorPage() {
             <span className="ml-2 text-xs text-gray-400 font-mono">{quest.id}</span>
             <span className="ml-1 text-xs text-gray-400">v{quest.version}</span>
           </div>
+          <label className="flex items-center gap-1 text-xs text-gray-500" title="이번 런에서 이 퀘스트가 활성화될 확률 (0.0~1.0). 게임 RON 의 spawn_chance.">
+            <span>spawn_chance</span>
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={quest.spawnChance ?? 1.0}
+              onChange={(e) => {
+                const v = Math.max(0, Math.min(1, Number(e.target.value)));
+                setQuest({ ...quest, spawnChance: v });
+                setDirty(true);
+              }}
+              className="w-16 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+            />
+          </label>
         </div>
         <div className="flex items-center gap-2">
           <Link

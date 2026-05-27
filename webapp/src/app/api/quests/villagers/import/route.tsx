@@ -46,12 +46,16 @@ export async function POST(req: NextRequest) {
           color: existing.color,
           dialogs: existing.dialogs,
           speed: existing.speed,
+          stationary: existing.stationary,
+          vendor: existing.vendor,
         },
       });
       existing.name = v.name;
       existing.color = v.color;
       existing.dialogs = v.dialogs;
       existing.speed = v.speed;
+      existing.stationary = v.stationary ?? false;
+      existing.vendor = v.vendor ?? false;
       existing.version = (existing.version ?? 1) + 1;
       await existing.save();
       updated++;
@@ -62,6 +66,8 @@ export async function POST(req: NextRequest) {
         color: v.color,
         dialogs: v.dialogs,
         speed: v.speed,
+        stationary: v.stationary ?? false,
+        vendor: v.vendor ?? false,
       });
       created++;
     }

@@ -325,6 +325,25 @@ describe("validateQuestStructure — Auto transition actions 타입 제한", () 
   });
 });
 
+describe("validateQuestStructure — spawnChance 범위 검증", () => {
+  it("0.0~1.0 범위는 통과", () => {
+    expect(validateQuestStructure(makeQuest({ spawnChance: 0.0 }))).toEqual([]);
+    expect(validateQuestStructure(makeQuest({ spawnChance: 0.5 }))).toEqual([]);
+    expect(validateQuestStructure(makeQuest({ spawnChance: 1.0 }))).toEqual([]);
+  });
+
+  it("범위를 벗어나면 오류", () => {
+    const overOne = validateQuestStructure(makeQuest({ spawnChance: 1.5 }));
+    expect(overOne.some((e) => e.path === "spawnChance")).toBe(true);
+    const negative = validateQuestStructure(makeQuest({ spawnChance: -0.1 }));
+    expect(negative.some((e) => e.path === "spawnChance")).toBe(true);
+  });
+
+  it("미지정(undefined)은 검증 스킵", () => {
+    expect(validateQuestStructure(makeQuest({}))).toEqual([]);
+  });
+});
+
 describe("validateQuestStructure — spawns phase 검증", () => {
   it("spawn phase 가 없으면 오류", () => {
     const q = makeQuest({ spawns: [{ phase: "phantom", item: "gem", zone: { type: "Town" } }] });

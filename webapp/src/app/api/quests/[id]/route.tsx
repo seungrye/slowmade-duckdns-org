@@ -61,6 +61,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.title !== undefined) quest.title = body.title;
   if (body.giverNpc !== undefined) quest.giverNpc = body.giverNpc;
   if (body.initialPhase !== undefined) quest.initialPhase = body.initialPhase;
+  if (body.spawnChance !== undefined) quest.spawnChance = body.spawnChance;
   if (body.transitions !== undefined) quest.transitions = body.transitions;
   if (body.spawns !== undefined) quest.spawns = body.spawns;
 
@@ -76,20 +77,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const catalogs = await loadCatalogSets();
   const phasesObj = Object.fromEntries(quest.phases ?? new Map()) as QuestDef["phases"];
   const transitions = (quest.transitions ?? []) as QuestDef["transitions"];
-  const warnings = validateQuestRefs(
-    {
-      id: quest.id,
-      title: quest.title,
-      giverNpc: quest.giverNpc,
-      initialPhase: quest.initialPhase,
-      phases: phasesObj,
-      transitions,
-      spawns: quest.spawns as QuestDef["spawns"],
-    },
-    catalogs,
-  );
-
-  const questDefForValidation: QuestDef = {
+  const questDefBase: QuestDef = {
     id: quest.id,
     title: quest.title,
     giverNpc: quest.giverNpc,
@@ -98,7 +86,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
     transitions,
     spawns: quest.spawns as QuestDef["spawns"],
   };
-  const structErrors = validateQuestStructure(questDefForValidation);
+  if (typeof quest.spawnChance === "number") questDefBase.spawnChance = quest.spawnChance;
+  const warnings = validateQuestRefs(questDefBase, catalogs);
+
+  const structErrors = validateQuestStructure(questDefBase);
 
   return NextResponse.json({
     success: true,

@@ -9,6 +9,10 @@ export interface VillagerDef {
   color: [number, number, number];
   dialogs: string[];
   speed: number;
+  /** 정지 주민 — true 면 매 턴 제자리(가판대 뒤 상인 등). 기본 false. */
+  stationary?: boolean;
+  /** 상인 — true 면 상호작용 시 상점이 열린다. 기본 false. */
+  vendor?: boolean;
 }
 
 export interface VillagerDocument extends VillagerDef {

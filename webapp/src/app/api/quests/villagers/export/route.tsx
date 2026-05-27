@@ -7,13 +7,18 @@ export async function GET() {
   await connectToDB();
   const docs = await Villager.find({}).sort({ id: 1 }).lean();
 
-  const villagers: VillagerDef[] = docs.map((d) => ({
-    id: d.id,
-    name: d.name,
-    color: [d.color[0], d.color[1], d.color[2]],
-    dialogs: d.dialogs ?? [],
-    speed: typeof d.speed === "number" ? d.speed : 1.0,
-  }));
+  const villagers: VillagerDef[] = docs.map((d) => {
+    const v: VillagerDef = {
+      id: d.id,
+      name: d.name,
+      color: [d.color[0], d.color[1], d.color[2]],
+      dialogs: d.dialogs ?? [],
+      speed: typeof d.speed === "number" ? d.speed : 1.0,
+    };
+    if (d.stationary) v.stationary = true;
+    if (d.vendor) v.vendor = true;
+    return v;
+  });
 
   const ron = serializeVillagersRon(villagers);
   return new Response(ron, {

@@ -48,6 +48,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   quest.title = def.title;
   quest.giverNpc = def.giverNpc;
   quest.initialPhase = def.initialPhase;
+  // spawnChance 미지정 RON 은 기본 1.0 (게임 default_spawn_chance 미러).
+  quest.spawnChance = def.spawnChance ?? 1.0;
   quest.phases = new Map(Object.entries(def.phases));
   quest.transitions = def.transitions as unknown[];
   quest.spawns = def.spawns as unknown[];

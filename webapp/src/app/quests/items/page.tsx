@@ -16,8 +16,13 @@ interface FormState {
   pickupMessage: string;
   imagePath: string;
   attackPower: number;
+  attackPowerMin: number | "";
+  attackPowerMax: number | "";
   element: WeaponElement | null;
   defenseBonus: number;
+  defenseBonusMin: number | "";
+  defenseBonusMax: number | "";
+  tier: number | "";
   effectAmount: number;
 }
 
@@ -27,8 +32,13 @@ const emptyForm: FormState = {
   pickupMessage: "",
   imagePath: "scene/open-chest.png",
   attackPower: 0,
+  attackPowerMin: "",
+  attackPowerMax: "",
   element: null,
   defenseBonus: 0,
+  defenseBonusMin: "",
+  defenseBonusMax: "",
+  tier: "",
   effectAmount: 0,
 };
 
@@ -78,8 +88,19 @@ export default function ItemsPage() {
       pickupMessage: item.pickupMessage,
     };
     if (item.kind === "quest") f.imagePath = item.imagePath;
-    else if (item.kind === "weapon") { f.attackPower = item.attackPower; f.element = item.element; }
-    else if (item.kind === "armor") f.defenseBonus = item.defenseBonus;
+    else if (item.kind === "weapon") {
+      f.attackPower = item.attackPower;
+      f.attackPowerMin = item.attackPowerMin ?? "";
+      f.attackPowerMax = item.attackPowerMax ?? "";
+      f.tier = item.tier ?? "";
+      f.element = item.element;
+    }
+    else if (item.kind === "armor") {
+      f.defenseBonus = item.defenseBonus;
+      f.defenseBonusMin = item.defenseBonusMin ?? "";
+      f.defenseBonusMax = item.defenseBonusMax ?? "";
+      f.tier = item.tier ?? "";
+    }
     else if (item.kind === "consumable") f.effectAmount = item.effect.amount;
     setEditForm(f);
   }
@@ -95,8 +116,21 @@ export default function ItemsPage() {
     if (includeId) { body.id = form.id; body.kind = form.kind; }
     switch (form.kind) {
       case "quest":      body.imagePath = form.imagePath; break;
-      case "weapon":     body.attackPower = form.attackPower; body.element = form.element; break;
-      case "armor":      body.defenseBonus = form.defenseBonus; break;
+      case "weapon": {
+        body.attackPower = form.attackPower;
+        if (form.attackPowerMin !== "") body.attackPowerMin = Number(form.attackPowerMin);
+        if (form.attackPowerMax !== "") body.attackPowerMax = Number(form.attackPowerMax);
+        if (form.tier !== "") body.tier = Number(form.tier);
+        body.element = form.element;
+        break;
+      }
+      case "armor": {
+        body.defenseBonus = form.defenseBonus;
+        if (form.defenseBonusMin !== "") body.defenseBonusMin = Number(form.defenseBonusMin);
+        if (form.defenseBonusMax !== "") body.defenseBonusMax = Number(form.defenseBonusMax);
+        if (form.tier !== "") body.tier = Number(form.tier);
+        break;
+      }
       case "consumable": body.effect = { type: "Heal", amount: form.effectAmount }; break;
     }
     return body;
@@ -184,8 +218,21 @@ export default function ItemsPage() {
   function summarize(item: ItemDocument): string {
     switch (item.kind) {
       case "quest":      return `image: ${item.imagePath}`;
-      case "weapon":     return `ATK ${item.attackPower}${item.element ? ` (${item.element})` : ""}`;
-      case "armor":      return `DEF +${item.defenseBonus}`;
+      case "weapon": {
+        const atk = item.attackPowerMin !== undefined && item.attackPowerMax !== undefined
+          ? `ATK ${item.attackPowerMin}~${item.attackPowerMax}`
+          : `ATK ${item.attackPower}`;
+        const tier = item.tier !== undefined ? ` T${item.tier}` : "";
+        const elem = item.element ? ` (${item.element})` : "";
+        return `${atk}${tier}${elem}`;
+      }
+      case "armor": {
+        const def = item.defenseBonusMin !== undefined && item.defenseBonusMax !== undefined
+          ? `DEF +${item.defenseBonusMin}~${item.defenseBonusMax}`
+          : `DEF +${item.defenseBonus}`;
+        const tier = item.tier !== undefined ? ` T${item.tier}` : "";
+        return `${def}${tier}`;
+      }
       case "consumable": return `${item.effect.type} +${item.effect.amount}`;
     }
   }
@@ -486,42 +533,118 @@ function FormFields({
       )}
 
       {form.kind === "weapon" && (
-        <div className="flex gap-2">
-          <label className="flex flex-col gap-1 w-32">
-            <span className="text-xs text-gray-500">attack_power</span>
-            <input
-              type="number"
-              value={form.attackPower}
-              onChange={(e) => setForm({ ...form, attackPower: Number(e.target.value) })}
-              className={inputCls}
-            />
-          </label>
-          <label className="flex flex-col gap-1 w-40">
-            <span className="text-xs text-gray-500">element</span>
-            <select
-              value={form.element ?? ""}
-              onChange={(e) => setForm({ ...form, element: (e.target.value || null) as WeaponElement | null })}
-              className={inputCls}
-            >
-              <option value="">(none)</option>
-              <option value="fire">fire</option>
-              <option value="ice">ice</option>
-              <option value="lightning">lightning</option>
-            </select>
-          </label>
+        <div className="space-y-2">
+          <div className="flex gap-2 flex-wrap">
+            <label className="flex flex-col gap-1 w-32">
+              <span className="text-xs text-gray-500">attack_power (단일)</span>
+              <input
+                type="number"
+                value={form.attackPower}
+                onChange={(e) => setForm({ ...form, attackPower: Number(e.target.value) })}
+                className={inputCls}
+              />
+            </label>
+            <label className="flex flex-col gap-1 w-40">
+              <span className="text-xs text-gray-500">element</span>
+              <select
+                value={form.element ?? ""}
+                onChange={(e) => setForm({ ...form, element: (e.target.value || null) as WeaponElement | null })}
+                className={inputCls}
+              >
+                <option value="">(none)</option>
+                <option value="fire">fire</option>
+                <option value="ice">ice</option>
+                <option value="lightning">lightning</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex gap-2 flex-wrap items-end">
+            <label className="flex flex-col gap-1 w-28">
+              <span className="text-xs text-gray-500">attack_power_min</span>
+              <input
+                type="number"
+                value={form.attackPowerMin}
+                onChange={(e) => setForm({ ...form, attackPowerMin: e.target.value === "" ? "" : Number(e.target.value) })}
+                className={inputCls}
+                placeholder="(없으면 단일값)"
+              />
+            </label>
+            <label className="flex flex-col gap-1 w-28">
+              <span className="text-xs text-gray-500">attack_power_max</span>
+              <input
+                type="number"
+                value={form.attackPowerMax}
+                onChange={(e) => setForm({ ...form, attackPowerMax: e.target.value === "" ? "" : Number(e.target.value) })}
+                className={inputCls}
+                placeholder="(없으면 단일값)"
+              />
+            </label>
+            <label className="flex flex-col gap-1 w-20">
+              <span className="text-xs text-gray-500">tier (1~5)</span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={form.tier}
+                onChange={(e) => setForm({ ...form, tier: e.target.value === "" ? "" : Number(e.target.value) })}
+                className={inputCls}
+              />
+            </label>
+            <span className="text-[10px] text-gray-400">
+              min/max + tier 입력 시 게임이 그 범위에서 랜덤 롤
+            </span>
+          </div>
         </div>
       )}
 
       {form.kind === "armor" && (
-        <label className="flex flex-col gap-1 w-32">
-          <span className="text-xs text-gray-500">defense_bonus</span>
-          <input
-            type="number"
-            value={form.defenseBonus}
-            onChange={(e) => setForm({ ...form, defenseBonus: Number(e.target.value) })}
-            className={inputCls}
-          />
-        </label>
+        <div className="space-y-2">
+          <label className="flex flex-col gap-1 w-32">
+            <span className="text-xs text-gray-500">defense_bonus (단일)</span>
+            <input
+              type="number"
+              value={form.defenseBonus}
+              onChange={(e) => setForm({ ...form, defenseBonus: Number(e.target.value) })}
+              className={inputCls}
+            />
+          </label>
+          <div className="flex gap-2 flex-wrap items-end">
+            <label className="flex flex-col gap-1 w-28">
+              <span className="text-xs text-gray-500">defense_bonus_min</span>
+              <input
+                type="number"
+                value={form.defenseBonusMin}
+                onChange={(e) => setForm({ ...form, defenseBonusMin: e.target.value === "" ? "" : Number(e.target.value) })}
+                className={inputCls}
+                placeholder="(없으면 단일값)"
+              />
+            </label>
+            <label className="flex flex-col gap-1 w-28">
+              <span className="text-xs text-gray-500">defense_bonus_max</span>
+              <input
+                type="number"
+                value={form.defenseBonusMax}
+                onChange={(e) => setForm({ ...form, defenseBonusMax: e.target.value === "" ? "" : Number(e.target.value) })}
+                className={inputCls}
+                placeholder="(없으면 단일값)"
+              />
+            </label>
+            <label className="flex flex-col gap-1 w-20">
+              <span className="text-xs text-gray-500">tier (1~5)</span>
+              <input
+                type="number"
+                min={1}
+                max={5}
+                value={form.tier}
+                onChange={(e) => setForm({ ...form, tier: e.target.value === "" ? "" : Number(e.target.value) })}
+                className={inputCls}
+              />
+            </label>
+            <span className="text-[10px] text-gray-400">
+              min/max + tier 입력 시 게임이 그 범위에서 랜덤 롤
+            </span>
+          </div>
+        </div>
       )}
 
       {form.kind === "consumable" && (

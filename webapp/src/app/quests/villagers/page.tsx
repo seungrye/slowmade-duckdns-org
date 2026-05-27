@@ -10,6 +10,8 @@ interface FormState {
   color: [number, number, number];
   dialogs: string;
   speed: number;
+  stationary: boolean;
+  vendor: boolean;
 }
 
 const emptyForm: FormState = {
@@ -18,6 +20,8 @@ const emptyForm: FormState = {
   color: [1.0, 1.0, 1.0],
   dialogs: "",
   speed: 1.0,
+  stationary: false,
+  vendor: false,
 };
 
 // ── 색상 유틸 (RON 은 0~1 RGB, <input type=color> 는 #rrggbb) ──
@@ -68,6 +72,8 @@ export default function VillagersPage() {
         color: createForm.color,
         dialogs: parseDialogs(createForm.dialogs),
         speed: createForm.speed,
+        stationary: createForm.stationary,
+        vendor: createForm.vendor,
       }),
     });
     if (res.ok) {
@@ -89,6 +95,8 @@ export default function VillagersPage() {
         color: editForm.color,
         dialogs: parseDialogs(editForm.dialogs),
         speed: editForm.speed,
+        stationary: editForm.stationary,
+        vendor: editForm.vendor,
       }),
     });
     if (res.ok) {
@@ -130,6 +138,8 @@ export default function VillagersPage() {
       color: [v.color[0], v.color[1], v.color[2]],
       dialogs: v.dialogs.join("\n"),
       speed: v.speed,
+      stationary: !!v.stationary,
+      vendor: !!v.vendor,
     });
   }
 
@@ -319,6 +329,26 @@ function FormFields({
         <span className="text-[10px] text-gray-400 font-mono">
           ({form.color.map((c) => c.toFixed(2)).join(", ")})
         </span>
+      </div>
+      <div className="flex gap-4 items-center">
+        <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs">
+          <input
+            type="checkbox"
+            aria-label="stationary"
+            checked={form.stationary}
+            onChange={(e) => setForm({ ...form, stationary: e.target.checked })}
+          />
+          <span>stationary <span className="text-gray-400">(가판대 뒤 고정 NPC)</span></span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs">
+          <input
+            type="checkbox"
+            aria-label="vendor"
+            checked={form.vendor}
+            onChange={(e) => setForm({ ...form, vendor: e.target.checked })}
+          />
+          <span>vendor <span className="text-gray-400">(상호작용 시 상점 열림)</span></span>
+        </label>
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-500">dialogs (한 줄 = 한 대사, 빈 줄 무시)</span>

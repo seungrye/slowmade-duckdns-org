@@ -20,8 +20,19 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
   };
   switch (item.kind) {
     case "quest":      snap.imagePath = item.imagePath; break;
-    case "weapon":     snap.attackPower = item.attackPower; snap.element = item.element ?? null; break;
-    case "armor":      snap.defenseBonus = item.defenseBonus; break;
+    case "weapon":
+      snap.attackPower = item.attackPower;
+      if (item.attackPowerMin !== undefined) snap.attackPowerMin = item.attackPowerMin;
+      if (item.attackPowerMax !== undefined) snap.attackPowerMax = item.attackPowerMax;
+      if (item.tier !== undefined) snap.tier = item.tier;
+      snap.element = item.element ?? null;
+      break;
+    case "armor":
+      snap.defenseBonus = item.defenseBonus;
+      if (item.defenseBonusMin !== undefined) snap.defenseBonusMin = item.defenseBonusMin;
+      if (item.defenseBonusMax !== undefined) snap.defenseBonusMax = item.defenseBonusMax;
+      if (item.tier !== undefined) snap.tier = item.tier;
+      break;
     case "consumable": snap.effect = item.effect; break;
   }
   return snap;
@@ -48,8 +59,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const merged: Record<string, unknown> = {
     imagePath: body.imagePath ?? item.imagePath,
     attackPower: body.attackPower ?? item.attackPower,
+    attackPowerMin: body.attackPowerMin ?? item.attackPowerMin,
+    attackPowerMax: body.attackPowerMax ?? item.attackPowerMax,
     element: body.element !== undefined ? body.element : item.element ?? null,
     defenseBonus: body.defenseBonus ?? item.defenseBonus,
+    defenseBonusMin: body.defenseBonusMin ?? item.defenseBonusMin,
+    defenseBonusMax: body.defenseBonusMax ?? item.defenseBonusMax,
+    tier: body.tier ?? item.tier,
     effect: body.effect ?? item.effect,
   };
   const v = validateKindFields(merged, item.kind as ItemKind);
@@ -74,10 +90,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
       break;
     case "weapon":
       if (body.attackPower !== undefined) item.attackPower = body.attackPower;
+      if (body.attackPowerMin !== undefined) item.attackPowerMin = body.attackPowerMin;
+      if (body.attackPowerMax !== undefined) item.attackPowerMax = body.attackPowerMax;
+      if (body.tier !== undefined) item.tier = body.tier;
       if (body.element !== undefined) item.element = body.element;
       break;
     case "armor":
       if (body.defenseBonus !== undefined) item.defenseBonus = body.defenseBonus;
+      if (body.defenseBonusMin !== undefined) item.defenseBonusMin = body.defenseBonusMin;
+      if (body.defenseBonusMax !== undefined) item.defenseBonusMax = body.defenseBonusMax;
+      if (body.tier !== undefined) item.tier = body.tier;
       break;
     case "consumable":
       if (body.effect !== undefined) item.effect = body.effect;

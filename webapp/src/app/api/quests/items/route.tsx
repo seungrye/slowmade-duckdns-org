@@ -43,9 +43,17 @@ export async function POST(req: NextRequest) {
   if (body.kind === "quest") doc.imagePath = body.imagePath;
   else if (body.kind === "weapon") {
     doc.attackPower = body.attackPower;
+    if (body.attackPowerMin !== undefined) doc.attackPowerMin = body.attackPowerMin;
+    if (body.attackPowerMax !== undefined) doc.attackPowerMax = body.attackPowerMax;
+    if (body.tier !== undefined) doc.tier = body.tier;
     doc.element = body.element ?? null;
   }
-  else if (body.kind === "armor") doc.defenseBonus = body.defenseBonus;
+  else if (body.kind === "armor") {
+    doc.defenseBonus = body.defenseBonus;
+    if (body.defenseBonusMin !== undefined) doc.defenseBonusMin = body.defenseBonusMin;
+    if (body.defenseBonusMax !== undefined) doc.defenseBonusMax = body.defenseBonusMax;
+    if (body.tier !== undefined) doc.tier = body.tier;
+  }
   else if (body.kind === "consumable") doc.effect = body.effect;
 
   const item = await Item.create(doc);

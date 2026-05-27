@@ -8,6 +8,9 @@ const QuestSchema = new Schema(
     title: { type: String, required: true },
     giverNpc: { type: String, default: "" },
     initialPhase: { type: String, default: "dormant" },
+    // 이번 런에서 퀘스트가 활성화될 확률 (0.0~1.0). 게임 RON 의 spawn_chance 미러.
+    // #[serde(default = "default_spawn_chance")] 와 동일하게 기본 1.0.
+    spawnChance: { type: Number, default: 1.0 },
     phases: { type: Map, of: Schema.Types.Mixed, default: {} },
     transitions: { type: [Schema.Types.Mixed], default: [] },
     spawns: { type: [Schema.Types.Mixed], default: [] },
@@ -22,6 +25,7 @@ export interface QuestDoc {
   title: string;
   giverNpc: string;
   initialPhase: string;
+  spawnChance: number;
   phases: Map<string, unknown>;
   transitions: unknown[];
   spawns: unknown[];

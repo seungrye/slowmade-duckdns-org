@@ -42,14 +42,26 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
   switch (d.kind) {
     case "quest":
       return { kind: "quest", ...base, imagePath: (d.imagePath as string) ?? "" };
-    case "weapon":
-      return {
+    case "weapon": {
+      const w: Extract<ItemDef, { kind: "weapon" }> = {
         kind: "weapon", ...base,
         attackPower: (d.attackPower as number) ?? 0,
         element: (d.element as WeaponElement | null | undefined) ?? null,
       };
-    case "armor":
-      return { kind: "armor", ...base, defenseBonus: (d.defenseBonus as number) ?? 0 };
+      if (typeof d.attackPowerMin === "number") w.attackPowerMin = d.attackPowerMin;
+      if (typeof d.attackPowerMax === "number") w.attackPowerMax = d.attackPowerMax;
+      if (typeof d.tier === "number") w.tier = d.tier;
+      return w;
+    }
+    case "armor": {
+      const a: Extract<ItemDef, { kind: "armor" }> = {
+        kind: "armor", ...base, defenseBonus: (d.defenseBonus as number) ?? 0,
+      };
+      if (typeof d.defenseBonusMin === "number") a.defenseBonusMin = d.defenseBonusMin;
+      if (typeof d.defenseBonusMax === "number") a.defenseBonusMax = d.defenseBonusMax;
+      if (typeof d.tier === "number") a.tier = d.tier;
+      return a;
+    }
     case "consumable":
       return {
         kind: "consumable", ...base,

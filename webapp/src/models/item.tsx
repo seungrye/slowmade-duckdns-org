@@ -21,12 +21,19 @@ const ItemSchema = new Schema(
     // quest 전용
     imagePath: { type: String },
 
-    // weapon 전용
+    // weapon 전용 — 단일값(attackPower) 은 호환 유지, random-stat 모드는 min/max + tier.
     attackPower: { type: Number },
+    attackPowerMin: { type: Number },
+    attackPowerMax: { type: Number },
     element: { type: String, default: null }, // "fire" | "ice" | "lightning" | null
 
     // armor 전용
     defenseBonus: { type: Number },
+    defenseBonusMin: { type: Number },
+    defenseBonusMax: { type: Number },
+
+    // weapon/armor 공통 — 드롭 테이블 등급 (1..=5)
+    tier: { type: Number },
 
     // consumable 전용
     effect: { type: ConsumableEffectSchema },
@@ -47,8 +54,13 @@ export interface ItemDoc {
   pickupMessage: string;
   imagePath?: string;
   attackPower?: number;
+  attackPowerMin?: number;
+  attackPowerMax?: number;
   element?: string | null;
   defenseBonus?: number;
+  defenseBonusMin?: number;
+  defenseBonusMax?: number;
+  tier?: number;
   effect?: { type: "Heal"; amount: number };
   version: number;
   createdAt: Date;

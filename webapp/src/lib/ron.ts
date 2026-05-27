@@ -203,10 +203,16 @@ class Parser {
     const name = this.parseIdent();
     if (name !== "WeaponDef") throw new Error(`Expected WeaponDef, got ${name}`);
     this.expectPunct("(");
-    let attackPower = 0;
+    let attackPower: number | undefined;
+    let attackPowerMin: number | undefined;
+    let attackPowerMax: number | undefined;
+    let tier: number | undefined;
     let element: WeaponElement | null = null;
     const common = this.parseItemCommon((key) => {
-      if (key === "attack_power") { attackPower = this.parseNumber(); return true; }
+      if (key === "attack_power")     { attackPower = this.parseNumber(); return true; }
+      if (key === "attack_power_min") { attackPowerMin = this.parseNumber(); return true; }
+      if (key === "attack_power_max") { attackPowerMax = this.parseNumber(); return true; }
+      if (key === "tier")             { tier = this.parseNumber(); return true; }
       if (key === "element") {
         // Some("fire") | None
         const peek = this.parseIdent();
@@ -224,20 +230,53 @@ class Parser {
       return false;
     });
     this.expectPunct(")");
-    return { kind: "weapon", ...common, attackPower, element };
+    // fallback: 둘 중 한쪽만 있어도 다른쪽을 추론 → round-trip 안전성 확보
+    if (attackPower === undefined) {
+      if (attackPowerMin !== undefined && attackPowerMax !== undefined) {
+        attackPower = Math.round((attackPowerMin + attackPowerMax) / 2);
+      } else {
+        attackPower = 0;
+      }
+    }
+    const def: Extract<ItemDef, { kind: "weapon" }> = {
+      kind: "weapon", ...common, attackPower, element,
+    };
+    if (attackPowerMin !== undefined) def.attackPowerMin = attackPowerMin;
+    if (attackPowerMax !== undefined) def.attackPowerMax = attackPowerMax;
+    if (tier !== undefined) def.tier = tier;
+    return def;
   }
 
   parseArmorDef(): Extract<ItemDef, { kind: "armor" }> {
     const name = this.parseIdent();
     if (name !== "ArmorDef") throw new Error(`Expected ArmorDef, got ${name}`);
     this.expectPunct("(");
-    let defenseBonus = 0;
+    let defenseBonus: number | undefined;
+    let defenseBonusMin: number | undefined;
+    let defenseBonusMax: number | undefined;
+    let tier: number | undefined;
     const common = this.parseItemCommon((key) => {
-      if (key === "defense_bonus") { defenseBonus = this.parseNumber(); return true; }
+      if (key === "defense_bonus")     { defenseBonus = this.parseNumber(); return true; }
+      if (key === "defense_bonus_min") { defenseBonusMin = this.parseNumber(); return true; }
+      if (key === "defense_bonus_max") { defenseBonusMax = this.parseNumber(); return true; }
+      if (key === "tier")              { tier = this.parseNumber(); return true; }
       return false;
     });
     this.expectPunct(")");
-    return { kind: "armor", ...common, defenseBonus };
+    if (defenseBonus === undefined) {
+      if (defenseBonusMin !== undefined && defenseBonusMax !== undefined) {
+        defenseBonus = Math.round((defenseBonusMin + defenseBonusMax) / 2);
+      } else {
+        defenseBonus = 0;
+      }
+    }
+    const def: Extract<ItemDef, { kind: "armor" }> = {
+      kind: "armor", ...common, defenseBonus,
+    };
+    if (defenseBonusMin !== undefined) def.defenseBonusMin = defenseBonusMin;
+    if (defenseBonusMax !== undefined) def.defenseBonusMax = defenseBonusMax;
+    if (tier !== undefined) def.tier = tier;
+    return def;
   }
 
   parseConsumableEffect(): ConsumableEffect {
@@ -281,13 +320,15 @@ class Parser {
       const key = this.parseIdent();
       this.expectPunct(":");
       switch (key) {
-        case "id":       def.id      = this.parseString(); break;
-        case "name":     def.name    = this.parseString(); break;
-        case "color":    def.color   = this.parseNumberTuple3(); break;
-        case "dialogs":  def.dialogs = this.parseArray(() => this.parseString()); break;
+        case "id":         def.id         = this.parseString(); break;
+        case "name":       def.name       = this.parseString(); break;
+        case "color":      def.color      = this.parseNumberTuple3(); break;
+        case "dialogs":    def.dialogs    = this.parseArray(() => this.parseString()); break;
         // 하위호환: 구 형식의 quest_id 는 소비 후 무시
-        case "quest_id": this.parseOptionString(); break;
-        case "speed":    def.speed   = this.parseNumber(); break;
+        case "quest_id":   this.parseOptionString(); break;
+        case "speed":      def.speed      = this.parseNumber(); break;
+        case "stationary": def.stationary = this.parseBool(); break;
+        case "vendor":     def.vendor     = this.parseBool(); break;
         default: break;
       }
       this.tryPunct(",");
@@ -988,6 +1029,10 @@ function serializeVillagerDef(v: VillagerDef): string {
   lines.push(`        id: ${q(v.id)},`);
   lines.push(`        name: ${q(v.name)},`);
   lines.push(`        color: (${v.color[0]}, ${v.color[1]}, ${v.color[2]}),`);
+  // stationary/vendor 는 게임 측 #[serde(default)] 와 호환을 위해 true 일 때만 출력.
+  // false(기본값)는 생략 → 기존 .ron 텍스트와 동일 형태 유지.
+  if (v.stationary) lines.push(`        stationary: true,`);
+  if (v.vendor)     lines.push(`        vendor: true,`);
   if (v.dialogs.length === 0) {
     lines.push(`        dialogs: [],`);
   } else {
@@ -1079,18 +1124,38 @@ export function serializeQuestItemsRon(items: Extract<ItemDef, { kind: "quest" }
 }
 
 export function serializeWeaponsRon(items: Extract<ItemDef, { kind: "weapon" }>[]): string {
-  return arrayWrap("WeaponDef", items.map((i) => [
-    ...serializeItemCommon(i),
-    `        attack_power: ${i.attackPower},`,
-    `        element: ${i.element == null ? "None" : `Some(${q(i.element)})`},`,
-  ]));
+  return arrayWrap("WeaponDef", items.map((i) => {
+    // 게임 RON 형식과 일치: random-stat 모드(min/max + tier) 가 있으면 그것을,
+    // 없으면 단일값(attack_power) 형식만 출력 → round-trip 보존.
+    const hasRandom = i.attackPowerMin !== undefined && i.attackPowerMax !== undefined;
+    const lines = [...serializeItemCommon(i)];
+    if (hasRandom) {
+      lines.push(`        attack_power_min: ${i.attackPowerMin},`);
+      lines.push(`        attack_power_max: ${i.attackPowerMax},`);
+      if (i.tier !== undefined) lines.push(`        tier: ${i.tier},`);
+    } else {
+      lines.push(`        attack_power: ${i.attackPower},`);
+      if (i.tier !== undefined) lines.push(`        tier: ${i.tier},`);
+    }
+    lines.push(`        element: ${i.element == null ? "None" : `Some(${q(i.element)})`},`);
+    return lines;
+  }));
 }
 
 export function serializeArmorsRon(items: Extract<ItemDef, { kind: "armor" }>[]): string {
-  return arrayWrap("ArmorDef", items.map((i) => [
-    ...serializeItemCommon(i),
-    `        defense_bonus: ${i.defenseBonus},`,
-  ]));
+  return arrayWrap("ArmorDef", items.map((i) => {
+    const hasRandom = i.defenseBonusMin !== undefined && i.defenseBonusMax !== undefined;
+    const lines = [...serializeItemCommon(i)];
+    if (hasRandom) {
+      lines.push(`        defense_bonus_min: ${i.defenseBonusMin},`);
+      lines.push(`        defense_bonus_max: ${i.defenseBonusMax},`);
+      if (i.tier !== undefined) lines.push(`        tier: ${i.tier},`);
+    } else {
+      lines.push(`        defense_bonus: ${i.defenseBonus},`);
+      if (i.tier !== undefined) lines.push(`        tier: ${i.tier},`);
+    }
+    return lines;
+  }));
 }
 
 export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consumable" }>[]): string {

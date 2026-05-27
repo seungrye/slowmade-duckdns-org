@@ -17,6 +17,15 @@ export function validateQuestStructure(quest: QuestDef): QuestStructError[] {
     out.push({ path: "initialPhase", message: `initialPhase "${quest.initialPhase}" 이 phases 에 없습니다` });
   }
 
+  if (quest.spawnChance !== undefined) {
+    if (typeof quest.spawnChance !== "number" || quest.spawnChance < 0 || quest.spawnChance > 1) {
+      out.push({
+        path: "spawnChance",
+        message: `spawnChance ${quest.spawnChance} 는 0.0~1.0 범위여야 합니다`,
+      });
+    }
+  }
+
   (quest.transitions ?? []).forEach((t, i) => {
     const base = `transitions[${i}]`;
     if (t.from && !phaseKeys.has(t.from)) {

@@ -88,15 +88,26 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
   switch (d.kind) {
     case "quest":
       return { kind: "quest", ...base, imagePath: (d.imagePath as string) ?? "" };
-    case "weapon":
-      return {
-        kind: "weapon",
-        ...base,
+    case "weapon": {
+      const w: Extract<ItemDef, { kind: "weapon" }> = {
+        kind: "weapon", ...base,
         attackPower: (d.attackPower as number) ?? 0,
         element: (d.element as WeaponElement | null | undefined) ?? null,
       };
-    case "armor":
-      return { kind: "armor", ...base, defenseBonus: (d.defenseBonus as number) ?? 0 };
+      if (typeof d.attackPowerMin === "number") w.attackPowerMin = d.attackPowerMin;
+      if (typeof d.attackPowerMax === "number") w.attackPowerMax = d.attackPowerMax;
+      if (typeof d.tier === "number") w.tier = d.tier;
+      return w;
+    }
+    case "armor": {
+      const a: Extract<ItemDef, { kind: "armor" }> = {
+        kind: "armor", ...base, defenseBonus: (d.defenseBonus as number) ?? 0,
+      };
+      if (typeof d.defenseBonusMin === "number") a.defenseBonusMin = d.defenseBonusMin;
+      if (typeof d.defenseBonusMax === "number") a.defenseBonusMax = d.defenseBonusMax;
+      if (typeof d.tier === "number") a.tier = d.tier;
+      return a;
+    }
     case "consumable":
       return {
         kind: "consumable",
@@ -110,13 +121,16 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
 
 function toVillagerDef(d: Record<string, unknown>): VillagerDef {
   const color = d.color as number[];
-  return {
+  const v: VillagerDef = {
     id: d.id as string,
     name: d.name as string,
     color: [color[0], color[1], color[2]],
     dialogs: (d.dialogs as string[]) ?? [],
     speed: typeof d.speed === "number" ? d.speed : 1.0,
   };
+  if (d.stationary) v.stationary = true;
+  if (d.vendor) v.vendor = true;
+  return v;
 }
 
 function toMonsterDef(d: Record<string, unknown>): MonsterDef {

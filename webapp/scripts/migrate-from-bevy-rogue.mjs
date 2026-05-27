@@ -96,39 +96,10 @@ function listRonFiles(dir) {
 const log = (...a) => console.log("[migrate]", ...a);
 const warn = (...a) => console.warn("[migrate:warn]", ...a);
 
-// ── 스키마 드리프트 전처리 ───────────────────────────────────────────────────
-// bevy-rogue 가 새 필드를 추가했지만 webapp ron 파서/DB 스키마가 아직 못 따라간
-// 경우를 안전하게 흡수한다. 모두 RON 텍스트 레벨에서 다룬다 (정규식 — RON 의
-// 단순 구조 덕에 충분히 안전).
-
-// weapons.ron: attack_power_min/max → 평균값을 attack_power 로. tier 는 제거.
-function preprocessWeaponsRon(src) {
-  // attack_power_min: N,\s*attack_power_max: M, → attack_power: round((N+M)/2),
-  let out = src.replace(
-    /attack_power_min:\s*(-?\d+(?:\.\d+)?),\s*attack_power_max:\s*(-?\d+(?:\.\d+)?),/g,
-    (_m, a, b) => `attack_power: ${Math.round((Number(a) + Number(b)) / 2)},`,
-  );
-  // tier: N, 제거 (그 라인 자체)
-  out = out.replace(/^\s*tier:\s*\d+,\s*$/gm, "");
-  return out;
-}
-
-// armors.ron: defense_bonus_min/max → 평균값을 defense_bonus 로. tier 제거.
-function preprocessArmorsRon(src) {
-  let out = src.replace(
-    /defense_bonus_min:\s*(-?\d+(?:\.\d+)?),\s*defense_bonus_max:\s*(-?\d+(?:\.\d+)?),/g,
-    (_m, a, b) => `defense_bonus: ${Math.round((Number(a) + Number(b)) / 2)},`,
-  );
-  out = out.replace(/^\s*tier:\s*\d+,\s*$/gm, "");
-  return out;
-}
-
-// villagers.ron: webapp 미지원 필드 (stationary, vendor 등) 라인 제거.
-function preprocessVillagersRon(src) {
-  return src
-    .replace(/^\s*stationary:\s*(true|false),\s*$/gm, "")
-    .replace(/^\s*vendor:\s*(true|false),\s*$/gm, "");
-}
+// ── 전처리 없음 ─────────────────────────────────────────────────────────────
+// 이전에는 webapp 가 모르는 필드(attack_power_min/max, tier, stationary, vendor 등)를
+// 평균값으로 변환하거나 제거했지만, 이제 site 가 모든 필드를 1급으로 지원하므로
+// 게임 RON 을 그대로 통과시킨다. (스키마 확장 후 재마이그레이션 시점)
 
 // 카운터
 const stats = {
@@ -176,27 +147,32 @@ async function migrateQuests() {
       title: def.title,
       giverNpc: def.giverNpc ?? "",
       initialPhase: def.initialPhase ?? "dormant",
+      // game default_spawn_chance 미러 — RON 에 없으면 1.0
+      spawnChance: def.spawnChance ?? 1.0,
       phases: def.phases ?? {},
       transitions: def.transitions ?? [],
       spawns: def.spawns ?? [],
     };
-    if (def.spawnChance !== undefined) fields.spawnChance = def.spawnChance;
 
+    // Mongoose 스키마 default 로 인해 existing.spawnChance 는 미저장 문서에서도
+    // 1.0 으로 채워져 보인다 → "DB 에 실제로 저장됐는지" 를 .lean() 으로 별도 확인.
+    const existingRaw = await Quest.findOne({ id: def.id }).lean();
     const existing = await Quest.findOne({ id: def.id });
+    const spawnChanceStored = existingRaw && Object.prototype.hasOwnProperty.call(existingRaw, "spawnChance")
+      ? existingRaw.spawnChance
+      : undefined;
     if (existing) {
-      // 비교 대상 — fields 키를 그대로 따라간다. spawnChance 는 Quest 스키마에
-      // 정의되지 않아 DB 에 저장되지 않으므로 비교에서 제외.
-      const fieldsForCompare = { ...fields };
-      delete fieldsForCompare.spawnChance;
       const compareSet = {
         title: existing.title,
         giverNpc: existing.giverNpc,
         initialPhase: existing.initialPhase,
+        // 비교 시에는 lean() 로 본 "실제 저장 값" 을 사용해 미저장 문서를 update 로 유도.
+        spawnChance: spawnChanceStored,
         phases: existing.phases,
         transitions: existing.transitions,
         spawns: existing.spawns,
       };
-      if (!changed(compareSet, fieldsForCompare)) {
+      if (!changed(compareSet, fields)) {
         stats.quests.unchanged++;
         continue;
       }
@@ -210,6 +186,7 @@ async function migrateQuests() {
           title: existing.title,
           giverNpc: existing.giverNpc,
           initialPhase: existing.initialPhase,
+          spawnChance: existing.spawnChance ?? 1.0,
           phases: Object.fromEntries(existing.phases ?? new Map()),
           transitions: existing.transitions,
           spawns: existing.spawns,
@@ -218,6 +195,7 @@ async function migrateQuests() {
       existing.title = fields.title;
       existing.giverNpc = fields.giverNpc;
       existing.initialPhase = fields.initialPhase;
+      existing.spawnChance = fields.spawnChance;
       existing.phases = new Map(Object.entries(fields.phases));
       existing.transitions = fields.transitions;
       existing.spawns = fields.spawns;
@@ -231,6 +209,7 @@ async function migrateQuests() {
         title: fields.title,
         giverNpc: fields.giverNpc,
         initialPhase: fields.initialPhase,
+        spawnChance: fields.spawnChance,
         phases: fields.phases,
         transitions: fields.transitions,
         spawns: fields.spawns,
@@ -280,8 +259,19 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
       pickupMessage: def.pickupMessage,
     };
     if (def.kind === "quest")           fields.imagePath = def.imagePath;
-    else if (def.kind === "weapon")     { fields.attackPower = def.attackPower; fields.element = def.element ?? null; }
-    else if (def.kind === "armor")      fields.defenseBonus = def.defenseBonus;
+    else if (def.kind === "weapon") {
+      fields.attackPower = def.attackPower;
+      if (def.attackPowerMin !== undefined) fields.attackPowerMin = def.attackPowerMin;
+      if (def.attackPowerMax !== undefined) fields.attackPowerMax = def.attackPowerMax;
+      if (def.tier !== undefined) fields.tier = def.tier;
+      fields.element = def.element ?? null;
+    }
+    else if (def.kind === "armor") {
+      fields.defenseBonus = def.defenseBonus;
+      if (def.defenseBonusMin !== undefined) fields.defenseBonusMin = def.defenseBonusMin;
+      if (def.defenseBonusMax !== undefined) fields.defenseBonusMax = def.defenseBonusMax;
+      if (def.tier !== undefined) fields.tier = def.tier;
+    }
     else if (def.kind === "consumable") fields.effect = def.effect;
 
     const existing = await Item.findOne({ id: def.id });
@@ -300,8 +290,19 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
         pickupMessage: existing.pickupMessage,
       };
       if (def.kind === "quest")           compareSet.imagePath = existing.imagePath;
-      else if (def.kind === "weapon")     { compareSet.attackPower = existing.attackPower; compareSet.element = existing.element ?? null; }
-      else if (def.kind === "armor")      compareSet.defenseBonus = existing.defenseBonus;
+      else if (def.kind === "weapon") {
+        compareSet.attackPower = existing.attackPower;
+        if (existing.attackPowerMin !== undefined) compareSet.attackPowerMin = existing.attackPowerMin;
+        if (existing.attackPowerMax !== undefined) compareSet.attackPowerMax = existing.attackPowerMax;
+        if (existing.tier !== undefined) compareSet.tier = existing.tier;
+        compareSet.element = existing.element ?? null;
+      }
+      else if (def.kind === "armor") {
+        compareSet.defenseBonus = existing.defenseBonus;
+        if (existing.defenseBonusMin !== undefined) compareSet.defenseBonusMin = existing.defenseBonusMin;
+        if (existing.defenseBonusMax !== undefined) compareSet.defenseBonusMax = existing.defenseBonusMax;
+        if (existing.tier !== undefined) compareSet.tier = existing.tier;
+      }
       else if (def.kind === "consumable") compareSet.effect = existing.effect;
 
       if (!changed(compareSet, fields)) {
@@ -337,9 +338,9 @@ async function migrateItems() {
   for (const id of await migrateItemFile(
     path.join(itemsDir, "quest_items.ron"), "quest", ron.parseQuestItemsRon, "questItems")) allSeen.add(id);
   for (const id of await migrateItemFile(
-    path.join(itemsDir, "weapons.ron"), "weapon", ron.parseWeaponsRon, "weapons", preprocessWeaponsRon)) allSeen.add(id);
+    path.join(itemsDir, "weapons.ron"), "weapon", ron.parseWeaponsRon, "weapons")) allSeen.add(id);
   for (const id of await migrateItemFile(
-    path.join(itemsDir, "armors.ron"), "armor", ron.parseArmorsRon, "armors", preprocessArmorsRon)) allSeen.add(id);
+    path.join(itemsDir, "armors.ron"), "armor", ron.parseArmorsRon, "armors")) allSeen.add(id);
   for (const id of await migrateItemFile(
     path.join(itemsDir, "consumables.ron"), "consumable", ron.parseConsumablesRon, "consumables")) allSeen.add(id);
 
@@ -363,7 +364,7 @@ async function migrateVillagers() {
   if (!fs.existsSync(file)) { warn(`villagers 파일 없음: ${file}`); return; }
   let defs;
   try {
-    defs = ron.parseVillagersRon(preprocessVillagersRon(readText(file)));
+    defs = ron.parseVillagersRon(readText(file));
   } catch (e) {
     warn(`villagers 파싱 실패: ${e.message}`); return;
   }
@@ -383,6 +384,8 @@ async function migrateVillagers() {
       color: v.color,
       dialogs: v.dialogs ?? [],
       speed: v.speed ?? 1.0,
+      stationary: !!v.stationary,
+      vendor: !!v.vendor,
     };
     const existing = await Villager.findOne({ id: v.id });
     if (existing) {
@@ -391,6 +394,8 @@ async function migrateVillagers() {
         color: existing.color,
         dialogs: existing.dialogs,
         speed: existing.speed,
+        stationary: !!existing.stationary,
+        vendor: !!existing.vendor,
       };
       if (!changed(compareSet, fields)) { stats.villagers.unchanged++; continue; }
       if (DRY_RUN) { stats.villagers.updated++; continue; }
