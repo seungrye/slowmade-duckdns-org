@@ -59,15 +59,15 @@ export default function BevyRogueClient() {
         await mod.default({ module_or_path: "/games/bevy-rogue/bevy_rogue_bg.wasm" });
         if (cancelled) return;
 
-        // ⚠️ HOTFIX: site DB 의 일부 카테고리(armors 등)가 새 game 스키마와 어긋나
-        // RON 파싱이 panic → 게임 자체가 안 뜨는 사고. 일단 fetch 를 끄고 임베드로
-        // 안전 복구. 후속으로 game-side 에 "REMOTE 파싱 실패 → 임베드 폴백"을 카테고리
-        // 별로 구현해 재활성한다. (URL 쿼리 ?live=1 일 때만 시도하도록 옵트인 토글.)
+        // REMOTE 콘텐츠 fetch — 기본 활성. game 측이 카테고리별 "REMOTE 파싱
+        // 실패 → 임베드 폴백" 안전망을 구현했으므로, site DB 의 일부 카테고리가
+        // 깨져도 그 카테고리만 임베드로 돌아가고 나머지는 라이브 적용된다.
+        // 디버깅·강제 임베드 모드는 ?live=0 으로 OFF 가능.
         setLoadingStage("content");
         let contentJson: string | null = null;
         const url = new URL(window.location.href);
-        const liveEnabled = url.searchParams.get("live") === "1";
-        if (liveEnabled) {
+        const liveDisabled = url.searchParams.get("live") === "0";
+        if (!liveDisabled) {
           try {
             const res = await fetch("/api/game/content/v1", { cache: "default" });
             if (res.ok) contentJson = await res.text();
