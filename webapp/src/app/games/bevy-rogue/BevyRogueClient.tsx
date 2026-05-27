@@ -70,17 +70,24 @@ export default function BevyRogueClient() {
 
   return (
     <div className="relative w-full flex flex-col items-center">
-      {/* 캔버스 컨테이너 — 화면 폭 활용, 어두운 배경. */}
-      <div className="relative w-full max-w-5xl bg-black rounded-lg overflow-hidden shadow-2xl">
+      {/*
+        캔버스 컨테이너 — Bevy 가 결정한 resolution(현재 ~640×496) 을 그대로 두고
+        부모 flex 로 가운데 정렬한다.
+        과거: 부모 w-full max-w-5xl + canvas w-full → winit 이 늘어난 캔버스를
+              window 크기로 인식하지만 카메라/world 는 lib.rs 의 고정 resolution
+              기준이라 게임이 캔버스 왼쪽에만 그려졌다.
+      */}
+      <div className="relative inline-block bg-black rounded-lg overflow-hidden shadow-2xl">
         <canvas
           id="bevy-canvas"
           ref={canvasRef}
-          // Bevy 가 마운트 후 width/height 를 자기 정책으로 설정한다.
-          // 초기 크기는 잠시 보이는 빈 박스의 자리표시 용.
-          width={1280}
-          height={720}
+          // Bevy 가 마운트 직후 width/height attribute 를 자기 resolution 으로
+          // 덮어쓴다. 이 초기값은 로더가 잠시 차지할 박스 크기.
+          width={640}
+          height={496}
           tabIndex={0}
-          className="block w-full h-auto bg-black outline-none"
+          // CSS 로 stretch 하지 않는다(stretch 하면 winit window != Bevy camera).
+          className="block bg-black outline-none"
           aria-label="bevy-rogue 게임 캔버스"
         />
 
