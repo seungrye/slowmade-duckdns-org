@@ -5,6 +5,9 @@ import { useEffect, useRef, useState } from "react";
 // bevy-rogue WASM glue 의 default export 타입.
 // (실제 .d.ts 는 site repo 에 없음 — wasm-bindgen --no-typescript.)
 type WasmInit = (input?: string | URL | Request | Response) => Promise<unknown>;
+// wasm 측 명시 진입점 — bevy-rogue/src/lib.rs `pub fn start(content_json: Option<String>)`.
+// `null` 이면 wasm 측이 임베드 폴백으로 진행.
+type WasmStart = (contentJson: string | null) => void;
 
 /**
  * bevy-rogue WASM 게임 클라이언트.
@@ -28,6 +31,9 @@ export default function BevyRogueClient() {
   // 외부 래퍼 — 실제 보이는 박스 (반응형). 너비를 측정해 scale 계산.
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  // 로더 단계 — wasm 다운로드 → 콘텐츠 동기화 → 초기화 순서로 진행.
+  // 사용자에게 무엇이 진행 중인지 한 줄로 보여준다.
+  const [loadingStage, setLoadingStage] = useState<"wasm" | "content" | "init">("wasm");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
@@ -42,6 +48,7 @@ export default function BevyRogueClient() {
         const glueUrl = "/games/bevy-rogue/bevy_rogue.js";
         const mod = (await import(/* webpackIgnore: true */ /* @vite-ignore */ glueUrl)) as {
           default: WasmInit;
+          start: WasmStart;
         };
         if (cancelled) return;
 
@@ -49,6 +56,27 @@ export default function BevyRogueClient() {
         // 글루 내부의 상대 경로 추측을 피한다(Next.js 라우트와 분리).
         await mod.default("/games/bevy-rogue/bevy_rogue_bg.wasm");
         if (cancelled) return;
+
+        // 콘텐츠 동기화 — site `/api/game/content/v1` 에서 최신 RON 묶음 받아오기.
+        // 실패시 null 을 넘기면 wasm 측이 build.rs 임베드 폴백으로 진행한다.
+        // 로컬 개발이나 API 미배포 상태에서도 게임은 정상 시작.
+        setLoadingStage("content");
+        let contentJson: string | null = null;
+        try {
+          const res = await fetch("/api/game/content/v1", { cache: "default" });
+          if (res.ok) {
+            contentJson = await res.text();
+          } else {
+            console.warn("[bevy-rogue] content fetch:", res.status);
+          }
+        } catch (e) {
+          console.warn("[bevy-rogue] content fetch 실패 → 임베드 폴백:", e);
+        }
+        if (cancelled) return;
+
+        // 명시적 진입점 호출 — wasm 측이 콘텐츠 install 후 게임 루프 시작.
+        setLoadingStage("init");
+        mod.start(contentJson);
 
         setStatus("ready");
       } catch (e) {
@@ -136,9 +164,15 @@ export default function BevyRogueClient() {
             aria-live="polite"
           >
             <div className="text-center">
-              <div className="text-lg font-semibold mb-2">게임을 불러오는 중...</div>
+              <div className="text-lg font-semibold mb-2">
+                {loadingStage === "wasm" && "게임을 불러오는 중..."}
+                {loadingStage === "content" && "콘텐츠 동기화 중..."}
+                {loadingStage === "init" && "게임 초기화 중..."}
+              </div>
               <div className="text-sm text-gray-400">
-                wasm 번들을 다운로드하고 초기화하는 중입니다(수 초 소요).
+                {loadingStage === "wasm" && "wasm 번들을 다운로드하는 중입니다(수 초 소요)."}
+                {loadingStage === "content" && "최신 게임 콘텐츠를 받아오는 중입니다."}
+                {loadingStage === "init" && "게임 루프를 시작하는 중입니다."}
               </div>
             </div>
           </div>
