@@ -33,6 +33,9 @@ const myPageLinks = [
     { href: "/dashboard/posts", label: "내가 올린 유머", description: "내가 업로드한 유머 보기", icon: <Archive size={20} /> },
     { href: "/dashboard/settings", label: "설정", description: "내 설정 보기", icon: <Settings size={20} /> },
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
+];
+
+const questLinks = [
     { href: "/quests", label: "퀘스트", description: "퀘스트 목록·편집", icon: <ScrollText size={20} /> },
     { href: "/quests/villagers", label: "Villager 카탈로그", description: "NPC 정의 관리", icon: <Users size={20} /> },
     { href: "/quests/items", label: "Item 카탈로그", description: "아이템 정의 관리", icon: <Package size={20} /> },
@@ -44,13 +47,20 @@ export default function Navbar() {
     const { data: session } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isQuestDropdownOpen, setIsQuestDropdownOpen] = useState(false);
     const pathname = usePathname();
     const dropdownRef = useRef<HTMLLIElement>(null);
+    const questDropdownRef = useRef<HTMLLIElement>(null);
+
+    const isQuestActive = pathname === "/quests" || pathname.startsWith("/quests/");
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
+            }
+            if (questDropdownRef.current && !questDropdownRef.current.contains(event.target as Node)) {
+                setIsQuestDropdownOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -81,13 +91,49 @@ export default function Navbar() {
                         </li>
                     ))}
 
+                    {/* 퀘스트 드롭다운 (인증 사용자만) */}
+                    {session && (
+                        <li className="relative" ref={questDropdownRef}>
+                            <button
+                                className={`flex items-center gap-1 ${isQuestActive ? "text-gray-400" : "text-gray-500"} hover:text-gray-300 transition`}
+                                onClick={() => {
+                                    setIsQuestDropdownOpen(!isQuestDropdownOpen);
+                                    setIsDropdownOpen(false);
+                                }}
+                                aria-label="퀘스트 메뉴"
+                            >
+                                <ScrollText size={20} /> 퀘스트 <ChevronDown size={16} />
+                            </button>
+
+                            {isQuestDropdownOpen && (
+                                <ul className="absolute right-0 mt-2 w-48 bg-gray-800 shadow-lg rounded-lg overflow-hidden z-20">
+                                    {questLinks.map((link) => (
+                                        <li key={link.href}>
+                                            <Link
+                                                href={link.href}
+                                                className="px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
+                                                onClick={() => setIsQuestDropdownOpen(false)}
+                                            >
+                                                {link.icon}
+                                                {link.label}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </li>
+                    )}
+
                     {/* 로그인 상태에 따라 메뉴 변경 */}
                     {session ? (
                         // 로그인한 경우: "마이페이지" 메뉴
                         <li className="relative" ref={dropdownRef}>
                             <button
                                 className="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition"
-                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                onClick={() => {
+                                    setIsDropdownOpen(!isDropdownOpen);
+                                    setIsQuestDropdownOpen(false);
+                                }}
                                 aria-label="마이페이지 메뉴"
                             >
                                 <User size={20} /> 마이페이지 <ChevronDown size={16} />
@@ -163,6 +209,18 @@ export default function Navbar() {
                     {/* 로그인 상태에 따라 모바일 메뉴 변경 */}
                     {session ? (
                         <>
+                            {questLinks.map((link) => (
+                                <li key={link.href} className="text-center">
+                                    <Link
+                                        href={link.href}
+                                        className="py-2 hover:bg-gray-600 transition flex items-center gap-1 justify-center"
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        {link.icon}
+                                        {link.label}
+                                    </Link>
+                                </li>
+                            ))}
                             {myPageLinks.map((link) => (
                                 <li key={link.href} className="text-center">
                                     <Link
