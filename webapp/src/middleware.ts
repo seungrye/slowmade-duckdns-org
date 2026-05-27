@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from 'next/server'
 export function middleware(_request: NextRequest) {
   const cspHeader = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com",
+    // 'wasm-unsafe-eval' — /games/bevy-rogue 의 Bevy(WASM) 컴파일 허용.
+    // 'unsafe-eval' 보다 안전(JS eval 은 여전히 금지, WebAssembly 만 허용).
+    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self'",

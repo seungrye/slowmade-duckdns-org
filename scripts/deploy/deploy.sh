@@ -30,6 +30,18 @@ HEALTH_PATH="/api/health"
 HEALTH_TIMEOUT_SEC=60
 HEALTH_INTERVAL_SEC=2
 
+# bevy-rogue WASM 산출물 위치/소스 repo 경로.
+BEVY_ROGUE_PATH="${BEVY_ROGUE_PATH:-/home/seungrye/bevy-rogue}"
+BEVY_WASM_DEST="$WEBAPP_DIR/public/games/bevy-rogue"
+
+# --rebuild-wasm 옵션 파싱 (단순 — 첫 인자만 본다).
+REBUILD_WASM=0
+for arg in "$@"; do
+    case "$arg" in
+        --rebuild-wasm) REBUILD_WASM=1 ;;
+    esac
+done
+
 log()  { printf '\033[1;34m[deploy]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[deploy]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[deploy]\033[0m %s\n' "$*" >&2; exit 1; }
@@ -71,6 +83,48 @@ health_check() {
     return 1
 }
 
+ensure_bevy_wasm() {
+    # bevy-rogue WASM 번들이 public/games/bevy-rogue/ 에 있는지 검사.
+    # 핵심 파일(bevy_rogue.js + bevy_rogue_bg.wasm) 둘 다 있어야 OK.
+    #
+    # 동작:
+    #   - --rebuild-wasm 또는 PUBLISH_WASM=1 → 무조건 publish-to-site.sh 호출.
+    #   - 핵심 파일이 둘 다 있으면 OK 메시지만.
+    #   - 없으면 자동으로 publish-to-site.sh 호출(사용자 편의).
+    #     스크립트도 없으면 명확한 안내 후 실패.
+    #
+    # 설계 이유:
+    #   blue/green 무중단 배포 흐름은 "한 번 실행하면 끝까지 간다" 가 자연스럽다.
+    #   누락 시 실패로 멈추면 운영자가 별도 publish 후 재실행해야 해 번거롭다.
+    #   bevy-rogue repo 가 있고 wasm-build.sh 가 동작하면 자동 publish 가 안전한 기본값.
+    local publish_script="$BEVY_ROGUE_PATH/scripts/publish-to-site.sh"
+    local has_glue=0 has_wasm=0
+    [[ -f "$BEVY_WASM_DEST/bevy_rogue.js" ]] && has_glue=1
+    [[ -f "$BEVY_WASM_DEST/bevy_rogue_bg.wasm" ]] && has_wasm=1
+
+    if [[ "$REBUILD_WASM" == "1" || "${PUBLISH_WASM:-0}" == "1" ]]; then
+        log "wasm 강제 재빌드/배포 (--rebuild-wasm 또는 PUBLISH_WASM=1)"
+        [[ -x "$publish_script" ]] || die "publish 스크립트 없음: $publish_script (BEVY_ROGUE_PATH 확인)"
+        SITE_PATH="$REPO_DIR" bash "$publish_script"
+        return
+    fi
+
+    if (( has_glue && has_wasm )); then
+        log "bevy-rogue wasm 산출물 확인됨: $BEVY_WASM_DEST"
+        return
+    fi
+
+    warn "bevy-rogue wasm 산출물 누락 — 자동 publish 시도"
+    if [[ ! -x "$publish_script" ]]; then
+        die "publish 스크립트 없음: $publish_script
+        해결: BEVY_ROGUE_PATH=<bevy-rogue repo 경로> 설정 후 재실행하거나,
+        bevy-rogue repo 에서 'bash scripts/publish-to-site.sh' 를 먼저 실행하라.
+        또는 git 에서 webapp/public/games/bevy-rogue/ 가 제외(.gitignore)되어 있으니
+        deploy 호스트에 bevy-rogue 빌드 환경이 필요하다."
+    fi
+    SITE_PATH="$REPO_DIR" bash "$publish_script"
+}
+
 main() {
     cd "$WEBAPP_DIR"
 
@@ -78,6 +132,9 @@ main() {
     active=$(current_port)
     inactive=$(inactive_port "$active")
     log "active=$active  →  deploying to inactive=$inactive"
+
+    # build 직전에 wasm 번들 보장.
+    ensure_bevy_wasm
 
     log "build (NEXT_DISTDIR=.next-${inactive})"
     NEXT_DISTDIR=".next-${inactive}" pnpm install --frozen-lockfile

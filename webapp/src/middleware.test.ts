@@ -14,7 +14,16 @@ describe('middleware', () => {
 
   it("script-src에 'unsafe-inline'과 cdn.jsdelivr.net, googletagmanager.com을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    expect(csp).toContain("script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.googletagmanager.com");
+    // 개별 토큰으로 단언 — 미들웨어 정책이 항목 추가에 유연하도록.
+    expect(csp).toMatch(/script-src [^;]*'self'/);
+    expect(csp).toMatch(/script-src [^;]*'unsafe-inline'/);
+    expect(csp).toMatch(/script-src [^;]*https:\/\/cdn\.jsdelivr\.net/);
+    expect(csp).toMatch(/script-src [^;]*https:\/\/www\.googletagmanager\.com/);
+  });
+
+  it("script-src에 'wasm-unsafe-eval' 을 허용한다 (bevy-rogue WASM)", () => {
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).toMatch(/script-src [^;]*'wasm-unsafe-eval'/);
   });
 
   it("style-src에 'unsafe-inline'을 허용한다", () => {

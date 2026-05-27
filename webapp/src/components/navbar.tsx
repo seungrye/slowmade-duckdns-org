@@ -21,11 +21,13 @@ import {
     Package,
     MapPin,
     Skull,
+    Gamepad2,
 } from "lucide-react";
 
 const navLinks = [
     { href: "/", label: "홈", description: "사이트로 돌아가기", icon: <Home size={20} /> },
     { href: "/tags", label: "태그", description: "태그 클라우드 보기", icon: <Layers size={20} /> },
+    { href: "/games/bevy-rogue", label: "게임", description: "Bevy Rogue 브라우저 게임", icon: <Gamepad2 size={20} /> },
 ];
 
 const myPageLinks = [
