@@ -221,7 +221,7 @@ export default function Navbar() {
                             <li>
                                 <button
                                     type="button"
-                                    className={`w-full py-2 px-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isQuestActive ? "text-gray-400" : "text-gray-300"}`}
+                                    className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isQuestActive ? "text-gray-400" : "text-gray-300"}`}
                                     onClick={() => setIsMobileQuestOpen((v) => !v)}
                                     aria-label="모바일 퀘스트 섹션 토글"
                                     aria-expanded={isMobileQuestOpen}
@@ -257,7 +257,7 @@ export default function Navbar() {
                             <li>
                                 <button
                                     type="button"
-                                    className={`w-full py-2 px-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isMyPageActive ? "text-gray-400" : "text-gray-300"}`}
+                                    className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isMyPageActive ? "text-gray-400" : "text-gray-300"}`}
                                     onClick={() => setIsMobileMyPageOpen((v) => !v)}
                                     aria-label="모바일 마이페이지 섹션 토글"
                                     aria-expanded={isMobileMyPageOpen}
