@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 
 // bevy-rogue WASM glue 의 default export 타입.
 // (실제 .d.ts 는 site repo 에 없음 — wasm-bindgen --no-typescript.)
-type WasmInit = (input?: string | URL | Request | Response) => Promise<unknown>;
+// 새 wasm-bindgen API: 단일 옵션 객체. 위치 인자는 deprecation 경고.
+type WasmInit = (opts?: { module_or_path?: string | URL | Request | Response }) => Promise<unknown>;
 // wasm 측 명시 진입점 — bevy-rogue/src/lib.rs `pub fn start(content_json: Option<String>)`.
 // `null` 이면 wasm 측이 임베드 폴백으로 진행.
 type WasmStart = (contentJson: string | null) => void;
@@ -52,9 +53,10 @@ export default function BevyRogueClient() {
         };
         if (cancelled) return;
 
-        // wasm 바이너리 URL — 글루의 default(input) 에 명시 전달해서
+        // wasm 바이너리 URL — 글루의 default 에 명시 전달해서
         // 글루 내부의 상대 경로 추측을 피한다(Next.js 라우트와 분리).
-        await mod.default("/games/bevy-rogue/bevy_rogue_bg.wasm");
+        // 새 wasm-bindgen 은 단일 옵션 객체 시그니처를 요구(위치 인자는 deprecation).
+        await mod.default({ module_or_path: "/games/bevy-rogue/bevy_rogue_bg.wasm" });
         if (cancelled) return;
 
         // 콘텐츠 동기화 — site `/api/game/content/v1` 에서 최신 RON 묶음 받아오기.
