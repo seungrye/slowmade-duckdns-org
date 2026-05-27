@@ -59,20 +59,22 @@ export default function BevyRogueClient() {
         await mod.default({ module_or_path: "/games/bevy-rogue/bevy_rogue_bg.wasm" });
         if (cancelled) return;
 
-        // 콘텐츠 동기화 — site `/api/game/content/v1` 에서 최신 RON 묶음 받아오기.
-        // 실패시 null 을 넘기면 wasm 측이 build.rs 임베드 폴백으로 진행한다.
-        // 로컬 개발이나 API 미배포 상태에서도 게임은 정상 시작.
+        // ⚠️ HOTFIX: site DB 의 일부 카테고리(armors 등)가 새 game 스키마와 어긋나
+        // RON 파싱이 panic → 게임 자체가 안 뜨는 사고. 일단 fetch 를 끄고 임베드로
+        // 안전 복구. 후속으로 game-side 에 "REMOTE 파싱 실패 → 임베드 폴백"을 카테고리
+        // 별로 구현해 재활성한다. (URL 쿼리 ?live=1 일 때만 시도하도록 옵트인 토글.)
         setLoadingStage("content");
         let contentJson: string | null = null;
-        try {
-          const res = await fetch("/api/game/content/v1", { cache: "default" });
-          if (res.ok) {
-            contentJson = await res.text();
-          } else {
-            console.warn("[bevy-rogue] content fetch:", res.status);
+        const url = new URL(window.location.href);
+        const liveEnabled = url.searchParams.get("live") === "1";
+        if (liveEnabled) {
+          try {
+            const res = await fetch("/api/game/content/v1", { cache: "default" });
+            if (res.ok) contentJson = await res.text();
+            else console.warn("[bevy-rogue] content fetch:", res.status);
+          } catch (e) {
+            console.warn("[bevy-rogue] content fetch 실패 → 임베드 폴백:", e);
           }
-        } catch (e) {
-          console.warn("[bevy-rogue] content fetch 실패 → 임베드 폴백:", e);
         }
         if (cancelled) return;
 
