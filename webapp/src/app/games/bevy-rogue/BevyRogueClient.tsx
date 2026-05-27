@@ -19,8 +19,14 @@ type WasmInit = (input?: string | URL | Request | Response) => Promise<unknown>;
  *   - 이 파일은 "use client" 클라이언트 컴포넌트.
  *   - page.tsx 가 next/dynamic({ ssr: false }) 로 import 한다.
  */
+// 캔버스의 native 해상도 — Bevy/winit 이 attribute 로 관리하는 값과 동일.
+const CANVAS_NATIVE_WIDTH = 640;
+const CANVAS_NATIVE_HEIGHT = 496;
+
 export default function BevyRogueClient() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // 외부 래퍼 — 실제 보이는 박스 (반응형). 너비를 측정해 scale 계산.
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -68,34 +74,61 @@ export default function BevyRogueClient() {
     };
   }, []);
 
+  // 모바일 반응형 — 부모 래퍼의 실제 폭을 측정해서 캔버스에 transform: scale 적용.
+  // canvas attribute/CSS 는 그대로 두고(winit 경합 회피) 부모 측정값만으로 시각 사이즈 조절.
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    const canvas = canvasRef.current;
+    if (!wrapper || !canvas) return;
+
+    const applyScale = () => {
+      const w = wrapper.clientWidth;
+      if (w <= 0) return;
+      // 부모가 native 보다 작을 때만 축소, 크면 native 유지(1배).
+      const scale = w < CANVAS_NATIVE_WIDTH ? w / CANVAS_NATIVE_WIDTH : 1;
+      canvas.style.transform = scale === 1 ? "none" : `scale(${scale})`;
+      canvas.style.transformOrigin = "top left";
+    };
+
+    applyScale();
+
+    // ResizeObserver 로 폭 변화 추적 — orientation change, 창 리사이즈, 부모 레이아웃 변화 모두 커버.
+    const ro = new ResizeObserver(() => applyScale());
+    ro.observe(wrapper);
+
+    return () => {
+      ro.disconnect();
+    };
+  }, []);
+
   return (
     <div className="relative w-full flex flex-col items-center">
       {/*
-        캔버스 컨테이너 — Bevy 가 결정한 resolution(현재 ~640×496) 을 그대로 두고
-        부모 flex 로 가운데 정렬한다.
-        과거: 부모 w-full max-w-5xl + canvas w-full → winit 이 늘어난 캔버스를
-              window 크기로 인식하지만 카메라/world 는 lib.rs 의 고정 resolution
-              기준이라 게임이 캔버스 왼쪽에만 그려졌다.
+        모바일 반응형 캔버스 컨테이너 (외부 래퍼).
+        - 부모는 max-w-[640px] + w-full → 데스크탑에선 640px native, 작은 화면에선 100%.
+        - aspectRatio + overflow:hidden 으로 scale 된 캔버스가 박스 안에 정확히 들어오게.
+        - canvas 자체 attribute(width=640,height=496)·CSS 는 그대로 — winit 정책과 경합 회피.
+        - useEffect + ResizeObserver 가 wrapper.clientWidth 를 측정해
+          canvas.style.transform = scale(parentWidth/640) 을 동적으로 적용.
+        - 픽셀 아트 보존: image-rendering: pixelated.
       */}
-      {/*
-        canvas 는 Bevy/winit 이 자기 resolution(640x496)으로 attribute·CSS 모두 관리한다.
-        CSS 로 stretch 시키려 하면 winit 이 다시 attribute 를 덮어써 경합이 일어남.
-        그래서 자연 사이즈를 받아들이고 박스를 가운데 정렬만 한다(mx-auto + inline-block).
-        픽셀 아트 보존을 위해 image-rendering: pixelated.
-      */}
-      <div className="relative inline-block bg-black rounded-lg overflow-hidden shadow-2xl mx-auto">
+      <div
+        ref={wrapperRef}
+        className="relative w-full max-w-[640px] mx-auto bg-black rounded-lg overflow-hidden shadow-2xl"
+        style={{ aspectRatio: `${CANVAS_NATIVE_WIDTH}/${CANVAS_NATIVE_HEIGHT}` }}
+      >
         <canvas
           id="bevy-canvas"
           ref={canvasRef}
-          width={640}
-          height={496}
+          width={CANVAS_NATIVE_WIDTH}
+          height={CANVAS_NATIVE_HEIGHT}
           tabIndex={0}
           className="block bg-black outline-none"
           style={{ imageRendering: "pixelated" }}
           aria-label="bevy-rogue 게임 캔버스"
         />
 
-        {/* 로딩 오버레이 */}
+        {/* 로딩 오버레이 — 외부 래퍼(스케일된 보이는 영역) 기준 */}
         {status === "loading" && (
           <div
             className="absolute inset-0 flex items-center justify-center bg-black/80 text-gray-200"

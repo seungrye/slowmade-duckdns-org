@@ -95,12 +95,69 @@ describe('Navbar — 퀘스트 드롭다운 (인증)', () => {
     expect(screen.getByText('내 프로필')).toBeTruthy();
   });
 
-  it('모바일 메뉴 열면 퀘스트 항목들도 렌더', () => {
+  it('모바일 메뉴 열면 퀘스트/마이페이지 collapsible 헤더가 노출 — 활성 라우트 아니면 자식은 접힘', () => {
+    pathnameMock.mockReturnValue('/');
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
-    expect(screen.getAllByText('퀘스트').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Villager 카탈로그').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Monster 카탈로그').length).toBeGreaterThan(0);
+    // 헤더 트리거는 보임
+    expect(screen.getByLabelText('모바일 퀘스트 섹션 토글')).toBeTruthy();
+    expect(screen.getByLabelText('모바일 마이페이지 섹션 토글')).toBeTruthy();
+    // 활성 라우트 아니므로 collapsible 자식은 초기 접힘
+    expect(screen.queryByText('Villager 카탈로그')).toBeNull();
+    expect(screen.queryByText('내 프로필')).toBeNull();
+  });
+
+  it('모바일 퀘스트 헤더 탭하면 자식 5개가 펴짐, 다시 탭하면 접힘', () => {
+    pathnameMock.mockReturnValue('/');
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    const questHeader = screen.getByLabelText('모바일 퀘스트 섹션 토글');
+    fireEvent.click(questHeader);
+    expect(screen.getByText('Villager 카탈로그')).toBeTruthy();
+    expect(screen.getByText('Item 카탈로그')).toBeTruthy();
+    expect(screen.getByText('Zone 카탈로그')).toBeTruthy();
+    expect(screen.getByText('Monster 카탈로그')).toBeTruthy();
+    // aria-expanded 가 true 로 바뀜
+    expect(questHeader.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(questHeader);
+    expect(screen.queryByText('Villager 카탈로그')).toBeNull();
+    expect(questHeader.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('모바일 마이페이지 헤더 탭하면 자식 4개가 펴짐', () => {
+    pathnameMock.mockReturnValue('/');
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    fireEvent.click(screen.getByLabelText('모바일 마이페이지 섹션 토글'));
+    expect(screen.getByText('내 프로필')).toBeTruthy();
+    expect(screen.getByText('내가 올린 유머')).toBeTruthy();
+    expect(screen.getByText('설정')).toBeTruthy();
+    expect(screen.getByText('유머 업로드')).toBeTruthy();
+  });
+
+  it('pathname 이 /quests* 이면 모바일 퀘스트 섹션이 초기부터 펴진 상태', () => {
+    pathnameMock.mockReturnValue('/quests/villagers');
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    // 토글 없이도 자식이 보임
+    expect(screen.getByText('Villager 카탈로그')).toBeTruthy();
+    expect(screen.getByLabelText('모바일 퀘스트 섹션 토글').getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('pathname 이 /dashboard* 이면 모바일 마이페이지 섹션이 초기부터 펴진 상태', () => {
+    pathnameMock.mockReturnValue('/dashboard/profile');
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    expect(screen.getByText('내 프로필')).toBeTruthy();
+    expect(screen.getByLabelText('모바일 마이페이지 섹션 토글').getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('pathname 이 /post/write 이면 모바일 마이페이지 섹션이 초기부터 펴진 상태', () => {
+    pathnameMock.mockReturnValue('/post/write');
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    expect(screen.getByText('유머 업로드')).toBeTruthy();
+    expect(screen.getByLabelText('모바일 마이페이지 섹션 토글').getAttribute('aria-expanded')).toBe('true');
   });
 });
 
@@ -121,5 +178,12 @@ describe('Navbar — 비로그인 시 퀘스트 미노출', () => {
   it('마이페이지 메뉴 트리거도 보이지 않음', () => {
     render(<Navbar />);
     expect(screen.queryByLabelText('마이페이지 메뉴')).toBeNull();
+  });
+
+  it('모바일 메뉴 열어도 collapsible 헤더 둘 다 미노출', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
+    expect(screen.queryByLabelText('모바일 마이페이지 섹션 토글')).toBeNull();
   });
 });

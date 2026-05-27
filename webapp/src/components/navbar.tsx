@@ -55,6 +55,12 @@ export default function Navbar() {
     const questDropdownRef = useRef<HTMLLIElement>(null);
 
     const isQuestActive = pathname === "/quests" || pathname.startsWith("/quests/");
+    const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
+
+    // 모바일 메뉴 내부 collapsible 섹션 상태.
+    // 활성 라우트면 시작부터 펴진 상태로(사용자가 현재 위치한 그룹을 바로 인지하도록).
+    const [isMobileQuestOpen, setIsMobileQuestOpen] = useState<boolean>(isQuestActive);
+    const [isMobileMyPageOpen, setIsMobileMyPageOpen] = useState<boolean>(isMyPageActive);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -211,30 +217,78 @@ export default function Navbar() {
                     {/* 로그인 상태에 따라 모바일 메뉴 변경 */}
                     {session ? (
                         <>
-                            {questLinks.map((link) => (
-                                <li key={link.href} className="text-center">
-                                    <Link
-                                        href={link.href}
-                                        className="py-2 hover:bg-gray-600 transition flex items-center gap-1 justify-center"
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        {link.icon}
-                                        {link.label}
-                                    </Link>
-                                </li>
-                            ))}
-                            {myPageLinks.map((link) => (
-                                <li key={link.href} className="text-center">
-                                    <Link
-                                        href={link.href}
-                                        className="py-2 hover:bg-gray-600 transition flex items-center gap-1 justify-center"
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        {link.icon}
-                                        {link.label}
-                                    </Link>
-                                </li>
-                            ))}
+                            {/* 퀘스트 collapsible 섹션 */}
+                            <li>
+                                <button
+                                    type="button"
+                                    className={`w-full py-2 px-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isQuestActive ? "text-gray-400" : "text-gray-300"}`}
+                                    onClick={() => setIsMobileQuestOpen((v) => !v)}
+                                    aria-label="모바일 퀘스트 섹션 토글"
+                                    aria-expanded={isMobileQuestOpen}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <ScrollText size={20} />
+                                        퀘스트
+                                    </span>
+                                    <ChevronDown
+                                        size={18}
+                                        className={`transition transform ${isMobileQuestOpen ? "rotate-180" : ""}`}
+                                    />
+                                </button>
+                                {isMobileQuestOpen && (
+                                    <ul className="pl-6 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                                        {questLinks.map((link) => (
+                                            <li key={link.href}>
+                                                <Link
+                                                    href={link.href}
+                                                    className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                    onClick={() => setIsOpen(false)}
+                                                >
+                                                    {link.icon}
+                                                    {link.label}
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </li>
+
+                            {/* 마이페이지 collapsible 섹션 */}
+                            <li>
+                                <button
+                                    type="button"
+                                    className={`w-full py-2 px-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isMyPageActive ? "text-gray-400" : "text-gray-300"}`}
+                                    onClick={() => setIsMobileMyPageOpen((v) => !v)}
+                                    aria-label="모바일 마이페이지 섹션 토글"
+                                    aria-expanded={isMobileMyPageOpen}
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <User size={20} />
+                                        마이페이지
+                                    </span>
+                                    <ChevronDown
+                                        size={18}
+                                        className={`transition transform ${isMobileMyPageOpen ? "rotate-180" : ""}`}
+                                    />
+                                </button>
+                                {isMobileMyPageOpen && (
+                                    <ul className="pl-6 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                                        {myPageLinks.map((link) => (
+                                            <li key={link.href}>
+                                                <Link
+                                                    href={link.href}
+                                                    className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                    onClick={() => setIsOpen(false)}
+                                                >
+                                                    {link.icon}
+                                                    {link.label}
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </li>
+
                             <li className="text-center">
                                 <button
                                     className="py-2 w-full hover:bg-gray-600 transition flex items-center gap-1 justify-center"
