@@ -81,13 +81,21 @@ export default function BevyRogueClient() {
         <canvas
           id="bevy-canvas"
           ref={canvasRef}
-          // Bevy 가 마운트 직후 width/height attribute 를 자기 resolution 으로
-          // 덮어쓴다. 이 초기값은 로더가 잠시 차지할 박스 크기.
+          // attribute(=drawing buffer)는 Bevy resolution(640x496) 그대로 둔다.
+          // winit 의 wasm 백엔드는 ResizeObserver 를 쓰지 않아 attribute 기준 그림.
           width={640}
           height={496}
           tabIndex={0}
-          // CSS 로 stretch 하지 않는다(stretch 하면 winit window != Bevy camera).
+          // CSS 만 키워 display 사이즈를 확대(픽셀 1:1 정수배). 게임 자체는
+          // 변하지 않지만 시각적으로 페이지를 더 차지해 카메라 viewport 가
+          // 한쪽에 작게 보이는 느낌을 줄인다. 픽셀 아트라 pixelated 유지.
           className="block bg-black outline-none"
+          style={{
+            imageRendering: "pixelated",
+            width: "min(1024px, 95vw)",
+            height: "auto",
+            aspectRatio: "640 / 496",
+          }}
           aria-label="bevy-rogue 게임 캔버스"
         />
 
