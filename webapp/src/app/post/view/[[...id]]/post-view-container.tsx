@@ -40,9 +40,13 @@ export default function PostViewContainer({ post }: { post: PostData }) {
     <article className="mx-auto px-4 py-6">
       <PostScrollDepth postId={post._id} postTitle={post.title} />
       <header className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
-        <div className="w-full p-3 flex justify-between items-center gap-4">
-          <h1 className="font-bold md:text-lg truncate">{post.title}</h1>
-          <div className="flex-shrink-0 flex items-center gap-3">
+        {/*
+          모바일(기본): 두 줄 — 1행 제목 좌정렬(전폭, wrap 가능), 2행 메타(작성자/날짜/액션) 우정렬.
+          데스크탑(md+): 한 줄 — 좌 제목 + 우 메타. truncate 는 데스크탑 한정.
+        */}
+        <div className="w-full p-3 flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-4">
+          <h1 className="font-bold md:text-lg md:truncate">{post.title}</h1>
+          <div className="flex-shrink-0 flex items-center gap-3 self-end md:self-auto">
             <address className="not-italic text-sm text-gray-500 dark:text-gray-400">
               <span>{post.author}</span>
             </address>
