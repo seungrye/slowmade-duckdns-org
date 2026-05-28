@@ -35,10 +35,15 @@ export type Action =
   | { type: "DespawnWorldItem"; itemId: string }
   | { type: "OpenPortal"; zone: string; generator: string; placement?: PortalPlacement }
   | { type: "ClosePortal"; zone: string }
-  | { type: "SpawnGuards"; count: number }
-  | { type: "PlaceTraps"; kind: TrapKind; count: number; hidden: boolean }
+  /**
+   * 가드 스폰. `zone` 지정 시 — 그 zone 진입 시점까지 deferred 큐에 보류했다가
+   * 그때 스폰. 미지정(undefined) 시 — 현재 맵에 즉시 스폰(legacy 동작).
+   * 잠입 퀘스트가 마을에서 수락돼도 가드가 마을에 깔리지 않도록 명시 권장.
+   */
+  | { type: "SpawnGuards"; count: number; zone?: SpawnZone }
+  | { type: "PlaceTraps"; kind: TrapKind; count: number; hidden: boolean; zone?: SpawnZone }
   | { type: "Explode"; radius: number; terrain: boolean; entityDamage: number }
-  | { type: "SpawnMonster"; monsterId: string; count: number };
+  | { type: "SpawnMonster"; monsterId: string; count: number; zone?: SpawnZone };
 
 // ── 상태 전환 ─────────────────────────────────────────────────────────────
 

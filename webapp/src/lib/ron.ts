@@ -661,30 +661,38 @@ class Parser {
       }
       case "SpawnGuards": {
         let count = 1;
+        let zone: SpawnZone | undefined;
         while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
           const key = this.parseIdent();
           this.expectPunct(":");
           if (key === "count") count = this.parseNumber();
+          else if (key === "zone") zone = this.parseOptionalZone();
           this.tryPunct(",");
         }
         this.expectPunct(")");
-        return { type: "SpawnGuards", count };
+        const action: Extract<Action, { type: "SpawnGuards" }> = { type: "SpawnGuards", count };
+        if (zone) action.zone = zone;
+        return action;
       }
       case "PlaceTraps": {
         let kind: TrapKind = "Spike";
         let count = 1;
         // hidden 미지정 시 serde default = true (게임 측 default_trap_hidden)
         let hidden = true;
+        let zone: SpawnZone | undefined;
         while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
           const key = this.parseIdent();
           this.expectPunct(":");
           if (key === "kind") kind = this.parseTrapKind();
           else if (key === "count") count = this.parseNumber();
           else if (key === "hidden") hidden = this.parseBool();
+          else if (key === "zone") zone = this.parseOptionalZone();
           this.tryPunct(",");
         }
         this.expectPunct(")");
-        return { type: "PlaceTraps", kind, count, hidden };
+        const action: Extract<Action, { type: "PlaceTraps" }> = { type: "PlaceTraps", kind, count, hidden };
+        if (zone) action.zone = zone;
+        return action;
       }
       case "Explode": {
         let radius = 0, entityDamage = 0;
@@ -702,15 +710,19 @@ class Parser {
       }
       case "SpawnMonster": {
         let monsterId = "", count = 1;
+        let zone: SpawnZone | undefined;
         while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
           const key = this.parseIdent();
           this.expectPunct(":");
           if (key === "id") monsterId = this.parseString();
           else if (key === "count") count = this.parseNumber();
+          else if (key === "zone") zone = this.parseOptionalZone();
           this.tryPunct(",");
         }
         this.expectPunct(")");
-        return { type: "SpawnMonster", monsterId, count };
+        const action: Extract<Action, { type: "SpawnMonster" }> = { type: "SpawnMonster", monsterId, count };
+        if (zone) action.zone = zone;
+        return action;
       }
       default:
         throw new Error(`Unknown action: ${name}`);
@@ -802,6 +814,34 @@ class Parser {
       return { type: "Named", id };
     }
     throw new Error(`Unknown zone with params: ${name}`);
+  }
+
+  /**
+   * `Option<ZoneId>` 파싱 — None / Some(<zone>) / (implicit_some 활성 시)<zone> 직접.
+   *
+   * - `None` → undefined
+   * - `Some(Named("…"))` → { type: "Named", id: "…" }
+   * - `Named("…")` (RON `#![enable(implicit_some)]`) → 직접 zone 파싱.
+   *
+   * 게임 측 QuestAction 의 zone 필드는 `Option<ZoneId>`(`#[serde(default)] None`).
+   * 기존 RON 의 SpawnGuards/PlaceTraps/SpawnMonster 에 zone 필드 없는 경우는
+   * 호출부에서 키 자체가 없으므로 이 함수가 호출되지 않는다.
+   */
+  parseOptionalZone(): SpawnZone | undefined {
+    const tok = this.peek();
+    if (tok?.kind === "ident" && tok.val === "None") {
+      this.parseIdent();
+      return undefined;
+    }
+    if (tok?.kind === "ident" && tok.val === "Some") {
+      this.parseIdent();
+      this.expectPunct("(");
+      const zone = this.parseSpawnZone();
+      this.expectPunct(")");
+      return zone;
+    }
+    // implicit_some — zone 값이 바로 옴.
+    return this.parseSpawnZone();
   }
 
   parseSpawn(): QuestSpawn {
@@ -1031,10 +1071,26 @@ function serializeAction(action: Action, depth: number): string {
       return `${i}OpenPortal(${parts.join(", ")})`;
     }
     case "ClosePortal":      return `${i}ClosePortal(${q(action.zone)})`;
-    case "SpawnGuards":      return `${i}SpawnGuards(count: ${action.count})`;
-    case "PlaceTraps":       return `${i}PlaceTraps(kind: ${action.kind}, count: ${action.count}, hidden: ${action.hidden})`;
+    case "SpawnGuards": {
+      const parts = [`count: ${action.count}`];
+      if (action.zone) parts.push(`zone: Some(${serializeZone(action.zone)})`);
+      return `${i}SpawnGuards(${parts.join(", ")})`;
+    }
+    case "PlaceTraps": {
+      const parts = [
+        `kind: ${action.kind}`,
+        `count: ${action.count}`,
+        `hidden: ${action.hidden}`,
+      ];
+      if (action.zone) parts.push(`zone: Some(${serializeZone(action.zone)})`);
+      return `${i}PlaceTraps(${parts.join(", ")})`;
+    }
     case "Explode":          return `${i}Explode(radius: ${action.radius}, terrain: ${action.terrain}, entity_damage: ${action.entityDamage})`;
-    case "SpawnMonster":     return `${i}SpawnMonster(id: ${q(action.monsterId)}, count: ${action.count})`;
+    case "SpawnMonster": {
+      const parts = [`id: ${q(action.monsterId)}`, `count: ${action.count}`];
+      if (action.zone) parts.push(`zone: Some(${serializeZone(action.zone)})`);
+      return `${i}SpawnMonster(${parts.join(", ")})`;
+    }
   }
 }
 

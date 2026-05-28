@@ -382,6 +382,34 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
     expect(quest.transitions[0].actions[0]).toEqual({ type: "SpawnMonster", monsterId: "frost_wyrm", count: 1 });
   });
 
+  it("SpawnGuards 액션 파싱 (zone: Some(Named) 지정 → deferred 큐 의도)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[SpawnGuards(count:5,zone:Some(Named("infiltration")))],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "SpawnGuards", count: 5, zone: { type: "Named", id: "infiltration" },
+    });
+  });
+
+  it("SpawnGuards 액션 파싱 (zone: None → undefined)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[SpawnGuards(count:5,zone:None)],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "SpawnGuards", count: 5 });
+  });
+
+  it("PlaceTraps 액션 파싱 (zone: Some(Named) deferred)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[PlaceTraps(kind:Alarm,count:4,hidden:true,zone:Some(Named("infiltration")))],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "PlaceTraps", kind: "Alarm", count: 4, hidden: true,
+      zone: { type: "Named", id: "infiltration" },
+    });
+  });
+
+  it("SpawnMonster 액션 파싱 (zone: Some(Named) deferred)", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[SpawnMonster(id:"frost_wyrm",count:1,zone:Some(Named("wyrm_lair")))],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "SpawnMonster", monsterId: "frost_wyrm", count: 1,
+      zone: { type: "Named", id: "wyrm_lair" },
+    });
+  });
+
   it("InZone(Town) / InZone(Named) when 파싱", () => {
     const quest = parseRon(wrap(
       `Transition(from:"a",trigger:Auto,when:InZone(Town),to:"b"),Transition(from:"a",trigger:Auto,when:InZone(Named("herb_glade")),to:"b")`
@@ -528,6 +556,38 @@ describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립",
       { type: "SpawnMonster", monsterId: "frost_wyrm", count: 1 },
       { type: "SpawnMonster", monsterId: "troll", count: 2 },
     ]);
+  });
+
+  it("zone 인자가 있는 spawn 액션은 라운드트립을 보존한다(deferred 의도)", () => {
+    // infiltration/vault_heist/trap_mine/dragon_hunt 의 신규 형식 — zone:Some(Named).
+    const quest: QuestDef = {
+      id: "z", title: "z", giverNpc: "n", initialPhase: "a",
+      phases: {
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "a", trigger: "Interact",
+          actions: [
+            { type: "SpawnGuards", count: 5, zone: { type: "Named", id: "infiltration" } },
+            { type: "PlaceTraps", kind: "Alarm", count: 4, hidden: true,
+              zone: { type: "Named", id: "infiltration" } },
+            { type: "SpawnMonster", monsterId: "frost_wyrm", count: 1,
+              zone: { type: "Named", id: "wyrm_lair" } },
+          ],
+          to: "b",
+        },
+      ],
+      spawns: [],
+    };
+    const ron = serializeRon(quest);
+    // 직렬화 표기 확인 — `zone: Some(Named("…"))`.
+    expect(ron).toContain(`SpawnGuards(count: 5, zone: Some(Named("infiltration")))`);
+    expect(ron).toContain(`zone: Some(Named("infiltration"))`);
+    expect(ron).toContain(`SpawnMonster(id: "frost_wyrm", count: 1, zone: Some(Named("wyrm_lair")))`);
+    // 라운드트립 보존.
+    expect(parseRon(ron)).toEqual(quest);
   });
 });
 
