@@ -82,6 +82,7 @@ const Quest = await loadDefault("src/models/quest.tsx");
 const Item = await loadDefault("src/models/item.tsx");
 const Villager = await loadDefault("src/models/villager.tsx");
 const Monster = await loadDefault("src/models/monster.tsx");
+const StartLoadout = await loadDefault("src/models/start-loadout.tsx");
 const QuestRevision = await loadDefault("src/models/quest-revision.tsx");
 const ItemRevision = await loadDefault("src/models/item-revision.tsx");
 const VillagerRevision = await loadDefault("src/models/villager-revision.tsx");
@@ -103,13 +104,14 @@ const warn = (...a) => console.warn("[migrate:warn]", ...a);
 
 // 카운터
 const stats = {
-  quests:      { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
-  questItems:  { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
-  weapons:     { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
-  armors:      { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
-  consumables: { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
-  villagers:   { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
-  monsters:    { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  quests:       { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  questItems:   { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  weapons:      { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  armors:       { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  consumables:  { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  villagers:    { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  monsters:     { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  startLoadout: { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
 };
 
 // 변경 감지를 위한 안정 비교 (단순 JSON stringify)
@@ -508,6 +510,61 @@ async function migrateMonsters() {
   }
 }
 
+async function migrateStartLoadout() {
+  const file = path.join(SOURCE, "items/start_loadout.ron");
+  if (!fs.existsSync(file)) {
+    warn(`start_loadout 파일 없음: ${file}`);
+    return;
+  }
+  let def;
+  try {
+    def = ron.parseStartLoadoutDef(readText(file));
+  } catch (e) {
+    warn(`start_loadout 파싱 실패: ${e.message}`);
+    stats.startLoadout.skipped++;
+    return;
+  }
+  stats.startLoadout.parsed++;
+
+  const fields = {
+    gold: def.gold ?? 0,
+    weapon: def.weapon ?? null,
+    armor: def.armor ?? null,
+    items: def.items ?? [],
+    consumables: (def.consumables ?? []).map((c) => ({ id: c.id, count: c.count })),
+  };
+
+  // 단일 doc(_id="default"). lean 비교로 mongoose Document 메타 노이즈 회피.
+  const existing = await StartLoadout.findById("default").lean();
+  if (existing) {
+    const compareSet = {
+      gold: existing.gold,
+      weapon: existing.weapon ?? null,
+      armor: existing.armor ?? null,
+      items: existing.items ?? [],
+      consumables: (existing.consumables ?? []).map((c) => ({ id: c.id, count: c.count })),
+    };
+    if (!changed(compareSet, fields)) {
+      stats.startLoadout.unchanged++;
+      return;
+    }
+    if (DRY_RUN) { stats.startLoadout.updated++; return; }
+    const doc = await StartLoadout.findById("default");
+    doc.gold = fields.gold;
+    doc.weapon = fields.weapon;
+    doc.armor = fields.armor;
+    doc.items = fields.items;
+    doc.consumables = fields.consumables;
+    doc.version = (doc.version ?? 1) + 1;
+    await doc.save();
+    stats.startLoadout.updated++;
+  } else {
+    if (DRY_RUN) { stats.startLoadout.created++; return; }
+    await StartLoadout.create({ _id: "default", ...fields, version: 1 });
+    stats.startLoadout.created++;
+  }
+}
+
 // ── 메인 ────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -537,7 +594,9 @@ async function main() {
     await migrateMonsters();
     log(`  monsters: parsed=${stats.monsters.parsed} created=${stats.monsters.created} updated=${stats.monsters.updated} unchanged=${stats.monsters.unchanged} skipped=${stats.monsters.skipped} pruned=${stats.monsters.pruned}`);
 
-    log("→ start_loadout: webapp 에 DB 모델 없음 (의도됨, /api/game/content/v1 에서 기본값 사용). skip.");
+    log("→ start_loadout 마이그레이션 시작");
+    await migrateStartLoadout();
+    log(`  startLoadout: parsed=${stats.startLoadout.parsed} created=${stats.startLoadout.created} updated=${stats.startLoadout.updated} unchanged=${stats.startLoadout.unchanged} skipped=${stats.startLoadout.skipped}`);
 
     // 요약
     console.log("\n[migrate] === 요약 ===");

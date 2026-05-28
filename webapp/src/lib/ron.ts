@@ -13,6 +13,7 @@ import type {
 import type { VillagerDef } from "@/types/villager";
 import type { ItemDef, ConsumableEffect, WeaponElement } from "@/types/item";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
+import type { StartLoadoutDef } from "@/types/start-loadout";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tokenizer
@@ -299,6 +300,64 @@ class Parser {
     });
     this.expectPunct(")");
     return { kind: "consumable", ...common, effect };
+  }
+
+  // ── StartLoadout ─────────────────────────────────────────────────────────
+  // 게임 측 Rust StartLoadout: { gold: u32, weapon: Option<String>, armor: Option<String>,
+  //                             items: Vec<String>, consumables: Vec<(String, u32)> }
+  // implicit_some directive 있을 수도 없을 수도 있어 양쪽 다 수용.
+
+  /** `("health_potion", 10)` 형식의 (id, count) 튜플. */
+  parseConsumableTuple(): { id: string; count: number } {
+    this.expectPunct("(");
+    const id = this.parseString();
+    this.tryPunct(",");
+    const count = this.parseNumber();
+    this.tryPunct(",");
+    this.expectPunct(")");
+    return { id, count };
+  }
+
+  /** weapon/armor 의 Option<String> — None, Some("x"), 또는 bare "x" (implicit_some). */
+  parseOptionStringField(): string | null {
+    if (this.peek()?.kind === "str") return this.parseString();
+    const name = this.parseIdent();
+    if (name === "None") return null;
+    if (name !== "Some") throw new Error(`Expected Some/None, got ${name}`);
+    this.expectPunct("(");
+    const v = this.parseString();
+    this.expectPunct(")");
+    return v;
+  }
+
+  parseStartLoadout(): StartLoadoutDef {
+    const name = this.parseIdent();
+    if (name !== "StartLoadout") throw new Error(`Expected StartLoadout, got ${name}`);
+    this.expectPunct("(");
+
+    const def: StartLoadoutDef = {
+      gold: 0,
+      weapon: null,
+      armor: null,
+      items: [],
+      consumables: [],
+    };
+
+    while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+      const key = this.parseIdent();
+      this.expectPunct(":");
+      switch (key) {
+        case "gold":        def.gold        = this.parseNumber(); break;
+        case "weapon":      def.weapon      = this.parseOptionStringField(); break;
+        case "armor":       def.armor       = this.parseOptionStringField(); break;
+        case "items":       def.items       = this.parseArray(() => this.parseString()); break;
+        case "consumables": def.consumables = this.parseArray(() => this.parseConsumableTuple()); break;
+        default: break;
+      }
+      this.tryPunct(",");
+    }
+    this.expectPunct(")");
+    return def;
   }
 
   // ── VillagerDef ──────────────────────────────────────────────────────────
@@ -900,6 +959,11 @@ export function parseMonstersRon(src: string): MonsterDef[] {
   return parser.parseArray(() => parser.parseMonsterDef());
 }
 
+export function parseStartLoadoutDef(src: string): StartLoadoutDef {
+  const parser = new Parser(tokenize(src));
+  return parser.parseStartLoadout();
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Serializer
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1163,6 +1227,33 @@ export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consuma
     ...serializeItemCommon(i),
     `        effect: ${i.effect.type}(${i.effect.amount}),`,
   ]));
+}
+
+/**
+ * StartLoadout 직렬화 — 게임의 assets/items/start_loadout.ron 과 round-trip 호환.
+ * - weapon/armor: None / Some("x") 형식.
+ * - consumables: ("id", count) 튜플 형식.
+ * - items 가 비어있어도 [] 로 명시.
+ */
+export function serializeStartLoadoutRon(def: StartLoadoutDef): string {
+  const lines: string[] = [];
+  lines.push(`StartLoadout(`);
+  lines.push(`    gold: ${def.gold},`);
+  lines.push(`    weapon: ${def.weapon == null ? "None" : `Some(${q(def.weapon)})`},`);
+  lines.push(`    armor: ${def.armor == null ? "None" : `Some(${q(def.armor)})`},`);
+  if (def.items.length === 0) {
+    lines.push(`    items: [],`);
+  } else {
+    lines.push(`    items: [${def.items.map(q).join(", ")}],`);
+  }
+  if (def.consumables.length === 0) {
+    lines.push(`    consumables: [],`);
+  } else {
+    const tuples = def.consumables.map((c) => `(${q(c.id)}, ${c.count})`).join(", ");
+    lines.push(`    consumables: [${tuples}],`);
+  }
+  lines.push(`)`);
+  return lines.join("\n") + "\n";
 }
 
 export function serializeRon(quest: QuestDef): string {

@@ -1033,3 +1033,137 @@ describe("parse/serialize MonstersRon — zones·중첩 spawn_condition·quest_o
   });
 });
 
+
+// ─── StartLoadout ─────────────────────────────────────────────────────────────
+
+import { parseStartLoadoutDef, serializeStartLoadoutRon } from "./ron";
+import type { StartLoadoutDef } from "@/types/start-loadout";
+import fs from "node:fs";
+import path from "node:path";
+
+describe("parseStartLoadoutDef", () => {
+  it("None 인 weapon/armor 와 빈 items/consumables 를 파싱한다", () => {
+    const src = `StartLoadout(
+      gold: 50,
+      weapon: None,
+      armor: None,
+      items: [],
+      consumables: [],
+    )`;
+    const def = parseStartLoadoutDef(src);
+    expect(def).toEqual({
+      gold: 50,
+      weapon: null,
+      armor: null,
+      items: [],
+      consumables: [],
+    });
+  });
+
+  it("Some(\"x\") weapon/armor 를 문자열로 파싱한다", () => {
+    const src = `StartLoadout(
+      gold: 100,
+      weapon: Some("sword"),
+      armor: Some("leather"),
+      items: [],
+      consumables: [],
+    )`;
+    const def = parseStartLoadoutDef(src);
+    expect(def.weapon).toBe("sword");
+    expect(def.armor).toBe("leather");
+  });
+
+  it("items 와 consumables 튜플 리스트를 파싱한다", () => {
+    const src = `StartLoadout(
+      gold: 50,
+      weapon: None,
+      armor: None,
+      items: ["sword", "spear", "bow"],
+      consumables: [("health_potion", 10), ("trap_kit", 3), ("disarm_tool", 1)],
+    )`;
+    const def = parseStartLoadoutDef(src);
+    expect(def.items).toEqual(["sword", "spear", "bow"]);
+    expect(def.consumables).toEqual([
+      { id: "health_potion", count: 10 },
+      { id: "trap_kit", count: 3 },
+      { id: "disarm_tool", count: 1 },
+    ]);
+  });
+
+  it("주석이 섞여 있어도 파싱된다", () => {
+    const src = `
+// 시작 인벤토리
+StartLoadout(
+    gold: 50,
+    weapon: None,
+    armor: None,
+    items: ["sword"],
+    consumables: [("health_potion", 1)],
+)`;
+    const def = parseStartLoadoutDef(src);
+    expect(def.items).toEqual(["sword"]);
+  });
+});
+
+describe("serializeStartLoadoutRon", () => {
+  it("None weapon/armor 와 빈 배열을 명시적으로 출력한다", () => {
+    const def: StartLoadoutDef = {
+      gold: 50,
+      weapon: null,
+      armor: null,
+      items: [],
+      consumables: [],
+    };
+    const out = serializeStartLoadoutRon(def);
+    expect(out).toContain("weapon: None");
+    expect(out).toContain("armor: None");
+    expect(out).toContain("items: []");
+    expect(out).toContain("consumables: []");
+  });
+
+  it("Some(...) 와 튜플 리스트를 출력한다", () => {
+    const def: StartLoadoutDef = {
+      gold: 50,
+      weapon: "sword",
+      armor: "leather",
+      items: ["sword", "spear"],
+      consumables: [{ id: "health_potion", count: 10 }],
+    };
+    const out = serializeStartLoadoutRon(def);
+    expect(out).toContain(`weapon: Some("sword")`);
+    expect(out).toContain(`armor: Some("leather")`);
+    expect(out).toContain(`items: ["sword", "spear"]`);
+    expect(out).toContain(`consumables: [("health_potion", 10)]`);
+  });
+
+  it("직렬화 후 재파싱하면 동일 구조 반환 (round-trip)", () => {
+    const def: StartLoadoutDef = {
+      gold: 42,
+      weapon: "spear",
+      armor: null,
+      items: ["sword", "bow", "bow"],
+      consumables: [
+        { id: "health_potion", count: 10 },
+        { id: "trap_kit", count: 3 },
+      ],
+    };
+    expect(parseStartLoadoutDef(serializeStartLoadoutRon(def))).toEqual(def);
+  });
+
+  it("게임 측 assets/items/start_loadout.ron 미러 (가능하면)", () => {
+    const ronPath = "/home/seungrye/bevy-rogue/assets/items/start_loadout.ron";
+    if (!fs.existsSync(ronPath)) return; // 게임 repo 가 없는 환경에서는 스킵
+    const src = fs.readFileSync(ronPath, "utf8");
+    const parsed = parseStartLoadoutDef(src);
+    // 게임 파일이 변동 가능하므로 round-trip 동치성만 검증.
+    const round = parseStartLoadoutDef(serializeStartLoadoutRon(parsed));
+    expect(round).toEqual(parsed);
+    // 회귀 가드: 비어있지 않아야 함
+    expect(parsed.gold).toBeGreaterThanOrEqual(0);
+    // 게임이 sword/spear/bow + health_potion 을 기대 → spot check
+    expect(parsed.items).toContain("sword");
+    expect(parsed.consumables.find((c) => c.id === "health_potion")?.count).toBeGreaterThanOrEqual(1);
+    // path/fs 변수가 사용됨을 명시
+    void path;
+  });
+});

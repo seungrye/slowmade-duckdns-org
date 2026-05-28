@@ -5,17 +5,20 @@ vi.mock("@/models/quest", () => ({ default: { find: vi.fn() } }));
 vi.mock("@/models/item", () => ({ default: { find: vi.fn() } }));
 vi.mock("@/models/villager", () => ({ default: { find: vi.fn() } }));
 vi.mock("@/models/monster", () => ({ default: { find: vi.fn() } }));
+vi.mock("@/models/start-loadout", () => ({ default: { findById: vi.fn() } }));
 
 import { GET } from "./route";
 import Quest from "@/models/quest";
 import Item from "@/models/item";
 import Villager from "@/models/villager";
 import Monster from "@/models/monster";
+import StartLoadout from "@/models/start-loadout";
 import {
   parseRon,
   parseQuestItemsRon,
   parseVillagersRon,
   parseMonstersRon,
+  parseStartLoadoutDef,
 } from "@/lib/ron";
 
 type FindMock = ReturnType<typeof vi.fn>;
@@ -26,6 +29,14 @@ function mockChain(model: { find: FindMock }, docs: unknown[]) {
     sort: vi.fn().mockReturnValue({
       lean: vi.fn().mockResolvedValue(docs),
     }),
+  });
+}
+
+// StartLoadout.findById("default").lean() 모킹. doc=null → DB 미존재(폴백).
+type FindByIdMock = ReturnType<typeof vi.fn>;
+function mockStartLoadout(doc: Record<string, unknown> | null) {
+  (StartLoadout as unknown as { findById: FindByIdMock }).findById.mockReturnValue({
+    lean: vi.fn().mockResolvedValue(doc),
   });
 }
 
@@ -91,6 +102,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Item as unknown as { find: FindMock }, [sampleQuestItemDoc()]);
     mockChain(Villager as unknown as { find: FindMock }, [sampleVillagerDoc()]);
     mockChain(Monster as unknown as { find: FindMock }, [sampleMonsterDoc()]);
+    mockStartLoadout(null);
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -114,6 +126,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Item as unknown as { find: FindMock }, []);
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
 
     const res = await GET();
     const body = await res.json();
@@ -132,6 +145,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Item as unknown as { find: FindMock }, [sampleQuestItemDoc()]);
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
 
     const res = await GET();
     const body = await res.json();
@@ -154,6 +168,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Item as unknown as { find: FindMock }, []);
     mockChain(Villager as unknown as { find: FindMock }, [sampleVillagerDoc()]);
     mockChain(Monster as unknown as { find: FindMock }, [sampleMonsterDoc()]);
+    mockStartLoadout(null);
 
     const res = await GET();
     const body = await res.json();
@@ -172,6 +187,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Item as unknown as { find: FindMock }, []);
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -195,9 +211,42 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Item as unknown as { find: FindMock }, []);
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
 
     const res = await GET();
     const body = await res.json();
     expect(body.quests.map((q: { id: string }) => q.id)).toEqual(["alpha_quest", "beta_quest"]);
+  });
+
+  it("StartLoadout DB doc 이 있으면 그 값을 serialize 해 반환한다", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout({
+      _id: "default",
+      gold: 50,
+      weapon: null,
+      armor: null,
+      items: ["sword", "spear", "bow"],
+      consumables: [
+        { id: "health_potion", count: 10 },
+        { id: "trap_kit", count: 3 },
+      ],
+    });
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.items["start_loadout.ron"];
+    expect(ron).toContain("StartLoadout(");
+    expect(ron).toContain(`items: ["sword", "spear", "bow"]`);
+    expect(ron).toContain(`("health_potion", 10)`);
+    // round-trip
+    const parsed = parseStartLoadoutDef(ron);
+    expect(parsed.items).toEqual(["sword", "spear", "bow"]);
+    expect(parsed.consumables).toEqual([
+      { id: "health_potion", count: 10 },
+      { id: "trap_kit", count: 3 },
+    ]);
   });
 });

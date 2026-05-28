@@ -242,6 +242,12 @@ export default function ItemsPage() {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Item 카탈로그</h1>
         <div className="flex gap-2 flex-wrap">
+          <Link
+            href="/quests/items/start-loadout"
+            className="px-3 py-2 text-sm rounded-lg border hover:border-blue-400 hover:text-blue-500 transition-colors"
+          >
+            시작 인벤토리 편집
+          </Link>
           <ImportButton onPick={handleImport} />
           <ExportButton filter={filter} />
           <button

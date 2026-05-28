@@ -16,6 +16,7 @@ import Quest from "@/models/quest";
 import Item from "@/models/item";
 import Villager from "@/models/villager";
 import Monster from "@/models/monster";
+import StartLoadout from "@/models/start-loadout";
 import {
   serializeRon,
   serializeQuestItemsRon,
@@ -24,11 +25,13 @@ import {
   serializeConsumablesRon,
   serializeVillagersRon,
   serializeMonstersRon,
+  serializeStartLoadoutRon,
 } from "@/lib/ron";
 import type { QuestDef } from "@/types/quest";
 import type { ItemDef, WeaponElement } from "@/types/item";
 import type { VillagerDef } from "@/types/villager";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
+import type { StartLoadoutDef } from "@/types/start-loadout";
 
 export const dynamic = "force-dynamic";
 
@@ -155,28 +158,43 @@ function toMonsterDef(d: Record<string, unknown>): MonsterDef {
 }
 
 // ── StartLoadout 기본값 ────────────────────────────────────────────────────────
-// 현재 webapp 에 StartLoadout DB 모델이 없으므로 게임 측 기본값과 동일한 RON 을 반환.
-// 추후 모델이 생기면 DB 조회로 교체. (Rust StartLoadout: gold/weapon/armor/items/consumables)
-const DEFAULT_START_LOADOUT_RON =
-  `StartLoadout(\n` +
-  `    gold: 50,\n` +
-  `    weapon: None,\n` +
-  `    armor: None,\n` +
-  `    items: [],\n` +
-  `    consumables: [],\n` +
-  `)\n`;
+// DB 에 doc 이 없을 때 폴백 — 게임 측 read_start_loadout() 의 default (gold 50) 미러.
+const DEFAULT_START_LOADOUT: StartLoadoutDef = {
+  gold: 50,
+  weapon: null,
+  armor: null,
+  items: [],
+  consumables: [],
+};
+
+function toStartLoadoutDef(d: Record<string, unknown>): StartLoadoutDef {
+  const consumablesRaw = (d.consumables as Array<Record<string, unknown>> | undefined) ?? [];
+  return {
+    gold: typeof d.gold === "number" ? d.gold : 0,
+    weapon: (d.weapon as string | null | undefined) ?? null,
+    armor: (d.armor as string | null | undefined) ?? null,
+    items: (d.items as string[] | undefined) ?? [],
+    consumables: consumablesRaw.map((c) => ({
+      id: c.id as string,
+      count: c.count as number,
+    })),
+  };
+}
 
 // ── GET ────────────────────────────────────────────────────────────────────────
 
 export async function GET() {
   await connectToDB();
 
-  const [questDocs, itemDocs, villagerDocs, monsterDocs] = await Promise.all([
+  const [questDocs, itemDocs, villagerDocs, monsterDocs, startLoadoutDoc] = await Promise.all([
     Quest.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     Item.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     Villager.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     Monster.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
+    StartLoadout.findById("default").lean() as unknown as Promise<Record<string, unknown> | null>,
   ]);
+
+  const startLoadout = startLoadoutDoc ? toStartLoadoutDef(startLoadoutDoc) : DEFAULT_START_LOADOUT;
 
   const quests = questDocs
     .map(toQuestDef)
@@ -200,7 +218,7 @@ export async function GET() {
       "weapons.ron": serializeWeaponsRon(weapons),
       "armors.ron": serializeArmorsRon(armors),
       "consumables.ron": serializeConsumablesRon(consumables),
-      "start_loadout.ron": DEFAULT_START_LOADOUT_RON,
+      "start_loadout.ron": serializeStartLoadoutRon(startLoadout),
     },
     villagers: serializeVillagersRon(villagers),
     monsters: serializeMonstersRon(monsters),
