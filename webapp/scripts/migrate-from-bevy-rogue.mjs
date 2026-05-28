@@ -109,6 +109,7 @@ const stats = {
   weapons:      { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
   armors:       { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
   consumables:  { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
+  accessories:  { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
   villagers:    { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
   monsters:     { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
   startLoadout: { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
@@ -275,6 +276,7 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
       if (def.tier !== undefined) fields.tier = def.tier;
     }
     else if (def.kind === "consumable") fields.effect = def.effect;
+    else if (def.kind === "accessory")  fields.desc = def.desc;
 
     const existing = await Item.findOne({ id: def.id });
     if (existing) {
@@ -306,6 +308,7 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
         if (existing.tier !== undefined) compareSet.tier = existing.tier;
       }
       else if (def.kind === "consumable") compareSet.effect = existing.effect;
+      else if (def.kind === "accessory")  compareSet.desc = existing.desc;
 
       if (!changed(compareSet, fields)) {
         stats[statKey].unchanged++;
@@ -345,6 +348,8 @@ async function migrateItems() {
     path.join(itemsDir, "armors.ron"), "armor", ron.parseArmorsRon, "armors")) allSeen.add(id);
   for (const id of await migrateItemFile(
     path.join(itemsDir, "consumables.ron"), "consumable", ron.parseConsumablesRon, "consumables")) allSeen.add(id);
+  for (const id of await migrateItemFile(
+    path.join(itemsDir, "accessories.ron"), "accessory", ron.parseAccessoriesRon, "accessories")) allSeen.add(id);
 
   if (PRUNE && !DRY_RUN) {
     const all = await Item.find({}, { id: 1, kind: 1 }).lean();
@@ -354,6 +359,7 @@ async function migrateItems() {
         const key = doc.kind === "quest" ? "questItems"
                   : doc.kind === "weapon" ? "weapons"
                   : doc.kind === "armor" ? "armors"
+                  : doc.kind === "accessory" ? "accessories"
                   : "consumables";
         stats[key].pruned++;
       }
@@ -581,7 +587,7 @@ async function main() {
 
     log("→ items 마이그레이션 시작");
     await migrateItems();
-    for (const k of ["questItems", "weapons", "armors", "consumables"]) {
+    for (const k of ["questItems", "weapons", "armors", "consumables", "accessories"]) {
       const s = stats[k];
       log(`  items.${k}: parsed=${s.parsed} created=${s.created} updated=${s.updated} unchanged=${s.unchanged} skipped=${s.skipped} pruned=${s.pruned}`);
     }

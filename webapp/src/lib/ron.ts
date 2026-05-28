@@ -302,6 +302,19 @@ class Parser {
     return { kind: "consumable", ...common, effect };
   }
 
+  parseAccessoryDef(): Extract<ItemDef, { kind: "accessory" }> {
+    const name = this.parseIdent();
+    if (name !== "AccessoryDef") throw new Error(`Expected AccessoryDef, got ${name}`);
+    this.expectPunct("(");
+    let desc = "";
+    const common = this.parseItemCommon((key) => {
+      if (key === "desc") { desc = this.parseString(); return true; }
+      return false;
+    });
+    this.expectPunct(")");
+    return { kind: "accessory", ...common, desc };
+  }
+
   // ── StartLoadout ─────────────────────────────────────────────────────────
   // 게임 측 Rust StartLoadout: { gold: u32, weapon: Option<String>, armor: Option<String>,
   //                             items: Vec<String>, consumables: Vec<(String, u32)> }
@@ -954,6 +967,11 @@ export function parseConsumablesRon(src: string): Extract<ItemDef, { kind: "cons
   return parser.parseArray(() => parser.parseConsumableDef());
 }
 
+export function parseAccessoriesRon(src: string): Extract<ItemDef, { kind: "accessory" }>[] {
+  const parser = new Parser(tokenize(src));
+  return parser.parseArray(() => parser.parseAccessoryDef());
+}
+
 export function parseMonstersRon(src: string): MonsterDef[] {
   const parser = new Parser(tokenize(src));
   return parser.parseArray(() => parser.parseMonsterDef());
@@ -1226,6 +1244,13 @@ export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consuma
   return arrayWrap("ConsumableDef", items.map((i) => [
     ...serializeItemCommon(i),
     `        effect: ${i.effect.type}(${i.effect.amount}),`,
+  ]));
+}
+
+export function serializeAccessoriesRon(items: Extract<ItemDef, { kind: "accessory" }>[]): string {
+  return arrayWrap("AccessoryDef", items.map((i) => [
+    ...serializeItemCommon(i),
+    `        desc: ${q(i.desc)},`,
   ]));
 }
 

@@ -6,6 +6,7 @@ import {
   parseWeaponsRon, serializeWeaponsRon,
   parseArmorsRon, serializeArmorsRon,
   parseConsumablesRon, serializeConsumablesRon,
+  parseAccessoriesRon, serializeAccessoriesRon,
   parseMonstersRon, serializeMonstersRon,
 } from "./ron";
 import type { QuestDef } from "@/types/quest";
@@ -866,6 +867,52 @@ describe("parse/serialize ConsumablesRon", () => {
   it("Heal 외 effect 는 throw", () => {
     const bad = `[ConsumableDef(id:"x",display_name:"",glyph_ascii:"",glyph_unicode:"",glyph_game_icon:"",pickup_message:"",effect:Burn(3))]`;
     expect(() => parseConsumablesRon(bad)).toThrow(/Unknown consumable effect/);
+  });
+});
+
+describe("parse/serialize AccessoriesRon", () => {
+  const SRC = `[
+    AccessoryDef(
+        id: "scout_lens",
+        display_name: "올빼미 안경",
+        glyph_ascii: "O",
+        glyph_unicode: "🔎",
+        glyph_game_icon: "🔎",
+        pickup_message: "올빼미 안경을 받았다.",
+        desc: "잠입 전용. 착용하면 가드 시야가 붉게 표시된다.",
+    ),
+    AccessoryDef(
+        id: "trap_scope",
+        display_name: "광부의 등불",
+        glyph_ascii: "L",
+        glyph_unicode: "🔦",
+        glyph_game_icon: "🔦",
+        pickup_message: "광부의 등불을 받았다.",
+        desc: "함정 전용. 착용하면 시야 안의 함정이 드러난다.",
+    ),
+]`;
+
+  it("AccessoryDef 두 개를 파싱하고 라운드트립으로 보존한다", () => {
+    const accs = parseAccessoriesRon(SRC);
+    expect(accs).toHaveLength(2);
+    expect(accs[0].id).toBe("scout_lens");
+    expect(accs[0].kind).toBe("accessory");
+    expect(accs[0].desc).toContain("잠입");
+    expect(accs[1].id).toBe("trap_scope");
+    expect(accs[1].desc).toContain("함정");
+    const reparsed = parseAccessoriesRon(serializeAccessoriesRon(accs));
+    expect(reparsed).toEqual(accs);
+  });
+
+  it("desc 필드가 빠진 AccessoryDef 도 빈 문자열로 안전하게 파싱된다", () => {
+    // desc 가 없어도 parser 가 throw 하지 않고 빈 문자열로 채운다.
+    const noDesc = `[AccessoryDef(id:"x",display_name:"x",glyph_ascii:"x",glyph_unicode:"x",glyph_game_icon:"x",pickup_message:"x")]`;
+    const accs = parseAccessoriesRon(noDesc);
+    expect(accs[0].desc).toBe("");
+  });
+
+  it("빈 배열은 [] 로 직렬화된다", () => {
+    expect(serializeAccessoriesRon([])).toBe("[]\n");
   });
 });
 

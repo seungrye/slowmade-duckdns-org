@@ -5,7 +5,7 @@ import Item from "@/models/item";
 import { validateItemForCreate } from "@/lib/item-validation";
 import type { ItemKind } from "@/types/item";
 
-const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable"];
+const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable", "accessory"];
 
 export async function GET(req: NextRequest) {
   await connectToDB();
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     if (body.tier !== undefined) doc.tier = body.tier;
   }
   else if (body.kind === "consumable") doc.effect = body.effect;
+  else if (body.kind === "accessory") doc.desc = body.desc;
 
   const item = await Item.create(doc);
   return apiSuccess(item, 201);

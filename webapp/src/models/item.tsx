@@ -11,7 +11,11 @@ const ConsumableEffectSchema = new Schema(
 const ItemSchema = new Schema(
   {
     id: { type: String, required: true, unique: true },
-    kind: { type: String, required: true, enum: ["quest", "weapon", "armor", "consumable"] },
+    kind: {
+      type: String,
+      required: true,
+      enum: ["quest", "weapon", "armor", "consumable", "accessory"],
+    },
     displayName: { type: String, required: true },
     glyphAscii: { type: String, required: true },
     glyphUnicode: { type: String, required: true },
@@ -38,6 +42,9 @@ const ItemSchema = new Schema(
     // consumable 전용
     effect: { type: ConsumableEffectSchema },
 
+    // accessory 전용 — 효과 설명 텍스트 (게임 효과는 id 로 분기, 통계 영향 없음)
+    desc: { type: String },
+
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -46,7 +53,7 @@ const ItemSchema = new Schema(
 export interface ItemDoc {
   _id: unknown;
   id: string;
-  kind: "quest" | "weapon" | "armor" | "consumable";
+  kind: "quest" | "weapon" | "armor" | "consumable" | "accessory";
   displayName: string;
   glyphAscii: string;
   glyphUnicode: string;
@@ -62,6 +69,7 @@ export interface ItemDoc {
   defenseBonusMax?: number;
   tier?: number;
   effect?: { type: "Heal"; amount: number };
+  desc?: string;
   version: number;
   createdAt: Date;
   updatedAt: Date;

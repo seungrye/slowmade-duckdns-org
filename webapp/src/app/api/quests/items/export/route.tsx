@@ -5,16 +5,18 @@ import Item from "@/models/item";
 import {
   serializeQuestItemsRon, serializeWeaponsRon,
   serializeArmorsRon, serializeConsumablesRon,
+  serializeAccessoriesRon,
 } from "@/lib/ron";
 import type { ItemDef, ItemKind, WeaponElement } from "@/types/item";
 
-const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable"];
+const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable", "accessory"];
 
 const FILENAMES: Record<ItemKind, string> = {
   quest: "quest_items.ron",
   weapon: "weapons.ron",
   armor: "armors.ron",
   consumable: "consumables.ron",
+  accessory: "accessories.ron",
 };
 
 function serializeByKind(kind: ItemKind, items: ItemDef[]): string {
@@ -27,6 +29,8 @@ function serializeByKind(kind: ItemKind, items: ItemDef[]): string {
       return serializeArmorsRon(items.filter((i): i is Extract<ItemDef, { kind: "armor" }> => i.kind === "armor"));
     case "consumable":
       return serializeConsumablesRon(items.filter((i): i is Extract<ItemDef, { kind: "consumable" }> => i.kind === "consumable"));
+    case "accessory":
+      return serializeAccessoriesRon(items.filter((i): i is Extract<ItemDef, { kind: "accessory" }> => i.kind === "accessory"));
   }
 }
 
@@ -67,6 +71,11 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
         kind: "consumable", ...base,
         effect: (d.effect as { type: "Heal"; amount: number }) ?? { type: "Heal", amount: 0 },
       };
+    case "accessory":
+      return {
+        kind: "accessory", ...base,
+        desc: (d.desc as string) ?? "",
+      };
     default:
       throw new Error(`Unknown kind: ${d.kind}`);
   }
@@ -76,7 +85,7 @@ export async function GET(req: NextRequest) {
   await connectToDB();
   const kindParam = new URL(req.url).searchParams.get("kind");
   if (!kindParam || !KINDS.includes(kindParam as ItemKind)) {
-    return apiError(`kind 파라미터 필수 (quest/weapon/armor/consumable)`, 400);
+    return apiError(`kind 파라미터 필수 (quest/weapon/armor/consumable/accessory)`, 400);
   }
   const kind = kindParam as ItemKind;
 

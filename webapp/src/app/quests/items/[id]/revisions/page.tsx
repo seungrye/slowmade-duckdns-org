@@ -38,6 +38,7 @@ export default function ItemRevisionsPage() {
       case "weapon":     return `ATK ${item.attackPower}${item.element ? ` (${item.element})` : ""}`;
       case "armor":      return `DEF +${item.defenseBonus}`;
       case "consumable": return `${item.effect.type} +${item.effect.amount}`;
+      case "accessory":  return item.desc;
     }
   }
 

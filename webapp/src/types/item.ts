@@ -1,7 +1,10 @@
-// Rust `QuestItemDef` / `WeaponDef` / `ArmorDef` / `ConsumableDef` 와 일치
-// — 단일 컬렉션 + kind 변별자 형태로 webapp 에 통합 저장
+// Rust `QuestItemDef` / `WeaponDef` / `ArmorDef` / `ConsumableDef` / `AccessoryDef`
+// 와 일치 — 단일 컬렉션 + kind 변별자 형태로 webapp 에 통합 저장.
+//
+// "accessory" 는 통계 영향 없는 장신구 (scout_lens / trap_scope 등).
+// 효과는 게임 코드가 id 로 분기한다(잠입·함정 도구).
 
-export type ItemKind = "quest" | "weapon" | "armor" | "consumable";
+export type ItemKind = "quest" | "weapon" | "armor" | "consumable" | "accessory";
 
 export type WeaponElement = "fire" | "ice" | "lightning";
 
@@ -37,7 +40,8 @@ export type ItemDef =
       defenseBonusMax?: number;
       tier?: number;
     })
-  | (ItemBase & { kind: "consumable"; effect: ConsumableEffect });
+  | (ItemBase & { kind: "consumable"; effect: ConsumableEffect })
+  | (ItemBase & { kind: "accessory"; desc: string });
 
 export type ItemDocument = ItemDef & {
   _id: string;

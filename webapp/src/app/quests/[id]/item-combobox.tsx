@@ -17,6 +17,7 @@ function summarize(item: ItemDocument): string {
     case "weapon":     return `weapon · ATK ${item.attackPower}${item.element ? ` (${item.element})` : ""}`;
     case "armor":      return `armor · DEF +${item.defenseBonus}`;
     case "consumable": return `consumable · ${item.effect.type} +${item.effect.amount}`;
+    case "accessory":  return `accessory · ${item.desc}`;
   }
 }
 

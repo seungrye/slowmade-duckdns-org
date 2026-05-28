@@ -24,6 +24,7 @@ interface FormState {
   defenseBonusMax: number | "";
   tier: number | "";
   effectAmount: number;
+  desc: string;
 }
 
 const emptyForm: FormState = {
@@ -40,6 +41,7 @@ const emptyForm: FormState = {
   defenseBonusMax: "",
   tier: "",
   effectAmount: 0,
+  desc: "",
 };
 
 export default function ItemsPage() {
@@ -65,7 +67,7 @@ export default function ItemsPage() {
   useEffect(() => { load(); }, []);
 
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: list.length, quest: 0, weapon: 0, armor: 0, consumable: 0 };
+    const c: Record<Filter, number> = { all: list.length, quest: 0, weapon: 0, armor: 0, consumable: 0, accessory: 0 };
     for (const it of list) c[it.kind]++;
     return c;
   }, [list]);
@@ -102,6 +104,7 @@ export default function ItemsPage() {
       f.tier = item.tier ?? "";
     }
     else if (item.kind === "consumable") f.effectAmount = item.effect.amount;
+    else if (item.kind === "accessory") f.desc = item.desc;
     setEditForm(f);
   }
 
@@ -132,6 +135,7 @@ export default function ItemsPage() {
         break;
       }
       case "consumable": body.effect = { type: "Heal", amount: form.effectAmount }; break;
+      case "accessory":  body.desc = form.desc; break;
     }
     return body;
   }
@@ -234,6 +238,7 @@ export default function ItemsPage() {
         return `${def}${tier}`;
       }
       case "consumable": return `${item.effect.type} +${item.effect.amount}`;
+      case "accessory":  return item.desc;
     }
   }
 
@@ -261,7 +266,7 @@ export default function ItemsPage() {
 
       {/* kind 필터 */}
       <div className="flex gap-1 mb-4 flex-wrap">
-        {(["all", "quest", "weapon", "armor", "consumable"] as Filter[]).map((k) => (
+        {(["all", "quest", "weapon", "armor", "consumable", "accessory"] as Filter[]).map((k) => (
           <button
             key={k}
             onClick={() => setFilter(k)}
@@ -406,7 +411,7 @@ function ImportButton({ onPick }: { onPick: (file: File, kind: ItemKind) => void
       </button>
       {open && (
         <div className="absolute top-full right-0 mt-1 z-10 bg-white dark:bg-gray-900 border rounded-lg shadow-lg p-2 space-y-1 min-w-[160px]">
-          {(["quest", "weapon", "armor", "consumable"] as ItemKind[]).map((k) => (
+          {(["quest", "weapon", "armor", "consumable", "accessory"] as ItemKind[]).map((k) => (
             <label
               key={k}
               className="block cursor-pointer px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -487,6 +492,7 @@ function FormFields({
             <option value="weapon">weapon</option>
             <option value="armor">armor</option>
             <option value="consumable">consumable</option>
+            <option value="accessory">accessory</option>
           </select>
         </label>
         <label className="flex flex-col gap-1 flex-1 min-w-[200px]">
@@ -661,6 +667,18 @@ function FormFields({
             value={form.effectAmount}
             onChange={(e) => setForm({ ...form, effectAmount: Number(e.target.value) })}
             className={inputCls}
+          />
+        </label>
+      )}
+
+      {form.kind === "accessory" && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">desc (효과 설명)</span>
+          <input
+            value={form.desc}
+            onChange={(e) => setForm({ ...form, desc: e.target.value })}
+            className={inputCls}
+            placeholder="잠입 전용. 착용하면 가드 시야가 붉게 표시된다."
           />
         </label>
       )}

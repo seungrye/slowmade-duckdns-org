@@ -5,10 +5,11 @@ import Item from "@/models/item";
 import ItemRevision from "@/models/item-revision";
 import {
   parseQuestItemsRon, parseWeaponsRon, parseArmorsRon, parseConsumablesRon,
+  parseAccessoriesRon,
 } from "@/lib/ron";
 import type { ItemDef, ItemKind } from "@/types/item";
 
-const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable"];
+const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable", "accessory"];
 
 function parseByKind(kind: ItemKind, src: string): ItemDef[] {
   switch (kind) {
@@ -16,6 +17,7 @@ function parseByKind(kind: ItemKind, src: string): ItemDef[] {
     case "weapon":     return parseWeaponsRon(src);
     case "armor":      return parseArmorsRon(src);
     case "consumable": return parseConsumablesRon(src);
+    case "accessory":  return parseAccessoriesRon(src);
   }
 }
 
@@ -45,6 +47,7 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
       if (item.tier !== undefined) snap.tier = item.tier;
       break;
     case "consumable": snap.effect = item.effect; break;
+    case "accessory":  snap.desc = item.desc; break;
   }
   return snap;
 }
@@ -53,7 +56,7 @@ export async function POST(req: NextRequest) {
   await connectToDB();
   const kindParam = new URL(req.url).searchParams.get("kind");
   if (!kindParam || !KINDS.includes(kindParam as ItemKind)) {
-    return apiError(`kind 파라미터 필수 (quest/weapon/armor/consumable)`, 400);
+    return apiError(`kind 파라미터 필수 (quest/weapon/armor/consumable/accessory)`, 400);
   }
   const kind = kindParam as ItemKind;
 
@@ -100,6 +103,7 @@ export async function POST(req: NextRequest) {
         existing.tier = def.tier;
       }
       else if (def.kind === "consumable") existing.effect = def.effect;
+      else if (def.kind === "accessory")  existing.desc = def.desc;
       existing.version = (existing.version ?? 1) + 1;
       await existing.save();
       updated++;
@@ -128,6 +132,7 @@ export async function POST(req: NextRequest) {
         if (def.tier !== undefined) doc.tier = def.tier;
       }
       else if (def.kind === "consumable") doc.effect = def.effect;
+      else if (def.kind === "accessory")  doc.desc = def.desc;
       await Item.create(doc);
       created++;
     }

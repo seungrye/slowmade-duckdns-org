@@ -140,7 +140,7 @@ describe("GET /api/game/content/v1", () => {
     expect(parsed.title).toBe("잠입 작전");
   });
 
-  it("items 가 정확히 5개 키(quest_items/weapons/armors/consumables/start_loadout)이고 quest_items 가 round-trip 된다", async () => {
+  it("items 가 정확히 6개 키(quest_items/weapons/armors/consumables/accessories/start_loadout)이고 quest_items 가 round-trip 된다", async () => {
     mockChain(Quest as unknown as { find: FindMock }, []);
     mockChain(Item as unknown as { find: FindMock }, [sampleQuestItemDoc()]);
     mockChain(Villager as unknown as { find: FindMock }, []);
@@ -151,7 +151,7 @@ describe("GET /api/game/content/v1", () => {
     const body = await res.json();
     const keys = Object.keys(body.items).sort();
     expect(keys).toEqual(
-      ["armors.ron", "consumables.ron", "quest_items.ron", "start_loadout.ron", "weapons.ron"]
+      ["accessories.ron", "armors.ron", "consumables.ron", "quest_items.ron", "start_loadout.ron", "weapons.ron"]
     );
     // quest_items round-trip
     const parsed = parseQuestItemsRon(body.items["quest_items.ron"]);
@@ -161,6 +161,8 @@ describe("GET /api/game/content/v1", () => {
     // start_loadout 은 게임 기본값과 동일한 StartLoadout 래퍼 문자열
     expect(body.items["start_loadout.ron"]).toContain("StartLoadout(");
     expect(body.items["start_loadout.ron"]).toContain("gold: 50");
+    // accessories 는 비어있어도 키와 빈 배열 직렬화 형태가 들어 있어야 한다.
+    expect(body.items["accessories.ron"]).toContain("[]");
   });
 
   it("villagers/monsters 가 RON 문자열이고 round-trip 가능하다", async () => {

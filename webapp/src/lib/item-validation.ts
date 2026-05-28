@@ -1,6 +1,6 @@
 import type { ItemKind } from "@/types/item";
 
-const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable"];
+const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable", "accessory"];
 
 export type ValidationResult = { ok: true } | { ok: false; message: string };
 
@@ -53,6 +53,15 @@ export function validateKindFields(body: Record<string, unknown>, kind: ItemKind
       const e = body.effect as { type?: unknown; amount?: unknown } | undefined;
       if (!e || e.type !== "Heal" || typeof e.amount !== "number") {
         return { ok: false, message: "consumable: effect { type: 'Heal', amount: number } 필수" };
+      }
+      return { ok: true };
+    }
+    case "accessory": {
+      if (body.desc !== undefined && typeof body.desc !== "string") {
+        return { ok: false, message: "accessory: desc 는 문자열이어야 합니다." };
+      }
+      if (body.desc === undefined || body.desc === "") {
+        return { ok: false, message: "accessory: desc 필수 (효과 설명)" };
       }
       return { ok: true };
     }

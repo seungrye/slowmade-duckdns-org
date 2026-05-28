@@ -23,6 +23,7 @@ import {
   serializeWeaponsRon,
   serializeArmorsRon,
   serializeConsumablesRon,
+  serializeAccessoriesRon,
   serializeVillagersRon,
   serializeMonstersRon,
   serializeStartLoadoutRon,
@@ -48,6 +49,7 @@ interface ContentResponse {
     "weapons.ron": string;
     "armors.ron": string;
     "consumables.ron": string;
+    "accessories.ron": string;
     "start_loadout.ron": string;
   };
   villagers: string;
@@ -116,6 +118,12 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
         kind: "consumable",
         ...base,
         effect: (d.effect as { type: "Heal"; amount: number }) ?? { type: "Heal", amount: 0 },
+      };
+    case "accessory":
+      return {
+        kind: "accessory",
+        ...base,
+        desc: (d.desc as string) ?? "",
       };
     default:
       throw new Error(`Unknown item kind: ${String(d.kind)}`);
@@ -205,6 +213,7 @@ export async function GET() {
   const weapons = items.filter((i): i is Extract<ItemDef, { kind: "weapon" }> => i.kind === "weapon");
   const armors = items.filter((i): i is Extract<ItemDef, { kind: "armor" }> => i.kind === "armor");
   const consumables = items.filter((i): i is Extract<ItemDef, { kind: "consumable" }> => i.kind === "consumable");
+  const accessories = items.filter((i): i is Extract<ItemDef, { kind: "accessory" }> => i.kind === "accessory");
 
   const villagers = villagerDocs.map(toVillagerDef);
   const monsters = monsterDocs.map(toMonsterDef);
@@ -218,6 +227,7 @@ export async function GET() {
       "weapons.ron": serializeWeaponsRon(weapons),
       "armors.ron": serializeArmorsRon(armors),
       "consumables.ron": serializeConsumablesRon(consumables),
+      "accessories.ron": serializeAccessoriesRon(accessories),
       "start_loadout.ron": serializeStartLoadoutRon(startLoadout),
     },
     villagers: serializeVillagersRon(villagers),
