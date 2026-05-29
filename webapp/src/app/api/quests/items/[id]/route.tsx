@@ -34,7 +34,10 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
       if (item.tier !== undefined) snap.tier = item.tier;
       break;
     case "consumable": snap.effect = item.effect; break;
-    case "accessory":  snap.desc = item.desc; break;
+    case "accessory":
+      snap.desc = item.desc;
+      if (item.effects !== undefined) snap.effects = item.effects;
+      break;
   }
   return snap;
 }
@@ -69,6 +72,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     tier: body.tier ?? item.tier,
     effect: body.effect ?? item.effect,
     desc: body.desc ?? item.desc,
+    effects: body.effects ?? item.effects,
   };
   const v = validateKindFields(merged, item.kind as ItemKind);
   if (!v.ok) return apiError(v.message, 400);
@@ -108,6 +112,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       break;
     case "accessory":
       if (body.desc !== undefined) item.desc = body.desc;
+      if (body.effects !== undefined) item.effects = body.effects;
       break;
   }
   item.version = (item.version ?? 1) + 1;

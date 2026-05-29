@@ -974,6 +974,50 @@ describe("parse/serialize AccessoriesRon", () => {
   it("빈 배열은 [] 로 직렬화된다", () => {
     expect(serializeAccessoriesRon([])).toBe("[]\n");
   });
+
+  it("effects 키 목록을 가진 AccessoryDef 도 라운드트립으로 보존한다", () => {
+    const src = `[
+      AccessoryDef(
+          id: "scout_lens",
+          display_name: "올빼미 안경",
+          glyph_ascii: "O",
+          glyph_unicode: "O",
+          glyph_game_icon: "O",
+          pickup_message: "획득",
+          desc: "잠입 전용.",
+          effects: [RevealGuardVision],
+      ),
+      AccessoryDef(
+          id: "trap_scope",
+          display_name: "등불",
+          glyph_ascii: "L",
+          glyph_unicode: "L",
+          glyph_game_icon: "L",
+          pickup_message: "획득",
+          desc: "함정 전용.",
+          effects: [RevealTrapsInSight],
+      ),
+    ]`;
+    const accs = parseAccessoriesRon(src);
+    expect(accs[0].effects).toEqual(["RevealGuardVision"]);
+    expect(accs[1].effects).toEqual(["RevealTrapsInSight"]);
+    const reparsed = parseAccessoriesRon(serializeAccessoriesRon(accs));
+    expect(reparsed).toEqual(accs);
+  });
+
+  it("effects 가 누락된 AccessoryDef 는 effects undefined 로 파싱되고 직렬화에도 누락된다", () => {
+    const src = `[AccessoryDef(id:"x",display_name:"x",glyph_ascii:"x",glyph_unicode:"x",glyph_game_icon:"x",pickup_message:"x",desc:"x")]`;
+    const accs = parseAccessoriesRon(src);
+    expect(accs[0].effects).toBeUndefined();
+    // 직렬화 결과에는 effects 줄이 없어야 한다 — 라운드트립 안정.
+    const ron = serializeAccessoriesRon(accs);
+    expect(ron).not.toContain("effects:");
+  });
+
+  it("알 수 없는 effect 키는 throw 한다", () => {
+    const bad = `[AccessoryDef(id:"x",display_name:"x",glyph_ascii:"x",glyph_unicode:"x",glyph_game_icon:"x",pickup_message:"x",desc:"x",effects:[NotARealEffect])]`;
+    expect(() => parseAccessoriesRon(bad)).toThrow(/Unknown AccessoryEffect/);
+  });
 });
 
 describe("parse/serialize MonstersRon — 기본 (실제 monsters.ron 형식)", () => {

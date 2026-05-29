@@ -2,13 +2,34 @@
 // 와 일치 — 단일 컬렉션 + kind 변별자 형태로 webapp 에 통합 저장.
 //
 // "accessory" 는 통계 영향 없는 장신구 (scout_lens / trap_scope 등).
-// 효과는 게임 코드가 id 로 분기한다(잠입·함정 도구).
+// 효과는 게임 코드가 id 가 아닌 `effects` 키 목록으로 분기한다.
 
 export type ItemKind = "quest" | "weapon" | "armor" | "consumable" | "accessory";
 
 export type WeaponElement = "fire" | "ice" | "lightning";
 
 export type ConsumableEffect = { type: "Heal"; amount: number };
+
+/**
+ * 액세서리의 데이터 주도 효과 키 — Rust 측 `AccessoryEffect` enum 과 1:1 대응.
+ * id 가 아닌 이 키로 게임 동작이 결정되므로, UI 에서 효과 조합을 자유롭게 바꿀 수 있다.
+ *
+ * 추가 시: Rust enum / 본 union / UI 라벨 3 곳을 함께 업데이트.
+ */
+export type AccessoryEffect =
+  | "RevealGuardVision"
+  | "RevealTrapsInSight";
+
+/** UI 표시용 한국어 라벨 — 편집 화면 멀티셀렉트 옵션에 사용. */
+export const ACCESSORY_EFFECT_LABELS: Record<AccessoryEffect, string> = {
+  RevealGuardVision: "가드 시야 노출 (잠입)",
+  RevealTrapsInSight: "함정 시야 노출 (함정)",
+};
+
+export const ACCESSORY_EFFECTS: AccessoryEffect[] = [
+  "RevealGuardVision",
+  "RevealTrapsInSight",
+];
 
 interface ItemBase {
   id: string;
@@ -41,7 +62,7 @@ export type ItemDef =
       tier?: number;
     })
   | (ItemBase & { kind: "consumable"; effect: ConsumableEffect })
-  | (ItemBase & { kind: "accessory"; desc: string });
+  | (ItemBase & { kind: "accessory"; desc: string; effects?: AccessoryEffect[] });
 
 export type ItemDocument = ItemDef & {
   _id: string;

@@ -1,4 +1,5 @@
-import type { ItemKind } from "@/types/item";
+import type { ItemKind, AccessoryEffect } from "@/types/item";
+import { ACCESSORY_EFFECTS } from "@/types/item";
 
 const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable", "accessory"];
 
@@ -62,6 +63,17 @@ export function validateKindFields(body: Record<string, unknown>, kind: ItemKind
       }
       if (body.desc === undefined || body.desc === "") {
         return { ok: false, message: "accessory: desc 필수 (효과 설명)" };
+      }
+      // effects 는 optional — 없으면 효과 없는 장식용 액세서리로 허용.
+      if (body.effects !== undefined) {
+        if (!Array.isArray(body.effects)) {
+          return { ok: false, message: "accessory: effects 는 배열이어야 합니다." };
+        }
+        for (const e of body.effects) {
+          if (typeof e !== "string" || !ACCESSORY_EFFECTS.includes(e as AccessoryEffect)) {
+            return { ok: false, message: `accessory: 알 수 없는 effect 키: ${String(e)}` };
+          }
+        }
       }
       return { ok: true };
     }

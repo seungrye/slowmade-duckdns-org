@@ -11,7 +11,8 @@ import type {
   TrapKind,
 } from "@/types/quest";
 import type { VillagerDef } from "@/types/villager";
-import type { ItemDef, ConsumableEffect, WeaponElement } from "@/types/item";
+import type { ItemDef, ConsumableEffect, WeaponElement, AccessoryEffect } from "@/types/item";
+import { ACCESSORY_EFFECTS } from "@/types/item";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
 
@@ -307,12 +308,26 @@ class Parser {
     if (name !== "AccessoryDef") throw new Error(`Expected AccessoryDef, got ${name}`);
     this.expectPunct("(");
     let desc = "";
+    let effects: AccessoryEffect[] | undefined;
     const common = this.parseItemCommon((key) => {
       if (key === "desc") { desc = this.parseString(); return true; }
+      if (key === "effects") {
+        // RON: effects: [RevealGuardVision, RevealTrapsInSight]
+        effects = this.parseArray(() => {
+          const id = this.parseIdent();
+          if (!ACCESSORY_EFFECTS.includes(id as AccessoryEffect)) {
+            throw new Error(`Unknown AccessoryEffect: ${id}`);
+          }
+          return id as AccessoryEffect;
+        });
+        return true;
+      }
       return false;
     });
     this.expectPunct(")");
-    return { kind: "accessory", ...common, desc };
+    const out: Extract<ItemDef, { kind: "accessory" }> = { kind: "accessory", ...common, desc };
+    if (effects !== undefined) out.effects = effects;
+    return out;
   }
 
   // ── StartLoadout ─────────────────────────────────────────────────────────
@@ -1304,10 +1319,17 @@ export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consuma
 }
 
 export function serializeAccessoriesRon(items: Extract<ItemDef, { kind: "accessory" }>[]): string {
-  return arrayWrap("AccessoryDef", items.map((i) => [
-    ...serializeItemCommon(i),
-    `        desc: ${q(i.desc)},`,
-  ]));
+  return arrayWrap("AccessoryDef", items.map((i) => {
+    const lines = [
+      ...serializeItemCommon(i),
+      `        desc: ${q(i.desc)},`,
+    ];
+    // effects 가 정의돼 있을 때만 직렬화 — undefined 면 빈 키도 안 적어서 round-trip 안정.
+    if (i.effects !== undefined) {
+      lines.push(`        effects: [${i.effects.join(", ")}],`);
+    }
+    return lines;
+  }));
 }
 
 /**

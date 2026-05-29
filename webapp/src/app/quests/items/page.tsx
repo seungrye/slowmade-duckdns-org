@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import type { ItemDocument, ItemKind, WeaponElement } from "@/types/item";
+import type { ItemDocument, ItemKind, WeaponElement, AccessoryEffect } from "@/types/item";
+import { ACCESSORY_EFFECTS, ACCESSORY_EFFECT_LABELS } from "@/types/item";
 import { useInfoDialog } from "@/components/info-dialog";
 
 type Filter = "all" | ItemKind;
@@ -26,6 +27,8 @@ interface FormState {
   tier: number | "";
   effectAmount: number;
   desc: string;
+  /** 액세서리 효과 키 — 빈 배열은 효과 없는 장식용. */
+  effects: AccessoryEffect[];
 }
 
 const emptyForm: FormState = {
@@ -43,6 +46,7 @@ const emptyForm: FormState = {
   tier: "",
   effectAmount: 0,
   desc: "",
+  effects: [],
 };
 
 export default function ItemsPage() {
@@ -106,7 +110,10 @@ export default function ItemsPage() {
       f.tier = item.tier ?? "";
     }
     else if (item.kind === "consumable") f.effectAmount = item.effect.amount;
-    else if (item.kind === "accessory") f.desc = item.desc;
+    else if (item.kind === "accessory") {
+      f.desc = item.desc;
+      f.effects = item.effects ?? [];
+    }
     setEditForm(f);
   }
 
@@ -137,7 +144,11 @@ export default function ItemsPage() {
         break;
       }
       case "consumable": body.effect = { type: "Heal", amount: form.effectAmount }; break;
-      case "accessory":  body.desc = form.desc; break;
+      case "accessory":
+        body.desc = form.desc;
+        // 빈 배열도 명시적으로 보내서 효과 제거가 가능하게 한다.
+        body.effects = form.effects;
+        break;
     }
     return body;
   }
@@ -248,7 +259,12 @@ export default function ItemsPage() {
         return `${def}${tier}`;
       }
       case "consumable": return `${item.effect.type} +${item.effect.amount}`;
-      case "accessory":  return item.desc;
+      case "accessory": {
+        const eff = item.effects && item.effects.length > 0
+          ? ` [${item.effects.join(", ")}]`
+          : "";
+        return `${item.desc}${eff}`;
+      }
     }
   }
 
@@ -682,15 +698,45 @@ function FormFields({
       )}
 
       {form.kind === "accessory" && (
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">desc (효과 설명)</span>
-          <input
-            value={form.desc}
-            onChange={(e) => setForm({ ...form, desc: e.target.value })}
-            className={inputCls}
-            placeholder="잠입 전용. 착용하면 가드 시야가 붉게 표시된다."
-          />
-        </label>
+        <>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">desc (효과 설명)</span>
+            <input
+              value={form.desc}
+              onChange={(e) => setForm({ ...form, desc: e.target.value })}
+              className={inputCls}
+              placeholder="잠입 전용. 착용하면 가드 시야가 붉게 표시된다."
+            />
+          </label>
+          <fieldset className="flex flex-col gap-1">
+            <legend className="text-xs text-gray-500">
+              effects (효과 키 — 데이터 주도, id 아닌 이 키로 게임 동작 결정)
+            </legend>
+            <div className="flex flex-col gap-1">
+              {ACCESSORY_EFFECTS.map((eff) => {
+                const checked = form.effects.includes(eff);
+                return (
+                  <label key={eff} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => {
+                        const next = e.target.checked
+                          ? [...form.effects, eff]
+                          : form.effects.filter((x) => x !== eff);
+                        setForm({ ...form, effects: next });
+                      }}
+                    />
+                    <span>
+                      <code className="text-xs">{eff}</code>{" "}
+                      <span className="text-gray-500">— {ACCESSORY_EFFECT_LABELS[eff]}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        </>
       )}
     </div>
   );

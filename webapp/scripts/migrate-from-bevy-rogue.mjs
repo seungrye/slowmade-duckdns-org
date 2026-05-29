@@ -308,7 +308,10 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
       if (def.tier !== undefined) fields.tier = def.tier;
     }
     else if (def.kind === "consumable") fields.effect = def.effect;
-    else if (def.kind === "accessory")  fields.desc = def.desc;
+    else if (def.kind === "accessory") {
+      fields.desc = def.desc;
+      if (def.effects !== undefined) fields.effects = def.effects;
+    }
 
     const existing = await Item.findOne({ id: def.id });
     if (existing) {
@@ -340,7 +343,10 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
         if (existing.tier !== undefined) compareSet.tier = existing.tier;
       }
       else if (def.kind === "consumable") compareSet.effect = existing.effect;
-      else if (def.kind === "accessory")  compareSet.desc = existing.desc;
+      else if (def.kind === "accessory") {
+        compareSet.desc = existing.desc;
+        if (existing.effects !== undefined) compareSet.effects = existing.effects;
+      }
 
       if (!changed(compareSet, fields)) {
         stats[statKey].unchanged++;

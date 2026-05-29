@@ -19,6 +19,7 @@ import {
   parseVillagersRon,
   parseMonstersRon,
   parseStartLoadoutDef,
+  parseAccessoriesRon,
 } from "@/lib/ron";
 
 type FindMock = ReturnType<typeof vi.fn>;
@@ -63,6 +64,20 @@ function sampleQuestItemDoc() {
     glyphGameIcon: "◆",
     pickupMessage: "영원의 보석을 획득했다!",
     imagePath: "scene/open-chest.png",
+  };
+}
+
+function sampleAccessoryDoc(effects?: unknown) {
+  return {
+    id: "scout_lens",
+    kind: "accessory",
+    displayName: "올빼미 안경",
+    glyphAscii: "O",
+    glyphUnicode: "O",
+    glyphGameIcon: "O",
+    pickupMessage: "획득",
+    desc: "잠입 전용.",
+    ...(effects !== undefined ? { effects } : {}),
   };
 }
 
@@ -250,5 +265,57 @@ describe("GET /api/game/content/v1", () => {
       { id: "health_potion", count: 10 },
       { id: "trap_kit", count: 3 },
     ]);
+  });
+
+  it("accessory 에 effects 가 있으면 응답 RON 에 effects 키가 포함된다", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, [
+      sampleAccessoryDoc(["RevealGuardVision"]),
+    ]);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.items["accessories.ron"];
+    expect(ron).toContain("effects:");
+    expect(ron).toContain("RevealGuardVision");
+
+    // round-trip
+    const accs = parseAccessoriesRon(ron);
+    expect(accs).toHaveLength(1);
+    expect(accs[0].id).toBe("scout_lens");
+    expect(accs[0].effects).toEqual(["RevealGuardVision"]);
+  });
+
+  it("accessory 에 effects 가 누락이면 응답 RON 에도 effects 키가 없다", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, [
+      sampleAccessoryDoc(undefined), // effects 미설정
+    ]);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.items["accessories.ron"];
+    expect(ron).not.toContain("effects:");
+  });
+
+  it("accessory 의 알 수 없는 effect 키는 응답 직전에 필터링된다(안전망)", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, [
+      sampleAccessoryDoc(["RevealGuardVision", "BogusKey"]),
+    ]);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+
+    const res = await GET();
+    const body = await res.json();
+    const accs = parseAccessoriesRon(body.items["accessories.ron"]);
+    expect(accs[0].effects).toEqual(["RevealGuardVision"]);
   });
 });

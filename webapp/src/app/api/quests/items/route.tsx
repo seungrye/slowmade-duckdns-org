@@ -55,7 +55,10 @@ export async function POST(req: NextRequest) {
     if (body.tier !== undefined) doc.tier = body.tier;
   }
   else if (body.kind === "consumable") doc.effect = body.effect;
-  else if (body.kind === "accessory") doc.desc = body.desc;
+  else if (body.kind === "accessory") {
+    doc.desc = body.desc;
+    if (body.effects !== undefined) doc.effects = body.effects;
+  }
 
   const item = await Item.create(doc);
   return apiSuccess(item, 201);

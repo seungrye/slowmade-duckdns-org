@@ -29,7 +29,8 @@ import {
   serializeStartLoadoutRon,
 } from "@/lib/ron";
 import type { QuestDef } from "@/types/quest";
-import type { ItemDef, WeaponElement } from "@/types/item";
+import type { ItemDef, WeaponElement, AccessoryEffect } from "@/types/item";
+import { ACCESSORY_EFFECTS } from "@/types/item";
 import type { VillagerDef } from "@/types/villager";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
@@ -119,12 +120,24 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
         ...base,
         effect: (d.effect as { type: "Heal"; amount: number }) ?? { type: "Heal", amount: 0 },
       };
-    case "accessory":
-      return {
+    case "accessory": {
+      const a: Extract<ItemDef, { kind: "accessory" }> = {
         kind: "accessory",
         ...base,
         desc: (d.desc as string) ?? "",
       };
+      // effects 가 DB 에 있고 유효한 키만 살려서 응답에 포함.
+      // 유효성 검증은 작성 시 거치지만, 직렬화 단계에서도 한번 더 필터링해 안전망.
+      const raw = d.effects;
+      if (Array.isArray(raw)) {
+        const filtered = raw.filter(
+          (e): e is AccessoryEffect =>
+            typeof e === "string" && ACCESSORY_EFFECTS.includes(e as AccessoryEffect),
+        );
+        a.effects = filtered;
+      }
+      return a;
+    }
     default:
       throw new Error(`Unknown item kind: ${String(d.kind)}`);
   }

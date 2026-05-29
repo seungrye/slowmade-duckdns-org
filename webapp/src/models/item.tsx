@@ -42,8 +42,11 @@ const ItemSchema = new Schema(
     // consumable 전용
     effect: { type: ConsumableEffectSchema },
 
-    // accessory 전용 — 효과 설명 텍스트 (게임 효과는 id 로 분기, 통계 영향 없음)
+    // accessory 전용 — 효과 설명 텍스트 (사람용)
     desc: { type: String },
+    // accessory 전용 — 데이터 주도 효과 키 목록. 게임 코드가 id 가 아닌 이 키로 분기.
+    // 유효 값: "RevealGuardVision" | "RevealTrapsInSight" (types/item.ts AccessoryEffect 와 동기).
+    effects: { type: [String], default: undefined },
 
     version: { type: Number, default: 1 },
   },
@@ -70,6 +73,7 @@ export interface ItemDoc {
   tier?: number;
   effect?: { type: "Heal"; amount: number };
   desc?: string;
+  effects?: string[];
   version: number;
   createdAt: Date;
   updatedAt: Date;

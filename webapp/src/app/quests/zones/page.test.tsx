@@ -57,15 +57,19 @@ describe('ZonesPage 신규 폼', () => {
     expect(screen.getByText('생성')).toBeTruthy();
   });
 
-  it('generator 입력에 datalist 추천 (KNOWN_GENERATORS)', async () => {
+  it('generator 가 strict select 로 KNOWN_GENERATORS 옵션을 제공한다', async () => {
+    // datalist → strict select 로 바뀜 (게임에 없는 generator 자유 입력 방지).
     const { container } = render(<ZonesPage />);
     await act(async () => {});
     fireEvent.click(screen.getByText('+ 새 zone'));
-    const opts = container.querySelectorAll('datalist#zone-generators option');
-    const values = Array.from(opts).map((o) => (o as HTMLOptionElement).value);
+    const selects = container.querySelectorAll('select');
+    // 신규 zone 폼의 generator select 한 개. 옵션 23개 중 핵심만 검사.
+    const opts = Array.from(selects).flatMap((s) => Array.from(s.querySelectorAll('option')));
+    const values = opts.map((o) => (o as HTMLOptionElement).value);
     expect(values).toContain('bsp');
     expect(values).toContain('forest');
     expect(values).toContain('cellular_automata');
+    expect(values).toContain('walled_town'); // 신규 23종에 포함되는지 검증
   });
 });
 

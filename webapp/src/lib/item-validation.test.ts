@@ -62,3 +62,32 @@ describe("validateItemForCreate — armor random-stat 필드", () => {
     expect(r.ok).toBe(false);
   });
 });
+
+describe("validateItemForCreate — accessory effects 필드", () => {
+  it("desc 있고 effects 누락이면 통과(빈 vec 와 동치 — 효과 없는 장식용)", () => {
+    const body = { ...base(), kind: "accessory", desc: "x" };
+    expect(validateItemForCreate(body)).toEqual({ ok: true });
+  });
+
+  it("desc 있고 effects 가 유효한 키 배열이면 통과", () => {
+    const body = { ...base(), kind: "accessory", desc: "x", effects: ["RevealGuardVision"] };
+    expect(validateItemForCreate(body)).toEqual({ ok: true });
+  });
+
+  it("desc 있고 effects 가 알 수 없는 키면 오류", () => {
+    const body = { ...base(), kind: "accessory", desc: "x", effects: ["NotARealEffect"] };
+    const r = validateItemForCreate(body);
+    expect(r.ok).toBe(false);
+  });
+
+  it("effects 가 배열이 아니면 오류", () => {
+    const body = { ...base(), kind: "accessory", desc: "x", effects: "RevealGuardVision" };
+    const r = validateItemForCreate(body);
+    expect(r.ok).toBe(false);
+  });
+
+  it("빈 effects 배열은 효과 없는 장식용으로 허용", () => {
+    const body = { ...base(), kind: "accessory", desc: "x", effects: [] };
+    expect(validateItemForCreate(body)).toEqual({ ok: true });
+  });
+});
