@@ -158,10 +158,10 @@ export function GeneratorPreview({ generator }: { generator: string }) {
         {data.width}×{data.height})
       </div>
 
-      {/* 데스크톱 — 4-col grid 2 row */}
-      <div className="hidden sm:grid sm:grid-cols-4 gap-2">
+      {/* 데스크톱 — 4-col grid 2 row. 카드 내부 padding p-2, 카드 간 gap 없음. */}
+      <div className="hidden sm:grid sm:grid-cols-4">
         {samples.map((s) => (
-          <div key={s.seed} className="text-center">
+          <div key={s.seed} className="text-center p-2">
             <PreviewCanvas
               sample={s}
               width={data.width}
