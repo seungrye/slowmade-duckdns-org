@@ -8,19 +8,25 @@ import { RPG_AWESOME_ICONS, formatCodepoint, type RpgAwesomeIcon } from "@/lib/r
  *
  * - 검색어로 이름 부분 일치 필터링.
  * - 그리드에 아이콘 자체(rpg-icon 폰트) + 이름을 표시.
- * - 선택 시 `\u{XXXX}` 형식 codepoint 문자열을 onSelect 콜백으로 반환.
- *   (RON 의 glyph_unicode 값과 동일 형식 → 폼에 그대로 대입 가능.)
- * - ESC / 백드롭 클릭 / 취소 버튼으로 닫힘. focus trap 은 단순화(접근성 기본 수준).
+ * - 선택 시:
+ *   · 기본: 단일 PUA 문자(String.fromCodePoint(cp)) — DB/API 가 그대로 저장하고
+ *     export RON 직렬화 시 자동으로 `\u{XXXX}` escape 로 출력된다.
+ *   · `outputFormat="literal"` 옵션 시: `\u{XXXX}` 문자열 직접.
+ * - ESC / 백드롭 클릭 / 취소 버튼으로 닫힘.
  */
+export type IconPickerOutput = "char" | "literal";
+
 export interface IconPickerDialogProps {
   open: boolean;
   onClose: () => void;
-  onSelect: (codepointLiteral: string) => void;
+  onSelect: (value: string) => void;
   /** 모달 제목. 기본값: "아이콘 선택 (RPG-Awesome)" */
   title?: string;
+  /** 출력 형식. 기본 "char" — 단일 PUA 문자. */
+  outputFormat?: IconPickerOutput;
 }
 
-export function IconPickerDialog({ open, onClose, onSelect, title }: IconPickerDialogProps) {
+export function IconPickerDialog({ open, onClose, onSelect, title, outputFormat = "char" }: IconPickerDialogProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -105,12 +111,13 @@ export function IconPickerDialog({ open, onClose, onSelect, title }: IconPickerD
               {filtered.map((icon) => {
                 const literal = formatCodepoint(icon.codepoint);
                 const ch = String.fromCodePoint(icon.codepoint);
+                const value = outputFormat === "literal" ? literal : ch;
                 return (
                   <li key={icon.name}>
                     <button
                       type="button"
                       onClick={() => {
-                        onSelect(literal);
+                        onSelect(value);
                         onClose();
                       }}
                       className="w-full flex flex-col items-center gap-1 p-2 rounded border border-transparent hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"

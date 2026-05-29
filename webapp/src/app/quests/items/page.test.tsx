@@ -173,7 +173,9 @@ describe('ItemsPage glyph_unicode 아이콘 픽커', () => {
     expect(screen.getByText(/아이콘 선택 \(RPG-Awesome\)/)).toBeTruthy();
   });
 
-  it('픽커에서 아이콘 선택 시 glyph_unicode 입력 값이 \\u{XXXX} 로 채워진다', async () => {
+  it('픽커에서 아이콘 선택 시 glyph_unicode 입력 값이 단일 PUA 문자로 채워진다', async () => {
+    // DB/API 가 단일 문자를 그대로 저장하고, RON 직렬화 시 자동으로 \u{XXXX} 로
+    // escape 되므로 디폴트는 single-char 출력이다.
     const { container } = render(<ItemsPage />);
     await act(async () => {});
     fireEvent.click(screen.getByText('+ 새 item'));
@@ -181,11 +183,11 @@ describe('ItemsPage glyph_unicode 아이콘 픽커', () => {
     const search = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
     fireEvent.change(search, { target: { value: 'broadsword' } });
     fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));
-    // 폼의 glyph_unicode 입력에 \u{E946} 가 들어와야 한다 (placeholder 와 같은 입력).
     const inputs = container.querySelectorAll('input.font-mono');
     const glyphUnicodeInput = Array.from(inputs).find(
       (el) => (el as HTMLInputElement).placeholder === '\\u{E946}',
     ) as HTMLInputElement;
-    expect(glyphUnicodeInput.value).toBe('\\u{E946}');
+    expect(glyphUnicodeInput.value).toBe(String.fromCodePoint(0xe946));
+    expect(glyphUnicodeInput.value.length).toBe(1);
   });
 });

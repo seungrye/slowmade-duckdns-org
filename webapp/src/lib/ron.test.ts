@@ -713,6 +713,38 @@ describe("parse/serialize QuestItemsRon", () => {
   it("빈 배열 직렬화", () => {
     expect(serializeQuestItemsRon([])).toBe("[]\n");
   });
+
+  it("glyph_unicode 의 \\u{XXXX} escape 가 실제 PUA 코드포인트로 디코드된다", () => {
+    // 게임 RON 은 RPG-Awesome PUA codepoint 를 \u{E946} 형식으로 기록한다.
+    // 사이트의 파서가 이를 단일 PUA 문자로 정확히 복원해야 한다.
+    const src = `[
+      QuestItemDef(
+          id: "x", display_name: "x", glyph_ascii: "/",
+          glyph_unicode: "\\u{E946}",
+          glyph_game_icon: "\\u{EA72}",
+          pickup_message: "p", image_path: "x.png",
+      ),
+    ]`;
+    const items = parseQuestItemsRon(src);
+    expect(items[0].glyphUnicode).toBe("\u{E946}");
+    expect(items[0].glyphGameIcon).toBe("\u{EA72}");
+    expect(items[0].glyphUnicode.length).toBe(1); // 1글자
+  });
+
+  it("직렬화 시 PUA codepoint 는 \\u{XXXX} escape 로 출력된다 (round-trip)", () => {
+    const items = parseQuestItemsRon(`[
+      QuestItemDef(
+          id: "x", display_name: "x", glyph_ascii: "/",
+          glyph_unicode: "\\u{E946}",
+          glyph_game_icon: "\\u{EA72}",
+          pickup_message: "p", image_path: "x.png",
+      ),
+    ]`);
+    const out = serializeQuestItemsRon(items);
+    expect(out).toContain('glyph_unicode: "\\u{E946}"');
+    expect(out).toContain('glyph_game_icon: "\\u{EA72}"');
+    expect(parseQuestItemsRon(out)).toEqual(items);
+  });
 });
 
 describe("parse/serialize WeaponsRon — 신규 random-stat 필드 (게임 RON 형식)", () => {

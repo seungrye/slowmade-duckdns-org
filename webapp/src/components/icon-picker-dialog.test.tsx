@@ -49,10 +49,26 @@ describe('IconPickerDialog', () => {
     expect(screen.getByText(new RegExp(`/ ${RPG_AWESOME_ICONS.length} 개`))).toBeTruthy();
   });
 
-  it('아이콘 클릭 시 \\u{XXXX} 형식 codepoint 를 onSelect 로 전달', () => {
+  it('기본은 단일 PUA 문자 onSelect (char 형식)', () => {
     const selectSpy = vi.fn();
     render(<Harness onSelect={selectSpy} />);
     // broadsword 선택 (U+E946)
+    const input = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'broadsword' } });
+    fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));
+    expect(selectSpy).toHaveBeenCalledWith(String.fromCodePoint(0xe946));
+  });
+
+  it('outputFormat="literal" 이면 \\u{XXXX} 형식 codepoint 문자열', () => {
+    const selectSpy = vi.fn();
+    render(
+      <IconPickerDialog
+        open={true}
+        onClose={() => {}}
+        onSelect={selectSpy}
+        outputFormat="literal"
+      />,
+    );
     const input = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'broadsword' } });
     fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));

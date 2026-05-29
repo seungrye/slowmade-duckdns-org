@@ -768,19 +768,26 @@ function FormFields({
 
 /**
  * glyph_unicode 입력 옆에 표시되는 라이브 미리보기.
- * 값이 `\u{XXXX}` 형식이면 해당 codepoint 를 RPG-Awesome 폰트로 렌더.
- * 다른 자유 텍스트(이모지 등) 면 그대로 표시(폰트만 RPGAwesome 시도).
+ *
+ * 입력 형식별 처리:
+ *   - 단일 PUA 문자 (DB 기본 저장 형식)   → 그대로 RPG-Awesome 폰트로 렌더.
+ *   - `\u{XXXX}` 리터럴 (사용자 직접 입력) → codepoint 로 변환해 렌더.
+ *   - 빈 문자열                          → 빈 박스.
+ *   - 그 외 자유 텍스트                  → 그대로 렌더.
  */
 function GlyphPreview({ literal }: { literal: string }) {
   const cp = parseCodepoint(literal);
   const ch = cp !== null ? String.fromCodePoint(cp) : literal;
+  const titleCp = cp !== null
+    ? `U+${cp.toString(16).toUpperCase()}`
+    : (literal.length > 0 ? `U+${literal.codePointAt(0)!.toString(16).toUpperCase()}` : "(empty)");
   return (
     <span
       className="rpg-icon inline-flex items-center justify-center w-9 text-2xl border rounded bg-white dark:bg-gray-800"
-      aria-label={cp !== null ? `미리보기 U+${cp.toString(16).toUpperCase()}` : "미리보기"}
-      title={cp !== null ? `U+${cp.toString(16).toUpperCase()}` : "free text"}
+      aria-label={`미리보기 ${titleCp}`}
+      title={titleCp}
     >
-      {ch || " "}
+      {ch || " "}
     </span>
   );
 }
