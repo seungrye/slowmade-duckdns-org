@@ -69,7 +69,9 @@ describe("collectNamedZones", () => {
     expect(collectNamedZones(q).sort()).toEqual(["infiltration", "trap_mine", "wyrm_lair"]);
   });
 
-  it("Town/Forest/Dungeon 같은 비-Named zone 은 제외", () => {
+  it("Town zone 은 카탈로그 등록 대상에서 제외 (표준 Named id 는 등록 대상)", () => {
+    // Town 은 시작 마을(코드 정적) → 카탈로그 X. forest/dungeon_<N> 등 표준
+    // Named id 는 카탈로그 자동 등록 대상이므로 결과 set 에 포함된다.
     const q = quest({
       transitions: [
         {
@@ -78,13 +80,13 @@ describe("collectNamedZones", () => {
           to: "x",
           actions: [
             { type: "SpawnGuards", count: 4, zone: { type: "Town" } },
-            { type: "PlaceTraps", kind: "Spike", count: 1, hidden: false, zone: { type: "Forest" } },
-            { type: "SpawnMonster", monsterId: "x", count: 1, zone: { type: "Dungeon", level: 3 } },
+            { type: "PlaceTraps", kind: "Spike", count: 1, hidden: false, zone: { type: "Named", id: "forest" } },
+            { type: "SpawnMonster", monsterId: "x", count: 1, zone: { type: "Named", id: "dungeon_3" } },
           ],
         },
       ],
     });
-    expect(collectNamedZones(q)).toEqual([]);
+    expect(collectNamedZones(q).sort()).toEqual(["dungeon_3", "forest"]);
   });
 
   it("zone 미지정(Action 의 optional 필드) 시 무시", () => {
@@ -155,12 +157,12 @@ describe("collectNamedZones", () => {
         {
           phase: "dormant",
           item: "gem",
-          zone: { type: "Forest" },
+          zone: { type: "Named", id: "forest" },
           condition: { type: "InZone", zone: { type: "Named", id: "dreadfort_vault" } },
         },
       ],
     });
-    expect(collectNamedZones(q).sort()).toEqual(["dreadfort_vault", "herb_glade"]);
+    expect(collectNamedZones(q).sort()).toEqual(["dreadfort_vault", "forest", "herb_glade"]);
   });
 
   it("같은 zone 이 여러 번 나와도 dedup", () => {

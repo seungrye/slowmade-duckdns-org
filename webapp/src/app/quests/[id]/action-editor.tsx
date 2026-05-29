@@ -29,7 +29,7 @@ function emptyAction(type: Action["type"]): Action {
     case "KillNpc":          return { type, npcId: "" };
     case "DespawnWorldItem": return { type, itemId: "" };
     case "OpenPortal":       return { type, zone: "", generator: "" };
-    case "OpenZonePortal":   return { type, target: { type: "MountainVillage" } };
+    case "OpenZonePortal":   return { type, target: { type: "Named", id: "mountain_village" } };
     case "ClosePortal":      return { type, zone: "" };
     case "SpawnGuards":      return { type, count: 1 };
     case "PlaceTraps":       return { type, kind: "Spike", count: 1, hidden: true };
@@ -91,8 +91,8 @@ function ActionRow({
           <option value="ClearFlag">ClearFlag</option>
           <option value="KillNpc">KillNpc</option>
           <option value="DespawnWorldItem">DespawnWorldItem</option>
-          <option value="OpenPortal">OpenPortal (Named 존)</option>
-          <option value="OpenZonePortal">OpenZonePortal (정적 마을 zone)</option>
+          <option value="OpenPortal">OpenPortal (Named 존 + generator)</option>
+          <option value="OpenZonePortal">OpenZonePortal (Town/Named zone)</option>
           <option value="ClosePortal">ClosePortal</option>
           <option value="SpawnGuards">SpawnGuards (경비병 스폰)</option>
           <option value="PlaceTraps">PlaceTraps (함정 배치)</option>
@@ -236,43 +236,29 @@ function ActionRow({
       {action.type === "OpenZonePortal" && (
         <div className="space-y-1">
           {/*
-            target select — 정적 마을 zone 위주. Forest/Dungeon 도 허용해 두지만
-            실제 사용 사례는 마을 분산 보상이 주된 목적.
+            target select — Town 만 정적, 나머지는 Named(id) 로 통일된 schema.
+            표준 Named id (mountain_village/seaside_harbor/forest/dungeon_<N>) 와
+            카탈로그의 동적 zone 을 모두 ZoneCombobox 가 자동완성한다.
           */}
           <select
             aria-label="target zone"
-            value={action.target.type === "Dungeon" ? "Dungeon" : action.target.type}
+            value={action.target.type}
             onChange={(e) => {
               const t = e.target.value;
-              if (t === "Dungeon") onChange({ ...action, target: { type: "Dungeon", level: 1 } });
-              else if (t === "Named") onChange({ ...action, target: { type: "Named", id: "" } });
-              else onChange({ ...action, target: { type: t as "Town" | "MountainVillage" | "SeasideHarbor" | "Forest" } });
+              if (t === "Town") onChange({ ...action, target: { type: "Town" } });
+              else onChange({ ...action, target: { type: "Named", id: "mountain_village" } });
             }}
             className={inputCls}
           >
             <option value="Town">Town (시작 마을)</option>
-            <option value="MountainVillage">MountainVillage (산속 마을)</option>
-            <option value="SeasideHarbor">SeasideHarbor (항구 마을)</option>
-            <option value="Forest">Forest (숲)</option>
-            <option value="Dungeon">Dungeon (던전)</option>
-            <option value="Named">Named (동적 zone)</option>
+            <option value="Named">Named (id 로 모든 zone)</option>
           </select>
-          {action.target.type === "Dungeon" && (
-            <input
-              type="number"
-              min={1}
-              value={action.target.level}
-              onChange={(e) => onChange({ ...action, target: { type: "Dungeon", level: Math.max(1, Number(e.target.value)) } })}
-              placeholder="level"
-              className={inputCls}
-            />
-          )}
           {action.target.type === "Named" && (
-            <input
+            <ZoneCombobox
               value={action.target.id}
-              onChange={(e) => onChange({ ...action, target: { type: "Named", id: e.target.value } })}
-              placeholder="Named id (예: herb_glade)"
-              className={`${inputCls} font-mono`}
+              onChange={(v) => onChange({ ...action, target: { type: "Named", id: v } })}
+              zones={zones}
+              placeholder="Named id (예: mountain_village, forest, herb_glade)"
             />
           )}
           <select

@@ -113,10 +113,10 @@ describe("parseRon — 기본", () => {
     expect(quest.phases["done"].objective).toBeNull();
   });
 
-  it("spawns 파싱", () => {
+  it("spawns 파싱 (옛 Dungeon(N) → Named('dungeon_N') 자동 변환)", () => {
     const quest = parseRon(SIMPLE_RON);
     expect(quest.spawns).toHaveLength(1);
-    expect(quest.spawns[0]).toEqual({ phase: "active", item: "key_item", zone: { type: "Dungeon", level: 1 } });
+    expect(quest.spawns[0]).toEqual({ phase: "active", item: "key_item", zone: { type: "Named", id: "dungeon_1" } });
   });
 
   it("implicit_some directive 가 있어도 파싱된다", () => {
@@ -342,33 +342,33 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
     expect(quest.transitions[0].actions[0]).toEqual({ type: "ClosePortal", zone: "cave" });
   });
 
-  it("OpenZonePortal — 정적 zone(MountainVillage) target 파싱", () => {
-    // OpenZonePortal(target: <ZoneId>) — placement 생략 시 게임 측 default(Border) 가 적용.
+  it("OpenZonePortal — 옛 MountainVillage 텍스트가 Named('mountain_village') 로 호환 파싱", () => {
+    // 옛 RON 의 정적 variant 명도 파서가 새 schema Named id 로 자동 변환.
     const quest = parseRon(wrap(
       `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:MountainVillage)],to:"b")`,
     ));
     expect(quest.transitions[0].actions[0]).toEqual({
-      type: "OpenZonePortal", target: { type: "MountainVillage" },
+      type: "OpenZonePortal", target: { type: "Named", id: "mountain_village" },
     });
   });
 
-  it("OpenZonePortal — SeasideHarbor + placement: NearGiver 파싱", () => {
+  it("OpenZonePortal — 옛 SeasideHarbor + placement: NearGiver 파싱", () => {
     const quest = parseRon(wrap(
       `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:SeasideHarbor,placement:NearGiver(radius:4))],to:"b")`,
     ));
     expect(quest.transitions[0].actions[0]).toEqual({
       type: "OpenZonePortal",
-      target: { type: "SeasideHarbor" },
+      target: { type: "Named", id: "seaside_harbor" },
       placement: { type: "NearGiver", radius: 4 },
     });
   });
 
-  it("OpenZonePortal — Dungeon(N) / Named target 도 허용", () => {
+  it("OpenZonePortal — 옛 Dungeon(N) 도 Named('dungeon_N') 로 / Named target 그대로", () => {
     const a = parseRon(wrap(
       `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:Dungeon(3))],to:"b")`,
     ));
     expect(a.transitions[0].actions[0]).toEqual({
-      type: "OpenZonePortal", target: { type: "Dungeon", level: 3 },
+      type: "OpenZonePortal", target: { type: "Named", id: "dungeon_3" },
     });
     const b = parseRon(wrap(
       `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:Named("herb_glade"))],to:"b")`,
@@ -463,7 +463,8 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
       ])`;
     const quest = parseRon(src);
     expect(quest.spawns[0]).toEqual({ phase: "a", item: "x", zone: { type: "Named", id: "z" }, count: 3 });
-    expect(quest.spawns[1]).toEqual({ phase: "a", item: "y", zone: { type: "Forest" }, condition: { type: "HasFlag", flag: "f" } });
+    // 옛 Forest 텍스트는 새 schema 의 Named('forest') 로 자동 흡수된다.
+    expect(quest.spawns[1]).toEqual({ phase: "a", item: "y", zone: { type: "Named", id: "forest" }, condition: { type: "HasFlag", flag: "f" } });
   });
 
   it("QuestDef.spawn_chance 파싱", () => {
@@ -908,7 +909,8 @@ describe("parseVillagersRon — stationary / vendor 신규 필드", () => {
 });
 
 describe("parseVillagersRon — home_zone (마을 분산)", () => {
-  // 4종의 정적 zone 와 Dungeon/Named 까지 모두 다루며 round-trip 일관성을 검증.
+  // 새 schema: Town | Named. 옛 RON 의 bare ident(MountainVillage/SeasideHarbor)
+  // 도 호환되어 Named 로 자동 변환된다.
   const SRC = `[
     VillagerDef(
         id: "burgomaster",
@@ -943,21 +945,21 @@ describe("parseVillagersRon — home_zone (마을 분산)", () => {
     ),
 ]`;
 
-  it("MountainVillage / SeasideHarbor home_zone 파싱", () => {
+  it("옛 MountainVillage / SeasideHarbor 표기는 Named 로 변환되어 파싱", () => {
     const v = parseVillagersRon(SRC);
     expect(v[0].homeZone).toEqual({ type: "Town" });
-    expect(v[1].homeZone).toEqual({ type: "MountainVillage" });
-    expect(v[2].homeZone).toEqual({ type: "SeasideHarbor" });
+    expect(v[1].homeZone).toEqual({ type: "Named", id: "mountain_village" });
+    expect(v[2].homeZone).toEqual({ type: "Named", id: "seaside_harbor" });
     // 마지막 elder 는 home_zone 필드 자체가 없는 RON — TS 상 undefined.
     // 게임 측 #[serde(default)] 미러: 마이그레이션/DB 에서 Town 으로 보정된다.
     expect(v[3].homeZone).toBeUndefined();
   });
 
-  it("라운드트립: 기본 Town 은 생략, 그 외는 명시 출력", () => {
+  it("라운드트립: 기본 Town 은 생략, 그 외는 Named 로 명시 출력", () => {
     const v = parseVillagersRon(SRC);
     const out = serializeVillagersRon(v);
-    expect(out).toContain("home_zone: MountainVillage");
-    expect(out).toContain("home_zone: SeasideHarbor");
+    expect(out).toContain('home_zone: Named("mountain_village")');
+    expect(out).toContain('home_zone: Named("seaside_harbor")');
     // Town 은 default 라 출력 생략 (호환을 위해 기존 RON 텍스트 모양 유지).
     const burgoBlock = out.slice(out.indexOf("burgomaster"), out.indexOf("huntmaster"));
     expect(burgoBlock).not.toContain("home_zone:");
@@ -1257,11 +1259,11 @@ describe("parse/serialize MonstersRon — zones·중첩 spawn_condition·quest_o
     ),
 ]`;
 
-  it("zones (Dungeon/Forest/Named) 와 중첩 조건을 파싱", () => {
+  it("zones 의 옛 Dungeon(N)/Forest 표기는 Named 로 변환되어 파싱", () => {
     const monsters = parseMonstersRon(SRC);
     expect(monsters[0].zones).toEqual([
-      { type: "Dungeon", level: 3 },
-      { type: "Forest" },
+      { type: "Named", id: "dungeon_3" },
+      { type: "Named", id: "forest" },
       { type: "Named", id: "desert" },
     ]);
     expect(monsters[0].questOnly).toBe(true);

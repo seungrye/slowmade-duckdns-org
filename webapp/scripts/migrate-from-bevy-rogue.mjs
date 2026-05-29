@@ -441,11 +441,11 @@ async function migrateVillagers() {
     const existing = await Villager.findOne({ id: v.id });
     if (existing) {
       // existing.homeZone 은 Mongoose Document 가 들어있으니 plain object 로 정규화.
+      // 새 schema: { type: "Town" } | { type: "Named", id: "..." } 만 유효.
       const existingHomeZone = existing.homeZone
-        ? { type: existing.homeZone.type, level: existing.homeZone.level, id: existing.homeZone.id }
+        ? { type: existing.homeZone.type, id: existing.homeZone.id }
         : { type: "Town" };
       // undefined 필드는 비교에서 제외하기 위해 정리
-      if (existingHomeZone.level === undefined) delete existingHomeZone.level;
       if (existingHomeZone.id === undefined) delete existingHomeZone.id;
       const compareSet = {
         name: existing.name,
@@ -624,6 +624,31 @@ async function migrateStartLoadout() {
 
 // ── 메인 ────────────────────────────────────────────────────────────────────
 
+// 게임 코드의 ZoneId 단순화에 맞춰 표준 Named zone 들이 카탈로그에 없으면
+// 자동 등록한다. 게임 측 `ZoneId::algorithm()` 의 정적 매핑 표와 동일한 generator.
+async function seedDefaultZones() {
+  const defaults = [
+    { name: "forest",           generator: "forest",       description: "숲 — 마을과 던전 사이 (게임 표준 Named zone)" },
+    { name: "dungeon_1",        generator: "bsp",          description: "던전 1층 (게임 표준 Named zone)" },
+    { name: "dungeon_2",        generator: "bsp",          description: "던전 2층 (게임 표준 Named zone)" },
+    { name: "mountain_village", generator: "grid_village", description: "산속 마을 — 사냥꾼/광부/전사 (퀘스트 보상 portal 로 해금)" },
+    { name: "seaside_harbor",   generator: "walled_town",  description: "항구 마을 — 탐험가/마법사/보물사냥꾼 (퀘스트 보상 portal 로 해금)" },
+  ];
+  let created = 0;
+  let unchanged = 0;
+  for (const def of defaults) {
+    const existing = await Zone.findOne({ name: def.name }).select("_id").lean();
+    if (existing) { unchanged++; continue; }
+    if (DRY_RUN) { created++; continue; }
+    try {
+      await Zone.create(def);
+      log(`zone seed: ${def.name} → ${def.generator}`);
+      created++;
+    } catch { /* unique 위반 — 동시 생성 무시 */ }
+  }
+  log(`  zones seed: created=${created} unchanged=${unchanged}`);
+}
+
 async function main() {
   log(`source = ${SOURCE}`);
   log(`mode   = ${DRY_RUN ? "DRY RUN (DB 쓰기 없음)" : "APPLY (DB 쓰기)"}${PRUNE ? " + PRUNE" : ""}`);
@@ -632,6 +657,9 @@ async function main() {
   log("MongoDB 연결됨");
 
   try {
+    log("→ 기본 Named zones 자동 등록");
+    await seedDefaultZones();
+
     log("→ quests 마이그레이션 시작");
     await migrateQuests();
     log(`  quests: parsed=${stats.quests.parsed} created=${stats.quests.created} updated=${stats.quests.updated} unchanged=${stats.quests.unchanged} skipped=${stats.quests.skipped} pruned=${stats.quests.pruned}`);

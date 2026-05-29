@@ -56,8 +56,7 @@ function collectNamedFromAction(a: Action, out: Set<string>) {
       if (a.zone) out.add(a.zone);
       break;
     case "OpenZonePortal":
-      // 정적 zone(Town/MountainVillage/SeasideHarbor/...) 은 카탈로그에 추가하지 않는다.
-      // Named target 만 등록 대상.
+      // Town 은 카탈로그 등록 대상이 아니다(코드의 시작 zone). Named id 만 등록.
       if (a.target.type === "Named" && a.target.id) out.add(a.target.id);
       break;
     case "SpawnGuards":

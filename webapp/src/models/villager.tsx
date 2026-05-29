@@ -1,19 +1,19 @@
 import { Schema, model, models, Model } from "mongoose";
 import type { ZoneIdValue } from "@/types/zone";
 
-// villager 의 `homeZone` 미들태그(`{ type: "Town" }`) 를 보관하는 sub-schema.
-// _id: false — sub-document 의 자동 _id 를 만들지 않는다(zone tag 는 식별자 아님).
+// villager 의 `homeZone` 미들태그(`{ type: "Town" }` | `{ type: "Named", id: ... }`)
+// 를 보관하는 sub-schema. _id: false — sub-document 의 자동 _id 를 만들지 않는다.
 //
-// validate: ZoneIdValue 의 변형 화이트리스트. 게임 측 ZoneId enum 과 동기화.
+// validate: ZoneIdValue 의 변형 화이트리스트. 게임 측 `ZoneId` enum 과 동기화 —
+// `Town` 만 정적, 나머지는 모두 `Named(id)` 로 표현된다(forest/dungeon_<N>/
+// mountain_village/seaside_harbor 포함).
 const ZoneIdSchema = new Schema(
   {
     type: {
       type: String,
       required: true,
-      enum: ["Town", "MountainVillage", "SeasideHarbor", "Forest", "Dungeon", "Named"],
+      enum: ["Town", "Named"],
     },
-    // Dungeon(N) 의 N — type === "Dungeon" 일 때만 의미가 있다.
-    level: { type: Number, default: undefined },
     // Named("…") 의 식별자 — type === "Named" 일 때만 의미가 있다.
     id: { type: String, default: undefined },
   },

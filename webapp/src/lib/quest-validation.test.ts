@@ -83,13 +83,23 @@ describe("validateQuestRefs — transition actions 참조", () => {
     ]);
   });
 
-  it("OpenZonePortal 정적 zone target 은 검증 대상이 아니다", () => {
-    // MountainVillage / SeasideHarbor / Town 등 정적 enum 변형은 카탈로그 등록 대상 X.
+  it("OpenZonePortal Town target 은 검증 대상이 아니다", () => {
+    // Town 은 시작 마을(코드 정적) → 카탈로그 등록 대상 X.
     const q = questWithTransition({ actions: [
-      { type: "OpenZonePortal", target: { type: "MountainVillage" } },
-      { type: "OpenZonePortal", target: { type: "SeasideHarbor" } },
+      { type: "OpenZonePortal", target: { type: "Town" } },
     ] });
     expect(validateQuestRefs(q, full)).toEqual([]);
+  });
+
+  it("OpenZonePortal 표준 Named id (카탈로그 등록됨) 은 통과한다", () => {
+    // 표준 Named (mountain_village/seaside_harbor 등) 는 카탈로그에 자동 등록되므로
+    // catalogs.zones 에 포함된 시뮬레이션 사례에서 경고 없음.
+    const c = { ...full, zones: new Set([...full.zones, "mountain_village", "seaside_harbor"]) };
+    const q = questWithTransition({ actions: [
+      { type: "OpenZonePortal", target: { type: "Named", id: "mountain_village" } },
+      { type: "OpenZonePortal", target: { type: "Named", id: "seaside_harbor" } },
+    ] });
+    expect(validateQuestRefs(q, c)).toEqual([]);
   });
 
   it("OpenZonePortal Named target 미등록 시 경고", () => {
@@ -121,15 +131,16 @@ describe("validateQuestRefs — transition actions 참조", () => {
     expect(validateQuestRefs(q, full)).toEqual([]);
   });
 
-  it("SpawnGuards Town/Forest/Dungeon zone 은 검증 안 함", () => {
+  it("SpawnGuards Town zone 은 검증 안 함 (표준 Named id 는 카탈로그에 있으면 통과)", () => {
+    const c = { ...full, zones: new Set([...full.zones, "forest", "dungeon_2"]) };
     const q = questWithTransition({
       actions: [
         { type: "SpawnGuards", count: 1, zone: { type: "Town" } },
-        { type: "SpawnGuards", count: 1, zone: { type: "Forest" } },
-        { type: "SpawnGuards", count: 1, zone: { type: "Dungeon", level: 2 } },
+        { type: "SpawnGuards", count: 1, zone: { type: "Named", id: "forest" } },
+        { type: "SpawnGuards", count: 1, zone: { type: "Named", id: "dungeon_2" } },
       ],
     });
-    expect(validateQuestRefs(q, full)).toEqual([]);
+    expect(validateQuestRefs(q, c)).toEqual([]);
   });
 
   it("GiveItems / RemoveItem / DespawnWorldItem 모두 itemId 검증", () => {
@@ -183,16 +194,17 @@ describe("validateQuestRefs — transition when 조건 참조", () => {
     expect(validateQuestRefs(q, full)[0].path).toBe("transitions[0].when.zone.id");
   });
 
-  it("InZone(Town/Forest/Dungeon) 은 검증 안 함", () => {
+  it("InZone(Town) 은 검증 안 함 (표준 Named id 는 카탈로그에 있으면 통과)", () => {
+    const c = { villagers: new Set<string>(), items: new Set<string>(), zones: new Set(["forest", "dungeon_1"]) };
     const q = quest({
       phases: { dormant: { dialog: [], objective: null }, x: { dialog: [], objective: null } },
       transitions: [
         { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Town" } }, actions: [], to: "x" },
-        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Forest" } }, actions: [], to: "x" },
-        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Dungeon", level: 1 } }, actions: [], to: "x" },
+        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Named", id: "forest" } }, actions: [], to: "x" },
+        { from: "dormant", trigger: "Auto", when: { type: "InZone", zone: { type: "Named", id: "dungeon_1" } }, actions: [], to: "x" },
       ],
     });
-    expect(validateQuestRefs(q, empty)).toEqual([]);
+    expect(validateQuestRefs(q, c)).toEqual([]);
   });
 
   it("And/Or/Not 재귀", () => {
@@ -231,7 +243,8 @@ describe("validateQuestRefs — transition when 조건 참조", () => {
 
 describe("validateQuestRefs — Spawns", () => {
   it("spawn.item 미등록", () => {
-    const q = quest({ spawns: [{ phase: "p", item: "없는", zone: { type: "Forest" } }] });
+    // Town zone 으로 — catalog 검증 영향 없는 정적 zone 사용.
+    const q = quest({ spawns: [{ phase: "p", item: "없는", zone: { type: "Town" } }] });
     expect(validateQuestRefs(q, full)).toEqual([
       { path: "spawns[0].item", kind: "item", missing: "없는" },
     ]);
@@ -245,9 +258,10 @@ describe("validateQuestRefs — Spawns", () => {
   });
 
   it("spawn.condition 재귀", () => {
+    // Town zone 으로 — catalog 검증 영향 없는 정적 zone 사용.
     const q = quest({
       spawns: [{
-        phase: "p", item: "sword", zone: { type: "Forest" },
+        phase: "p", item: "sword", zone: { type: "Town" },
         condition: { type: "HasItem", itemId: "없는" },
       }],
     });

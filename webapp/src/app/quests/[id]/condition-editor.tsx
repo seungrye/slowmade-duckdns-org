@@ -23,7 +23,7 @@ function emptyCondition(type: Condition["type"]): Condition {
     case "Or":      return { type: "Or", conditions: [] };
     case "Not":     return { type: "Not", condition: { type: "Always" } };
     case "PhaseIs": return { type: "PhaseIs", quest: "", phase: "" };
-    case "InZone":  return { type: "InZone", zone: { type: "Forest" } };
+    case "InZone":  return { type: "InZone", zone: { type: "Named", id: "forest" } };
   }
 }
 
@@ -155,42 +155,31 @@ export function ConditionEditor({ condition, onChange, items = [], zones = [] }:
         </div>
       )}
 
-      {/* InZone */}
+      {/* InZone — Town 만 정적, 나머지는 Named(id) 로 통일.
+            id 자동완성: site Zone 카탈로그 + 표준 Named(forest/dungeon_<N>/
+            mountain_village/seaside_harbor) — 모두 ZoneCombobox 에 넘겨진다. */}
       {condition.type === "InZone" && (
         <div className="space-y-1">
           <select
             value={condition.zone.type}
             onChange={(e) => {
               const zoneType = e.target.value as SpawnZone["type"];
-              const zone: SpawnZone =
-                zoneType === "Dungeon" ? { type: "Dungeon", level: 1 }
-                : zoneType === "Named" ? { type: "Named", id: "" }
-                : zoneType === "Town" ? { type: "Town" }
-                : { type: "Forest" };
+              const zone: SpawnZone = zoneType === "Town"
+                ? { type: "Town" }
+                : { type: "Named", id: "forest" };
               onChange({ ...condition, zone });
             }}
             className={selectCls}
           >
-            <option value="Town">Town</option>
-            <option value="Forest">Forest</option>
-            <option value="Dungeon">Dungeon</option>
-            <option value="Named">Named (퀘스트 동적 존)</option>
+            <option value="Town">Town (시작 마을)</option>
+            <option value="Named">Named (id 로 모든 zone)</option>
           </select>
-          {condition.zone.type === "Dungeon" && (
-            <input
-              type="number"
-              value={condition.zone.level}
-              onChange={(e) => onChange({ ...condition, zone: { type: "Dungeon", level: Number(e.target.value) } })}
-              placeholder="레벨"
-              className={selectCls}
-            />
-          )}
           {condition.zone.type === "Named" && (
             <ZoneCombobox
               value={condition.zone.id}
               onChange={(v) => onChange({ ...condition, zone: { type: "Named", id: v } })}
               zones={zones}
-              placeholder="존 ID (예: herb_glade)"
+              placeholder="존 ID (예: forest, dungeon_1, herb_glade)"
             />
           )}
         </div>

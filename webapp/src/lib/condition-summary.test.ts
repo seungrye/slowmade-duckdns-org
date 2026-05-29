@@ -4,8 +4,10 @@ import { conditionSummary, zoneLabel, transitionLabel } from "./condition-summar
 describe("zoneLabel", () => {
   it("각 존 타입을 한글로", () => {
     expect(zoneLabel({ type: "Town" })).toBe("마을");
-    expect(zoneLabel({ type: "Forest" })).toBe("숲");
-    expect(zoneLabel({ type: "Dungeon", level: 2 })).toBe("던전 2층");
+    expect(zoneLabel({ type: "Named", id: "forest" })).toBe("숲");
+    expect(zoneLabel({ type: "Named", id: "dungeon_2" })).toBe("던전 2층");
+    expect(zoneLabel({ type: "Named", id: "mountain_village" })).toBe("산속 마을");
+    expect(zoneLabel({ type: "Named", id: "seaside_harbor" })).toBe("항구 마을");
     expect(zoneLabel({ type: "Named", id: "demon_cave" })).toBe("demon_cave");
   });
 });

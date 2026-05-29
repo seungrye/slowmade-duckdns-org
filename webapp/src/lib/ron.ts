@@ -882,19 +882,22 @@ class Parser {
 
   parseSpawnZone(): SpawnZone {
     const name = this.parseIdent();
-    // 괄호 없는 단순 변형: Town | MountainVillage | SeasideHarbor | Forest
+    // 괄호 없는 단순 변형:
+    //   - `Town` — 새 schema 의 유일한 정적 variant
+    //   - `Forest` / `MountainVillage` / `SeasideHarbor` — 옛 schema 호환 (Named 로 변환)
     if (!(this.peek()?.kind === "punct" && this.peek()?.val === "(")) {
-      if (name === "Town" || name === "MountainVillage"
-          || name === "SeasideHarbor" || name === "Forest") {
-        return { type: name };
-      }
+      if (name === "Town") return { type: "Town" };
+      if (name === "Forest")          return { type: "Named", id: "forest" };
+      if (name === "MountainVillage") return { type: "Named", id: "mountain_village" };
+      if (name === "SeasideHarbor")   return { type: "Named", id: "seaside_harbor" };
       throw new Error(`Unknown bare zone: ${name}`);
     }
     this.expectPunct("(");
     if (name === "Dungeon") {
+      // 옛 schema 호환 — `Dungeon(N)` → `Named("dungeon_N")`.
       const level = this.parseNumber();
       this.expectPunct(")");
-      return { type: "Dungeon", level };
+      return { type: "Named", id: `dungeon_${level}` };
     }
     if (name === "Named") {
       const id = this.parseString();
@@ -934,7 +937,8 @@ class Parser {
 
   parseSpawn(): QuestSpawn {
     let phase = "", item = "";
-    let zone: SpawnZone = { type: "Dungeon", level: 1 };
+    // 게임의 새 schema: Town | Named. 기본값은 dungeon_1 (가장 흔한 spawn zone).
+    let zone: SpawnZone = { type: "Named", id: "dungeon_1" };
     let count: number | undefined;
     let condition: Condition | undefined;
 
@@ -1216,14 +1220,9 @@ function serializeAction(action: Action, depth: number): string {
 }
 
 function serializeZone(zone: SpawnZone): string {
-  switch (zone.type) {
-    case "Town":            return "Town";
-    case "MountainVillage": return "MountainVillage";
-    case "SeasideHarbor":   return "SeasideHarbor";
-    case "Forest":          return "Forest";
-    case "Dungeon":         return `Dungeon(${zone.level})`;
-    case "Named":           return `Named(${q(zone.id)})`;
-  }
+  // 단순 schema: Town 만 bare, 나머지는 Named("...").
+  if (zone.type === "Town") return "Town";
+  return `Named(${q(zone.id)})`;
 }
 
 function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): string {

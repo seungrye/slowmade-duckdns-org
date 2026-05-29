@@ -15,51 +15,39 @@ interface FormState {
   stationary: boolean;
   vendor: boolean;
   /**
-   * homeZone — UI 에서는 정적 마을 zone 3종(Town/MountainVillage/SeasideHarbor) +
-   * Forest + Dungeon(N) + Named("…") 만 select 한다. UI 표현은 `homeZoneTag` 로 단순화.
+   * homeZone — Town 만 정적, 그 외 모든 zone 은 Named(id) 로 통일된 schema.
+   * 표준 Named id (mountain_village/seaside_harbor/forest/dungeon_<N>) 와 site
+   * 카탈로그의 동적 Named zone 모두 같은 입력칸으로 처리.
    */
   homeZoneTag: HomeZoneTag;
-  homeZoneDungeonLevel: number;
   homeZoneNamedId: string;
 }
 
-// `homeZone` UI 태그 — select 옵션 한 줄.
-type HomeZoneTag = "Town" | "MountainVillage" | "SeasideHarbor" | "Forest" | "Dungeon" | "Named";
+// `homeZone` UI 태그 — Town 또는 Named.
+type HomeZoneTag = "Town" | "Named";
 
 const HOME_ZONE_OPTIONS: { tag: HomeZoneTag; label: string }[] = [
-  { tag: "Town",            label: "마을 (Town) — 시작 마을 · 기본값" },
-  { tag: "MountainVillage", label: "산속 마을 (MountainVillage) — 사냥꾼/광부/전사" },
-  { tag: "SeasideHarbor",   label: "항구 마을 (SeasideHarbor) — 탐험가/마법사" },
-  { tag: "Forest",          label: "숲 (Forest)" },
-  { tag: "Dungeon",         label: "던전 N층 (Dungeon)" },
-  { tag: "Named",           label: 'Named("…") — 동적 zone' },
+  { tag: "Town",  label: "마을 (Town) — 시작 마을 · 기본값" },
+  { tag: "Named", label: 'Named("…") — id 로 모든 zone' },
+];
+
+/** UI 자동완성용 표준 Named id (게임 코드 내장) + 동적 카탈로그 zone. */
+const STANDARD_NAMED_ZONES: { id: string; label: string }[] = [
+  { id: "mountain_village", label: "mountain_village — 산속 마을 (사냥꾼/광부/전사)" },
+  { id: "seaside_harbor",   label: "seaside_harbor — 항구 마을 (탐험가/마법사)" },
+  { id: "forest",           label: "forest — 숲" },
+  { id: "dungeon_1",        label: "dungeon_1 — 던전 1층" },
+  { id: "dungeon_2",        label: "dungeon_2 — 던전 2층" },
 ];
 
 function tagFromHomeZone(z: ZoneIdValue | undefined): HomeZoneTag {
   if (!z) return "Town";
-  switch (z.type) {
-    case "Town":
-    case "MountainVillage":
-    case "SeasideHarbor":
-    case "Forest":
-      return z.type;
-    case "Dungeon": return "Dungeon";
-    case "Named":   return "Named";
-  }
+  return z.type === "Town" ? "Town" : "Named";
 }
 
 function homeZoneFromForm(form: FormState): ZoneIdValue {
-  switch (form.homeZoneTag) {
-    case "Town":
-    case "MountainVillage":
-    case "SeasideHarbor":
-    case "Forest":
-      return { type: form.homeZoneTag };
-    case "Dungeon":
-      return { type: "Dungeon", level: Math.max(1, Math.floor(form.homeZoneDungeonLevel || 1)) };
-    case "Named":
-      return { type: "Named", id: form.homeZoneNamedId.trim() };
-  }
+  if (form.homeZoneTag === "Town") return { type: "Town" };
+  return { type: "Named", id: form.homeZoneNamedId.trim() };
 }
 
 const emptyForm: FormState = {
@@ -71,7 +59,6 @@ const emptyForm: FormState = {
   stationary: false,
   vendor: false,
   homeZoneTag: "Town",
-  homeZoneDungeonLevel: 1,
   homeZoneNamedId: "",
 };
 
@@ -200,7 +187,6 @@ export default function VillagersPage() {
       stationary: !!v.stationary,
       vendor: !!v.vendor,
       homeZoneTag: tag,
-      homeZoneDungeonLevel: v.homeZone?.type === "Dungeon" ? v.homeZone.level : 1,
       homeZoneNamedId: v.homeZone?.type === "Named" ? v.homeZone.id : "",
     });
   }
@@ -282,9 +268,7 @@ export default function VillagersPage() {
                       대사 {v.dialogs.length}줄 · speed {v.speed}
                       {v.homeZone && v.homeZone.type !== "Town" && (
                         <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-mono">
-                          {v.homeZone.type === "Dungeon" ? `Dungeon(${v.homeZone.level})`
-                            : v.homeZone.type === "Named" ? `Named("${v.homeZone.id}")`
-                            : v.homeZone.type}
+                          {`Named("${v.homeZone.id}")`}
                         </span>
                       )}
                     </div>
@@ -420,12 +404,13 @@ function FormFields({
         </label>
       </div>
       {/*
-        home_zone 선택 — 게임의 ZoneId enum 분포에 맞춰 mvp 단계 화이트리스트로
-        고정한다. Dungeon/Named 는 보조 입력칸으로 N/id 를 받는다.
+        home_zone 선택 — Town 만 정적, 그 외 모든 zone 은 Named(id) 로 통일된 schema.
+        Named 일 때는 표준 Named id(mountain_village 등) + 카탈로그 zone 을 datalist
+        로 자동완성한다.
       */}
       <div className="flex gap-2 items-end flex-wrap">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">home_zone (거주 마을 zone)</span>
+          <span className="text-xs text-gray-500">home_zone (거주 zone)</span>
           <select
             aria-label="home_zone"
             value={form.homeZoneTag}
@@ -437,30 +422,22 @@ function FormFields({
             ))}
           </select>
         </label>
-        {form.homeZoneTag === "Dungeon" && (
-          <label className="flex flex-col gap-1 w-24">
-            <span className="text-xs text-gray-500">Dungeon level</span>
-            <input
-              type="number"
-              min={1}
-              step={1}
-              aria-label="dungeon_level"
-              value={form.homeZoneDungeonLevel}
-              onChange={(e) => setForm({ ...form, homeZoneDungeonLevel: Number(e.target.value) })}
-              className={inputCls}
-            />
-          </label>
-        )}
         {form.homeZoneTag === "Named" && (
           <label className="flex flex-col gap-1">
             <span className="text-xs text-gray-500">Named id</span>
             <input
               aria-label="named_id"
+              list="home-zone-named-ids"
               value={form.homeZoneNamedId}
               onChange={(e) => setForm({ ...form, homeZoneNamedId: e.target.value })}
-              placeholder="herb_glade"
-              className={`${inputCls} w-48 font-mono`}
+              placeholder="mountain_village / seaside_harbor / forest / dungeon_1 / herb_glade"
+              className={`${inputCls} w-96 font-mono`}
             />
+            <datalist id="home-zone-named-ids">
+              {STANDARD_NAMED_ZONES.map((z) => (
+                <option key={z.id} value={z.id}>{z.label}</option>
+              ))}
+            </datalist>
           </label>
         )}
       </div>

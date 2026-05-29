@@ -2,13 +2,17 @@ import type { Condition, SpawnZone } from "@/types/quest";
 
 /** SpawnZone 을 한글 라벨로. */
 export function zoneLabel(zone: SpawnZone): string {
-  switch (zone.type) {
-    case "Town":            return "마을";
-    case "MountainVillage": return "산속 마을";
-    case "SeasideHarbor":   return "항구 마을";
-    case "Forest":          return "숲";
-    case "Dungeon":         return `던전 ${zone.level}층`;
-    case "Named":           return zone.id;
+  if (zone.type === "Town") return "마을";
+  // 표준 Named id 에는 친근한 한글 라벨
+  switch (zone.id) {
+    case "forest":           return "숲";
+    case "mountain_village": return "산속 마을";
+    case "seaside_harbor":   return "항구 마을";
+    default: {
+      const m = /^dungeon_(\d+)$/.exec(zone.id);
+      if (m) return `던전 ${m[1]}층`;
+      return zone.id;
+    }
   }
 }
 

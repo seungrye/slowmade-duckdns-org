@@ -72,13 +72,14 @@ export interface QuestTransition {
 }
 
 // ── 스폰 존 ───────────────────────────────────────────────────────────────
+//
+// 단순화: 게임의 `ZoneId` 가 `Town | Named(String)` 로 통일됐다.
+// 표준 Named id: "forest", "dungeon_<N>", "mountain_village", "seaside_harbor".
+// 옛 RON 의 bare ident(`Forest`/`MountainVillage`/`SeasideHarbor`) 와 paren
+// 형식(`Dungeon(N)`) 도 파서가 자동으로 Named 로 흡수한다.
 
 export type SpawnZone =
   | { type: "Town" }
-  | { type: "MountainVillage" }
-  | { type: "SeasideHarbor" }
-  | { type: "Forest" }
-  | { type: "Dungeon"; level: number }
   | { type: "Named"; id: string };
 
 export interface QuestSpawn {

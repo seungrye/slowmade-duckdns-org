@@ -116,7 +116,9 @@ function validateAction(a: Action, path: string, c: CatalogSets, out: QuestRefWa
       }
       break;
     case "OpenZonePortal":
-      // 정적 zone enum 변형은 카탈로그 검증 대상이 아니다. Named 만 등록 존재성 확인.
+      // Town (시작 마을) 은 카탈로그 등록 대상이 아니다. Named 만 등록 존재성 확인.
+      // 표준 Named id (forest/dungeon_<N>/mountain_village/seaside_harbor) 도
+      // 카탈로그에 자동 등록되어 있으므로 일반 Named 와 같은 경로로 검증된다.
       if (a.target.type === "Named" && a.target.id && !c.zones.has(a.target.id)) {
         out.push({ path: `${path}.target.id`, kind: "zone", missing: a.target.id });
       }
