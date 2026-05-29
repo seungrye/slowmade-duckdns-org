@@ -13,6 +13,11 @@ import { useEffect, useRef, useState } from "react";
  *   "samples": [{ "seed": 42, "grid": ["####...", ...] }, ...] }
  * ```
  *
+ * 레이아웃:
+ * - 데스크톱(sm 이상): 4-col grid 2 row 로 8 장 모두 표시 (작게).
+ * - 모바일(< sm): 한 장 캐로셀 — 좌/우 화살표 + 도트 + swipe. canvas 는
+ *   `max-w-full h-auto` 로 컨테이너 폭을 넘지 않게 스케일.
+ *
  * Site 는 정적 자산만 서빙 — Rust 코드는 직접 실행 불가하므로 prebuild 패턴.
  * generator 추가/변경 시 bevy-rogue 측에서 다시 실행해 JSON 만 갱신하면 된다.
  */
@@ -40,9 +45,25 @@ const TILE_COLORS: Record<string, string> = {
   c: "#b8843e", // Counter — 나무
 };
 
-const TILE_PX = 3; // 80×50 → 240×150 — 카드 8장 그리드에 적당.
+const TILE_PX_GRID = 3;     // 데스크톱 4-col grid 의 한 칸 — 80×50 → 240×150.
+const TILE_PX_CAROUSEL = 4; // 모바일 캐로셀의 한 장 — 80×50 → 320×200 (CSS 로 max 100%).
 
-function PreviewCanvas({ sample, width, height }: { sample: Sample; width: number; height: number }) {
+/**
+ * Canvas 로 grid 를 그린다. canvas 의 *intrinsic* 사이즈는 width×tilePx 이지만,
+ * CSS `max-w-full h-auto` 로 컨테이너 폭을 넘으면 자동 스케일 다운된다.
+ * `imageRendering: pixelated` 로 픽셀이 뭉개지지 않게.
+ */
+function PreviewCanvas({
+  sample,
+  width,
+  height,
+  tilePx,
+}: {
+  sample: Sample;
+  width: number;
+  height: number;
+  tilePx: number;
+}) {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -50,22 +71,22 @@ function PreviewCanvas({ sample, width, height }: { sample: Sample; width: numbe
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    canvas.width = width * TILE_PX;
-    canvas.height = height * TILE_PX;
+    canvas.width = width * tilePx;
+    canvas.height = height * tilePx;
     for (let y = 0; y < height; y++) {
       const row = sample.grid[y] ?? "";
       for (let x = 0; x < width; x++) {
         const ch = row[x] ?? "#";
         ctx.fillStyle = TILE_COLORS[ch] ?? "#000";
-        ctx.fillRect(x * TILE_PX, y * TILE_PX, TILE_PX, TILE_PX);
+        ctx.fillRect(x * tilePx, y * tilePx, tilePx, tilePx);
       }
     }
-  }, [sample, width, height]);
+  }, [sample, width, height, tilePx]);
 
   return (
     <canvas
       ref={ref}
-      className="border border-gray-300 dark:border-gray-700 rounded"
+      className="border border-gray-300 dark:border-gray-700 rounded max-w-full h-auto"
       style={{ imageRendering: "pixelated" }}
       title={`seed ${sample.seed}`}
     />
@@ -76,12 +97,16 @@ export function GeneratorPreview({ generator }: { generator: string }) {
   const [data, setData] = useState<SampleFile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [idx, setIdx] = useState(0);
+  // 모바일 swipe 시작 X 좌표.
+  const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
     setError(null);
     setLoading(true);
+    setIdx(0); // generator 가 바뀌면 캐로셀 처음으로
     fetch(`/generator-samples/${encodeURIComponent(generator)}.json`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -114,18 +139,97 @@ export function GeneratorPreview({ generator }: { generator: string }) {
   }
   if (!data) return null;
 
+  const samples = data.samples;
+  if (samples.length === 0) return null;
+  const safeIdx = ((idx % samples.length) + samples.length) % samples.length;
+  const current = samples[safeIdx];
+  const prev = () => setIdx((i) => (i - 1 + samples.length) % samples.length);
+  const next = () => setIdx((i) => (i + 1) % samples.length);
+
   return (
     <div>
       <div className="text-xs text-gray-500 mb-1">
-        {generator} 미리보기 ({data.samples.length} 시드 × {data.width}×{data.height})
+        {generator} 미리보기 (
+        <span className="hidden sm:inline">{samples.length} 시드</span>
+        <span className="sm:hidden">
+          {safeIdx + 1}/{samples.length}
+        </span>
+        {" × "}
+        {data.width}×{data.height})
       </div>
-      <div className="grid grid-cols-4 gap-2">
-        {data.samples.map((s) => (
+
+      {/* 데스크톱 — 4-col grid 2 row */}
+      <div className="hidden sm:grid sm:grid-cols-4 gap-2">
+        {samples.map((s) => (
           <div key={s.seed} className="text-center">
-            <PreviewCanvas sample={s} width={data.width} height={data.height} />
+            <PreviewCanvas
+              sample={s}
+              width={data.width}
+              height={data.height}
+              tilePx={TILE_PX_GRID}
+            />
             <div className="text-[10px] text-gray-400 font-mono">seed {s.seed}</div>
           </div>
         ))}
+      </div>
+
+      {/* 모바일 — 캐로셀 (한 장 + 좌/우 화살표 + 도트 + swipe) */}
+      <div className="sm:hidden">
+        <div
+          className="relative flex items-center justify-center px-8 overflow-hidden"
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0]?.clientX ?? null;
+          }}
+          onTouchEnd={(e) => {
+            const start = touchStartX.current;
+            touchStartX.current = null;
+            if (start == null) return;
+            const end = e.changedTouches[0]?.clientX ?? start;
+            const dx = end - start;
+            if (dx > 30) prev();
+            else if (dx < -30) next();
+          }}
+        >
+          <button
+            type="button"
+            onClick={prev}
+            aria-label="이전 시드"
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-2 py-1 rounded-full bg-white/80 dark:bg-gray-900/80 border shadow hover:bg-white dark:hover:bg-gray-800 text-lg leading-none"
+          >
+            ‹
+          </button>
+          <div className="text-center min-w-0 max-w-full">
+            <PreviewCanvas
+              sample={current}
+              width={data.width}
+              height={data.height}
+              tilePx={TILE_PX_CAROUSEL}
+            />
+            <div className="text-[10px] text-gray-400 font-mono mt-1">seed {current.seed}</div>
+          </div>
+          <button
+            type="button"
+            onClick={next}
+            aria-label="다음 시드"
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 px-2 py-1 rounded-full bg-white/80 dark:bg-gray-900/80 border shadow hover:bg-white dark:hover:bg-gray-800 text-lg leading-none"
+          >
+            ›
+          </button>
+        </div>
+        {/* 인덱스 도트 */}
+        <div className="flex justify-center gap-1.5 mt-2 flex-wrap">
+          {samples.map((s, i) => (
+            <button
+              key={s.seed}
+              type="button"
+              onClick={() => setIdx(i)}
+              aria-label={`시드 ${s.seed}`}
+              className={`w-2 h-2 rounded-full transition-colors ${
+                i === safeIdx ? "bg-blue-500" : "bg-gray-300 dark:bg-gray-600 hover:bg-gray-400"
+              }`}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
