@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import VirtualKeypad from "./VirtualKeypad";
 
 // bevy-rogue WASM glue 의 default export 타입.
 // (실제 .d.ts 는 site repo 에 없음 — wasm-bindgen --no-typescript.)
@@ -133,6 +134,9 @@ export default function BevyRogueClient() {
     };
   }, []);
 
+  // 가상 키패드에 캔버스 ref 를 안정적으로 노출 — 매 렌더마다 새 함수 만들지 않도록 useCallback.
+  const getCanvas = useCallback(() => canvasRef.current, []);
+
   return (
     <div className="relative w-full flex flex-col items-center">
       {/*
@@ -202,14 +206,25 @@ export default function BevyRogueClient() {
         )}
       </div>
 
+      {/*
+        모바일 가상 키패드 — 데스크탑(md 이상) 에서는 숨겨진다 (VirtualKeypad 내부 `md:hidden`).
+        getCanvas 콜백으로 canvasRef 를 노출 — 키패드 내부에서 KeyboardEvent dispatch 대상을 결정.
+      */}
+      <div className="w-full max-w-[640px] mx-auto">
+        <VirtualKeypad getCanvas={getCanvas} />
+      </div>
+
       {/* 조작 안내 */}
       <div className="mt-4 text-sm text-gray-400 text-center max-w-2xl">
         <div className="mb-1">
           이동: <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-gray-200">WASD</kbd> /{" "}
           <kbd className="px-1.5 py-0.5 bg-gray-800 rounded text-gray-200">방향키</kbd>
         </div>
-        <div className="text-xs text-gray-500">
+        <div className="text-xs text-gray-500 hidden md:block">
           캔버스를 한 번 클릭한 뒤 키 입력이 잘 안 되면 다시 캔버스를 포커스하세요.
+        </div>
+        <div className="text-xs text-gray-500 md:hidden">
+          모바일에서는 아래 가상 키패드로 조작할 수 있습니다.
         </div>
       </div>
     </div>
