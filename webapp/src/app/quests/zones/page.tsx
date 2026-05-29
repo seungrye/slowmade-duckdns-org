@@ -175,6 +175,12 @@ export default function ZonesPage() {
 
   return (
     <div className="mx-auto px-4 py-6">
+      {/*
+        시스템 정적 zone 안내 — 게임 코드의 ZoneId enum 에 박혀 있는 zone 들.
+        DB 등록 대상이 아니고 카탈로그에 추가되지 않지만, villager.homeZone /
+        OpenZonePortal 액션에서 이 식별자들을 참조할 수 있다.
+      */}
+      <SystemZonesPanel />
       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Zone 카탈로그</h1>
         <div className="flex gap-2">
@@ -269,6 +275,44 @@ export default function ZonesPage() {
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * 시스템 정적 zone (게임의 `ZoneId` enum) 패널 — DB 카탈로그가 아닌, 코드에 박혀
+ * 있는 zone 들의 참조 카드. villager.homeZone / OpenZonePortal 액션에서 이
+ * 식별자를 직접 쓴다. 편집 대상이 아니므로 read-only.
+ */
+function SystemZonesPanel() {
+  const systemZones: { name: string; generator: string; desc: string }[] = [
+    { name: "Town",            generator: "organic_village", desc: "시작 마을 — 신규 게임 진입 zone" },
+    { name: "MountainVillage", generator: "grid_village",    desc: "산속 마을 — 사냥꾼·광부·전사 (퀘스트 보상 portal 로 해금)" },
+    { name: "SeasideHarbor",   generator: "walled_town",     desc: "항구 마을 — 탐험가·마법사·보물사냥꾼 (퀘스트 보상 portal 로 해금)" },
+    { name: "Forest",          generator: "forest",          desc: "숲 — 마을과 던전 사이" },
+    { name: "Dungeon(N)",      generator: "bsp",             desc: "던전 N층 — N 은 정수 (가변 매개변수)" },
+  ];
+  return (
+    <details className="mb-6 border rounded-lg bg-gray-50 dark:bg-gray-900">
+      <summary className="cursor-pointer px-3 py-2 text-sm font-medium select-none">
+        시스템 정적 zone ({systemZones.length}개) — 게임의 ZoneId enum
+      </summary>
+      <div className="p-3 border-t text-xs space-y-1">
+        <p className="text-gray-500">
+          이 zone 들은 코드에 정의되어 있어 DB 카탈로그에 등록되지 않지만,
+          <code className="px-1 mx-0.5 font-mono">villager.homeZone</code> 과
+          <code className="px-1 mx-0.5 font-mono">OpenZonePortal</code> 액션의 target 으로 참조됩니다.
+        </p>
+        <ul className="space-y-1 mt-2">
+          {systemZones.map((z) => (
+            <li key={z.name} className="flex gap-2 items-center">
+              <span className="font-mono px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700">{z.name}</span>
+              <span className="font-mono text-gray-500">{z.generator}</span>
+              <span className="text-gray-600 dark:text-gray-400">— {z.desc}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }
 

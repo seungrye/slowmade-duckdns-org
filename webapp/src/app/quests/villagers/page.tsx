@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { VillagerDocument } from "@/types/villager";
+import type { ZoneIdValue } from "@/types/zone";
 import { useInfoDialog } from "@/components/info-dialog";
 
 interface FormState {
@@ -13,6 +14,52 @@ interface FormState {
   speed: number;
   stationary: boolean;
   vendor: boolean;
+  /**
+   * homeZone — UI 에서는 정적 마을 zone 3종(Town/MountainVillage/SeasideHarbor) +
+   * Forest + Dungeon(N) + Named("…") 만 select 한다. UI 표현은 `homeZoneTag` 로 단순화.
+   */
+  homeZoneTag: HomeZoneTag;
+  homeZoneDungeonLevel: number;
+  homeZoneNamedId: string;
+}
+
+// `homeZone` UI 태그 — select 옵션 한 줄.
+type HomeZoneTag = "Town" | "MountainVillage" | "SeasideHarbor" | "Forest" | "Dungeon" | "Named";
+
+const HOME_ZONE_OPTIONS: { tag: HomeZoneTag; label: string }[] = [
+  { tag: "Town",            label: "마을 (Town) — 시작 마을 · 기본값" },
+  { tag: "MountainVillage", label: "산속 마을 (MountainVillage) — 사냥꾼/광부/전사" },
+  { tag: "SeasideHarbor",   label: "항구 마을 (SeasideHarbor) — 탐험가/마법사" },
+  { tag: "Forest",          label: "숲 (Forest)" },
+  { tag: "Dungeon",         label: "던전 N층 (Dungeon)" },
+  { tag: "Named",           label: 'Named("…") — 동적 zone' },
+];
+
+function tagFromHomeZone(z: ZoneIdValue | undefined): HomeZoneTag {
+  if (!z) return "Town";
+  switch (z.type) {
+    case "Town":
+    case "MountainVillage":
+    case "SeasideHarbor":
+    case "Forest":
+      return z.type;
+    case "Dungeon": return "Dungeon";
+    case "Named":   return "Named";
+  }
+}
+
+function homeZoneFromForm(form: FormState): ZoneIdValue {
+  switch (form.homeZoneTag) {
+    case "Town":
+    case "MountainVillage":
+    case "SeasideHarbor":
+    case "Forest":
+      return { type: form.homeZoneTag };
+    case "Dungeon":
+      return { type: "Dungeon", level: Math.max(1, Math.floor(form.homeZoneDungeonLevel || 1)) };
+    case "Named":
+      return { type: "Named", id: form.homeZoneNamedId.trim() };
+  }
 }
 
 const emptyForm: FormState = {
@@ -23,6 +70,9 @@ const emptyForm: FormState = {
   speed: 1.0,
   stationary: false,
   vendor: false,
+  homeZoneTag: "Town",
+  homeZoneDungeonLevel: 1,
+  homeZoneNamedId: "",
 };
 
 // ── 색상 유틸 (RON 은 0~1 RGB, <input type=color> 는 #rrggbb) ──
@@ -76,6 +126,7 @@ export default function VillagersPage() {
         speed: createForm.speed,
         stationary: createForm.stationary,
         vendor: createForm.vendor,
+        homeZone: homeZoneFromForm(createForm),
       }),
     });
     if (res.ok) {
@@ -99,6 +150,7 @@ export default function VillagersPage() {
         speed: editForm.speed,
         stationary: editForm.stationary,
         vendor: editForm.vendor,
+        homeZone: homeZoneFromForm(editForm),
       }),
     });
     if (res.ok) {
@@ -138,6 +190,7 @@ export default function VillagersPage() {
 
   function startEdit(v: VillagerDocument) {
     setEditingId(v.id);
+    const tag = tagFromHomeZone(v.homeZone);
     setEditForm({
       id: v.id,
       name: v.name,
@@ -146,6 +199,9 @@ export default function VillagersPage() {
       speed: v.speed,
       stationary: !!v.stationary,
       vendor: !!v.vendor,
+      homeZoneTag: tag,
+      homeZoneDungeonLevel: v.homeZone?.type === "Dungeon" ? v.homeZone.level : 1,
+      homeZoneNamedId: v.homeZone?.type === "Named" ? v.homeZone.id : "",
     });
   }
 
@@ -224,6 +280,13 @@ export default function VillagersPage() {
                     </div>
                     <div className="text-xs text-gray-500 truncate">
                       대사 {v.dialogs.length}줄 · speed {v.speed}
+                      {v.homeZone && v.homeZone.type !== "Town" && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-mono">
+                          {v.homeZone.type === "Dungeon" ? `Dungeon(${v.homeZone.level})`
+                            : v.homeZone.type === "Named" ? `Named("${v.homeZone.id}")`
+                            : v.homeZone.type}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -355,6 +418,51 @@ function FormFields({
           />
           <span>vendor <span className="text-gray-400">(상호작용 시 상점 열림)</span></span>
         </label>
+      </div>
+      {/*
+        home_zone 선택 — 게임의 ZoneId enum 분포에 맞춰 mvp 단계 화이트리스트로
+        고정한다. Dungeon/Named 는 보조 입력칸으로 N/id 를 받는다.
+      */}
+      <div className="flex gap-2 items-end flex-wrap">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">home_zone (거주 마을 zone)</span>
+          <select
+            aria-label="home_zone"
+            value={form.homeZoneTag}
+            onChange={(e) => setForm({ ...form, homeZoneTag: e.target.value as HomeZoneTag })}
+            className={`${inputCls} w-80`}
+          >
+            {HOME_ZONE_OPTIONS.map((o) => (
+              <option key={o.tag} value={o.tag}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        {form.homeZoneTag === "Dungeon" && (
+          <label className="flex flex-col gap-1 w-24">
+            <span className="text-xs text-gray-500">Dungeon level</span>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              aria-label="dungeon_level"
+              value={form.homeZoneDungeonLevel}
+              onChange={(e) => setForm({ ...form, homeZoneDungeonLevel: Number(e.target.value) })}
+              className={inputCls}
+            />
+          </label>
+        )}
+        {form.homeZoneTag === "Named" && (
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-gray-500">Named id</span>
+            <input
+              aria-label="named_id"
+              value={form.homeZoneNamedId}
+              onChange={(e) => setForm({ ...form, homeZoneNamedId: e.target.value })}
+              placeholder="herb_glade"
+              className={`${inputCls} w-48 font-mono`}
+            />
+          </label>
+        )}
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-500">dialogs (한 줄 = 한 대사, 빈 줄 무시)</span>

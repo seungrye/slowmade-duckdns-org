@@ -83,6 +83,24 @@ describe("validateQuestRefs — transition actions 참조", () => {
     ]);
   });
 
+  it("OpenZonePortal 정적 zone target 은 검증 대상이 아니다", () => {
+    // MountainVillage / SeasideHarbor / Town 등 정적 enum 변형은 카탈로그 등록 대상 X.
+    const q = questWithTransition({ actions: [
+      { type: "OpenZonePortal", target: { type: "MountainVillage" } },
+      { type: "OpenZonePortal", target: { type: "SeasideHarbor" } },
+    ] });
+    expect(validateQuestRefs(q, full)).toEqual([]);
+  });
+
+  it("OpenZonePortal Named target 미등록 시 경고", () => {
+    const q = questWithTransition({ actions: [
+      { type: "OpenZonePortal", target: { type: "Named", id: "없는존" } },
+    ] });
+    expect(validateQuestRefs(q, full)).toEqual([
+      { path: "transitions[0].actions[0].target.id", kind: "zone", missing: "없는존" },
+    ]);
+  });
+
   it("SpawnGuards/PlaceTraps/SpawnMonster 의 Named zone 미등록", () => {
     const q = questWithTransition({
       actions: [

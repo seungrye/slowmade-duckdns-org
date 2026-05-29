@@ -342,6 +342,42 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
     expect(quest.transitions[0].actions[0]).toEqual({ type: "ClosePortal", zone: "cave" });
   });
 
+  it("OpenZonePortal — 정적 zone(MountainVillage) target 파싱", () => {
+    // OpenZonePortal(target: <ZoneId>) — placement 생략 시 게임 측 default(Border) 가 적용.
+    const quest = parseRon(wrap(
+      `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:MountainVillage)],to:"b")`,
+    ));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "OpenZonePortal", target: { type: "MountainVillage" },
+    });
+  });
+
+  it("OpenZonePortal — SeasideHarbor + placement: NearGiver 파싱", () => {
+    const quest = parseRon(wrap(
+      `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:SeasideHarbor,placement:NearGiver(radius:4))],to:"b")`,
+    ));
+    expect(quest.transitions[0].actions[0]).toEqual({
+      type: "OpenZonePortal",
+      target: { type: "SeasideHarbor" },
+      placement: { type: "NearGiver", radius: 4 },
+    });
+  });
+
+  it("OpenZonePortal — Dungeon(N) / Named target 도 허용", () => {
+    const a = parseRon(wrap(
+      `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:Dungeon(3))],to:"b")`,
+    ));
+    expect(a.transitions[0].actions[0]).toEqual({
+      type: "OpenZonePortal", target: { type: "Dungeon", level: 3 },
+    });
+    const b = parseRon(wrap(
+      `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:Named("herb_glade"))],to:"b")`,
+    ));
+    expect(b.transitions[0].actions[0]).toEqual({
+      type: "OpenZonePortal", target: { type: "Named", id: "herb_glade" },
+    });
+  });
+
   it("SpawnGuards 액션 파싱 (count 필드)", () => {
     const quest = parseRon(wrap(`Transition(from:"a",trigger:Interact,actions:[SpawnGuards(count:6)],to:"b")`));
     expect(quest.transitions[0].actions[0]).toEqual({ type: "SpawnGuards", count: 6 });
@@ -868,6 +904,73 @@ describe("parseVillagersRon — stationary / vendor 신규 필드", () => {
     expect(elderBlock).not.toContain("vendor");
     // 라운드트립 정합
     expect(parseVillagersRon(out)).toEqual(villagers);
+  });
+});
+
+describe("parseVillagersRon — home_zone (마을 분산)", () => {
+  // 4종의 정적 zone 와 Dungeon/Named 까지 모두 다루며 round-trip 일관성을 검증.
+  const SRC = `[
+    VillagerDef(
+        id: "burgomaster",
+        name: "촌장",
+        color: (1.0, 0.85, 0.0),
+        dialogs: [],
+        speed: 1.0,
+        home_zone: Town,
+    ),
+    VillagerDef(
+        id: "huntmaster",
+        name: "수렵단장",
+        color: (0.70, 0.30, 0.25),
+        dialogs: [],
+        speed: 0.6,
+        home_zone: MountainVillage,
+    ),
+    VillagerDef(
+        id: "battlemage",
+        name: "전투마법사",
+        color: (0.55, 0.35, 0.85),
+        dialogs: [],
+        speed: 0.6,
+        home_zone: SeasideHarbor,
+    ),
+    VillagerDef(
+        id: "elder",
+        name: "장로",
+        color: (0.9, 0.8, 0.5),
+        dialogs: [],
+        speed: 0.5,
+    ),
+]`;
+
+  it("MountainVillage / SeasideHarbor home_zone 파싱", () => {
+    const v = parseVillagersRon(SRC);
+    expect(v[0].homeZone).toEqual({ type: "Town" });
+    expect(v[1].homeZone).toEqual({ type: "MountainVillage" });
+    expect(v[2].homeZone).toEqual({ type: "SeasideHarbor" });
+    // 마지막 elder 는 home_zone 필드 자체가 없는 RON — TS 상 undefined.
+    // 게임 측 #[serde(default)] 미러: 마이그레이션/DB 에서 Town 으로 보정된다.
+    expect(v[3].homeZone).toBeUndefined();
+  });
+
+  it("라운드트립: 기본 Town 은 생략, 그 외는 명시 출력", () => {
+    const v = parseVillagersRon(SRC);
+    const out = serializeVillagersRon(v);
+    expect(out).toContain("home_zone: MountainVillage");
+    expect(out).toContain("home_zone: SeasideHarbor");
+    // Town 은 default 라 출력 생략 (호환을 위해 기존 RON 텍스트 모양 유지).
+    const burgoBlock = out.slice(out.indexOf("burgomaster"), out.indexOf("huntmaster"));
+    expect(burgoBlock).not.toContain("home_zone:");
+    // 라운드트립 — parse → serialize → parse 했을 때 Town 의 명시/생략 차이는 의도된 lossy.
+    // 정규화 후 동치를 보장: Town 명시는 parse 결과에서 homeZone 키가 유지되지만,
+    // serialize 가 생략하므로 두 번째 parse 에서는 키 자체가 없다. 두 값을 정규화 비교.
+    const normalize = (defs: ReturnType<typeof parseVillagersRon>) =>
+      defs.map((d) => {
+        const { homeZone, ...rest } = d;
+        const isDefault = !homeZone || homeZone.type === "Town";
+        return isDefault ? rest : { ...rest, homeZone };
+      });
+    expect(normalize(parseVillagersRon(out))).toEqual(normalize(v));
   });
 });
 

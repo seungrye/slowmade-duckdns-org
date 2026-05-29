@@ -34,6 +34,12 @@ export type Action =
   | { type: "KillNpc"; npcId: string }
   | { type: "DespawnWorldItem"; itemId: string }
   | { type: "OpenPortal"; zone: string; generator: string; placement?: PortalPlacement }
+  /**
+   * 정적 zone(Town/MountainVillage/SeasideHarbor/Forest/Dungeon(N)) 으로 가는
+   * portal 을 현재 zone 에 즉시 스폰한다. Named 등록 없이 ZoneId enum 변형을 그대로 쓴다.
+   * 시작 마을(Town) 에서 다른 마을로 가는 보상 portal 등에 사용. 기본 placement: Border.
+   */
+  | { type: "OpenZonePortal"; target: SpawnZone; placement?: PortalPlacement }
   | { type: "ClosePortal"; zone: string }
   /**
    * 가드 스폰. `zone` 지정 시 — 그 zone 진입 시점까지 deferred 큐에 보류했다가
@@ -69,6 +75,8 @@ export interface QuestTransition {
 
 export type SpawnZone =
   | { type: "Town" }
+  | { type: "MountainVillage" }
+  | { type: "SeasideHarbor" }
   | { type: "Forest" }
   | { type: "Dungeon"; level: number }
   | { type: "Named"; id: string };

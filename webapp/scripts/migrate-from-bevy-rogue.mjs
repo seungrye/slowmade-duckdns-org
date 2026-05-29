@@ -425,6 +425,10 @@ async function migrateVillagers() {
     stats.villagers.parsed++;
     seenIds.add(v.id);
 
+    // homeZone — RON 측 home_zone 이 누락되면 ron.ts 의 parseVillagerDef 가 그 키를
+    // 세팅하지 않으므로 v.homeZone === undefined. 게임 측 #[serde(default)] 와 동일하게
+    // Town 으로 보정해 DB 에 일관된 형태로 저장한다(미러).
+    const homeZone = v.homeZone ?? { type: "Town" };
     const fields = {
       name: v.name,
       color: v.color,
@@ -432,9 +436,17 @@ async function migrateVillagers() {
       speed: v.speed ?? 1.0,
       stationary: !!v.stationary,
       vendor: !!v.vendor,
+      homeZone,
     };
     const existing = await Villager.findOne({ id: v.id });
     if (existing) {
+      // existing.homeZone 은 Mongoose Document 가 들어있으니 plain object 로 정규화.
+      const existingHomeZone = existing.homeZone
+        ? { type: existing.homeZone.type, level: existing.homeZone.level, id: existing.homeZone.id }
+        : { type: "Town" };
+      // undefined 필드는 비교에서 제외하기 위해 정리
+      if (existingHomeZone.level === undefined) delete existingHomeZone.level;
+      if (existingHomeZone.id === undefined) delete existingHomeZone.id;
       const compareSet = {
         name: existing.name,
         color: existing.color,
@@ -442,6 +454,7 @@ async function migrateVillagers() {
         speed: existing.speed,
         stationary: !!existing.stationary,
         vendor: !!existing.vendor,
+        homeZone: existingHomeZone,
       };
       if (!changed(compareSet, fields)) { stats.villagers.unchanged++; continue; }
       if (DRY_RUN) { stats.villagers.updated++; continue; }

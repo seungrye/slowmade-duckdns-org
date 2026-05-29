@@ -3,10 +3,12 @@ import type { Condition, SpawnZone } from "@/types/quest";
 /** SpawnZone 을 한글 라벨로. */
 export function zoneLabel(zone: SpawnZone): string {
   switch (zone.type) {
-    case "Town":    return "마을";
-    case "Forest":  return "숲";
-    case "Dungeon": return `던전 ${zone.level}층`;
-    case "Named":   return zone.id;
+    case "Town":            return "마을";
+    case "MountainVillage": return "산속 마을";
+    case "SeasideHarbor":   return "항구 마을";
+    case "Forest":          return "숲";
+    case "Dungeon":         return `던전 ${zone.level}층`;
+    case "Named":           return zone.id;
   }
 }
 

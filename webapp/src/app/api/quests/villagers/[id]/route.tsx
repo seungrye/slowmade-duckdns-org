@@ -45,6 +45,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       speed: villager.speed,
       stationary: villager.stationary,
       vendor: villager.vendor,
+      homeZone: villager.homeZone,
     },
   });
 
@@ -54,6 +55,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.speed !== undefined) villager.speed = body.speed;
   if (body.stationary !== undefined) villager.stationary = body.stationary;
   if (body.vendor !== undefined) villager.vendor = body.vendor;
+  if (body.homeZone !== undefined) villager.homeZone = body.homeZone;
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();

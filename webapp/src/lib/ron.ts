@@ -466,6 +466,9 @@ class Parser {
         case "speed":      def.speed      = this.parseNumber(); break;
         case "stationary": def.stationary = this.parseBool(); break;
         case "vendor":     def.vendor     = this.parseBool(); break;
+        // home_zone — 게임의 ZoneId 와 동일한 RON 인코딩(parseSpawnZone 재사용).
+        // 누락 시 default = Town (게임 측 #[serde(default)] 와 미러).
+        case "home_zone":  def.homeZone   = this.parseSpawnZone(); break;
         default: break;
       }
       this.tryPunct(",");
@@ -724,6 +727,23 @@ class Parser {
         this.expectPunct(")");
         return { type: "ClosePortal", zone };
       }
+      case "OpenZonePortal": {
+        // OpenZonePortal(target: <ZoneId>, placement?: <PortalPlacement>)
+        let target: SpawnZone | undefined;
+        let placement: PortalPlacement | undefined;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "target") target = this.parseSpawnZone();
+          else if (key === "placement") placement = this.parsePlacement();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        if (!target) throw new Error("OpenZonePortal: target 필수");
+        const action: Extract<Action, { type: "OpenZonePortal" }> = { type: "OpenZonePortal", target };
+        if (placement) action.placement = placement;
+        return action;
+      }
       case "SpawnGuards": {
         let count = 1;
         let zone: SpawnZone | undefined;
@@ -862,9 +882,12 @@ class Parser {
 
   parseSpawnZone(): SpawnZone {
     const name = this.parseIdent();
-    // 괄호 없는 단순 변형: Town | Forest
+    // 괄호 없는 단순 변형: Town | MountainVillage | SeasideHarbor | Forest
     if (!(this.peek()?.kind === "punct" && this.peek()?.val === "(")) {
-      if (name === "Town" || name === "Forest") return { type: name };
+      if (name === "Town" || name === "MountainVillage"
+          || name === "SeasideHarbor" || name === "Forest") {
+        return { type: name };
+      }
       throw new Error(`Unknown bare zone: ${name}`);
     }
     this.expectPunct("(");
@@ -1161,6 +1184,13 @@ function serializeAction(action: Action, depth: number): string {
       if (action.placement) parts.push(`placement: ${serializePlacement(action.placement)}`);
       return `${i}OpenPortal(${parts.join(", ")})`;
     }
+    case "OpenZonePortal": {
+      // OpenZonePortal(target: <ZoneId>, placement?: <PortalPlacement>)
+      // placement 미지정 시 게임 측 default = Border 가 적용된다. 명시되어 있으면 그대로 직렬화.
+      const parts = [`target: ${serializeZone(action.target)}`];
+      if (action.placement) parts.push(`placement: ${serializePlacement(action.placement)}`);
+      return `${i}OpenZonePortal(${parts.join(", ")})`;
+    }
     case "ClosePortal":      return `${i}ClosePortal(${q(action.zone)})`;
     case "SpawnGuards": {
       const parts = [`count: ${action.count}`];
@@ -1187,10 +1217,12 @@ function serializeAction(action: Action, depth: number): string {
 
 function serializeZone(zone: SpawnZone): string {
   switch (zone.type) {
-    case "Town":    return "Town";
-    case "Forest":  return "Forest";
-    case "Dungeon": return `Dungeon(${zone.level})`;
-    case "Named":   return `Named(${q(zone.id)})`;
+    case "Town":            return "Town";
+    case "MountainVillage": return "MountainVillage";
+    case "SeasideHarbor":   return "SeasideHarbor";
+    case "Forest":          return "Forest";
+    case "Dungeon":         return `Dungeon(${zone.level})`;
+    case "Named":           return `Named(${q(zone.id)})`;
   }
 }
 
@@ -1270,6 +1302,10 @@ function serializeVillagerDef(v: VillagerDef): string {
     lines.push(`        ],`);
   }
   lines.push(`        speed: ${v.speed},`);
+  // home_zone — 기본 `Town` 은 생략(`#[serde(default)]` 와 호환). 그 외는 명시.
+  if (v.homeZone && v.homeZone.type !== "Town") {
+    lines.push(`        home_zone: ${serializeZone(v.homeZone)},`);
+  }
   lines.push(`    ),`);
   return lines.join("\n");
 }

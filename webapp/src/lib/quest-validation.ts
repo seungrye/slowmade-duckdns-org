@@ -115,6 +115,12 @@ function validateAction(a: Action, path: string, c: CatalogSets, out: QuestRefWa
         out.push({ path: `${path}.zone`, kind: "zone", missing: a.zone });
       }
       break;
+    case "OpenZonePortal":
+      // 정적 zone enum 변형은 카탈로그 검증 대상이 아니다. Named 만 등록 존재성 확인.
+      if (a.target.type === "Named" && a.target.id && !c.zones.has(a.target.id)) {
+        out.push({ path: `${path}.target.id`, kind: "zone", missing: a.target.id });
+      }
+      break;
     case "SpawnGuards":
     case "PlaceTraps":
     case "SpawnMonster":

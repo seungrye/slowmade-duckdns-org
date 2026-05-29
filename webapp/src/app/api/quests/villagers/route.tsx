@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     speed: body.speed ?? 1.0,
     stationary: body.stationary ?? false,
     vendor: body.vendor ?? false,
+    // homeZone — 미지정 시 schema default(`{ type: "Town" }`) 가 적용된다.
+    homeZone: body.homeZone,
   });
 
   return apiSuccess(villager, 201);

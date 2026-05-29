@@ -1,5 +1,7 @@
 // Rust `VillagerDef` 와 일치 — bevy-rogue 의 villagers.ron 형식
 
+import type { ZoneIdValue } from "./zone";
+
 export interface VillagerDef {
   /** unique 식별자 (snake_case). 퀘스트 giver_npc / KillNpc 가 참조. */
   id: string;
@@ -13,6 +15,13 @@ export interface VillagerDef {
   stationary?: boolean;
   /** 상인 — true 면 상호작용 시 상점이 열린다. 기본 false. */
   vendor?: boolean;
+  /**
+   * NPC 거주 zone — 이 zone 의 마을 맵에서만 게임이 이 NPC 를 스폰한다.
+   * 기본값은 `{ type: "Town" }` 으로, 기존 RON 과 100% 호환된다(미지정 시 시작 마을).
+   * MountainVillage/SeasideHarbor 등 신규 마을 zone 으로 분산하려면 명시한다.
+   * 게임 측 `#[serde(default = "default_home_zone")]` 와 동일한 의미.
+   */
+  homeZone?: ZoneIdValue;
 }
 
 export interface VillagerDocument extends VillagerDef {
