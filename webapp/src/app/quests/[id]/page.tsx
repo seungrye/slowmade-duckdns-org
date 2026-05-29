@@ -25,6 +25,7 @@ import { PhasePanel } from "./phase-panel";
 import { EdgePanel } from "./edge-panel";
 import { buildGraph, syncPhasePositions } from "./build-graph";
 import { highlightEdges } from "./edge-utils";
+import { useInfoDialog } from "@/components/info-dialog";
 
 const NODE_TYPES: NodeTypes = { phase: PhaseNode };
 
@@ -46,6 +47,8 @@ export default function QuestEditorPage() {
   const [villagers, setVillagers] = useState<VillagerDocument[]>([]);
   const [items, setItems] = useState<ItemDocument[]>([]);
   const [zones, setZones] = useState<ZoneDocument[]>([]);
+
+  const { showInfo } = useInfoDialog();
 
   // 퀘스트 불러오기
   useEffect(() => {
@@ -283,9 +286,25 @@ export default function QuestEditorPage() {
 
     // 끊어진 참조 경고 (저장 자체는 성공)
     const warnings = json.warnings as Array<{ path: string; kind: string; missing: string }> | undefined;
+    const autoRegisteredZones = json.autoRegisteredZones as string[] | undefined;
+    const sections: string[] = [];
+    if (autoRegisteredZones && autoRegisteredZones.length > 0) {
+      sections.push(
+        `자동 등록된 zone ${autoRegisteredZones.length}개:\n` +
+          autoRegisteredZones.map((n) => `  · ${n}`).join("\n"),
+      );
+    }
     if (warnings && warnings.length > 0) {
       const lines = warnings.map((w) => `  ${w.kind} 누락: ${w.missing} (at ${w.path})`);
-      alert(`저장 완료. 끊어진 참조 ${warnings.length}개:\n${lines.join("\n")}`);
+      sections.push(`끊어진 참조 ${warnings.length}개:\n${lines.join("\n")}`);
+    }
+    if (sections.length > 0) {
+      const hasWarnings = (warnings?.length ?? 0) > 0;
+      showInfo({
+        title: hasWarnings ? "저장 완료 — 참조 경고" : "저장 완료",
+        body: sections.join("\n\n"),
+        variant: hasWarnings ? "warning" : "info",
+      });
     }
   }
 

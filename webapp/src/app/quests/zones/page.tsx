@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { ZoneDocument } from "@/types/zone";
+import { useInfoDialog } from "@/components/info-dialog";
 
 interface FormState {
   name: string;
@@ -28,6 +29,7 @@ export default function ZonesPage() {
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
   const [extracting, setExtracting] = useState(false);
+  const { showInfo } = useInfoDialog();
 
   async function load() {
     setLoading(true);
@@ -48,7 +50,7 @@ export default function ZonesPage() {
       body: JSON.stringify(createForm),
     });
     if (res.ok) { setCreating(false); setCreateForm(emptyForm); load(); }
-    else alert((await res.json()).message);
+    else showInfo({ title: "생성 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
   }
 
   async function handleSave(name: string) {
@@ -61,7 +63,7 @@ export default function ZonesPage() {
       }),
     });
     if (res.ok) { setEditingName(null); load(); }
-    else alert((await res.json()).message);
+    else showInfo({ title: "저장 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
   }
 
   async function handleDelete(name: string) {
@@ -78,16 +80,21 @@ export default function ZonesPage() {
     if (res.ok) {
       const { data } = await res.json();
       let msg = `추출 완료: 신규 ${data.created}, 건너뜀 ${data.skipped}`;
-      if (data.conflicts.length > 0) {
+      const hasConflicts = data.conflicts.length > 0;
+      if (hasConflicts) {
         msg += `\n\n⚠ generator 불일치 (수동 해결 필요):`;
         for (const c of data.conflicts) {
           msg += `\n  ${c.name}: 카탈로그 "${c.catalogGenerator}" vs 발견 "${c.foundGenerator}"`;
         }
       }
-      alert(msg);
+      showInfo({
+        title: hasConflicts ? "zone 추출 — 충돌 있음" : "zone 추출 완료",
+        body: msg,
+        variant: hasConflicts ? "warning" : "success",
+      });
       load();
     } else {
-      alert((await res.json()).message);
+      showInfo({ title: "zone 추출 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 

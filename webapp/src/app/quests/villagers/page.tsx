@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { VillagerDocument } from "@/types/villager";
+import { useInfoDialog } from "@/components/info-dialog";
 
 interface FormState {
   id: string;
@@ -49,6 +50,7 @@ export default function VillagersPage() {
   const [createForm, setCreateForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
+  const { showInfo } = useInfoDialog();
 
   async function load() {
     setLoading(true);
@@ -82,7 +84,7 @@ export default function VillagersPage() {
       load();
     } else {
       const json = await res.json();
-      alert(json.message);
+      showInfo({ title: "생성 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 
@@ -104,7 +106,7 @@ export default function VillagersPage() {
       load();
     } else {
       const json = await res.json();
-      alert(json.message);
+      showInfo({ title: "저장 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 
@@ -123,10 +125,14 @@ export default function VillagersPage() {
     });
     const json = await res.json();
     if (res.ok) {
-      alert(`가져오기 완료: 신규 ${json.data.created}, 갱신 ${json.data.updated}`);
+      showInfo({
+        title: "가져오기 완료",
+        body: `신규 ${json.data.created}개, 갱신 ${json.data.updated}개`,
+        variant: "success",
+      });
       load();
     } else {
-      alert(json.message);
+      showInfo({ title: "가져오기 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 

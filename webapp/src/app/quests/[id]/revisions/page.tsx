@@ -4,12 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { QuestRevisionDocument } from "@/types/quest";
+import { useInfoDialog } from "@/components/info-dialog";
 
 export default function RevisionsPage() {
   const { id } = useParams<{ id: string }>();
   const [revisions, setRevisions] = useState<QuestRevisionDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<number | null>(null);
+  const { showInfo } = useInfoDialog();
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/quests/${id}/revisions`);
@@ -28,11 +30,11 @@ export default function RevisionsPage() {
     });
     setRestoring(null);
     if (res.ok) {
-      alert("롤백 완료");
+      showInfo({ title: "롤백 완료", body: `버전 ${version}으로 복원되었습니다.`, variant: "success" });
       load();
     } else {
       const json = await res.json();
-      alert(json.message);
+      showInfo({ title: "롤백 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 

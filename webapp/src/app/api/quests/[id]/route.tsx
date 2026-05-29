@@ -5,6 +5,7 @@ import Quest from "@/models/quest";
 import QuestRevision from "@/models/quest-revision";
 import { validateQuestRefs, validateQuestStructure } from "@/lib/quest-validation";
 import { loadCatalogSets } from "@/lib/catalog-sets";
+import { upsertNamedZonesFromQuest } from "@/lib/upsert-quest-zones";
 import type { QuestDef } from "@/types/quest";
 
 type Params = { params: Promise<{ id: string }> };
@@ -74,7 +75,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
   await quest.save();
 
   // 참조 무결성 검증 (soft warning)
-  const catalogs = await loadCatalogSets();
   const phasesObj = Object.fromEntries(quest.phases ?? new Map()) as QuestDef["phases"];
   const transitions = (quest.transitions ?? []) as QuestDef["transitions"];
   const questDefBase: QuestDef = {
@@ -87,8 +87,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
     spawns: quest.spawns as QuestDef["spawns"],
   };
   if (typeof quest.spawnChance === "number") questDefBase.spawnChance = quest.spawnChance;
-  const warnings = validateQuestRefs(questDefBase, catalogs);
 
+  // 저장 직전에 quest 안에서 참조되는 Named zone 들을 카탈로그에 자동 upsert
+  // — 검증 단계에서 zone 누락 경고가 뜨지 않도록.
+  const autoRegisteredZones = await upsertNamedZonesFromQuest(questDefBase);
+
+  const catalogs = await loadCatalogSets();
+  const warnings = validateQuestRefs(questDefBase, catalogs);
   const structErrors = validateQuestStructure(questDefBase);
 
   return NextResponse.json({
@@ -99,5 +104,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     },
     warnings,
     structErrors,
+    autoRegisteredZones,
   });
 }

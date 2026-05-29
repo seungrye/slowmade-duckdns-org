@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { QuestDocument } from "@/types/quest";
+import { useInfoDialog } from "@/components/info-dialog";
 
 export default function QuestsPage() {
   const [quests, setQuests] = useState<QuestDocument[]>([]);
@@ -11,6 +12,7 @@ export default function QuestsPage() {
   const [newId, setNewId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const importRef = useRef<HTMLInputElement>(null);
+  const { showInfo } = useInfoDialog();
 
   async function load() {
     const res = await fetch("/api/quests");
@@ -36,7 +38,7 @@ export default function QuestsPage() {
       load();
     } else {
       const json = await res.json();
-      alert(json.message);
+      showInfo({ title: "퀘스트 생성 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 
@@ -57,7 +59,7 @@ export default function QuestsPage() {
       load();
     } else {
       const json = await res.json();
-      alert(json.message);
+      showInfo({ title: "임포트 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 
@@ -68,7 +70,10 @@ export default function QuestsPage() {
     const id = parsed?.[1];
     const titleParsed = text.match(/title:\s*"([^"]+)"/);
     const title = titleParsed?.[1] ?? id ?? "imported";
-    if (!id) { alert("RON 파일에서 id를 찾을 수 없습니다."); return; }
+    if (!id) {
+      showInfo({ title: "임포트 실패", body: "RON 파일에서 id를 찾을 수 없습니다.", variant: "error" });
+      return;
+    }
 
     const createRes = await fetch("/api/quests", {
       method: "POST",
@@ -77,7 +82,7 @@ export default function QuestsPage() {
     });
     if (!createRes.ok) {
       const json = await createRes.json();
-      alert(json.message);
+      showInfo({ title: "퀘스트 생성 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
       return;
     }
     const { data: created } = await createRes.json();
@@ -91,7 +96,7 @@ export default function QuestsPage() {
       load();
     } else {
       const json = await importRes.json();
-      alert(json.message);
+      showInfo({ title: "임포트 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
     }
   }
 
@@ -175,8 +180,19 @@ export default function QuestsPage() {
                 <Link href={`/quests/${q._id}`} className="font-medium hover:text-blue-500 block">
                   {q.title}
                 </Link>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {q.id} · v{q.version} · {new Date(q.updatedAt).toLocaleDateString("ko-KR")}
+                <p className="text-xs text-gray-500 mt-0.5 flex flex-wrap items-center gap-x-2">
+                  <span>{q.id}</span>
+                  <span>·</span>
+                  <span>v{q.version}</span>
+                  <span>·</span>
+                  <span>{new Date(q.updatedAt).toLocaleDateString("ko-KR")}</span>
+                  <span>·</span>
+                  <span
+                    className="font-mono px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800"
+                    title="이번 런에서 이 퀘스트가 활성화될 확률 (0.0~1.0)"
+                  >
+                    스폰 {(q.spawnChance ?? 1.0).toFixed(2)}
+                  </span>
                 </p>
               </div>
               <div className="flex gap-2 flex-shrink-0">

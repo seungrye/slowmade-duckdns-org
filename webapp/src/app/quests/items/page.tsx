@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { ItemDocument, ItemKind, WeaponElement } from "@/types/item";
+import { useInfoDialog } from "@/components/info-dialog";
 
 type Filter = "all" | ItemKind;
 
@@ -54,6 +55,7 @@ export default function ItemsPage() {
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  const { showInfo } = useInfoDialog();
 
   async function load() {
     setLoading(true);
@@ -149,7 +151,7 @@ export default function ItemsPage() {
       body: JSON.stringify(bodyFromForm(createForm, true)),
     });
     if (res.ok) { setCreating(false); setCreateForm(emptyForm); load(); }
-    else alert((await res.json()).message);
+    else showInfo({ title: "생성 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
   }
 
   async function handleSave(id: string) {
@@ -159,7 +161,7 @@ export default function ItemsPage() {
       body: JSON.stringify(bodyFromForm(editForm, false)),
     });
     if (res.ok) { setEditingId(null); load(); }
-    else alert((await res.json()).message);
+    else showInfo({ title: "저장 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
   }
 
   async function handleDelete(id: string) {
@@ -204,7 +206,7 @@ export default function ItemsPage() {
     });
     setDeleting(false);
     if (res.ok) load();
-    else alert((await res.json()).message);
+    else showInfo({ title: "일괄 삭제 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
   }
 
   async function handleImport(file: File, kind: ItemKind) {
@@ -215,8 +217,16 @@ export default function ItemsPage() {
       body: text,
     });
     const json = await res.json();
-    if (res.ok) { alert(`가져오기 완료: 신규 ${json.data.created}, 갱신 ${json.data.updated}`); load(); }
-    else alert(json.message);
+    if (res.ok) {
+      showInfo({
+        title: "가져오기 완료",
+        body: `신규 ${json.data.created}개, 갱신 ${json.data.updated}개`,
+        variant: "success",
+      });
+      load();
+    } else {
+      showInfo({ title: "가져오기 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   function summarize(item: ItemDocument): string {

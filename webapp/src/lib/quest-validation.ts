@@ -115,7 +115,15 @@ function validateAction(a: Action, path: string, c: CatalogSets, out: QuestRefWa
         out.push({ path: `${path}.zone`, kind: "zone", missing: a.zone });
       }
       break;
-    // Log, SetFlag, ClearFlag — 검증 대상 없음
+    case "SpawnGuards":
+    case "PlaceTraps":
+    case "SpawnMonster":
+      // optional Named zone — 지정된 경우에만 카탈로그 존재 검사
+      if (a.zone && a.zone.type === "Named" && a.zone.id && !c.zones.has(a.zone.id)) {
+        out.push({ path: `${path}.zone.id`, kind: "zone", missing: a.zone.id });
+      }
+      break;
+    // Log, SetFlag, ClearFlag, Explode — 검증 대상 없음
   }
 }
 

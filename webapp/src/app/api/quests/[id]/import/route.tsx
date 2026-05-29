@@ -6,6 +6,7 @@ import QuestRevision from "@/models/quest-revision";
 import { parseRon } from "@/lib/ron";
 import { validateQuestRefs, validateQuestStructure } from "@/lib/quest-validation";
 import { loadCatalogSets } from "@/lib/catalog-sets";
+import { upsertNamedZonesFromQuest } from "@/lib/upsert-quest-zones";
 import type { QuestDef } from "@/types/quest";
 
 type Params = { params: Promise<{ id: string }> };
@@ -58,20 +59,24 @@ export async function POST(req: NextRequest, { params }: Params) {
   await quest.save();
 
   // 참조 무결성 검증 (soft warning)
-  const catalogs = await loadCatalogSets();
   const phasesObj = Object.fromEntries(quest.phases ?? new Map()) as QuestDef["phases"];
-  const warnings = validateQuestRefs(
-    {
-      id: quest.id,
-      title: quest.title,
-      giverNpc: quest.giverNpc,
-      initialPhase: quest.initialPhase,
-      phases: phasesObj,
-      transitions: (quest.transitions ?? []) as QuestDef["transitions"],
-      spawns: quest.spawns as QuestDef["spawns"],
-    },
-    catalogs,
-  );
+  const questDefBase: QuestDef = {
+    id: quest.id,
+    title: quest.title,
+    giverNpc: quest.giverNpc,
+    initialPhase: quest.initialPhase,
+    phases: phasesObj,
+    transitions: (quest.transitions ?? []) as QuestDef["transitions"],
+    spawns: quest.spawns as QuestDef["spawns"],
+  };
+  if (typeof quest.spawnChance === "number") questDefBase.spawnChance = quest.spawnChance;
+
+  // 임포트 직전에 quest 안에서 참조되는 Named zone 들을 카탈로그에 자동 upsert
+  // — RON 임포트 후 끊어진 zone 참조 경고를 줄이기 위함.
+  const autoRegisteredZones = await upsertNamedZonesFromQuest(questDefBase);
+
+  const catalogs = await loadCatalogSets();
+  const warnings = validateQuestRefs(questDefBase, catalogs);
 
   return NextResponse.json({
     success: true,
@@ -80,5 +85,6 @@ export async function POST(req: NextRequest, { params }: Params) {
       phases: phasesObj,
     },
     warnings,
+    autoRegisteredZones,
   });
 }

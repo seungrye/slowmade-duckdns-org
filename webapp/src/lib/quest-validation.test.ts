@@ -83,6 +83,37 @@ describe("validateQuestRefs — transition actions 참조", () => {
     ]);
   });
 
+  it("SpawnGuards/PlaceTraps/SpawnMonster 의 Named zone 미등록", () => {
+    const q = questWithTransition({
+      actions: [
+        { type: "SpawnGuards", count: 3, zone: { type: "Named", id: "없는1" } },
+        { type: "PlaceTraps", kind: "Spike", count: 1, hidden: true, zone: { type: "Named", id: "없는2" } },
+        { type: "SpawnMonster", monsterId: "x", count: 1, zone: { type: "Named", id: "없는3" } },
+      ],
+    });
+    const w = validateQuestRefs(q, full);
+    expect(w.map((x) => x.missing).sort()).toEqual(["없는1", "없는2", "없는3"]);
+    expect(w.every((x) => x.kind === "zone")).toBe(true);
+  });
+
+  it("SpawnGuards 의 zone 생략 시 검증 안 함 (legacy 동작)", () => {
+    const q = questWithTransition({
+      actions: [{ type: "SpawnGuards", count: 3 }],
+    });
+    expect(validateQuestRefs(q, full)).toEqual([]);
+  });
+
+  it("SpawnGuards Town/Forest/Dungeon zone 은 검증 안 함", () => {
+    const q = questWithTransition({
+      actions: [
+        { type: "SpawnGuards", count: 1, zone: { type: "Town" } },
+        { type: "SpawnGuards", count: 1, zone: { type: "Forest" } },
+        { type: "SpawnGuards", count: 1, zone: { type: "Dungeon", level: 2 } },
+      ],
+    });
+    expect(validateQuestRefs(q, full)).toEqual([]);
+  });
+
   it("GiveItems / RemoveItem / DespawnWorldItem 모두 itemId 검증", () => {
     const q = questWithTransition({
       actions: [

@@ -83,10 +83,14 @@ const Item = await loadDefault("src/models/item.tsx");
 const Villager = await loadDefault("src/models/villager.tsx");
 const Monster = await loadDefault("src/models/monster.tsx");
 const StartLoadout = await loadDefault("src/models/start-loadout.tsx");
+const Zone = await loadDefault("src/models/zone.tsx");
 const QuestRevision = await loadDefault("src/models/quest-revision.tsx");
 const ItemRevision = await loadDefault("src/models/item-revision.tsx");
 const VillagerRevision = await loadDefault("src/models/villager-revision.tsx");
 const MonsterRevision = await loadDefault("src/models/monster-revision.tsx");
+
+// quest 안의 Named zone 들을 사이트 Zone 카탈로그에 자동 upsert (재마이그레이션 안전성).
+const zoneExtract = await jiti.import(path.join(webappRoot, "src/lib/zone-extract.ts"));
 
 // ── 유틸 ────────────────────────────────────────────────────────────────────
 function readText(p) { return fs.readFileSync(p, "utf8"); }
@@ -145,6 +149,20 @@ async function migrateQuests() {
     if (!def.id) def.id = path.basename(file, ".ron");
     stats.quests.parsed++;
     seenIds.add(def.id);
+
+    // Named zone (SpawnGuards/PlaceTraps/SpawnMonster/InZone/spawns) 자동 등록.
+    // 게임 RON 이 새 zone 을 도입했을 때 site Zone 카탈로그에 동기 누락되지 않도록.
+    if (!DRY_RUN) {
+      const namedZones = zoneExtract.collectNamedZones(def);
+      for (const name of namedZones) {
+        const existingZone = await Zone.findOne({ name }).select("_id").lean();
+        if (existingZone) continue;
+        try {
+          await Zone.create({ name, generator: "default", description: "" });
+          log(`zone auto-upsert: ${name} (from quest ${def.id})`);
+        } catch { /* unique 위반 — 동시 생성 무시 */ }
+      }
+    }
 
     const fields = {
       title: def.title,
