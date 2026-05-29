@@ -88,8 +88,8 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
   },
 ];
 
-// 평면 id 배열(테스트 용도).
-export const KNOWN_GENERATORS = GENERATOR_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+// 필요시 평면 id 배열: `GENERATOR_GROUPS.flatMap((g) => g.items.map((i) => i.id))`.
+// Next page 파일은 named export 제약이 있어 별도 상수로 두지 않는다(테스트에서 직접 사용).
 
 export default function ZonesPage() {
   const [list, setList] = useState<ZoneDocument[]>([]);
