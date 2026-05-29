@@ -152,14 +152,28 @@ async function migrateQuests() {
 
     // Named zone (SpawnGuards/PlaceTraps/SpawnMonster/InZone/spawns) 자동 등록.
     // 게임 RON 이 새 zone 을 도입했을 때 site Zone 카탈로그에 동기 누락되지 않도록.
+    // generator 는 같은 quest 의 OpenPortal 매핑에서 가져옴(없으면 fallback "bsp").
+    // 기존 zone 중 generator === "default" (이전 버전의 placeholder) 인 것은 정정.
     if (!DRY_RUN) {
+      const portalRefs = zoneExtract.collectFromQuest(def); // [{zone, generator}]
+      const portalGen = new Map();
+      for (const p of portalRefs) {
+        if (!portalGen.has(p.zone) && p.generator) portalGen.set(p.zone, p.generator);
+      }
       const namedZones = zoneExtract.collectNamedZones(def);
       for (const name of namedZones) {
-        const existingZone = await Zone.findOne({ name }).select("_id").lean();
-        if (existingZone) continue;
+        const generator = portalGen.get(name) ?? "bsp";
+        const existingZone = await Zone.findOne({ name }).select("_id generator").lean();
+        if (existingZone) {
+          if (existingZone.generator === "default" && generator !== "default") {
+            await Zone.updateOne({ _id: existingZone._id }, { $set: { generator } });
+            log(`zone generator 정정: ${name} (default → ${generator})`);
+          }
+          continue;
+        }
         try {
-          await Zone.create({ name, generator: "default", description: "" });
-          log(`zone auto-upsert: ${name} (from quest ${def.id})`);
+          await Zone.create({ name, generator, description: "" });
+          log(`zone auto-upsert: ${name} → ${generator} (from quest ${def.id})`);
         } catch { /* unique 위반 — 동시 생성 무시 */ }
       }
     }

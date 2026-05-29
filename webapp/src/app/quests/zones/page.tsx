@@ -13,12 +13,32 @@ interface FormState {
 
 const emptyForm: FormState = { name: "", generator: "bsp", description: "" };
 
+// 게임에 등록된 모든 generator (`bevy-rogue/src/modules/map/generators/*.rs`).
+// strict select 로 노출하므로 새 generator 추가 시 여기도 갱신해야 한다.
 const KNOWN_GENERATORS = [
+  "archipelago",
+  "biome_world",
   "bsp",
   "bsp_indoor",
-  "forest",
   "cellular_automata",
+  "coastal",
+  "dla",
+  "drunkard",
+  "forest",
+  "grid_village",
+  "island",
+  "maze",
+  "maze_prim",
+  "ocean",
   "organic_village",
+  "perlin",
+  "prefab",
+  "recursive_division",
+  "rooms",
+  "voronoi_districts",
+  "voronoi_rooms",
+  "walled_town",
+  "wfc",
 ];
 
 export default function ZonesPage() {
@@ -225,16 +245,18 @@ function FormFields({
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">generator</span>
-          <input
+          {/*
+            게임이 모르는 generator 가 들어가면 그 zone 진입 시 깨지므로
+            datalist 자유입력 대신 strict select 로 고정. KNOWN_GENERATORS 는
+            게임의 등록 generator 와 동일.
+          */}
+          <select
             value={form.generator}
             onChange={(e) => setForm({ ...form, generator: e.target.value })}
-            list="zone-generators"
-            placeholder="bsp"
             className={`${inputCls} w-48 font-mono`}
-          />
-          <datalist id="zone-generators">
-            {KNOWN_GENERATORS.map((g) => <option key={g} value={g} />)}
-          </datalist>
+          >
+            {KNOWN_GENERATORS.map((g) => <option key={g} value={g}>{g}</option>)}
+          </select>
         </label>
       </div>
       <label className="flex flex-col gap-1">
