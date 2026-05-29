@@ -1,0 +1,112 @@
+{
+  "generators": [
+    {
+      "file": "bsp.json",
+      "name": "bsp"
+    },
+    {
+      "file": "simple_rooms.json",
+      "name": "simple_rooms"
+    },
+    {
+      "file": "drunkard.json",
+      "name": "drunkard"
+    },
+    {
+      "file": "cellular_automata.json",
+      "name": "cellular_automata"
+    },
+    {
+      "file": "dla.json",
+      "name": "dla"
+    },
+    {
+      "file": "bsp_indoor.json",
+      "name": "bsp_indoor"
+    },
+    {
+      "file": "prefab.json",
+      "name": "prefab"
+    },
+    {
+      "file": "organic_village.json",
+      "name": "organic_village"
+    },
+    {
+      "file": "grid_village.json",
+      "name": "grid_village"
+    },
+    {
+      "file": "forest.json",
+      "name": "forest"
+    },
+    {
+      "file": "perlin.json",
+      "name": "perlin"
+    },
+    {
+      "file": "maze.json",
+      "name": "maze"
+    },
+    {
+      "file": "maze_prim.json",
+      "name": "maze_prim"
+    },
+    {
+      "file": "recursive_division.json",
+      "name": "recursive_division"
+    },
+    {
+      "file": "voronoi_rooms.json",
+      "name": "voronoi_rooms"
+    },
+    {
+      "file": "walled_town.json",
+      "name": "walled_town"
+    },
+    {
+      "file": "voronoi_districts.json",
+      "name": "voronoi_districts"
+    },
+    {
+      "file": "island.json",
+      "name": "island"
+    },
+    {
+      "file": "archipelago.json",
+      "name": "archipelago"
+    },
+    {
+      "file": "coastal.json",
+      "name": "coastal"
+    },
+    {
+      "file": "ocean.json",
+      "name": "ocean"
+    },
+    {
+      "file": "biome_world.json",
+      "name": "biome_world"
+    },
+    {
+      "file": "wfc.json",
+      "name": "wfc"
+    },
+    {
+      "file": "tinykeep.json",
+      "name": "tinykeep"
+    }
+  ],
+  "height": 50,
+  "seeds": [
+    42,
+    7,
+    1234,
+    9999,
+    55555,
+    31337,
+    808,
+    1729
+  ],
+  "width": 80
+}

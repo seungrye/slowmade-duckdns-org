@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { ZoneDocument } from "@/types/zone";
 import { useInfoDialog } from "@/components/info-dialog";
+import { GeneratorPreview } from "@/components/generator-preview";
 
 interface FormState {
   name: string;
@@ -370,6 +371,10 @@ function FormFields({
           className={inputCls}
         />
       </label>
+      {/* 선택한 generator 의 prebuild 샘플(80×50, 8 시드) 미리보기 — 시각으로 결정 보조. */}
+      <div className="mt-2 p-2 rounded border bg-white dark:bg-gray-950">
+        <GeneratorPreview generator={form.generator} />
+      </div>
     </div>
   );
 }
