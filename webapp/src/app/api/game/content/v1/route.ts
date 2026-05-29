@@ -154,6 +154,8 @@ function toVillagerDef(d: Record<string, unknown>): VillagerDef {
   };
   if (d.stationary) v.stationary = true;
   if (d.vendor) v.vendor = true;
+  // homeZone — Mongoose subdoc 그대로 통과(serializer 가 Town 기본은 자동 생략).
+  if (d.homeZone) v.homeZone = d.homeZone as VillagerDef["homeZone"];
   return v;
 }
 
