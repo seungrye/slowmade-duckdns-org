@@ -139,7 +139,7 @@ export function GeneratorPreview({ generator }: { generator: string }) {
   }
   if (!data) return null;
 
-  const samples = data.samples;
+  const samples = data.samples.slice(0, 4); // 시드 4 개만 표시 (데스크톱 4-col 한 줄, 모바일 캐로셀 4 장).
   if (samples.length === 0) return null;
   const safeIdx = ((idx % samples.length) + samples.length) % samples.length;
   const current = samples[safeIdx];
