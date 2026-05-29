@@ -44,13 +44,63 @@ function tokenize(src: string): Token[] {
     // 공백
     if (/\s/.test(src[i])) { i++; continue; }
     // 문자열
+    // Rust/RON 호환 escape 처리:
+    //   \n \r \t \\ \" \0  → 표준 escape
+    //   \x7F                → 8비트 hex (Rust 호환, 0x7F 까지만 안전)
+    //   \u{XXXX} / \u{XXXXXX} → 유니코드 codepoint (game RON 의 glyph_unicode 가 사용)
+    //   기타 \?              → ? 를 그대로 (예: 이전 호환 유지)
     if (src[i] === '"') {
       let s = "";
       i++;
       while (i < src.length && src[i] !== '"') {
-        if (src[i] === "\\") { i++; s += src[i]; }
-        else s += src[i];
-        i++;
+        if (src[i] === "\\") {
+          i++;
+          const esc = src[i];
+          if (esc === "n")      { s += "\n"; i++; }
+          else if (esc === "r") { s += "\r"; i++; }
+          else if (esc === "t") { s += "\t"; i++; }
+          else if (esc === "0") { s += "\0"; i++; }
+          else if (esc === "\\") { s += "\\"; i++; }
+          else if (esc === '"')  { s += '"';  i++; }
+          else if (esc === "x") {
+            // \xHH (2 자리 hex)
+            const hh = src.slice(i + 1, i + 3);
+            const cp = parseInt(hh, 16);
+            if (/^[0-9a-fA-F]{2}$/.test(hh) && Number.isFinite(cp)) {
+              s += String.fromCharCode(cp);
+              i += 3;
+            } else {
+              s += esc; i++;
+            }
+          }
+          else if (esc === "u" && src[i + 1] === "{") {
+            // \u{XXXX} — 1~6 자리 hex
+            const end = src.indexOf("}", i + 2);
+            if (end >= 0) {
+              const hex = src.slice(i + 2, end);
+              const cp = parseInt(hex, 16);
+              if (/^[0-9a-fA-F]{1,6}$/.test(hex) && Number.isFinite(cp) && cp <= 0x10FFFF) {
+                s += String.fromCodePoint(cp);
+                i = end + 1;
+              } else {
+                // 잘못된 형식 — escape 를 그대로 보존
+                s += esc;
+                i++;
+              }
+            } else {
+              s += esc;
+              i++;
+            }
+          }
+          else {
+            // 알 수 없는 escape — escape 문자만 보존 (이전 동작 호환)
+            s += esc; i++;
+          }
+        }
+        else {
+          s += src[i];
+          i++;
+        }
       }
       i++;
       tokens.push({ kind: "str", val: s });
@@ -1042,7 +1092,33 @@ export function parseStartLoadoutDef(src: string): StartLoadoutDef {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ind(n: number) { return "    ".repeat(n); }
-function q(s: string) { return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"` ; }
+function q(s: string) {
+  // RON 문자열 직렬화: ASCII 인쇄 가능 문자는 그대로, 비-ASCII 중에서도 BMP 바깥/
+  // PUA(아이콘 폰트 영역) 처럼 가시성이 떨어지거나 깨지기 쉬운 코드포인트는 \u{XXXX}
+  // 로 escape 한다. 인쇄 가능 한글/한자 등 일반 BMP 글리프는 그대로 두어 가독성 유지.
+  let out = '"';
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    if (ch === '"') out += '\\"';
+    else if (ch === '\\') out += '\\\\';
+    else if (ch === '\n') out += '\\n';
+    else if (ch === '\r') out += '\\r';
+    else if (ch === '\t') out += '\\t';
+    // PUA(E000~F8FF) 와 supplementary PUA(F0000+, 100000+) 는 escape 로 출력 →
+    // 게임의 RPG-Awesome/Kenney 아이콘 폰트 codepoint 가 안정 round-trip 된다.
+    else if (
+      (cp >= 0xE000 && cp <= 0xF8FF) ||
+      cp >= 0x10000 // 모든 supplementary plane (이모지 등) 도 escape
+    ) {
+      out += `\\u{${cp.toString(16).toUpperCase()}}`;
+    }
+    else {
+      out += ch;
+    }
+  }
+  out += '"';
+  return out;
+}
 
 function serializeCondition(cond: Condition): string {
   switch (cond.type) {

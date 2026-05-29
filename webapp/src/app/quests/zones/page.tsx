@@ -15,31 +15,80 @@ const emptyForm: FormState = { name: "", generator: "bsp", description: "" };
 
 // 게임에 등록된 모든 generator (`bevy-rogue/src/modules/map/generators/*.rs`).
 // strict select 로 노출하므로 새 generator 추가 시 여기도 갱신해야 한다.
-const KNOWN_GENERATORS = [
-  "archipelago",
-  "biome_world",
-  "bsp",
-  "bsp_indoor",
-  "cellular_automata",
-  "coastal",
-  "dla",
-  "drunkard",
-  "forest",
-  "grid_village",
-  "island",
-  "maze",
-  "maze_prim",
-  "ocean",
-  "organic_village",
-  "perlin",
-  "prefab",
-  "recursive_division",
-  "rooms",
-  "voronoi_districts",
-  "voronoi_rooms",
-  "walled_town",
-  "wfc",
+// 카테고리 그룹 + 설명을 함께 보유 — <optgroup> 으로 렌더링.
+const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[] }[] = [
+  {
+    category: "던전 (방+복도)",
+    items: [
+      { id: "bsp",                desc: "BSP 분할, 규칙적 방 + 깔끔한 복도" },
+      { id: "rooms",              desc: "크기 다양한 방 랜덤 배치 (simple_rooms)" },
+      { id: "recursive_division", desc: "재귀 분할 (미로 변형)" },
+    ],
+  },
+  {
+    category: "동굴 (유기적)",
+    items: [
+      { id: "drunkard",           desc: "술취한 보행, 굴곡진 통로" },
+      { id: "cellular_automata",  desc: "자연 침식 동굴" },
+      { id: "dla",                desc: "디퓨전 한정 응집, 중심에서 뻗는 침식 구조" },
+    ],
+  },
+  {
+    category: "실내 (건물 평면도)",
+    items: [
+      { id: "bsp_indoor",         desc: "BSP 소규모 적용" },
+      { id: "prefab",             desc: "손제작 방 청사진 조합" },
+    ],
+  },
+  {
+    category: "마을",
+    items: [
+      { id: "organic_village",    desc: "유기적 건물 배치" },
+      { id: "grid_village",       desc: "격자 도로망 + 블록" },
+      { id: "walled_town",        desc: "성벽 마을 (잠입 퀘스트용)" },
+    ],
+  },
+  {
+    category: "미로",
+    items: [
+      { id: "maze",               desc: "Wilson 알고리즘 미로" },
+      { id: "maze_prim",          desc: "Prim 알고리즘 미로" },
+    ],
+  },
+  {
+    category: "보로노이/구획",
+    items: [
+      { id: "voronoi_rooms",      desc: "보로노이 셀 = 방" },
+      { id: "voronoi_districts",  desc: "보로노이 구획 + 도로" },
+    ],
+  },
+  {
+    category: "자연 (숲)",
+    items: [
+      { id: "forest",             desc: "나무 군집 + 좁은 길" },
+      { id: "perlin",             desc: "펄린 노이즈 자연 지형" },
+    ],
+  },
+  {
+    category: "수상/해안 (Water/Sand 타일)",
+    items: [
+      { id: "coastal",            desc: "해안선" },
+      { id: "island",             desc: "단일 섬" },
+      { id: "archipelago",        desc: "군도 (여러 섬)" },
+      { id: "ocean",              desc: "외해" },
+      { id: "biome_world",        desc: "다중 바이옴" },
+    ],
+  },
+  {
+    category: "알고리즘 기반",
+    items: [
+      { id: "wfc",                desc: "Wave Function Collapse" },
+    ],
+  },
 ];
+
+// 평면 id 배열(검증·테스트 용도).
+const KNOWN_GENERATORS = GENERATOR_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 
 export default function ZonesPage() {
   const [list, setList] = useState<ZoneDocument[]>([]);
@@ -253,9 +302,15 @@ function FormFields({
           <select
             value={form.generator}
             onChange={(e) => setForm({ ...form, generator: e.target.value })}
-            className={`${inputCls} w-48 font-mono`}
+            className={`${inputCls} w-72 font-mono`}
           >
-            {KNOWN_GENERATORS.map((g) => <option key={g} value={g}>{g}</option>)}
+            {GENERATOR_GROUPS.map((group) => (
+              <optgroup key={group.category} label={group.category}>
+                {group.items.map((i) => (
+                  <option key={i.id} value={i.id}>{i.id} — {i.desc}</option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </label>
       </div>

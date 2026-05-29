@@ -5,6 +5,8 @@ import Link from "next/link";
 import type { ItemDocument, ItemKind, WeaponElement, AccessoryEffect } from "@/types/item";
 import { ACCESSORY_EFFECTS, ACCESSORY_EFFECT_LABELS } from "@/types/item";
 import { useInfoDialog } from "@/components/info-dialog";
+import { IconPickerDialog } from "@/components/icon-picker-dialog";
+import { parseCodepoint } from "@/lib/rpg-awesome-icons";
 
 type Filter = "all" | ItemKind;
 
@@ -493,6 +495,7 @@ function FormFields({
   kindEditable: boolean;
 }) {
   const inputCls = "border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800";
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
   return (
     <div className="space-y-2">
       <div className="flex gap-2 flex-wrap items-end">
@@ -532,20 +535,41 @@ function FormFields({
         </label>
       </div>
 
-      <div className="flex gap-2 items-end">
+      <div className="flex gap-2 items-end flex-wrap">
         <label className="flex flex-col gap-1 w-20">
           <span className="text-xs text-gray-500">glyph_ascii</span>
           <input value={form.glyphAscii} onChange={(e) => setForm({ ...form, glyphAscii: e.target.value })} className={`${inputCls} font-mono`} />
         </label>
-        <label className="flex flex-col gap-1 w-20">
+        <div className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">glyph_unicode</span>
-          <input value={form.glyphUnicode} onChange={(e) => setForm({ ...form, glyphUnicode: e.target.value })} className={`${inputCls} font-mono`} />
-        </label>
+          <div className="flex items-stretch gap-1">
+            <input
+              value={form.glyphUnicode}
+              onChange={(e) => setForm({ ...form, glyphUnicode: e.target.value })}
+              className={`${inputCls} font-mono w-32`}
+              placeholder="\u{E946}"
+            />
+            <GlyphPreview literal={form.glyphUnicode} />
+            <button
+              type="button"
+              onClick={() => setIconPickerOpen(true)}
+              className="px-2 py-1 text-xs rounded border hover:border-blue-400 hover:text-blue-500 transition-colors"
+              title="RPG-Awesome 아이콘 선택"
+            >
+              아이콘 선택
+            </button>
+          </div>
+        </div>
         <label className="flex flex-col gap-1 w-20">
           <span className="text-xs text-gray-500">glyph_game_icon</span>
           <input value={form.glyphGameIcon} onChange={(e) => setForm({ ...form, glyphGameIcon: e.target.value })} className={`${inputCls} font-mono`} />
         </label>
       </div>
+      <IconPickerDialog
+        open={iconPickerOpen}
+        onClose={() => setIconPickerOpen(false)}
+        onSelect={(literal) => setForm({ ...form, glyphUnicode: literal })}
+      />
 
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-500">pickup_message</span>
@@ -739,5 +763,24 @@ function FormFields({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * glyph_unicode 입력 옆에 표시되는 라이브 미리보기.
+ * 값이 `\u{XXXX}` 형식이면 해당 codepoint 를 RPG-Awesome 폰트로 렌더.
+ * 다른 자유 텍스트(이모지 등) 면 그대로 표시(폰트만 RPGAwesome 시도).
+ */
+function GlyphPreview({ literal }: { literal: string }) {
+  const cp = parseCodepoint(literal);
+  const ch = cp !== null ? String.fromCodePoint(cp) : literal;
+  return (
+    <span
+      className="rpg-icon inline-flex items-center justify-center w-9 text-2xl border rounded bg-white dark:bg-gray-800"
+      aria-label={cp !== null ? `미리보기 U+${cp.toString(16).toUpperCase()}` : "미리보기"}
+      title={cp !== null ? `U+${cp.toString(16).toUpperCase()}` : "free text"}
+    >
+      {ch || " "}
+    </span>
   );
 }

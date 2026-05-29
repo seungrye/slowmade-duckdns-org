@@ -40,6 +40,30 @@ body {
   font-family: var(--font-family)
 }
 
+/*
+ * RPG-Awesome 0.0.2 (https://github.com/nagoshiashumari/Rpg-Awesome)
+ * 게임의 glyph_unicode (GlyphStyle::Unicode) 스타일에 사용되는 판타지/RPG PUA 아이콘 폰트.
+ * /public/fonts/rpg-awesome.ttf 가 bevy-rogue/assets/fonts/ 와 같은 파일.
+ * 사이트 quests/items 편집 UI 의 아이콘 픽커/미리보기에서 사용.
+ */
+@font-face {
+  font-family: 'RPGAwesome';
+  src: url('/fonts/rpg-awesome.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.rpg-icon {
+  font-family: 'RPGAwesome', sans-serif;
+  font-style: normal;
+  font-variant: normal;
+  font-weight: normal;
+  line-height: 1;
+  /* PUA 글리프가 베이스라인을 따라 살짝 어긋나는 폰트 특성을 흡수 */
+  display: inline-block;
+}
+
 *:focus {
   outline: none;
 }

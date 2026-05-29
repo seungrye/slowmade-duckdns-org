@@ -156,3 +156,36 @@ describe('ItemsPage 내보내기 버튼', () => {
     expect(screen.getByText('weapon 내보내기')).toBeTruthy();
   });
 });
+
+describe('ItemsPage glyph_unicode 아이콘 픽커', () => {
+  it('"+ 새 item" 폼에 "아이콘 선택" 버튼이 있다', async () => {
+    render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByText('+ 새 item'));
+    expect(screen.getByTitle('RPG-Awesome 아이콘 선택')).toBeTruthy();
+  });
+
+  it('"아이콘 선택" 버튼을 누르면 픽커 모달이 열린다', async () => {
+    render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByText('+ 새 item'));
+    fireEvent.click(screen.getByTitle('RPG-Awesome 아이콘 선택'));
+    expect(screen.getByText(/아이콘 선택 \(RPG-Awesome\)/)).toBeTruthy();
+  });
+
+  it('픽커에서 아이콘 선택 시 glyph_unicode 입력 값이 \\u{XXXX} 로 채워진다', async () => {
+    const { container } = render(<ItemsPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByText('+ 새 item'));
+    fireEvent.click(screen.getByTitle('RPG-Awesome 아이콘 선택'));
+    const search = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: 'broadsword' } });
+    fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));
+    // 폼의 glyph_unicode 입력에 \u{E946} 가 들어와야 한다 (placeholder 와 같은 입력).
+    const inputs = container.querySelectorAll('input.font-mono');
+    const glyphUnicodeInput = Array.from(inputs).find(
+      (el) => (el as HTMLInputElement).placeholder === '\\u{E946}',
+    ) as HTMLInputElement;
+    expect(glyphUnicodeInput.value).toBe('\\u{E946}');
+  });
+});
