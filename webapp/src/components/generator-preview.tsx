@@ -86,7 +86,7 @@ function PreviewCanvas({
   return (
     <canvas
       ref={ref}
-      className="border border-gray-300 dark:border-gray-700 rounded max-w-full h-auto"
+      className="border border-gray-300 dark:border-gray-700 rounded w-full max-w-full h-auto"
       style={{ imageRendering: "pixelated" }}
       title={`seed ${sample.seed}`}
     />
