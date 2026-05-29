@@ -20,6 +20,7 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
   {
     category: "던전 (방+복도)",
     items: [
+      { id: "tinykeep",           desc: "TinyKeep — 들로네/MST 기반 부정형 방 배치 + 유기적 복도 네트워크" },
       { id: "bsp",                desc: "BSP 분할, 규칙적 방 + 깔끔한 복도" },
       { id: "rooms",              desc: "크기 다양한 방 랜덤 배치 (simple_rooms)" },
       { id: "recursive_division", desc: "재귀 분할 (미로 변형)" },
@@ -87,8 +88,8 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
   },
 ];
 
-// 평면 id 배열(검증·테스트 용도).
-const KNOWN_GENERATORS = GENERATOR_GROUPS.flatMap((g) => g.items.map((i) => i.id));
+// 평면 id 배열(테스트 용도).
+export const KNOWN_GENERATORS = GENERATOR_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 
 export default function ZonesPage() {
   const [list, setList] = useState<ZoneDocument[]>([]);
