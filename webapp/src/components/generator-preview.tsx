@@ -173,10 +173,12 @@ export function GeneratorPreview({ generator }: { generator: string }) {
         ))}
       </div>
 
-      {/* 모바일 — 캐로셀 (한 장 + 좌/우 화살표 + 도트 + swipe) */}
+      {/* 모바일 — 캐로셀 (한 장 + 좌/우 화살표 + 도트 + swipe).
+          캐로셀 컨테이너는 padding 없이 이미지를 폭 가득 채우고, chevron 버튼이
+          이미지 가장자리에 반쯤 걸쳐 overlay 된다. */}
       <div className="sm:hidden">
         <div
-          className="relative flex items-center justify-center px-8 overflow-hidden"
+          className="relative flex items-center justify-center"
           onTouchStart={(e) => {
             touchStartX.current = e.touches[0]?.clientX ?? null;
           }}
@@ -194,9 +196,11 @@ export function GeneratorPreview({ generator }: { generator: string }) {
             type="button"
             onClick={prev}
             aria-label="이전 시드"
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 px-2 py-1 rounded-full bg-white/80 dark:bg-gray-900/80 border shadow hover:bg-white dark:hover:bg-gray-800 text-lg leading-none"
+            className="absolute left-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-white/75 dark:bg-gray-900/75 border border-gray-300 dark:border-gray-700 shadow hover:bg-white dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
           >
-            ‹
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
           </button>
           <div className="text-center min-w-0 max-w-full">
             <PreviewCanvas
@@ -211,9 +215,11 @@ export function GeneratorPreview({ generator }: { generator: string }) {
             type="button"
             onClick={next}
             aria-label="다음 시드"
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 px-2 py-1 rounded-full bg-white/80 dark:bg-gray-900/80 border shadow hover:bg-white dark:hover:bg-gray-800 text-lg leading-none"
+            className="absolute right-1 top-1/2 -translate-y-1/2 z-10 p-1.5 rounded-full bg-white/75 dark:bg-gray-900/75 border border-gray-300 dark:border-gray-700 shadow hover:bg-white dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
           >
-            ›
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         </div>
         {/* 인덱스 도트 */}
