@@ -139,6 +139,14 @@
     {
       "file": "marukrap_spaceship.json",
       "name": "marukrap_spaceship"
+    },
+    {
+      "file": "watabou_village.json",
+      "name": "watabou_village"
+    },
+    {
+      "file": "watabou_village_isolated.json",
+      "name": "watabou_village_isolated"
     }
   ],
   "height": 50,

@@ -54,6 +54,8 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
       { id: "organic_village",    desc: "유기적 건물 배치" },
       { id: "grid_village",       desc: "격자 도로망 + 블록" },
       { id: "walled_town",        desc: "성벽 마을 (잠입 퀘스트용)" },
+      { id: "watabou_village",          desc: "Watabou Village 스타일 — L-system 도로 + lot 분할" },
+      { id: "watabou_village_isolated", desc: "Watabou Village isolated — 외부 도로 없는 닫힌 마을" },
     ],
   },
   {
