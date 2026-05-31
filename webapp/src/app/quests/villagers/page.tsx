@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { VillagerDocument, HomeLandmark } from "@/types/villager";
 import { HOME_LANDMARKS, HOME_LANDMARK_LABEL } from "@/types/villager";
 import type { ZoneIdValue } from "@/types/zone";
 import { useInfoDialog } from "@/components/info-dialog";
+import {
+  type TownConfig, type TownLandmark,
+  TOWN_CONFIG_DEFAULTS, availableLandmarks,
+} from "@/types/town-config";
 
 interface FormState {
   id: string;
@@ -96,7 +100,21 @@ export default function VillagersPage() {
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [townConfig, setTownConfig] = useState<TownConfig>(TOWN_CONFIG_DEFAULTS);
   const { showInfo } = useInfoDialog();
+
+  // home_landmark select 의 옵션 set — Town config 의 selected landmark + Random/Road.
+  // 사이즈/환경에 따라 town 옵션에서 비활성화된 landmark 는 자동 제외.
+  const allowedLandmarks = useMemo(() => {
+    const available = new Set<string>(
+      availableLandmarks(townConfig.size, townConfig.environment),
+    );
+    const allowed = new Set<HomeLandmark>(["random", "road"]);
+    for (const lm of townConfig.landmarks) {
+      if (available.has(lm)) allowed.add(lm as TownLandmark);
+    }
+    return allowed;
+  }, [townConfig]);
 
   async function load() {
     setLoading(true);
@@ -145,6 +163,14 @@ export default function VillagersPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  // Town config 한 번 로드 — home_landmark select 옵션 필터링용.
+  useEffect(() => {
+    fetch("/api/quests/town-config")
+      .then((r) => r.json())
+      .then((j) => { if (j.data) setTownConfig(j.data as TownConfig); })
+      .catch(() => { /* default 유지 */ });
+  }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -296,7 +322,7 @@ export default function VillagersPage() {
           onSubmit={handleCreate}
           className="mb-6 p-4 border rounded-lg bg-gray-50 dark:bg-gray-900 space-y-2"
         >
-          <FormFields form={createForm} setForm={setCreateForm} idEditable />
+          <FormFields form={createForm} setForm={setCreateForm} idEditable allowedLandmarks={allowedLandmarks} />
           <div className="flex gap-2">
             <button type="submit" className="px-3 py-1 text-sm rounded bg-blue-600 text-white">
               생성
@@ -385,7 +411,7 @@ export default function VillagersPage() {
               </div>
               {editingId === v.id && (
                 <div className="p-3 bg-white dark:bg-gray-950 space-y-2">
-                  <FormFields form={editForm} setForm={setEditForm} idEditable={false} />
+                  <FormFields form={editForm} setForm={setEditForm} idEditable={false} allowedLandmarks={allowedLandmarks} />
                   <button
                     onClick={() => handleSave(v.id)}
                     className="px-3 py-1 text-sm rounded bg-blue-600 text-white"
@@ -410,10 +436,13 @@ function FormFields({
   form,
   setForm,
   idEditable,
+  allowedLandmarks,
 }: {
   form: FormState;
   setForm: (f: FormState) => void;
   idEditable: boolean;
+  /** home_landmark select 에 노출할 옵션 set. Town config 의 selected landmark + Random/Road. */
+  allowedLandmarks: Set<HomeLandmark>;
 }) {
   const inputCls = "border rounded px-2 py-1 text-sm w-full bg-white dark:bg-gray-800";
   return (
@@ -541,7 +570,7 @@ function FormFields({
             }
             className={`${inputCls} w-80 ${form.homeZoneTag !== "Town" ? "opacity-60" : ""}`}
           >
-            {HOME_LANDMARKS.map((lm) => (
+            {HOME_LANDMARKS.filter((lm) => allowedLandmarks.has(lm)).map((lm) => (
               <option key={lm} value={lm}>{HOME_LANDMARK_LABEL[lm]}</option>
             ))}
           </select>
