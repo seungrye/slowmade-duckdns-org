@@ -87,14 +87,54 @@ export default function VillagersPage() {
   const [createForm, setCreateForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { showInfo } = useInfoDialog();
 
   async function load() {
     setLoading(true);
+    setSelectedIds(new Set());
     const res = await fetch("/api/quests/villagers");
     const json = await res.json();
     setList(json.data ?? []);
     setLoading(false);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  const allSelected = list.length > 0 && list.every((v) => selectedIds.has(v.id));
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) for (const v of list) next.delete(v.id);
+      else for (const v of list) next.add(v.id);
+      return next;
+    });
+  }
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}개 villager 를 삭제하시겠습니까?`)) return;
+    setBulkDeleting(true);
+    const res = await fetch("/api/quests/villagers/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    });
+    setBulkDeleting(false);
+    if (res.ok) {
+      const { data } = await res.json();
+      showInfo({ title: "일괄 삭제 완료", body: `${data.deleted}개 villager 삭제.`, variant: "success" });
+      load();
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showInfo({ title: "일괄 삭제 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -224,6 +264,23 @@ export default function VillagersPage() {
         </div>
       </div>
 
+      {list.length > 0 && (
+        <div className="flex items-center gap-3 mb-3 text-sm">
+          <label className="flex items-center gap-1 text-gray-600 dark:text-gray-400 select-none cursor-pointer">
+            <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="전체 선택" />
+            전체 선택
+          </label>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting || selectedIds.size === 0}
+            className="px-3 py-1 rounded border border-red-300 text-red-500 hover:border-red-500 hover:text-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {bulkDeleting ? "삭제 중..." : `선택 삭제 (${selectedIds.size})`}
+          </button>
+        </div>
+      )}
+
       {creating && (
         <form
           onSubmit={handleCreate}
@@ -254,7 +311,14 @@ export default function VillagersPage() {
           {list.map((v) => (
             <li key={v.id} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900">
-                <div className="flex items-center gap-3 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(v.id)}
+                  onChange={() => toggleSelect(v.id)}
+                  aria-label={`${v.id} 선택`}
+                  className="shrink-0"
+                />
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span
                     className="w-5 h-5 rounded shrink-0 border border-gray-300"
                     style={{ background: `rgb(${v.color[0] * 255}, ${v.color[1] * 255}, ${v.color[2] * 255})` }}

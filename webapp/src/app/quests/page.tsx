@@ -15,6 +15,7 @@ export default function QuestsPage() {
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkSpawn, setBulkSpawn] = useState("1.0");
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const { showInfo } = useInfoDialog();
 
@@ -43,6 +44,26 @@ export default function QuestsPage() {
       else for (const q of quests) next.add(q._id);
       return next;
     });
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}개 퀘스트를 삭제하시겠습니까?`)) return;
+    setBulkDeleting(true);
+    const res = await fetch("/api/quests/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    });
+    setBulkDeleting(false);
+    if (res.ok) {
+      const { data } = await res.json();
+      showInfo({ title: "일괄 삭제 완료", body: `${data.deleted}개 퀘스트 삭제.`, variant: "success" });
+      load();
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showInfo({ title: "일괄 삭제 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   async function handleBulkSpawn(e: React.FormEvent) {
@@ -152,29 +173,9 @@ export default function QuestsPage() {
 
   return (
     <div className="mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">퀘스트 목록</h1>
         <div className="flex gap-2 flex-wrap items-center">
-          {quests.length > 0 && (
-            <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 select-none">
-              <input
-                type="checkbox"
-                checked={quests.length > 0 && quests.every((q) => selectedIds.has(q._id))}
-                onChange={toggleSelectAll}
-                aria-label="전체 선택"
-              />
-              전체
-            </label>
-          )}
-          {selectedIds.size > 0 && (
-            <button
-              type="button"
-              onClick={() => setBulkOpen(true)}
-              className="px-3 py-2 text-sm rounded-lg border border-purple-300 hover:border-purple-500 hover:text-purple-600 transition-colors"
-            >
-              spawn 일괄 변경 ({selectedIds.size})
-            </button>
-          )}
           <label className="cursor-pointer px-3 py-2 text-sm rounded-lg border border-dashed border-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors">
             .ron 가져오기
             <input
@@ -197,6 +198,36 @@ export default function QuestsPage() {
           </button>
         </div>
       </div>
+
+      {quests.length > 0 && (
+        <div className="flex items-center gap-3 mb-3 text-sm flex-wrap">
+          <label className="flex items-center gap-1 text-gray-600 dark:text-gray-400 select-none cursor-pointer">
+            <input
+              type="checkbox"
+              checked={quests.every((q) => selectedIds.has(q._id))}
+              onChange={toggleSelectAll}
+              aria-label="전체 선택"
+            />
+            전체 선택
+          </label>
+          <button
+            type="button"
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting || selectedIds.size === 0}
+            className="px-3 py-1 rounded border border-red-300 text-red-500 hover:border-red-500 hover:text-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {bulkDeleting ? "삭제 중..." : `선택 삭제 (${selectedIds.size})`}
+          </button>
+          <button
+            type="button"
+            onClick={() => setBulkOpen(true)}
+            disabled={selectedIds.size === 0}
+            className="px-3 py-1 rounded border border-purple-300 text-purple-500 hover:border-purple-500 hover:text-purple-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            spawn 일괄 변경 ({selectedIds.size})
+          </button>
+        </div>
+      )}
 
       {creating && (
         <form
