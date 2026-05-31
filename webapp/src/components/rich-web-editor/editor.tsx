@@ -43,6 +43,7 @@ import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 import { MathPopover, MathButton, MathContent } from "@/components/tiptap-ui/math-popover"
+import { TableButton } from "@/components/tiptap-ui/table-button"
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
@@ -150,6 +151,7 @@ const MainToolbarContent = ({
                     ) : (
                         <MathButton onClick={onMathClick} aria-label="수식 삽입" />
                     )}
+                    <TableButton aria-label="표" />
                 </ToolbarGroup>
 
                 <ToolbarSeparator />

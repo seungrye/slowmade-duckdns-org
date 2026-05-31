@@ -18,6 +18,10 @@ import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
 import { InlineMath, BlockMath } from "@tiptap/extension-mathematics"
+import { Table } from "@tiptap/extension-table"
+import { TableRow } from "@tiptap/extension-table-row"
+import { TableHeader } from "@tiptap/extension-table-header"
+import { TableCell } from "@tiptap/extension-table-cell"
 import "katex/dist/katex.min.css"
 
 // --- Custom Extensions ---
@@ -64,6 +68,10 @@ export const tiptapExtensions = [
     Link.configure({ openOnClick: true }),
     InlineMath.configure({ katexOptions: { throwOnError: false } }),
     BlockMath.configure({ katexOptions: { throwOnError: false } }),
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
 ];
 
 export interface RichContentViewerProps {

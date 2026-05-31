@@ -12,6 +12,10 @@ import { Superscript } from "@tiptap/extension-superscript"
 import { Underline } from "@tiptap/extension-underline"
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight"
 import { InlineMath, BlockMath } from "@tiptap/extension-mathematics"
+import { Table } from "@tiptap/extension-table"
+import { TableRow } from "@tiptap/extension-table-row"
+import { TableHeader } from "@tiptap/extension-table-header"
+import { TableCell } from "@tiptap/extension-table-cell"
 import { Markdown } from "@tiptap/markdown"
 import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
@@ -86,5 +90,9 @@ export const editorExtensions = [
     Link.configure({ openOnClick: false }),
     InlineMath.configure({ katexOptions: { throwOnError: false } }),
     BlockMath.configure({ katexOptions: { throwOnError: false } }),
+    Table.configure({ resizable: true }),
+    TableRow,
+    TableHeader,
+    TableCell,
     Markdown,
 ];

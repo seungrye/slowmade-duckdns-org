@@ -36,6 +36,14 @@ describe('editorExtensions', () => {
         expect(names).toContain('inlineMath');
         expect(names).toContain('blockMath');
     });
+
+    it('Table 관련 확장 4종이 포함되어 있다', () => {
+        const names = editorExtensions.map(e => e.name);
+        expect(names).toContain('table');
+        expect(names).toContain('tableRow');
+        expect(names).toContain('tableHeader');
+        expect(names).toContain('tableCell');
+    });
 });
 
 // renderMarkdown 커스텀 직렬화 검증 — <sup>/<sub>/<p style> 로 포맷 보존
