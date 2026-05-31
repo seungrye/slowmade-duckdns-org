@@ -96,7 +96,7 @@ describe('SystemZonesPanel Town 옵션 form', () => {
             _id: 'default',
             size: 'village', roads: 'radial', wealth: 'common',
             defenses: 'none', landmarks: ['inn', 'smithy'],
-            fields: true, version: 1,
+            fields: true, environment: 'plains', version: 1,
           } }),
         } as Response);
       }
@@ -107,7 +107,7 @@ describe('SystemZonesPanel Town 옵션 form', () => {
     });
   }
 
-  it('Town 옵션 form 이 6 개 옵션과 저장/기본값 버튼을 렌더한다', async () => {
+  it('Town 옵션 form 이 7 개 옵션과 저장/기본값 버튼을 렌더한다', async () => {
     mockFetchByUrl();
     const { container } = render(<ZonesPage />);
     await act(async () => {});
@@ -117,11 +117,35 @@ describe('SystemZonesPanel Town 옵션 form', () => {
     expect(container.textContent).toContain('roads (도로 형태)');
     expect(container.textContent).toContain('wealth (부유함)');
     expect(container.textContent).toContain('defenses (방어 시설)');
+    expect(container.textContent).toContain('environment (지리 환경)');
     expect(container.textContent).toContain('landmarks');
     expect(container.textContent).toContain('fields (외곽 농경지)');
     // 버튼
     expect(screen.getByText('저장')).toBeTruthy();
     expect(screen.getByText('기본값 복원')).toBeTruthy();
+  });
+
+  it('Hamlet/Plains 일 때 Manor 체크박스가 disabled (Town 전용)', async () => {
+    mockFetchByUrl({ data: {
+      _id: 'default',
+      size: 'hamlet', roads: 'radial', wealth: 'common',
+      defenses: 'none', landmarks: [],
+      fields: true, environment: 'plains', version: 1,
+    } });
+    const { container } = render(<ZonesPage />);
+    await act(async () => {});
+    const manorBox = container.querySelector('input[aria-label="town-landmark-manor"]') as HTMLInputElement | null;
+    expect(manorBox).toBeTruthy();
+    expect(manorBox!.disabled).toBe(true);
+  });
+
+  it('Plains 일 때 Docks 체크박스가 disabled (Coastal 전용)', async () => {
+    mockFetchByUrl();
+    const { container } = render(<ZonesPage />);
+    await act(async () => {});
+    const docksBox = container.querySelector('input[aria-label="town-landmark-docks"]') as HTMLInputElement | null;
+    expect(docksBox).toBeTruthy();
+    expect(docksBox!.disabled).toBe(true);
   });
 
   it('Town generator 가 카탈로그 generator select 옵션에 포함된다', async () => {

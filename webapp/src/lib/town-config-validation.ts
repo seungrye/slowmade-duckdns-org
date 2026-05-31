@@ -5,10 +5,13 @@
 //   - defenses: TOWN_DEFENSES 중 하나
 //   - landmarks: 배열, 각 원소는 TOWN_LANDMARKS 중 하나, 중복 허용 X
 //   - fields: boolean
+//   - environment: TOWN_ENVIRONMENTS 중 하나 (누락 시 기본 plains)
 
 import {
-  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
-  type TownConfig, type TownSize, type TownRoads, type TownWealth, type TownDefenses, type TownLandmark,
+  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS, TOWN_ENVIRONMENTS,
+  TOWN_CONFIG_DEFAULTS,
+  type TownConfig, type TownSize, type TownRoads, type TownWealth, type TownDefenses,
+  type TownLandmark, type TownEnvironment,
 } from "@/types/town-config";
 
 export type ValidationResult = { ok: true } | { ok: false; message: string };
@@ -52,11 +55,19 @@ export function validateTownConfig(body: unknown): ValidationResult {
   if (typeof b.fields !== "boolean") {
     return { ok: false, message: "fields 는 boolean 이어야 합니다." };
   }
+  // environment 는 신규 필드 — 누락 시 기본 plains 로 보강(하위호환). 명시되었으나
+  // enum 외 값이면 실패.
+  if (b.environment !== undefined && !inEnum(TOWN_ENVIRONMENTS, b.environment)) {
+    return { ok: false, message: `environment 는 ${TOWN_ENVIRONMENTS.join("/")} 중 하나여야 합니다.` };
+  }
   return { ok: true };
 }
 
 /** body 를 정규화된 TownConfig 로 변환 (validate 통과 후 사용). */
 export function normalizeTownConfig(body: Record<string, unknown>): TownConfig {
+  const env: TownEnvironment = inEnum(TOWN_ENVIRONMENTS, body.environment)
+    ? (body.environment as TownEnvironment)
+    : TOWN_CONFIG_DEFAULTS.environment;
   return {
     size: body.size as TownSize,
     roads: body.roads as TownRoads,
@@ -64,5 +75,6 @@ export function normalizeTownConfig(body: Record<string, unknown>): TownConfig {
     defenses: body.defenses as TownDefenses,
     landmarks: [...(body.landmarks as TownLandmark[])],
     fields: body.fields as boolean,
+    environment: env,
   };
 }

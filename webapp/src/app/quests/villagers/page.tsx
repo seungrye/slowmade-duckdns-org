@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { VillagerDocument } from "@/types/villager";
+import type { VillagerDocument, HomeLandmark } from "@/types/villager";
+import { HOME_LANDMARKS, HOME_LANDMARK_LABEL } from "@/types/villager";
 import type { ZoneIdValue } from "@/types/zone";
 import { useInfoDialog } from "@/components/info-dialog";
 
@@ -21,6 +22,11 @@ interface FormState {
    */
   homeZoneTag: HomeZoneTag;
   homeZoneNamedId: string;
+  /**
+   * Town zone 안에서 villager 가 spawn 될 landmark.
+   * 기본 "random" (기존 동작). Town 이외 zone 에선 게임이 무시한다.
+   */
+  homeLandmark: HomeLandmark;
 }
 
 // `homeZone` UI 태그 — Town 또는 Named.
@@ -60,6 +66,7 @@ const emptyForm: FormState = {
   vendor: false,
   homeZoneTag: "Town",
   homeZoneNamedId: "",
+  homeLandmark: "random",
 };
 
 // ── 색상 유틸 (RON 은 0~1 RGB, <input type=color> 는 #rrggbb) ──
@@ -154,6 +161,7 @@ export default function VillagersPage() {
         stationary: createForm.stationary,
         vendor: createForm.vendor,
         homeZone: homeZoneFromForm(createForm),
+        homeLandmark: createForm.homeLandmark,
       }),
     });
     if (res.ok) {
@@ -178,6 +186,7 @@ export default function VillagersPage() {
         stationary: editForm.stationary,
         vendor: editForm.vendor,
         homeZone: homeZoneFromForm(editForm),
+        homeLandmark: editForm.homeLandmark,
       }),
     });
     if (res.ok) {
@@ -228,6 +237,7 @@ export default function VillagersPage() {
       vendor: !!v.vendor,
       homeZoneTag: tag,
       homeZoneNamedId: v.homeZone?.type === "Named" ? v.homeZone.id : "",
+      homeLandmark: v.homeLandmark ?? "random",
     });
   }
 
@@ -333,6 +343,11 @@ export default function VillagersPage() {
                       {v.homeZone && v.homeZone.type !== "Town" && (
                         <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 font-mono">
                           {`Named("${v.homeZone.id}")`}
+                        </span>
+                      )}
+                      {v.homeLandmark && v.homeLandmark !== "random" && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 font-mono">
+                          {v.homeLandmark}
                         </span>
                       )}
                     </div>
@@ -504,6 +519,33 @@ function FormFields({
             </datalist>
           </label>
         )}
+        {/*
+          home_landmark — Town zone 한정. Town zone 안의 6 landmark + Road + Random.
+          Town 이외 zone 에서는 게임이 무시한다 (Random fallback). 기본값 "random".
+        */}
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-gray-500">
+            home_landmark <span className="text-gray-400">(Town zone 한정 spawn 위치)</span>
+          </span>
+          <select
+            aria-label="home_landmark"
+            value={form.homeLandmark}
+            onChange={(e) =>
+              setForm({ ...form, homeLandmark: e.target.value as HomeLandmark })
+            }
+            disabled={form.homeZoneTag !== "Town"}
+            title={
+              form.homeZoneTag !== "Town"
+                ? "Town zone 에서만 의미가 있다 — 그 외 zone 에서는 게임이 Random 으로 처리"
+                : undefined
+            }
+            className={`${inputCls} w-80 ${form.homeZoneTag !== "Town" ? "opacity-60" : ""}`}
+          >
+            {HOME_LANDMARKS.map((lm) => (
+              <option key={lm} value={lm}>{HOME_LANDMARK_LABEL[lm]}</option>
+            ))}
+          </select>
+        </label>
       </div>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-gray-500">dialogs (한 줄 = 한 대사, 빈 줄 무시)</span>

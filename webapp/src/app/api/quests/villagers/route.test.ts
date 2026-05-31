@@ -96,4 +96,25 @@ describe('POST /api/villagers', () => {
       speed: 0.5,
     }));
   });
+
+  it('homeLandmark 가 enum 외 값이면 400', async () => {
+    (Villager.findOne as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    const res = await POST(makeRequest({
+      id: 'x', name: 'x', color: [0.5, 0.5, 0.5], homeLandmark: 'castle',
+    }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toMatch(/homeLandmark/);
+  });
+
+  it('homeLandmark 가 enum 값이면 그대로 전달', async () => {
+    (Villager.findOne as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (Villager.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'innkeeper' });
+    await POST(makeRequest({
+      id: 'innkeeper', name: '여관 주인', color: [0.5, 0.5, 0.5], homeLandmark: 'inn',
+    }));
+    expect(Villager.create).toHaveBeenCalledWith(expect.objectContaining({
+      homeLandmark: 'inn',
+    }));
+  });
 });

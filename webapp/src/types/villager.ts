@@ -2,6 +2,64 @@
 
 import type { ZoneIdValue } from "./zone";
 
+/**
+ * Villager 의 거주 landmark (Town zone 한정).
+ *
+ * 게임 측 `HomeLandmark` Rust enum 미러:
+ *   - `random` — 임의 floor tile (기본값, 기존 동작 유지)
+ *   - `road`   — 도로(road) 타일군
+ *   - 13 landmark — Inn / Smithy / Temple / Guard / Market / Manor /
+ *                  Tavern / Herbalist / Graveyard / Jail / Guild /
+ *                  Alchemist / Docks
+ *
+ * 게임 측에서 `home_zone == Town` 이고 해당 landmark 가 TownConfig.landmarks 에
+ * 포함된 경우 그 영역 내부 임의 floor tile 에 spawn. 비활성/Town 외 zone 이면
+ * Random fallback.
+ *
+ * TS 는 kebab/lowercase, RON 은 PascalCase 로 직렬화한다(serializeVillagersRon 참조).
+ */
+export type HomeLandmark =
+  | "random"
+  | "road"
+  | "inn"
+  | "smithy"
+  | "temple"
+  | "guard"
+  | "market"
+  | "manor"
+  | "tavern"
+  | "herbalist"
+  | "graveyard"
+  | "jail"
+  | "guild"
+  | "alchemist"
+  | "docks";
+
+export const HOME_LANDMARKS: readonly HomeLandmark[] = [
+  "random", "road",
+  "inn", "smithy", "temple", "guard", "market", "manor",
+  "tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks",
+] as const;
+
+/** 한글 라벨 — UI 표시용 (game 측은 PascalCase enum). */
+export const HOME_LANDMARK_LABEL: Record<HomeLandmark, string> = {
+  random:    "임의 위치 (Random) — 기본",
+  road:      "도로 (Road)",
+  inn:       "여관 (Inn)",
+  smithy:    "대장간 (Smithy)",
+  temple:    "신전 (Temple)",
+  guard:     "경비초소 (Guard)",
+  market:    "시장 (Market)",
+  manor:     "영주 저택 (Manor)",
+  tavern:    "선술집 (Tavern)",
+  herbalist: "약초집 (Herbalist)",
+  graveyard: "무덤 (Graveyard)",
+  jail:      "감옥 (Jail)",
+  guild:     "길드 (Guild)",
+  alchemist: "연금술공방 (Alchemist)",
+  docks:     "부두 (Docks)",
+};
+
 export interface VillagerDef {
   /** unique 식별자 (snake_case). 퀘스트 giver_npc / KillNpc 가 참조. */
   id: string;
@@ -22,6 +80,11 @@ export interface VillagerDef {
    * 게임 측 `#[serde(default = "default_home_zone")]` 와 동일한 의미.
    */
   homeZone?: ZoneIdValue;
+  /**
+   * 거주 landmark — Town zone 한정 (그 외 zone 에서는 무시되고 Random fallback).
+   * 미지정/누락 시 `"random"` (게임 측 `#[serde(default)] HomeLandmark::Random` 미러).
+   */
+  homeLandmark?: HomeLandmark;
 }
 
 export interface VillagerDocument extends VillagerDef {

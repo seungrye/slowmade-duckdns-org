@@ -2,11 +2,16 @@ import { NextRequest } from "next/server";
 import { connectToDB } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import Villager from "@/models/villager";
+import { HOME_LANDMARKS, type HomeLandmark } from "@/types/villager";
 
 function isValidColor(c: unknown): c is [number, number, number] {
   return Array.isArray(c)
     && c.length === 3
     && c.every((n) => typeof n === "number" && n >= 0 && n <= 1);
+}
+
+function isValidHomeLandmark(v: unknown): v is HomeLandmark {
+  return typeof v === "string" && (HOME_LANDMARKS as readonly string[]).includes(v);
 }
 
 export async function GET() {
@@ -28,6 +33,12 @@ export async function POST(req: NextRequest) {
   if (!isValidColor(body.color)) {
     return apiError("color 는 [r, g, b] (각 0.0~1.0) 형식이어야 합니다.", 400);
   }
+  if (body.homeLandmark !== undefined && !isValidHomeLandmark(body.homeLandmark)) {
+    return apiError(
+      `homeLandmark 는 ${HOME_LANDMARKS.join("/")} 중 하나여야 합니다.`,
+      400,
+    );
+  }
 
   const existing = await Villager.findOne({ id: body.id });
   if (existing) return apiError(`이미 존재하는 villager id 입니다: ${body.id}`, 409);
@@ -42,6 +53,8 @@ export async function POST(req: NextRequest) {
     vendor: body.vendor ?? false,
     // homeZone — 미지정 시 schema default(`{ type: "Town" }`) 가 적용된다.
     homeZone: body.homeZone,
+    // homeLandmark — 미지정 시 schema default("random") 가 적용된다.
+    homeLandmark: body.homeLandmark,
   });
 
   return apiSuccess(villager, 201);

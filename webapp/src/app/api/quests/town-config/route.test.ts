@@ -33,6 +33,7 @@ const VALID_BODY = {
   defenses: "none",
   landmarks: ["inn", "smithy"],
   fields: true,
+  environment: "plains",
 };
 
 describe("GET /api/quests/town-config", () => {
@@ -41,7 +42,7 @@ describe("GET /api/quests/town-config", () => {
     createMock.mockReset();
   });
 
-  it("doc 없으면 기본값(Village/Radial/Common/None/[Inn,Smithy]/fields=true) 반환", async () => {
+  it("doc 없으면 기본값(Village/Radial/Common/None/[Inn,Smithy]/fields=true/Plains) 반환", async () => {
     findByIdMock.mockReturnValue(leanResolve(null));
     const res = await GET();
     expect(res.status).toBe(200);
@@ -54,6 +55,7 @@ describe("GET /api/quests/town-config", () => {
       defenses: "none",
       landmarks: ["inn", "smithy"],
       fields: true,
+      environment: "plains",
       version: 0,
     });
   });
@@ -120,19 +122,36 @@ describe("PUT /api/quests/town-config", () => {
     const existing = {
       _id: "default",
       size: "village", roads: "radial", wealth: "common", defenses: "none",
-      landmarks: ["inn"], fields: true, version: 2, save: saveMock,
+      landmarks: ["inn"], fields: true, environment: "plains", version: 2, save: saveMock,
     };
     findByIdMock.mockResolvedValue(existing);
     const res = await PUT(makeRequest({
       size: "town", roads: "random", wealth: "wealthy", defenses: "stone",
-      landmarks: ["inn", "smithy", "manor"], fields: false,
+      landmarks: ["inn", "smithy", "manor"], fields: false, environment: "coastal",
     }));
     expect(res.status).toBe(200);
     expect(existing.size).toBe("town");
     expect(existing.wealth).toBe("wealthy");
     expect(existing.fields).toBe(false);
     expect(existing.landmarks).toEqual(["inn", "smithy", "manor"]);
+    expect(existing.environment).toBe("coastal");
     expect(existing.version).toBe(3);
     expect(saveMock).toHaveBeenCalled();
+  });
+
+  it("환경 = coastal + 신규 7 landmark 도 통과 (13 종 매트릭스)", async () => {
+    findByIdMock.mockResolvedValue(null);
+    createMock.mockResolvedValue({ _id: "default", ...VALID_BODY, version: 1 });
+    const res = await PUT(makeRequest({
+      ...VALID_BODY,
+      environment: "coastal",
+      landmarks: ["tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks"],
+    }));
+    expect(res.status).toBe(201);
+  });
+
+  it("environment 가 enum 외 값이면 400", async () => {
+    const res = await PUT(makeRequest({ ...VALID_BODY, environment: "desert" }));
+    expect(res.status).toBe(400);
   });
 });

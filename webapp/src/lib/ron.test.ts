@@ -976,6 +976,136 @@ describe("parseVillagersRon — home_zone (마을 분산)", () => {
   });
 });
 
+describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
+  // 새 필드: HomeLandmark enum — Random(기본) / Road / 6 landmark.
+  // 게임 측 #[serde(default)] 와 동일 — 누락 시 undefined, Random 명시 시도 호환.
+  const SRC = `[
+    VillagerDef(
+        id: "innkeeper",
+        name: "여관 주인",
+        color: (0.8, 0.6, 0.3),
+        dialogs: [],
+        speed: 1.0,
+        home_landmark: Inn,
+    ),
+    VillagerDef(
+        id: "guard_captain",
+        name: "초소장",
+        color: (0.5, 0.5, 0.6),
+        dialogs: [],
+        speed: 1.0,
+        home_landmark: Guard,
+    ),
+    VillagerDef(
+        id: "wanderer",
+        name: "방랑자",
+        color: (0.4, 0.4, 0.4),
+        dialogs: [],
+        speed: 1.0,
+        home_landmark: Road,
+    ),
+    VillagerDef(
+        id: "burgomaster",
+        name: "촌장",
+        color: (1.0, 0.85, 0.0),
+        dialogs: [],
+        speed: 1.0,
+        home_landmark: Random,
+    ),
+    VillagerDef(
+        id: "elder",
+        name: "장로",
+        color: (0.9, 0.8, 0.5),
+        dialogs: [],
+        speed: 0.5,
+    ),
+  ]`;
+
+  it("PascalCase enum 을 lowercase TS 값으로 파싱", () => {
+    const v = parseVillagersRon(SRC);
+    expect(v[0].homeLandmark).toBe("inn");
+    expect(v[1].homeLandmark).toBe("guard");
+    expect(v[2].homeLandmark).toBe("road");
+    expect(v[3].homeLandmark).toBe("random");
+    // 미지정 → undefined (게임 측 #[serde(default)] 미러 — DB 에서 "random" 보정)
+    expect(v[4].homeLandmark).toBeUndefined();
+  });
+
+  it("라운드트립: 기본 Random 은 생략, 6 landmark + Road 는 PascalCase 명시", () => {
+    const v = parseVillagersRon(SRC);
+    const out = serializeVillagersRon(v);
+    expect(out).toContain("home_landmark: Inn");
+    expect(out).toContain("home_landmark: Guard");
+    expect(out).toContain("home_landmark: Road");
+    // Random 은 default 라 출력 생략
+    const burgoBlock = out.slice(out.indexOf("burgomaster"), out.indexOf("elder"));
+    expect(burgoBlock).not.toContain("home_landmark");
+    // elder 도 미지정이므로 출력 없음
+    const elderBlock = out.slice(out.indexOf("elder"));
+    expect(elderBlock).not.toContain("home_landmark");
+    // 정규화 라운드트립 — Random/undefined 동치 처리
+    const normalize = (defs: ReturnType<typeof parseVillagersRon>) =>
+      defs.map((d) => {
+        const { homeLandmark, ...rest } = d;
+        const isDefault = !homeLandmark || homeLandmark === "random";
+        return isDefault ? rest : { ...rest, homeLandmark };
+      });
+    expect(normalize(parseVillagersRon(out))).toEqual(normalize(v));
+  });
+
+  it("알 수 없는 home_landmark 는 throw", () => {
+    const bad = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0,home_landmark:Castle)]`;
+    expect(() => parseVillagersRon(bad)).toThrow(/Unknown home_landmark/);
+  });
+
+  it("6 landmark 모두 직렬화/재파싱 round-trip", () => {
+    const v: VillagerDef[] = [
+      { id: "a", name: "a", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "inn" },
+      { id: "b", name: "b", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "smithy" },
+      { id: "c", name: "c", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "temple" },
+      { id: "d", name: "d", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "guard" },
+      { id: "e", name: "e", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "market" },
+      { id: "f", name: "f", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "manor" },
+    ];
+    const out = serializeVillagersRon(v);
+    expect(out).toContain("home_landmark: Inn");
+    expect(out).toContain("home_landmark: Smithy");
+    expect(out).toContain("home_landmark: Temple");
+    expect(out).toContain("home_landmark: Guard");
+    expect(out).toContain("home_landmark: Market");
+    expect(out).toContain("home_landmark: Manor");
+    expect(parseVillagersRon(out)).toEqual(v);
+  });
+
+  it("신규 7 landmark (Tavern/Herbalist/Graveyard/Jail/Guild/Alchemist/Docks) round-trip", () => {
+    const v: VillagerDef[] = [
+      { id: "a", name: "a", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "tavern" },
+      { id: "b", name: "b", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "herbalist" },
+      { id: "c", name: "c", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "graveyard" },
+      { id: "d", name: "d", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "jail" },
+      { id: "e", name: "e", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "guild" },
+      { id: "f", name: "f", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "alchemist" },
+      { id: "g", name: "g", color: [0, 0, 0], dialogs: [], speed: 1.0, homeLandmark: "docks" },
+    ];
+    const out = serializeVillagersRon(v);
+    expect(out).toContain("home_landmark: Tavern");
+    expect(out).toContain("home_landmark: Herbalist");
+    expect(out).toContain("home_landmark: Graveyard");
+    expect(out).toContain("home_landmark: Jail");
+    expect(out).toContain("home_landmark: Guild");
+    expect(out).toContain("home_landmark: Alchemist");
+    expect(out).toContain("home_landmark: Docks");
+    expect(parseVillagersRon(out)).toEqual(v);
+  });
+
+  it("기존 RON (home_landmark 없음) 도 무영향 — 미지정은 undefined", () => {
+    // 회귀 가드 — bevy-rogue 의 기존 villagers.ron 호환.
+    const oldRon = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0)]`;
+    const v = parseVillagersRon(oldRon);
+    expect("homeLandmark" in v[0]).toBe(false);
+  });
+});
+
 describe("parse/serialize WeaponsRon", () => {
   const SRC = `[
     WeaponDef(
@@ -1460,7 +1590,7 @@ import { serializeTownConfigRon } from "./ron";
 import { TOWN_CONFIG_DEFAULTS } from "@/types/town-config";
 
 describe("serializeTownConfigRon", () => {
-  it("기본값 → PascalCase enum + landmarks 배열", () => {
+  it("기본값 → PascalCase enum + landmarks 배열 + environment Plains", () => {
     const ron = serializeTownConfigRon(TOWN_CONFIG_DEFAULTS);
     expect(ron).toContain("TownOptions(");
     expect(ron).toContain("size: Village,");
@@ -1469,32 +1599,42 @@ describe("serializeTownConfigRon", () => {
     expect(ron).toContain("defenses: None,");
     expect(ron).toContain("landmarks: [Inn, Smithy],");
     expect(ron).toContain("fields: true,");
+    expect(ron).toContain("environment: Plains,");
     expect(ron.endsWith(")\n")).toBe(true);
   });
 
-  it("모든 옵션 값 변환", () => {
+  it("모든 옵션 값 변환 (13 landmark 포함)", () => {
     const ron = serializeTownConfigRon({
       size: "town", roads: "linear", wealth: "wealthy",
-      defenses: "stone", landmarks: ["inn", "smithy", "temple", "guard", "market", "manor"],
+      defenses: "stone",
+      landmarks: [
+        "inn", "smithy", "temple", "guard", "market", "manor",
+        "tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks",
+      ],
       fields: false,
+      environment: "coastal",
     });
     expect(ron).toContain("size: Town,");
     expect(ron).toContain("roads: Linear,");
     expect(ron).toContain("wealth: Wealthy,");
     expect(ron).toContain("defenses: Stone,");
-    expect(ron).toContain("landmarks: [Inn, Smithy, Temple, Guard, Market, Manor],");
+    expect(ron).toContain(
+      "landmarks: [Inn, Smithy, Temple, Guard, Market, Manor, Tavern, Herbalist, Graveyard, Jail, Guild, Alchemist, Docks],",
+    );
     expect(ron).toContain("fields: false,");
+    expect(ron).toContain("environment: Coastal,");
   });
 
   it("빈 landmarks 도 직렬화 가능", () => {
     const ron = serializeTownConfigRon({
       size: "hamlet", roads: "random", wealth: "poor",
-      defenses: "wooden", landmarks: [], fields: true,
+      defenses: "wooden", landmarks: [], fields: true, environment: "plains",
     });
     expect(ron).toContain("landmarks: [],");
     expect(ron).toContain("defenses: Wooden,");
     expect(ron).toContain("size: Hamlet,");
     expect(ron).toContain("roads: Random,");
     expect(ron).toContain("wealth: Poor,");
+    expect(ron).toContain("environment: Plains,");
   });
 });

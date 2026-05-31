@@ -3,6 +3,7 @@ import { connectToDB } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import Villager from "@/models/villager";
 import VillagerRevision from "@/models/villager-revision";
+import { HOME_LANDMARKS, type HomeLandmark } from "@/types/villager";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -10,6 +11,10 @@ function isValidColor(c: unknown): c is [number, number, number] {
   return Array.isArray(c)
     && c.length === 3
     && c.every((n) => typeof n === "number" && n >= 0 && n <= 1);
+}
+
+function isValidHomeLandmark(v: unknown): v is HomeLandmark {
+  return typeof v === "string" && (HOME_LANDMARKS as readonly string[]).includes(v);
 }
 
 export async function GET(_req: NextRequest, { params }: Params) {
@@ -32,6 +37,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.color !== undefined && !isValidColor(body.color)) {
     return apiError("color 는 [r, g, b] (각 0.0~1.0) 형식이어야 합니다.", 400);
   }
+  if (body.homeLandmark !== undefined && !isValidHomeLandmark(body.homeLandmark)) {
+    return apiError(
+      `homeLandmark 는 ${HOME_LANDMARKS.join("/")} 중 하나여야 합니다.`,
+      400,
+    );
+  }
 
   // 갱신 직전 현재 버전을 revision 으로 백업
   await VillagerRevision.create({
@@ -46,6 +57,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       stationary: villager.stationary,
       vendor: villager.vendor,
       homeZone: villager.homeZone,
+      homeLandmark: villager.homeLandmark,
     },
   });
 
@@ -56,6 +68,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.stationary !== undefined) villager.stationary = body.stationary;
   if (body.vendor !== undefined) villager.vendor = body.vendor;
   if (body.homeZone !== undefined) villager.homeZone = body.homeZone;
+  if (body.homeLandmark !== undefined) villager.homeLandmark = body.homeLandmark;
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();

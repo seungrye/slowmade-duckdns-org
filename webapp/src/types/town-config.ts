@@ -9,7 +9,33 @@ export type TownSize = "hamlet" | "village" | "town";
 export type TownRoads = "radial" | "linear" | "random";
 export type TownWealth = "poor" | "common" | "wealthy";
 export type TownDefenses = "none" | "wooden" | "stone";
-export type TownLandmark = "inn" | "smithy" | "temple" | "guard" | "market" | "manor";
+/**
+ * 13 landmark 식별자. 사이즈/환경 조합으로 노출 여부가 분기된다.
+ *   - Hamlet+ : inn / smithy / tavern / herbalist / graveyard (+docks if coastal)
+ *   - Village+: 위 + temple / guard / market / jail / guild
+ *   - Town    : 위 + manor / alchemist
+ *   - docks   : Coastal 환경에서만 노출 (Hamlet+).
+ */
+export type TownLandmark =
+  | "inn"
+  | "smithy"
+  | "temple"
+  | "guard"
+  | "market"
+  | "manor"
+  | "tavern"
+  | "herbalist"
+  | "graveyard"
+  | "jail"
+  | "guild"
+  | "alchemist"
+  | "docks";
+
+/**
+ * 마을의 지리 환경. Plains 는 기본 — 해안 전용 landmark(docks) 가 비활성화된다.
+ * Coastal 은 docks 가 노출되고, 게임 측 generator 가 외곽 한 변에 Water 띠를 둔다.
+ */
+export type TownEnvironment = "plains" | "coastal";
 
 export interface TownConfig {
   size: TownSize;
@@ -18,6 +44,7 @@ export interface TownConfig {
   defenses: TownDefenses;
   landmarks: TownLandmark[];
   fields: boolean;
+  environment: TownEnvironment;
 }
 
 export const TOWN_SIZES: readonly TownSize[] = ["hamlet", "village", "town"] as const;
@@ -26,7 +53,9 @@ export const TOWN_WEALTHS: readonly TownWealth[] = ["poor", "common", "wealthy"]
 export const TOWN_DEFENSES: readonly TownDefenses[] = ["none", "wooden", "stone"] as const;
 export const TOWN_LANDMARKS: readonly TownLandmark[] = [
   "inn", "smithy", "temple", "guard", "market", "manor",
+  "tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks",
 ] as const;
+export const TOWN_ENVIRONMENTS: readonly TownEnvironment[] = ["plains", "coastal"] as const;
 
 export const TOWN_CONFIG_DEFAULTS: TownConfig = {
   size: "village",
@@ -35,6 +64,7 @@ export const TOWN_CONFIG_DEFAULTS: TownConfig = {
   defenses: "none",
   landmarks: ["inn", "smithy"],
   fields: true,
+  environment: "plains",
 };
 
 export interface TownConfigDocument extends TownConfig {
@@ -69,7 +99,57 @@ export const TOWN_LANDMARK_LABEL: Record<TownLandmark, string> = {
   inn: "Inn (여관)",
   smithy: "Smithy (대장간)",
   temple: "Temple (신전)",
-  guard: "Guard (초소)",
+  guard: "Guard (경비초소)",
   market: "Market (시장)",
-  manor: "Manor (대저택)",
+  manor: "Manor (영주 저택)",
+  tavern: "Tavern (선술집)",
+  herbalist: "Herbalist (약초집)",
+  graveyard: "Graveyard (무덤)",
+  jail: "Jail (감옥)",
+  guild: "Guild (길드)",
+  alchemist: "Alchemist (연금술공방)",
+  docks: "Docks (부두)",
 };
+export const TOWN_ENVIRONMENT_LABEL: Record<TownEnvironment, string> = {
+  plains: "Plains (평원)",
+  coastal: "Coastal (해안)",
+};
+
+// ── 사이즈/환경별 노출 ────────────────────────────────────────────────────────
+
+/**
+ * 사이즈 그룹 — Hamlet ⊂ Village ⊂ Town (Town 은 모든 landmark 의 슈퍼셋).
+ * Docks 는 환경 = Coastal 일 때만 추가된다.
+ */
+const HAMLET_BASE: readonly TownLandmark[] = [
+  "inn", "smithy", "tavern", "herbalist", "graveyard",
+];
+const VILLAGE_ADDITIONS: readonly TownLandmark[] = [
+  "temple", "guard", "market", "jail", "guild",
+];
+const TOWN_ADDITIONS: readonly TownLandmark[] = [
+  "manor", "alchemist",
+];
+
+/**
+ * 주어진 사이즈/환경에서 선택 가능한 landmark 목록.
+ * UI 는 이 목록 외 항목을 `disabled` 처리하고, API/RON export 는 이 목록 외 값을
+ * 조용히 필터링한다. 게임 측은 동일 규칙으로 carve 단계에서 silently skip 한다.
+ */
+export function availableLandmarks(
+  size: TownSize,
+  env: TownEnvironment,
+): TownLandmark[] {
+  const out: TownLandmark[] = [...HAMLET_BASE];
+  if (size === "village" || size === "town") out.push(...VILLAGE_ADDITIONS);
+  if (size === "town") out.push(...TOWN_ADDITIONS);
+  if (env === "coastal") out.push("docks");
+  return out;
+}
+
+/** 주어진 landmark 가 (size, env) 에서 노출/허용되는지 여부. */
+export function isLandmarkAvailable(
+  l: TownLandmark, size: TownSize, env: TownEnvironment,
+): boolean {
+  return availableLandmarks(size, env).includes(l);
+}

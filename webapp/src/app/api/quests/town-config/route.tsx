@@ -42,6 +42,7 @@ export async function PUT(req: NextRequest) {
     existing.defenses = def.defenses;
     existing.landmarks = def.landmarks;
     existing.fields = def.fields;
+    existing.environment = def.environment;
     existing.version = (existing.version ?? 1) + 1;
     await existing.save();
     return apiSuccess(existing);

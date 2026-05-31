@@ -10,12 +10,13 @@ import type {
   SpawnZone,
   TrapKind,
 } from "@/types/quest";
-import type { VillagerDef } from "@/types/villager";
+import type { VillagerDef, HomeLandmark } from "@/types/villager";
+import { HOME_LANDMARKS } from "@/types/villager";
 import type { ItemDef, ConsumableEffect, WeaponElement, AccessoryEffect } from "@/types/item";
 import { ACCESSORY_EFFECTS } from "@/types/item";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
-import type { TownConfig } from "@/types/town-config";
+import type { TownConfig, TownEnvironment } from "@/types/town-config";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tokenizer
@@ -472,6 +473,9 @@ class Parser {
         // home_zone — 게임의 ZoneId 와 동일한 RON 인코딩(parseSpawnZone 재사용).
         // 누락 시 default = Town (게임 측 #[serde(default)] 와 미러).
         case "home_zone":  def.homeZone   = this.parseSpawnZone(); break;
+        // home_landmark — PascalCase enum (Random/Road/Inn/Smithy/Temple/Guard/
+        // Market/Manor). 누락 시 default = "random" (게임 측 #[serde(default)] 미러).
+        case "home_landmark": def.homeLandmark = this.parseHomeLandmark(); break;
         default: break;
       }
       this.tryPunct(",");
@@ -552,6 +556,19 @@ class Parser {
     if (v === "true") return true;
     if (v === "false") return false;
     throw new Error(`Expected bool, got ${v}`);
+  }
+
+  /**
+   * HomeLandmark enum — bare ident (Random | Road | Inn | Smithy | Temple |
+   * Guard | Market | Manor). 게임 측 PascalCase 와 TS lowercase 매핑.
+   */
+  parseHomeLandmark(): HomeLandmark {
+    const v = this.parseIdent();
+    const lower = v.toLowerCase();
+    if ((HOME_LANDMARKS as readonly string[]).includes(lower)) {
+      return lower as HomeLandmark;
+    }
+    throw new Error(`Unknown home_landmark: ${v}`);
   }
 
   /** TrapKind enum — bare ident (Spike | Poison | Alarm | Teleport). */
@@ -1308,6 +1325,14 @@ function serializeVillagerDef(v: VillagerDef): string {
   if (v.homeZone && v.homeZone.type !== "Town") {
     lines.push(`        home_zone: ${serializeZone(v.homeZone)},`);
   }
+  // home_landmark — 기본 `Random` 은 생략(게임 측 #[serde(default)] 미러).
+  // 그 외 14 값은 PascalCase enum 으로 명시:
+  //   Road/Inn/Smithy/Temple/Guard/Market/Manor/Tavern/Herbalist/Graveyard/
+  //   Jail/Guild/Alchemist/Docks.
+  if (v.homeLandmark && v.homeLandmark !== "random") {
+    const pascal = v.homeLandmark.charAt(0).toUpperCase() + v.homeLandmark.slice(1);
+    lines.push(`        home_landmark: ${pascal},`);
+  }
   lines.push(`    ),`);
   return lines.join("\n");
 }
@@ -1485,11 +1510,15 @@ export function serializeStartLoadoutRon(def: StartLoadoutDef): string {
  *       defenses: None,
  *       landmarks: [Inn, Smithy],
  *       fields: true,
+ *       environment: Plains,
  *   )
  */
 export function serializeTownConfigRon(def: TownConfig): string {
   const pascal = (s: string): string =>
     s.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+
+  // environment 는 신규 필드 — 누락 시 기본 Plains (하위 호환).
+  const env: TownEnvironment = def.environment ?? "plains";
 
   const lines: string[] = [];
   lines.push(`TownOptions(`);
@@ -1503,6 +1532,7 @@ export function serializeTownConfigRon(def: TownConfig): string {
     lines.push(`    landmarks: [${def.landmarks.map(pascal).join(", ")}],`);
   }
   lines.push(`    fields: ${def.fields ? "true" : "false"},`);
+  lines.push(`    environment: ${pascal(env)},`);
   lines.push(`)`);
   return lines.join("\n") + "\n";
 }

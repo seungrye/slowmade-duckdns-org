@@ -29,6 +29,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
       color: villager.color,
       dialogs: villager.dialogs,
       speed: villager.speed,
+      stationary: villager.stationary,
+      vendor: villager.vendor,
+      homeZone: villager.homeZone,
+      homeLandmark: villager.homeLandmark,
     },
   });
 
@@ -37,6 +41,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
   villager.color = (def.color as number[]) ?? villager.color;
   villager.dialogs = (def.dialogs as string[]) ?? villager.dialogs;
   villager.speed = typeof def.speed === "number" ? def.speed : villager.speed;
+  if (def.stationary !== undefined) villager.stationary = !!def.stationary;
+  if (def.vendor !== undefined) villager.vendor = !!def.vendor;
+  if (def.homeZone !== undefined) villager.homeZone = def.homeZone as typeof villager.homeZone;
+  if (def.homeLandmark !== undefined) villager.homeLandmark = def.homeLandmark as typeof villager.homeLandmark;
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();

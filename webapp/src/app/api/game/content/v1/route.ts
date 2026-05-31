@@ -38,8 +38,10 @@ import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
 import {
   TOWN_CONFIG_DEFAULTS, TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
+  TOWN_ENVIRONMENTS,
   type TownConfig as TownConfigDef,
   type TownSize, type TownRoads, type TownWealth, type TownDefenses, type TownLandmark,
+  type TownEnvironment,
 } from "@/types/town-config";
 
 export const dynamic = "force-dynamic";
@@ -165,6 +167,8 @@ function toVillagerDef(d: Record<string, unknown>): VillagerDef {
   if (d.vendor) v.vendor = true;
   // homeZone — Mongoose subdoc 그대로 통과(serializer 가 Town 기본은 자동 생략).
   if (d.homeZone) v.homeZone = d.homeZone as VillagerDef["homeZone"];
+  // homeLandmark — schema 기본 "random". serializer 가 기본값 생략.
+  if (d.homeLandmark) v.homeLandmark = d.homeLandmark as VillagerDef["homeLandmark"];
   return v;
 }
 
@@ -229,6 +233,7 @@ function toTownConfigDef(d: Record<string, unknown>): TownConfigDef {
     defenses: inEnum<TownDefenses>(TOWN_DEFENSES, d.defenses, TOWN_CONFIG_DEFAULTS.defenses),
     landmarks,
     fields: typeof d.fields === "boolean" ? d.fields : TOWN_CONFIG_DEFAULTS.fields,
+    environment: inEnum<TownEnvironment>(TOWN_ENVIRONMENTS, d.environment, TOWN_CONFIG_DEFAULTS.environment),
   };
 }
 

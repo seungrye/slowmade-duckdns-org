@@ -356,9 +356,10 @@ describe("GET /api/game/content/v1", () => {
     expect(ron).toContain("defenses: None,");
     expect(ron).toContain("landmarks: [Inn, Smithy],");
     expect(ron).toContain("fields: true,");
+    expect(ron).toContain("environment: Plains,");
   });
 
-  it("TownConfig DB doc 이 있으면 그 값을 serialize 해 반환", async () => {
+  it("TownConfig DB doc 이 있으면 그 값을 serialize 해 반환 (environment 포함)", async () => {
     mockChain(Quest as unknown as { find: FindMock }, []);
     mockChain(Item as unknown as { find: FindMock }, []);
     mockChain(Villager as unknown as { find: FindMock }, []);
@@ -372,6 +373,7 @@ describe("GET /api/game/content/v1", () => {
       defenses: "stone",
       landmarks: ["temple", "market", "manor"],
       fields: false,
+      environment: "coastal",
     });
 
     const res = await GET();
@@ -383,6 +385,35 @@ describe("GET /api/game/content/v1", () => {
     expect(ron).toContain("defenses: Stone,");
     expect(ron).toContain("landmarks: [Temple, Market, Manor],");
     expect(ron).toContain("fields: false,");
+    expect(ron).toContain("environment: Coastal,");
+  });
+
+  it("TownConfig DB doc 에 신규 7 landmark (Tavern/Docks 등) 도 PascalCase 로 export 된다", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig({
+      _id: "default",
+      size: "town",
+      roads: "radial",
+      wealth: "common",
+      defenses: "none",
+      landmarks: [
+        "tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks",
+      ],
+      fields: true,
+      environment: "coastal",
+    });
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.town_config;
+    expect(ron).toContain(
+      "landmarks: [Tavern, Herbalist, Graveyard, Jail, Guild, Alchemist, Docks],",
+    );
+    expect(ron).toContain("environment: Coastal,");
   });
 
   it("TownConfig DB doc 에 알 수 없는 값이 있으면 default 로 폴백", async () => {

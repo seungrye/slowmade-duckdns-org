@@ -7,9 +7,10 @@ import { useInfoDialog } from "@/components/info-dialog";
 import { GeneratorPreview } from "@/components/generator-preview";
 import {
   TOWN_CONFIG_DEFAULTS,
-  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
+  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS, TOWN_ENVIRONMENTS,
   TOWN_SIZE_LABEL, TOWN_ROADS_LABEL, TOWN_WEALTH_LABEL, TOWN_DEFENSES_LABEL,
-  TOWN_LANDMARK_LABEL,
+  TOWN_LANDMARK_LABEL, TOWN_ENVIRONMENT_LABEL,
+  isLandmarkAvailable,
   type TownConfig, type TownLandmark,
 } from "@/types/town-config";
 
@@ -405,6 +406,7 @@ function SystemZonesPanel() {
           defenses: data.defenses ?? TOWN_CONFIG_DEFAULTS.defenses,
           landmarks: Array.isArray(data.landmarks) ? data.landmarks : TOWN_CONFIG_DEFAULTS.landmarks,
           fields: typeof data.fields === "boolean" ? data.fields : TOWN_CONFIG_DEFAULTS.fields,
+          environment: data.environment ?? TOWN_CONFIG_DEFAULTS.environment,
         });
       } finally {
         setLoading(false);
@@ -522,20 +524,45 @@ function SystemZonesPanel() {
                     {TOWN_DEFENSES.map((s) => (<option key={s} value={s}>{TOWN_DEFENSES_LABEL[s]}</option>))}
                   </select>
                 </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">environment (지리 환경)</span>
+                  <select
+                    value={config.environment}
+                    onChange={(e) => setConfig({ ...config, environment: e.target.value as TownConfig["environment"] })}
+                    className={inputCls}
+                    aria-label="town-environment"
+                  >
+                    {TOWN_ENVIRONMENTS.map((s) => (<option key={s} value={s}>{TOWN_ENVIRONMENT_LABEL[s]}</option>))}
+                  </select>
+                </label>
               </div>
               <div className="space-y-1">
-                <span className="text-gray-500">landmarks (선택 가능, 중복 X)</span>
+                <span className="text-gray-500">
+                  landmarks (사이즈/환경 따라 일부 비활성)
+                </span>
                 <div className="flex flex-wrap gap-2">
                   {TOWN_LANDMARKS.map((l) => {
                     const checked = config.landmarks.includes(l);
+                    const available = isLandmarkAvailable(l, config.size, config.environment);
+                    const disabledTitle = !available
+                      ? (l === "docks"
+                          ? "Docks 는 환경 = Coastal 일 때만 노출됩니다."
+                          : `현재 사이즈(${config.size})에서는 ${TOWN_LANDMARK_LABEL[l]} 가 비활성입니다.`)
+                      : undefined;
                     return (
                       <label
                         key={l}
-                        className="flex items-center gap-1 px-2 py-1 rounded border cursor-pointer hover:border-blue-400 select-none"
+                        title={disabledTitle}
+                        className={`flex items-center gap-1 px-2 py-1 rounded border select-none ${
+                          available
+                            ? "cursor-pointer hover:border-blue-400"
+                            : "opacity-50 cursor-not-allowed"
+                        }`}
                       >
                         <input
                           type="checkbox"
                           checked={checked}
+                          disabled={!available}
                           onChange={() => toggleLandmark(l)}
                           aria-label={`town-landmark-${l}`}
                         />

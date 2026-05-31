@@ -1,5 +1,6 @@
 import { Schema, model, models, Model } from "mongoose";
 import type { ZoneIdValue } from "@/types/zone";
+import { HOME_LANDMARKS, type HomeLandmark } from "@/types/villager";
 
 // villager 의 `homeZone` 미들태그(`{ type: "Town" }` | `{ type: "Named", id: ... }`)
 // 를 보관하는 sub-schema. _id: false — sub-document 의 자동 _id 를 만들지 않는다.
@@ -41,6 +42,15 @@ const VillagerSchema = new Schema(
     // 게임 RON 의 home_zone 미러 — #[serde(default = "Town")] 와 동일한 기본값.
     // 분산 미설정 시 시작 마을(Town) 에 자동 배치된다(기존 동작 유지).
     homeZone: { type: ZoneIdSchema, default: () => ({ type: "Town" }) },
+    // 게임 RON 의 home_landmark 미러 — #[serde(default)] HomeLandmark::Random.
+    // Town zone 안에서 villager 가 어디에 spawn 할지 지정. 6 landmark + Road + Random.
+    // Town 이 아닌 zone 또는 해당 landmark 가 비활성(TownConfig.landmarks 미포함)일
+    // 경우 게임 측에서 Random fallback 한다.
+    homeLandmark: {
+      type: String,
+      enum: HOME_LANDMARKS,
+      default: "random" satisfies HomeLandmark,
+    },
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -56,6 +66,7 @@ export interface VillagerDoc {
   stationary: boolean;
   vendor: boolean;
   homeZone: ZoneIdValue;
+  homeLandmark: HomeLandmark;
   version: number;
   createdAt: Date;
   updatedAt: Date;

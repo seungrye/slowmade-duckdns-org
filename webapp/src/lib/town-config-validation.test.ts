@@ -8,6 +8,7 @@ const VALID = {
   defenses: "none",
   landmarks: ["inn", "smithy"],
   fields: true,
+  environment: "plains",
 };
 
 describe("validateTownConfig", () => {
@@ -36,7 +37,7 @@ describe("validateTownConfig", () => {
   });
 
   it("landmarks 에 알 수 없는 값이 있으면 실패", () => {
-    expect(validateTownConfig({ ...VALID, landmarks: ["inn", "tavern"] }).ok).toBe(false);
+    expect(validateTownConfig({ ...VALID, landmarks: ["inn", "castle"] }).ok).toBe(false);
   });
 
   it("landmarks 중복 시 실패", () => {
@@ -54,9 +55,33 @@ describe("validateTownConfig", () => {
     }).ok).toBe(true);
   });
 
+  it("landmarks 13 종 모두(신규 7 포함) 선택해도 통과", () => {
+    expect(validateTownConfig({
+      ...VALID,
+      landmarks: [
+        "inn", "smithy", "temple", "guard", "market", "manor",
+        "tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks",
+      ],
+    }).ok).toBe(true);
+  });
+
   it("fields 가 boolean 이 아니면 실패", () => {
     expect(validateTownConfig({ ...VALID, fields: 1 }).ok).toBe(false);
     expect(validateTownConfig({ ...VALID, fields: "true" }).ok).toBe(false);
+  });
+
+  it("environment 가 누락되어도 통과 (하위호환 — 기본 plains)", () => {
+    const { environment, ...rest } = VALID;
+    void environment;
+    expect(validateTownConfig(rest).ok).toBe(true);
+  });
+
+  it("environment 가 enum 외 값이면 실패", () => {
+    expect(validateTownConfig({ ...VALID, environment: "desert" }).ok).toBe(false);
+  });
+
+  it("environment 가 coastal 이면 통과", () => {
+    expect(validateTownConfig({ ...VALID, environment: "coastal" }).ok).toBe(true);
   });
 });
 
@@ -68,5 +93,18 @@ describe("normalizeTownConfig", () => {
     expect(out.landmarks).not.toBe(arr); // 새 배열
     expect(out.size).toBe("village");
     expect(out.fields).toBe(true);
+    expect(out.environment).toBe("plains");
+  });
+
+  it("environment 누락 시 기본 plains 적용", () => {
+    const { environment, ...rest } = VALID;
+    void environment;
+    const out = normalizeTownConfig(rest);
+    expect(out.environment).toBe("plains");
+  });
+
+  it("environment coastal 명시 시 그대로 보존", () => {
+    const out = normalizeTownConfig({ ...VALID, environment: "coastal" });
+    expect(out.environment).toBe("coastal");
   });
 });
