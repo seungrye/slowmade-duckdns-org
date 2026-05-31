@@ -41,21 +41,22 @@ body {
 }
 
 /*
- * RPG-Awesome 0.0.2 (https://github.com/nagoshiashumari/Rpg-Awesome)
- * 게임의 glyph_unicode (GlyphStyle::Unicode) 스타일에 사용되는 판타지/RPG PUA 아이콘 폰트.
- * /public/fonts/rpg-awesome.ttf 가 bevy-rogue/assets/fonts/ 와 같은 파일.
+ * game-icons.net (seiyria/gameicons-font 빌드, CC BY 3.0)
+ * 게임의 glyph_game_icon (GlyphStyle::GameIcon) 스타일에 사용되는 판타지/RPG 픽토그램 폰트.
+ * Supplementary PUA(U+FF000~U+100005) 영역에 4102 개 아이콘 수록.
+ * /public/fonts/game-icons.ttf 가 bevy-rogue/assets/fonts/ 와 같은 파일.
  * 사이트 quests/items 편집 UI 의 아이콘 픽커/미리보기에서 사용.
  */
 @font-face {
-  font-family: 'RPGAwesome';
-  src: url('/fonts/rpg-awesome.ttf') format('truetype');
+  font-family: 'GameIcons';
+  src: url('/fonts/game-icons.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
-.rpg-icon {
-  font-family: 'RPGAwesome', sans-serif;
+.game-icon {
+  font-family: 'GameIcons', sans-serif;
   font-style: normal;
   font-variant: normal;
   font-weight: normal;

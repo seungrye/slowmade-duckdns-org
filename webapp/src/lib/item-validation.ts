@@ -6,7 +6,7 @@ const KINDS: ItemKind[] = ["quest", "weapon", "armor", "consumable", "accessory"
 export type ValidationResult = { ok: true } | { ok: false; message: string };
 
 export function validateItemForCreate(body: Record<string, unknown>): ValidationResult {
-  const requiredStrings = ["id", "kind", "displayName", "glyphAscii", "glyphUnicode", "glyphGameIcon", "pickupMessage"];
+  const requiredStrings = ["id", "kind", "displayName", "glyphAscii", "glyphGameIcon", "pickupMessage"];
   for (const f of requiredStrings) {
     const v = body[f];
     if (typeof v !== "string" || !v.trim()) {

@@ -67,7 +67,7 @@ describe('POST /api/quests/items/import', () => {
   it('기존 weapon 은 revision 백업 + version + 1', async () => {
     const existing = {
       _id: 'i1', id: 'sword', kind: 'weapon',
-      displayName: '구검', glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X',
+      displayName: '구검', glyphAscii: '/', glyphGameIcon: 'X',
       pickupMessage: '획득', attackPower: 5, element: 'ice', version: 2,
       save: vi.fn().mockResolvedValue(undefined),
     };

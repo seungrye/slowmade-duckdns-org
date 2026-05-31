@@ -27,7 +27,6 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
     kind: item.kind,
     displayName: item.displayName,
     glyphAscii: item.glyphAscii,
-    glyphUnicode: item.glyphUnicode,
     glyphGameIcon: item.glyphGameIcon,
     pickupMessage: item.pickupMessage,
   };
@@ -84,7 +83,6 @@ export async function POST(req: NextRequest) {
       // 공통 필드
       existing.displayName = def.displayName;
       existing.glyphAscii = def.glyphAscii;
-      existing.glyphUnicode = def.glyphUnicode;
       existing.glyphGameIcon = def.glyphGameIcon;
       existing.pickupMessage = def.pickupMessage;
       // 종별 필드
@@ -113,7 +111,6 @@ export async function POST(req: NextRequest) {
         kind: def.kind,
         displayName: def.displayName,
         glyphAscii: def.glyphAscii,
-        glyphUnicode: def.glyphUnicode,
         glyphGameIcon: def.glyphGameIcon,
         pickupMessage: def.pickupMessage,
       };

@@ -7,7 +7,6 @@ function base() {
     kind: "weapon",
     displayName: "x",
     glyphAscii: "/",
-    glyphUnicode: "X",
     glyphGameIcon: "X",
     pickupMessage: "x",
   } as Record<string, unknown>;

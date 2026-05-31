@@ -47,7 +47,7 @@ function tokenize(src: string): Token[] {
     // Rust/RON 호환 escape 처리:
     //   \n \r \t \\ \" \0  → 표준 escape
     //   \x7F                → 8비트 hex (Rust 호환, 0x7F 까지만 안전)
-    //   \u{XXXX} / \u{XXXXXX} → 유니코드 codepoint (game RON 의 glyph_unicode 가 사용)
+    //   \u{XXXX} / \u{XXXXXX} → 유니코드 codepoint (game RON 의 glyph_game_icon 이 사용)
     //   기타 \?              → ? 를 그대로 (예: 이전 호환 유지)
     if (src[i] === '"') {
       let s = "";
@@ -214,10 +214,10 @@ class Parser {
   // 공통 필드를 def 객체에 채워넣고 미처리 키를 콜백으로 위임
   parseItemCommon(handleKindKey: (key: string) => boolean): {
     id: string; displayName: string;
-    glyphAscii: string; glyphUnicode: string; glyphGameIcon: string;
+    glyphAscii: string; glyphGameIcon: string;
     pickupMessage: string;
   } {
-    let id = "", displayName = "", glyphAscii = "", glyphUnicode = "",
+    let id = "", displayName = "", glyphAscii = "",
       glyphGameIcon = "", pickupMessage = "";
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
@@ -227,7 +227,9 @@ class Parser {
         case "id":              id = this.parseString(); break;
         case "display_name":    displayName = this.parseString(); break;
         case "glyph_ascii":     glyphAscii = this.parseString(); break;
-        case "glyph_unicode":   glyphUnicode = this.parseString(); break;
+        // 하위 호환: 옛 RON 의 glyph_unicode 키는 silently 소비 (값 폐기).
+        // 마이그레이션 후 모든 RON 에서 제거되었으나, 캐시된 옛 데이터를 안전하게 흡수.
+        case "glyph_unicode":   this.parseString(); break;
         case "glyph_game_icon": glyphGameIcon = this.parseString(); break;
         case "pickup_message":  pickupMessage = this.parseString(); break;
         default:
@@ -235,7 +237,7 @@ class Parser {
       }
       this.tryPunct(",");
     }
-    return { id, displayName, glyphAscii, glyphUnicode, glyphGameIcon, pickupMessage };
+    return { id, displayName, glyphAscii, glyphGameIcon, pickupMessage };
   }
 
   parseQuestItemDef(): Extract<ItemDef, { kind: "quest" }> {
@@ -1132,7 +1134,7 @@ function q(s: string) {
     else if (ch === '\r') out += '\\r';
     else if (ch === '\t') out += '\\t';
     // PUA(E000~F8FF) 와 supplementary PUA(F0000+, 100000+) 는 escape 로 출력 →
-    // 게임의 RPG-Awesome/Kenney 아이콘 폰트 codepoint 가 안정 round-trip 된다.
+    // 게임의 game-icons.net (PUA U+FF000~U+100005) 폰트 codepoint 가 안정 round-trip.
     else if (
       (cp >= 0xE000 && cp <= 0xF8FF) ||
       cp >= 0x10000 // 모든 supplementary plane (이모지 등) 도 escape
@@ -1362,7 +1364,6 @@ function serializeItemCommon(item: ItemDef): string[] {
     `        id: ${q(item.id)},`,
     `        display_name: ${q(item.displayName)},`,
     `        glyph_ascii: ${q(item.glyphAscii)},`,
-    `        glyph_unicode: ${q(item.glyphUnicode)},`,
     `        glyph_game_icon: ${q(item.glyphGameIcon)},`,
     `        pickup_message: ${q(item.pickupMessage)},`,
   ];

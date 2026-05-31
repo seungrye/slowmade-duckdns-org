@@ -7,10 +7,10 @@ import { ACCESSORY_EFFECTS, ACCESSORY_EFFECT_LABELS } from "@/types/item";
 import { useInfoDialog } from "@/components/info-dialog";
 import { IconPickerDialog } from "@/components/icon-picker-dialog";
 /**
- * 신규 item 의 기본 아이콘 — RPG-Awesome 의 `help` (U+E9FF).
+ * 신규 item 의 기본 아이콘 — game-icons.net 의 `help` (Supplementary PUA).
  * picker 안 열어도 의미 있는 fallback 으로 표시되도록.
  */
-const DEFAULT_GLYPH_UNICODE = String.fromCodePoint(0xe9ff);
+const DEFAULT_GLYPH_GAME_ICON = String.fromCodePoint(0xff752);
 
 type Filter = "all" | ItemKind;
 
@@ -19,7 +19,6 @@ interface FormState {
   kind: ItemKind;
   displayName: string;
   glyphAscii: string;
-  glyphUnicode: string;
   glyphGameIcon: string;
   pickupMessage: string;
   imagePath: string;
@@ -39,7 +38,7 @@ interface FormState {
 
 const emptyForm: FormState = {
   id: "", kind: "quest",
-  displayName: "", glyphAscii: "", glyphUnicode: DEFAULT_GLYPH_UNICODE, glyphGameIcon: "",
+  displayName: "", glyphAscii: "", glyphGameIcon: DEFAULT_GLYPH_GAME_ICON,
   pickupMessage: "",
   imagePath: "scene/open-chest.png",
   attackPower: 0,
@@ -97,7 +96,6 @@ export default function ItemsPage() {
       kind: item.kind,
       displayName: item.displayName,
       glyphAscii: item.glyphAscii,
-      glyphUnicode: item.glyphUnicode,
       glyphGameIcon: item.glyphGameIcon,
       pickupMessage: item.pickupMessage,
     };
@@ -127,7 +125,6 @@ export default function ItemsPage() {
     const body: Record<string, unknown> = {
       displayName: form.displayName,
       glyphAscii: form.glyphAscii,
-      glyphUnicode: form.glyphUnicode,
       glyphGameIcon: form.glyphGameIcon,
       pickupMessage: form.pickupMessage,
     };
@@ -545,28 +542,24 @@ function FormFields({
           <input value={form.glyphAscii} onChange={(e) => setForm({ ...form, glyphAscii: e.target.value })} className={`${inputCls} font-mono`} />
         </label>
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-gray-500">glyph_unicode</span>
-          {/* 직접 입력 + 별도 미리보기 박스 대신 — 버튼 자체가 현재 글리프를 표시.
-              클릭 시 RPG-Awesome 아이콘 picker 가 열린다. 빈 값(레거시) 이면 help. */}
+          <span className="text-xs text-gray-500">glyph_game_icon</span>
+          {/* 버튼 자체가 현재 글리프를 표시. 클릭 시 game-icons.net 아이콘 picker
+              가 열린다. 빈 값(레거시) 이면 help 아이콘. */}
           <button
             type="button"
             onClick={() => setIconPickerOpen(true)}
-            className="rpg-icon inline-flex items-center justify-center w-12 h-12 text-3xl border rounded bg-white dark:bg-gray-800 hover:border-blue-400 hover:text-blue-500 transition-colors"
-            title="RPG-Awesome 아이콘 선택"
-            aria-label="RPG-Awesome 아이콘 선택"
+            className="game-icon inline-flex items-center justify-center w-12 h-12 text-3xl border rounded bg-white dark:bg-gray-800 hover:border-blue-400 hover:text-blue-500 transition-colors"
+            title="game-icons.net 아이콘 선택"
+            aria-label="game-icons.net 아이콘 선택"
           >
-            {form.glyphUnicode || DEFAULT_GLYPH_UNICODE}
+            {form.glyphGameIcon || DEFAULT_GLYPH_GAME_ICON}
           </button>
         </div>
-        <label className="flex flex-col gap-1 w-20">
-          <span className="text-xs text-gray-500">glyph_game_icon</span>
-          <input value={form.glyphGameIcon} onChange={(e) => setForm({ ...form, glyphGameIcon: e.target.value })} className={`${inputCls} font-mono`} />
-        </label>
       </div>
       <IconPickerDialog
         open={iconPickerOpen}
         onClose={() => setIconPickerOpen(false)}
-        onSelect={(literal) => setForm({ ...form, glyphUnicode: literal })}
+        onSelect={(literal) => setForm({ ...form, glyphGameIcon: literal })}
       />
 
       <label className="flex flex-col gap-1">

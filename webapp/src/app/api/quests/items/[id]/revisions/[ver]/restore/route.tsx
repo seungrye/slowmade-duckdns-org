@@ -12,7 +12,6 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
     kind: item.kind,
     displayName: item.displayName,
     glyphAscii: item.glyphAscii,
-    glyphUnicode: item.glyphUnicode,
     glyphGameIcon: item.glyphGameIcon,
     pickupMessage: item.pickupMessage,
   };
@@ -49,7 +48,6 @@ export async function POST(_req: NextRequest, { params }: Params) {
   // kind 자체는 변경 불가 — 무시
   item.displayName = (def.displayName as string) ?? item.displayName;
   item.glyphAscii = (def.glyphAscii as string) ?? item.glyphAscii;
-  item.glyphUnicode = (def.glyphUnicode as string) ?? item.glyphUnicode;
   item.glyphGameIcon = (def.glyphGameIcon as string) ?? item.glyphGameIcon;
   item.pickupMessage = (def.pickupMessage as string) ?? item.pickupMessage;
   switch (item.kind) {

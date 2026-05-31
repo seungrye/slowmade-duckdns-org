@@ -35,7 +35,6 @@ interface ItemBase {
   id: string;
   displayName: string;
   glyphAscii: string;
-  glyphUnicode: string;
   glyphGameIcon: string;
   pickupMessage: string;
 }

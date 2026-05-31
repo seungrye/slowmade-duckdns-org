@@ -7,16 +7,16 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({}) }));
 
 const mockItems = [
   { _id: '1', id: 'eternal_gem', kind: 'quest', displayName: '영원의 보석',
-    glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆',
+    glyphAscii: '*', glyphGameIcon: '◆',
     pickupMessage: '획득', imagePath: 'scene/x.png', version: 1 },
   { _id: '2', id: 'sword', kind: 'weapon', displayName: '검',
-    glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X',
+    glyphAscii: '/', glyphGameIcon: 'X',
     pickupMessage: '획득', attackPower: 7, element: 'fire', version: 2 },
   { _id: '3', id: 'leather_armor', kind: 'armor', displayName: '가죽 갑옷',
-    glyphAscii: ']', glyphUnicode: 'X', glyphGameIcon: 'X',
+    glyphAscii: ']', glyphGameIcon: 'X',
     pickupMessage: '획득', defenseBonus: 2, version: 1 },
   { _id: '4', id: 'health_potion', kind: 'consumable', displayName: '체력 물약',
-    glyphAscii: '!', glyphUnicode: '❤', glyphGameIcon: '❤',
+    glyphAscii: '!', glyphGameIcon: '❤',
     pickupMessage: '획득', effect: { type: 'Heal', amount: 8 }, version: 3 },
 ];
 
@@ -157,37 +157,37 @@ describe('ItemsPage 내보내기 버튼', () => {
   });
 });
 
-describe('ItemsPage glyph_unicode 아이콘 픽커', () => {
+describe('ItemsPage glyph_game_icon 아이콘 픽커', () => {
   it('"+ 새 item" 폼에 "아이콘 선택" 버튼이 있다', async () => {
     render(<ItemsPage />);
     await act(async () => {});
     fireEvent.click(screen.getByText('+ 새 item'));
-    expect(screen.getByTitle('RPG-Awesome 아이콘 선택')).toBeTruthy();
+    expect(screen.getByTitle('game-icons.net 아이콘 선택')).toBeTruthy();
   });
 
   it('"아이콘 선택" 버튼을 누르면 픽커 모달이 열린다', async () => {
     render(<ItemsPage />);
     await act(async () => {});
     fireEvent.click(screen.getByText('+ 새 item'));
-    fireEvent.click(screen.getByTitle('RPG-Awesome 아이콘 선택'));
-    expect(screen.getByText(/아이콘 선택 \(RPG-Awesome\)/)).toBeTruthy();
+    fireEvent.click(screen.getByTitle('game-icons.net 아이콘 선택'));
+    expect(screen.getByText(/아이콘 선택 \(game-icons\.net\)/)).toBeTruthy();
   });
 
-  it('픽커에서 아이콘 선택 시 glyph_unicode 입력 값이 단일 PUA 문자로 채워진다', async () => {
-    // DB/API 가 단일 문자를 그대로 저장하고, RON 직렬화 시 자동으로 \u{XXXX} 로
+  it('픽커에서 아이콘 선택 시 glyph_game_icon 버튼이 단일 PUA 문자로 갱신된다', async () => {
+    // DB/API 가 단일 문자를 그대로 저장하고, RON 직렬화 시 자동으로 \u{XXXXX} 로
     // escape 되므로 디폴트는 single-char 출력이다.
-    const { container } = render(<ItemsPage />);
+    render(<ItemsPage />);
     await act(async () => {});
     fireEvent.click(screen.getByText('+ 새 item'));
-    fireEvent.click(screen.getByTitle('RPG-Awesome 아이콘 선택'));
+    const pickerButton = screen.getByTitle('game-icons.net 아이콘 선택');
+    fireEvent.click(pickerButton);
     const search = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
     fireEvent.change(search, { target: { value: 'broadsword' } });
     fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));
-    const inputs = container.querySelectorAll('input.font-mono');
-    const glyphUnicodeInput = Array.from(inputs).find(
-      (el) => (el as HTMLInputElement).placeholder === '\\u{E946}',
-    ) as HTMLInputElement;
-    expect(glyphUnicodeInput.value).toBe(String.fromCodePoint(0xe946));
-    expect(glyphUnicodeInput.value.length).toBe(1);
+    // 픽커 닫힌 뒤 같은 버튼이 새 글리프(broadsword U+FF23C)를 표시.
+    const updatedButton = screen.getByTitle('game-icons.net 아이콘 선택');
+    expect(updatedButton.textContent).toBe(String.fromCodePoint(0xff23c));
+    // Supplementary plane PUA 는 UTF-16 surrogate pair (length=2) 이지만 codepoint 단일.
+    expect([...(updatedButton.textContent ?? '')]).toHaveLength(1);
   });
 });

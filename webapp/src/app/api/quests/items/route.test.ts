@@ -25,7 +25,6 @@ function makeRequest(url: string, body?: object): NextRequest {
 const baseValid = {
   displayName: '검',
   glyphAscii: '/',
-  glyphUnicode: 'X',
   glyphGameIcon: 'X',
   pickupMessage: '검 획득',
 };

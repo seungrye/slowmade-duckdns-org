@@ -46,7 +46,7 @@ describe('PUT /api/quests/items/[id]', () => {
   it('weapon: element 가 잘못된 값이면 400', async () => {
     const item = {
       _id: 'i1', id: 'sword', kind: 'weapon', displayName: '검',
-      glyphAscii: '/', glyphUnicode: '', glyphGameIcon: '', pickupMessage: '',
+      glyphAscii: '/', glyphGameIcon: '', pickupMessage: '',
       attackPower: 7, element: 'fire', version: 1,
       save: vi.fn(),
     };
@@ -60,7 +60,7 @@ describe('PUT /api/quests/items/[id]', () => {
   it('weapon: attackPower 갱신 + revision 백업 + version + 1', async () => {
     const item = {
       _id: 'i1', id: 'sword', kind: 'weapon', displayName: '검',
-      glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X', pickupMessage: '검',
+      glyphAscii: '/', glyphGameIcon: 'X', pickupMessage: '검',
       attackPower: 7, element: 'fire', version: 3,
       save: vi.fn().mockResolvedValue(undefined),
     };
@@ -81,7 +81,7 @@ describe('PUT /api/quests/items/[id]', () => {
   it('quest: imagePath 갱신', async () => {
     const item = {
       _id: 'i1', id: 'gem', kind: 'quest', displayName: '보석',
-      glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆', pickupMessage: '획득',
+      glyphAscii: '*', glyphGameIcon: '◆', pickupMessage: '획득',
       imagePath: 'scene/old.png', version: 1,
       save: vi.fn().mockResolvedValue(undefined),
     };
@@ -95,7 +95,7 @@ describe('PUT /api/quests/items/[id]', () => {
   it('consumable: effect 갱신', async () => {
     const item = {
       _id: 'i1', id: 'health_potion', kind: 'consumable', displayName: '물약',
-      glyphAscii: '!', glyphUnicode: '❤', glyphGameIcon: '❤', pickupMessage: '획득',
+      glyphAscii: '!', glyphGameIcon: '❤', pickupMessage: '획득',
       effect: { type: 'Heal', amount: 8 }, version: 1,
       save: vi.fn().mockResolvedValue(undefined),
     };

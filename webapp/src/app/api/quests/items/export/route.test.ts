@@ -25,7 +25,7 @@ describe('GET /api/quests/items/export', () => {
         lean: vi.fn().mockResolvedValue([
           {
             id: 'sword', kind: 'weapon', displayName: '검',
-            glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X',
+            glyphAscii: '/', glyphGameIcon: 'X',
             pickupMessage: '획득', attackPower: 7, element: 'fire',
           },
         ]),
@@ -46,7 +46,7 @@ describe('GET /api/quests/items/export', () => {
         lean: vi.fn().mockResolvedValue([
           {
             id: 'gem', kind: 'quest', displayName: '보석',
-            glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆',
+            glyphAscii: '*', glyphGameIcon: '◆',
             pickupMessage: '획득', imagePath: 'scene/x.png',
           },
         ]),

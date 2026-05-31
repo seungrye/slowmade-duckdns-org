@@ -9,25 +9,25 @@ const noop = vi.fn();
 const mockItems: ItemDocument[] = [
   {
     _id: '1', id: 'eternal_gem', kind: 'quest', displayName: '영원의 보석',
-    glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆',
+    glyphAscii: '*', glyphGameIcon: '◆',
     pickupMessage: '획득', imagePath: 'scene/x.png',
     version: 1, createdAt: '', updatedAt: '',
   },
   {
     _id: '2', id: 'sword', kind: 'weapon', displayName: '검',
-    glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X',
+    glyphAscii: '/', glyphGameIcon: 'X',
     pickupMessage: '획득', attackPower: 7, element: 'fire',
     version: 1, createdAt: '', updatedAt: '',
   },
   {
     _id: '3', id: 'leather_armor', kind: 'armor', displayName: '가죽 갑옷',
-    glyphAscii: ']', glyphUnicode: 'X', glyphGameIcon: 'X',
+    glyphAscii: ']', glyphGameIcon: 'X',
     pickupMessage: '획득', defenseBonus: 2,
     version: 1, createdAt: '', updatedAt: '',
   },
   {
     _id: '4', id: 'health_potion', kind: 'consumable', displayName: '체력 물약',
-    glyphAscii: '!', glyphUnicode: '❤', glyphGameIcon: '❤',
+    glyphAscii: '!', glyphGameIcon: '❤',
     pickupMessage: '획득', effect: { type: 'Heal', amount: 8 },
     version: 1, createdAt: '', updatedAt: '',
   },

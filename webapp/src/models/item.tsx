@@ -18,7 +18,6 @@ const ItemSchema = new Schema(
     },
     displayName: { type: String, required: true },
     glyphAscii: { type: String, required: true },
-    glyphUnicode: { type: String, required: true },
     glyphGameIcon: { type: String, required: true },
     pickupMessage: { type: String, required: true },
 
@@ -59,7 +58,6 @@ export interface ItemDoc {
   kind: "quest" | "weapon" | "armor" | "consumable" | "accessory";
   displayName: string;
   glyphAscii: string;
-  glyphUnicode: string;
   glyphGameIcon: string;
   pickupMessage: string;
   imagePath?: string;

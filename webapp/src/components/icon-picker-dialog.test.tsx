@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { useState } from 'react';
 import { IconPickerDialog } from './icon-picker-dialog';
-import { RPG_AWESOME_ICONS } from '@/lib/rpg-awesome-icons';
+import { GAME_ICONS } from '@/lib/game-icons-icons';
 
 function Harness({ onSelect }: { onSelect: (s: string) => void }) {
   const [open, setOpen] = useState(true);
@@ -42,24 +42,24 @@ describe('IconPickerDialog', () => {
     expect(screen.getAllByRole('button', { name: /broadsword 선택/ }).length).toBe(1);
   });
 
-  it('총 개수 표시는 전체 RPG_AWESOME_ICONS 길이와 일치한다', () => {
+  it('총 개수 표시는 전체 GAME_ICONS 길이와 일치한다', () => {
     render(
       <IconPickerDialog open={true} onClose={() => {}} onSelect={() => {}} />,
     );
-    expect(screen.getByText(new RegExp(`/ ${RPG_AWESOME_ICONS.length} 개`))).toBeTruthy();
+    expect(screen.getByText(new RegExp(`총 ${GAME_ICONS.length} 개`))).toBeTruthy();
   });
 
   it('기본은 단일 PUA 문자 onSelect (char 형식)', () => {
     const selectSpy = vi.fn();
     render(<Harness onSelect={selectSpy} />);
-    // broadsword 선택 (U+E946)
+    // broadsword 선택 (U+FF23C)
     const input = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'broadsword' } });
     fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));
-    expect(selectSpy).toHaveBeenCalledWith(String.fromCodePoint(0xe946));
+    expect(selectSpy).toHaveBeenCalledWith(String.fromCodePoint(0xff23c));
   });
 
-  it('outputFormat="literal" 이면 \\u{XXXX} 형식 codepoint 문자열', () => {
+  it('outputFormat="literal" 이면 \\u{XXXXX} 형식 codepoint 문자열', () => {
     const selectSpy = vi.fn();
     render(
       <IconPickerDialog
@@ -72,7 +72,7 @@ describe('IconPickerDialog', () => {
     const input = screen.getByPlaceholderText(/아이콘 이름 검색/) as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'broadsword' } });
     fireEvent.click(screen.getByRole('button', { name: /broadsword 선택/ }));
-    expect(selectSpy).toHaveBeenCalledWith('\\u{E946}');
+    expect(selectSpy).toHaveBeenCalledWith('\\u{FF23C}');
   });
 
   it('ESC 키로 닫힌다', () => {

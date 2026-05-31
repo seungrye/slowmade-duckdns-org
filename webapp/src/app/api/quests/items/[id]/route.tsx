@@ -14,7 +14,6 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
     kind: item.kind,
     displayName: item.displayName,
     glyphAscii: item.glyphAscii,
-    glyphUnicode: item.glyphUnicode,
     glyphGameIcon: item.glyphGameIcon,
     pickupMessage: item.pickupMessage,
   };
@@ -86,7 +85,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (body.displayName !== undefined) item.displayName = body.displayName;
   if (body.glyphAscii !== undefined) item.glyphAscii = body.glyphAscii;
-  if (body.glyphUnicode !== undefined) item.glyphUnicode = body.glyphUnicode;
   if (body.glyphGameIcon !== undefined) item.glyphGameIcon = body.glyphGameIcon;
   if (body.pickupMessage !== undefined) item.pickupMessage = body.pickupMessage;
 

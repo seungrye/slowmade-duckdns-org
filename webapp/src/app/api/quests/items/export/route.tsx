@@ -39,7 +39,6 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
     id: d.id as string,
     displayName: d.displayName as string,
     glyphAscii: d.glyphAscii as string,
-    glyphUnicode: d.glyphUnicode as string,
     glyphGameIcon: d.glyphGameIcon as string,
     pickupMessage: d.pickupMessage as string,
   };

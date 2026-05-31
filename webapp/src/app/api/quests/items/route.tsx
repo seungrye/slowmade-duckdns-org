@@ -36,7 +36,6 @@ export async function POST(req: NextRequest) {
     kind: body.kind,
     displayName: body.displayName,
     glyphAscii: body.glyphAscii,
-    glyphUnicode: body.glyphUnicode,
     glyphGameIcon: body.glyphGameIcon,
     pickupMessage: body.pickupMessage,
   };

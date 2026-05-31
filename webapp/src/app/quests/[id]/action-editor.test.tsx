@@ -152,13 +152,13 @@ describe('ActionEditor — Item picker (ItemCombobox 통합)', () => {
   const items = [
     {
       _id: '1', id: 'eternal_gem', kind: 'quest' as const, displayName: '영원의 보석',
-      glyphAscii: '*', glyphUnicode: '◆', glyphGameIcon: '◆',
+      glyphAscii: '*', glyphGameIcon: '◆',
       pickupMessage: '획득', imagePath: 'scene/x.png',
       version: 1, createdAt: '', updatedAt: '',
     },
     {
       _id: '2', id: 'health_potion', kind: 'consumable' as const, displayName: '체력 물약',
-      glyphAscii: '!', glyphUnicode: '❤', glyphGameIcon: '❤',
+      glyphAscii: '!', glyphGameIcon: '❤',
       pickupMessage: '획득', effect: { type: 'Heal' as const, amount: 8 },
       version: 1, createdAt: '', updatedAt: '',
     },

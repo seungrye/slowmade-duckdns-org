@@ -42,7 +42,7 @@ describe('POST /api/quests/items/[id]/revisions/[ver]/restore', () => {
   it('weapon 롤백 — 백업 + 종별 필드 적용 + version + 1', async () => {
     const item = {
       _id: 'i1', id: 'sword', kind: 'weapon',
-      displayName: '검(현재)', glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X',
+      displayName: '검(현재)', glyphAscii: '/', glyphGameIcon: 'X',
       pickupMessage: '획득', attackPower: 12, element: 'lightning', version: 5,
       save: vi.fn().mockResolvedValue(undefined),
     };
@@ -52,7 +52,7 @@ describe('POST /api/quests/items/[id]/revisions/[ver]/restore', () => {
         item: {
           id: 'sword', kind: 'weapon',
           displayName: '검(과거)',
-          glyphAscii: '/', glyphUnicode: 'X', glyphGameIcon: 'X', pickupMessage: '획득',
+          glyphAscii: '/', glyphGameIcon: 'X', pickupMessage: '획득',
           attackPower: 7, element: 'fire',
         },
       }),
