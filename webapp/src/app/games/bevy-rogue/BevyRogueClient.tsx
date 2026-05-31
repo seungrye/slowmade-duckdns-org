@@ -70,7 +70,9 @@ export default function BevyRogueClient() {
         const liveDisabled = url.searchParams.get("live") === "0";
         if (!liveDisabled) {
           try {
-            const res = await fetch("/api/game/content/v1", { cache: "default" });
+            // no-store: 카탈로그·town options 가 *방금 저장된 게* 즉시 보여야 함.
+            // 1분 cache 의 짧은 stale 도 사용자가 옵션 변경 직후 게임 시작하면 어색해 보여서.
+            const res = await fetch("/api/game/content/v1", { cache: "no-store" });
             if (res.ok) contentJson = await res.text();
             else console.warn("[bevy-rogue] content fetch:", res.status);
           } catch (e) {
