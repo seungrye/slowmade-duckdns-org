@@ -6,6 +6,7 @@ vi.mock("@/models/item", () => ({ default: { find: vi.fn() } }));
 vi.mock("@/models/villager", () => ({ default: { find: vi.fn() } }));
 vi.mock("@/models/monster", () => ({ default: { find: vi.fn() } }));
 vi.mock("@/models/start-loadout", () => ({ default: { findById: vi.fn() } }));
+vi.mock("@/models/town-config", () => ({ default: { findById: vi.fn() } }));
 
 import { GET } from "./route";
 import Quest from "@/models/quest";
@@ -13,6 +14,7 @@ import Item from "@/models/item";
 import Villager from "@/models/villager";
 import Monster from "@/models/monster";
 import StartLoadout from "@/models/start-loadout";
+import TownConfig from "@/models/town-config";
 import {
   parseRon,
   parseQuestItemsRon,
@@ -37,6 +39,13 @@ function mockChain(model: { find: FindMock }, docs: unknown[]) {
 type FindByIdMock = ReturnType<typeof vi.fn>;
 function mockStartLoadout(doc: Record<string, unknown> | null) {
   (StartLoadout as unknown as { findById: FindByIdMock }).findById.mockReturnValue({
+    lean: vi.fn().mockResolvedValue(doc),
+  });
+}
+
+// TownConfig.findById("default").lean() 모킹. doc=null → DB 미존재(폴백).
+function mockTownConfig(doc: Record<string, unknown> | null) {
+  (TownConfig as unknown as { findById: FindByIdMock }).findById.mockReturnValue({
     lean: vi.fn().mockResolvedValue(doc),
   });
 }
@@ -116,6 +125,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, [sampleVillagerDoc()]);
     mockChain(Monster as unknown as { find: FindMock }, [sampleMonsterDoc()]);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -124,12 +134,14 @@ describe("GET /api/game/content/v1", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 
     const body = await res.json();
-    expect(body).toHaveProperty("version", 1);
+    // v2 — town_config 키 추가.
+    expect(body).toHaveProperty("version", 2);
     expect(body).toHaveProperty("generated_at");
     expect(body).toHaveProperty("quests");
     expect(body).toHaveProperty("items");
     expect(body).toHaveProperty("villagers");
     expect(body).toHaveProperty("monsters");
+    expect(body).toHaveProperty("town_config");
     // generated_at 은 ISO8601 형태
     expect(() => new Date(body.generated_at).toISOString()).not.toThrow();
   });
@@ -140,6 +152,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -159,6 +172,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -184,6 +198,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, [sampleVillagerDoc()]);
     mockChain(Monster as unknown as { find: FindMock }, [sampleMonsterDoc()]);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -203,6 +218,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -227,6 +243,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -249,6 +266,7 @@ describe("GET /api/game/content/v1", () => {
         { id: "trap_kit", count: 3 },
       ],
     });
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -273,6 +291,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -295,6 +314,7 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
@@ -310,10 +330,83 @@ describe("GET /api/game/content/v1", () => {
     mockChain(Villager as unknown as { find: FindMock }, []);
     mockChain(Monster as unknown as { find: FindMock }, []);
     mockStartLoadout(null);
+    mockTownConfig(null);
 
     const res = await GET();
     const body = await res.json();
     const accs = parseAccessoriesRon(body.items["accessories.ron"]);
     expect(accs[0].effects).toEqual(["RevealGuardVision"]);
+  });
+
+  it("TownConfig DB doc 이 없으면 기본값(Village/Radial/Common/None/[Inn,Smithy]/fields=true) RON 반환", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.town_config;
+    expect(ron).toContain("TownOptions(");
+    expect(ron).toContain("size: Village,");
+    expect(ron).toContain("roads: Radial,");
+    expect(ron).toContain("wealth: Common,");
+    expect(ron).toContain("defenses: None,");
+    expect(ron).toContain("landmarks: [Inn, Smithy],");
+    expect(ron).toContain("fields: true,");
+  });
+
+  it("TownConfig DB doc 이 있으면 그 값을 serialize 해 반환", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig({
+      _id: "default",
+      size: "town",
+      roads: "linear",
+      wealth: "wealthy",
+      defenses: "stone",
+      landmarks: ["temple", "market", "manor"],
+      fields: false,
+    });
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.town_config;
+    expect(ron).toContain("size: Town,");
+    expect(ron).toContain("roads: Linear,");
+    expect(ron).toContain("wealth: Wealthy,");
+    expect(ron).toContain("defenses: Stone,");
+    expect(ron).toContain("landmarks: [Temple, Market, Manor],");
+    expect(ron).toContain("fields: false,");
+  });
+
+  it("TownConfig DB doc 에 알 수 없는 값이 있으면 default 로 폴백", async () => {
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig({
+      _id: "default",
+      size: "megacity",  // 알 수 없는 값 → default(village)
+      roads: "spiral",   // 알 수 없는 값 → default(radial)
+      wealth: "common",
+      defenses: "none",
+      landmarks: ["inn", "unknown", "smithy"], // unknown 필터링
+      fields: true,
+    });
+
+    const res = await GET();
+    const body = await res.json();
+    const ron = body.town_config;
+    expect(ron).toContain("size: Village,");
+    expect(ron).toContain("roads: Radial,");
+    // landmarks 의 unknown 은 필터링됨
+    expect(ron).toContain("landmarks: [Inn, Smithy],");
   });
 });

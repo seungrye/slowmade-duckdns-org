@@ -37,6 +37,10 @@
       "name": "grid_village"
     },
     {
+      "file": "town.json",
+      "name": "town"
+    },
+    {
       "file": "forest.json",
       "name": "forest"
     },

@@ -17,6 +17,7 @@ import Item from "@/models/item";
 import Villager from "@/models/villager";
 import Monster from "@/models/monster";
 import StartLoadout from "@/models/start-loadout";
+import TownConfig from "@/models/town-config";
 import {
   serializeRon,
   serializeQuestItemsRon,
@@ -27,6 +28,7 @@ import {
   serializeVillagersRon,
   serializeMonstersRon,
   serializeStartLoadoutRon,
+  serializeTownConfigRon,
 } from "@/lib/ron";
 import type { QuestDef } from "@/types/quest";
 import type { ItemDef, WeaponElement, AccessoryEffect } from "@/types/item";
@@ -34,12 +36,18 @@ import { ACCESSORY_EFFECTS } from "@/types/item";
 import type { VillagerDef } from "@/types/villager";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
+import {
+  TOWN_CONFIG_DEFAULTS, TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
+  type TownConfig as TownConfigDef,
+  type TownSize, type TownRoads, type TownWealth, type TownDefenses, type TownLandmark,
+} from "@/types/town-config";
 
 export const dynamic = "force-dynamic";
 
 // ── 응답 스키마 ──────────────────────────────────────────────────────────────
 // 게임 측 파서와 동일 형태(키/타입). 변경 시 version 증가 & 게임 동시 업데이트 필수.
-const SCHEMA_VERSION = 1;
+// v2: town_config 키 추가 (시작 마을 ZoneId::Town 생성 옵션 RON).
+const SCHEMA_VERSION = 2;
 
 interface ContentResponse {
   version: number;
@@ -55,6 +63,8 @@ interface ContentResponse {
   };
   villagers: string;
   monsters: string;
+  /** 시작 마을 생성 옵션 RON. 게임은 ZoneId::Town 진입 시 이 옵션을 generator 에 전달. */
+  town_config: string;
 }
 
 // ── DB 문서 → 도메인 타입 매핑 ────────────────────────────────────────────────
@@ -203,20 +213,41 @@ function toStartLoadoutDef(d: Record<string, unknown>): StartLoadoutDef {
   };
 }
 
+// ── TownConfig 폴백 ────────────────────────────────────────────────────────────
+// DB doc 의 알 수 없는/누락 값은 default 로 치환 — 새 옵션 추가 시 호환.
+function toTownConfigDef(d: Record<string, unknown>): TownConfigDef {
+  const inEnum = <T extends string>(set: readonly T[], v: unknown, fallback: T): T =>
+    (typeof v === "string" && (set as readonly string[]).includes(v)) ? (v as T) : fallback;
+  const landmarksRaw = Array.isArray(d.landmarks) ? d.landmarks : [];
+  const landmarks = landmarksRaw.filter(
+    (v): v is TownLandmark => typeof v === "string" && (TOWN_LANDMARKS as readonly string[]).includes(v),
+  );
+  return {
+    size: inEnum<TownSize>(TOWN_SIZES, d.size, TOWN_CONFIG_DEFAULTS.size),
+    roads: inEnum<TownRoads>(TOWN_ROADS, d.roads, TOWN_CONFIG_DEFAULTS.roads),
+    wealth: inEnum<TownWealth>(TOWN_WEALTHS, d.wealth, TOWN_CONFIG_DEFAULTS.wealth),
+    defenses: inEnum<TownDefenses>(TOWN_DEFENSES, d.defenses, TOWN_CONFIG_DEFAULTS.defenses),
+    landmarks,
+    fields: typeof d.fields === "boolean" ? d.fields : TOWN_CONFIG_DEFAULTS.fields,
+  };
+}
+
 // ── GET ────────────────────────────────────────────────────────────────────────
 
 export async function GET() {
   await connectToDB();
 
-  const [questDocs, itemDocs, villagerDocs, monsterDocs, startLoadoutDoc] = await Promise.all([
+  const [questDocs, itemDocs, villagerDocs, monsterDocs, startLoadoutDoc, townConfigDoc] = await Promise.all([
     Quest.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     Item.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     Villager.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     Monster.find({}).sort({ id: 1 }).lean() as unknown as Promise<Record<string, unknown>[]>,
     StartLoadout.findById("default").lean() as unknown as Promise<Record<string, unknown> | null>,
+    TownConfig.findById("default").lean() as unknown as Promise<Record<string, unknown> | null>,
   ]);
 
   const startLoadout = startLoadoutDoc ? toStartLoadoutDef(startLoadoutDoc) : DEFAULT_START_LOADOUT;
+  const townConfig = townConfigDoc ? toTownConfigDef(townConfigDoc) : TOWN_CONFIG_DEFAULTS;
 
   const quests = questDocs
     .map(toQuestDef)
@@ -246,6 +277,7 @@ export async function GET() {
     },
     villagers: serializeVillagersRon(villagers),
     monsters: serializeMonstersRon(monsters),
+    town_config: serializeTownConfigRon(townConfig),
   };
 
   return new Response(JSON.stringify(body), {

@@ -1455,3 +1455,46 @@ describe("serializeStartLoadoutRon", () => {
     void path;
   });
 });
+
+import { serializeTownConfigRon } from "./ron";
+import { TOWN_CONFIG_DEFAULTS } from "@/types/town-config";
+
+describe("serializeTownConfigRon", () => {
+  it("기본값 → PascalCase enum + landmarks 배열", () => {
+    const ron = serializeTownConfigRon(TOWN_CONFIG_DEFAULTS);
+    expect(ron).toContain("TownOptions(");
+    expect(ron).toContain("size: Village,");
+    expect(ron).toContain("roads: Radial,");
+    expect(ron).toContain("wealth: Common,");
+    expect(ron).toContain("defenses: None,");
+    expect(ron).toContain("landmarks: [Inn, Smithy],");
+    expect(ron).toContain("fields: true,");
+    expect(ron.endsWith(")\n")).toBe(true);
+  });
+
+  it("모든 옵션 값 변환", () => {
+    const ron = serializeTownConfigRon({
+      size: "town", roads: "linear", wealth: "wealthy",
+      defenses: "stone", landmarks: ["inn", "smithy", "temple", "guard", "market", "manor"],
+      fields: false,
+    });
+    expect(ron).toContain("size: Town,");
+    expect(ron).toContain("roads: Linear,");
+    expect(ron).toContain("wealth: Wealthy,");
+    expect(ron).toContain("defenses: Stone,");
+    expect(ron).toContain("landmarks: [Inn, Smithy, Temple, Guard, Market, Manor],");
+    expect(ron).toContain("fields: false,");
+  });
+
+  it("빈 landmarks 도 직렬화 가능", () => {
+    const ron = serializeTownConfigRon({
+      size: "hamlet", roads: "random", wealth: "poor",
+      defenses: "wooden", landmarks: [], fields: true,
+    });
+    expect(ron).toContain("landmarks: [],");
+    expect(ron).toContain("defenses: Wooden,");
+    expect(ron).toContain("size: Hamlet,");
+    expect(ron).toContain("roads: Random,");
+    expect(ron).toContain("wealth: Poor,");
+  });
+});

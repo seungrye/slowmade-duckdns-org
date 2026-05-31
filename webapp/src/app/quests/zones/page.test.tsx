@@ -84,3 +84,76 @@ describe('ZonesPage 빈 상태', () => {
     expect(screen.getByText(/등록된 zone 이 없습니다/)).toBeTruthy();
   });
 });
+
+describe('SystemZonesPanel Town 옵션 form', () => {
+  function mockFetchByUrl(townConfig?: Partial<{ data: Record<string, unknown> }>) {
+    vi.spyOn(global, 'fetch').mockImplementation((url) => {
+      const u = typeof url === 'string' ? url : (url as Request).url;
+      if (u.includes('/api/quests/town-config')) {
+        return Promise.resolve({
+          ok: true, status: 200,
+          json: async () => townConfig ?? ({ data: {
+            _id: 'default',
+            size: 'village', roads: 'radial', wealth: 'common',
+            defenses: 'none', landmarks: ['inn', 'smithy'],
+            fields: true, version: 1,
+          } }),
+        } as Response);
+      }
+      return Promise.resolve({
+        ok: true, status: 200,
+        json: async () => ({ data: mockZones }),
+      } as Response);
+    });
+  }
+
+  it('Town 옵션 form 이 6 개 옵션과 저장/기본값 버튼을 렌더한다', async () => {
+    mockFetchByUrl();
+    const { container } = render(<ZonesPage />);
+    await act(async () => {});
+    // 옵션 라벨 일부 검증
+    expect(container.textContent).toContain('Town 생성 옵션');
+    expect(container.textContent).toContain('size (마을 규모)');
+    expect(container.textContent).toContain('roads (도로 형태)');
+    expect(container.textContent).toContain('wealth (부유함)');
+    expect(container.textContent).toContain('defenses (방어 시설)');
+    expect(container.textContent).toContain('landmarks');
+    expect(container.textContent).toContain('fields (외곽 농경지)');
+    // 버튼
+    expect(screen.getByText('저장')).toBeTruthy();
+    expect(screen.getByText('기본값 복원')).toBeTruthy();
+  });
+
+  it('Town generator 가 카탈로그 generator select 옵션에 포함된다', async () => {
+    mockFetchByUrl();
+    const { container } = render(<ZonesPage />);
+    await act(async () => {});
+    fireEvent.click(screen.getByText('+ 새 zone'));
+    const selects = container.querySelectorAll('select');
+    const opts = Array.from(selects).flatMap((s) => Array.from(s.querySelectorAll('option')));
+    const values = opts.map((o) => (o as HTMLOptionElement).value);
+    expect(values).toContain('town');
+  });
+
+  it('저장 버튼 클릭 시 PUT 요청을 보낸다', async () => {
+    mockFetchByUrl();
+    render(<ZonesPage />);
+    await act(async () => {});
+    const fetchSpy = vi.spyOn(global, 'fetch');
+    fetchSpy.mockClear();
+    fetchSpy.mockResolvedValueOnce({
+      ok: true, status: 200,
+      json: async () => ({ data: {} }),
+    } as Response);
+    await act(async () => {
+      fireEvent.click(screen.getByText('저장'));
+    });
+    const calls = fetchSpy.mock.calls.filter((c) => {
+      const u = typeof c[0] === 'string' ? c[0] : (c[0] as Request).url;
+      return u.includes('/api/quests/town-config');
+    });
+    expect(calls.length).toBeGreaterThanOrEqual(1);
+    const putCall = calls.find((c) => (c[1] as RequestInit | undefined)?.method === 'PUT');
+    expect(putCall).toBeTruthy();
+  });
+});

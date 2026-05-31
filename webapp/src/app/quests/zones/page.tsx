@@ -5,6 +5,13 @@ import Link from "next/link";
 import type { ZoneDocument } from "@/types/zone";
 import { useInfoDialog } from "@/components/info-dialog";
 import { GeneratorPreview } from "@/components/generator-preview";
+import {
+  TOWN_CONFIG_DEFAULTS,
+  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
+  TOWN_SIZE_LABEL, TOWN_ROADS_LABEL, TOWN_WEALTH_LABEL, TOWN_DEFENSES_LABEL,
+  TOWN_LANDMARK_LABEL,
+  type TownConfig, type TownLandmark,
+} from "@/types/town-config";
 
 interface FormState {
   name: string;
@@ -51,6 +58,7 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
   {
     category: "마을",
     items: [
+      { id: "town",               desc: "시작 마을 — 옵션(size/roads/wealth/defenses/landmarks/fields) 분기" },
       { id: "organic_village",    desc: "유기적 건물 배치" },
       { id: "grid_village",       desc: "격자 도로망 + 블록" },
       { id: "walled_town",        desc: "성벽 마을 (잠입 퀘스트용)" },
@@ -371,15 +379,79 @@ export default function ZonesPage() {
  * `Named(id)` 로 통일되어 아래 일반 카탈로그에 등록·편집 가능하다.
  */
 function SystemZonesPanel() {
+  // Town 은 유일한 시스템 정적 zone. generator 는 옵션을 받는 신규 `town`.
   const systemZones: { name: string; generator: string; desc: string }[] = [
-    { name: "Town", generator: "organic_village", desc: "시작 마을 — 신규 게임 진입 zone (유일한 정적 ZoneId)" },
+    { name: "Town", generator: "town", desc: "시작 마을 — 신규 게임 진입 zone (유일한 정적 ZoneId)" },
   ];
+
+  // 옵션 form 상태. load 시 /api/quests/town-config fetch.
+  const [config, setConfig] = useState<TownConfig>(TOWN_CONFIG_DEFAULTS);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const { showInfo } = useInfoDialog();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/quests/town-config");
+        if (!res.ok) { setLoading(false); return; }
+        const json = await res.json();
+        const data = json.data ?? {};
+        // 누락된 키는 default 로 보강 — 새 옵션 추가 시 호환.
+        setConfig({
+          size: data.size ?? TOWN_CONFIG_DEFAULTS.size,
+          roads: data.roads ?? TOWN_CONFIG_DEFAULTS.roads,
+          wealth: data.wealth ?? TOWN_CONFIG_DEFAULTS.wealth,
+          defenses: data.defenses ?? TOWN_CONFIG_DEFAULTS.defenses,
+          landmarks: Array.isArray(data.landmarks) ? data.landmarks : TOWN_CONFIG_DEFAULTS.landmarks,
+          fields: typeof data.fields === "boolean" ? data.fields : TOWN_CONFIG_DEFAULTS.fields,
+        });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  function toggleLandmark(l: TownLandmark) {
+    setConfig((prev) => {
+      const has = prev.landmarks.includes(l);
+      return {
+        ...prev,
+        landmarks: has
+          ? prev.landmarks.filter((x) => x !== l)
+          : [...prev.landmarks, l],
+      };
+    });
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    const res = await fetch("/api/quests/town-config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(config),
+    });
+    setSaving(false);
+    if (res.ok) {
+      showInfo({ title: "저장 완료", body: "Town 생성 옵션이 저장되었습니다.", variant: "success" });
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showInfo({ title: "저장 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
+  }
+
+  function handleResetDefaults() {
+    setConfig(TOWN_CONFIG_DEFAULTS);
+  }
+
+  const inputCls = "border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800";
+
   return (
     <details className="mb-6 border rounded-lg bg-gray-50 dark:bg-gray-900">
       <summary className="cursor-pointer px-3 py-2 text-sm font-medium select-none">
         시스템 정적 zone ({systemZones.length}개) — 게임의 ZoneId::Town
       </summary>
-      <div className="p-3 border-t text-xs space-y-1">
+      <div className="p-3 border-t text-xs space-y-3">
         <p className="text-gray-500">
           <code className="px-1 mx-0.5 font-mono">Town</code> 은 코드에 정의된 유일한
           정적 zone 으로 DB 카탈로그에 등록되지 않습니다.
@@ -397,6 +469,111 @@ function SystemZonesPanel() {
             </li>
           ))}
         </ul>
+
+        {/* Town 생성 옵션 — 게임 측 TownOptions 와 1:1 매핑 */}
+        <div className="mt-3 p-3 rounded border bg-white dark:bg-gray-950 space-y-3">
+          <div className="font-medium text-sm">Town 생성 옵션</div>
+          {loading ? (
+            <p className="text-gray-400">불러오는 중...</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">size (마을 규모)</span>
+                  <select
+                    value={config.size}
+                    onChange={(e) => setConfig({ ...config, size: e.target.value as TownConfig["size"] })}
+                    className={inputCls}
+                    aria-label="town-size"
+                  >
+                    {TOWN_SIZES.map((s) => (<option key={s} value={s}>{TOWN_SIZE_LABEL[s]}</option>))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">roads (도로 형태)</span>
+                  <select
+                    value={config.roads}
+                    onChange={(e) => setConfig({ ...config, roads: e.target.value as TownConfig["roads"] })}
+                    className={inputCls}
+                    aria-label="town-roads"
+                  >
+                    {TOWN_ROADS.map((s) => (<option key={s} value={s}>{TOWN_ROADS_LABEL[s]}</option>))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">wealth (부유함)</span>
+                  <select
+                    value={config.wealth}
+                    onChange={(e) => setConfig({ ...config, wealth: e.target.value as TownConfig["wealth"] })}
+                    className={inputCls}
+                    aria-label="town-wealth"
+                  >
+                    {TOWN_WEALTHS.map((s) => (<option key={s} value={s}>{TOWN_WEALTH_LABEL[s]}</option>))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">defenses (방어 시설)</span>
+                  <select
+                    value={config.defenses}
+                    onChange={(e) => setConfig({ ...config, defenses: e.target.value as TownConfig["defenses"] })}
+                    className={inputCls}
+                    aria-label="town-defenses"
+                  >
+                    {TOWN_DEFENSES.map((s) => (<option key={s} value={s}>{TOWN_DEFENSES_LABEL[s]}</option>))}
+                  </select>
+                </label>
+              </div>
+              <div className="space-y-1">
+                <span className="text-gray-500">landmarks (선택 가능, 중복 X)</span>
+                <div className="flex flex-wrap gap-2">
+                  {TOWN_LANDMARKS.map((l) => {
+                    const checked = config.landmarks.includes(l);
+                    return (
+                      <label
+                        key={l}
+                        className="flex items-center gap-1 px-2 py-1 rounded border cursor-pointer hover:border-blue-400 select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleLandmark(l)}
+                          aria-label={`town-landmark-${l}`}
+                        />
+                        <span>{TOWN_LANDMARK_LABEL[l]}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={config.fields}
+                  onChange={(e) => setConfig({ ...config, fields: e.target.checked })}
+                  aria-label="town-fields"
+                />
+                <span className="text-gray-700 dark:text-gray-300">fields (외곽 농경지)</span>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-3 py-1 rounded bg-blue-600 text-white text-xs disabled:opacity-50"
+                >
+                  {saving ? "저장 중..." : "저장"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetDefaults}
+                  className="px-3 py-1 rounded border text-xs hover:border-gray-500"
+                >
+                  기본값 복원
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </details>
   );

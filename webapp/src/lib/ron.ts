@@ -15,6 +15,7 @@ import type { ItemDef, ConsumableEffect, WeaponElement, AccessoryEffect } from "
 import { ACCESSORY_EFFECTS } from "@/types/item";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
+import type { TownConfig } from "@/types/town-config";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tokenizer
@@ -1467,6 +1468,41 @@ export function serializeStartLoadoutRon(def: StartLoadoutDef): string {
     const tuples = def.consumables.map((c) => `(${q(c.id)}, ${c.count})`).join(", ");
     lines.push(`    consumables: [${tuples}],`);
   }
+  lines.push(`)`);
+  return lines.join("\n") + "\n";
+}
+
+/**
+ * TownConfig → RON 직렬화 (시작 마을 ZoneId::Town 생성 옵션).
+ * 게임 측 `TownOptions` 와 1:1 매핑. enum 변환:
+ *   kebab-case (TS) → PascalCase (Rust enum variants).
+ *
+ * 예:
+ *   TownOptions(
+ *       size: Village,
+ *       roads: Radial,
+ *       wealth: Common,
+ *       defenses: None,
+ *       landmarks: [Inn, Smithy],
+ *       fields: true,
+ *   )
+ */
+export function serializeTownConfigRon(def: TownConfig): string {
+  const pascal = (s: string): string =>
+    s.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+
+  const lines: string[] = [];
+  lines.push(`TownOptions(`);
+  lines.push(`    size: ${pascal(def.size)},`);
+  lines.push(`    roads: ${pascal(def.roads)},`);
+  lines.push(`    wealth: ${pascal(def.wealth)},`);
+  lines.push(`    defenses: ${pascal(def.defenses)},`);
+  if (def.landmarks.length === 0) {
+    lines.push(`    landmarks: [],`);
+  } else {
+    lines.push(`    landmarks: [${def.landmarks.map(pascal).join(", ")}],`);
+  }
+  lines.push(`    fields: ${def.fields ? "true" : "false"},`);
   lines.push(`)`);
   return lines.join("\n") + "\n";
 }
