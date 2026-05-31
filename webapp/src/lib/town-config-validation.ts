@@ -68,8 +68,12 @@ export function normalizeTownConfig(body: Record<string, unknown>): TownConfig {
   const env: TownEnvironment = inEnum(TOWN_ENVIRONMENTS, body.environment)
     ? (body.environment as TownEnvironment)
     : TOWN_CONFIG_DEFAULTS.environment;
+  const algo: TownAlgorithm = inEnum(TOWN_ALGORITHMS, body.algorithm)
+    ? (body.algorithm as TownAlgorithm)
+    : TOWN_CONFIG_DEFAULTS.algorithm;
   return {
     size: body.size as TownSize,
+    algorithm: algo,
     roads: body.roads as TownRoads,
     wealth: body.wealth as TownWealth,
     defenses: body.defenses as TownDefenses,
