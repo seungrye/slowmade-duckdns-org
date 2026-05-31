@@ -11,6 +11,10 @@ export default function QuestsPage() {
   const [creating, setCreating] = useState(false);
   const [newId, setNewId] = useState("");
   const [newTitle, setNewTitle] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkSpawn, setBulkSpawn] = useState("1.0");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
   const { showInfo } = useInfoDialog();
 
@@ -18,7 +22,53 @@ export default function QuestsPage() {
     const res = await fetch("/api/quests");
     const json = await res.json();
     setQuests(json.data ?? []);
+    setSelectedIds(new Set());
     setLoading(false);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const all = quests.length > 0 && quests.every((q) => prev.has(q._id));
+      const next = new Set(prev);
+      if (all) for (const q of quests) next.delete(q._id);
+      else for (const q of quests) next.add(q._id);
+      return next;
+    });
+  }
+
+  async function handleBulkSpawn(e: React.FormEvent) {
+    e.preventDefault();
+    const sc = Number(bulkSpawn);
+    if (!Number.isFinite(sc) || sc < 0 || sc > 1) {
+      showInfo({ title: "값 오류", body: "0.0~1.0 사이 숫자여야 합니다.", variant: "error" });
+      return;
+    }
+    if (selectedIds.size === 0) return;
+    setBulkSubmitting(true);
+    const res = await fetch("/api/quests/bulk-update-spawn-chance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds), spawnChance: sc }),
+    });
+    setBulkSubmitting(false);
+    if (res.ok) {
+      const { data } = await res.json();
+      setBulkOpen(false);
+      showInfo({ title: "일괄 변경 완료", body: `${data.updated}개 퀘스트 갱신.`, variant: "success" });
+      load();
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showInfo({ title: "일괄 변경 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -102,9 +152,29 @@ export default function QuestsPage() {
 
   return (
     <div className="mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">퀘스트 목록</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          {quests.length > 0 && (
+            <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 select-none">
+              <input
+                type="checkbox"
+                checked={quests.length > 0 && quests.every((q) => selectedIds.has(q._id))}
+                onChange={toggleSelectAll}
+                aria-label="전체 선택"
+              />
+              전체
+            </label>
+          )}
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setBulkOpen(true)}
+              className="px-3 py-2 text-sm rounded-lg border border-purple-300 hover:border-purple-500 hover:text-purple-600 transition-colors"
+            >
+              spawn 일괄 변경 ({selectedIds.size})
+            </button>
+          )}
           <label className="cursor-pointer px-3 py-2 text-sm rounded-lg border border-dashed border-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors">
             .ron 가져오기
             <input
@@ -176,7 +246,15 @@ export default function QuestsPage() {
               key={q._id}
               className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
             >
-              <div>
+              <div className="flex items-start gap-3 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(q._id)}
+                  onChange={() => toggleSelect(q._id)}
+                  aria-label={`${q.title} 선택`}
+                  className="mt-1 shrink-0"
+                />
+                <div className="min-w-0">
                 <Link href={`/quests/${q._id}`} className="font-medium hover:text-blue-500 block">
                   {q.title}
                 </Link>
@@ -194,6 +272,7 @@ export default function QuestsPage() {
                     스폰 {(q.spawnChance ?? 1.0).toFixed(2)}
                   </span>
                 </p>
+                </div>
               </div>
               <div className="flex gap-2 flex-shrink-0">
                 <label className="cursor-pointer px-2 py-1 text-xs rounded border hover:border-blue-400 hover:text-blue-500 transition-colors">
@@ -231,6 +310,53 @@ export default function QuestsPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {/* spawn 일괄 변경 모달 */}
+      {bulkOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => !bulkSubmitting && setBulkOpen(false)}
+        >
+          <form
+            onSubmit={handleBulkSpawn}
+            onClick={(e) => e.stopPropagation()}
+            className="w-80 p-4 rounded-lg bg-white dark:bg-gray-900 border shadow-xl space-y-3"
+          >
+            <h2 className="text-lg font-semibold">spawn 확률 일괄 변경</h2>
+            <p className="text-xs text-gray-500">선택한 {selectedIds.size}개 퀘스트의 spawnChance 를 같은 값으로 설정합니다.</p>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs text-gray-500">spawnChance (0.0 ~ 1.0)</span>
+              <input
+                type="number"
+                step="0.05"
+                min="0"
+                max="1"
+                value={bulkSpawn}
+                onChange={(e) => setBulkSpawn(e.target.value)}
+                className="border rounded px-2 py-1 text-sm font-mono"
+                autoFocus
+              />
+            </label>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                disabled={bulkSubmitting}
+                className="px-3 py-1 text-sm rounded border"
+              >
+                취소
+              </button>
+              <button
+                type="submit"
+                disabled={bulkSubmitting}
+                className="px-3 py-1 text-sm rounded bg-purple-600 text-white disabled:opacity-50"
+              >
+                {bulkSubmitting ? "적용 중..." : "적용"}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );
