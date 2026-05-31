@@ -132,22 +132,24 @@ const TOWN_ADDITIONS: readonly TownLandmark[] = [
 ];
 
 /**
- * 주어진 사이즈/환경에서 선택 가능한 landmark 목록.
- * UI 는 이 목록 외 항목을 `disabled` 처리하고, API/RON export 는 이 목록 외 값을
- * 조용히 필터링한다. 게임 측은 동일 규칙으로 carve 단계에서 silently skip 한다.
+ * 환경에서 선택 가능한 landmark 목록.
+ * 정책 변경: size 무시 — 모든 12 종 landmark 가 항상 사용 가능. env 만 의미
+ * (Coastal 일 때만 Docks 추가).
  */
 export function availableLandmarks(
-  size: TownSize,
+  _size: TownSize,
   env: TownEnvironment,
 ): TownLandmark[] {
-  const out: TownLandmark[] = [...HAMLET_BASE];
-  if (size === "village" || size === "town") out.push(...VILLAGE_ADDITIONS);
-  if (size === "town") out.push(...TOWN_ADDITIONS);
+  const out: TownLandmark[] = [
+    ...HAMLET_BASE,
+    ...VILLAGE_ADDITIONS,
+    ...TOWN_ADDITIONS,
+  ];
   if (env === "coastal") out.push("docks");
   return out;
 }
 
-/** 주어진 landmark 가 (size, env) 에서 노출/허용되는지 여부. */
+/** 주어진 landmark 가 환경에서 노출/허용되는지 여부 (size 무시). */
 export function isLandmarkAvailable(
   l: TownLandmark, size: TownSize, env: TownEnvironment,
 ): boolean {

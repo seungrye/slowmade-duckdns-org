@@ -107,13 +107,13 @@ describe('SystemZonesPanel Town 옵션 form', () => {
     });
   }
 
-  it('Town 옵션 form 이 7 개 옵션과 저장/기본값 버튼을 렌더한다', async () => {
+  it('Town 옵션 form 이 6 개 옵션과 저장/기본값 버튼을 렌더한다 (size 제외)', async () => {
     mockFetchByUrl();
     const { container } = render(<ZonesPage />);
     await act(async () => {});
     // 옵션 라벨 일부 검증
     expect(container.textContent).toContain('Town 생성 옵션');
-    expect(container.textContent).toContain('size (마을 규모)');
+    // 'size (마을 규모)' 는 정책 변경(landmark+villager 수로 자동 결정)으로 UI 에서 제거됨.
     expect(container.textContent).toContain('roads (도로 형태)');
     expect(container.textContent).toContain('wealth (부유함)');
     expect(container.textContent).toContain('defenses (방어 시설)');
@@ -125,7 +125,8 @@ describe('SystemZonesPanel Town 옵션 form', () => {
     expect(screen.getByText('기본값 복원')).toBeTruthy();
   });
 
-  it('Hamlet/Plains 일 때 Manor 체크박스가 disabled (Town 전용)', async () => {
+  it('size 무관 — Manor 체크박스도 항상 enabled (Plains)', async () => {
+    // 정책 변경: size 옵션 deprecate. 모든 landmark 가 size 무관 사용 가능.
     mockFetchByUrl({ data: {
       _id: 'default',
       size: 'hamlet', roads: 'radial', wealth: 'common',
@@ -136,7 +137,7 @@ describe('SystemZonesPanel Town 옵션 form', () => {
     await act(async () => {});
     const manorBox = container.querySelector('input[aria-label="town-landmark-manor"]') as HTMLInputElement | null;
     expect(manorBox).toBeTruthy();
-    expect(manorBox!.disabled).toBe(true);
+    expect(manorBox!.disabled).toBe(false);
   });
 
   it('Plains 일 때 Docks 체크박스가 disabled (Coastal 전용)', async () => {

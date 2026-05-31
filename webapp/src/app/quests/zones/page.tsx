@@ -480,17 +480,10 @@ function SystemZonesPanel() {
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-gray-500">size (마을 규모)</span>
-                  <select
-                    value={config.size}
-                    onChange={(e) => setConfig({ ...config, size: e.target.value as TownConfig["size"] })}
-                    className={inputCls}
-                    aria-label="town-size"
-                  >
-                    {TOWN_SIZES.map((s) => (<option key={s} value={s}>{TOWN_SIZE_LABEL[s]}</option>))}
-                  </select>
-                </label>
+                {/*
+                  size 옵션은 정책 변경으로 제거 (UI 만 숨김 — DB 스키마는 호환 위해 유지).
+                  마을 크기는 landmark + villager 수로 자동 결정된다.
+                */}
                 <label className="flex flex-col gap-1">
                   <span className="text-gray-500">roads (도로 형태)</span>
                   <select
