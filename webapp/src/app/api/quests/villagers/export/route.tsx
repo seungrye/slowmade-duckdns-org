@@ -17,9 +17,10 @@ export async function GET() {
     };
     if (d.stationary) v.stationary = true;
     if (d.vendor) v.vendor = true;
-    // homeZone/homeLandmark — serializer 가 기본값(Town / random) 은 자동 생략.
+    // homeZone/homeLandmark/freeRoam — serializer 가 기본값(Town / random / false) 은 자동 생략.
     if (d.homeZone) v.homeZone = d.homeZone as VillagerDef["homeZone"];
     if (d.homeLandmark) v.homeLandmark = d.homeLandmark as VillagerDef["homeLandmark"];
+    if (d.freeRoam) v.freeRoam = true;
     return v;
   });
 

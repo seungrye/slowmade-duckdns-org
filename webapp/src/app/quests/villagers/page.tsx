@@ -31,6 +31,10 @@ interface FormState {
    * 기본 "random" (기존 동작). Town 이외 zone 에선 게임이 무시한다.
    */
   homeLandmark: HomeLandmark;
+  /**
+   * 자유 이동 — true 면 거주 영역 무시(어디든). false (기본) 면 거주 영역 안만.
+   */
+  freeRoam: boolean;
 }
 
 // `homeZone` UI 태그 — Town 또는 Named.
@@ -71,6 +75,7 @@ const emptyForm: FormState = {
   homeZoneTag: "Town",
   homeZoneNamedId: "",
   homeLandmark: "random",
+  freeRoam: false,
 };
 
 // ── 색상 유틸 (RON 은 0~1 RGB, <input type=color> 는 #rrggbb) ──
@@ -188,6 +193,7 @@ export default function VillagersPage() {
         vendor: createForm.vendor,
         homeZone: homeZoneFromForm(createForm),
         homeLandmark: createForm.homeLandmark,
+        freeRoam: createForm.freeRoam,
       }),
     });
     if (res.ok) {
@@ -213,6 +219,7 @@ export default function VillagersPage() {
         vendor: editForm.vendor,
         homeZone: homeZoneFromForm(editForm),
         homeLandmark: editForm.homeLandmark,
+        freeRoam: editForm.freeRoam,
       }),
     });
     if (res.ok) {
@@ -264,6 +271,7 @@ export default function VillagersPage() {
       homeZoneTag: tag,
       homeZoneNamedId: v.homeZone?.type === "Named" ? v.homeZone.id : "",
       homeLandmark: v.homeLandmark ?? "random",
+      freeRoam: !!v.freeRoam,
     });
   }
 
@@ -491,7 +499,7 @@ function FormFields({
           ({form.color.map((c) => c.toFixed(2)).join(", ")})
         </span>
       </div>
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-4 items-center flex-wrap">
         <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs">
           <input
             type="checkbox"
@@ -509,6 +517,15 @@ function FormFields({
             onChange={(e) => setForm({ ...form, vendor: e.target.checked })}
           />
           <span>vendor <span className="text-gray-400">(상호작용 시 상점 열림)</span></span>
+        </label>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs">
+          <input
+            type="checkbox"
+            aria-label="free_roam"
+            checked={form.freeRoam}
+            onChange={(e) => setForm({ ...form, freeRoam: e.target.checked })}
+          />
+          <span>free_roam <span className="text-gray-400">(거주 영역 제한 해제 — 어디든 이동)</span></span>
         </label>
       </div>
       {/*

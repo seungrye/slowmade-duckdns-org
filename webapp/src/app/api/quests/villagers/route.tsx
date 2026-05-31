@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
     homeZone: body.homeZone,
     // homeLandmark — 미지정 시 schema default("random") 가 적용된다.
     homeLandmark: body.homeLandmark,
+    // freeRoam — 미지정 시 schema default(false) 가 적용된다.
+    freeRoam: body.freeRoam ?? false,
   });
 
   return apiSuccess(villager, 201);

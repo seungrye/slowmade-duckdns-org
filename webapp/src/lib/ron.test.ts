@@ -1106,6 +1106,47 @@ describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
   });
 });
 
+describe("parseVillagersRon — free_roam (거주영역 제한 해제)", () => {
+  // 게임 측 `#[serde(default)] free_roam: false` 미러 — 누락 시 undefined,
+  // 명시 시 boolean. true 만 직렬화에 출력(기본 false 는 생략).
+
+  it("free_roam 누락 시 undefined", () => {
+    const ron = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0)]`;
+    const v = parseVillagersRon(ron);
+    expect(v[0].freeRoam).toBeUndefined();
+  });
+
+  it("free_roam: true 파싱", () => {
+    const ron = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0,free_roam:true)]`;
+    const v = parseVillagersRon(ron);
+    expect(v[0].freeRoam).toBe(true);
+  });
+
+  it("free_roam: false 파싱", () => {
+    const ron = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0,free_roam:false)]`;
+    const v = parseVillagersRon(ron);
+    expect(v[0].freeRoam).toBe(false);
+  });
+
+  it("serializer 는 true 만 출력 (false/undefined 는 생략)", () => {
+    const v: VillagerDef[] = [
+      { id: "a", name: "a", color: [0, 0, 0], dialogs: [], speed: 1.0, freeRoam: true },
+      { id: "b", name: "b", color: [0, 0, 0], dialogs: [], speed: 1.0, freeRoam: false },
+      { id: "c", name: "c", color: [0, 0, 0], dialogs: [], speed: 1.0 },
+    ];
+    const out = serializeVillagersRon(v);
+    // a 블록 — true 명시
+    const aBlock = out.slice(out.indexOf('"a"'), out.indexOf('"b"'));
+    expect(aBlock).toContain("free_roam: true");
+    // b 블록 — false 는 생략 (기본값)
+    const bBlock = out.slice(out.indexOf('"b"'), out.indexOf('"c"'));
+    expect(bBlock).not.toContain("free_roam");
+    // c 블록 — undefined 도 생략
+    const cBlock = out.slice(out.indexOf('"c"'));
+    expect(cBlock).not.toContain("free_roam");
+  });
+});
+
 describe("parse/serialize WeaponsRon", () => {
   const SRC = `[
     WeaponDef(

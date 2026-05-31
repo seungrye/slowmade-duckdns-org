@@ -7,8 +7,8 @@ import { useInfoDialog } from "@/components/info-dialog";
 import { GeneratorPreview } from "@/components/generator-preview";
 import {
   TOWN_CONFIG_DEFAULTS,
-  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS, TOWN_ENVIRONMENTS,
-  TOWN_SIZE_LABEL, TOWN_ROADS_LABEL, TOWN_WEALTH_LABEL, TOWN_DEFENSES_LABEL,
+  TOWN_SIZES, TOWN_ALGORITHMS, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS, TOWN_ENVIRONMENTS,
+  TOWN_SIZE_LABEL, TOWN_ALGORITHM_LABEL, TOWN_ROADS_LABEL, TOWN_WEALTH_LABEL, TOWN_DEFENSES_LABEL,
   TOWN_LANDMARK_LABEL, TOWN_ENVIRONMENT_LABEL,
   isLandmarkAvailable,
   type TownConfig, type TownLandmark,
@@ -401,6 +401,7 @@ function SystemZonesPanel() {
         // 누락된 키는 default 로 보강 — 새 옵션 추가 시 호환.
         setConfig({
           size: data.size ?? TOWN_CONFIG_DEFAULTS.size,
+          algorithm: data.algorithm ?? TOWN_CONFIG_DEFAULTS.algorithm,
           roads: data.roads ?? TOWN_CONFIG_DEFAULTS.roads,
           wealth: data.wealth ?? TOWN_CONFIG_DEFAULTS.wealth,
           defenses: data.defenses ?? TOWN_CONFIG_DEFAULTS.defenses,
@@ -484,6 +485,17 @@ function SystemZonesPanel() {
                   size 옵션은 정책 변경으로 제거 (UI 만 숨김 — DB 스키마는 호환 위해 유지).
                   마을 크기는 landmark + villager 수로 자동 결정된다.
                 */}
+                <label className="flex flex-col gap-1">
+                  <span className="text-gray-500">algorithm (생성 알고리즘)</span>
+                  <select
+                    value={config.algorithm ?? "grid"}
+                    onChange={(e) => setConfig({ ...config, algorithm: e.target.value as TownConfig["algorithm"] })}
+                    className={inputCls}
+                    aria-label="town-algorithm"
+                  >
+                    {TOWN_ALGORITHMS.map((s) => (<option key={s} value={s}>{TOWN_ALGORITHM_LABEL[s]}</option>))}
+                  </select>
+                </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-gray-500">roads (도로 형태)</span>
                   <select

@@ -117,4 +117,26 @@ describe('POST /api/villagers', () => {
       homeLandmark: 'inn',
     }));
   });
+
+  it('freeRoam 미지정 시 기본 false 로 전달', async () => {
+    (Villager.findOne as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (Villager.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'a' });
+    await POST(makeRequest({
+      id: 'a', name: 'a', color: [0.5, 0.5, 0.5],
+    }));
+    expect(Villager.create).toHaveBeenCalledWith(expect.objectContaining({
+      freeRoam: false,
+    }));
+  });
+
+  it('freeRoam: true 그대로 전달', async () => {
+    (Villager.findOne as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (Villager.create as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'wanderer' });
+    await POST(makeRequest({
+      id: 'wanderer', name: '방랑자', color: [0.5, 0.5, 0.5], freeRoam: true,
+    }));
+    expect(Villager.create).toHaveBeenCalledWith(expect.objectContaining({
+      freeRoam: true,
+    }));
+  });
 });

@@ -37,8 +37,11 @@ export type TownLandmark =
  */
 export type TownEnvironment = "plains" | "coastal";
 
+export type TownAlgorithm = "grid" | "tinykeep" | "watabou";
+
 export interface TownConfig {
   size: TownSize;
+  algorithm: TownAlgorithm;
   roads: TownRoads;
   wealth: TownWealth;
   defenses: TownDefenses;
@@ -48,6 +51,7 @@ export interface TownConfig {
 }
 
 export const TOWN_SIZES: readonly TownSize[] = ["hamlet", "village", "town"] as const;
+export const TOWN_ALGORITHMS: readonly TownAlgorithm[] = ["grid", "tinykeep", "watabou"] as const;
 export const TOWN_ROADS: readonly TownRoads[] = ["radial", "linear", "random"] as const;
 export const TOWN_WEALTHS: readonly TownWealth[] = ["poor", "common", "wealthy"] as const;
 export const TOWN_DEFENSES: readonly TownDefenses[] = ["none", "wooden", "stone"] as const;
@@ -59,6 +63,7 @@ export const TOWN_ENVIRONMENTS: readonly TownEnvironment[] = ["plains", "coastal
 
 export const TOWN_CONFIG_DEFAULTS: TownConfig = {
   size: "village",
+  algorithm: "grid",
   roads: "radial",
   wealth: "common",
   defenses: "none",
@@ -79,6 +84,11 @@ export const TOWN_SIZE_LABEL: Record<TownSize, string> = {
   hamlet: "Hamlet (작은 촌락)",
   village: "Village (마을)",
   town: "Town (큰 마을)",
+};
+export const TOWN_ALGORITHM_LABEL: Record<TownAlgorithm, string> = {
+  grid: "Grid (격자 — 현재)",
+  tinykeep: "Tinykeep (밀집 + 흙길) — 미구현",
+  watabou: "Watabou (회전 마름모) — 미구현",
 };
 export const TOWN_ROADS_LABEL: Record<TownRoads, string> = {
   radial: "Radial (중앙 광장 + 방사형)",

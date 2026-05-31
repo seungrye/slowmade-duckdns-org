@@ -8,9 +8,9 @@
 //   - environment: TOWN_ENVIRONMENTS 중 하나 (누락 시 기본 plains)
 
 import {
-  TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS, TOWN_ENVIRONMENTS,
+  TOWN_SIZES, TOWN_ALGORITHMS, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS, TOWN_ENVIRONMENTS,
   TOWN_CONFIG_DEFAULTS,
-  type TownConfig, type TownSize, type TownRoads, type TownWealth, type TownDefenses,
+  type TownConfig, type TownSize, type TownAlgorithm, type TownRoads, type TownWealth, type TownDefenses,
   type TownLandmark, type TownEnvironment,
 } from "@/types/town-config";
 

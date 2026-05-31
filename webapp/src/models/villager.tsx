@@ -51,6 +51,9 @@ const VillagerSchema = new Schema(
       enum: HOME_LANDMARKS,
       default: "random" satisfies HomeLandmark,
     },
+    // 게임 RON 의 free_roam 미러 — #[serde(default)] free_roam: false.
+    // false 면 거주 영역(landmark/명명 집/도로) 안만 이동. true 면 자유 이동.
+    freeRoam: { type: Boolean, default: false },
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -67,6 +70,7 @@ export interface VillagerDoc {
   vendor: boolean;
   homeZone: ZoneIdValue;
   homeLandmark: HomeLandmark;
+  freeRoam: boolean;
   version: number;
   createdAt: Date;
   updatedAt: Date;

@@ -50,6 +50,7 @@ export async function POST(req: NextRequest) {
           vendor: existing.vendor,
           homeZone: existing.homeZone,
           homeLandmark: existing.homeLandmark,
+          freeRoam: existing.freeRoam,
         },
       });
       existing.name = v.name;
@@ -58,10 +59,11 @@ export async function POST(req: NextRequest) {
       existing.speed = v.speed;
       existing.stationary = v.stationary ?? false;
       existing.vendor = v.vendor ?? false;
-      // homeZone/homeLandmark — RON 에 명시되어 있으면 갱신.
+      // homeZone/homeLandmark/freeRoam — RON 에 명시되어 있으면 갱신.
       // 미지정(undefined) 시 기존 값 유지 (게임 측 #[serde(default)] 와 동일).
       if (v.homeZone !== undefined) existing.homeZone = v.homeZone;
       if (v.homeLandmark !== undefined) existing.homeLandmark = v.homeLandmark;
+      if (v.freeRoam !== undefined) existing.freeRoam = v.freeRoam;
       existing.version = (existing.version ?? 1) + 1;
       await existing.save();
       updated++;
@@ -77,6 +79,7 @@ export async function POST(req: NextRequest) {
         // RON 에 명시되어 있을 때만 전달 — 미지정 시 schema default 적용.
         ...(v.homeZone !== undefined ? { homeZone: v.homeZone } : {}),
         ...(v.homeLandmark !== undefined ? { homeLandmark: v.homeLandmark } : {}),
+        ...(v.freeRoam !== undefined ? { freeRoam: v.freeRoam } : {}),
       });
       created++;
     }

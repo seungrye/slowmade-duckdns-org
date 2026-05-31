@@ -476,6 +476,8 @@ class Parser {
         // home_landmark — PascalCase enum (Random/Road/Inn/Smithy/Temple/Guard/
         // Market/Manor). 누락 시 default = "random" (게임 측 #[serde(default)] 미러).
         case "home_landmark": def.homeLandmark = this.parseHomeLandmark(); break;
+        // free_roam — bool. 누락 시 default = false (게임 측 #[serde(default)] 미러).
+        case "free_roam":  def.freeRoam   = this.parseBool(); break;
         default: break;
       }
       this.tryPunct(",");
@@ -1333,6 +1335,8 @@ function serializeVillagerDef(v: VillagerDef): string {
     const pascal = v.homeLandmark.charAt(0).toUpperCase() + v.homeLandmark.slice(1);
     lines.push(`        home_landmark: ${pascal},`);
   }
+  // free_roam — 기본 false 는 생략(게임 측 #[serde(default)] 미러). true 만 출력.
+  if (v.freeRoam) lines.push(`        free_roam: true,`);
   lines.push(`    ),`);
   return lines.join("\n");
 }

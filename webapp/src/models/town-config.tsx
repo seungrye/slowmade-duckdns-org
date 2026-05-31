@@ -30,14 +30,25 @@ const TownConfigSchema = new Schema(
       enum: TOWN_ENVIRONMENTS,
       default: "plains" satisfies TownEnvironment,
     },
+    // 신규 — 마을 생성 알고리즘. 기본 Grid (현재 구현). Tinykeep/Watabou 는 stub.
+    algorithm: {
+      type: String,
+      required: true,
+      enum: ["grid", "tinykeep", "watabou"],
+      default: "grid",
+    },
     version: { type: Number, default: 1 },
   },
   { timestamps: true, _id: false }
 );
 
+export type TownAlgorithm = "grid" | "tinykeep" | "watabou";
+export const TOWN_ALGORITHMS: readonly TownAlgorithm[] = ["grid", "tinykeep", "watabou"];
+
 export interface TownConfigDoc {
   _id: string;
   size: "hamlet" | "village" | "town";
+  algorithm: TownAlgorithm;
   roads: "radial" | "linear" | "random";
   wealth: "poor" | "common" | "wealthy";
   defenses: "none" | "wooden" | "stone";

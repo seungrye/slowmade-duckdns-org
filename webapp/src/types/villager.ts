@@ -85,6 +85,14 @@ export interface VillagerDef {
    * 미지정/누락 시 `"random"` (게임 측 `#[serde(default)] HomeLandmark::Random` 미러).
    */
   homeLandmark?: HomeLandmark;
+  /**
+   * 자유 이동 — true 면 어디든 이동 (기존 동작). false (기본) 면 거주 영역 안만:
+   *   - homeLandmark = specific landmark → 그 landmark room 안
+   *   - homeLandmark = "random" → 그 villager 의 명명 거주 집 안
+   *   - homeLandmark = "road"   → 도로 타일 따라
+   * 게임 측 `#[serde(default)] free_roam: false` 미러.
+   */
+  freeRoam?: boolean;
 }
 
 export interface VillagerDocument extends VillagerDef {

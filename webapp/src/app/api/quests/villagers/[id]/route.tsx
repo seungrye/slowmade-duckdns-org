@@ -58,6 +58,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       vendor: villager.vendor,
       homeZone: villager.homeZone,
       homeLandmark: villager.homeLandmark,
+      freeRoam: villager.freeRoam,
     },
   });
 
@@ -69,6 +70,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.vendor !== undefined) villager.vendor = body.vendor;
   if (body.homeZone !== undefined) villager.homeZone = body.homeZone;
   if (body.homeLandmark !== undefined) villager.homeLandmark = body.homeLandmark;
+  if (body.freeRoam !== undefined) villager.freeRoam = body.freeRoam;
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();
