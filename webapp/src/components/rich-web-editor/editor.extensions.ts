@@ -1,3 +1,5 @@
+import { Extension } from "@tiptap/react"
+import { Plugin, PluginKey } from "@tiptap/pm/state"
 import { StarterKit } from "@tiptap/starter-kit"
 import { Paragraph } from "@tiptap/extension-paragraph"
 import { Heading } from "@tiptap/extension-heading"
@@ -71,6 +73,80 @@ const SubscriptWithMarkdown = Subscript.extend({
     },
 });
 
+// 텍스트가 명백한 markdown 표현(heading/blockquote/list/code/fence 등)을 한 줄 이상 포함하면
+// markdown 으로 간주. 단순히 `*` 만 하나 있다고 markdown 으로 판단하지는 않음(오인 변환 방지).
+export const looksLikeMarkdown = (text: string): boolean => {
+    if (!text) return false;
+    const lines = text.split(/\r?\n/);
+    let hits = 0;
+    for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) continue;
+        // ATX heading: # ~ ###### + space
+        if (/^#{1,6}\s+\S/.test(line)) { hits += 2; continue; }
+        // blockquote
+        if (/^>\s+\S/.test(line)) { hits += 2; continue; }
+        // unordered list
+        if (/^[-*+]\s+\S/.test(line)) { hits += 1; continue; }
+        // ordered list
+        if (/^\d+\.\s+\S/.test(line)) { hits += 1; continue; }
+        // fenced code
+        if (/^```/.test(line)) { hits += 2; continue; }
+        // horizontal rule
+        if (/^(---|\*\*\*|___)\s*$/.test(line)) { hits += 1; continue; }
+        // inline code: `xxx`
+        if (/(^|[^`])`[^`\n]+`(?!`)/.test(line)) { hits += 1; continue; }
+        // bold/italic with markers
+        if (/\*\*[^*\n]+\*\*/.test(line) || /__[^_\n]+__/.test(line)) { hits += 1; continue; }
+        // link [text](url)
+        if (/\[[^\]\n]+\]\([^)\n]+\)/.test(line)) { hits += 1; continue; }
+    }
+    // 최소 2점 이상이어야 markdown 으로 간주 (단일 약한 신호는 무시)
+    return hits >= 2;
+};
+
+// Paste 시 plain text 가 markdown 으로 보이면 markdown 파서를 거쳐 삽입.
+// rich text(text/html) 가 같이 들어오면 손대지 않음 — 브라우저/외부 에디터의 서식을 보존.
+const markdownPasteKey = new PluginKey('markdownPaste');
+export const MarkdownPaste = Extension.create({
+    name: 'markdownPaste',
+    addProseMirrorPlugins() {
+        const editor = this.editor;
+        return [
+            new Plugin({
+                key: markdownPasteKey,
+                props: {
+                    handlePaste(view, event) {
+                        const cd = event.clipboardData;
+                        if (!cd) return false;
+                        const html = cd.getData('text/html');
+                        if (html && html.trim().length > 0) return false;
+                        const text = cd.getData('text/plain');
+                        if (!text) return false;
+                        if (!looksLikeMarkdown(text)) return false;
+                        // markdown manager 가 없으면 기본 동작 유지
+                        const manager = editor.storage.markdown?.manager;
+                        if (!manager || typeof manager.parse !== 'function') return false;
+                        try {
+                            const json = manager.parse(text);
+                            if (!json) return false;
+                            editor
+                                .chain()
+                                .focus()
+                                .insertContent(json)
+                                .run();
+                            event.preventDefault();
+                            return true;
+                        } catch {
+                            return false;
+                        }
+                    },
+                },
+            }),
+        ];
+    },
+});
+
 export const editorExtensions = [
     StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false, paragraph: false, heading: false }),
     ParagraphWithAlign,
@@ -95,4 +171,5 @@ export const editorExtensions = [
     TableHeader,
     TableCell,
     Markdown,
+    MarkdownPaste,
 ];
