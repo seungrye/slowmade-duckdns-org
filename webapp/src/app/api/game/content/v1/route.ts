@@ -37,10 +37,10 @@ import type { VillagerDef } from "@/types/villager";
 import type { MonsterDef, MonsterElement } from "@/types/monster";
 import type { StartLoadoutDef } from "@/types/start-loadout";
 import {
-  TOWN_CONFIG_DEFAULTS, TOWN_SIZES, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
+  TOWN_CONFIG_DEFAULTS, TOWN_SIZES, TOWN_ALGORITHMS, TOWN_ROADS, TOWN_WEALTHS, TOWN_DEFENSES, TOWN_LANDMARKS,
   TOWN_ENVIRONMENTS,
   type TownConfig as TownConfigDef,
-  type TownSize, type TownRoads, type TownWealth, type TownDefenses, type TownLandmark,
+  type TownSize, type TownAlgorithm, type TownRoads, type TownWealth, type TownDefenses, type TownLandmark,
   type TownEnvironment,
 } from "@/types/town-config";
 
@@ -228,6 +228,7 @@ function toTownConfigDef(d: Record<string, unknown>): TownConfigDef {
   );
   return {
     size: inEnum<TownSize>(TOWN_SIZES, d.size, TOWN_CONFIG_DEFAULTS.size),
+    algorithm: inEnum<TownAlgorithm>(TOWN_ALGORITHMS, d.algorithm, TOWN_CONFIG_DEFAULTS.algorithm),
     roads: inEnum<TownRoads>(TOWN_ROADS, d.roads, TOWN_CONFIG_DEFAULTS.roads),
     wealth: inEnum<TownWealth>(TOWN_WEALTHS, d.wealth, TOWN_CONFIG_DEFAULTS.wealth),
     defenses: inEnum<TownDefenses>(TOWN_DEFENSES, d.defenses, TOWN_CONFIG_DEFAULTS.defenses),
