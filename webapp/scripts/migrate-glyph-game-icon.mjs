@@ -28,86 +28,86 @@ const __dirname0 = path.dirname(__filename0);
 // 값: game-icons.net codepoint (Supplementary PUA)
 const GLYPH_MAPPING = new Map([
   // RPG-Awesome PUA → game-icons
-  [0xE908, 0xFF0C8], // ankh
-  [0xE909, 0xFF0D4], // anvil
-  [0xE917, 0xFF17B], // battle-axe (axe)
-  [0xE91C, 0xFF240], // broken-axe (battered-axe)
-  [0xE929, 0xFF21C], // box-trap (bear-trap)
-  [0xE935, 0xFF544], // energy-shield (bolt-shield)
-  [0xE93A, 0xFF1F3], // book-cover (book)
-  [0xE940, 0xFF213], // bowie-knife
-  [0xE946, 0xFF23C], // broadsword
-  [0xE948, 0xFF72F], // heart-minus (broken-heart)
-  [0xE95D, 0xFF30B], // castle (castle-emblem)
-  [0xE976, 0xFF3EC], // cracked-shield
-  [0xE978, 0xFF402], // crossbow
-  [0xE97F, 0xFF415], // crown
-  [0xE983, 0xFF421], // crystal-cluster
-  [0xE992, 0xFF47C], // diamond-trophy (diamond)
-  [0xE9A2, 0xFF4CE], // dragon-head (dragon)
-  [0xE9AD, 0xFF50F], // easter-egg (egg)
-  [0xE9B5, 0xFF573], // eyeball
-  [0xE9B6, 0xFF57E], // fairy-wand
-  [0xE9BA, 0xFF2B9], // caravel (fast-ship)
-  [0xE9C6, 0xFF5E4], // fizzing-flask
-  [0xE9E0, 0xFF687], // gem-pendant (gem)
-  [0xE9E2, 0xFF697], // glass-heart
-  [0xE9EE, 0xFF6F7], // hammer-drop (hammer)
-  [0xEA16, 0xFF820], // key
-  [0xEA1C, 0xFF84A], // lantern-flame
-  [0xEA2F, 0xFF899], // lightning-saber (lightning-sword)
-  [0xEA65, 0xFFAB9], // plain-dagger
-  [0xEA72, 0xFFAFD], // potion-ball (potion)
-  [0xEA87, 0xFFBB8], // round-shield
-  [0xEA8F, 0xFFC12], // scroll-unfurled
-  [0xEA96, 0xFFC57], // shield
-  [0xEAA1, 0xFFC9B], // skull-crossed-bones (skull)
-  [0xEAAC, 0xFFE74], // thrust-bend (spear-head)
-  [0xEAD1, 0xFFEA0], // torch
-  [0xEAD4, 0xFFECB], // trefoil-lily
-  [0xEAE7, 0xFFFD5], // wolf-head
+  [0xE908, 0xF0C8], // ankh
+  [0xE909, 0xF0D4], // anvil
+  [0xE917, 0xF17B], // battle-axe (axe)
+  [0xE91C, 0xF240], // broken-axe (battered-axe)
+  [0xE929, 0xF21C], // box-trap (bear-trap)
+  [0xE935, 0xF544], // energy-shield (bolt-shield)
+  [0xE93A, 0xF1F3], // book-cover (book)
+  [0xE940, 0xF213], // bowie-knife
+  [0xE946, 0xF23C], // broadsword
+  [0xE948, 0xF72F], // heart-minus (broken-heart)
+  [0xE95D, 0xF30B], // castle (castle-emblem)
+  [0xE976, 0xF3EC], // cracked-shield
+  [0xE978, 0xF402], // crossbow
+  [0xE97F, 0xF415], // crown
+  [0xE983, 0xF421], // crystal-cluster
+  [0xE992, 0xF47C], // diamond-trophy (diamond)
+  [0xE9A2, 0xF4CE], // dragon-head (dragon)
+  [0xE9AD, 0xF50F], // easter-egg (egg)
+  [0xE9B5, 0xF573], // eyeball
+  [0xE9B6, 0xF57E], // fairy-wand
+  [0xE9BA, 0xF2B9], // caravel (fast-ship)
+  [0xE9C6, 0xF5E4], // fizzing-flask
+  [0xE9E0, 0xF687], // gem-pendant (gem)
+  [0xE9E2, 0xF697], // glass-heart
+  [0xE9EE, 0xF6F7], // hammer-drop (hammer)
+  [0xEA16, 0xF820], // key
+  [0xEA1C, 0xF84A], // lantern-flame
+  [0xEA2F, 0xF899], // lightning-saber (lightning-sword)
+  [0xEA65, 0xFAB9], // plain-dagger
+  [0xEA72, 0xFAFD], // potion-ball (potion)
+  [0xEA87, 0xFBB8], // round-shield
+  [0xEA8F, 0xFC12], // scroll-unfurled
+  [0xEA96, 0xFC57], // shield
+  [0xEAA1, 0xFC9B], // skull-crossed-bones (skull)
+  [0xEAAC, 0xFE74], // thrust-bend (spear-head)
+  [0xEAD1, 0xFEA0], // torch
+  [0xEAD4, 0xFECB], // trefoil-lily
+  [0xEAE7, 0xFFD5], // wolf-head
 
   // Unicode emoji/symbol → game-icons
-  [0x1F4DC, 0xFFC12], // 📜 scroll-unfurled
-  [0x1F50E, 0xFF8F2], // 🔎 magnifying-glass
-  [0x1F526, 0xFF5F7], // 🔦 flashlight
-  [0x2020,  0xFF400], // † cross-mark
-  [0x2295,  0xFFE29], // ⊕ target-arrows
-  [0x2318,  0xFF440], // ⌘ cycle
-  [0x2393,  0xFF753], // ⎓ hexagonal-nut
-  [0x25B2,  0xFFED1], // ▲ triangle-target
-  [0x25B6,  0xFFAC9], // ▶ play-button
-  [0x25B8,  0xFF0FE], // ▸ arrowhead
-  [0x25C6,  0xFF43B], // ◆ cut-diamond
-  [0x25C9,  0xFF25F], // ◉ bullseye
-  [0x25CE,  0xFF0E3], // ◎ archery-target
-  [0x25D4,  0xFF6F1], // ◔ half-tornado
-  [0x2600,  0xFFDD9], // ☀ sun
-  [0x2605,  0xFFD7A], // ★ star-formation
-  [0x2620,  0xFFC9B], // ☠ skull-crossed-bones
-  [0x2638,  0xFF3B1], // ☸ compass
-  [0x2640,  0xFF5A2], // ♀ female
-  [0x2641,  0xFF509], // ♁ earth-asia-oceania
-  [0x265A,  0xFF347], // ♚ chess-king
-  [0x2665,  0xFF738], // ♥ hearts
-  [0x2692,  0xFF6F9], // ⚒ hammer-sickle
-  [0x2694,  0xFF40C], // ⚔ crossed-swords
-  [0x2697,  0xFFBB6], // ⚗ round-bottom-flask
-  [0x2698,  0xFF2FF], // ⚘ carnivorous-plant
-  [0x269C,  0xFF602], // ⚜ fleur-de-lys
-  [0x26D3,  0xFF323], // ⛓ chained-heart
-  [0x2702,  0xFFC06], // ✂ scissors
-  [0x2709,  0xFF54D], // ✉ envelope
-  [0x270E,  0xFFB38], // ✎ quill-ink
-  [0x271D,  0xFF400], // ✝ cross-mark
-  [0x2720,  0xFF771], // ✠ holy-symbol
-  [0x2742,  0xFFCFF], // spark-plug
-  [0x2746,  0xFFCD8], // ❄ snowflake-2
-  [0x2767,  0xFFAC0], // ❧ plant-roots
-  [0x2B22,  0xFF753], // ⬢ hexagonal-nut
+  [0x1F4DC, 0xFC12], // 📜 scroll-unfurled
+  [0x1F50E, 0xF8F2], // 🔎 magnifying-glass
+  [0x1F526, 0xF5F7], // 🔦 flashlight
+  [0x2020,  0xF400], // † cross-mark
+  [0x2295,  0xFE29], // ⊕ target-arrows
+  [0x2318,  0xF440], // ⌘ cycle
+  [0x2393,  0xF753], // ⎓ hexagonal-nut
+  [0x25B2,  0xFED1], // ▲ triangle-target
+  [0x25B6,  0xFAC9], // ▶ play-button
+  [0x25B8,  0xF0FE], // ▸ arrowhead
+  [0x25C6,  0xF43B], // ◆ cut-diamond
+  [0x25C9,  0xF25F], // ◉ bullseye
+  [0x25CE,  0xF0E3], // ◎ archery-target
+  [0x25D4,  0xF6F1], // ◔ half-tornado
+  [0x2600,  0xFDD9], // ☀ sun
+  [0x2605,  0xFD7A], // ★ star-formation
+  [0x2620,  0xFC9B], // ☠ skull-crossed-bones
+  [0x2638,  0xF3B1], // ☸ compass
+  [0x2640,  0xF5A2], // ♀ female
+  [0x2641,  0xF509], // ♁ earth-asia-oceania
+  [0x265A,  0xF347], // ♚ chess-king
+  [0x2665,  0xF738], // ♥ hearts
+  [0x2692,  0xF6F9], // ⚒ hammer-sickle
+  [0x2694,  0xF40C], // ⚔ crossed-swords
+  [0x2697,  0xFBB6], // ⚗ round-bottom-flask
+  [0x2698,  0xF2FF], // ⚘ carnivorous-plant
+  [0x269C,  0xF602], // ⚜ fleur-de-lys
+  [0x26D3,  0xF323], // ⛓ chained-heart
+  [0x2702,  0xFC06], // ✂ scissors
+  [0x2709,  0xF54D], // ✉ envelope
+  [0x270E,  0xFB38], // ✎ quill-ink
+  [0x271D,  0xF400], // ✝ cross-mark
+  [0x2720,  0xF771], // ✠ holy-symbol
+  [0x2742,  0xFCFF], // spark-plug
+  [0x2746,  0xFCD8], // ❄ snowflake-2
+  [0x2767,  0xFAC0], // ❧ plant-roots
+  [0x2B22,  0xF753], // ⬢ hexagonal-nut
 ]);
 
-const DEFAULT_GAME_ICON = 0xFF753; // hexagonal-nut — 매핑 누락 시 시각적 placeholder
+const DEFAULT_GAME_ICON = 0xF753; // hexagonal-nut — 매핑 누락 시 시각적 placeholder
 
 // .env.local 의 MONGO_URI 추출 (mongoose 직접 연결)
 function loadMongoUri() {
@@ -151,7 +151,7 @@ async function main() {
       const cp = cur.codePointAt(0);
       if (cp <= 0x7F) {
         // ASCII — 그대로 둔다
-      } else if (cp >= 0xFF000 && cp <= 0x100005) {
+      } else if (cp >= 0xF000 && cp <= 0x0005) {
         // 이미 game-icons PUA 범위 — 그대로
       } else if (GLYPH_MAPPING.has(cp)) {
         const newCp = GLYPH_MAPPING.get(cp);
