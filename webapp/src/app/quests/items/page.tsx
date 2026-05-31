@@ -6,7 +6,11 @@ import type { ItemDocument, ItemKind, WeaponElement, AccessoryEffect } from "@/t
 import { ACCESSORY_EFFECTS, ACCESSORY_EFFECT_LABELS } from "@/types/item";
 import { useInfoDialog } from "@/components/info-dialog";
 import { IconPickerDialog } from "@/components/icon-picker-dialog";
-import { parseCodepoint } from "@/lib/rpg-awesome-icons";
+/**
+ * 신규 item 의 기본 아이콘 — RPG-Awesome 의 `help` (U+E9FF).
+ * picker 안 열어도 의미 있는 fallback 으로 표시되도록.
+ */
+const DEFAULT_GLYPH_UNICODE = String.fromCodePoint(0xe9ff);
 
 type Filter = "all" | ItemKind;
 
@@ -35,7 +39,7 @@ interface FormState {
 
 const emptyForm: FormState = {
   id: "", kind: "quest",
-  displayName: "", glyphAscii: "", glyphUnicode: "", glyphGameIcon: "",
+  displayName: "", glyphAscii: "", glyphUnicode: DEFAULT_GLYPH_UNICODE, glyphGameIcon: "",
   pickupMessage: "",
   imagePath: "scene/open-chest.png",
   attackPower: 0,
@@ -542,23 +546,17 @@ function FormFields({
         </label>
         <div className="flex flex-col gap-1">
           <span className="text-xs text-gray-500">glyph_unicode</span>
-          <div className="flex items-stretch gap-1">
-            <input
-              value={form.glyphUnicode}
-              onChange={(e) => setForm({ ...form, glyphUnicode: e.target.value })}
-              className={`${inputCls} font-mono w-32`}
-              placeholder="\u{E946}"
-            />
-            <GlyphPreview literal={form.glyphUnicode} />
-            <button
-              type="button"
-              onClick={() => setIconPickerOpen(true)}
-              className="px-2 py-1 text-xs rounded border hover:border-blue-400 hover:text-blue-500 transition-colors"
-              title="RPG-Awesome 아이콘 선택"
-            >
-              아이콘 선택
-            </button>
-          </div>
+          {/* 직접 입력 + 별도 미리보기 박스 대신 — 버튼 자체가 현재 글리프를 표시.
+              클릭 시 RPG-Awesome 아이콘 picker 가 열린다. 빈 값(레거시) 이면 help. */}
+          <button
+            type="button"
+            onClick={() => setIconPickerOpen(true)}
+            className="rpg-icon inline-flex items-center justify-center w-12 h-12 text-3xl border rounded bg-white dark:bg-gray-800 hover:border-blue-400 hover:text-blue-500 transition-colors"
+            title="RPG-Awesome 아이콘 선택"
+            aria-label="RPG-Awesome 아이콘 선택"
+          >
+            {form.glyphUnicode || DEFAULT_GLYPH_UNICODE}
+          </button>
         </div>
         <label className="flex flex-col gap-1 w-20">
           <span className="text-xs text-gray-500">glyph_game_icon</span>
@@ -766,28 +764,3 @@ function FormFields({
   );
 }
 
-/**
- * glyph_unicode 입력 옆에 표시되는 라이브 미리보기.
- *
- * 입력 형식별 처리:
- *   - 단일 PUA 문자 (DB 기본 저장 형식)   → 그대로 RPG-Awesome 폰트로 렌더.
- *   - `\u{XXXX}` 리터럴 (사용자 직접 입력) → codepoint 로 변환해 렌더.
- *   - 빈 문자열                          → 빈 박스.
- *   - 그 외 자유 텍스트                  → 그대로 렌더.
- */
-function GlyphPreview({ literal }: { literal: string }) {
-  const cp = parseCodepoint(literal);
-  const ch = cp !== null ? String.fromCodePoint(cp) : literal;
-  const titleCp = cp !== null
-    ? `U+${cp.toString(16).toUpperCase()}`
-    : (literal.length > 0 ? `U+${literal.codePointAt(0)!.toString(16).toUpperCase()}` : "(empty)");
-  return (
-    <span
-      className="rpg-icon inline-flex items-center justify-center w-9 text-2xl border rounded bg-white dark:bg-gray-800"
-      aria-label={`미리보기 ${titleCp}`}
-      title={titleCp}
-    >
-      {ch || " "}
-    </span>
-  );
-}
