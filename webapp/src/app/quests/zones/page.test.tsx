@@ -63,7 +63,7 @@ describe('ZonesPage 신규 폼', () => {
     await act(async () => {});
     fireEvent.click(screen.getByText('+ 새 zone'));
     const selects = container.querySelectorAll('select');
-    // 신규 zone 폼의 generator select 한 개. 옵션 23개 중 핵심만 검사.
+    // 신규 zone 폼의 generator select 한 개. 옵션(27종+) 중 핵심만 검사.
     const opts = Array.from(selects).flatMap((s) => Array.from(s.querySelectorAll('option')));
     const values = opts.map((o) => (o as HTMLOptionElement).value);
     expect(values).toContain('bsp');

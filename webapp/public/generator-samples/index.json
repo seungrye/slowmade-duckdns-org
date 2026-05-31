@@ -95,6 +95,50 @@
     {
       "file": "tinykeep.json",
       "name": "tinykeep"
+    },
+    {
+      "file": "marukrap_cave.json",
+      "name": "marukrap_cave"
+    },
+    {
+      "file": "marukrap_big_cave.json",
+      "name": "marukrap_big_cave"
+    },
+    {
+      "file": "marukrap_caves_and_mazes.json",
+      "name": "marukrap_caves_and_mazes"
+    },
+    {
+      "file": "marukrap_caves_and_rooms.json",
+      "name": "marukrap_caves_and_rooms"
+    },
+    {
+      "file": "marukrap_caves_and_lava.json",
+      "name": "marukrap_caves_and_lava"
+    },
+    {
+      "file": "marukrap_dungeon.json",
+      "name": "marukrap_dungeon"
+    },
+    {
+      "file": "marukrap_forest.json",
+      "name": "marukrap_forest"
+    },
+    {
+      "file": "marukrap_mazy_forest.json",
+      "name": "marukrap_mazy_forest"
+    },
+    {
+      "file": "marukrap_forest_and_lakes.json",
+      "name": "marukrap_forest_and_lakes"
+    },
+    {
+      "file": "marukrap_forest_and_river.json",
+      "name": "marukrap_forest_and_river"
+    },
+    {
+      "file": "marukrap_spaceship.json",
+      "name": "marukrap_spaceship"
     }
   ],
   "height": 50,

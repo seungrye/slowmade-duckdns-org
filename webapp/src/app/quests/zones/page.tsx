@@ -25,6 +25,7 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
       { id: "bsp",                desc: "BSP 분할, 규칙적 방 + 깔끔한 복도" },
       { id: "rooms",              desc: "크기 다양한 방 랜덤 배치 (simple_rooms)" },
       { id: "recursive_division", desc: "재귀 분할 (미로 변형)" },
+      { id: "marukrap_dungeon",   desc: "marukrap ClassicDungeon — relaxed 포인트 + 방 배치 + L복도" },
     ],
   },
   {
@@ -33,6 +34,11 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
       { id: "drunkard",           desc: "술취한 보행, 굴곡진 통로" },
       { id: "cellular_automata",  desc: "자연 침식 동굴" },
       { id: "dla",                desc: "디퓨전 한정 응집, 중심에서 뻗는 침식 구조" },
+      { id: "marukrap_cave",      desc: "marukrap ConnectedCaves — CA 동굴 + 영역 연결 + 작은 벽덩어리 제거" },
+      { id: "marukrap_big_cave",  desc: "marukrap BigCave — wall 40% 로 낮춰 하나의 거대한 동굴" },
+      { id: "marukrap_caves_and_mazes", desc: "marukrap CavesAndMazes — 동굴 + 격자 미로 통로" },
+      { id: "marukrap_caves_and_rooms", desc: "marukrap CavesAndRooms — 동굴에 작은 사각 방 박힘" },
+      { id: "marukrap_caves_and_lava",  desc: "marukrap CavesAndLava — 동굴 + 굽이굽이 용암 강 (Lava 타일)" },
     ],
   },
   {
@@ -69,6 +75,16 @@ const GENERATOR_GROUPS: { category: string; items: { id: string; desc: string }[
     items: [
       { id: "forest",             desc: "나무 군집 + 좁은 길" },
       { id: "perlin",             desc: "펄린 노이즈 자연 지형" },
+      { id: "marukrap_forest",    desc: "marukrap OldForest — Voronoi 빈터 + 길 + 침식·평활" },
+      { id: "marukrap_mazy_forest", desc: "marukrap MazyForest — 호수 CA 시드 + shoreline carve 로 미로 통로" },
+      { id: "marukrap_forest_and_lakes", desc: "marukrap ForestAndLakes — 숲 + 자연 호수 + 강가 시야 트임" },
+      { id: "marukrap_forest_and_river", desc: "marukrap ForestAndRiver — 숲을 가로지르는 굽이굽이 단일 강" },
+    ],
+  },
+  {
+    category: "우주/모듈",
+    items: [
+      { id: "marukrap_spaceship", desc: "marukrap Spaceship — 외곽 hull + 격자 모듈 방 + 좌우 거울 대칭" },
     ],
   },
   {
@@ -100,14 +116,55 @@ export default function ZonesPage() {
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
   const [extracting, setExtracting] = useState(false);
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { showInfo } = useInfoDialog();
 
   async function load() {
     setLoading(true);
+    setSelectedNames(new Set());
     const res = await fetch("/api/quests/zones");
     const json = await res.json();
     setList(json.data ?? []);
     setLoading(false);
+  }
+
+  function toggleSelect(name: string) {
+    setSelectedNames((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+  const allSelected = list.length > 0 && list.every((z) => selectedNames.has(z.name));
+  function toggleSelectAll() {
+    setSelectedNames((prev) => {
+      const next = new Set(prev);
+      if (allSelected) for (const z of list) next.delete(z.name);
+      else for (const z of list) next.add(z.name);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (selectedNames.size === 0) return;
+    if (!confirm(`${selectedNames.size}개 zone 을 삭제하시겠습니까?`)) return;
+    setBulkDeleting(true);
+    const res = await fetch("/api/quests/zones/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names: Array.from(selectedNames) }),
+    });
+    setBulkDeleting(false);
+    if (res.ok) {
+      const { data } = await res.json();
+      showInfo({ title: "일괄 삭제 완료", body: `${data.deleted}개 zone 삭제.`, variant: "success" });
+      load();
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showInfo({ title: "일괄 삭제 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -184,7 +241,23 @@ export default function ZonesPage() {
       <SystemZonesPanel />
       <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Zone 카탈로그</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          {list.length > 0 && (
+            <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 select-none">
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="전체 선택" />
+              전체 선택
+            </label>
+          )}
+          {selectedNames.size > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="px-3 py-2 text-sm rounded-lg border border-red-300 hover:border-red-500 text-red-500 hover:text-red-600 transition-colors disabled:opacity-50"
+            >
+              {bulkDeleting ? "삭제 중..." : `선택 삭제 (${selectedNames.size})`}
+            </button>
+          )}
           <button
             onClick={handleExtract}
             disabled={extracting}
@@ -229,7 +302,14 @@ export default function ZonesPage() {
           {list.map((z) => (
             <li key={z.name} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900">
-                <div className="min-w-0">
+                <input
+                  type="checkbox"
+                  checked={selectedNames.has(z.name)}
+                  onChange={() => toggleSelect(z.name)}
+                  aria-label={`${z.name} 선택`}
+                  className="shrink-0"
+                />
+                <div className="min-w-0 flex-1">
                   <div className="font-medium truncate">{z.name}</div>
                   <div className="text-xs text-gray-500 truncate">
                     <span className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono mr-2">

@@ -87,14 +87,55 @@ export default function MonstersPage() {
   const [createForm, setCreateForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<FormState>(emptyForm);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const { showInfo } = useInfoDialog();
 
   async function load() {
     setLoading(true);
+    setSelectedIds(new Set());
     const res = await fetch("/api/quests/monsters");
     const json = await res.json();
     setList(json.data ?? []);
     setLoading(false);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  const allSelected = list.length > 0 && list.every((m) => selectedIds.has(m.id));
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) for (const m of list) next.delete(m.id);
+      else for (const m of list) next.add(m.id);
+      return next;
+    });
+  }
+
+  async function handleBulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`${selectedIds.size}개 monster 를 삭제하시겠습니까?`)) return;
+    setBulkDeleting(true);
+    const res = await fetch("/api/quests/monsters/bulk-delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: Array.from(selectedIds) }),
+    });
+    setBulkDeleting(false);
+    if (res.ok) {
+      const { data } = await res.json();
+      showInfo({ title: "일괄 삭제 완료", body: `${data.deleted}개 monster 삭제.`, variant: "success" });
+      load();
+    } else {
+      const json = await res.json().catch(() => ({}));
+      showInfo({ title: "일괄 삭제 실패", body: json.message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -180,9 +221,25 @@ export default function MonstersPage() {
 
   return (
     <div className="mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">Monster 카탈로그</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          {list.length > 0 && (
+            <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 select-none">
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="전체 선택" />
+              전체 선택
+            </label>
+          )}
+          {selectedIds.size > 0 && (
+            <button
+              type="button"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="px-3 py-2 text-sm rounded-lg border border-red-300 hover:border-red-500 text-red-500 hover:text-red-600 transition-colors disabled:opacity-50"
+            >
+              {bulkDeleting ? "삭제 중..." : `선택 삭제 (${selectedIds.size})`}
+            </button>
+          )}
           <label className="cursor-pointer px-3 py-2 text-sm rounded-lg border border-dashed border-gray-400 hover:border-blue-500 hover:text-blue-500 transition-colors">
             .ron 가져오기
             <input
@@ -241,7 +298,14 @@ export default function MonstersPage() {
           {list.map((m) => (
             <li key={m.id} className="border rounded-lg overflow-hidden">
               <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 dark:bg-gray-900">
-                <div className="flex items-center gap-3 min-w-0">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(m.id)}
+                  onChange={() => toggleSelect(m.id)}
+                  aria-label={`${m.id} 선택`}
+                  className="shrink-0"
+                />
+                <div className="flex items-center gap-3 min-w-0 flex-1">
                   <span
                     className="w-6 h-6 rounded shrink-0 border border-gray-300 grid place-items-center font-mono text-xs"
                     style={{ color: `rgb(${m.color[0] * 255}, ${m.color[1] * 255}, ${m.color[2] * 255})` }}

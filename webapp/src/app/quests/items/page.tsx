@@ -174,8 +174,18 @@ export default function ItemsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(bodyFromForm(editForm, false)),
     });
-    if (res.ok) { setEditingId(null); load(); }
-    else showInfo({ title: "저장 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
+    if (res.ok) {
+      // PUT 응답에 갱신된 doc 이 들어 있어 list 의 해당 항목만 in-place 교체.
+      // load() 로 전체 refetch + setLoading(true) 깜빡임 회피.
+      const json = await res.json();
+      const updated = json.data as ItemDocument | undefined;
+      if (updated) {
+        setList((prev) => prev.map((it) => (it.id === id ? updated : it)));
+      }
+      setEditingId(null);
+    } else {
+      showInfo({ title: "저장 실패", body: (await res.json()).message ?? "알 수 없는 오류", variant: "error" });
+    }
   }
 
   async function handleDelete(id: string) {
