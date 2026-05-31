@@ -60,24 +60,30 @@ export default function BevyRogueClient() {
         await mod.default({ module_or_path: "/games/bevy-rogue/bevy_rogue_bg.wasm" });
         if (cancelled) return;
 
-        // REMOTE 콘텐츠 fetch — 기본 활성. game 측이 카테고리별 "REMOTE 파싱
-        // 실패 → 임베드 폴백" 안전망을 구현했으므로, site DB 의 일부 카테고리가
-        // 깨져도 그 카테고리만 임베드로 돌아가고 나머지는 라이브 적용된다.
-        // 디버깅·강제 임베드 모드는 ?live=0 으로 OFF 가능.
+        // REMOTE 콘텐츠 fetch 정책:
+        //   - 진행 중 게임 (localStorage 에 'progress.ron' 있음) → SKIP.
+        //     진행 중 게임은 저장된 town_config / 카탈로그 상태를 그대로 유지.
+        //     site 옵션이 바뀌어도 그 게임에는 반영 안 됨. 신규 게임은 fetch 후 적용.
+        //   - 신규 게임 → /api/game/content/v1 fetch → mod.start 로 install.
+        //   - ?live=0 → 강제 임베드 모드 (디버그용).
         setLoadingStage("content");
         let contentJson: string | null = null;
         const url = new URL(window.location.href);
         const liveDisabled = url.searchParams.get("live") === "0";
-        if (!liveDisabled) {
+        const hasProgress = (() => {
+          try { return !!window.localStorage?.getItem("progress.ron"); }
+          catch { return false; }
+        })();
+        if (!liveDisabled && !hasProgress) {
           try {
-            // no-store: 카탈로그·town options 가 *방금 저장된 게* 즉시 보여야 함.
-            // 1분 cache 의 짧은 stale 도 사용자가 옵션 변경 직후 게임 시작하면 어색해 보여서.
             const res = await fetch("/api/game/content/v1", { cache: "no-store" });
             if (res.ok) contentJson = await res.text();
             else console.warn("[bevy-rogue] content fetch:", res.status);
           } catch (e) {
             console.warn("[bevy-rogue] content fetch 실패 → 임베드 폴백:", e);
           }
+        } else if (hasProgress) {
+          console.info("[bevy-rogue] 진행 중 게임 감지 — REMOTE fetch SKIP, 저장된 상태로 시작");
         }
         if (cancelled) return;
 
