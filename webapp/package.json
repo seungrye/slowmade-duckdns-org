@@ -17,6 +17,7 @@
     "defaults"
   ],
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
     "@floating-ui/react": "^0.27.16",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
