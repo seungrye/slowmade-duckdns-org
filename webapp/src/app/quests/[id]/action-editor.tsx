@@ -20,21 +20,23 @@ interface Props {
 
 function emptyAction(type: Action["type"]): Action {
   switch (type) {
-    case "Log":              return { type, text: "" };
-    case "GiveItem":         return { type, itemId: "" };
-    case "GiveItems":        return { type, itemId: "", count: 1 };
-    case "RemoveItem":       return { type, itemId: "" };
-    case "SetFlag":          return { type, flag: "", value: "" };
-    case "ClearFlag":        return { type, flag: "" };
-    case "KillNpc":          return { type, npcId: "" };
-    case "DespawnWorldItem": return { type, itemId: "" };
-    case "OpenPortal":       return { type, zone: "", generator: "" };
-    case "OpenZonePortal":   return { type, target: { type: "Named", id: "mountain_village" } };
-    case "ClosePortal":      return { type, zone: "" };
-    case "SpawnGuards":      return { type, count: 1 };
-    case "PlaceTraps":       return { type, kind: "Spike", count: 1, hidden: true };
-    case "Explode":          return { type, radius: 1, terrain: true, entityDamage: 0 };
-    case "SpawnMonster":     return { type, monsterId: "", count: 1 };
+    case "Log":               return { type, text: "" };
+    case "GiveItem":          return { type, itemId: "" };
+    case "GiveItems":         return { type, itemId: "", count: 1 };
+    case "RemoveItem":        return { type, itemId: "" };
+    case "RemoveItems":       return { type, itemId: "", count: 1 };
+    case "TeleportToNpcHome": return { type, npcId: "" };
+    case "SetFlag":           return { type, flag: "", value: "" };
+    case "ClearFlag":         return { type, flag: "" };
+    case "KillNpc":           return { type, npcId: "" };
+    case "DespawnWorldItem":  return { type, itemId: "" };
+    case "OpenPortal":        return { type, zone: "", generator: "" };
+    case "OpenZonePortal":    return { type, target: { type: "Named", id: "mountain_village" } };
+    case "ClosePortal":       return { type, zone: "" };
+    case "SpawnGuards":       return { type, count: 1 };
+    case "PlaceTraps":        return { type, kind: "Spike", count: 1, hidden: true };
+    case "Explode":           return { type, radius: 1, terrain: true, entityDamage: 0 };
+    case "SpawnMonster":      return { type, monsterId: "", count: 1 };
   }
 }
 
@@ -87,6 +89,8 @@ function ActionRow({
           <option value="GiveItem">GiveItem</option>
           <option value="GiveItems">GiveItems (수량)</option>
           <option value="RemoveItem">RemoveItem</option>
+          <option value="RemoveItems">RemoveItems (수량)</option>
+          <option value="TeleportToNpcHome">TeleportToNpcHome (NPC 집으로)</option>
           <option value="SetFlag">SetFlag</option>
           <option value="ClearFlag">ClearFlag</option>
           <option value="KillNpc">KillNpc</option>
@@ -142,6 +146,36 @@ function ActionRow({
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
         </div>
+      )}
+
+      {action.type === "RemoveItems" && (
+        <div className="flex gap-1 items-start">
+          <div className="flex-1 min-w-0">
+            <ItemCombobox
+              value={action.itemId}
+              onChange={(v) => onChange({ ...action, itemId: v })}
+              items={items}
+              placeholder="아이템 id"
+            />
+          </div>
+          <input
+            type="number"
+            min={1}
+            value={action.count ?? 1}
+            onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+            placeholder="수량"
+            className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+          />
+        </div>
+      )}
+
+      {action.type === "TeleportToNpcHome" && (
+        <NpcCombobox
+          value={action.npcId}
+          onChange={(v) => onChange({ ...action, npcId: v })}
+          villagers={villagers}
+          placeholder="NPC id (그 NPC 의 home_landmark 위치로 텔레포트)"
+        />
       )}
 
       {action.type === "SetFlag" && (

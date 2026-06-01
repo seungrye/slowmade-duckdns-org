@@ -40,8 +40,15 @@ export function conditionSummary(cond?: Condition): string {
 }
 
 /** 엣지 라벨용: 트리거 + 조건 요약 (길면 말줄임). */
-export function transitionLabel(trigger: "Interact" | "Auto", when?: Condition): string {
-  const t = trigger === "Auto" ? "자동" : "대화";
+export function transitionLabel(
+  trigger: "Interact" | "Auto" | "EnterNpcFov" | "HoldingItemInNpcFov",
+  when?: Condition,
+): string {
+  const t =
+    trigger === "Auto" ? "자동"
+      : trigger === "EnterNpcFov" ? "시야"
+      : trigger === "HoldingItemInNpcFov" ? "시야+소지"
+      : "대화";
   const s = conditionSummary(when);
   const short = s.length > 22 ? `${s.slice(0, 21)}…` : s;
   return `${t}: ${short}`;

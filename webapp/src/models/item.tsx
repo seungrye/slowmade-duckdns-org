@@ -20,6 +20,9 @@ const ItemSchema = new Schema(
     glyphAscii: { type: String, required: true },
     glyphGameIcon: { type: String, required: true },
     pickupMessage: { type: String, required: true },
+    // hidden=true 면 일반 vendor 인벤토리에 자동 편성되지 않는다 (Phase 2 보너스).
+    // 누락 시 false 의미 (기존 호환).
+    hidden: { type: Boolean, default: undefined },
 
     // quest 전용
     imagePath: { type: String },
@@ -60,6 +63,7 @@ export interface ItemDoc {
   glyphAscii: string;
   glyphGameIcon: string;
   pickupMessage: string;
+  hidden?: boolean;
   imagePath?: string;
   attackPower?: number;
   attackPowerMin?: number;

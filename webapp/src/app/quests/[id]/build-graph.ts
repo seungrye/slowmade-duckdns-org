@@ -64,22 +64,25 @@ export function buildGraph(quest: QuestDocument): { nodes: Node[]; edges: Edge[]
     });
   }
 
-  // transition 1개 = 엣지 1개. Interact 는 파랑, Auto 는 주황 점선.
+  // transition 1개 = 엣지 1개. Interact 는 파랑, Auto 는 주황 점선, FOV 는 빨강 점선.
   (quest.transitions ?? []).forEach((t, ti) => {
     if (!t.from || !t.to) return;
     const isAuto = t.trigger === "Auto";
+    const isFov = t.trigger === "EnterNpcFov" || t.trigger === "HoldingItemInNpcFov";
     edges.push({
       id: `t${ti}:${t.from}→${t.to}`,
       source: t.from,
       target: t.to,
       label: transitionLabel(t.trigger, t.when),
       labelBgPadding: [4, 2],
-      labelBgStyle: { fill: isAuto ? "#fff7ed" : "#eff6ff" },
+      labelBgStyle: { fill: isAuto ? "#fff7ed" : isFov ? "#fef2f2" : "#eff6ff" },
       style: isAuto
         ? { stroke: "#f59e0b", strokeDasharray: "6 3" }
+        : isFov
+        ? { stroke: "#ef4444", strokeDasharray: "6 3" }
         : { stroke: "#3b82f6" },
       data: { edgeType: "transition", transitionIndex: ti },
-      animated: isAuto,
+      animated: isAuto || isFov,
     });
   });
 

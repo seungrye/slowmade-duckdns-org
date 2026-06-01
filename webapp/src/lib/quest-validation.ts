@@ -7,7 +7,17 @@ export interface QuestStructError {
   message: string;
 }
 
-const ALLOWED_AUTO_ACTIONS = new Set(["DespawnWorldItem", "RemoveItem", "SetFlag"]);
+// Auto trigger 는 부작용이 적은 액션만 허용 — 게임 측 `is_auto_action_supported` 미러.
+const ALLOWED_AUTO_ACTIONS = new Set([
+  "DespawnWorldItem", "RemoveItem", "RemoveItems", "SetFlag",
+]);
+
+// FOV trigger(`EnterNpcFov` / `HoldingItemInNpcFov`) 는 잠입 실패 흐름이라
+// TeleportToNpcHome / Log / ClearFlag 까지 허용. 게임 측 `check_fov_triggers` 핸들러 미러.
+const ALLOWED_FOV_ACTIONS = new Set([
+  "DespawnWorldItem", "RemoveItem", "RemoveItems", "SetFlag", "ClearFlag",
+  "Log", "TeleportToNpcHome",
+]);
 
 export function validateQuestStructure(quest: QuestDef): QuestStructError[] {
   const out: QuestStructError[] = [];
@@ -37,7 +47,20 @@ export function validateQuestStructure(quest: QuestDef): QuestStructError[] {
     if (t.trigger === "Auto") {
       (t.actions ?? []).forEach((a, j) => {
         if (!ALLOWED_AUTO_ACTIONS.has(a.type)) {
-          out.push({ path: `${base}.actions[${j}]`, message: `Auto transition 에서 "${a.type}" 은 지원하지 않습니다 (DespawnWorldItem / RemoveItem / SetFlag 만 가능)` });
+          out.push({ path: `${base}.actions[${j}]`, message: `Auto transition 에서 "${a.type}" 은 지원하지 않습니다 (DespawnWorldItem / RemoveItem / RemoveItems / SetFlag 만 가능)` });
+        }
+      });
+    }
+    if (t.trigger === "EnterNpcFov" || t.trigger === "HoldingItemInNpcFov") {
+      if (!t.triggerNpcId) {
+        out.push({ path: `${base}.triggerNpcId`, message: `${t.trigger} 트리거는 triggerNpcId 가 필요합니다` });
+      }
+      if (t.trigger === "HoldingItemInNpcFov" && !t.triggerItemId) {
+        out.push({ path: `${base}.triggerItemId`, message: `HoldingItemInNpcFov 트리거는 triggerItemId 가 필요합니다` });
+      }
+      (t.actions ?? []).forEach((a, j) => {
+        if (!ALLOWED_FOV_ACTIONS.has(a.type)) {
+          out.push({ path: `${base}.actions[${j}]`, message: `${t.trigger} 트리거에서 "${a.type}" 은 지원하지 않습니다 (DespawnWorldItem / RemoveItem / RemoveItems / SetFlag / ClearFlag / Log / TeleportToNpcHome 만 가능)` });
         }
       });
     }

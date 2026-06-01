@@ -1700,3 +1700,188 @@ describe("serializeTownConfigRon", () => {
     expect(ron).toContain("environment: Plains,");
   });
 });
+
+// ── Phase 2: 새 TriggerKind / ActionKind round-trip ──────────────────────────
+
+describe("quest RON — Phase 2: FOV 트리거 + 텔레포트/회수 액션", () => {
+  function wrap(transitions: string, phases = `"a":QuestPhaseDef(dialog:[],objective:None),"b":QuestPhaseDef(dialog:[],objective:None)`) {
+    return `QuestDef(id:"t",title:"t",giver_npc:"n",initial_phase:"a",
+      phases:{${phases}},transitions:[${transitions}],spawns:[])`;
+  }
+
+  it("EnterNpcFov 트리거 파싱 — npc_id 보존", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:EnterNpcFov(npc_id:"market_owner"),actions:[Log("들켰다")],to:"b")`));
+    expect(quest.transitions[0].trigger).toBe("EnterNpcFov");
+    expect(quest.transitions[0].triggerNpcId).toBe("market_owner");
+  });
+
+  it("HoldingItemInNpcFov 트리거 파싱 — npc_id + item_id 보존", () => {
+    const quest = parseRon(wrap(
+      `Transition(from:"a",trigger:HoldingItemInNpcFov(npc_id:"market_owner",item_id:"super_tintham_cracker"),actions:[TeleportToNpcHome(npc_id:"elder"),RemoveItems(item:"super_tintham_cracker",count:Some(1))],to:"b")`
+    ));
+    expect(quest.transitions[0].trigger).toBe("HoldingItemInNpcFov");
+    expect(quest.transitions[0].triggerNpcId).toBe("market_owner");
+    expect(quest.transitions[0].triggerItemId).toBe("super_tintham_cracker");
+    expect(quest.transitions[0].actions).toEqual([
+      { type: "TeleportToNpcHome", npcId: "elder" },
+      { type: "RemoveItems", itemId: "super_tintham_cracker", count: 1 },
+    ]);
+  });
+
+  it("RemoveItems 액션 — count 미지정 (None) 파싱", () => {
+    const quest = parseRon(wrap(`Transition(from:"a",trigger:Auto,actions:[RemoveItems(item:"x")],to:"b")`));
+    expect(quest.transitions[0].actions[0]).toEqual({ type: "RemoveItems", itemId: "x" });
+  });
+
+  it("EnterNpcFov + 액션 — 라운드트립 직렬화/파싱", () => {
+    const quest: QuestDef = {
+      id: "fov_quest",
+      title: "FOV 테스트",
+      giverNpc: "elder",
+      initialPhase: "a",
+      phases: {
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "a",
+          trigger: "EnterNpcFov",
+          triggerNpcId: "market_owner",
+          actions: [{ type: "Log", text: "발각!" }],
+          to: "b",
+        },
+      ],
+      spawns: [],
+    };
+    const reparsed = parseRon(serializeRon(quest));
+    expect(reparsed.transitions[0].trigger).toBe("EnterNpcFov");
+    expect(reparsed.transitions[0].triggerNpcId).toBe("market_owner");
+    expect(reparsed.transitions[0].actions).toEqual([{ type: "Log", text: "발각!" }]);
+  });
+
+  it("HoldingItemInNpcFov + TeleportToNpcHome + RemoveItems — 라운드트립", () => {
+    const quest: QuestDef = {
+      id: "fail_quest",
+      title: "실패 흐름",
+      giverNpc: "elder",
+      initialPhase: "in_progress",
+      phases: {
+        in_progress: { dialog: [], objective: null },
+        accepted: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "in_progress",
+          trigger: "HoldingItemInNpcFov",
+          triggerNpcId: "market_owner",
+          triggerItemId: "super_tintham_cracker",
+          actions: [
+            { type: "TeleportToNpcHome", npcId: "elder" },
+            { type: "RemoveItems", itemId: "super_tintham_cracker", count: 1 },
+            { type: "Log", text: "정신이 들고 보니 장로 집이다." },
+          ],
+          to: "accepted",
+        },
+      ],
+      spawns: [],
+    };
+    const reparsed = parseRon(serializeRon(quest));
+    expect(reparsed.transitions[0]).toMatchObject({
+      from: "in_progress",
+      trigger: "HoldingItemInNpcFov",
+      triggerNpcId: "market_owner",
+      triggerItemId: "super_tintham_cracker",
+      to: "accepted",
+    });
+    expect(reparsed.transitions[0].actions).toEqual([
+      { type: "TeleportToNpcHome", npcId: "elder" },
+      { type: "RemoveItems", itemId: "super_tintham_cracker", count: 1 },
+      { type: "Log", text: "정신이 들고 보니 장로 집이다." },
+    ]);
+  });
+
+  it("ConsumableDef hidden=true 가 RON 라운드트립으로 보존된다", () => {
+    // 보너스 1: hidden 필드로 vendor 인벤토리 노출 제어.
+    const ron = serializeConsumablesRon([
+      {
+        kind: "consumable",
+        id: "super_tintham_cracker",
+        displayName: "졸라맛있는 틴탐 크래커",
+        glyphAscii: "!",
+        glyphGameIcon: "!",
+        pickupMessage: "획득",
+        effect: { type: "Heal", amount: 10 },
+        hidden: true,
+      },
+    ]);
+    expect(ron).toContain("hidden: true");
+    const parsed = parseConsumablesRon(ron);
+    expect(parsed[0].hidden).toBe(true);
+  });
+
+  it("ConsumableDef hidden 미지정은 RON 출력에서 생략된다", () => {
+    const ron = serializeConsumablesRon([
+      {
+        kind: "consumable",
+        id: "potion",
+        displayName: "물약",
+        glyphAscii: "!",
+        glyphGameIcon: "!",
+        pickupMessage: "획득",
+        effect: { type: "Heal", amount: 10 },
+      },
+    ]);
+    expect(ron).not.toContain("hidden:");
+    const parsed = parseConsumablesRon(ron);
+    expect(parsed[0].hidden).toBeUndefined();
+  });
+
+  it("QuestSpawn landmark=market 가 RON 라운드트립으로 보존된다", () => {
+    // 보너스 2: spawn 위치를 Town 안 Market landmark 로 한정.
+    const quest: QuestDef = {
+      id: "elder_tintham_quest",
+      title: "장로의 비밀 간식",
+      giverNpc: "elder",
+      initialPhase: "accepted",
+      phases: { accepted: { dialog: [], objective: null } },
+      transitions: [],
+      spawns: [
+        {
+          phase: "accepted",
+          item: "super_tintham_cracker",
+          zone: { type: "Town" },
+          landmark: "market",
+        },
+      ],
+    };
+    const ron = serializeRon(quest);
+    expect(ron).toContain("landmark: Some(Market)");
+    const reparsed = parseRon(ron);
+    expect(reparsed.spawns[0].landmark).toBe("market");
+  });
+
+  it("Interact / Auto 트리거는 bare ident 로 유지된다", () => {
+    const quest: QuestDef = {
+      id: "t",
+      title: "t",
+      giverNpc: "elder",
+      initialPhase: "a",
+      phases: {
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+      },
+      transitions: [
+        { from: "a", trigger: "Interact", actions: [], to: "b" },
+        { from: "b", trigger: "Auto", actions: [], to: "a" },
+      ],
+      spawns: [],
+    };
+    const ron = serializeRon(quest);
+    expect(ron).toContain("trigger: Interact");
+    expect(ron).toContain("trigger: Auto");
+    // 구조체 형태가 아닌 bare ident
+    expect(ron).not.toContain("Interact(");
+    expect(ron).not.toContain("Auto(");
+  });
+});

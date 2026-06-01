@@ -40,6 +40,12 @@ interface ItemBase {
   glyphAscii: string;
   glyphGameIcon: string;
   pickupMessage: string;
+  /**
+   * 일반 vendor 인벤토리에 노출되지 않게 할지 여부. true 면 vendor 가 이 아이템을
+   * 판매 인벤토리에 자동 편성하지 않는다 (퀘스트 spawn 같은 명시적 경로는 별도).
+   * `#[serde(default)]` 미러 — 누락은 false (기존 RON 호환).
+   */
+  hidden?: boolean;
 }
 
 // 무기/방어구의 랜덤 스탯 모드 — 게임이 RON 에 attack_power_min/max + tier 를 두고

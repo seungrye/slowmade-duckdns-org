@@ -218,9 +218,11 @@ class Parser {
     id: string; displayName: string;
     glyphAscii: string; glyphGameIcon: string;
     pickupMessage: string;
+    hidden?: boolean;
   } {
     let id = "", displayName = "", glyphAscii = "",
       glyphGameIcon = "", pickupMessage = "";
+    let hidden: boolean | undefined;
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
@@ -234,12 +236,19 @@ class Parser {
         case "glyph_unicode":   this.parseString(); break;
         case "glyph_game_icon": glyphGameIcon = this.parseString(); break;
         case "pickup_message":  pickupMessage = this.parseString(); break;
+        case "hidden":          hidden = this.parseBool(); break;
         default:
           if (!handleKindKey(key)) throw new Error(`Unknown item field: ${key}`);
       }
       this.tryPunct(",");
     }
-    return { id, displayName, glyphAscii, glyphGameIcon, pickupMessage };
+    const out: {
+      id: string; displayName: string;
+      glyphAscii: string; glyphGameIcon: string;
+      pickupMessage: string; hidden?: boolean;
+    } = { id, displayName, glyphAscii, glyphGameIcon, pickupMessage };
+    if (hidden !== undefined) out.hidden = hidden;
+    return out;
   }
 
   parseQuestItemDef(): Extract<ItemDef, { kind: "quest" }> {
@@ -705,6 +714,47 @@ class Parser {
         this.expectPunct(")");
         return { type: "RemoveItem", itemId };
       }
+      case "RemoveItems": {
+        // RemoveItems(item: "x", count: Some(2))  또는  RemoveItems(item: "x")
+        let itemId = "";
+        let count: number | undefined;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "item") itemId = this.parseString();
+          else if (key === "count") {
+            // Option<u32>: None / Some(n) / bare n (implicit_some).
+            const t = this.peek();
+            if (t?.kind === "ident" && t.val === "None") {
+              this.parseIdent();
+            } else if (t?.kind === "ident" && t.val === "Some") {
+              this.parseIdent();
+              this.expectPunct("(");
+              count = this.parseNumber();
+              this.expectPunct(")");
+            } else {
+              count = this.parseNumber();
+            }
+          }
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        const out: Extract<Action, { type: "RemoveItems" }> = { type: "RemoveItems", itemId };
+        if (count !== undefined) out.count = count;
+        return out;
+      }
+      case "TeleportToNpcHome": {
+        // TeleportToNpcHome(npc_id: "elder")
+        let npcId = "";
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "npc_id") npcId = this.parseString();
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        return { type: "TeleportToNpcHome", npcId };
+      }
       case "DespawnWorldItem": {
         const itemId = this.parseString();
         this.expectPunct(")");
@@ -873,6 +923,8 @@ class Parser {
     let from = "";
     let to = "";
     let trigger: TriggerKind = "Interact";
+    let triggerNpcId: string | undefined;
+    let triggerItemId: string | undefined;
     let when: Condition | undefined;
     let actions: Action[] = [];
 
@@ -883,9 +935,26 @@ class Parser {
         case "from":    from = this.parseString(); break;
         case "to":      to = this.parseString(); break;
         case "trigger": {
+          // 변형 두 종류:
+          //   1) bare ident: Interact / Auto
+          //   2) 구조체: EnterNpcFov(npc_id: "x") / HoldingItemInNpcFov(npc_id: "x", item_id: "y")
           const v = this.parseIdent();
-          if (v !== "Interact" && v !== "Auto") throw new Error(`Unknown trigger: ${v}`);
-          trigger = v;
+          if (v === "Interact" || v === "Auto") {
+            trigger = v;
+          } else if (v === "EnterNpcFov" || v === "HoldingItemInNpcFov") {
+            trigger = v;
+            this.expectPunct("(");
+            while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+              const k = this.parseIdent();
+              this.expectPunct(":");
+              if (k === "npc_id") triggerNpcId = this.parseString();
+              else if (k === "item_id") triggerItemId = this.parseString();
+              this.tryPunct(",");
+            }
+            this.expectPunct(")");
+          } else {
+            throw new Error(`Unknown trigger: ${v}`);
+          }
           break;
         }
         case "when":    when = this.parseWhenValue(); break;
@@ -897,6 +966,8 @@ class Parser {
 
     const t: QuestTransition = { from, trigger, actions, to };
     if (when !== undefined) t.when = when;
+    if (triggerNpcId !== undefined) t.triggerNpcId = triggerNpcId;
+    if (triggerItemId !== undefined) t.triggerItemId = triggerItemId;
     return t;
   }
 
@@ -963,6 +1034,7 @@ class Parser {
     let zone: SpawnZone = { type: "Named", id: "dungeon_1" };
     let count: number | undefined;
     let condition: Condition | undefined;
+    let landmark: HomeLandmark | undefined;
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
@@ -973,6 +1045,23 @@ class Parser {
         case "zone":      zone  = this.parseSpawnZone(); break;
         case "count":     count = this.parseNumber(); break;
         case "condition": condition = this.parseOptionCondition(); break;
+        case "landmark": {
+          // Option<HomeLandmark> — None / Some(Market) / bare Market (implicit_some).
+          const t = this.peek();
+          if (t?.kind === "ident" && t.val === "None") {
+            this.parseIdent();
+          } else if (t?.kind === "ident" && t.val === "Some") {
+            this.parseIdent();
+            this.expectPunct("(");
+            const lmPascal = this.parseIdent();
+            landmark = lmPascal.toLowerCase() as HomeLandmark;
+            this.expectPunct(")");
+          } else {
+            const lmPascal = this.parseIdent();
+            landmark = lmPascal.toLowerCase() as HomeLandmark;
+          }
+          break;
+        }
         default: break;
       }
       this.tryPunct(",");
@@ -980,6 +1069,7 @@ class Parser {
     const spawn: QuestSpawn = { phase, item, zone };
     if (count !== undefined) spawn.count = count;
     if (condition !== undefined) spawn.condition = condition;
+    if (landmark !== undefined) spawn.landmark = landmark;
     return spawn;
   }
 
@@ -1201,6 +1291,12 @@ function serializeAction(action: Action, depth: number): string {
     case "GiveItem":         return `${i}GiveItem(${q(action.itemId)})`;
     case "GiveItems":        return `${i}GiveItems(item: ${q(action.itemId)}, count: ${action.count})`;
     case "RemoveItem":       return `${i}RemoveItem(${q(action.itemId)})`;
+    case "RemoveItems": {
+      const parts = [`item: ${q(action.itemId)}`];
+      if (action.count !== undefined) parts.push(`count: Some(${action.count})`);
+      return `${i}RemoveItems(${parts.join(", ")})`;
+    }
+    case "TeleportToNpcHome": return `${i}TeleportToNpcHome(npc_id: ${q(action.npcId)})`;
     case "DespawnWorldItem": return `${i}DespawnWorldItem(${q(action.itemId)})`;
     case "KillNpc":          return `${i}KillNpc(${q(action.npcId)})`;
     case "SetFlag":          return `${i}SetFlag(flag: ${q(action.flag)}, value: ${q(action.value)})`;
@@ -1272,7 +1368,17 @@ function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): s
 function serializeTransition(t: QuestTransition, depth: number): string {
   const i = ind(depth);
   const i1 = ind(depth + 1);
-  const head = `from: ${q(t.from)}, trigger: ${t.trigger}`;
+  // 트리거 직렬화 — bare ident (Interact/Auto) 또는 구조체 (EnterNpcFov/HoldingItemInNpcFov).
+  let triggerStr: string = t.trigger;
+  if (t.trigger === "EnterNpcFov") {
+    const npc = t.triggerNpcId ?? "";
+    triggerStr = `EnterNpcFov(npc_id: ${q(npc)})`;
+  } else if (t.trigger === "HoldingItemInNpcFov") {
+    const npc = t.triggerNpcId ?? "";
+    const item = t.triggerItemId ?? "";
+    triggerStr = `HoldingItemInNpcFov(npc_id: ${q(npc)}, item_id: ${q(item)})`;
+  }
+  const head = `from: ${q(t.from)}, trigger: ${triggerStr}`;
   const whenPart = t.when ? `when: ${serializeCondition(t.when)}` : null;
 
   // actions 가 없으면 한 줄로
@@ -1302,6 +1408,11 @@ function serializeSpawn(s: QuestSpawn): string {
   ];
   if (s.count !== undefined) parts.push(`count: ${s.count}`);
   if (s.condition !== undefined) parts.push(`condition: Some(${serializeCondition(s.condition)})`);
+  if (s.landmark !== undefined) {
+    // 게임 HomeLandmark enum 은 PascalCase (TS 는 kebab/lowercase).
+    const pascal = s.landmark.charAt(0).toUpperCase() + s.landmark.slice(1);
+    parts.push(`landmark: Some(${pascal})`);
+  }
   return `        QuestSpawn(${parts.join(", ")}),`;
 }
 
@@ -1390,13 +1501,16 @@ export function serializeMonstersRon(monsters: MonsterDef[]): string {
 // ── Item serializers (4 종) ──────────────────────────────────────────────────
 
 function serializeItemCommon(item: ItemDef): string[] {
-  return [
+  const lines = [
     `        id: ${q(item.id)},`,
     `        display_name: ${q(item.displayName)},`,
     `        glyph_ascii: ${q(item.glyphAscii)},`,
     `        glyph_game_icon: ${q(item.glyphGameIcon)},`,
     `        pickup_message: ${q(item.pickupMessage)},`,
   ];
+  // hidden 기본값(false/누락) 은 생략 — 게임 측 #[serde(default)] 미러.
+  if (item.hidden) lines.push(`        hidden: true,`);
+  return lines;
 }
 
 function arrayWrap(structName: string, lines: string[][]): string {

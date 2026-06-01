@@ -1,3 +1,5 @@
+import type { HomeLandmark } from "./villager";
+
 // ── 조건 타입 ──────────────────────────────────────────────────────────────
 
 export type Condition =
@@ -29,6 +31,12 @@ export type Action =
   | { type: "GiveItem"; itemId: string }
   | { type: "GiveItems"; itemId: string; count: number }
   | { type: "RemoveItem"; itemId: string }
+  /**
+   * 인벤토리에서 `itemId` 를 `count` 개까지 회수한다. count 미지정 시 1.
+   * 게임 `QuestAction::RemoveItems { item, count: Option<u32> }` 미러.
+   * `RemoveItem` 의 수량 확장형 — 잠입 실패 시 여러 개 회수 같은 시나리오.
+   */
+  | { type: "RemoveItems"; itemId: string; count?: number }
   | { type: "SetFlag"; flag: string; value: string }
   | { type: "ClearFlag"; flag: string }
   | { type: "KillNpc"; npcId: string }
@@ -49,12 +57,36 @@ export type Action =
   | { type: "SpawnGuards"; count: number; zone?: SpawnZone }
   | { type: "PlaceTraps"; kind: TrapKind; count: number; hidden: boolean; zone?: SpawnZone }
   | { type: "Explode"; radius: number; terrain: boolean; entityDamage: number }
-  | { type: "SpawnMonster"; monsterId: string; count: number; zone?: SpawnZone };
+  | { type: "SpawnMonster"; monsterId: string; count: number; zone?: SpawnZone }
+  /**
+   * 플레이어를 지정 NPC 의 home_landmark 위치로 텔레포트한다.
+   * 게임 `QuestAction::TeleportToNpcHome { npc_id }` 미러. 잠입 실패 시 장로 집으로
+   * 강제 복귀 같은 흐름에 사용.
+   */
+  | { type: "TeleportToNpcHome"; npcId: string };
 
 // ── 상태 전환 ─────────────────────────────────────────────────────────────
 
-/** NPC 상호작용(Interact) 또는 매 프레임 자동 조건(Auto) 트리거. */
-export type TriggerKind = "Interact" | "Auto";
+/**
+ * 상태 전이의 트리거 종류.
+ * - `Interact` — NPC 마지막 대사 이후 플레이어가 상호작용했을 때.
+ * - `Auto`     — 매 프레임 조건 자동 평가.
+ * - `EnterNpcFov` — 플레이어가 지정 NPC 의 시야 안에 들어옴 (잠입 퀘스트의 vendor 발각 등).
+ *                  `triggerNpcId` 가 그 NPC 의 id.
+ * - `HoldingItemInNpcFov` — 위 + 지정 아이템 인벤토리 보유 동시 조건.
+ *                          `triggerNpcId` + `triggerItemId` 가 필요.
+ *
+ * 게임 `quest::TriggerKind` enum 미러. variant 추가 시 ron.ts 의 parser/serializer 도 함께 갱신.
+ *
+ * NOTE: 호환성을 위해 string union 으로 유지. EnterNpcFov / HoldingItemInNpcFov 의
+ * 인스턴스 매개변수(npc_id / item_id)는 `QuestTransition` 의 `triggerNpcId`
+ * / `triggerItemId` 필드로 전달한다.
+ */
+export type TriggerKind =
+  | "Interact"
+  | "Auto"
+  | "EnterNpcFov"
+  | "HoldingItemInNpcFov";
 
 /**
  * 순서형 상태 전환 규칙. 같은 (from, trigger) 그룹에서 RON 목록 순서대로
@@ -64,9 +96,19 @@ export type TriggerKind = "Interact" | "Auto";
 export interface QuestTransition {
   from: string;
   trigger: TriggerKind;
+  /**
+   * `EnterNpcFov` / `HoldingItemInNpcFov` 트리거의 NPC id.
+   * 다른 trigger 종류에선 무시되며 RON 직렬화에도 포함되지 않는다.
+   */
+  triggerNpcId?: string;
+  /**
+   * `HoldingItemInNpcFov` 트리거의 item id.
+   * 다른 trigger 종류에선 무시.
+   */
+  triggerItemId?: string;
   /** 없으면 항상 매칭 (unconditional) */
   when?: Condition;
-  /** Auto trigger 는 DespawnWorldItem/RemoveItem/SetFlag 만 허용 */
+  /** Auto / FOV trigger 는 DespawnWorldItem / RemoveItem / RemoveItems / SetFlag / Log / TeleportToNpcHome 만 허용 */
   actions: Action[];
   to: string;
 }
@@ -88,6 +130,12 @@ export interface QuestSpawn {
   zone: SpawnZone;
   count?: number;
   condition?: Condition;
+  /**
+   * Town zone 안에서 *특정 landmark 영역* 안으로 스폰 위치를 좁힌다.
+   * 예: `landmark: "market"` 이면 시장 안 floor 타일에만 spawn.
+   * 게임 `QuestSpawn.landmark: Option<HomeLandmark>` 미러. 누락은 None (기존 동작 — zone 의 임의 방).
+   */
+  landmark?: HomeLandmark;
 }
 
 // ── 페이즈 ────────────────────────────────────────────────────────────────

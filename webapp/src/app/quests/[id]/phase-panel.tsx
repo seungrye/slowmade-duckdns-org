@@ -140,7 +140,13 @@ export function PhasePanel({
           <div className="space-y-1">
             {outgoing.map(({ t, index }) => {
               const isAuto = t.trigger === "Auto";
+              const isFov = t.trigger === "EnterNpcFov" || t.trigger === "HoldingItemInNpcFov";
               const selfLoop = t.to === phaseId;
+              const triggerLabel = isAuto
+                ? "자동"
+                : isFov
+                ? t.trigger === "EnterNpcFov" ? "시야" : "시야+소지"
+                : "대화";
               return (
                 <button
                   key={index}
@@ -152,10 +158,12 @@ export function PhasePanel({
                       className={`text-[9px] font-mono px-1 py-0.5 rounded ${
                         isAuto
                           ? "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300"
+                          : isFov
+                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
                           : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
                       }`}
                     >
-                      {isAuto ? "자동" : "대화"}
+                      {triggerLabel}
                     </span>
                     <span className="text-[11px] text-gray-400">→</span>
                     <span className="text-[11px] font-mono font-medium truncate">

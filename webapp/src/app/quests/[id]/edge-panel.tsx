@@ -103,11 +103,36 @@ export function EdgePanel({
         >
           <option value="Interact">Interact — NPC 대화 후 상호작용</option>
           <option value="Auto">Auto — 매 프레임 조건 자동 평가</option>
+          <option value="EnterNpcFov">EnterNpcFov — NPC 시야 진입</option>
+          <option value="HoldingItemInNpcFov">HoldingItemInNpcFov — 시야 + 아이템 소지</option>
         </select>
         {tx.trigger === "Auto" && (
           <p className="text-[10px] text-gray-400 mt-1">
-            Auto 의 액션은 DespawnWorldItem / RemoveItem / SetFlag 만 허용됩니다.
+            Auto 의 액션은 DespawnWorldItem / RemoveItem / RemoveItems / SetFlag 만 허용됩니다.
           </p>
+        )}
+        {(tx.trigger === "EnterNpcFov" || tx.trigger === "HoldingItemInNpcFov") && (
+          <div className="mt-2 space-y-1">
+            <input
+              type="text"
+              placeholder="NPC id (예: market_owner)"
+              value={tx.triggerNpcId ?? ""}
+              onChange={(e) => update({ triggerNpcId: e.target.value })}
+              className={selectCls}
+            />
+            {tx.trigger === "HoldingItemInNpcFov" && (
+              <input
+                type="text"
+                placeholder="아이템 id (예: super_tintham_cracker)"
+                value={tx.triggerItemId ?? ""}
+                onChange={(e) => update({ triggerItemId: e.target.value })}
+                className={selectCls}
+              />
+            )}
+            <p className="text-[10px] text-gray-400">
+              FOV 트리거의 액션은 DespawnWorldItem / RemoveItem / RemoveItems / SetFlag / ClearFlag / Log / TeleportToNpcHome 만 허용됩니다.
+            </p>
+          </div>
         )}
       </section>
 
