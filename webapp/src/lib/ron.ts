@@ -487,6 +487,24 @@ class Parser {
         case "home_landmark": def.homeLandmark = this.parseHomeLandmark(); break;
         // free_roam — bool. 누락 시 default = false (게임 측 #[serde(default)] 미러).
         case "free_roam":  def.freeRoam   = this.parseBool(); break;
+        // vendor_vision_radius — Option<u32>. None / Some(N) / 누락 모두 허용.
+        // 누락은 game 측 #[serde(default) None] 미러 — undefined 로 둔다.
+        case "vendor_vision_radius": {
+          const t = this.peek();
+          if (t?.kind === "ident" && t.val === "None") {
+            this.parseIdent();
+            // undefined 으로 두어 export 시 다시 누락 처리.
+          } else if (t?.kind === "ident" && t.val === "Some") {
+            this.parseIdent();
+            this.expectPunct("(");
+            def.vendorVisionRadius = this.parseNumber();
+            this.expectPunct(")");
+          } else {
+            // implicit_some — bare 숫자 N → Some(N).
+            def.vendorVisionRadius = this.parseNumber();
+          }
+          break;
+        }
         default: break;
       }
       this.tryPunct(",");
@@ -1035,6 +1053,7 @@ class Parser {
     let count: number | undefined;
     let condition: Condition | undefined;
     let landmark: HomeLandmark | undefined;
+    let vendorDistanceMin: number | undefined;
 
     while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
       const key = this.parseIdent();
@@ -1062,6 +1081,21 @@ class Parser {
           }
           break;
         }
+        case "vendor_distance_min": {
+          // Option<u32> — None / Some(N) / bare N (implicit_some).
+          const t = this.peek();
+          if (t?.kind === "ident" && t.val === "None") {
+            this.parseIdent();
+          } else if (t?.kind === "ident" && t.val === "Some") {
+            this.parseIdent();
+            this.expectPunct("(");
+            vendorDistanceMin = this.parseNumber();
+            this.expectPunct(")");
+          } else {
+            vendorDistanceMin = this.parseNumber();
+          }
+          break;
+        }
         default: break;
       }
       this.tryPunct(",");
@@ -1070,6 +1104,7 @@ class Parser {
     if (count !== undefined) spawn.count = count;
     if (condition !== undefined) spawn.condition = condition;
     if (landmark !== undefined) spawn.landmark = landmark;
+    if (vendorDistanceMin !== undefined) spawn.vendorDistanceMin = vendorDistanceMin;
     return spawn;
   }
 
@@ -1413,6 +1448,9 @@ function serializeSpawn(s: QuestSpawn): string {
     const pascal = s.landmark.charAt(0).toUpperCase() + s.landmark.slice(1);
     parts.push(`landmark: Some(${pascal})`);
   }
+  if (s.vendorDistanceMin !== undefined) {
+    parts.push(`vendor_distance_min: Some(${s.vendorDistanceMin})`);
+  }
   return `        QuestSpawn(${parts.join(", ")}),`;
 }
 
@@ -1448,6 +1486,11 @@ function serializeVillagerDef(v: VillagerDef): string {
   }
   // free_roam — 기본 false 는 생략(게임 측 #[serde(default)] 미러). true 만 출력.
   if (v.freeRoam) lines.push(`        free_roam: true,`);
+  // vendor_vision_radius — Option<u32>. None (또는 null/undefined) 은 생략 (게임
+  // 측 #[serde(default) None] 미러). 명시값만 Some(N) 으로 출력.
+  if (v.vendorVisionRadius !== undefined && v.vendorVisionRadius !== null) {
+    lines.push(`        vendor_vision_radius: Some(${v.vendorVisionRadius}),`);
+  }
   lines.push(`    ),`);
   return lines.join("\n");
 }

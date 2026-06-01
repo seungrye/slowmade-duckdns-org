@@ -43,6 +43,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
       400,
     );
   }
+  if (body.vendorVisionRadius !== undefined && body.vendorVisionRadius !== null
+      && (typeof body.vendorVisionRadius !== "number"
+          || !Number.isInteger(body.vendorVisionRadius)
+          || body.vendorVisionRadius < 0)) {
+    return apiError("vendorVisionRadius 는 0 이상의 정수 또는 null 이어야 합니다.", 400);
+  }
 
   // 갱신 직전 현재 버전을 revision 으로 백업
   await VillagerRevision.create({
@@ -59,6 +65,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       homeZone: villager.homeZone,
       homeLandmark: villager.homeLandmark,
       freeRoam: villager.freeRoam,
+      vendorVisionRadius: villager.vendorVisionRadius,
     },
   });
 
@@ -71,6 +78,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.homeZone !== undefined) villager.homeZone = body.homeZone;
   if (body.homeLandmark !== undefined) villager.homeLandmark = body.homeLandmark;
   if (body.freeRoam !== undefined) villager.freeRoam = body.freeRoam;
+  if (body.vendorVisionRadius !== undefined) villager.vendorVisionRadius = body.vendorVisionRadius;
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();

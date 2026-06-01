@@ -35,6 +35,11 @@ interface FormState {
    * 자유 이동 — true 면 거주 영역 무시(어디든). false (기본) 면 거주 영역 안만.
    */
   freeRoam: boolean;
+  /**
+   * vendor 의 시야 반경 (vendor=true 일 때만 의미). 빈 문자열 → null (게임
+   * 측 fallback default 6 사용). 정수 → 그 값으로 override.
+   */
+  vendorVisionRadius: string;
 }
 
 // `homeZone` UI 태그 — Town 또는 Named.
@@ -76,7 +81,21 @@ const emptyForm: FormState = {
   homeZoneNamedId: "",
   homeLandmark: "random",
   freeRoam: false,
+  vendorVisionRadius: "",
 };
+
+/**
+ * `vendorVisionRadius` 입력 문자열을 API 요청에 사용할 number|null 로 변환.
+ * 공백/빈 문자열 → null (게임 측 fallback default 6). 정수 → 그 값.
+ * 잘못된 입력은 null 로 안전화 (UI 가드).
+ */
+function parseVendorVisionRadius(s: string): number | null {
+  const trimmed = s.trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) return null;
+  return n;
+}
 
 // ── 색상 유틸 (RON 은 0~1 RGB, <input type=color> 는 #rrggbb) ──
 function randomColor(): [number, number, number] {
@@ -194,6 +213,10 @@ export default function VillagersPage() {
         homeZone: homeZoneFromForm(createForm),
         homeLandmark: createForm.homeLandmark,
         freeRoam: createForm.freeRoam,
+        // vendor=false 면 null 강제 (의미 없는 값 저장 방지).
+        vendorVisionRadius: createForm.vendor
+          ? parseVendorVisionRadius(createForm.vendorVisionRadius)
+          : null,
       }),
     });
     if (res.ok) {
@@ -220,6 +243,10 @@ export default function VillagersPage() {
         homeZone: homeZoneFromForm(editForm),
         homeLandmark: editForm.homeLandmark,
         freeRoam: editForm.freeRoam,
+        // vendor=false 면 null 강제 (의미 없는 값 저장 방지).
+        vendorVisionRadius: editForm.vendor
+          ? parseVendorVisionRadius(editForm.vendorVisionRadius)
+          : null,
       }),
     });
     if (res.ok) {
@@ -272,6 +299,11 @@ export default function VillagersPage() {
       homeZoneNamedId: v.homeZone?.type === "Named" ? v.homeZone.id : "",
       homeLandmark: v.homeLandmark ?? "random",
       freeRoam: !!v.freeRoam,
+      // null/undefined 면 빈 문자열 (= "기본값 사용"), 명시값은 그대로.
+      vendorVisionRadius:
+        typeof v.vendorVisionRadius === "number"
+          ? String(v.vendorVisionRadius)
+          : "",
     });
   }
 
@@ -518,6 +550,30 @@ function FormFields({
           />
           <span>vendor <span className="text-gray-400">(상호작용 시 상점 열림)</span></span>
         </label>
+        {/*
+          vendor_vision_radius — vendor=true 일 때만 노출. 빈 문자열 → null
+          (게임 측 fallback default 6 타일). 정수 → 그 vendor 만 해당 반경으로
+          override. `RevealVendorVision` 액세서리 활성 시 보라 FOV 오버레이에 반영.
+        */}
+        {form.vendor && (
+          <label className="flex items-center gap-1.5 select-none text-xs">
+            <span>vendor_vision_radius</span>
+            <input
+              type="number"
+              aria-label="vendor_vision_radius"
+              min={0}
+              step={1}
+              value={form.vendorVisionRadius}
+              onChange={(e) =>
+                setForm({ ...form, vendorVisionRadius: e.target.value })
+              }
+              placeholder="6"
+              title="시야 반경 (타일). 비워두면 게임 측 default 6 사용."
+              className={`${inputCls} w-20`}
+            />
+            <span className="text-gray-400">(타일 / 비우면 default 6)</span>
+          </label>
+        )}
         <label className="flex items-center gap-1.5 cursor-pointer select-none text-xs">
           <input
             type="checkbox"

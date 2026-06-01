@@ -134,8 +134,22 @@ export interface QuestSpawn {
    * Town zone 안에서 *특정 landmark 영역* 안으로 스폰 위치를 좁힌다.
    * 예: `landmark: "market"` 이면 시장 안 floor 타일에만 spawn.
    * 게임 `QuestSpawn.landmark: Option<HomeLandmark>` 미러. 누락은 None (기존 동작 — zone 의 임의 방).
+   *
+   * `landmark_tiles` 는 prefab carve 시점에 *내부* (외벽+1) Floor 좌표만 기록되므로
+   * "상점 내부" 가 자연히 보장된다 (외벽 / 도로 옆은 제외).
    */
   landmark?: HomeLandmark;
+  /**
+   * vendor (`vendor: true` 인 NPC) 로부터 최소 manhattan 거리. landmark 안에서도
+   * 이 거리 미만의 타일은 후보에서 제외 — vendor 카운터 옆 즉시 시야에 spawn 금지.
+   *
+   * `super_tintham_cracker` 처럼 vendor 가 *몰래 숨겨놓은* 아이템이 vendor 옆에
+   * spawn 되면 곧바로 발각된다 → 어느 정도 떨어진 위치여야 회피 가능. `2` 면
+   * 카운터로부터 2칸 떨어진 후보만 허용.
+   *
+   * 게임 `QuestSpawn.vendor_distance_min: Option<u32>` 미러. 누락은 None (필터 없음).
+   */
+  vendorDistanceMin?: number;
 }
 
 // ── 페이즈 ────────────────────────────────────────────────────────────────

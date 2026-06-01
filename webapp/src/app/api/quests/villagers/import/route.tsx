@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
           homeZone: existing.homeZone,
           homeLandmark: existing.homeLandmark,
           freeRoam: existing.freeRoam,
+          vendorVisionRadius: existing.vendorVisionRadius,
         },
       });
       existing.name = v.name;
@@ -64,6 +65,8 @@ export async function POST(req: NextRequest) {
       if (v.homeZone !== undefined) existing.homeZone = v.homeZone;
       if (v.homeLandmark !== undefined) existing.homeLandmark = v.homeLandmark;
       if (v.freeRoam !== undefined) existing.freeRoam = v.freeRoam;
+      // vendorVisionRadius — 동일 정책. null/undefined 미명시 시 기존 값 유지.
+      if (v.vendorVisionRadius !== undefined) existing.vendorVisionRadius = v.vendorVisionRadius;
       existing.version = (existing.version ?? 1) + 1;
       await existing.save();
       updated++;
@@ -80,6 +83,7 @@ export async function POST(req: NextRequest) {
         ...(v.homeZone !== undefined ? { homeZone: v.homeZone } : {}),
         ...(v.homeLandmark !== undefined ? { homeLandmark: v.homeLandmark } : {}),
         ...(v.freeRoam !== undefined ? { freeRoam: v.freeRoam } : {}),
+        ...(v.vendorVisionRadius !== undefined ? { vendorVisionRadius: v.vendorVisionRadius } : {}),
       });
       created++;
     }

@@ -908,6 +908,117 @@ describe("parseVillagersRon — stationary / vendor 신규 필드", () => {
   });
 });
 
+describe("parseVillagersRon — vendor_vision_radius (Option<u32>)", () => {
+  // 데이터 주도 가드: vendor 별 시야 반경 override.
+  // 미지정 → game 측 fallback default (6). 명시 → 그 vendor 만 적용.
+  it("vendor_vision_radius: Some(2) 가 파싱·라운드트립 보존된다", () => {
+    const src = `[
+    VillagerDef(
+        id: "market_owner",
+        name: "시장 상인",
+        color: (0.3, 0.9, 0.3),
+        vendor: true,
+        dialogs: [],
+        speed: 1.0,
+        vendor_vision_radius: Some(2),
+    ),
+]`;
+    const villagers = parseVillagersRon(src);
+    expect(villagers[0].vendor).toBe(true);
+    expect(villagers[0].vendorVisionRadius).toBe(2);
+    const out = serializeVillagersRon(villagers);
+    expect(out).toContain("vendor_vision_radius: Some(2)");
+    // round-trip
+    const reparsed = parseVillagersRon(out);
+    expect(reparsed[0].vendorVisionRadius).toBe(2);
+  });
+
+  it("vendor_vision_radius 누락은 undefined (game 측 default 6 사용)", () => {
+    const src = `[
+    VillagerDef(
+        id: "plain_vendor",
+        name: "기본 상인",
+        color: (0.3, 0.9, 0.3),
+        vendor: true,
+        dialogs: [],
+        speed: 1.0,
+    ),
+]`;
+    const villagers = parseVillagersRon(src);
+    expect(villagers[0].vendorVisionRadius).toBeUndefined();
+    // serializer 는 undefined 면 vendor_vision_radius 줄을 출력하지 않는다.
+    const out = serializeVillagersRon(villagers);
+    expect(out).not.toContain("vendor_vision_radius");
+  });
+
+  it("vendor_vision_radius: None 은 undefined 와 동등하게 처리된다", () => {
+    const src = `[
+    VillagerDef(
+        id: "none_vendor",
+        name: "none",
+        color: (0.3, 0.9, 0.3),
+        vendor: true,
+        dialogs: [],
+        speed: 1.0,
+        vendor_vision_radius: None,
+    ),
+]`;
+    const villagers = parseVillagersRon(src);
+    expect(villagers[0].vendorVisionRadius).toBeUndefined();
+  });
+});
+
+describe("parseRon — QuestSpawn.vendor_distance_min (Option<u32>)", () => {
+  // 데이터 주도 가드: super_tintham_cracker 가 vendor 옆에 spawn 되지 않게.
+  it("vendor_distance_min: Some(2) 가 RON 라운드트립으로 보존된다", () => {
+    const quest: QuestDef = {
+      id: "elder_tintham_quest",
+      title: "장로의 비밀 간식",
+      giverNpc: "elder",
+      initialPhase: "accepted",
+      phases: { accepted: { dialog: [], objective: null } },
+      transitions: [],
+      spawns: [
+        {
+          phase: "accepted",
+          item: "super_tintham_cracker",
+          zone: { type: "Town" },
+          landmark: "market",
+          vendorDistanceMin: 2,
+        },
+      ],
+    };
+    const ron = serializeRon(quest);
+    expect(ron).toContain("landmark: Some(Market)");
+    expect(ron).toContain("vendor_distance_min: Some(2)");
+    const reparsed = parseRon(ron);
+    expect(reparsed.spawns[0].landmark).toBe("market");
+    expect(reparsed.spawns[0].vendorDistanceMin).toBe(2);
+  });
+
+  it("vendor_distance_min 누락은 undefined (필터 미적용)", () => {
+    const quest: QuestDef = {
+      id: "q",
+      title: "q",
+      giverNpc: "g",
+      initialPhase: "a",
+      phases: { a: { dialog: [], objective: null } },
+      transitions: [],
+      spawns: [
+        {
+          phase: "a",
+          item: "i",
+          zone: { type: "Town" },
+        },
+      ],
+    };
+    const ron = serializeRon(quest);
+    expect(ron).not.toContain("vendor_distance_min");
+    const reparsed = parseRon(ron);
+    expect(reparsed.spawns[0].vendorDistanceMin).toBeUndefined();
+  });
+});
+
 describe("parseVillagersRon — home_zone (마을 분산)", () => {
   // 새 schema: Town | Named. 옛 RON 의 bare ident(MountainVillage/SeasideHarbor)
   // 도 호환되어 Named 로 자동 변환된다.

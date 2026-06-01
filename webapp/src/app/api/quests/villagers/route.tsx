@@ -39,6 +39,12 @@ export async function POST(req: NextRequest) {
       400,
     );
   }
+  if (body.vendorVisionRadius !== undefined && body.vendorVisionRadius !== null
+      && (typeof body.vendorVisionRadius !== "number"
+          || !Number.isInteger(body.vendorVisionRadius)
+          || body.vendorVisionRadius < 0)) {
+    return apiError("vendorVisionRadius 는 0 이상의 정수 또는 null 이어야 합니다.", 400);
+  }
 
   const existing = await Villager.findOne({ id: body.id });
   if (existing) return apiError(`이미 존재하는 villager id 입니다: ${body.id}`, 409);
@@ -57,6 +63,8 @@ export async function POST(req: NextRequest) {
     homeLandmark: body.homeLandmark,
     // freeRoam — 미지정 시 schema default(false) 가 적용된다.
     freeRoam: body.freeRoam ?? false,
+    // vendorVisionRadius — null/미지정 시 schema default(null) → 게임 측 fallback (6).
+    vendorVisionRadius: body.vendorVisionRadius ?? null,
   });
 
   return apiSuccess(villager, 201);

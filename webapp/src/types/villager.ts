@@ -93,6 +93,17 @@ export interface VillagerDef {
    * 게임 측 `#[serde(default)] free_roam: false` 미러.
    */
   freeRoam?: boolean;
+  /**
+   * vendor (`vendor: true`) 의 시야 반경 (타일 단위). `RevealVendorVision`
+   * 액세서리 효과가 활성일 때 이 반경의 FOV 가 보라색 오버레이로 표시된다.
+   *
+   * 미지정 (`undefined` / `null`) 시 게임 측 fallback default (6 타일) 사용.
+   * 명시 시 그 vendor 만 해당 반경 적용 (예: market_owner 는 2 로 상점 내부만).
+   *
+   * `vendor: false` 인 NPC 에서는 무시된다 (오버레이는 vendor 만 그린다).
+   * 게임 측 `#[serde(default)] vendor_vision_radius: Option<u32>` 미러.
+   */
+  vendorVisionRadius?: number | null;
 }
 
 export interface VillagerDocument extends VillagerDef {

@@ -21,6 +21,10 @@ export async function GET() {
     if (d.homeZone) v.homeZone = d.homeZone as VillagerDef["homeZone"];
     if (d.homeLandmark) v.homeLandmark = d.homeLandmark as VillagerDef["homeLandmark"];
     if (d.freeRoam) v.freeRoam = true;
+    // vendorVisionRadius — null/0 미만은 미지정 처리. serializer 가 None 생략.
+    if (typeof d.vendorVisionRadius === "number" && d.vendorVisionRadius >= 0) {
+      v.vendorVisionRadius = d.vendorVisionRadius;
+    }
     return v;
   });
 

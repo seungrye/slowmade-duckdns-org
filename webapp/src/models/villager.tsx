@@ -54,6 +54,11 @@ const VillagerSchema = new Schema(
     // 게임 RON 의 free_roam 미러 — #[serde(default)] free_roam: false.
     // false 면 거주 영역(landmark/명명 집/도로) 안만 이동. true 면 자유 이동.
     freeRoam: { type: Boolean, default: false },
+    // 게임 RON 의 vendor_vision_radius 미러 — Option<u32> 의 직렬화.
+    // null/undefined → 게임 측 fallback default (6 타일).
+    // 정수 (>= 0) → 그 vendor 만 해당 반경 적용 (예: market_owner = 2).
+    // vendor=false 인 NPC 에서는 무시된다 (오버레이는 vendor 만 그린다).
+    vendorVisionRadius: { type: Number, default: null },
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -71,6 +76,11 @@ export interface VillagerDoc {
   homeZone: ZoneIdValue;
   homeLandmark: HomeLandmark;
   freeRoam: boolean;
+  /**
+   * vendor 의 시야 반경 — null 은 게임 측 default (6). vendor=false 면 무시.
+   * 게임 측 `Option<u32>` 미러 (Schema default = null).
+   */
+  vendorVisionRadius: number | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
