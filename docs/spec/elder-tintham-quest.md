@@ -30,7 +30,10 @@
 
 ## ✅ P1 — site 카탈로그
 
-### 1) `RevealVendorVision` AccessoryEffect 추가
+> 완료 보고: `RevealVendorVision` 효과 키 추가 + 회귀 테스트 통과. 카탈로그
+> 데이터(items / villager / quest) 는 mongo 직접 삽입으로 처리(아래 보고 참조).
+
+### 1) ✅ `RevealVendorVision` AccessoryEffect 추가
 
 `webapp/src/types/item.ts` 의 `AccessoryEffect` union 에 `"RevealVendorVision"`
 키를 추가한다. UI 라벨도 같이.
