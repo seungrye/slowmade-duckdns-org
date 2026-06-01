@@ -1,7 +1,8 @@
 "use client";
 
 import type { Action, PortalPlacement, TrapKind } from "@/types/quest";
-import type { VillagerDocument } from "@/types/villager";
+import type { VillagerDocument, HomeLandmark } from "@/types/villager";
+import { HOME_LANDMARKS, HOME_LANDMARK_LABEL } from "@/types/villager";
 import type { ItemDocument } from "@/types/item";
 import type { ZoneDocument } from "@/types/zone";
 import { NpcCombobox } from "./npc-combobox";
@@ -37,6 +38,7 @@ function emptyAction(type: Action["type"]): Action {
     case "PlaceTraps":        return { type, kind: "Spike", count: 1, hidden: true };
     case "Explode":           return { type, radius: 1, terrain: true, entityDamage: 0 };
     case "SpawnMonster":      return { type, monsterId: "", count: 1 };
+    case "SpawnItem":         return { type, itemId: "" };
   }
 }
 
@@ -102,6 +104,7 @@ function ActionRow({
           <option value="PlaceTraps">PlaceTraps (함정 배치)</option>
           <option value="Explode">Explode (폭발)</option>
           <option value="SpawnMonster">SpawnMonster (몬스터 스폰)</option>
+          <option value="SpawnItem">SpawnItem (런타임 아이템 스폰)</option>
         </select>
         <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
           ✕
@@ -425,6 +428,104 @@ function ActionRow({
             placeholder="수량"
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
+        </div>
+      )}
+
+      {action.type === "SpawnItem" && (
+        <div className="space-y-1">
+          <ItemCombobox
+            value={action.itemId}
+            onChange={(v) => onChange({ ...action, itemId: v })}
+            items={items}
+            placeholder="아이템 id"
+          />
+          {/* zone — undefined(현재 zone) / Town / Named */}
+          <select
+            aria-label="spawn zone"
+            value={action.zone?.type ?? "__current__"}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "__current__") {
+                const { zone: _zone, ...rest } = action;
+                void _zone;
+                onChange(rest);
+              } else if (v === "Town") {
+                onChange({ ...action, zone: { type: "Town" } });
+              } else {
+                onChange({ ...action, zone: { type: "Named", id: "mountain_village" } });
+              }
+            }}
+            className={inputCls}
+          >
+            <option value="__current__">(현재 zone — 기본)</option>
+            <option value="Town">Town (시작 마을)</option>
+            <option value="Named">Named (id 지정)</option>
+          </select>
+          {action.zone?.type === "Named" && (
+            <ZoneCombobox
+              value={action.zone.id}
+              onChange={(v) => onChange({ ...action, zone: { type: "Named", id: v } })}
+              zones={zones}
+              placeholder="Named id (예: mountain_village, herb_glade)"
+            />
+          )}
+          {/* landmark — Town zone 한정 (undefined 시 zone 임의 floor) */}
+          <select
+            aria-label="spawn landmark"
+            value={action.landmark ?? "__none__"}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "__none__") {
+                const { landmark: _lm, ...rest } = action;
+                void _lm;
+                onChange(rest);
+              } else {
+                onChange({ ...action, landmark: v as HomeLandmark });
+              }
+            }}
+            className={inputCls}
+          >
+            <option value="__none__">(landmark 없음 — zone 임의 floor)</option>
+            {HOME_LANDMARKS.map((lm) => (
+              <option key={lm} value={lm}>{HOME_LANDMARK_LABEL[lm]}</option>
+            ))}
+          </select>
+          <div className="flex gap-1 items-start">
+            <input
+              type="number"
+              min={0}
+              value={action.vendorDistanceMin ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "") {
+                  const { vendorDistanceMin: _v, ...rest } = action;
+                  void _v;
+                  onChange(rest);
+                } else {
+                  onChange({ ...action, vendorDistanceMin: Number(raw) });
+                }
+              }}
+              placeholder="vendor 최소거리 (manhattan, 비우면 무제한)"
+              className={halfCls}
+            />
+            <input
+              type="number"
+              min={1}
+              value={action.count ?? ""}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "") {
+                  const { count: _c, ...rest } = action;
+                  void _c;
+                  onChange(rest);
+                } else {
+                  onChange({ ...action, count: Number(raw) });
+                }
+              }}
+              placeholder="수량 (기본 1)"
+              className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
+            />
+          </div>
         </div>
       )}
     </div>
