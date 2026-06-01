@@ -500,4 +500,122 @@ describe("GET /api/game/content/v1", () => {
     // landmarks 의 unknown 은 필터링됨
     expect(ron).toContain("landmarks: [Inn, Smithy],");
   });
+
+  // ── HoldingItemInNpcFov / EnterNpcFov 트리거 회귀 ────────────────────────────
+  //
+  // 회귀: 라이브에서 `elder_tintham_quest` 의 `HoldingItemInNpcFov` fail transition
+  // 자체가 DB 에 들어 있지 않아 시장 주인 시야에 걸려도 아무 일도 일어나지 않았다.
+  //
+  // 이 테스트는 *mongo doc 형태 그대로* (JS object: trigger=string, triggerNpcId/
+  // triggerItemId 필드) 가 `/api/game/content/v1` 응답의 RON 에 게임-파서 호환
+  // 형식(`HoldingItemInNpcFov(npc_id: ..., item_id: ...)`) 으로 *직렬화* 되는지
+  // 확인한다. 또 round-trip 도 검증(parseRon → triggerNpcId/triggerItemId 보존).
+  //
+  // 의도: 새 TriggerKind variant 가 추가될 때 같은 누락 패턴(toQuestDef 가 doc 을
+  // 통째로 통과시키는데 serializer/parser 중 하나가 미지원) 을 끝-끝 단에서 잡는다.
+  it("HoldingItemInNpcFov fail transition 이 mongo doc → RON 응답에 정확히 직렬화된다", async () => {
+    const questDoc = {
+      id: "elder_tintham_quest",
+      title: "장로의 비밀 간식",
+      giverNpc: "elder",
+      initialPhase: "dormant",
+      spawnChance: 1,
+      phases: {
+        dormant: { dialog: ["인사."], objective: null },
+        accepted: { dialog: ["들키지 말게."], objective: "훔쳐오라" },
+        failed: { dialog: ["허허..."], objective: "재시도" },
+      },
+      // mongo subdoc 형태 — trigger=string + triggerNpcId/triggerItemId 별도 필드.
+      // toQuestDef 가 그대로 통과시키고 serializeRon 이 새 trigger variant 를
+      // 처리해야 한다.
+      transitions: [
+        {
+          from: "accepted",
+          trigger: "HoldingItemInNpcFov",
+          triggerNpcId: "market_owner",
+          triggerItemId: "super_tintham_cracker",
+          actions: [
+            { type: "TeleportToNpcHome", npcId: "elder" },
+            { type: "RemoveItems", itemId: "super_tintham_cracker", count: 1 },
+            { type: "Log", text: "구두쇠 박씨에게 들켰다!" },
+          ],
+          to: "failed",
+        },
+      ],
+      spawns: [],
+    };
+    mockChain(Quest as unknown as { find: FindMock }, [questDoc]);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    expect(body.quests).toHaveLength(1);
+    const ron: string = body.quests[0].ron;
+
+    // 1) RON 텍스트에 trigger 의 구조체 변형이 그대로 보여야 한다 (snake_case 필드명 포함).
+    //    parser 가 OK 해도 serializer 가 누락하면 게임은 받지 못한다 — 문자열 매칭으로 명시 검증.
+    expect(ron).toContain(
+      'trigger: HoldingItemInNpcFov(npc_id: "market_owner", item_id: "super_tintham_cracker")',
+    );
+    // 2) action 들도 game RON 형식으로 직렬화 (TeleportToNpcHome / RemoveItems).
+    expect(ron).toContain('TeleportToNpcHome(npc_id: "elder")');
+    expect(ron).toContain('RemoveItems(item: "super_tintham_cracker", count: Some(1))');
+
+    // 3) round-trip — parseRon 으로 다시 파싱했을 때 trigger 메타가 모두 보존.
+    const parsed = parseRon(ron);
+    expect(parsed.transitions).toHaveLength(1);
+    const t = parsed.transitions[0];
+    expect(t.trigger).toBe("HoldingItemInNpcFov");
+    expect(t.triggerNpcId).toBe("market_owner");
+    expect(t.triggerItemId).toBe("super_tintham_cracker");
+    expect(t.from).toBe("accepted");
+    expect(t.to).toBe("failed");
+    expect(t.actions).toEqual([
+      { type: "TeleportToNpcHome", npcId: "elder" },
+      { type: "RemoveItems", itemId: "super_tintham_cracker", count: 1 },
+      { type: "Log", text: "구두쇠 박씨에게 들켰다!" },
+    ]);
+  });
+
+  it("EnterNpcFov 트리거도 mongo doc → RON 응답에 정확히 직렬화된다", async () => {
+    // HoldingItemInNpcFov 의 동기 variant. 같은 누락 패턴 회귀를 한 번에 막는다.
+    const questDoc = {
+      id: "fov_quest",
+      title: "FOV 테스트",
+      giverNpc: "elder",
+      initialPhase: "a",
+      phases: {
+        a: { dialog: [], objective: null },
+        b: { dialog: [], objective: null },
+      },
+      transitions: [
+        {
+          from: "a",
+          trigger: "EnterNpcFov",
+          triggerNpcId: "guard_captain",
+          actions: [{ type: "Log", text: "발각!" }],
+          to: "b",
+        },
+      ],
+      spawns: [],
+    };
+    mockChain(Quest as unknown as { find: FindMock }, [questDoc]);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    const ron: string = body.quests[0].ron;
+    expect(ron).toContain('trigger: EnterNpcFov(npc_id: "guard_captain")');
+    const parsed = parseRon(ron);
+    expect(parsed.transitions[0].trigger).toBe("EnterNpcFov");
+    expect(parsed.transitions[0].triggerNpcId).toBe("guard_captain");
+  });
 });
