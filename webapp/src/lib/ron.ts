@@ -899,6 +899,62 @@ class Parser {
         if (zone) action.zone = zone;
         return action;
       }
+      case "SpawnItem": {
+        // SpawnItem(item_id: "x", zone: Some(...), landmark: Some(Market),
+        //            vendor_distance_min: Some(2), count: Some(1))
+        // 모든 선택 필드는 None / Some / implicit_some / bare 모두 수용.
+        let itemId = "";
+        let zone: SpawnZone | undefined;
+        let landmark: HomeLandmark | undefined;
+        let vendorDistanceMin: number | undefined;
+        let count: number | undefined;
+        while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
+          const key = this.parseIdent();
+          this.expectPunct(":");
+          if (key === "item_id") {
+            itemId = this.parseString();
+          } else if (key === "zone") {
+            zone = this.parseOptionalZone();
+          } else if (key === "landmark") {
+            // landmark: Option<HomeLandmark>. None / Some(PascalCase) / bare PascalCase.
+            const t = this.peek();
+            if (t?.kind === "ident" && t.val === "None") {
+              this.parseIdent();
+            } else if (t?.kind === "ident" && t.val === "Some") {
+              this.parseIdent();
+              this.expectPunct("(");
+              landmark = this.parseHomeLandmark();
+              this.expectPunct(")");
+            } else {
+              landmark = this.parseHomeLandmark();
+            }
+          } else if (key === "vendor_distance_min" || key === "count") {
+            // Option<u32>: None / Some(n) / bare n.
+            const t = this.peek();
+            let n: number | undefined;
+            if (t?.kind === "ident" && t.val === "None") {
+              this.parseIdent();
+            } else if (t?.kind === "ident" && t.val === "Some") {
+              this.parseIdent();
+              this.expectPunct("(");
+              n = this.parseNumber();
+              this.expectPunct(")");
+            } else {
+              n = this.parseNumber();
+            }
+            if (key === "vendor_distance_min") vendorDistanceMin = n;
+            else count = n;
+          }
+          this.tryPunct(",");
+        }
+        this.expectPunct(")");
+        const action: Extract<Action, { type: "SpawnItem" }> = { type: "SpawnItem", itemId };
+        if (zone !== undefined) action.zone = zone;
+        if (landmark !== undefined) action.landmark = landmark;
+        if (vendorDistanceMin !== undefined) action.vendorDistanceMin = vendorDistanceMin;
+        if (count !== undefined) action.count = count;
+        return action;
+      }
       default:
         throw new Error(`Unknown action: ${name}`);
     }
@@ -1368,6 +1424,23 @@ function serializeAction(action: Action, depth: number): string {
       const parts = [`id: ${q(action.monsterId)}`, `count: ${action.count}`];
       if (action.zone) parts.push(`zone: Some(${serializeZone(action.zone)})`);
       return `${i}SpawnMonster(${parts.join(", ")})`;
+    }
+    case "SpawnItem": {
+      // SpawnItem(item_id: "x", zone: Some(...), landmark: Some(Market),
+      //            vendor_distance_min: Some(2), count: Some(1))
+      const parts = [`item_id: ${q(action.itemId)}`];
+      if (action.zone) parts.push(`zone: Some(${serializeZone(action.zone)})`);
+      if (action.landmark !== undefined) {
+        const pascal = action.landmark.charAt(0).toUpperCase() + action.landmark.slice(1);
+        parts.push(`landmark: Some(${pascal})`);
+      }
+      if (action.vendorDistanceMin !== undefined) {
+        parts.push(`vendor_distance_min: Some(${action.vendorDistanceMin})`);
+      }
+      if (action.count !== undefined) {
+        parts.push(`count: Some(${action.count})`);
+      }
+      return `${i}SpawnItem(${parts.join(", ")})`;
     }
   }
 }

@@ -581,6 +581,79 @@ describe("GET /api/game/content/v1", () => {
     ]);
   });
 
+  // ── SpawnItem action 회귀 ──────────────────────────────────────────────────
+  //
+  // 정책: 잠입 실패 후 재시도 (failed → accepted Interact transition) 에서
+  // 사라진 quest item 을 데이터-주도로 다시 spawn. mongo doc 의 `SpawnItem`
+  // 액션이 게임 RON 호환 형식 (`SpawnItem(item_id: ..., landmark: ..., ...)`) 으로
+  // 직렬화되어야 한다.
+  it("SpawnItem mongo doc → RON 응답에 itemId / landmark / vendor_distance_min / count 모두 직렬화된다", async () => {
+    const questDoc = {
+      id: "elder_tintham_quest",
+      title: "장로의 비밀 간식",
+      giverNpc: "elder",
+      initialPhase: "dormant",
+      phases: {
+        dormant: { dialog: ["인사."], objective: null },
+        accepted: { dialog: ["다시 가져와라."], objective: "재시도" },
+        failed: { dialog: ["허허…"], objective: "재시도" },
+      },
+      // 핵심: failed → accepted Interact transition 의 actions 에 SpawnItem.
+      transitions: [
+        {
+          from: "failed",
+          trigger: "Interact",
+          actions: [
+            {
+              type: "SpawnItem",
+              itemId: "super_tintham_cracker",
+              landmark: "market",
+              vendorDistanceMin: 2,
+              count: 1,
+            },
+            { type: "Log", text: "다시 시도해보겠나..." },
+          ],
+          to: "accepted",
+        },
+      ],
+      spawns: [],
+    };
+    mockChain(Quest as unknown as { find: FindMock }, [questDoc]);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    expect(body.quests).toHaveLength(1);
+    const ron: string = body.quests[0].ron;
+
+    // 1) SpawnItem 의 4 개 인스턴스 필드 모두 직렬화 (snake_case 필드명 + PascalCase enum).
+    expect(ron).toContain(
+      'SpawnItem(item_id: "super_tintham_cracker", landmark: Some(Market), vendor_distance_min: Some(2), count: Some(1))',
+    );
+
+    // 2) round-trip — parseRon 으로 다시 파싱했을 때 모든 필드 보존.
+    const parsed = parseRon(ron);
+    expect(parsed.transitions).toHaveLength(1);
+    const t = parsed.transitions[0];
+    expect(t.from).toBe("failed");
+    expect(t.to).toBe("accepted");
+    expect(t.trigger).toBe("Interact");
+    expect(t.actions).toEqual([
+      {
+        type: "SpawnItem",
+        itemId: "super_tintham_cracker",
+        landmark: "market",
+        vendorDistanceMin: 2,
+        count: 1,
+      },
+      { type: "Log", text: "다시 시도해보겠나..." },
+    ]);
+  });
+
   it("EnterNpcFov 트리거도 mongo doc → RON 응답에 정확히 직렬화된다", async () => {
     // HoldingItemInNpcFov 의 동기 variant. 같은 누락 패턴 회귀를 한 번에 막는다.
     const questDoc = {

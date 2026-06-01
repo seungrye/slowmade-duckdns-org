@@ -63,7 +63,31 @@ export type Action =
    * 게임 `QuestAction::TeleportToNpcHome { npc_id }` 미러. 잠입 실패 시 장로 집으로
    * 강제 복귀 같은 흐름에 사용.
    */
-  | { type: "TeleportToNpcHome"; npcId: string };
+  | { type: "TeleportToNpcHome"; npcId: string }
+  /**
+   * 월드에 quest item 을 *런타임으로* spawn 한다. 기존 `QuestSpawn` 은 phase
+   * 진입 + 맵 변경 시점에만 발동되므로 한 phase 안에서 재 spawn 이 불가.
+   * `SpawnItem` 은 transition action 으로 호출되어 — 예) 잠입 실패 후 재시도
+   * transition (failed → accepted) 에서 사라진 졸라크래커를 다시 깐다.
+   *
+   * 데이터-주도: 어떤 아이템·landmark·vendor 거리·count·zone 모두 인스턴스로 전달.
+   * 코드에 어떤 item/위치도 박지 않는다 — 다른 quest 도 같은 mechanic 을 재사용.
+   *
+   * - `zone` undefined → 현재 zone 에 즉시 spawn (대부분의 retry 시나리오).
+   * - `landmark` 지정 시 그 landmark 내부 floor 타일만 후보 (예: market).
+   * - `vendorDistanceMin` 지정 시 vendor 카운터로부터 그 manhattan 거리 미만 타일 제외.
+   * - `count` 미지정 시 1.
+   *
+   * 게임 `QuestAction::SpawnItem { item_id, zone, landmark, vendor_distance_min, count }` 미러.
+   */
+  | {
+      type: "SpawnItem";
+      itemId: string;
+      zone?: SpawnZone;
+      landmark?: HomeLandmark;
+      vendorDistanceMin?: number;
+      count?: number;
+    };
 
 // ── 상태 전환 ─────────────────────────────────────────────────────────────
 

@@ -127,6 +127,17 @@ function validateAction(a: Action, path: string, c: CatalogSets, out: QuestRefWa
         out.push({ path: `${path}.itemId`, kind: "item", missing: a.itemId });
       }
       break;
+    case "SpawnItem":
+      // item 카탈로그 존재성 검증. landmark / vendorDistanceMin 은 검증 대상 외
+      // (게임 측이 None / 잘못된 landmark 도 silently fallback 한다 — UI 가이드 차원
+      // 에서만 활용). zone 은 Named 일 때만 카탈로그 검사.
+      if (a.itemId && !c.items.has(a.itemId)) {
+        out.push({ path: `${path}.itemId`, kind: "item", missing: a.itemId });
+      }
+      if (a.zone && a.zone.type === "Named" && a.zone.id && !c.zones.has(a.zone.id)) {
+        out.push({ path: `${path}.zone.id`, kind: "zone", missing: a.zone.id });
+      }
+      break;
     case "KillNpc":
       if (a.npcId && !c.villagers.has(a.npcId)) {
         out.push({ path: `${path}.npcId`, kind: "villager", missing: a.npcId });
