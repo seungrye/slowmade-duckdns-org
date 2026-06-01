@@ -10,11 +10,31 @@ const mockVillagers = [
   { _id: '2', id: 'burgomaster', name: '촌장', color: [1.0, 0.85, 0.0], dialogs: ['안녕', '잘가'], speed: 1.0, version: 3 },
 ];
 
+// page.tsx 는 villagers 외에 /api/quests/town-config 도 호출하므로 URL 별 응답이 필요.
+// town-config 응답에 landmarks 등 배열 필드가 빠지면 useMemo 내부에서 iterable 오류 발생.
+const mockTownConfig = {
+  size: 'village',
+  algorithm: 'grid',
+  roads: 'radial',
+  wealth: 'common',
+  defenses: 'none',
+  landmarks: ['inn', 'smithy'],
+  fields: true,
+  environment: 'plains',
+};
+
+function mockFetchByUrl(villagers: unknown = mockVillagers) {
+  return vi.spyOn(global, 'fetch').mockImplementation(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url.includes('/api/quests/town-config')) {
+      return { json: async () => ({ data: mockTownConfig }), ok: true } as Response;
+    }
+    return { json: async () => ({ data: villagers }), ok: true } as Response;
+  });
+}
+
 beforeEach(() => {
-  vi.spyOn(global, 'fetch').mockResolvedValue({
-    json: async () => ({ data: mockVillagers }),
-    ok: true,
-  } as Response);
+  mockFetchByUrl();
 });
 
 describe('VillagersPage 렌더', () => {
@@ -70,10 +90,7 @@ describe('VillagersPage 신규 폼', () => {
 
 describe('VillagersPage 빈 상태', () => {
   it('등록된 villager 가 없으면 안내 메시지', async () => {
-    vi.spyOn(global, 'fetch').mockResolvedValue({
-      json: async () => ({ data: [] }),
-      ok: true,
-    } as Response);
+    mockFetchByUrl([]);
     render(<VillagersPage />);
     await act(async () => {});
     expect(screen.getByText(/등록된 villager 가 없습니다/)).toBeTruthy();
