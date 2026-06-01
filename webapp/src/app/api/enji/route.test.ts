@@ -141,4 +141,80 @@ describe('/api/enji POST', () => {
 
     expect(mockCommentSave).toHaveBeenCalledTimes(2); // enji 댓글도 저장됨
   });
+
+  it('첫 모델이 503 으로 실패하면 fallback 모델로 재시도하여 성공한다', async () => {
+    mockGenerateContent
+      .mockRejectedValueOnce(new Error('{"error":{"code":503,"status":"UNAVAILABLE","message":"high demand"}}'))
+      .mockResolvedValueOnce({ text: 'fallback 모델 응답' });
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '@enji-bot 테스트',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(mockCommentSave).toHaveBeenCalledTimes(2); // userComment + enji 응답
+  });
+
+  it('모든 모델이 transient 에러로 실패하면 안내용 enji 댓글을 저장한다', async () => {
+    mockGenerateContent.mockRejectedValue(
+      new Error('{"error":{"code":503,"status":"UNAVAILABLE","message":"high demand"}}'),
+    );
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '@enji-bot 테스트',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 4개 모델 전부 시도
+    expect(mockGenerateContent).toHaveBeenCalledTimes(4);
+    // userComment + 안내 댓글
+    expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('비-transient 에러는 fallback 없이 즉시 안내 댓글로 종료한다', async () => {
+    mockGenerateContent.mockRejectedValue(
+      new Error('{"error":{"code":400,"status":"INVALID_ARGUMENT","message":"bad input"}}'),
+    );
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '@enji-bot 테스트',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 첫 모델에서 즉시 중단
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    // userComment + 안내 댓글
+    expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('빈 응답이면 다음 모델로 fallback 한다', async () => {
+    mockGenerateContent
+      .mockResolvedValueOnce({ text: '' })
+      .mockResolvedValueOnce({ text: '두번째 모델 응답' });
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '@enji-bot 테스트',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
 });

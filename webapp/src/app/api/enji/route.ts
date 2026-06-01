@@ -26,14 +26,50 @@ function isAllowedOrigin(req: NextRequest): boolean {
   return origin.startsWith(siteUrl) || referer.startsWith(siteUrl);
 }
 
+// Gemini 모델 fallback chain.
+// - 첫 번째 모델이 503(과부하)/429(쿼터)/네트워크 타임아웃으로 실패하면 다음 모델로 재시도.
+// - "*-latest" alias 는 가끔 503 으로 응답하기 때문에 안정적인 stable 모델을 먼저 둔다.
+const GEMINI_MODEL_CHAIN = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-flash-lite-latest',
+  'gemini-flash-latest',
+];
+
+function isTransientGeminiError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  // 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED, fetch failed, headers timeout 등은 재시도 가치 있음.
+  return /\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|fetch failed|HEADERS_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND)\b/i.test(msg);
+}
+
 async function callGemini(contextMessage: string): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
-  const result = await ai.models.generateContent({
-    model: 'gemini-flash-latest',
-    config: { systemInstruction: ENJI_SYSTEM_PROMPT },
-    contents: contextMessage,
-  });
-  return result.text ?? '';
+  let lastError: unknown;
+  for (const model of GEMINI_MODEL_CHAIN) {
+    try {
+      const result = await ai.models.generateContent({
+        model,
+        config: { systemInstruction: ENJI_SYSTEM_PROMPT },
+        contents: contextMessage,
+      });
+      const text = result.text ?? '';
+      if (!text.trim()) {
+        // 빈 응답도 재시도 대상 (응답이 비면 사용자에게 의미가 없음).
+        lastError = new Error(`Empty response from model ${model}`);
+        continue;
+      }
+      return text;
+    } catch (err) {
+      lastError = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[enji] model=${model} failed:`, msg.slice(0, 200));
+      if (!isTransientGeminiError(err)) {
+        // 비-transient 에러(예: 400 invalid request)는 fallback 해도 동일 결과이므로 즉시 중단.
+        break;
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 async function saveEnjiComment(postId: string, parentId: string, text: string) {
@@ -116,7 +152,26 @@ export async function POST(req: NextRequest) {
 
   void callGemini(contextMessage)
     .then((text) => saveEnjiComment(postId, String(userComment._id), text))
-    .catch((err) => console.error('Background enji error:', err));
+    .catch(async (err) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      const cause = (err as { cause?: unknown })?.cause;
+      console.error('[enji] background failed:', msg);
+      if (err instanceof Error && err.stack) {
+        console.error('[enji] stack:', err.stack.split('\n').slice(0, 5).join('\n'));
+      }
+      if (cause) console.error('[enji] cause:', cause);
+
+      // 사용자가 영원히 폴링하지 않도록, 실패 안내를 enji-bot 댓글로 등록.
+      try {
+        await saveEnjiComment(
+          postId,
+          String(userComment._id),
+          '죄송해요, 지금은 답변 드리기 어려운 상태예요. 잠시 후 다시 멘션해 주세요. (모델 일시 과부하)',
+        );
+      } catch (saveErr) {
+        console.error('[enji] failed to save error comment:', saveErr);
+      }
+    });
 
   return NextResponse.json({ success: true, data: { userComment } }, { status: 201 });
 }
