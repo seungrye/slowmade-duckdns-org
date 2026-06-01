@@ -169,6 +169,12 @@ function toVillagerDef(d: Record<string, unknown>): VillagerDef {
   if (d.homeZone) v.homeZone = d.homeZone as VillagerDef["homeZone"];
   // homeLandmark — schema 기본 "random". serializer 가 기본값 생략.
   if (d.homeLandmark) v.homeLandmark = d.homeLandmark as VillagerDef["homeLandmark"];
+  // freeRoam — schema 기본 false. true 만 RON 에 출력(serializer 가 기본값 생략).
+  if (d.freeRoam) v.freeRoam = true;
+  // vendorVisionRadius — Option<u32>. null/undefined 는 게임 측 fallback default(6) 사용.
+  //   명시 시 그 vendor 만 그 반경 적용 (예: market_owner = 2). serializer 가 Some(N) 출력.
+  //   이 매핑이 빠지면 mongo 값이 RON 응답에 안 실려 게임이 영원히 fallback 으로 동작한다.
+  if (typeof d.vendorVisionRadius === "number") v.vendorVisionRadius = d.vendorVisionRadius;
   return v;
 }
 

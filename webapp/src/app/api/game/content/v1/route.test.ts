@@ -212,6 +212,66 @@ describe("GET /api/game/content/v1", () => {
     expect(m[0].id).toBe("slime");
   });
 
+  it("villager 의 vendorVisionRadius/freeRoam 가 RON 응답에 round-trip 된다", async () => {
+    // 회귀 — 과거 toVillagerDef 가 mongo 의 vendorVisionRadius/freeRoam 을
+    // 누락해, 라이브에서 market_owner 가 vendor_vision_radius: 2 를 받지 못하고
+    // 게임 측 fallback (6) 으로 동작한 버그 방지.
+    const marketOwner = {
+      id: "market_owner",
+      name: "구두쇠 박씨",
+      color: [0.6, 0.4, 0.2],
+      dialogs: ["어서 오세요!"],
+      speed: 0.5,
+      vendor: true,
+      stationary: false,
+      homeZone: { type: "Town" },
+      homeLandmark: "market",
+      freeRoam: false,
+      vendorVisionRadius: 2,
+    };
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, [marketOwner]);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    // RON 문자열에 snake_case 키가 직접 보여야 한다 (parser 가 OK 해도 직렬화 누락이면
+    // 게임은 못 받는다 — 문자열 매칭으로 명시 검증).
+    expect(body.villagers).toContain("vendor_vision_radius: Some(2)");
+    // free_roam 은 기본 false → 출력 안 함 (게임 측 #[serde(default)]).
+    expect(body.villagers).not.toContain("free_roam");
+    // round-trip 한 결과에 vendorVisionRadius=2 가 남아 있다.
+    const parsed = parseVillagersRon(body.villagers);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("market_owner");
+    expect(parsed[0].vendorVisionRadius).toBe(2);
+    expect(parsed[0].homeLandmark).toBe("market");
+  });
+
+  it("villager 의 freeRoam=true 가 RON 응답에 free_roam: true 로 직렬화된다", async () => {
+    const wanderer = {
+      id: "wanderer",
+      name: "방랑자",
+      color: [0.5, 0.5, 0.5],
+      dialogs: ["..."],
+      speed: 1.0,
+      freeRoam: true,
+    };
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, [wanderer]);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    expect(body.villagers).toContain("free_roam: true");
+  });
+
   it("DB 가 비어 있어도 200 + 빈 배열·빈 RON 래퍼를 반환한다", async () => {
     mockChain(Quest as unknown as { find: FindMock }, []);
     mockChain(Item as unknown as { find: FindMock }, []);
