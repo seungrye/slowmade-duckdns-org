@@ -1326,6 +1326,27 @@ describe("parse/serialize AccessoriesRon", () => {
     const bad = `[AccessoryDef(id:"x",display_name:"x",glyph_ascii:"x",glyph_unicode:"x",glyph_game_icon:"x",pickup_message:"x",desc:"x",effects:[NotARealEffect])]`;
     expect(() => parseAccessoriesRon(bad)).toThrow(/Unknown AccessoryEffect/);
   });
+
+  // 잠입 퀘스트 "장로의 비밀 간식" 에서 도입한 신규 효과 키. vendor (시장 주인)
+  // 의 시야 영역을 시각화하는 액세서리 — 가드 시야와 분리된 별도 키.
+  it("RevealVendorVision 효과 키도 라운드트립으로 보존된다", () => {
+    const src = `[
+      AccessoryDef(
+          id: "market_vision_glasses",
+          display_name: "시장 주인 투시 안경",
+          glyph_ascii: "G",
+          glyph_unicode: "G",
+          glyph_game_icon: "G",
+          pickup_message: "장로가 건넨 수상한 안경을 썼다.",
+          desc: "착용하면 시장 주인의 시야 범위가 빨갛게 보인다.",
+          effects: [RevealVendorVision],
+      ),
+    ]`;
+    const accs = parseAccessoriesRon(src);
+    expect(accs[0].effects).toEqual(["RevealVendorVision"]);
+    const reparsed = parseAccessoriesRon(serializeAccessoriesRon(accs));
+    expect(reparsed).toEqual(accs);
+  });
 });
 
 describe("parse/serialize MonstersRon — 기본 (실제 monsters.ron 형식)", () => {

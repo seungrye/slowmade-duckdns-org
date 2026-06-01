@@ -44,7 +44,7 @@ const ItemSchema = new Schema(
     // accessory 전용 — 효과 설명 텍스트 (사람용)
     desc: { type: String },
     // accessory 전용 — 데이터 주도 효과 키 목록. 게임 코드가 id 가 아닌 이 키로 분기.
-    // 유효 값: "RevealGuardVision" | "RevealTrapsInSight" (types/item.ts AccessoryEffect 와 동기).
+    // 유효 값: "RevealGuardVision" | "RevealTrapsInSight" | "RevealVendorVision" (types/item.ts AccessoryEffect 와 동기).
     effects: { type: [String], default: undefined },
 
     version: { type: Number, default: 1 },

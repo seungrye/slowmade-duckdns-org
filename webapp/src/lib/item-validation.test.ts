@@ -89,4 +89,9 @@ describe("validateItemForCreate — accessory effects 필드", () => {
     const body = { ...base(), kind: "accessory", desc: "x", effects: [] };
     expect(validateItemForCreate(body)).toEqual({ ok: true });
   });
+
+  it("RevealVendorVision 효과 키도 허용된다 (장로의 비밀 간식 안경)", () => {
+    const body = { ...base(), kind: "accessory", desc: "x", effects: ["RevealVendorVision"] };
+    expect(validateItemForCreate(body)).toEqual({ ok: true });
+  });
 });

@@ -18,17 +18,20 @@ export type ConsumableEffect = { type: "Heal"; amount: number };
  */
 export type AccessoryEffect =
   | "RevealGuardVision"
-  | "RevealTrapsInSight";
+  | "RevealTrapsInSight"
+  | "RevealVendorVision";
 
 /** UI 표시용 한국어 라벨 — 편집 화면 멀티셀렉트 옵션에 사용. */
 export const ACCESSORY_EFFECT_LABELS: Record<AccessoryEffect, string> = {
   RevealGuardVision: "가드 시야 노출 (잠입)",
   RevealTrapsInSight: "함정 시야 노출 (함정)",
+  RevealVendorVision: "상인 시야 노출 (잠입)",
 };
 
 export const ACCESSORY_EFFECTS: AccessoryEffect[] = [
   "RevealGuardVision",
   "RevealTrapsInSight",
+  "RevealVendorVision",
 ];
 
 interface ItemBase {
