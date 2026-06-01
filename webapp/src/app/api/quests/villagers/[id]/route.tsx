@@ -49,6 +49,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
           || body.vendorVisionRadius < 0)) {
     return apiError("vendorVisionRadius 는 0 이상의 정수 또는 null 이어야 합니다.", 400);
   }
+  if (body.vendorInventory !== undefined && body.vendorInventory !== null
+      && !(Array.isArray(body.vendorInventory)
+           && body.vendorInventory.every((v: unknown) => typeof v === "string"))) {
+    return apiError("vendorInventory 는 문자열 배열 또는 null 이어야 합니다.", 400);
+  }
 
   // 갱신 직전 현재 버전을 revision 으로 백업
   await VillagerRevision.create({
@@ -66,6 +71,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       homeLandmark: villager.homeLandmark,
       freeRoam: villager.freeRoam,
       vendorVisionRadius: villager.vendorVisionRadius,
+      vendorInventory: villager.vendorInventory,
     },
   });
 
@@ -79,6 +85,11 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.homeLandmark !== undefined) villager.homeLandmark = body.homeLandmark;
   if (body.freeRoam !== undefined) villager.freeRoam = body.freeRoam;
   if (body.vendorVisionRadius !== undefined) villager.vendorVisionRadius = body.vendorVisionRadius;
+  // vendorInventory — null 명시 시 필드 제거 (SHOP_CATALOG fallback 으로 복귀). 배열은 그대로 저장.
+  if (body.vendorInventory !== undefined) {
+    if (body.vendorInventory === null) villager.vendorInventory = undefined;
+    else if (Array.isArray(body.vendorInventory)) villager.vendorInventory = body.vendorInventory;
+  }
   villager.version = (villager.version ?? 1) + 1;
 
   await villager.save();

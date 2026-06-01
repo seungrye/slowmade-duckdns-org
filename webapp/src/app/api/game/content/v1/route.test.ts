@@ -654,6 +654,93 @@ describe("GET /api/game/content/v1", () => {
     ]);
   });
 
+  // ── 상점 시스템 (buyPrice/sellPrice/vendorInventory) end-to-end ────────────────
+  it("vendor 가 vendorInventory 가지면 RON 에 vendor_inventory: Some([...]) + weapon 의 buy_price 직렬화", async () => {
+    const shopkeeperDoc = {
+      id: "shopkeeper",
+      name: "상점 주인",
+      color: [0.6, 0.4, 0.2],
+      dialogs: ["어서 오세요!"],
+      speed: 0.5,
+      vendor: true,
+      vendorInventory: ["iron_sword"],
+    };
+    const swordDoc = {
+      id: "iron_sword",
+      kind: "weapon",
+      displayName: "철검",
+      glyphAscii: "/",
+      glyphGameIcon: "X",
+      pickupMessage: "획득",
+      attackPower: 10,
+      element: null,
+      buyPrice: 100,
+      sellPrice: 70,
+    };
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, [swordDoc]);
+    mockChain(Villager as unknown as { find: FindMock }, [shopkeeperDoc]);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+
+    // villagers RON 에 vendor_inventory: Some(["iron_sword"]) 직렬화
+    expect(body.villagers).toContain('vendor_inventory: Some([');
+    expect(body.villagers).toContain('"iron_sword"');
+
+    // weapons RON 에 buy_price: Some(100) + sell_price: Some(70) 직렬화
+    expect(body.items["weapons.ron"]).toContain("buy_price: Some(100)");
+    expect(body.items["weapons.ron"]).toContain("sell_price: Some(70)");
+  });
+
+  it("vendor 가 vendorInventory 없으면 vendor_inventory 키 자체 미출력 (SHOP_CATALOG fallback)", async () => {
+    const elderDoc = {
+      id: "elder",
+      name: "장로",
+      color: [0.9, 0.8, 0.5],
+      dialogs: ["안녕."],
+      speed: 0.5,
+      vendor: false,
+    };
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, []);
+    mockChain(Villager as unknown as { find: FindMock }, [elderDoc]);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    expect(body.villagers).not.toContain("vendor_inventory");
+  });
+
+  it("Item 에 buyPrice/sellPrice 미설정 시 RON 응답에 두 키 모두 미출력", async () => {
+    const swordDoc = {
+      id: "plain_sword",
+      kind: "weapon",
+      displayName: "평범한 검",
+      glyphAscii: "/",
+      glyphGameIcon: "X",
+      pickupMessage: "획득",
+      attackPower: 5,
+      element: null,
+    };
+    mockChain(Quest as unknown as { find: FindMock }, []);
+    mockChain(Item as unknown as { find: FindMock }, [swordDoc]);
+    mockChain(Villager as unknown as { find: FindMock }, []);
+    mockChain(Monster as unknown as { find: FindMock }, []);
+    mockStartLoadout(null);
+    mockTownConfig(null);
+
+    const res = await GET();
+    const body = await res.json();
+    expect(body.items["weapons.ron"]).not.toContain("buy_price");
+    expect(body.items["weapons.ron"]).not.toContain("sell_price");
+  });
+
   it("EnterNpcFov 트리거도 mongo doc → RON 응답에 정확히 직렬화된다", async () => {
     // HoldingItemInNpcFov 의 동기 variant. 같은 누락 패턴 회귀를 한 번에 막는다.
     const questDoc = {

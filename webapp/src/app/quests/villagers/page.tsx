@@ -40,6 +40,14 @@ interface FormState {
    * 측 fallback default 6 사용). 정수 → 그 값으로 override.
    */
   vendorVisionRadius: string;
+  /**
+   * 상점 인벤토리 — vendor 가 판매할 item id 목록 (vendor=true 일 때만 의미).
+   *   null         → 키 미저장 (SHOP_CATALOG 하드코딩 fallback, phase 2).
+   *   []           → 명시적 빈 상점.
+   *   [...]        → 그 id 목록만 판매.
+   * UI 는 체크박스로 "fallback 사용"(null) vs "직접 지정"(배열) 모드 토글.
+   */
+  vendorInventory: string[] | null;
 }
 
 // `homeZone` UI 태그 — Town 또는 Named.
@@ -82,6 +90,7 @@ const emptyForm: FormState = {
   homeLandmark: "random",
   freeRoam: false,
   vendorVisionRadius: "",
+  vendorInventory: null,
 };
 
 /**
@@ -115,6 +124,9 @@ function hexToRgb01(hex: string): [number, number, number] {
   return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
 }
 
+/** vendorInventory 멀티셀렉트 입력 옵션 — `/api/quests/items` 의 doc 일부만 사용. */
+interface ItemOption { id: string; displayName: string; kind: string }
+
 export default function VillagersPage() {
   const [list, setList] = useState<VillagerDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +137,9 @@ export default function VillagersPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [townConfig, setTownConfig] = useState<TownConfig>(TOWN_CONFIG_DEFAULTS);
+  // 모든 item — vendorInventory 멀티셀렉트 옵션. /api/quests/items 에서 한 번 로드.
+  // load 실패 시 빈 배열 → 멀티셀렉트가 비어 있어도 입력은 가능 (자유 텍스트 fallback).
+  const [allItems, setAllItems] = useState<ItemOption[]>([]);
   const { showInfo } = useInfoDialog();
 
   // home_landmark select 의 옵션 set — Town config 의 selected landmark + Random/Road.
@@ -196,6 +211,20 @@ export default function VillagersPage() {
       .catch(() => { /* default 유지 */ });
   }, []);
 
+  // 모든 item 목록 한 번 로드 — vendorInventory 멀티셀렉트 옵션. fetch 실패는 무시(빈 옵션).
+  useEffect(() => {
+    fetch("/api/quests/items")
+      .then((r) => r.json())
+      .then((j) => {
+        const arr = (j.data ?? []) as Array<{ id?: unknown; displayName?: unknown; kind?: unknown }>;
+        const opts: ItemOption[] = arr
+          .filter((d) => typeof d.id === "string" && typeof d.displayName === "string" && typeof d.kind === "string")
+          .map((d) => ({ id: d.id as string, displayName: d.displayName as string, kind: d.kind as string }));
+        setAllItems(opts);
+      })
+      .catch(() => { /* 빈 옵션 유지 */ });
+  }, []);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!createForm.id.trim() || !createForm.name.trim()) return;
@@ -217,6 +246,9 @@ export default function VillagersPage() {
         vendorVisionRadius: createForm.vendor
           ? parseVendorVisionRadius(createForm.vendorVisionRadius)
           : null,
+        // vendorInventory: null → fallback (SHOP_CATALOG), 배열 → 명시.
+        //   vendor=false 면 null 강제 (의미 없는 값 저장 방지).
+        vendorInventory: createForm.vendor ? createForm.vendorInventory : null,
       }),
     });
     if (res.ok) {
@@ -247,6 +279,8 @@ export default function VillagersPage() {
         vendorVisionRadius: editForm.vendor
           ? parseVendorVisionRadius(editForm.vendorVisionRadius)
           : null,
+        // vendorInventory: null → 필드 제거 (SHOP_CATALOG fallback), 배열 → 명시.
+        vendorInventory: editForm.vendor ? editForm.vendorInventory : null,
       }),
     });
     if (res.ok) {
@@ -304,6 +338,8 @@ export default function VillagersPage() {
         typeof v.vendorVisionRadius === "number"
           ? String(v.vendorVisionRadius)
           : "",
+      // vendorInventory: 배열은 그대로 — null/undefined → "fallback 사용" 모드.
+      vendorInventory: Array.isArray(v.vendorInventory) ? [...v.vendorInventory] : null,
     });
   }
 
@@ -362,7 +398,7 @@ export default function VillagersPage() {
           onSubmit={handleCreate}
           className="mb-6 p-4 border rounded-lg bg-gray-50 dark:bg-gray-900 space-y-2"
         >
-          <FormFields form={createForm} setForm={setCreateForm} idEditable allowedLandmarks={allowedLandmarks} />
+          <FormFields form={createForm} setForm={setCreateForm} idEditable allowedLandmarks={allowedLandmarks} allItems={allItems} />
           <div className="flex gap-2">
             <button type="submit" className="px-3 py-1 text-sm rounded bg-blue-600 text-white">
               생성
@@ -451,7 +487,7 @@ export default function VillagersPage() {
               </div>
               {editingId === v.id && (
                 <div className="p-3 bg-white dark:bg-gray-950 space-y-2">
-                  <FormFields form={editForm} setForm={setEditForm} idEditable={false} allowedLandmarks={allowedLandmarks} />
+                  <FormFields form={editForm} setForm={setEditForm} idEditable={false} allowedLandmarks={allowedLandmarks} allItems={allItems} />
                   <button
                     onClick={() => handleSave(v.id)}
                     className="px-3 py-1 text-sm rounded bg-blue-600 text-white"
@@ -477,12 +513,15 @@ function FormFields({
   setForm,
   idEditable,
   allowedLandmarks,
+  allItems,
 }: {
   form: FormState;
   setForm: (f: FormState) => void;
   idEditable: boolean;
   /** home_landmark select 에 노출할 옵션 set. Town config 의 selected landmark + Random/Road. */
   allowedLandmarks: Set<HomeLandmark>;
+  /** vendorInventory 멀티셀렉트 옵션 (모든 item). */
+  allItems: ItemOption[];
 }) {
   const inputCls = "border rounded px-2 py-1 text-sm w-full bg-white dark:bg-gray-800";
   return (
@@ -659,6 +698,67 @@ function FormFields({
           className={`${inputCls} resize-y font-mono text-xs`}
         />
       </label>
+
+      {/*
+        vendor_inventory — vendor 가 판매할 item id 목록. vendor=true 일 때만 노출.
+          null  → SHOP_CATALOG 하드코딩 fallback (phase 2, 기본 동작).
+          []    → 명시적 빈 상점.
+          [...] → 그 id 목록만 판매.
+        UI 는 체크박스로 "fallback 모드" / "직접 지정 모드" 토글.
+      */}
+      {form.vendor && (
+        <fieldset className="flex flex-col gap-1 border-t pt-2 mt-2">
+          <legend className="text-xs text-gray-500">vendor_inventory (판매 아이템 목록)</legend>
+          <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
+            <input
+              type="checkbox"
+              aria-label="vendor_inventory_override"
+              checked={form.vendorInventory !== null}
+              onChange={(e) =>
+                setForm({ ...form, vendorInventory: e.target.checked ? [] : null })
+              }
+            />
+            <span>
+              직접 지정 <span className="text-gray-400">(체크 해제 = SHOP_CATALOG 하드코딩 fallback)</span>
+            </span>
+          </label>
+          {form.vendorInventory !== null && (
+            <div className="flex flex-col gap-1 mt-1 max-h-64 overflow-y-auto border rounded p-2 bg-white dark:bg-gray-900">
+              {allItems.length === 0 ? (
+                <span className="text-xs text-gray-400">item 카탈로그가 비어 있습니다.</span>
+              ) : (
+                allItems.map((it) => {
+                  const checked = (form.vendorInventory ?? []).includes(it.id);
+                  return (
+                    <label key={it.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        aria-label={`vendor_item_${it.id}`}
+                        checked={checked}
+                        onChange={(e) => {
+                          const cur = form.vendorInventory ?? [];
+                          const next = e.target.checked
+                            ? [...cur, it.id]
+                            : cur.filter((x) => x !== it.id);
+                          setForm({ ...form, vendorInventory: next });
+                        }}
+                      />
+                      <span className="px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-mono">
+                        {it.kind}
+                      </span>
+                      <span className="font-mono text-gray-400">{it.id}</span>
+                      <span>{it.displayName}</span>
+                    </label>
+                  );
+                })
+              )}
+              <span className="text-[10px] text-gray-400 mt-1">
+                선택 {form.vendorInventory.length}개 · 빈 배열 = 명시적 빈 상점
+              </span>
+            </div>
+          )}
+        </fieldset>
+      )}
     </div>
   );
 }

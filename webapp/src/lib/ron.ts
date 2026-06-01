@@ -1564,6 +1564,15 @@ function serializeVillagerDef(v: VillagerDef): string {
   if (v.vendorVisionRadius !== undefined && v.vendorVisionRadius !== null) {
     lines.push(`        vendor_vision_radius: Some(${v.vendorVisionRadius}),`);
   }
+  // vendor_inventory — Option<Vec<String>>. 게임 측 SHOP_CATALOG fallback 과 명시적
+  // 빈 상점([]) 을 구분해야 하므로 undefined 만 미출력, [] 도 명시적으로 Some([]) 출력.
+  //   undefined → 키 생략   → 게임 측 SHOP_CATALOG fallback (phase 2)
+  //   []        → Some([])  → 명시적 빈 상점
+  //   [...]     → Some([…]) → 그 id 목록만 판매
+  if (v.vendorInventory !== undefined) {
+    const ids = v.vendorInventory.map((id) => q(id)).join(", ");
+    lines.push(`        vendor_inventory: Some([${ids}]),`);
+  }
   lines.push(`    ),`);
   return lines.join("\n");
 }
@@ -1629,6 +1638,24 @@ function serializeItemCommon(item: ItemDef): string[] {
   return lines;
 }
 
+/**
+ * 상점 가격 필드 (buyPrice/sellPrice) 직렬화. 모든 kind 공통.
+ * undefined/null → 키 미출력 (게임 측 `#[serde(default)] None` 미러).
+ * 정수 → `Some(N)` 출력.
+ *
+ * 모든 kind 의 serializer 뒤쪽(공통 끝)에서 동일 형식으로 추가하도록 별도 함수화.
+ */
+function serializeShopPriceLines(item: ItemDef): string[] {
+  const out: string[] = [];
+  if (item.buyPrice !== undefined && item.buyPrice !== null) {
+    out.push(`        buy_price: Some(${item.buyPrice}),`);
+  }
+  if (item.sellPrice !== undefined && item.sellPrice !== null) {
+    out.push(`        sell_price: Some(${item.sellPrice}),`);
+  }
+  return out;
+}
+
 function arrayWrap(structName: string, lines: string[][]): string {
   if (lines.length === 0) return "[]\n";
   const out = ["["];
@@ -1645,6 +1672,7 @@ export function serializeQuestItemsRon(items: Extract<ItemDef, { kind: "quest" }
   return arrayWrap("QuestItemDef", items.map((i) => [
     ...serializeItemCommon(i),
     `        image_path: ${q(i.imagePath)},`,
+    ...serializeShopPriceLines(i),
   ]));
 }
 
@@ -1663,6 +1691,7 @@ export function serializeWeaponsRon(items: Extract<ItemDef, { kind: "weapon" }>[
       if (i.tier !== undefined) lines.push(`        tier: ${i.tier},`);
     }
     lines.push(`        element: ${i.element == null ? "None" : `Some(${q(i.element)})`},`);
+    lines.push(...serializeShopPriceLines(i));
     return lines;
   }));
 }
@@ -1679,6 +1708,7 @@ export function serializeArmorsRon(items: Extract<ItemDef, { kind: "armor" }>[])
       lines.push(`        defense_bonus: ${i.defenseBonus},`);
       if (i.tier !== undefined) lines.push(`        tier: ${i.tier},`);
     }
+    lines.push(...serializeShopPriceLines(i));
     return lines;
   }));
 }
@@ -1687,6 +1717,7 @@ export function serializeConsumablesRon(items: Extract<ItemDef, { kind: "consuma
   return arrayWrap("ConsumableDef", items.map((i) => [
     ...serializeItemCommon(i),
     `        effect: ${i.effect.type}(${i.effect.amount}),`,
+    ...serializeShopPriceLines(i),
   ]));
 }
 
@@ -1700,6 +1731,7 @@ export function serializeAccessoriesRon(items: Extract<ItemDef, { kind: "accesso
     if (i.effects !== undefined) {
       lines.push(`        effects: [${i.effects.join(", ")}],`);
     }
+    lines.push(...serializeShopPriceLines(i));
     return lines;
   }));
 }

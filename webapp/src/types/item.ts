@@ -46,6 +46,17 @@ interface ItemBase {
    * `#[serde(default)]` 미러 — 누락은 false (기존 RON 호환).
    */
   hidden?: boolean;
+  /**
+   * 상점 시스템 — vendor → player 매수가. undefined/null 이면 비매물(비매품).
+   * 게임 측 `Option<u32>` 미러. 누락 시 게임 측에서 SHOP_CATALOG fallback (phase 2).
+   * 음수 불가, 0 은 무료 판매로 의미적 허용.
+   */
+  buyPrice?: number;
+  /**
+   * 상점 시스템 — player → vendor 매도가. undefined/null 이면 buyPrice/2 자동.
+   * 게임 측 `Option<u32>` 미러. 누락 시 게임 측 default 추론.
+   */
+  sellPrice?: number;
 }
 
 // 무기/방어구의 랜덤 스탯 모드 — 게임이 RON 에 attack_power_min/max + tier 를 두고

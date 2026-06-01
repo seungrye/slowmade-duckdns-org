@@ -45,6 +45,11 @@ export async function POST(req: NextRequest) {
           || body.vendorVisionRadius < 0)) {
     return apiError("vendorVisionRadius 는 0 이상의 정수 또는 null 이어야 합니다.", 400);
   }
+  if (body.vendorInventory !== undefined && body.vendorInventory !== null
+      && !(Array.isArray(body.vendorInventory)
+           && body.vendorInventory.every((v: unknown) => typeof v === "string"))) {
+    return apiError("vendorInventory 는 문자열 배열 또는 null 이어야 합니다.", 400);
+  }
 
   const existing = await Villager.findOne({ id: body.id });
   if (existing) return apiError(`이미 존재하는 villager id 입니다: ${body.id}`, 409);
@@ -65,6 +70,9 @@ export async function POST(req: NextRequest) {
     freeRoam: body.freeRoam ?? false,
     // vendorVisionRadius — null/미지정 시 schema default(null) → 게임 측 fallback (6).
     vendorVisionRadius: body.vendorVisionRadius ?? null,
+    // vendorInventory — undefined → schema default (undefined, 키 미저장) → SHOP_CATALOG fallback.
+    //   [] → 명시적 빈 상점. [...] → 그 id 목록만. null → 미저장 (undefined 동치).
+    ...(Array.isArray(body.vendorInventory) ? { vendorInventory: body.vendorInventory } : {}),
   });
 
   return apiSuccess(villager, 201);

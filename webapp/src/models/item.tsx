@@ -50,6 +50,13 @@ const ItemSchema = new Schema(
     // 유효 값: "RevealGuardVision" | "RevealTrapsInSight" | "RevealVendorVision" (types/item.ts AccessoryEffect 와 동기).
     effects: { type: [String], default: undefined },
 
+    // 상점 시스템 (모든 kind 공통) — game 측 `Option<u32>` 미러.
+    // buyPrice 누락 → 비매물 (vendor 가 판매 인벤토리에 노출 X, phase 2 게임 측에서 필터).
+    // sellPrice 누락 → 게임 측에서 buyPrice/2 자동 계산.
+    // default: undefined — Mongoose 가 doc 에 키 자체를 넣지 않게 해 RON serializer 가 미출력으로 처리.
+    buyPrice: { type: Number, default: undefined },
+    sellPrice: { type: Number, default: undefined },
+
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -76,6 +83,8 @@ export interface ItemDoc {
   effect?: { type: "Heal"; amount: number };
   desc?: string;
   effects?: string[];
+  buyPrice?: number;
+  sellPrice?: number;
   version: number;
   createdAt: Date;
   updatedAt: Date;

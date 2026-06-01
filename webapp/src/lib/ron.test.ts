@@ -1996,3 +1996,197 @@ describe("quest RON — Phase 2: FOV 트리거 + 텔레포트/회수 액션", ()
     expect(ron).not.toContain("Auto(");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 상점 시스템 — buyPrice / sellPrice (Item) + vendorInventory (Villager)
+//
+// 게임 측 phase 2 에서 SHOP_CATALOG 하드코딩을 DB-driven 으로 전환하기 위한
+// webapp 측 데이터 + RON 직렬화. 모든 신규 필드는 Option<...> 으로 누락 호환.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("serializeWeaponsRon — buyPrice/sellPrice (상점 가격)", () => {
+  const baseCommon = {
+    displayName: "철검",
+    glyphAscii: "/",
+    glyphGameIcon: "X",
+    pickupMessage: "철검을 획득했다!",
+  };
+
+  it("Weapon 에 buyPrice 있으면 RON 에 buy_price: Some(N) 출력", () => {
+    const w: Extract<import("@/types/item").ItemDef, { kind: "weapon" }> = {
+      kind: "weapon",
+      id: "iron_sword",
+      ...baseCommon,
+      attackPower: 10,
+      element: null,
+      buyPrice: 100,
+    };
+    const ron = serializeWeaponsRon([w]);
+    expect(ron).toContain("buy_price: Some(100)");
+  });
+
+  it("Weapon 에 buyPrice 없으면 buy_price 필드 자체 출력 안 함", () => {
+    const w: Extract<import("@/types/item").ItemDef, { kind: "weapon" }> = {
+      kind: "weapon",
+      id: "iron_sword",
+      ...baseCommon,
+      attackPower: 10,
+      element: null,
+    };
+    const ron = serializeWeaponsRon([w]);
+    expect(ron).not.toContain("buy_price");
+  });
+
+  it("Weapon 에 sellPrice 있으면 sell_price: Some(N) 출력", () => {
+    const w: Extract<import("@/types/item").ItemDef, { kind: "weapon" }> = {
+      kind: "weapon",
+      id: "iron_sword",
+      ...baseCommon,
+      attackPower: 10,
+      element: null,
+      buyPrice: 100,
+      sellPrice: 70,
+    };
+    const ron = serializeWeaponsRon([w]);
+    expect(ron).toContain("sell_price: Some(70)");
+  });
+
+  it("Weapon 에 sellPrice 없으면 sell_price 필드 자체 출력 안 함", () => {
+    const w: Extract<import("@/types/item").ItemDef, { kind: "weapon" }> = {
+      kind: "weapon",
+      id: "iron_sword",
+      ...baseCommon,
+      attackPower: 10,
+      element: null,
+      buyPrice: 100,
+    };
+    const ron = serializeWeaponsRon([w]);
+    expect(ron).not.toContain("sell_price");
+  });
+});
+
+describe("serializeArmorsRon / serializeConsumablesRon / serializeAccessoriesRon / serializeQuestItemsRon — buyPrice/sellPrice", () => {
+  it("Armor buy_price / sell_price 직렬화", () => {
+    const a: Extract<import("@/types/item").ItemDef, { kind: "armor" }> = {
+      kind: "armor",
+      id: "leather_armor",
+      displayName: "가죽 갑옷",
+      glyphAscii: "]",
+      glyphGameIcon: "X",
+      pickupMessage: "획득",
+      defenseBonus: 2,
+      buyPrice: 60,
+      sellPrice: 30,
+    };
+    const ron = serializeArmorsRon([a]);
+    expect(ron).toContain("buy_price: Some(60)");
+    expect(ron).toContain("sell_price: Some(30)");
+  });
+
+  it("Consumable buy_price 직렬화", () => {
+    const c: Extract<import("@/types/item").ItemDef, { kind: "consumable" }> = {
+      kind: "consumable",
+      id: "health_potion",
+      displayName: "체력 물약",
+      glyphAscii: "!",
+      glyphGameIcon: "❤",
+      pickupMessage: "획득",
+      effect: { type: "Heal", amount: 8 },
+      buyPrice: 25,
+    };
+    const ron = serializeConsumablesRon([c]);
+    expect(ron).toContain("buy_price: Some(25)");
+    expect(ron).not.toContain("sell_price");
+  });
+
+  it("Accessory buy_price / sell_price 직렬화", () => {
+    const a: Extract<import("@/types/item").ItemDef, { kind: "accessory" }> = {
+      kind: "accessory",
+      id: "scout_lens",
+      displayName: "올빼미 안경",
+      glyphAscii: "o",
+      glyphGameIcon: "o",
+      pickupMessage: "획득",
+      desc: "잠입 전용.",
+      buyPrice: 200,
+      sellPrice: 100,
+    };
+    const ron = serializeAccessoriesRon([a]);
+    expect(ron).toContain("buy_price: Some(200)");
+    expect(ron).toContain("sell_price: Some(100)");
+  });
+
+  it("QuestItem buy_price / sell_price 직렬화 (quest item 도 통일 schema)", () => {
+    const q: Extract<import("@/types/item").ItemDef, { kind: "quest" }> = {
+      kind: "quest",
+      id: "eternal_gem",
+      displayName: "영원의 보석",
+      glyphAscii: "*",
+      glyphGameIcon: "◆",
+      pickupMessage: "획득",
+      imagePath: "scene/open-chest.png",
+      buyPrice: 5000,
+    };
+    const ron = serializeQuestItemsRon([q]);
+    expect(ron).toContain("buy_price: Some(5000)");
+  });
+
+  it("Armor 의 buyPrice/sellPrice 모두 없으면 두 키 다 미출력", () => {
+    const a: Extract<import("@/types/item").ItemDef, { kind: "armor" }> = {
+      kind: "armor",
+      id: "leather_armor",
+      displayName: "가죽 갑옷",
+      glyphAscii: "]",
+      glyphGameIcon: "X",
+      pickupMessage: "획득",
+      defenseBonus: 2,
+    };
+    const ron = serializeArmorsRon([a]);
+    expect(ron).not.toContain("buy_price");
+    expect(ron).not.toContain("sell_price");
+  });
+});
+
+describe("serializeVillagersRon — vendorInventory (상점 아이템 목록)", () => {
+  it("Villager 에 vendorInventory 있으면 vendor_inventory: Some([...]) 출력", () => {
+    const v: import("@/types/villager").VillagerDef = {
+      id: "shopkeeper",
+      name: "상점 주인",
+      color: [0.6, 0.4, 0.2],
+      dialogs: [],
+      speed: 0.5,
+      vendor: true,
+      vendorInventory: ["health_potion", "iron_sword"],
+    };
+    const ron = serializeVillagersRon([v]);
+    expect(ron).toContain("vendor_inventory: Some([");
+    expect(ron).toContain('"health_potion"');
+    expect(ron).toContain('"iron_sword"');
+  });
+
+  it("Villager 에 vendorInventory 없으면 vendor_inventory 필드 출력 안 함", () => {
+    const v: import("@/types/villager").VillagerDef = {
+      id: "elder",
+      name: "장로",
+      color: [0.9, 0.8, 0.5],
+      dialogs: [],
+      speed: 0.5,
+    };
+    const ron = serializeVillagersRon([v]);
+    expect(ron).not.toContain("vendor_inventory");
+  });
+
+  it("Villager vendorInventory 빈 배열이면 vendor_inventory: Some([]) (None 과 의미 다름)", () => {
+    const v: import("@/types/villager").VillagerDef = {
+      id: "empty_shop",
+      name: "빈 가게",
+      color: [0.5, 0.5, 0.5],
+      dialogs: [],
+      speed: 0.5,
+      vendor: true,
+      vendorInventory: [],
+    };
+    const ron = serializeVillagersRon([v]);
+    expect(ron).toContain("vendor_inventory: Some([])");
+  });
+});

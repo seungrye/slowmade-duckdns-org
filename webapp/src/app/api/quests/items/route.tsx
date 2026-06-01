@@ -39,6 +39,14 @@ export async function POST(req: NextRequest) {
     glyphGameIcon: body.glyphGameIcon,
     pickupMessage: body.pickupMessage,
   };
+  // 상점 가격 (모든 kind 공통) — 0 이상의 정수만 저장. 누락 시 키 자체 미저장 →
+  // RON 응답에서 미출력(게임 측 #[serde(default)] None 미러).
+  if (typeof body.buyPrice === "number" && Number.isFinite(body.buyPrice) && body.buyPrice >= 0) {
+    doc.buyPrice = body.buyPrice;
+  }
+  if (typeof body.sellPrice === "number" && Number.isFinite(body.sellPrice) && body.sellPrice >= 0) {
+    doc.sellPrice = body.sellPrice;
+  }
   if (body.kind === "quest") doc.imagePath = body.imagePath;
   else if (body.kind === "weapon") {
     doc.attackPower = body.attackPower;

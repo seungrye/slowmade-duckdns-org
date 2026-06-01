@@ -17,6 +17,9 @@ function snapshot(item: Record<string, unknown>): Record<string, unknown> {
     glyphGameIcon: item.glyphGameIcon,
     pickupMessage: item.pickupMessage,
   };
+  // 상점 가격 — 있으면 revision 에 보존, 없으면 키 미저장(이전 동작 호환).
+  if (item.buyPrice !== undefined) snap.buyPrice = item.buyPrice;
+  if (item.sellPrice !== undefined) snap.sellPrice = item.sellPrice;
   switch (item.kind) {
     case "quest":      snap.imagePath = item.imagePath; break;
     case "weapon":
@@ -87,6 +90,20 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (body.glyphAscii !== undefined) item.glyphAscii = body.glyphAscii;
   if (body.glyphGameIcon !== undefined) item.glyphGameIcon = body.glyphGameIcon;
   if (body.pickupMessage !== undefined) item.pickupMessage = body.pickupMessage;
+
+  // 상점 가격 — null 명시 시 필드 제거 (비매물로 되돌리기). 양수/0 만 저장.
+  if (body.buyPrice !== undefined) {
+    if (body.buyPrice === null) item.buyPrice = undefined;
+    else if (typeof body.buyPrice === "number" && Number.isFinite(body.buyPrice) && body.buyPrice >= 0) {
+      item.buyPrice = body.buyPrice;
+    }
+  }
+  if (body.sellPrice !== undefined) {
+    if (body.sellPrice === null) item.sellPrice = undefined;
+    else if (typeof body.sellPrice === "number" && Number.isFinite(body.sellPrice) && body.sellPrice >= 0) {
+      item.sellPrice = body.sellPrice;
+    }
+  }
 
   switch (item.kind) {
     case "quest":

@@ -34,6 +34,16 @@ interface FormState {
   desc: string;
   /** 액세서리 효과 키 — 빈 배열은 효과 없는 장식용. */
   effects: AccessoryEffect[];
+  /**
+   * 상점 매수가 (vendor → player). 빈 문자열 → 비매물(키 미저장).
+   * 정수 → Some(N) 으로 RON 출력 → 게임 측 상점 인벤토리에 노출.
+   */
+  buyPrice: number | "";
+  /**
+   * 상점 매도가 (player → vendor). 빈 문자열 → buyPrice/2 자동 (게임 측 추론).
+   * 정수 → Some(N) 으로 RON 출력 → 그 값으로 vendor 가 매입.
+   */
+  sellPrice: number | "";
 }
 
 const emptyForm: FormState = {
@@ -52,6 +62,8 @@ const emptyForm: FormState = {
   effectAmount: 0,
   desc: "",
   effects: [],
+  buyPrice: "",
+  sellPrice: "",
 };
 
 export default function ItemsPage() {
@@ -98,6 +110,9 @@ export default function ItemsPage() {
       glyphAscii: item.glyphAscii,
       glyphGameIcon: item.glyphGameIcon,
       pickupMessage: item.pickupMessage,
+      // 상점 가격 — 빈 문자열은 "키 없음" (비매물 / 매도가 자동 추론).
+      buyPrice: item.buyPrice ?? "",
+      sellPrice: item.sellPrice ?? "",
     };
     if (item.kind === "quest") f.imagePath = item.imagePath;
     else if (item.kind === "weapon") {
@@ -129,6 +144,19 @@ export default function ItemsPage() {
       pickupMessage: form.pickupMessage,
     };
     if (includeId) { body.id = form.id; body.kind = form.kind; }
+    // 상점 가격 — 모든 kind 공통.
+    //   POST(생성): 빈 문자열은 body 에 키 자체 안 포함 → schema 가 키 미저장.
+    //   PUT(수정): 빈 문자열은 null 로 보내 명시적 "필드 제거" 신호 → 비매물 복귀 가능.
+    if (form.buyPrice === "") {
+      if (!includeId) body.buyPrice = null;
+    } else {
+      body.buyPrice = Number(form.buyPrice);
+    }
+    if (form.sellPrice === "") {
+      if (!includeId) body.sellPrice = null;
+    } else {
+      body.sellPrice = Number(form.sellPrice);
+    }
     switch (form.kind) {
       case "quest":      body.imagePath = form.imagePath; break;
       case "weapon": {
@@ -763,6 +791,49 @@ function FormFields({
           </fieldset>
         </>
       )}
+
+      {/*
+        상점 가격 — 모든 kind 공통.
+          buyPrice 빈칸: 비매물 (vendor 가 자동 인벤토리에 넣지 않음).
+          sellPrice 빈칸: 게임 측에서 buyPrice/2 로 자동 계산.
+        RON 출력 시 buy_price/sell_price 가 Some(N) 또는 미출력으로 직렬화된다.
+      */}
+      <fieldset className="flex flex-col gap-1 border-t pt-2 mt-2">
+        <legend className="text-xs text-gray-500">상점 가격 (phase 2 vendor 시스템)</legend>
+        <div className="flex gap-2 flex-wrap items-end">
+          <label className="flex flex-col gap-1 w-32">
+            <span className="text-xs text-gray-500">buy_price (vendor → player)</span>
+            <input
+              type="number"
+              aria-label="buy_price"
+              min={0}
+              step={1}
+              value={form.buyPrice}
+              onChange={(e) => setForm({ ...form, buyPrice: e.target.value === "" ? "" : Number(e.target.value) })}
+              placeholder="(없으면 비매물)"
+              title="비워두면 vendor 가 판매하지 않는다."
+              className={inputCls}
+            />
+          </label>
+          <label className="flex flex-col gap-1 w-32">
+            <span className="text-xs text-gray-500">sell_price (player → vendor)</span>
+            <input
+              type="number"
+              aria-label="sell_price"
+              min={0}
+              step={1}
+              value={form.sellPrice}
+              onChange={(e) => setForm({ ...form, sellPrice: e.target.value === "" ? "" : Number(e.target.value) })}
+              placeholder="(없으면 buy_price/2)"
+              title="비워두면 게임 측에서 buy_price/2 로 자동 추론."
+              className={inputCls}
+            />
+          </label>
+          <span className="text-[10px] text-gray-400">
+            buy_price 비우면 비매물 · sell_price 비우면 buy_price/2 자동
+          </span>
+        </div>
+      </fieldset>
     </div>
   );
 }

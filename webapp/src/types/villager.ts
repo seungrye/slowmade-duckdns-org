@@ -104,6 +104,20 @@ export interface VillagerDef {
    * 게임 측 `#[serde(default)] vendor_vision_radius: Option<u32>` 미러.
    */
   vendorVisionRadius?: number | null;
+  /**
+   * 상점 인벤토리 — 이 vendor 가 판매할 아이템 id 목록.
+   * - `undefined` (필드 누락) → 게임 측 SHOP_CATALOG 하드코딩 fallback (phase 2).
+   * - `[]` (빈 배열) → 명시적 빈 상점 (None 과 의미가 다름).
+   * - `[...]` → 그 id 목록의 아이템만 판매 (item buyPrice 가 None 이면 게임 측에서 제외).
+   *
+   * 게임 측 RON 직렬화는 `Option<Vec<String>>` 으로 표현:
+   *   - undefined → 필드 생략
+   *   - []        → `vendor_inventory: Some([])`
+   *   - [...]     → `vendor_inventory: Some([...])`
+   *
+   * `vendor: false` 인 NPC 에서는 의미 없음 (게임 측에서 무시).
+   */
+  vendorInventory?: string[];
 }
 
 export interface VillagerDocument extends VillagerDef {

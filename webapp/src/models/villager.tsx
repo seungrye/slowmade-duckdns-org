@@ -59,6 +59,12 @@ const VillagerSchema = new Schema(
     // 정수 (>= 0) → 그 vendor 만 해당 반경 적용 (예: market_owner = 2).
     // vendor=false 인 NPC 에서는 무시된다 (오버레이는 vendor 만 그린다).
     vendorVisionRadius: { type: Number, default: null },
+    // 상점 인벤토리 — vendor 가 판매할 item id 목록 (Option<Vec<String>>).
+    //   undefined → 키 미저장 → RON 에서 vendor_inventory 미출력 → 게임 측 SHOP_CATALOG fallback.
+    //   []        → 빈 배열 저장 → RON 에서 `vendor_inventory: Some([])` 출력 → 명시적 빈 상점.
+    //   [...]     → 그 id 목록 저장 → RON 에서 `vendor_inventory: Some([...])` 출력.
+    // default: undefined — Mongoose 가 doc 에 키 자체를 넣지 않게 해 RON serializer 가 미출력 처리.
+    vendorInventory: { type: [String], default: undefined },
     version: { type: Number, default: 1 },
   },
   { timestamps: true }
@@ -81,6 +87,11 @@ export interface VillagerDoc {
    * 게임 측 `Option<u32>` 미러 (Schema default = null).
    */
   vendorVisionRadius: number | null;
+  /**
+   * 상점 인벤토리 — vendor 가 판매할 item id 목록 (Option<Vec<String>>).
+   * undefined → 게임 측 SHOP_CATALOG fallback. [] → 빈 상점. [...] → 그 id 목록만.
+   */
+  vendorInventory?: string[];
   version: number;
   createdAt: Date;
   updatedAt: Date;

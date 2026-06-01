@@ -102,9 +102,23 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
     glyphGameIcon: d.glyphGameIcon as string,
     pickupMessage: d.pickupMessage as string,
   };
+  // 상점 가격 필드 (buyPrice/sellPrice) — 모든 kind 공통. 누락 시 키 자체 미존재 →
+  // RON 응답에서 buy_price/sell_price 미출력 (게임 측 #[serde(default)] None 미러).
+  // 음수/비숫자 등 잘못된 값은 안전망으로 무시 — DB invariant 가 보장하지 않을 수 있으므로.
+  function applyPrices<T extends { buyPrice?: number; sellPrice?: number }>(out: T): T {
+    if (typeof d.buyPrice === "number" && Number.isFinite(d.buyPrice) && d.buyPrice >= 0) {
+      out.buyPrice = d.buyPrice;
+    }
+    if (typeof d.sellPrice === "number" && Number.isFinite(d.sellPrice) && d.sellPrice >= 0) {
+      out.sellPrice = d.sellPrice;
+    }
+    return out;
+  }
   switch (d.kind) {
     case "quest":
-      return { kind: "quest", ...base, imagePath: (d.imagePath as string) ?? "" };
+      return applyPrices<Extract<ItemDef, { kind: "quest" }>>({
+        kind: "quest", ...base, imagePath: (d.imagePath as string) ?? "",
+      });
     case "weapon": {
       const w: Extract<ItemDef, { kind: "weapon" }> = {
         kind: "weapon", ...base,
@@ -114,7 +128,7 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
       if (typeof d.attackPowerMin === "number") w.attackPowerMin = d.attackPowerMin;
       if (typeof d.attackPowerMax === "number") w.attackPowerMax = d.attackPowerMax;
       if (typeof d.tier === "number") w.tier = d.tier;
-      return w;
+      return applyPrices(w);
     }
     case "armor": {
       const a: Extract<ItemDef, { kind: "armor" }> = {
@@ -123,14 +137,14 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
       if (typeof d.defenseBonusMin === "number") a.defenseBonusMin = d.defenseBonusMin;
       if (typeof d.defenseBonusMax === "number") a.defenseBonusMax = d.defenseBonusMax;
       if (typeof d.tier === "number") a.tier = d.tier;
-      return a;
+      return applyPrices(a);
     }
     case "consumable":
-      return {
+      return applyPrices<Extract<ItemDef, { kind: "consumable" }>>({
         kind: "consumable",
         ...base,
         effect: (d.effect as { type: "Heal"; amount: number }) ?? { type: "Heal", amount: 0 },
-      };
+      });
     case "accessory": {
       const a: Extract<ItemDef, { kind: "accessory" }> = {
         kind: "accessory",
@@ -147,7 +161,7 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
         );
         a.effects = filtered;
       }
-      return a;
+      return applyPrices(a);
     }
     default:
       throw new Error(`Unknown item kind: ${String(d.kind)}`);
@@ -175,6 +189,12 @@ function toVillagerDef(d: Record<string, unknown>): VillagerDef {
   //   명시 시 그 vendor 만 그 반경 적용 (예: market_owner = 2). serializer 가 Some(N) 출력.
   //   이 매핑이 빠지면 mongo 값이 RON 응답에 안 실려 게임이 영원히 fallback 으로 동작한다.
   if (typeof d.vendorVisionRadius === "number") v.vendorVisionRadius = d.vendorVisionRadius;
+  // vendorInventory — Option<Vec<String>>. 명시적 빈 상점([]) 과 SHOP_CATALOG fallback
+  // (undefined) 구분. Array.isArray 만으로 분기해 빈 배열도 보존.
+  // 유효 id 만 필터(string 화) — 잘못된 DB 값 안전망.
+  if (Array.isArray(d.vendorInventory)) {
+    v.vendorInventory = d.vendorInventory.filter((x): x is string => typeof x === "string");
+  }
   return v;
 }
 
