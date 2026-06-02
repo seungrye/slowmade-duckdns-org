@@ -8,6 +8,23 @@ import type { ZoneDocument } from "@/types/zone";
 import { NpcCombobox } from "./npc-combobox";
 import { ItemCombobox } from "./item-combobox";
 import { ZoneCombobox } from "./zone-combobox";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Props {
   actions: Action[];
@@ -15,6 +32,12 @@ interface Props {
   villagers?: VillagerDocument[];
   items?: ItemDocument[];
   zones?: ZoneDocument[];
+}
+
+// ── 순서 재배치 헬퍼 (단위 테스트용 export) ──────────────────────────────────
+export function reorderActions<T>(items: T[], from: number, to: number): T[] {
+  if (from === to) return items;
+  return arrayMove(items, from, to);
 }
 
 // ── 액션 타입 초기값 ──────────────────────────────────────────────────────────
@@ -532,26 +555,99 @@ function ActionRow({
   );
 }
 
-// ── ActionEditor ──────────────────────────────────────────────────────────────
+// ── SortableActionRow — ActionRow 를 dnd-kit useSortable 로 감싸는 wrapper ───
 
-export function ActionEditor({ actions, onChange, villagers = [], items = [], zones = [] }: Props) {
+function SortableActionRow({
+  id,
+  action,
+  onChange,
+  onRemove,
+  villagers,
+  items,
+  zones,
+}: {
+  id: string;
+  action: Action;
+  onChange: (a: Action) => void;
+  onRemove: () => void;
+  villagers: VillagerDocument[];
+  items: ItemDocument[];
+  zones: ZoneDocument[];
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
   return (
-    <div className="space-y-1">
-      {actions.map((action, i) => (
+    <div ref={setNodeRef} style={style} className="flex gap-1 items-stretch">
+      <button
+        {...attributes}
+        {...listeners}
+        type="button"
+        aria-label="드래그로 순서 변경"
+        className="cursor-grab text-zinc-400 hover:text-zinc-200 px-1 select-none touch-none flex items-center text-xs"
+      >
+        ⋮⋮
+      </button>
+      <div className="flex-1 min-w-0">
         <ActionRow
-          key={i}
           action={action}
+          onChange={onChange}
+          onRemove={onRemove}
           villagers={villagers}
           items={items}
           zones={zones}
-          onChange={(a) => {
-            const next = [...actions];
-            next[i] = a;
-            onChange(next);
-          }}
-          onRemove={() => onChange(actions.filter((_, j) => j !== i))}
         />
-      ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ActionEditor ──────────────────────────────────────────────────────────────
+
+export function ActionEditor({ actions, onChange, villagers = [], items = [], zones = [] }: Props) {
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  // 각 action 에 안정적인 id — index 기반 (배열 reorder 시 변하지만 dnd-kit 충분)
+  const ids = actions.map((_, i) => `action-${i}`);
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = ids.indexOf(String(active.id));
+    const to = ids.indexOf(String(over.id));
+    if (from !== -1 && to !== -1) {
+      onChange(reorderActions(actions, from, to));
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+          {actions.map((action, i) => (
+            <SortableActionRow
+              key={ids[i]}
+              id={ids[i]}
+              action={action}
+              villagers={villagers}
+              items={items}
+              zones={zones}
+              onChange={(a) => {
+                const next = [...actions];
+                next[i] = a;
+                onChange(next);
+              }}
+              onRemove={() => onChange(actions.filter((_, j) => j !== i))}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
       <button
         onClick={() => onChange([...actions, { type: "Log", text: "" }])}
         className="text-xs text-blue-500 hover:text-blue-700"

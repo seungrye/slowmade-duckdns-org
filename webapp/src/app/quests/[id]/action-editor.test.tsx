@@ -1,9 +1,52 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ActionEditor } from './action-editor';
+import { ActionEditor, reorderActions } from './action-editor';
+import type { Action } from '@/types/quest';
 
 const noop = vi.fn();
+
+describe('ActionEditor — 순서 변경 (drag-and-drop)', () => {
+  it('각 액션 카드에 drag-handle (aria-label=드래그/순서) 가 노출된다', () => {
+    const actions: Action[] = [
+      { type: 'Log', text: 'first' },
+      { type: 'GiveItem', itemId: 'potion' },
+      { type: 'RemoveItem', itemId: 'key' },
+    ];
+    render(<ActionEditor actions={actions} onChange={noop} />);
+    const handles = screen.getAllByRole('button', { name: /순서|drag/i });
+    expect(handles.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('reorderActions 가 0 → 2 이동 시 배열을 정확히 재배치한다', () => {
+    const actions: Action[] = [
+      { type: 'Log', text: 'A' },
+      { type: 'Log', text: 'B' },
+      { type: 'Log', text: 'C' },
+    ];
+    const result = reorderActions(actions, 0, 2);
+    expect(result.map((a) => (a as { text: string }).text)).toEqual(['B', 'C', 'A']);
+  });
+
+  it('reorderActions 가 같은 index 면 원본 그대로', () => {
+    const actions: Action[] = [
+      { type: 'Log', text: 'A' },
+      { type: 'Log', text: 'B' },
+    ];
+    const result = reorderActions(actions, 1, 1);
+    expect(result).toEqual(actions);
+  });
+
+  it('reorderActions 가 마지막 → 처음 이동 시 정확', () => {
+    const actions: Action[] = [
+      { type: 'Log', text: 'A' },
+      { type: 'Log', text: 'B' },
+      { type: 'Log', text: 'C' },
+    ];
+    const result = reorderActions(actions, 2, 0);
+    expect(result.map((a) => (a as { text: string }).text)).toEqual(['C', 'A', 'B']);
+  });
+});
 
 describe('ActionEditor — SetFlag', () => {
   it('SetFlag 액션의 두 입력 필드가 렌더된다', () => {
