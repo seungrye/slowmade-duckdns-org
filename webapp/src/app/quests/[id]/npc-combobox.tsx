@@ -34,6 +34,7 @@ export function NpcCombobox({
           list={listId}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onPointerDown={(e) => e.stopPropagation()}
           placeholder={placeholder}
           className={`flex-1 min-w-0 border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800 ${className}`}
         />

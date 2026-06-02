@@ -70,6 +70,11 @@ function emptyAction(type: Action["type"]): Action {
 const inputCls = "w-full border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800";
 const halfCls = "flex-1 min-w-0 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800";
 
+// dnd-kit drag listener 는 카드 wrapper 에 부착되어 있어 input/button 클릭 시
+// pointerdown 이 wrapper 까지 버블링되면 focus 가 안 됨. interactive 요소에서
+// stopPropagation 으로 차단.
+const stopPropagation = (e: React.PointerEvent) => e.stopPropagation();
+
 // placement select 의 "(기본)" 옵션 — undefined 와 명시적 InsideRoom 구분
 const PLACEMENT_DEFAULT = "__default__";
 type PlacementSelectValue = typeof PLACEMENT_DEFAULT | PortalPlacement["type"];
@@ -108,6 +113,7 @@ function ActionRow({
         <select
           value={action.type}
           onChange={(e) => onChange(emptyAction(e.target.value as Action["type"]))}
+          onPointerDown={stopPropagation}
           className="flex-1 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
         >
           <option value="Log">Log</option>
@@ -129,7 +135,7 @@ function ActionRow({
           <option value="SpawnMonster">SpawnMonster (몬스터 스폰)</option>
           <option value="SpawnItem">SpawnItem (런타임 아이템 스폰)</option>
         </select>
-        <button onClick={onRemove} className="text-red-400 hover:text-red-600 text-xs px-1">
+        <button onClick={onRemove} onPointerDown={stopPropagation} className="text-red-400 hover:text-red-600 text-xs px-1">
           ✕
         </button>
       </div>
@@ -138,6 +144,7 @@ function ActionRow({
         <textarea
           value={action.text}
           onChange={(e) => onChange({ ...action, text: e.target.value })}
+          onPointerDown={stopPropagation}
           rows={2}
           placeholder="출력할 텍스트"
           className="w-full border rounded px-1 py-0.5 text-xs resize-none"
@@ -168,6 +175,7 @@ function ActionRow({
             min={1}
             value={action.count}
             onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+            onPointerDown={stopPropagation}
             placeholder="수량"
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
@@ -189,6 +197,7 @@ function ActionRow({
             min={1}
             value={action.count ?? 1}
             onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+            onPointerDown={stopPropagation}
             placeholder="수량"
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
@@ -209,12 +218,14 @@ function ActionRow({
           <input
             value={action.flag}
             onChange={(e) => onChange({ ...action, flag: e.target.value })}
+            onPointerDown={stopPropagation}
             placeholder="flag"
             className={halfCls}
           />
           <input
             value={action.value}
             onChange={(e) => onChange({ ...action, value: e.target.value })}
+            onPointerDown={stopPropagation}
             placeholder="value"
             className={halfCls}
           />
@@ -225,6 +236,7 @@ function ActionRow({
         <input
           value={action.flag}
           onChange={(e) => onChange({ ...action, flag: e.target.value })}
+          onPointerDown={stopPropagation}
           placeholder="flag 이름"
           className={inputCls}
         />
@@ -256,6 +268,7 @@ function ActionRow({
           <input
             value={action.generator}
             onChange={(e) => onChange({ ...action, generator: e.target.value })}
+            onPointerDown={stopPropagation}
             placeholder="생성기 (bsp / forest / cellular_automata 등)"
             className={inputCls}
           />
@@ -269,6 +282,7 @@ function ActionRow({
                 onChange({ ...action, placement: next });
               }
             }}
+            onPointerDown={stopPropagation}
             className={inputCls}
           >
             <option value={PLACEMENT_DEFAULT}>(기본 — InsideRoom, 직렬화 시 생략)</option>
@@ -286,6 +300,7 @@ function ActionRow({
                 ...action,
                 placement: { type: "NearGiver", radius: Number(e.target.value) },
               })}
+              onPointerDown={stopPropagation}
               placeholder="radius"
               className={inputCls}
             />
@@ -308,6 +323,7 @@ function ActionRow({
               if (t === "Town") onChange({ ...action, target: { type: "Town" } });
               else onChange({ ...action, target: { type: "Named", id: "mountain_village" } });
             }}
+            onPointerDown={stopPropagation}
             className={inputCls}
           >
             <option value="Town">Town (시작 마을)</option>
@@ -331,6 +347,7 @@ function ActionRow({
                 onChange({ ...action, placement: next });
               }
             }}
+            onPointerDown={stopPropagation}
             className={inputCls}
           >
             <option value={PLACEMENT_DEFAULT}>(기본 — Border, 직렬화 시 생략)</option>
@@ -348,6 +365,7 @@ function ActionRow({
                 ...action,
                 placement: { type: "NearGiver", radius: Number(e.target.value) },
               })}
+              onPointerDown={stopPropagation}
               placeholder="radius"
               className={inputCls}
             />
@@ -359,6 +377,7 @@ function ActionRow({
         <input
           value={action.zone}
           onChange={(e) => onChange({ ...action, zone: e.target.value })}
+          onPointerDown={stopPropagation}
           placeholder="존 ID"
           className={inputCls}
         />
@@ -370,6 +389,7 @@ function ActionRow({
           min={1}
           value={action.count}
           onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+          onPointerDown={stopPropagation}
           placeholder="경비병 수"
           className={inputCls}
         />
@@ -381,6 +401,7 @@ function ActionRow({
             <select
               value={action.kind}
               onChange={(e) => onChange({ ...action, kind: e.target.value as TrapKind })}
+              onPointerDown={stopPropagation}
               className={halfCls}
             >
               <option value="Spike">Spike</option>
@@ -393,6 +414,7 @@ function ActionRow({
               min={1}
               value={action.count}
               onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+              onPointerDown={stopPropagation}
               placeholder="개수"
               className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
             />
@@ -402,6 +424,7 @@ function ActionRow({
               type="checkbox"
               checked={action.hidden}
               onChange={(e) => onChange({ ...action, hidden: e.target.checked })}
+              onPointerDown={stopPropagation}
             />
             hidden (숨김 함정)
           </label>
@@ -414,6 +437,7 @@ function ActionRow({
             type="number"
             value={action.radius}
             onChange={(e) => onChange({ ...action, radius: Number(e.target.value) })}
+            onPointerDown={stopPropagation}
             placeholder="반경"
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
@@ -422,6 +446,7 @@ function ActionRow({
               type="checkbox"
               checked={action.terrain}
               onChange={(e) => onChange({ ...action, terrain: e.target.checked })}
+              onPointerDown={stopPropagation}
             />
             지형 파괴
           </label>
@@ -429,6 +454,7 @@ function ActionRow({
             type="number"
             value={action.entityDamage}
             onChange={(e) => onChange({ ...action, entityDamage: Number(e.target.value) })}
+            onPointerDown={stopPropagation}
             placeholder="피해"
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
@@ -440,6 +466,7 @@ function ActionRow({
           <input
             value={action.monsterId}
             onChange={(e) => onChange({ ...action, monsterId: e.target.value })}
+            onPointerDown={stopPropagation}
             placeholder="몬스터 id (예: frost_wyrm)"
             className={halfCls}
           />
@@ -448,6 +475,7 @@ function ActionRow({
             min={1}
             value={action.count}
             onChange={(e) => onChange({ ...action, count: Number(e.target.value) })}
+            onPointerDown={stopPropagation}
             placeholder="수량"
             className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
           />
@@ -478,6 +506,7 @@ function ActionRow({
                 onChange({ ...action, zone: { type: "Named", id: "mountain_village" } });
               }
             }}
+            onPointerDown={stopPropagation}
             className={inputCls}
           >
             <option value="__current__">(현재 zone — 기본)</option>
@@ -506,6 +535,7 @@ function ActionRow({
                 onChange({ ...action, landmark: v as HomeLandmark });
               }
             }}
+            onPointerDown={stopPropagation}
             className={inputCls}
           >
             <option value="__none__">(landmark 없음 — zone 임의 floor)</option>
@@ -528,6 +558,7 @@ function ActionRow({
                   onChange({ ...action, vendorDistanceMin: Number(raw) });
                 }
               }}
+              onPointerDown={stopPropagation}
               placeholder="vendor 최소거리 (manhattan, 비우면 무제한)"
               className={halfCls}
             />
@@ -545,6 +576,7 @@ function ActionRow({
                   onChange({ ...action, count: Number(raw) });
                 }
               }}
+              onPointerDown={stopPropagation}
               placeholder="수량 (기본 1)"
               className="w-20 border rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-800"
             />
@@ -580,27 +612,26 @@ function SortableActionRow({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+  // 카드 전체가 drag handle — ⋮⋮ grip 제거. wrapper 에 cursor-grab + attributes/listeners.
+  // 내부 input/select/textarea/button 은 onPointerDown stopPropagation 으로 wrapper 까지
+  // 이벤트가 올라가지 않게 막아 focus / 값 변경이 정상 동작.
   return (
-    <div ref={setNodeRef} style={style} className="flex gap-1 items-stretch">
-      <button
-        {...attributes}
-        {...listeners}
-        type="button"
-        aria-label="드래그로 순서 변경"
-        className="cursor-grab text-zinc-400 hover:text-zinc-200 px-1 select-none touch-none flex items-center text-xs"
-      >
-        ⋮⋮
-      </button>
-      <div className="flex-1 min-w-0">
-        <ActionRow
-          action={action}
-          onChange={onChange}
-          onRemove={onRemove}
-          villagers={villagers}
-          items={items}
-          zones={zones}
-        />
-      </div>
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-sortable-card
+      className="cursor-grab active:cursor-grabbing touch-none"
+      {...attributes}
+      {...listeners}
+    >
+      <ActionRow
+        action={action}
+        onChange={onChange}
+        onRemove={onRemove}
+        villagers={villagers}
+        items={items}
+        zones={zones}
+      />
     </div>
   );
 }
@@ -609,7 +640,9 @@ function SortableActionRow({
 
 export function ActionEditor({ actions, onChange, villagers = [], items = [], zones = [] }: Props) {
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    // activationConstraint distance: 8 — 8px 이상 이동 시에만 drag 시작.
+    // 단순 클릭은 drag 로 인식되지 않아 카드 안 input/button 클릭 동작 보존.
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 

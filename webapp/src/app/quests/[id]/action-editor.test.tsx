@@ -7,15 +7,34 @@ import type { Action } from '@/types/quest';
 const noop = vi.fn();
 
 describe('ActionEditor — 순서 변경 (drag-and-drop)', () => {
-  it('각 액션 카드에 drag-handle (aria-label=드래그/순서) 가 노출된다', () => {
-    const actions: Action[] = [
-      { type: 'Log', text: 'first' },
-      { type: 'GiveItem', itemId: 'potion' },
-      { type: 'RemoveItem', itemId: 'key' },
-    ];
-    render(<ActionEditor actions={actions} onChange={noop} />);
-    const handles = screen.getAllByRole('button', { name: /순서|drag/i });
-    expect(handles.length).toBeGreaterThanOrEqual(3);
+  it('카드 전체에 cursor-grab 스타일이 적용된다', () => {
+    // SortableActionRow 의 wrapper div 에 className 포함 'cursor-grab' 또는 'cursor-move'
+    const actions: Action[] = [{ type: 'Log', text: 'first' }];
+    const { container } = render(<ActionEditor actions={actions} onChange={() => {}} />);
+    const card = container.querySelector('[data-sortable-card]');
+    expect(card?.className).toMatch(/cursor-(grab|move)/);
+  });
+
+  it('카드 안 input 의 onPointerDown 이 stopPropagation 된다', () => {
+    // input 에 onPointerDown handler 가 존재 + 호출 시 stopPropagation
+    const actions: Action[] = [{ type: 'Log', text: 'first' }];
+    const { container } = render(<ActionEditor actions={actions} onChange={() => {}} />);
+    // Log 액션의 textarea 가 stopPropagation 처리되어야 함
+    const textarea = container.querySelector('textarea');
+    expect(textarea).not.toBeNull();
+    // pointerdown 이벤트 시뮬레이션 + stopPropagation 확인 — jsdom 에 PointerEvent 없어서 Event 로 대체
+    const event = new Event('pointerdown', { bubbles: true, cancelable: true });
+    const stopSpy = vi.spyOn(event, 'stopPropagation');
+    textarea!.dispatchEvent(event);
+    expect(stopSpy).toHaveBeenCalled();
+  });
+
+  it('⋮⋮ grip 핸들이 더 이상 렌더되지 않는다', () => {
+    const actions: Action[] = [{ type: 'Log', text: 'first' }];
+    const { container } = render(<ActionEditor actions={actions} onChange={() => {}} />);
+    expect(container.textContent).not.toContain('⋮⋮');
+    // aria-label "드래그로 순서 변경" 도 없음
+    expect(container.querySelector('[aria-label*="드래그"]')).toBeNull();
   });
 
   it('reorderActions 가 0 → 2 이동 시 배열을 정확히 재배치한다', () => {
