@@ -10,7 +10,31 @@ vi.mock('@/lib/env', () => ({
     geminiApiKey: 'test-key',
     siteUrl: 'https://test.example.com',
     points: { newComment: 1 },
+    minio: {
+      endpoint: 'cdn.example.com',
+      accessKey: 'ak',
+      secretKey: 'sk',
+      bucket: 'public',
+      port: undefined,
+    },
+    enjiImage: {
+      dailyLimit: 50,
+    },
   },
+}));
+
+const mockGenerateImage = vi.fn();
+const mockTryConsume = vi.fn();
+vi.mock('@/lib/enji/imageGen', async () => {
+  const actual: typeof import('@/lib/enji/imageGen') = await vi.importActual('@/lib/enji/imageGen');
+  return {
+    ...actual,
+    generateImage: (...args: unknown[]) => mockGenerateImage(...args),
+  };
+});
+vi.mock('@/lib/enji/quota', () => ({
+  tryConsumeDailyQuota: (...args: unknown[]) => mockTryConsume(...args),
+  todayKey: () => '2026-06-05',
 }));
 
 const mockCommentSave = vi.fn();
@@ -72,6 +96,11 @@ describe('/api/enji POST', () => {
     mockCommentSave.mockResolvedValue(undefined);
     mockGenerateContent.mockResolvedValue({ text: 'enji 테스트 응답' });
     mockAuth.mockResolvedValue({ user: { name: 'Test', email: 'test@test.com' } });
+    mockGenerateImage.mockResolvedValue({
+      key: 'enji-images/test.jpg',
+      url: 'https://cdn.example.com/public/enji-images/test.jpg',
+    });
+    mockTryConsume.mockResolvedValue(true);
   });
 
   it('미로그인 사용자면 401 반환', async () => {
@@ -216,5 +245,92 @@ describe('/api/enji POST', () => {
 
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('/image 명령어 요청은 generateImage 를 호출하고 이미지 댓글을 저장한다', async () => {
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '/image a cat',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    // Gemini 는 호출되지 않아야 함
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+
+    // 일일 한도 체크 → generateImage → 댓글 저장
+    expect(mockTryConsume).toHaveBeenCalledTimes(1);
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    const [promptArg] = mockGenerateImage.mock.calls[0];
+    expect(promptArg).toBe('a cat');
+
+    // userComment + enji 이미지 댓글 = 2회
+    expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('일일 한도 초과 시 generateImage 를 호출하지 않고 안내 댓글을 저장한다', async () => {
+    mockTryConsume.mockResolvedValueOnce(false);
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '/image a cat',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    // userComment + 안내 댓글
+    expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('Pollinations 실패 시 안내 댓글을 저장한다', async () => {
+    mockGenerateImage.mockRejectedValueOnce(new Error('Pollinations 502'));
+
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '/image something',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    // userComment + 안내 댓글
+    expect(mockCommentSave).toHaveBeenCalledTimes(2);
+  });
+
+  it('한국어 prompt 가 정확히 전달된다', async () => {
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '/image 한국 마을 광장 도트 픽셀 아트',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const [promptArg] = mockGenerateImage.mock.calls[0];
+    expect(promptArg).toBe('한국 마을 광장 도트 픽셀 아트');
+  });
+
+  it('일반 채팅 메시지는 기존 Gemini 흐름 유지 (이미지 흐름 미진입)', async () => {
+    const res = await POST(makeRequest({
+      postId: 'post-id',
+      content: '@enji-bot 안녕',
+      anonid: 'test1234',
+    }));
+    expect(res.status).toBe(201);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(mockTryConsume).not.toHaveBeenCalled();
+    expect(mockGenerateImage).not.toHaveBeenCalled();
+    expect(mockGenerateContent).toHaveBeenCalled();
   });
 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import * as Minio from 'minio';
 import { auth } from '@/auth';
 import { apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
@@ -8,6 +9,22 @@ import User from '@/models/user';
 import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
 import { nanoid } from 'nanoid';
+import { parseImageCommand, generateImage } from '@/lib/enji/imageGen';
+import { tryConsumeDailyQuota } from '@/lib/enji/quota';
+
+let _minioClient: Minio.Client | null = null;
+function getMinioClient(): Minio.Client {
+  if (!_minioClient) {
+    _minioClient = new Minio.Client({
+      endPoint: env.minio.endpoint,
+      port: env.minio.port,
+      useSSL: true,
+      accessKey: env.minio.accessKey,
+      secretKey: env.minio.secretKey,
+    });
+  }
+  return _minioClient;
+}
 
 const ENJI_SYSTEM_PROMPT = `당신은 "enji-bot"입니다. 유머 콘텐츠 사이트의 AI 비서입니다.
 - 친근하고 유쾌한 말투로 한국어로 답변합니다.
@@ -72,7 +89,12 @@ async function callGemini(contextMessage: string): Promise<string> {
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
-async function saveEnjiComment(postId: string, parentId: string, text: string) {
+async function saveEnjiComment(
+  postId: string,
+  parentId: string,
+  text: string,
+  extras?: { imageUrl?: string; imagePrompt?: string },
+) {
   const enjiComment = new Comment({
     post: postId,
     parent: parentId,
@@ -80,9 +102,58 @@ async function saveEnjiComment(postId: string, parentId: string, text: string) {
     author: 'enji-bot',
     authorId: null,
     isEnji: true,
+    imageUrl: extras?.imageUrl ?? null,
+    imagePrompt: extras?.imagePrompt ?? null,
   });
   await enjiComment.save();
   return enjiComment;
+}
+
+/**
+ * `/image <prompt>` 처리 — Pollinations.AI 호출 + MinIO 업로드 + enji 댓글 저장.
+ * route 의 finalize 단계를 백그라운드로 돌리기 위해 별도 export.
+ */
+async function handleImageCommand(
+  prompt: string,
+  postId: string,
+  parentCommentId: string,
+): Promise<void> {
+  try {
+    const allowed = await tryConsumeDailyQuota(env.enjiImage.dailyLimit);
+    if (!allowed) {
+      await saveEnjiComment(
+        postId,
+        parentCommentId,
+        `오늘의 이미지 생성 한도(${env.enjiImage.dailyLimit}장)를 모두 사용했어요. 내일 다시 시도해 주세요.`,
+      );
+      return;
+    }
+
+    const result = await generateImage(prompt, {
+      minioClient: getMinioClient(),
+      bucket: env.minio.bucket,
+      endpoint: env.minio.endpoint,
+    });
+
+    await saveEnjiComment(
+      postId,
+      parentCommentId,
+      `🎨 "${prompt}" 생성 완료`,
+      { imageUrl: result.url, imagePrompt: prompt },
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[enji-image] failed:', msg);
+    try {
+      await saveEnjiComment(
+        postId,
+        parentCommentId,
+        '죄송해요, 이미지 생성에 실패했어요. 잠시 후 다시 시도해 주세요.',
+      );
+    } catch (saveErr) {
+      console.error('[enji-image] failed to save error comment:', saveErr);
+    }
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -136,6 +207,13 @@ export async function POST(req: NextRequest) {
 
   const userComment = new Comment({ post: postId, parent: parentId, content, author, authorId });
   await userComment.save();
+
+  // `/image <prompt>` 명령어 분기 — Gemini 대신 Pollinations 이미지 생성 흐름.
+  const imageCmd = parseImageCommand(content);
+  if (imageCmd) {
+    void handleImageCommand(imageCmd.prompt, postId, String(userComment._id));
+    return NextResponse.json({ success: true, data: { userComment } }, { status: 201 });
+  }
 
   const recentComments = await Comment.find({ post: postId, isDeleted: false })
     .sort({ createdAt: -1 })

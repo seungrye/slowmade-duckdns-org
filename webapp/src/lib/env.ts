@@ -45,6 +45,11 @@ export const env = {
 
   siteUrl: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
+
+  enjiImage: {
+    // 사이트 전체 일일 한도 (Pollinations 비용 X, 남용 방지용)
+    dailyLimit: intEnv('ENJI_IMAGE_DAILY_LIMIT', 50),
+  },
 } as const;
 
 export function validateEnv(): void {

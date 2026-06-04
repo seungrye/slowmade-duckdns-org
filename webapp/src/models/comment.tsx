@@ -11,6 +11,8 @@ const CommentSchema = new mongoose.Schema(
       createdAt: { type: Date, default: Date.now }, // 작성일
       isDeleted: { type: Boolean, default: false },  // 삭제 플래그 추가
       isEnji: { type: Boolean, default: false },
+      imageUrl: { type: String, default: null }, // enji-bot 이미지 생성 결과 URL (MinIO public URL)
+      imagePrompt: { type: String, default: null }, // 원본 prompt (검색/디버깅용)
     },
     { timestamps: true }
   );

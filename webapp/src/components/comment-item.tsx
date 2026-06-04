@@ -65,6 +65,28 @@ export default function CommentItem({
               </span>
             </div>
             <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{c.content}</p>
+            {c.imageUrl && (
+              <div className="mt-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={c.imageUrl}
+                  alt={c.imagePrompt ?? 'enji-bot 생성 이미지'}
+                  className="max-w-full md:max-w-md rounded-lg border border-purple-200 dark:border-purple-800"
+                  loading="lazy"
+                />
+                <div className="mt-1 flex items-center gap-2 text-xs text-purple-600 dark:text-purple-400">
+                  <span aria-label="AI 생성">✨ AI 생성</span>
+                  <a
+                    href={c.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
+                    원본 보기
+                  </a>
+                </div>
+              </div>
+            )}
             {session?.user && (
               <button
                 className="text-sm text-purple-600 hover:underline mt-2"

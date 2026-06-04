@@ -102,6 +102,11 @@ export default function CommentInput({
           onKeyDown={handleKeyDown}
           onClick={handleChange}
         />
+        {mentions.includes('enji-bot') && (
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            💡 <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">/image &lt;설명&gt;</code> 으로 enji-bot 이미지 생성
+          </p>
+        )}
         {suggestions.length > 0 && (
           <ul
             role="listbox"

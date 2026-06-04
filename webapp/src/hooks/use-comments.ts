@@ -63,7 +63,8 @@ export function useComments(postId: string) {
       localStorage.setItem('anonid-token', anonidToken);
     }
 
-    const isEnjiCall = parentIsEnji === true || /@enji-bot/i.test(content);
+    const isImageCmd = /^\s*\/image\s+/i.test(content);
+    const isEnjiCall = parentIsEnji === true || /@enji-bot/i.test(content) || isImageCmd;
     const endpoint = isEnjiCall ? '/api/enji' : '/api/comments';
 
     try {
