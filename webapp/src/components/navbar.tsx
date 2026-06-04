@@ -22,6 +22,7 @@ import {
     MapPin,
     Skull,
     Gamepad2,
+    BookOpen,
 } from "lucide-react";
 
 const navLinks = [
@@ -43,6 +44,7 @@ const questLinks = [
     { href: "/quests/items", label: "Item 카탈로그", description: "아이템 정의 관리", icon: <Package size={20} /> },
     { href: "/quests/zones", label: "Zone 카탈로그", description: "Named 존 정의 관리", icon: <MapPin size={20} /> },
     { href: "/quests/monsters", label: "Monster 카탈로그", description: "몬스터 정의 관리", icon: <Skull size={20} /> },
+    { href: "/scenes", label: "씬 (web-adventure)", description: "Web-Adventure 씬 CMS", icon: <BookOpen size={20} /> },
 ];
 
 export default function Navbar() {
@@ -54,7 +56,11 @@ export default function Navbar() {
     const dropdownRef = useRef<HTMLLIElement>(null);
     const questDropdownRef = useRef<HTMLLIElement>(null);
 
-    const isQuestActive = pathname === "/quests" || pathname.startsWith("/quests/");
+    const isQuestActive =
+        pathname === "/quests"
+        || pathname.startsWith("/quests/")
+        || pathname === "/scenes"
+        || pathname.startsWith("/scenes/");
     const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
 
     // 모바일 메뉴 내부 collapsible 섹션 상태.
