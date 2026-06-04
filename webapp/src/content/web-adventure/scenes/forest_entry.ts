@@ -22,6 +22,13 @@ export const forestEntry: Scene = {
       onFailure: "forest_lost",
     },
     {
+      // 3 주차: 깊은 숲 (forest_inner) — 안경 분기로 이어진다.
+      kind: "plain",
+      id: "go_deeper",
+      label: "숲 안쪽으로 더 들어간다",
+      to: "forest_inner",
+    },
+    {
       kind: "plain",
       id: "back_from_forest",
       label: "왔던 길을 돌아간다",

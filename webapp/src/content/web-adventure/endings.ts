@@ -14,6 +14,11 @@ export const endingsMeta: Record<string, EndingMeta> = {
     epilogue:
       "산신령이 깨달음을 전한다. 너는 더 이상 마을의 너가 아니다 — 안개 너머의 너가 되었다.",
   },
+  goblin_friend: {
+    title: "도깨비의 친구 — 엔딩",
+    epilogue:
+      "도깨비가 너의 손을 잡았다. 마을의 길은 이제 너의 것이 아니다 — 동굴 속의 또 다른 세계가 너를 부른다.",
+  },
 };
 
 export function getEndingMeta(endingId: string): EndingMeta {

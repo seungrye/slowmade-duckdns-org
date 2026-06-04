@@ -64,8 +64,9 @@ describe("web-adventure 시나리오", () => {
 
     state = makeChoice(state, "sneak_storage", fixedRng);
     if (state.phase === "playing") {
+      // 3 주차: flag → item 으로 변경.
       expect(state.currentScene).toBe("market_storage_success");
-      expect(state.character.flags.hasSecretSnack).toBe(true);
+      expect(state.character.inventory).toContain("super_tintham_cracker");
     }
 
     state = makeChoice(state, "to_elder", fixedRng);
@@ -130,5 +131,60 @@ describe("web-adventure 시나리오", () => {
 
     state = makeChoice(state, "back", lowRng);
     if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+  });
+
+  // 3 주차 시나리오.
+
+  test("패시브 안경 보유 시 숲 깊은 곳 분기 진입 가능 (forest_inner_with_glasses)", () => {
+    // 1. 광장 → 숲 입구 → 깊은 숲 (forest_inner). 안경 사전 보유 (시작 인벤 강제 주입).
+    // 2. forest_inner 에서 conditional hasItem spirit_glasses 가 활성화 → forest_inner_with_glasses.
+    const char = makeTestCharacter({ wis: 5 });
+    char.inventory = ["spirit_glasses"];
+    let state: GameState = startGame(char);
+
+    state = makeChoice(state, "to_forest");
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_entry");
+
+    state = makeChoice(state, "go_deeper");
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_inner");
+
+    state = makeChoice(state, "see_with_glasses");
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_inner_with_glasses");
+
+    state = makeChoice(state, "meet_spirit_directly");
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("spirit");
+  });
+
+  test("동굴 진입 시 횃불 없으면 conditional 차단 (cave_inside 잠김)", () => {
+    let state: GameState = startGame(makeTestCharacter());
+
+    state = makeChoice(state, "to_cave");
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_entry");
+
+    // torch 없음 — enter_with_torch 차단. 상태 유지.
+    const before = state;
+    state = makeChoice(state, "enter_with_torch");
+    expect(state).toEqual(before);
+  });
+
+  test("도깨비 카리스마 12 성공 → goblin_charm 획득 → goblin_friend 엔딩", () => {
+    const highRng = () => 0.99;
+    const char = makeTestCharacter({ cha: 8 });
+    char.inventory = ["torch"];
+    let state: GameState = startGame(char);
+
+    state = makeChoice(state, "to_cave");
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_entry");
+
+    state = makeChoice(state, "enter_with_torch");
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_inside");
+
+    state = makeChoice(state, "meet_goblin", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("goblin_encounter");
+
+    state = makeChoice(state, "befriend_goblin", highRng);
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("goblin_friend");
   });
 });

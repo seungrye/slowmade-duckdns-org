@@ -173,7 +173,8 @@ describe("getUnavailableReason", () => {
     expect(reason).toContain("비밀 간식");
   });
 
-  test("hasItem 미충족 시 아이템 정보 포함", () => {
+  test("hasItem 미충족 시 아이템 정보 포함 (한글 라벨)", () => {
+    // 3 주차: itemId 가 카탈로그에 있으면 displayName 으로 표시.
     const choice: Choice = {
       kind: "conditional",
       id: "x",
@@ -183,6 +184,6 @@ describe("getUnavailableReason", () => {
     };
     const reason = getUnavailableReason(choice, makeTestCharacter());
     expect(reason).not.toBeNull();
-    expect(reason).toContain("torch");
+    expect(reason).toContain("횃불");
   });
 });

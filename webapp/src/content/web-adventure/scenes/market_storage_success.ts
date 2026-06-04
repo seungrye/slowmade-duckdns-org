@@ -20,5 +20,6 @@ export const marketStorageSuccess: Scene = {
       to: "elder_house_arrival",
     },
   ],
-  onEnter: { setFlags: { hasSecretSnack: true } },
+  // 3 주차: hasSecretSnack flag → super_tintham_cracker 아이템.
+  onEnter: { addItems: ["super_tintham_cracker"] },
 };

@@ -3,12 +3,16 @@
 // 액션:
 //   START_GAME — creating → playing
 //   MAKE_CHOICE — playing 에서 현재 씬의 choice 처리 (plain/probability/conditional)
+//   USE_ITEM — 인벤 consumable 사용 (HP 회복 + 소모) — 3 주차
+//   REROLL — 직전 probability 판정 재굴림 (rerollsLeft 소모) — 3 주차
 //   END_GAME — playing → ended (강제 종료)
+//   RESET — creating 으로 복귀
 //
 // 규칙:
 //   - 결과 씬이 isEnding=true 면 자동으로 ended phase 로 전환.
-//   - probability 액션은 rng (선택)을 받아 결정적 테스트가 가능하다.
-//   - 알 수 없는 액션 / 무효 입력 / 조건 미충족은 *상태 그대로* 반환.
+//   - probability 판정은 *effectiveStat* (패시브 포함) 으로 계산.
+//   - 인벤 cap 8 — addItems 초과분 무시.
+//   - rng 인자는 결정적 테스트 주입용.
 
 import type {
   Character,
@@ -19,17 +23,21 @@ import type {
   SceneRegistry,
 } from "@/types/web-adventure";
 import { rollProbability } from "./rollDice";
+import { effectiveStat } from "./stats";
+import { items, INVENTORY_CAP } from "@/content/web-adventure/items";
 
 export type Action =
   | { type: "START_GAME"; character: Character; startScene: string }
   | { type: "MAKE_CHOICE"; choiceId: string; rng?: () => number }
+  | { type: "USE_ITEM"; itemId: string }
+  | { type: "REROLL"; rng?: () => number }
   | { type: "END_GAME"; endingId: string }
   | { type: "RESET" };
 
 function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   switch (cond.kind) {
     case "minStat":
-      return character.stats[cond.stat] >= cond.min;
+      return effectiveStat(character, cond.stat) >= cond.min;
     case "hasItem":
       return character.inventory.includes(cond.itemId);
     case "flag":
@@ -37,7 +45,7 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   }
 }
 
-/** 씬 onEnter 적용 — setFlags / addItems 를 character 에 반영한 새 character 를 반환. */
+/** 씬 onEnter 적용 — setFlags / addItems 를 character 에 반영. cap 8 초과 시 초과분 무시. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
   const { setFlags, addItems } = scene.onEnter;
@@ -49,6 +57,7 @@ function applyOnEnter(character: Character, scene: Scene): Character {
   if (itemsChanged) {
     const merged = [...character.inventory];
     for (const it of addItems!) {
+      if (merged.length >= INVENTORY_CAP) break; // cap — 초과분 무시.
       if (!merged.includes(it)) merged.push(it);
     }
     nextInventory = merged;
@@ -88,15 +97,46 @@ function findChoice(scene: Scene, choiceId: string): Choice | undefined {
   return scene.choices.find((c) => c.id === choiceId);
 }
 
+/** 인벤에서 *최초 1 개* 만 제거. */
+function removeFirst(arr: string[], target: string): string[] {
+  const i = arr.indexOf(target);
+  if (i < 0) return arr;
+  return [...arr.slice(0, i), ...arr.slice(i + 1)];
+}
+
+/**
+ * 마지막 probability 결정 — REROLL 이 *직전 판정 씬* 으로 되돌아가 다시 굴리기 위한 메타.
+ * 단순 설계: state.log 마지막 entry 가 probability 판정이면 그 직전 씬 + choiceId 를 알 수 없으니,
+ * playing 상태에 *pendingReroll* 메타를 두는 대신, **방금 도달한 씬의 *역참조*** 로 처리.
+ *
+ * 더 단순: REROLL 은 *현재 씬* 으로 들어오기 *직전의 probability choice* 를 다시 굴린다.
+ * 이를 위해 playing 상태에 lastProbability 메타를 둔다.
+ */
+type PlayingState = Extract<GameState, { phase: "playing" }>;
+type LastProbability = {
+  prevSceneId: string;
+  choiceId: string;
+  stat: import("@/types/web-adventure").StatKey;
+  difficulty: number;
+  onSuccess: string;
+  onFailure: string;
+};
+
+// playing state 에 lastProbability 메타 부착 (옵셔널).
+// GameState 타입을 깨지 않고 런타임 필드만 추가 — Object spread 사용.
+type PlayingWithMeta = PlayingState & { lastProbability?: LastProbability };
+
 export function gameReducer(state: GameState, action: Action, scenes: SceneRegistry): GameState {
   switch (action.type) {
     case "START_GAME": {
       if (state.phase !== "creating") return state;
       const startScene = scenes[action.startScene];
       if (!startScene) return state;
+      // onEnter 적용 — 시작 씬에 onEnter 가 있을 수 있음 (3 주차+).
+      const startedCharacter = applyOnEnter(action.character, startScene);
       return {
         phase: "playing",
-        character: action.character,
+        character: startedCharacter,
         currentScene: action.startScene,
         log: [`게임 시작 — ${startScene.title}`],
       };
@@ -113,16 +153,33 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
         case "plain":
           return moveTo(state, choice.to, scenes, `선택: ${choice.label}`);
         case "probability": {
+          const statValue = effectiveStat(state.character, choice.stat);
           const result = rollProbability({
-            stat: state.character.stats[choice.stat],
+            stat: statValue,
             ability: state.character.ability,
             statKey: choice.stat,
             difficulty: choice.difficulty,
             rng: action.rng,
           });
           const target = result.success ? choice.onSuccess : choice.onFailure;
-          const logEntry = `${choice.label} — d20=${result.roll}+${state.character.stats[choice.stat]}(+${result.bonus}) vs ${choice.difficulty} → ${result.success ? "성공" : "실패"}`;
-          return moveTo(state, target, scenes, logEntry);
+          const logEntry = `${choice.label} — d20=${result.roll}+${statValue}(+${result.bonus}) vs ${choice.difficulty} → ${result.success ? "성공" : "실패"}`;
+          const next = moveTo(state, target, scenes, logEntry);
+          // probability 판정 결과를 *PlayingState* 라면 메타로 기록 (REROLL 용).
+          if (next.phase === "playing") {
+            const withMeta: PlayingWithMeta = {
+              ...next,
+              lastProbability: {
+                prevSceneId: state.currentScene,
+                choiceId: choice.id,
+                stat: choice.stat,
+                difficulty: choice.difficulty,
+                onSuccess: choice.onSuccess,
+                onFailure: choice.onFailure,
+              },
+            };
+            return withMeta;
+          }
+          return next;
         }
         case "conditional": {
           if (!evalCondition(choice.condition, state.character)) return state;
@@ -130,6 +187,61 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
         }
       }
       return state;
+    }
+
+    case "USE_ITEM": {
+      if (state.phase !== "playing") return state;
+      const item = items[action.itemId];
+      if (!item) return state;
+      if (item.kind !== "consumable") return state;
+      if (!state.character.inventory.includes(action.itemId)) return state;
+      const heal = item.heal ?? 0;
+      const nextHp = Math.min(state.character.maxHp, state.character.hp + heal);
+      return {
+        ...state,
+        character: {
+          ...state.character,
+          hp: nextHp,
+          inventory: removeFirst(state.character.inventory, action.itemId),
+        },
+        log: [...state.log, `사용: ${item.displayName} (+${heal} HP)`],
+      };
+    }
+
+    case "REROLL": {
+      if (state.phase !== "playing") return state;
+      const meta = (state as PlayingWithMeta).lastProbability;
+      if (!meta) return state;
+      if (state.character.rerollsLeft <= 0) return state;
+      // 이전 씬 으로 *복원* — 단, 실제 씬 전환은 필요 없음. 대신 *재굴림 결과로 다시 moveTo*.
+      const statValue = effectiveStat(state.character, meta.stat);
+      const result = rollProbability({
+        stat: statValue,
+        ability: state.character.ability,
+        statKey: meta.stat,
+        difficulty: meta.difficulty,
+        rng: action.rng,
+      });
+      const target = result.success ? meta.onSuccess : meta.onFailure;
+      // 재굴림은 prevSceneId 기준 으로 시뮬레이션 — log 에 재굴림 표시.
+      const logEntry = `재굴림 — d20=${result.roll}+${statValue}(+${result.bonus}) vs ${meta.difficulty} → ${result.success ? "성공" : "실패"}`;
+      // rerollsLeft -1 + 이전 씬 *복원* 한 state 를 base 로 다시 moveTo.
+      const reverted: PlayingState = {
+        ...state,
+        character: { ...state.character, rerollsLeft: state.character.rerollsLeft - 1 },
+        currentScene: meta.prevSceneId,
+      };
+      // moveTo 가 onEnter 를 *다시* 적용하므로, *이전 씬으로 복귀했다가* 다시 *재굴림 결과 씬* 으로 이동.
+      // 단, 직전 실패 씬의 onEnter 가 flag 를 부여한 경우 중복 적용 방지를 위해 log 만 append 후 moveTo.
+      const moved = moveTo(reverted, target, scenes, logEntry);
+      if (moved.phase === "playing") {
+        const withMeta: PlayingWithMeta = {
+          ...moved,
+          lastProbability: meta,
+        };
+        return withMeta;
+      }
+      return moved;
     }
 
     case "END_GAME": {

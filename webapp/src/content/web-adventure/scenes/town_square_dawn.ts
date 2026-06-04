@@ -21,5 +21,6 @@ export const townSquareDawn: Scene = {
       to: "elder_house_arrival",
     },
     { kind: "plain", id: "to_forest", label: "숲으로 향한다", to: "forest_entry" },
+    { kind: "plain", id: "to_cave", label: "산기슭 동굴로 향한다", to: "cave_entry" },
   ],
 };

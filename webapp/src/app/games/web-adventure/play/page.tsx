@@ -4,6 +4,7 @@ import { useReducer } from "react";
 import type { GameState } from "@/types/web-adventure";
 import { gameReducer, type Action } from "@/lib/web-adventure/engine/reducer";
 import { scenes, START_SCENE_ID } from "@/lib/web-adventure/engine/sceneRegistry";
+import { items } from "@/content/web-adventure/items";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
 import EndingScreen from "./EndingScreen";
@@ -12,14 +13,84 @@ import EndingScreen from "./EndingScreen";
 //
 // phase 별 렌더:
 //   creating → CharacterCreator
-//   playing  → SceneRenderer (현재 씬)
-//   ended    → EndingScreen (메타 + 최종 스탯 + 다시 시작)
+//   playing  → 상단 상태(HP/인벤/재굴림) + SceneRenderer
+//   ended    → EndingScreen
 
 const initialState: GameState = { phase: "creating" };
 
 function reducer(state: GameState, action: Action): GameState {
   return gameReducer(state, action, scenes);
 }
+
+/** 인벤토리 1 줄 표시 — 3 주차 간단 UI. 본격 사이드 패널은 5 주차. */
+function InventoryStrip({
+  inventory,
+  rerollsLeft,
+  hp,
+  maxHp,
+  onUseItem,
+  onReroll,
+  canReroll,
+}: {
+  inventory: string[];
+  rerollsLeft: number;
+  hp: number;
+  maxHp: number;
+  onUseItem: (itemId: string) => void;
+  onReroll: () => void;
+  canReroll: boolean;
+}) {
+  return (
+    <div className="rounded-md bg-amber-100/70 border border-amber-300 p-3 mb-3 text-sm">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 items-center">
+        <span>
+          HP <span className="font-mono font-bold">{hp}</span> / {maxHp}
+        </span>
+        <span>
+          재굴림{" "}
+          <span className="font-mono font-bold">{rerollsLeft}</span>
+        </span>
+        {canReroll && rerollsLeft > 0 && (
+          <button
+            type="button"
+            onClick={onReroll}
+            className="rounded bg-amber-700 text-amber-50 px-2 py-0.5 text-xs hover:bg-amber-800"
+          >
+            직전 판정 다시 굴리기
+          </button>
+        )}
+      </div>
+      {inventory.length === 0 ? (
+        <div className="mt-1 text-amber-700 italic">가방: 비어 있음</div>
+      ) : (
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
+          <span className="text-amber-800">가방:</span>
+          {inventory.map((id, idx) => {
+            const item = items[id];
+            if (!item) return <span key={`${id}-${idx}`}>{id}</span>;
+            return (
+              <span key={`${id}-${idx}`} className="inline-flex items-center gap-1">
+                <span>{item.displayName}</span>
+                {item.kind === "consumable" && (
+                  <button
+                    type="button"
+                    onClick={() => onUseItem(id)}
+                    className="rounded bg-amber-700 text-amber-50 px-1.5 py-0.5 text-xs hover:bg-amber-800"
+                    title={item.desc}
+                  >
+                    사용
+                  </button>
+                )}
+              </span>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+type PlayingMeta = GameState & { lastProbability?: unknown };
 
 export default function WebAdventurePlayPage() {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -29,7 +100,9 @@ export default function WebAdventurePlayPage() {
       <div className="max-w-2xl mx-auto">
         <header className="mb-4 text-center">
           <h1 className="text-2xl md:text-3xl font-bold">Web Adventure</h1>
-          <p className="text-xs text-amber-700 mt-1">2 주차 데모 — 5 씬 + 2 분기 + 2 엔딩</p>
+          <p className="text-xs text-amber-700 mt-1">
+            3 주차 데모 — 15 씬 + 인벤토리 + USE_ITEM + 재굴림
+          </p>
         </header>
 
         {state.phase === "creating" && (
@@ -41,11 +114,22 @@ export default function WebAdventurePlayPage() {
         )}
 
         {state.phase === "playing" && scenes[state.currentScene] && (
-          <SceneRenderer
-            scene={scenes[state.currentScene]}
-            character={state.character}
-            onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
-          />
+          <>
+            <InventoryStrip
+              inventory={state.character.inventory}
+              rerollsLeft={state.character.rerollsLeft}
+              hp={state.character.hp}
+              maxHp={state.character.maxHp}
+              onUseItem={(itemId) => dispatch({ type: "USE_ITEM", itemId })}
+              onReroll={() => dispatch({ type: "REROLL" })}
+              canReroll={Boolean((state as PlayingMeta).lastProbability)}
+            />
+            <SceneRenderer
+              scene={scenes[state.currentScene]}
+              character={state.character}
+              onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
+            />
+          </>
         )}
 
         {state.phase === "ended" && (

@@ -63,16 +63,16 @@ describe("gameReducer", () => {
 
   test("MAKE_CHOICE plain 액션이 isEnding 씬에 도달하면 ended 로 전환된다", () => {
     // 장로 집 도착 → 비밀 간식 보유 시 give_snack (conditional) → ending_main (isEnding=true)
+    // 3 주차: flag → hasItem super_tintham_cracker.
     const state: GameState = {
       phase: "playing",
       character: makeTestCharacter({}, "scholar"),
       currentScene: "elder_house_arrival",
       log: [],
     };
-    // flag 부여 — 직접 character.flags 수정.
-    const charWithFlag = { ...state.character, flags: { hasSecretSnack: true } };
+    const charWithItem = { ...state.character, inventory: ["super_tintham_cracker"] };
     const next = gameReducer(
-      { ...state, character: charWithFlag },
+      { ...state, character: charWithItem },
       { type: "MAKE_CHOICE", choiceId: "give_snack" },
       scenes as SceneRegistry,
     );
@@ -134,13 +134,14 @@ describe("gameReducer", () => {
   });
 
   test("MAKE_CHOICE conditional 조건 충족이면 to 씬으로 이동한다", () => {
-    const charWithFlag = {
+    // 3 주차: flag → hasItem super_tintham_cracker.
+    const charWithItem = {
       ...makeTestCharacter(),
-      flags: { hasSecretSnack: true },
+      inventory: ["super_tintham_cracker"],
     };
     const state: GameState = {
       phase: "playing",
-      character: charWithFlag,
+      character: charWithItem,
       currentScene: "elder_house_arrival",
       log: [],
     };
@@ -211,8 +212,8 @@ describe("gameReducer", () => {
 
   // 2 주차 추가 — onEnter / RESET / probability 실패 분기 + conditional 차단.
 
-  test("onEnter setFlags 가 목적지 씬 진입 시 character.flags 에 반영된다", () => {
-    // 시장에서 잠입 성공 → market_storage_success → setFlags: { hasSecretSnack: true }
+  test("onEnter addItems 가 목적지 씬 진입 시 character.inventory 에 반영된다", () => {
+    // 3 주차: market_storage_success → addItems: ["super_tintham_cracker"]
     const fixedRng = () => 0.99; // 높은 굴림 = 성공 강제
     const state: GameState = {
       phase: "playing",
@@ -228,7 +229,7 @@ describe("gameReducer", () => {
     expect(next.phase).toBe("playing");
     if (next.phase === "playing") {
       expect(next.currentScene).toBe("market_storage_success");
-      expect(next.character.flags.hasSecretSnack).toBe(true);
+      expect(next.character.inventory).toContain("super_tintham_cracker");
     }
   });
 
@@ -274,7 +275,7 @@ describe("gameReducer", () => {
   });
 
   test("conditional 차단: flag 없으면 give_snack 무시", () => {
-    // elder_house_arrival 의 give_snack 은 hasSecretSnack flag 필요.
+    // elder_house_arrival 의 give_snack 은 *hasItem super_tintham_cracker* 로 변경 (3 주차).
     const state: GameState = {
       phase: "playing",
       character: makeTestCharacter(),
@@ -288,5 +289,103 @@ describe("gameReducer", () => {
     );
     // 조건 미충족 → 상태 유지
     expect(next).toEqual(state);
+  });
+
+  // 3 주차 RED 추가.
+
+  test("hasItem 조건으로 super_tintham_cracker 보유 시 give_snack 가능 (flag 대체)", () => {
+    // market_storage_success 의 onEnter 가 addItems: ["super_tintham_cracker"] 로 변경.
+    // elder_house_arrival 의 give_snack 은 hasItem super_tintham_cracker 로 변경.
+    const charWithItem = {
+      ...makeTestCharacter(),
+      inventory: ["super_tintham_cracker"],
+    };
+    const state: GameState = {
+      phase: "playing",
+      character: charWithItem,
+      currentScene: "elder_house_arrival",
+      log: [],
+    };
+    const next = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "give_snack" },
+      scenes as SceneRegistry,
+    );
+    expect(next.phase).toBe("ended");
+    if (next.phase === "ended") expect(next.endingId).toBe("main");
+  });
+
+  test("market_storage_success 진입 시 super_tintham_cracker 가 인벤에 추가된다", () => {
+    const fixedRng = () => 0.99;
+    const state: GameState = {
+      phase: "playing",
+      character: makeTestCharacter({ dex: 10 }),
+      currentScene: "market_morning",
+      log: [],
+    };
+    const next = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: fixedRng },
+      scenes as SceneRegistry,
+    );
+    expect(next.phase).toBe("playing");
+    if (next.phase === "playing") {
+      expect(next.currentScene).toBe("market_storage_success");
+      expect(next.character.inventory).toContain("super_tintham_cracker");
+    }
+  });
+
+  test("REROLL 액션이 rerollsLeft 를 1 감소시키고 다시 굴린다", () => {
+    // lucky 어빌 + dex 5 + 실패 굴림. REROLL 시 rerollsLeft 감소.
+    const lucky = makeTestCharacter({}, "lucky");
+    lucky.rerollsLeft = 3;
+    // 초기 실패: market_caught
+    const state: GameState = {
+      phase: "playing",
+      character: lucky,
+      currentScene: "market_morning",
+      log: [],
+    };
+    const failed = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: () => 0.0 },
+      scenes as SceneRegistry,
+    );
+    expect(failed.phase).toBe("playing");
+    if (failed.phase === "playing") {
+      expect(failed.currentScene).toBe("market_caught");
+    }
+    // REROLL — market_morning 로 복귀해서 다시 시도, rerollsLeft -1.
+    // (단순 설계: REROLL 은 *마지막 choice* 를 다시 굴리며 *이전 씬* 로 되돌림.)
+    const rerolled = gameReducer(
+      failed,
+      { type: "REROLL", rng: () => 0.99 },
+      scenes as SceneRegistry,
+    );
+    expect(rerolled.phase).toBe("playing");
+    if (rerolled.phase === "playing") {
+      expect(rerolled.character.rerollsLeft).toBe(2);
+      // 재굴림 성공 → market_storage_success
+      expect(rerolled.currentScene).toBe("market_storage_success");
+    }
+  });
+
+  test("REROLL 은 rerollsLeft 가 0 이면 무효", () => {
+    const noReroll = makeTestCharacter({}, "scholar");
+    noReroll.rerollsLeft = 0;
+    const state: GameState = {
+      phase: "playing",
+      character: noReroll,
+      currentScene: "market_morning",
+      log: [],
+    };
+    const failed = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: () => 0.0 },
+      scenes as SceneRegistry,
+    );
+    // REROLL — 무효, 상태 유지.
+    const rerolled = gameReducer(failed, { type: "REROLL", rng: () => 0.99 }, scenes as SceneRegistry);
+    expect(rerolled).toEqual(failed);
   });
 });

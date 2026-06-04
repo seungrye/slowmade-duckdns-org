@@ -6,6 +6,8 @@
 //     사용 가능하거나 plain/probability 면 null.
 
 import type { Character, Choice, ChoiceCondition, StatKey } from "@/types/web-adventure";
+import { effectiveStat } from "./stats";
+import { items } from "@/content/web-adventure/items";
 
 const STAT_LABEL_KO: Record<StatKey, string> = {
   str: "힘",
@@ -28,7 +30,7 @@ const FLAG_LABEL_KO: Record<string, string> = {
 function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   switch (cond.kind) {
     case "minStat":
-      return character.stats[cond.stat] >= cond.min;
+      return effectiveStat(character, cond.stat) >= cond.min;
     case "hasItem":
       return character.inventory.includes(cond.itemId);
     case "flag":
@@ -52,7 +54,10 @@ export function getUnavailableReason(choice: Choice, character: Character): stri
       const label = FLAG_LABEL_KO[c.key] ?? c.key;
       return `${label} 필요`;
     }
-    case "hasItem":
-      return `아이템 필요: ${c.itemId}`;
+    case "hasItem": {
+      const item = items[c.itemId];
+      const label = item ? item.displayName : c.itemId;
+      return `아이템 필요: ${label}`;
+    }
   }
 }

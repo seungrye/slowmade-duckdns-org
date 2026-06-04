@@ -2,6 +2,8 @@
 
 import type { Character, Choice } from "@/types/web-adventure";
 import { estimateSuccessPercent } from "@/lib/web-adventure/engine/rollDice";
+import { effectiveStat } from "@/lib/web-adventure/engine/stats";
+import { items } from "@/content/web-adventure/items";
 
 // 선택지 리스트 — 종류별 (plain/probability/conditional) 렌더.
 
@@ -42,8 +44,9 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
           );
         }
         if (c.kind === "probability") {
+          // 3 주차: effectiveStat (base + passive) 으로 백분율 계산.
           const percent = estimateSuccessPercent({
-            stat: character.stats[c.stat],
+            stat: effectiveStat(character, c.stat),
             ability: character.ability,
             statKey: c.stat,
             difficulty: c.difficulty,
@@ -63,15 +66,16 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
             </li>
           );
         }
-        // conditional
+        // conditional — 3 주차: minStat 은 effectiveStat 사용, hasItem 은 displayName 라벨.
         let allowed = true;
         let reason = "";
         if (c.condition.kind === "minStat") {
-          allowed = character.stats[c.condition.stat] >= c.condition.min;
+          allowed = effectiveStat(character, c.condition.stat) >= c.condition.min;
           reason = `${STAT_LABELS_SHORT[c.condition.stat] ?? c.condition.stat} ${c.condition.min} 이상 필요`;
         } else if (c.condition.kind === "hasItem") {
           allowed = character.inventory.includes(c.condition.itemId);
-          reason = `아이템 필요: ${c.condition.itemId}`;
+          const item = items[c.condition.itemId];
+          reason = `아이템 필요: ${item ? item.displayName : c.condition.itemId}`;
         } else {
           allowed = !!character.flags[c.condition.key];
           reason = `조건 필요: ${c.condition.key}`;

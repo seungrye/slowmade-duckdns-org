@@ -16,7 +16,8 @@ export const elderHouseArrival: Scene = {
       kind: "conditional",
       id: "give_snack",
       label: "비밀 간식을 전한다",
-      condition: { kind: "flag", key: "hasSecretSnack" },
+      // 3 주차: flag → 아이템 보유 조건.
+      condition: { kind: "hasItem", itemId: "super_tintham_cracker" },
       to: "ending_main",
     },
     {

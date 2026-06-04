@@ -20,6 +20,11 @@ const BASE_STAT = 5;
 const BONUS_TOTAL = 5;
 const MAX_BONUS_PER_STAT = 2;
 
+// 3 주차 HP 공식: maxHp = 100 + con * 5 (con 5 기본 → 125, con 7 최대 → 135).
+const MAX_HP_BASE = 100;
+const MAX_HP_PER_CON = 5;
+const LUCKY_REROLLS = 3;
+
 type Props = {
   onComplete: (character: Character) => void;
 };
@@ -52,6 +57,10 @@ export default function CharacterCreator({ onComplete }: Props) {
     setBonus((b) => ({ ...b, [stat]: b[stat] - 1 }));
   }
 
+  const previewCon = BASE_STAT + bonus.con;
+  const previewMaxHp = MAX_HP_BASE + previewCon * MAX_HP_PER_CON;
+  const previewRerolls = ability === "lucky" ? LUCKY_REROLLS : 0;
+
   function submit() {
     if (!canSubmit) return;
     const stats: Record<StatKey, number> = {
@@ -62,8 +71,8 @@ export default function CharacterCreator({ onComplete }: Props) {
       con: BASE_STAT + bonus.con,
       wis: BASE_STAT + bonus.wis,
     };
-    // PoC HP 공식: 10 + (con-5)*2 (최소 1)
-    const maxHp = Math.max(1, 10 + (stats.con - BASE_STAT) * 2);
+    // 3 주차 HP 공식: 100 + con * 5.
+    const maxHp = MAX_HP_BASE + stats.con * MAX_HP_PER_CON;
     const character: Character = {
       stats,
       hp: maxHp,
@@ -71,7 +80,7 @@ export default function CharacterCreator({ onComplete }: Props) {
       ability,
       inventory: [],
       flags: {},
-      rerollsLeft: ability === "lucky" ? 3 : 0,
+      rerollsLeft: ability === "lucky" ? LUCKY_REROLLS : 0,
     };
     onComplete(character);
   }
@@ -148,6 +157,22 @@ export default function CharacterCreator({ onComplete }: Props) {
           );
         })}
       </ul>
+
+      <div className="mb-4 rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
+        <div>
+          최대 HP 미리보기: <span className="font-mono font-bold">{previewMaxHp}</span>{" "}
+          <span className="text-amber-700">(공식: {MAX_HP_BASE} + 체력 × {MAX_HP_PER_CON})</span>
+        </div>
+        <div>
+          재굴림 횟수:{" "}
+          <span className="font-mono font-bold">{previewRerolls}</span>
+          {ability === "lucky" ? (
+            <span className="text-amber-700"> (행운아 어빌)</span>
+          ) : (
+            <span className="text-amber-700"> (행운아 어빌 선택 시 +{LUCKY_REROLLS})</span>
+          )}
+        </div>
+      </div>
 
       <button
         type="button"
