@@ -14,6 +14,12 @@ export const marketMorning: Scene = {
   ],
   choices: [
     {
+      kind: "plain",
+      id: "buy_supplies",
+      label: "좌판에서 물건을 산다",
+      to: "market_buy",
+    },
+    {
       kind: "probability",
       id: "sneak_storage",
       label: "비밀 창고로 몰래 잠입한다",

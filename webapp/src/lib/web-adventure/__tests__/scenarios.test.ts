@@ -187,4 +187,78 @@ describe("web-adventure 시나리오", () => {
     expect(state.phase).toBe("ended");
     if (state.phase === "ended") expect(state.endingId).toBe("goblin_friend");
   });
+
+  // 3 주차 미니 fix — 막힌 아이템 경로 풀기.
+
+  test("시장에서 물건을 사면 bread + torch + herb 3 개가 인벤에 들어온다", () => {
+    let state: GameState = startGame(makeTestCharacter());
+    state = makeChoice(state, "to_market");
+    state = makeChoice(state, "buy_supplies");
+    if (state.phase === "playing") {
+      expect(state.currentScene).toBe("market_buy");
+      expect(state.character.inventory).toContain("bread");
+      expect(state.character.inventory).toContain("torch");
+      expect(state.character.inventory).toContain("herb");
+    }
+  });
+
+  test("시장에서 torch 획득 후 동굴 진입 가능 (cave_inside 도달)", () => {
+    let state: GameState = startGame(makeTestCharacter());
+    state = makeChoice(state, "to_market");
+    state = makeChoice(state, "buy_supplies");
+    state = makeChoice(state, "back_to_square");
+    if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+    state = makeChoice(state, "to_cave");
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_entry");
+    state = makeChoice(state, "enter_with_torch");
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_inside");
+  });
+
+  test("도깨비 친구 엔딩 도달 (시장 torch 획득 → 동굴 → 도깨비 cha 판정 ✓)", () => {
+    const fixedRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ cha: 8 }));
+    state = makeChoice(state, "to_market", fixedRng);
+    state = makeChoice(state, "buy_supplies", fixedRng);
+    state = makeChoice(state, "back_to_square", fixedRng);
+    state = makeChoice(state, "to_cave", fixedRng);
+    state = makeChoice(state, "enter_with_torch", fixedRng);
+    state = makeChoice(state, "meet_goblin", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("goblin_encounter");
+    state = makeChoice(state, "befriend_goblin", fixedRng);
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("goblin_friend");
+  });
+
+  test("숲 wis 판정 ✓ → spirit_glasses 획득 → forest_find_glasses 진입", () => {
+    const fixedRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ wis: 7 }));
+    state = makeChoice(state, "to_forest", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_entry");
+    state = makeChoice(state, "go_deeper", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_inner");
+    state = makeChoice(state, "look_around", fixedRng);
+    if (state.phase === "playing") {
+      expect(state.currentScene).toBe("forest_find_glasses");
+      expect(state.character.inventory).toContain("spirit_glasses");
+    }
+  });
+
+  test("USE_ITEM bread 시 HP +20 회복 및 인벤에서 제거", () => {
+    let state: GameState = startGame(makeTestCharacter());
+    state = makeChoice(state, "to_market");
+    state = makeChoice(state, "buy_supplies");
+    if (state.phase === "playing") {
+      expect(state.character.inventory).toContain("bread");
+      // 임의로 HP 감소.
+      state = {
+        ...state,
+        character: { ...state.character, hp: 5, maxHp: 30 },
+      };
+    }
+    state = gameReducer(state, { type: "USE_ITEM", itemId: "bread" }, scenes);
+    if (state.phase === "playing") {
+      expect(state.character.hp).toBe(25); // 5 + 20 = 25, max 30 미만이라 그대로.
+      expect(state.character.inventory).not.toContain("bread");
+    }
+  });
 });

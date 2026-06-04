@@ -22,6 +22,16 @@ export const forestInner: Scene = {
       to: "forest_inner_with_glasses",
     },
     {
+      // 3 주차 미니 fix — wis 10 판정 ✓ 시 안경 획득 씬으로.
+      kind: "probability",
+      id: "look_around",
+      label: "주변을 살핀다",
+      stat: "wis",
+      difficulty: 10,
+      onSuccess: "forest_find_glasses",
+      onFailure: "forest_inner",
+    },
+    {
       // 안경 없을 때의 *지혜 판정* (난이도 13, 안경 없으면 어렵다).
       kind: "probability",
       id: "search_blindly",

@@ -4,6 +4,7 @@
 import type { SceneRegistry } from "@/types/web-adventure";
 import { townSquareDawn } from "@/content/web-adventure/scenes/town_square_dawn";
 import { marketMorning } from "@/content/web-adventure/scenes/market_morning";
+import { marketBuy } from "@/content/web-adventure/scenes/market_buy";
 import { marketStorageSuccess } from "@/content/web-adventure/scenes/market_storage_success";
 import { marketCaught } from "@/content/web-adventure/scenes/market_caught";
 import { elderHouseArrival } from "@/content/web-adventure/scenes/elder_house_arrival";
@@ -11,6 +12,7 @@ import { forestEntry } from "@/content/web-adventure/scenes/forest_entry";
 import { forestLost } from "@/content/web-adventure/scenes/forest_lost";
 import { forestInner } from "@/content/web-adventure/scenes/forest_inner";
 import { forestInnerWithGlasses } from "@/content/web-adventure/scenes/forest_inner_with_glasses";
+import { forestFindGlasses } from "@/content/web-adventure/scenes/forest_find_glasses";
 import { caveEntry } from "@/content/web-adventure/scenes/cave_entry";
 import { caveInside } from "@/content/web-adventure/scenes/cave_inside";
 import { caveAfterSpellbook } from "@/content/web-adventure/scenes/cave_after_spellbook";
@@ -22,6 +24,7 @@ import { endingGoblinFriend } from "@/content/web-adventure/scenes/ending_goblin
 export const scenes: SceneRegistry = {
   [townSquareDawn.id]: townSquareDawn,
   [marketMorning.id]: marketMorning,
+  [marketBuy.id]: marketBuy,
   [marketStorageSuccess.id]: marketStorageSuccess,
   [marketCaught.id]: marketCaught,
   [elderHouseArrival.id]: elderHouseArrival,
@@ -29,6 +32,7 @@ export const scenes: SceneRegistry = {
   [forestLost.id]: forestLost,
   [forestInner.id]: forestInner,
   [forestInnerWithGlasses.id]: forestInnerWithGlasses,
+  [forestFindGlasses.id]: forestFindGlasses,
   [caveEntry.id]: caveEntry,
   [caveInside.id]: caveInside,
   [caveAfterSpellbook.id]: caveAfterSpellbook,
