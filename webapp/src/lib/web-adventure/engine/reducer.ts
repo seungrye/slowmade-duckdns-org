@@ -45,6 +45,25 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   }
 }
 
+/**
+ * onEnter.addItems 병합 규칙 (#203).
+ * - 인벤이 cap 에 도달하면 즉시 중단.
+ * - 카탈로그 미정의 id 는 skip.
+ * - stackable=false 이고 이미 보유 중이면 skip (재진입 중복 방지).
+ * - stackable=true 면 그대로 push (개수 누적).
+ */
+function pushItems(inventory: string[], toAdd: string[]): string[] {
+  const result = [...inventory];
+  for (const id of toAdd) {
+    if (result.length >= INVENTORY_CAP) break; // cap — 초과분 무시.
+    const item = items[id];
+    if (!item) continue; // 미정의 id 는 무시.
+    if (!item.stackable && result.includes(id)) continue; // 비-스택 중복 차단.
+    result.push(id);
+  }
+  return result;
+}
+
 /** 씬 onEnter 적용 — setFlags / addItems 를 character 에 반영. cap 8 초과 시 초과분 무시. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
@@ -53,15 +72,9 @@ function applyOnEnter(character: Character, scene: Scene): Character {
   const itemsChanged = addItems && addItems.length > 0;
   if (!flagsChanged && !itemsChanged) return character;
   const nextFlags = flagsChanged ? { ...character.flags, ...setFlags } : character.flags;
-  let nextInventory = character.inventory;
-  if (itemsChanged) {
-    const merged = [...character.inventory];
-    for (const it of addItems!) {
-      if (merged.length >= INVENTORY_CAP) break; // cap — 초과분 무시.
-      if (!merged.includes(it)) merged.push(it);
-    }
-    nextInventory = merged;
-  }
+  const nextInventory = itemsChanged
+    ? pushItems(character.inventory, addItems!)
+    : character.inventory;
   return { ...character, flags: nextFlags, inventory: nextInventory };
 }
 

@@ -228,3 +228,170 @@ describe("rollProbability 가 effectiveStat (패시브 포함) 을 사용한다"
     expect(result.success).toBe(true);
   });
 });
+
+// #203 — addItems 중복 방지 (stackable 필드).
+// consumable(bread/herb) 만 stackable=true, 나머지는 stackable=false (재진입 시 skip).
+
+describe("stackable 필드 정의", () => {
+  test("consumable bread/herb 는 stackable=true", () => {
+    expect(items.bread.stackable).toBe(true);
+    expect(items.herb.stackable).toBe(true);
+  });
+
+  test("passive/key/weapon/quest 아이템은 stackable=false", () => {
+    expect(items.spellbook.stackable).toBe(false);
+    expect(items.spirit_glasses.stackable).toBe(false);
+    expect(items.goblin_charm.stackable).toBe(false);
+    expect(items.torch.stackable).toBe(false);
+    expect(items.rusty_key.stackable).toBe(false);
+    expect(items.rusty_sword.stackable).toBe(false);
+    expect(items.market_receipt.stackable).toBe(false);
+    expect(items.super_tintham_cracker.stackable).toBe(false);
+    expect(items.scroll.stackable).toBe(false);
+    expect(items.companion_token.stackable).toBe(false);
+  });
+});
+
+describe("#203 addItems 중복 방지 (재진입 시)", () => {
+  test("non-stackable spellbook 두 번 진입 시 인벤에 1개만 있다", () => {
+    // cave_after_spellbook 의 onEnter.addItems: ["spellbook"].
+    // START_GAME 으로 cave_after_spellbook 진입 → spellbook 1 추가.
+    // 동일 씬 재진입 시 (cave_inside → take_spellbook → cave_after_spellbook) → skip.
+    const character = makeTestCharacter();
+    let state: GameState = {
+      phase: "creating",
+    };
+    state = gameReducer(
+      state,
+      { type: "START_GAME", character, startScene: "cave_after_spellbook" },
+      scenes as SceneRegistry,
+    );
+    expect(state.phase).toBe("playing");
+    if (state.phase === "playing") {
+      // 1차 진입 — spellbook 1 개.
+      expect(state.character.inventory.filter((id) => id === "spellbook").length).toBe(1);
+    }
+    // 2차 진입 — back_to_cave → take_spellbook → cave_after_spellbook.
+    state = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "back_to_cave" },
+      scenes as SceneRegistry,
+    );
+    state = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "take_spellbook" },
+      scenes as SceneRegistry,
+    );
+    expect(state.phase).toBe("playing");
+    if (state.phase === "playing") {
+      expect(state.currentScene).toBe("cave_after_spellbook");
+      expect(state.character.inventory.filter((id) => id === "spellbook").length).toBe(1);
+    }
+  });
+
+  test("stackable bread/herb 두 번 진입 시 인벤에 각각 2개, non-stackable torch 는 1개", () => {
+    // market_buy onEnter.addItems: ["bread", "torch", "herb"].
+    // 두 번 진입 시 bread/herb 는 stackable=true → 2 개, torch 는 stackable=false → 1 개.
+    const character = makeTestCharacter();
+    let state: GameState = { phase: "creating" };
+    state = gameReducer(
+      state,
+      { type: "START_GAME", character, startScene: "market_buy" },
+      scenes as SceneRegistry,
+    );
+    // 1차 진입 후 광장 복귀.
+    state = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "back_to_square" },
+      scenes as SceneRegistry,
+    );
+    expect(state.phase).toBe("playing");
+    // 광장 → 시장 → market_buy 재진입.
+    state = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "to_market" },
+      scenes as SceneRegistry,
+    );
+    state = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "buy_supplies" },
+      scenes as SceneRegistry,
+    );
+    expect(state.phase).toBe("playing");
+    if (state.phase === "playing") {
+      expect(state.currentScene).toBe("market_buy");
+      const breadCount = state.character.inventory.filter((id) => id === "bread").length;
+      const torchCount = state.character.inventory.filter((id) => id === "torch").length;
+      const herbCount = state.character.inventory.filter((id) => id === "herb").length;
+      expect(breadCount).toBe(2);
+      expect(torchCount).toBe(1);
+      expect(herbCount).toBe(2);
+    }
+  });
+
+  test("non-stackable spirit_glasses 반복 획득 시도 시 1개만 유지", () => {
+    // forest_find_glasses onEnter.addItems: ["spirit_glasses"].
+    // 이미 보유 상태에서 진입 → skip.
+    const character = makeTestCharacter({ inventory: ["spirit_glasses"] });
+    let state: GameState = { phase: "creating" };
+    state = gameReducer(
+      state,
+      { type: "START_GAME", character, startScene: "forest_find_glasses" },
+      scenes as SceneRegistry,
+    );
+    expect(state.phase).toBe("playing");
+    if (state.phase === "playing") {
+      expect(state.character.inventory.filter((id) => id === "spirit_glasses").length).toBe(1);
+    }
+  });
+
+  test("인벤 cap 8 — stackable 도 cap 초과 시 추가 차단", () => {
+    // 인벤 6 + market_buy 진입 (bread+torch+herb 3 개 시도) → 8 까지만 추가.
+    const character = makeTestCharacter({
+      inventory: ["a", "b", "c", "d", "e", "f"], // 6 개.
+    });
+    let state: GameState = { phase: "creating" };
+    state = gameReducer(
+      state,
+      { type: "START_GAME", character, startScene: "market_buy" },
+      scenes as SceneRegistry,
+    );
+    expect(state.phase).toBe("playing");
+    if (state.phase === "playing") {
+      // 6 + bread + torch = 8 (cap), herb skip.
+      expect(state.character.inventory.length).toBe(INVENTORY_CAP);
+      expect(state.character.inventory).toContain("bread");
+      expect(state.character.inventory).toContain("torch");
+      expect(state.character.inventory).not.toContain("herb");
+    }
+  });
+
+  test("아이템 미정의 id 는 무시 (inventory 변화 없음)", () => {
+    // 가상 시나리오: reducer 의 pushItems 가 items[id] === undefined 면 skip.
+    // 직접 applyOnEnter 호출 어려우므로 — items 카탈로그 검증 + 가상 onEnter 전달.
+    // 여기서는 reducer 동작 검증 위해 inline scene 사용.
+    const fakeScenes: SceneRegistry = {
+      ...(scenes as SceneRegistry),
+      __ghost_scene__: {
+        id: "__ghost_scene__",
+        illustration: "",
+        title: "유령",
+        body: [],
+        choices: [],
+        onEnter: { addItems: ["nonexistent_item_xyz", "bread"] },
+      },
+    };
+    const character = makeTestCharacter();
+    let state: GameState = { phase: "creating" };
+    state = gameReducer(
+      state,
+      { type: "START_GAME", character, startScene: "__ghost_scene__" },
+      fakeScenes,
+    );
+    expect(state.phase).toBe("playing");
+    if (state.phase === "playing") {
+      // 미정의 id 는 무시, bread 만 추가.
+      expect(state.character.inventory).toEqual(["bread"]);
+    }
+  });
+});
