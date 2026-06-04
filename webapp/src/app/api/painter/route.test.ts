@@ -8,6 +8,7 @@ vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/lib/env', () => ({
   env: {
     siteUrl: 'https://test.example.com',
+    geminiApiKey: 'test-gemini-key',
     minio: {
       endpoint: 'cdn.example.com',
       accessKey: 'ak',
@@ -22,12 +23,14 @@ vi.mock('@/lib/env', () => ({
 }));
 
 const mockGenerateImage = vi.fn();
+const mockTranslateAndGenerate = vi.fn();
 const mockTryConsume = vi.fn();
 vi.mock('@/lib/painter/imageGen', async () => {
   const actual: typeof import('@/lib/painter/imageGen') = await vi.importActual('@/lib/painter/imageGen');
   return {
     ...actual,
     generateImage: (...args: unknown[]) => mockGenerateImage(...args),
+    translateAndGenerate: (...args: unknown[]) => mockTranslateAndGenerate(...args),
   };
 });
 vi.mock('@/lib/painter/quota', () => ({
@@ -83,6 +86,14 @@ describe('/api/painter POST', () => {
       key: 'painter-images/test.jpg',
       url: 'https://cdn.example.com/public/painter-images/test.jpg',
     });
+    // 기본은 영문 입력 — translatedPrompt null
+    mockTranslateAndGenerate.mockImplementation(async (prompt: string) => ({
+      key: 'painter-images/test.jpg',
+      url: 'https://cdn.example.com/public/painter-images/test.jpg',
+      originalPrompt: prompt,
+      translatedPrompt: null,
+      usedPrompt: prompt,
+    }));
     mockTryConsume.mockResolvedValue(true);
   });
 
@@ -126,8 +137,8 @@ describe('/api/painter POST', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(mockTryConsume).toHaveBeenCalledTimes(1);
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
-    const [promptArg] = mockGenerateImage.mock.calls[0];
+    expect(mockTranslateAndGenerate).toHaveBeenCalledTimes(1);
+    const [promptArg] = mockTranslateAndGenerate.mock.calls[0];
     // @painter-bot 멘션 부분은 제거되고 나머지가 prompt
     expect(promptArg).toBe('한국 마을 광장 도트');
 
@@ -145,12 +156,12 @@ describe('/api/painter POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
-    const [promptArg] = mockGenerateImage.mock.calls[0];
+    expect(mockTranslateAndGenerate).toHaveBeenCalledTimes(1);
+    const [promptArg] = mockTranslateAndGenerate.mock.calls[0];
     expect(promptArg).toBe('a cat dancing on the moon');
   });
 
-  it('painter quota 초과 시 안내 댓글 저장 + generateImage 호출 X', async () => {
+  it('painter quota 초과 시 안내 댓글 저장 + translateAndGenerate 호출 X', async () => {
     mockTryConsume.mockResolvedValueOnce(false);
 
     const res = await POST(makeRequest({
@@ -162,13 +173,13 @@ describe('/api/painter POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(mockGenerateImage).not.toHaveBeenCalled();
+    expect(mockTranslateAndGenerate).not.toHaveBeenCalled();
     // userComment + 안내 댓글
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
   it('Pollinations 실패 시 안내 댓글 저장', async () => {
-    mockGenerateImage.mockRejectedValueOnce(new Error('Pollinations 502'));
+    mockTranslateAndGenerate.mockRejectedValueOnce(new Error('Pollinations 502'));
 
     const res = await POST(makeRequest({
       postId: 'post-id',
@@ -179,7 +190,7 @@ describe('/api/painter POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
+    expect(mockTranslateAndGenerate).toHaveBeenCalledTimes(1);
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
@@ -191,11 +202,8 @@ describe('/api/painter POST', () => {
     }));
     await new Promise((r) => setTimeout(r, 10));
 
-    // mockCommentSave 가 호출된 인스턴스 중 painter 댓글 분 검증
-    // 첫 번째 호출 = userComment, 두 번째 호출 = painter 댓글
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
-    // this 컨텍스트는 캡처가 까다로우므로 호출 횟수와 generateImage 호출로 보조 검증.
-    const [promptArg] = mockGenerateImage.mock.calls[0];
+    const [promptArg] = mockTranslateAndGenerate.mock.calls[0];
     expect(promptArg).toBe('한국 마을');
   });
 
@@ -207,7 +215,62 @@ describe('/api/painter POST', () => {
     }));
     await new Promise((r) => setTimeout(r, 10));
 
-    const [promptArg] = mockGenerateImage.mock.calls[0];
+    const [promptArg] = mockTranslateAndGenerate.mock.calls[0];
     expect(promptArg).toBe('한국 마을 광장 도트 픽셀 아트');
+  });
+
+  it('한글 prompt 가 번역되면 응답 댓글에 원본과 번역본을 모두 표기한다', async () => {
+    mockTranslateAndGenerate.mockResolvedValueOnce({
+      key: 'painter-images/k.jpg',
+      url: 'https://cdn.example.com/public/painter-images/k.jpg',
+      originalPrompt: '한국 마을 광장 도트',
+      translatedPrompt: 'Korean village square, pixel art',
+      usedPrompt: 'Korean village square, pixel art',
+    });
+
+    await POST(makeRequest({
+      postId: 'post-id',
+      content: '@painter-bot 한국 마을 광장 도트',
+      anonid: 'test1234',
+    }));
+    await new Promise((r) => setTimeout(r, 10));
+
+    // 두 번째 mockCommentSave 호출 = painter 댓글
+    const calls = mockCommentSave.mock.instances;
+    const painterComment = calls.find((inst) => {
+      const data = inst as unknown as { author?: string };
+      return data.author === 'painter-bot';
+    }) as unknown as { content: string; imageUrl: string | null } | undefined;
+    expect(painterComment).toBeTruthy();
+    expect(painterComment!.content).toContain('한국 마을 광장 도트');
+    expect(painterComment!.content).toContain('Korean village square, pixel art');
+    expect(painterComment!.imageUrl).toBe('https://cdn.example.com/public/painter-images/k.jpg');
+  });
+
+  it('영문 prompt 면 응답 댓글에 번역본 없이 원본만 표기한다', async () => {
+    mockTranslateAndGenerate.mockResolvedValueOnce({
+      key: 'painter-images/e.jpg',
+      url: 'https://cdn.example.com/public/painter-images/e.jpg',
+      originalPrompt: 'a cat on the moon',
+      translatedPrompt: null,
+      usedPrompt: 'a cat on the moon',
+    });
+
+    await POST(makeRequest({
+      postId: 'post-id',
+      content: '@painter-bot a cat on the moon',
+      anonid: 'test1234',
+    }));
+    await new Promise((r) => setTimeout(r, 10));
+
+    const calls = mockCommentSave.mock.instances;
+    const painterComment = calls.find((inst) => {
+      const data = inst as unknown as { author?: string };
+      return data.author === 'painter-bot';
+    }) as unknown as { content: string } | undefined;
+    expect(painterComment).toBeTruthy();
+    expect(painterComment!.content).toContain('a cat on the moon');
+    // 화살표 표기는 번역됐을 때만
+    expect(painterComment!.content).not.toMatch(/↓|→/);
   });
 });

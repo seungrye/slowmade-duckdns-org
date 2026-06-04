@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { buildPollinationsUrl, generateImage } from './imageGen';
+
+const mockGenerateContent = vi.fn();
+vi.mock('@google/genai', () => {
+  class MockGoogleGenAI {
+    models = { generateContent: mockGenerateContent };
+  }
+  return { GoogleGenAI: MockGoogleGenAI };
+});
+
+import { buildPollinationsUrl, generateImage, translateAndGenerate } from './imageGen';
 
 describe('painter buildPollinationsUrl', () => {
   it('기본 옵션이 포함된 Pollinations URL 을 생성한다', () => {
@@ -165,5 +174,119 @@ describe('painter generateImage', () => {
       }
       vi.resetModules();
     }
+  });
+});
+
+describe('painter translateAndGenerate', () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-05T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    globalThis.fetch = originalFetch;
+  });
+
+  function setupFetchMock() {
+    const fakeBytes = new Uint8Array([9, 9, 9]);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      arrayBuffer: () => Promise.resolve(fakeBytes.buffer),
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  function setupMinio() {
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const minioClient = { putObject } as unknown as Parameters<typeof translateAndGenerate>[1]['minioClient'];
+    return { putObject, minioClient };
+  }
+
+  it('한글 prompt → Gemini 번역 후 번역된 영문으로 Pollinations 호출', async () => {
+    mockGenerateContent.mockResolvedValueOnce({ text: 'Korean village square at dawn' });
+    const fetchMock = setupFetchMock();
+    const { minioClient } = setupMinio();
+
+    const result = await translateAndGenerate('한국 마을 광장 새벽', {
+      minioClient,
+      bucket: 'public',
+      endpoint: 'cdn.example.com',
+      geminiApiKey: 'gemini-key',
+    });
+
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    // 번역된 영문이 URL 에 들어가야 함 (한글 원본 X)
+    expect(calledUrl).toContain(encodeURIComponent('Korean village square at dawn'));
+    expect(calledUrl).not.toContain(encodeURIComponent('한국 마을 광장 새벽'));
+
+    expect(result.originalPrompt).toBe('한국 마을 광장 새벽');
+    expect(result.translatedPrompt).toBe('Korean village square at dawn');
+    expect(result.usedPrompt).toBe('Korean village square at dawn');
+    expect(result.url).toMatch(/painter-images/);
+  });
+
+  it('영문 prompt → 번역 단계 skip + Pollinations 직접 호출', async () => {
+    const fetchMock = setupFetchMock();
+    const { minioClient } = setupMinio();
+
+    const result = await translateAndGenerate('a cat dancing on the moon', {
+      minioClient,
+      bucket: 'public',
+      endpoint: 'cdn.example.com',
+      geminiApiKey: 'gemini-key',
+    });
+
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.originalPrompt).toBe('a cat dancing on the moon');
+    expect(result.translatedPrompt).toBeNull();
+    expect(result.usedPrompt).toBe('a cat dancing on the moon');
+  });
+
+  it('번역 실패 시 원본 한글 prompt 로 Pollinations 호출 (fallback)', async () => {
+    mockGenerateContent.mockRejectedValueOnce(new Error('Gemini timeout'));
+    const fetchMock = setupFetchMock();
+    const { minioClient } = setupMinio();
+
+    const result = await translateAndGenerate('한국 마을', {
+      minioClient,
+      bucket: 'public',
+      endpoint: 'cdn.example.com',
+      geminiApiKey: 'gemini-key',
+    });
+
+    expect(mockGenerateContent).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const calledUrl = String(fetchMock.mock.calls[0][0]);
+    expect(calledUrl).toContain(encodeURIComponent('한국 마을'));
+    expect(result.originalPrompt).toBe('한국 마을');
+    expect(result.translatedPrompt).toBeNull();
+    expect(result.usedPrompt).toBe('한국 마을');
+  });
+
+  it('geminiApiKey 가 비어있고 한글 입력이면 번역 시도 X, 원본으로 fallback', async () => {
+    const fetchMock = setupFetchMock();
+    const { minioClient } = setupMinio();
+
+    const result = await translateAndGenerate('한국 마을', {
+      minioClient,
+      bucket: 'public',
+      endpoint: 'cdn.example.com',
+      geminiApiKey: '',
+    });
+
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result.originalPrompt).toBe('한국 마을');
+    expect(result.translatedPrompt).toBeNull();
+    expect(result.usedPrompt).toBe('한국 마을');
   });
 });

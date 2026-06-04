@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { env } from '@/lib/env';
+import { containsKorean, translateToEnglish } from './translate';
 
 export interface PollinationsOptions {
   width?: number;
@@ -77,4 +78,54 @@ export async function generateImage(
 
   const publicUrl = `https://${opts.endpoint}/${opts.bucket}/${key}`;
   return { key, url: publicUrl };
+}
+
+export interface TranslateAndGenerateOptions extends GenerateImageOptions {
+  /** Gemini API key — 빈 문자열이면 번역 시도 X (한글이어도 원본 그대로). */
+  geminiApiKey: string;
+}
+
+export interface TranslateAndGenerateResult {
+  key: string;
+  url: string;
+  /** 사용자가 입력한 원본 prompt (한국어 가능). */
+  originalPrompt: string;
+  /** 번역됐을 때 영문 번역본. 영문 입력 / 번역 실패 시 null. */
+  translatedPrompt: string | null;
+  /** 실제로 Pollinations 에 전달한 prompt (번역됐으면 영문, 실패 시 원본). */
+  usedPrompt: string;
+}
+
+/**
+ * 한글 prompt 자동 영문 번역 + Pollinations 이미지 생성.
+ *
+ * - 한글 감지 시 Gemini 번역 시도.
+ * - 번역 실패 (Gemini 타임아웃 / 키 없음 / 빈 응답) 시 원본 한글 prompt 로 Pollinations 호출 (fallback).
+ * - 영문 입력은 번역 단계 skip.
+ */
+export async function translateAndGenerate(
+  originalPrompt: string,
+  opts: TranslateAndGenerateOptions,
+): Promise<TranslateAndGenerateResult> {
+  let translatedPrompt: string | null = null;
+  let usedPrompt = originalPrompt;
+
+  if (containsKorean(originalPrompt) && opts.geminiApiKey) {
+    try {
+      const translated = await translateToEnglish(originalPrompt, opts.geminiApiKey);
+      // translateToEnglish 가 영문 입력엔 원본을 그대로 반환하지만,
+      // 여기선 이미 한글 확인 후 호출했으므로 결과는 번역본.
+      if (translated && translated !== originalPrompt) {
+        translatedPrompt = translated;
+        usedPrompt = translated;
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[painter-translate] failed, falling back to original prompt:', msg.slice(0, 200));
+      // fallback: 원본 그대로
+    }
+  }
+
+  const { key, url } = await generateImage(usedPrompt, opts);
+  return { key, url, originalPrompt, translatedPrompt, usedPrompt };
 }

@@ -8,7 +8,7 @@ import User from '@/models/user';
 import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
 import { nanoid } from 'nanoid';
-import { generateImage } from '@/lib/painter/imageGen';
+import { translateAndGenerate } from '@/lib/painter/imageGen';
 import { tryConsumeDailyQuota } from '@/lib/painter/quota';
 
 let _minioClient: Minio.Client | null = null;
@@ -82,17 +82,24 @@ async function handlePainterRequest(
       return;
     }
 
-    const result = await generateImage(prompt, {
+    const result = await translateAndGenerate(prompt, {
       minioClient: getMinioClient(),
       bucket: env.minio.bucket,
       endpoint: env.minio.endpoint,
+      geminiApiKey: env.geminiApiKey,
     });
+
+    // 번역됐을 때: 원본 + 영문 번역본을 모두 표기.
+    // 영문 / 번역 실패 시: 기존 단일 형식 유지.
+    const commentText = result.translatedPrompt
+      ? `🎨 "${result.originalPrompt}"\n↓\n"${result.translatedPrompt}"\n생성 완료`
+      : `🎨 "${result.originalPrompt}" 생성 완료`;
 
     await savePainterComment(
       postId,
       parentCommentId,
-      `🎨 "${prompt}" 생성 완료`,
-      { imageUrl: result.url, imagePrompt: prompt },
+      commentText,
+      { imageUrl: result.url, imagePrompt: result.usedPrompt },
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

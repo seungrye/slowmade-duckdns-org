@@ -104,7 +104,7 @@ export default function CommentInput({
         />
         {mentions.includes('painter-bot') && (
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            💡 <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">@painter-bot &lt;설명&gt;</code> 멘션으로 그림 요청
+            💡 <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">@painter-bot &lt;설명&gt;</code> 멘션으로 그림 요청 (한국어/영문 모두 가능 — 자동 번역)
           </p>
         )}
         {suggestions.length > 0 && (
