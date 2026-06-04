@@ -1,0 +1,135 @@
+// WebAdventureScene — Web MUD CYOA 씬 mongo 모델.
+//
+// Phase B (#212): 18 정적 ts 씬을 mongo 로 100% 이전.
+// 클라이언트는 `/api/web-adventure/content/v1` 엔드포인트로 캐시 가능한
+// 전체 씬 컨텐츠를 fetch (Phase C 에서 도입).
+//
+// 스키마는 src/types/web-adventure.ts 의 Scene 타입을 1:1 미러링.
+// Choice 의 kind 별 필드 (plain → to, probability → onSuccess/onFailure,
+// conditional → condition) 는 schema-level required 가 표현하기 어려우므로
+// path-level validate() 로 동적 검증한다 (validateSync 에서도 호출됨).
+
+import { Schema, model, models, Model } from "mongoose";
+
+// ── Choice 의 condition (conditional 종류일 때만 사용) ─────────────────────
+const ChoiceConditionSchema = new Schema(
+  {
+    kind: { type: String, enum: ["minStat", "hasItem", "flag"], required: true },
+    stat: { type: String },
+    min: { type: Number },
+    itemId: { type: String },
+    key: { type: String },
+  },
+  { _id: false },
+);
+
+// ── Choice ──────────────────────────────────────────────────────────────────
+// kind 별 필수 필드 매트릭스:
+//   plain        → to
+//   probability  → stat, difficulty, onSuccess, onFailure
+//   conditional  → condition, to
+//
+// pre('validate') 는 validateSync() 에서 동작하지 않으므로 path-level
+// .validate() 로 구현 (validator 가 false 반환 또는 throw 시 에러 등록).
+const ChoiceSchema = new Schema(
+  {
+    kind: {
+      type: String,
+      enum: ["plain", "probability", "conditional"],
+      required: true,
+    },
+    id: { type: String, required: true },
+    label: { type: String, required: true },
+
+    // plain | conditional
+    to: { type: String },
+
+    // probability
+    stat: { type: String },
+    difficulty: { type: Number },
+    onSuccess: { type: String },
+    onFailure: { type: String },
+
+    // conditional
+    condition: { type: ChoiceConditionSchema },
+  },
+  { _id: false },
+);
+
+// kind path 의 validator 에 *전체 choice* 를 점검하는 함수를 매단다.
+// (mongoose 는 validator 함수에서 this = sub-document.)
+ChoiceSchema.path("kind").validate(function (kind: string) {
+  // this 는 choice sub-document.
+  const self = this as unknown as Record<string, unknown>;
+  if (kind === "plain") {
+    if (!self.to) return false;
+  } else if (kind === "probability") {
+    if (!self.stat) return false;
+    if (self.difficulty === undefined || self.difficulty === null) return false;
+    if (!self.onSuccess) return false;
+    if (!self.onFailure) return false;
+  } else if (kind === "conditional") {
+    if (!self.condition) return false;
+    if (!self.to) return false;
+  }
+  return true;
+}, "Choice 의 kind 별 필수 필드가 누락되었습니다.");
+
+// ── onEnter ────────────────────────────────────────────────────────────────
+const OnEnterSchema = new Schema(
+  {
+    setFlags: { type: Map, of: Boolean },
+    // default 를 명시적으로 undefined 로 — mongoose 가 array 타입에 자동으로
+    // 빈 배열을 부여하지 않도록 막는다 (idempotent migration 위함).
+    addItems: { type: [String], default: undefined },
+  },
+  { _id: false },
+);
+
+// ── Scene 본체 ──────────────────────────────────────────────────────────────
+// body 는 mongoose 가 array 타입을 default [] 로 처리해서 required 만으로는
+// "누락" 을 잡지 못하므로 validator 로 *비어있지 않음* 까지 강제한다.
+const WebAdventureSceneSchema = new Schema(
+  {
+    id: { type: String, required: true, unique: true, index: true },
+    title: { type: String, required: true },
+    illustration: { type: String, required: true },
+    body: {
+      type: [String],
+      required: true,
+      validate: {
+        validator: (v: unknown) => Array.isArray(v) && v.length > 0,
+        message: "body 는 비어있지 않은 배열이어야 합니다.",
+      },
+    },
+    choices: { type: [ChoiceSchema], required: true, default: [] },
+    onEnter: { type: OnEnterSchema },
+    isEnding: { type: Boolean },
+    endingId: {
+      type: String,
+      enum: ["main", "spirit", "fail", "shopkeeper", "goblin_friend", "wizard_apprentice"],
+    },
+  },
+  { timestamps: true },
+);
+
+// ── DTO 인터페이스 ─────────────────────────────────────────────────────────
+export interface WebAdventureSceneDoc {
+  _id: unknown;
+  id: string;
+  title: string;
+  illustration: string;
+  body: string[];
+  choices: Array<Record<string, unknown>>;
+  onEnter?: { setFlags?: Map<string, boolean>; addItems?: string[] };
+  isEnding?: boolean;
+  endingId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const WebAdventureScene: Model<WebAdventureSceneDoc> =
+  (models.WebAdventureScene as Model<WebAdventureSceneDoc> | undefined) ??
+  model<WebAdventureSceneDoc>("WebAdventureScene", WebAdventureSceneSchema);
+
+export default WebAdventureScene;
