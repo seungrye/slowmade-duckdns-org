@@ -51,7 +51,7 @@ export function useComments(postId: string) {
   const submitComment = useCallback(async (
     parentId: string | null,
     content: string,
-    parentIsEnji?: boolean,
+    parentBotAuthor?: string | boolean,
   ): Promise<boolean> => {
     if (!content.trim()) return false;
 
@@ -63,9 +63,21 @@ export function useComments(postId: string) {
       localStorage.setItem('anonid-token', anonidToken);
     }
 
+    // 기존 호환: parentIsEnji=true 도 받아 enji 분기.
+    const parentIsEnji = parentBotAuthor === true || parentBotAuthor === 'enji-bot';
+    const parentIsPainter = parentBotAuthor === 'painter-bot';
+
     const isImageCmd = /^\s*\/image\s+/i.test(content);
-    const isEnjiCall = parentIsEnji === true || /@enji-bot/i.test(content) || isImageCmd;
-    const endpoint = isEnjiCall ? '/api/enji' : '/api/comments';
+    const hasPainterMention = /@painter-bot/i.test(content);
+    const hasEnjiMention = /@enji-bot/i.test(content);
+
+    const isPainterCall = parentIsPainter || hasPainterMention;
+    // painter 가 우선 — @enji-bot 과 @painter-bot 동시 있으면 painter 처리.
+    const isEnjiCall = !isPainterCall && (parentIsEnji || hasEnjiMention || isImageCmd);
+
+    let endpoint = '/api/comments';
+    if (isPainterCall) endpoint = '/api/painter';
+    else if (isEnjiCall) endpoint = '/api/enji';
 
     try {
       const response = await fetch(endpoint, {
@@ -78,7 +90,7 @@ export function useComments(postId: string) {
 
       const result = await response.json();
 
-      if (!isEnjiCall) {
+      if (!isPainterCall && !isEnjiCall) {
         showAchievementToasts(result.data);
         return true;
       }

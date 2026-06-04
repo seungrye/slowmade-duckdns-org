@@ -1,0 +1,167 @@
+import { NextRequest, NextResponse } from 'next/server';
+import * as Minio from 'minio';
+import { auth } from '@/auth';
+import { apiError } from '@/lib/api-response';
+import Comment from '@/models/comment';
+import Post from '@/models/post';
+import User from '@/models/user';
+import { connectToDB } from '@/lib/db';
+import { env } from '@/lib/env';
+import { nanoid } from 'nanoid';
+import { generateImage } from '@/lib/painter/imageGen';
+import { tryConsumeDailyQuota } from '@/lib/painter/quota';
+
+let _minioClient: Minio.Client | null = null;
+function getMinioClient(): Minio.Client {
+  if (!_minioClient) {
+    _minioClient = new Minio.Client({
+      endPoint: env.minio.endpoint,
+      port: env.minio.port,
+      useSSL: true,
+      accessKey: env.minio.accessKey,
+      secretKey: env.minio.secretKey,
+    });
+  }
+  return _minioClient;
+}
+
+function isAllowedOrigin(req: NextRequest): boolean {
+  const siteUrl = env.siteUrl.replace(/\/$/, '');
+  const origin = req.headers.get('origin') ?? '';
+  const referer = req.headers.get('referer') ?? '';
+  return origin.startsWith(siteUrl) || referer.startsWith(siteUrl);
+}
+
+/**
+ * @painter-bot 멘션을 제거하여 순수 prompt 만 추출.
+ * - 멘션 없으면 전체 content 를 prompt 로 사용.
+ * - 양 끝 공백/멘션 흔적 제거.
+ */
+function extractPrompt(content: string): string {
+  return content.replace(/@painter-bot/gi, '').trim();
+}
+
+async function savePainterComment(
+  postId: string,
+  parentId: string,
+  text: string,
+  extras?: { imageUrl?: string; imagePrompt?: string },
+) {
+  const painterComment = new Comment({
+    post: postId,
+    parent: parentId,
+    content: text,
+    author: 'painter-bot',
+    authorId: null,
+    isEnji: true, // 봇 댓글 (✨ 스타일 재사용 — comment-item.tsx 의 분기 트리거)
+    imageUrl: extras?.imageUrl ?? null,
+    imagePrompt: extras?.imagePrompt ?? null,
+  });
+  await painterComment.save();
+  return painterComment;
+}
+
+/**
+ * painter-bot 의 이미지 생성 백그라운드 처리.
+ * - quota 체크 → Pollinations 호출 → MinIO 업로드 → 댓글 저장.
+ * - 실패 시 안내 댓글 등록.
+ */
+async function handlePainterRequest(
+  prompt: string,
+  postId: string,
+  parentCommentId: string,
+): Promise<void> {
+  try {
+    const allowed = await tryConsumeDailyQuota(env.painterImage.dailyLimit);
+    if (!allowed) {
+      await savePainterComment(
+        postId,
+        parentCommentId,
+        `오늘의 이미지 생성 한도(${env.painterImage.dailyLimit}장)를 모두 사용했어요. 내일 다시 시도해 주세요.`,
+      );
+      return;
+    }
+
+    const result = await generateImage(prompt, {
+      minioClient: getMinioClient(),
+      bucket: env.minio.bucket,
+      endpoint: env.minio.endpoint,
+    });
+
+    await savePainterComment(
+      postId,
+      parentCommentId,
+      `🎨 "${prompt}" 생성 완료`,
+      { imageUrl: result.url, imagePrompt: prompt },
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[painter-image] failed:', msg);
+    try {
+      await savePainterComment(
+        postId,
+        parentCommentId,
+        '죄송해요, 그림 그리기에 실패했어요. 잠시 후 다시 시도해 주세요.',
+      );
+    } catch (saveErr) {
+      console.error('[painter-image] failed to save error comment:', saveErr);
+    }
+  }
+}
+
+export async function POST(req: NextRequest) {
+  if (!isAllowedOrigin(req)) {
+    return apiError('허용되지 않은 요청입니다.', 403);
+  }
+
+  const session = await auth();
+  if (!session?.user) {
+    return apiError('로그인이 필요합니다.', 401);
+  }
+
+  const { postId, parentId = null, content, anonid } = await req.json();
+
+  if (!content?.trim()) return apiError('댓글 내용이 없습니다.', 400);
+  if (!postId) return apiError('postId가 필요합니다.', 400);
+
+  await connectToDB();
+
+  const post = await Post.findById(postId).lean();
+  if (!post) return apiError('게시글을 찾을 수 없습니다.', 404);
+
+  let author: string;
+  let authorId = null;
+
+  if (session?.user) {
+    author = session.user.name ?? 'accounted user';
+    const user = await User.findOne({ email: session.user.email });
+    if (user) authorId = user._id;
+  } else {
+    const charset = ['i', 'l', 'I', '|', '!'];
+    const baseChars = '_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let num = BigInt(0);
+    for (const char of (anonid ?? nanoid(8))) {
+      const value = baseChars.indexOf(char);
+      if (value === -1) continue;
+      num = num * BigInt(62) + BigInt(value);
+    }
+    let result = '';
+    const base = BigInt(charset.length);
+    while (num > 0) {
+      result = charset[Number(num % base)] + result;
+      num = num / base;
+    }
+    author = result || charset[0];
+  }
+
+  const userComment = new Comment({ post: postId, parent: parentId, content, author, authorId });
+  await userComment.save();
+
+  // painter-bot 은 *모든 content 가 prompt*. 명령어 파싱 X.
+  const prompt = extractPrompt(content);
+  const finalPrompt = prompt || '아무거나 멋진 그림';
+
+  void handlePainterRequest(finalPrompt, postId, String(userComment._id));
+
+  return NextResponse.json({ success: true, data: { userComment } }, { status: 201 });
+}

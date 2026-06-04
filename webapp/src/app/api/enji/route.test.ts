@@ -247,7 +247,7 @@ describe('/api/enji POST', () => {
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
-  it('/image 명령어 요청은 generateImage 를 호출하고 이미지 댓글을 저장한다', async () => {
+  it('/image 명령어 요청은 painter-bot 안내 메시지로 응답한다 (마이그레이션)', async () => {
     const res = await POST(makeRequest({
       postId: 'post-id',
       content: '/image a cat',
@@ -257,66 +257,22 @@ describe('/api/enji POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    // Gemini 는 호출되지 않아야 함
+    // Gemini 호출 X, generateImage 호출 X, quota 차감 X
     expect(mockGenerateContent).not.toHaveBeenCalled();
-
-    // 일일 한도 체크 → generateImage → 댓글 저장
-    expect(mockTryConsume).toHaveBeenCalledTimes(1);
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
-    const [promptArg] = mockGenerateImage.mock.calls[0];
-    expect(promptArg).toBe('a cat');
-
-    // userComment + enji 이미지 댓글 = 2회
-    expect(mockCommentSave).toHaveBeenCalledTimes(2);
-  });
-
-  it('일일 한도 초과 시 generateImage 를 호출하지 않고 안내 댓글을 저장한다', async () => {
-    mockTryConsume.mockResolvedValueOnce(false);
-
-    const res = await POST(makeRequest({
-      postId: 'post-id',
-      content: '/image a cat',
-      anonid: 'test1234',
-    }));
-    expect(res.status).toBe(201);
-
-    await new Promise((r) => setTimeout(r, 10));
-
     expect(mockGenerateImage).not.toHaveBeenCalled();
-    expect(mockGenerateContent).not.toHaveBeenCalled();
-    // userComment + 안내 댓글
+    expect(mockTryConsume).not.toHaveBeenCalled();
+
+    // userComment + 마이그레이션 안내 enji 댓글 = 2회
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
-  });
 
-  it('Pollinations 실패 시 안내 댓글을 저장한다', async () => {
-    mockGenerateImage.mockRejectedValueOnce(new Error('Pollinations 502'));
-
-    const res = await POST(makeRequest({
-      postId: 'post-id',
-      content: '/image something',
-      anonid: 'test1234',
-    }));
-    expect(res.status).toBe(201);
-
-    await new Promise((r) => setTimeout(r, 10));
-
-    expect(mockGenerateImage).toHaveBeenCalledTimes(1);
-    // userComment + 안내 댓글
-    expect(mockCommentSave).toHaveBeenCalledTimes(2);
-  });
-
-  it('한국어 prompt 가 정확히 전달된다', async () => {
-    const res = await POST(makeRequest({
-      postId: 'post-id',
-      content: '/image 한국 마을 광장 도트 픽셀 아트',
-      anonid: 'test1234',
-    }));
-    expect(res.status).toBe(201);
-
-    await new Promise((r) => setTimeout(r, 10));
-
-    const [promptArg] = mockGenerateImage.mock.calls[0];
-    expect(promptArg).toBe('한국 마을 광장 도트 픽셀 아트');
+    // 안내 댓글 본문에 painter-bot 멘션 안내 문구 포함
+    const calls = mockCommentSave.mock.instances;
+    const enjiNotice = calls.find((inst) => {
+      const data = inst as unknown as { isEnji?: boolean; content?: string };
+      return data.isEnji === true;
+    }) as unknown as { content: string } | undefined;
+    expect(enjiNotice).toBeTruthy();
+    expect(enjiNotice!.content).toMatch(/painter-bot/);
   });
 
   it('일반 채팅 메시지는 기존 Gemini 흐름 유지 (이미지 흐름 미진입)', async () => {

@@ -159,6 +159,72 @@ describe('useComments', () => {
       expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
     });
 
+    it('@painter-bot 포함 댓글은 /api/painter 로 제출한다', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: { userComment: { _id: 'uc1' } } }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.submitComment(null, '@painter-bot 한국 마을 광장');
+      });
+
+      expect(ok!).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith('/api/painter', expect.anything());
+    });
+
+    it("parentBotAuthor='painter-bot' 이면 @painter-bot 없어도 /api/painter 로 제출한다", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { userComment: { _id: 'uc1' } } }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.submitComment('parent-id', '하나 더 그려줘', 'painter-bot');
+      });
+
+      expect(ok!).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith('/api/painter', expect.anything());
+    });
+
+    it("parentBotAuthor='enji-bot' 이면 /api/enji 로 제출한다", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { userComment: { _id: 'uc1' } } }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      let ok: boolean;
+      await act(async () => {
+        ok = await result.current.submitComment('parent-id', '추가 질문', 'enji-bot');
+      });
+
+      expect(ok!).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
+    });
+
+    it('/image 명령어는 여전히 /api/enji 로 제출되어 마이그레이션 안내를 받는다', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true, data: { userComment: { _id: 'uc1' } } }),
+      });
+
+      const { result } = renderHook(() => useComments('post1'));
+
+      await act(async () => {
+        await result.current.submitComment(null, '/image a cat');
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith('/api/enji', expect.anything());
+    });
+
     it('@enji-bot 제출 후 enjiComment 없으면 폴링하여 댓글 업데이트', async () => {
       vi.useFakeTimers();
 

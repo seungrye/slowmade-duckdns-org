@@ -102,9 +102,9 @@ export default function CommentInput({
           onKeyDown={handleKeyDown}
           onClick={handleChange}
         />
-        {mentions.includes('enji-bot') && (
+        {mentions.includes('painter-bot') && (
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            💡 <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">/image &lt;설명&gt;</code> 으로 enji-bot 이미지 생성
+            💡 <code className="px-1 bg-gray-100 dark:bg-gray-700 rounded">@painter-bot &lt;설명&gt;</code> 멘션으로 그림 요청
           </p>
         )}
         {suggestions.length > 0 && (
@@ -125,6 +125,7 @@ export default function CommentInput({
                 onMouseDown={(e) => { e.preventDefault(); insertMention(name); }}
               >
                 {name === 'enji-bot' && <span>✨</span>}
+                {name === 'painter-bot' && <span>🎨</span>}
                 <span>@{name}</span>
               </li>
             ))}

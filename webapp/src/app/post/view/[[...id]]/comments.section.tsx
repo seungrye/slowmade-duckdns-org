@@ -43,8 +43,10 @@ export default function Comments({ postId }: Props) {
   }, []);
 
   const handleReplySubmit = useCallback(async (parentId: string, content: string) => {
-    const parentIsEnji = comments.some(c => c._id === parentId && c.isEnji);
-    const ok = await submitComment(parentId, content, parentIsEnji);
+    const parent = comments.find(c => c._id === parentId);
+    // parent 가 봇(enji-bot / painter-bot) 이면 author 명을 그대로 넘겨 라우팅 결정.
+    const parentBotAuthor = parent?.isEnji ? parent.author : undefined;
+    const ok = await submitComment(parentId, content, parentBotAuthor);
     if (ok) {
       toast.success("덧글이 성공적으로 작성되었습니다!");
       setOpenReplyFor(null);
@@ -129,7 +131,7 @@ export default function Comments({ postId }: Props) {
         onSubmit={handleTopLevelSubmit}
         disabled={submitting}
         mentions={[
-          ...(session ? ['enji-bot'] : []),
+          ...(session ? ['enji-bot', 'painter-bot'] : []),
           ...new Set(
             comments
               .filter(c => !c.isDeleted && !c.isEnji && c.authorId != null)

@@ -93,6 +93,20 @@ describe('CommentInput', () => {
     expect(textarea.value).toBe('@alice ');
   });
 
+  it('mentions 에 painter-bot 이 있으면 그림 요청 힌트가 표시된다', () => {
+    render(<CommentInput onSubmit={vi.fn()} mentions={['painter-bot']} />);
+    expect(screen.getByText(/painter-bot/)).toBeInTheDocument();
+  });
+
+  it('mentions 에 painter-bot 이 있으면 드롭다운에 🎨 아이콘이 표시된다', async () => {
+    render(<CommentInput onSubmit={vi.fn()} mentions={['painter-bot', 'enji-bot']} />);
+    const textarea = screen.getByRole('textbox');
+    fireEvent.change(textarea, { target: { value: '@' } });
+    await waitFor(() => {
+      expect(screen.getByText('@painter-bot')).toBeInTheDocument();
+    });
+  });
+
   it('Escape 키로 드롭다운을 닫는다', async () => {
     render(<CommentInput onSubmit={vi.fn()} mentions={['enji-bot', 'alice']} />);
     const textarea = screen.getByRole('textbox');

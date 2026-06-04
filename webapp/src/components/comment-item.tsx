@@ -101,7 +101,7 @@ export default function CommentItem({
                 inputId={`reply-${c._id}`}
                 onSubmit={(content) => onReplySubmit(c._id, content)}
                 disabled={submitting}
-                placeholder="enji에게 답장..."
+                placeholder={c.author === 'painter-bot' ? 'painter-bot 에게 그림 요청...' : 'enji에게 답장...'}
               />
             )}
           </div>

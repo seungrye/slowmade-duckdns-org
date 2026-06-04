@@ -50,6 +50,11 @@ export const env = {
     // 사이트 전체 일일 한도 (Pollinations 비용 X, 남용 방지용)
     dailyLimit: intEnv('ENJI_IMAGE_DAILY_LIMIT', 50),
   },
+
+  painterImage: {
+    // painter-bot 사이트 전체 일일 한도 (Pollinations 비용 X, 남용 방지용)
+    dailyLimit: intEnv('PAINTER_IMAGE_DAILY_LIMIT', 50),
+  },
 } as const;
 
 export function validateEnv(): void {
