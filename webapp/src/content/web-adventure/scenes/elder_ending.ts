@@ -4,7 +4,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const elderEnding: Scene = {
   id: "elder_ending",
-  illustration: "/web-adventure/scenes/placeholder-elder.svg",
+  illustration: "/web-adventure/scenes/elder-house.png",
   title: "장로의 집",
   body: [
     "장로의 집 문을 두드린다. 안에서 사람이 부스럭거리는 소리가 난다.",
