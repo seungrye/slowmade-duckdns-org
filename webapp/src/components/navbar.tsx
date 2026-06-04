@@ -16,11 +16,6 @@ import {
     Layers,
     LogIn,
     Settings,
-    ScrollText,
-    Users,
-    Package,
-    MapPin,
-    Skull,
     Gamepad2,
     BookOpen,
 } from "lucide-react";
@@ -38,43 +33,35 @@ const myPageLinks = [
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
 ];
 
-const questLinks = [
-    { href: "/quests", label: "퀘스트", description: "퀘스트 목록·편집", icon: <ScrollText size={20} /> },
-    { href: "/quests/villagers", label: "Villager 카탈로그", description: "NPC 정의 관리", icon: <Users size={20} /> },
-    { href: "/quests/items", label: "Item 카탈로그", description: "아이템 정의 관리", icon: <Package size={20} /> },
-    { href: "/quests/zones", label: "Zone 카탈로그", description: "Named 존 정의 관리", icon: <MapPin size={20} /> },
-    { href: "/quests/monsters", label: "Monster 카탈로그", description: "몬스터 정의 관리", icon: <Skull size={20} /> },
-    { href: "/scenes", label: "씬 (web-adventure)", description: "Web-Adventure 씬 CMS", icon: <BookOpen size={20} /> },
-];
+// 인증된 사용자에게만 노출되는 단일 콘텐츠 관리 링크.
+// 과거 questLinks 드롭다운(퀘스트/Villager/Item/Zone/Monster 카탈로그)은
+// Phase E 에서 quest CMS 일괄 제거와 함께 사라졌다. 남은 콘텐츠 CMS 는
+// web-adventure 의 씬 편집 뿐이라 평탄한 단일 링크로 이동한다.
+const scenesLink = {
+    href: "/scenes",
+    label: "씬 (web-adventure)",
+    description: "Web-Adventure 씬 CMS",
+    icon: <BookOpen size={20} />,
+};
 
 export default function Navbar() {
     const { data: session } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [isQuestDropdownOpen, setIsQuestDropdownOpen] = useState(false);
     const pathname = usePathname();
     const dropdownRef = useRef<HTMLLIElement>(null);
-    const questDropdownRef = useRef<HTMLLIElement>(null);
 
-    const isQuestActive =
-        pathname === "/quests"
-        || pathname.startsWith("/quests/")
-        || pathname === "/scenes"
-        || pathname.startsWith("/scenes/");
+    const isScenesActive = pathname === "/scenes" || pathname.startsWith("/scenes/");
     const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
 
     // 모바일 메뉴 내부 collapsible 섹션 상태.
     // 활성 라우트면 시작부터 펴진 상태로(사용자가 현재 위치한 그룹을 바로 인지하도록).
-    const [isMobileQuestOpen, setIsMobileQuestOpen] = useState<boolean>(isQuestActive);
     const [isMobileMyPageOpen, setIsMobileMyPageOpen] = useState<boolean>(isMyPageActive);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
                 setIsDropdownOpen(false);
-            }
-            if (questDropdownRef.current && !questDropdownRef.current.contains(event.target as Node)) {
-                setIsQuestDropdownOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -105,36 +92,18 @@ export default function Navbar() {
                         </li>
                     ))}
 
-                    {/* 퀘스트 드롭다운 (인증 사용자만) */}
+                    {/* 씬 (web-adventure) — 인증 사용자만 */}
                     {session && (
-                        <li className="relative" ref={questDropdownRef}>
-                            <button
-                                className={`flex items-center gap-1 ${isQuestActive ? "text-gray-400" : "text-gray-500"} hover:text-gray-300 transition`}
-                                onClick={() => {
-                                    setIsQuestDropdownOpen(!isQuestDropdownOpen);
-                                    setIsDropdownOpen(false);
-                                }}
-                                aria-label="퀘스트 메뉴"
+                        <li className="relative group">
+                            <Link
+                                href={scenesLink.href}
+                                className={`${isScenesActive ? "text-gray-400" : "text-gray-500"
+                                    } hover:text-gray-300 transition flex items-center gap-1`}
+                                aria-label="씬 메뉴"
                             >
-                                <ScrollText size={20} /> 퀘스트 <ChevronDown size={16} />
-                            </button>
-
-                            {isQuestDropdownOpen && (
-                                <ul className="absolute right-0 mt-2 w-48 bg-gray-800 shadow-lg rounded-lg overflow-hidden z-20">
-                                    {questLinks.map((link) => (
-                                        <li key={link.href}>
-                                            <Link
-                                                href={link.href}
-                                                className="px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
-                                                onClick={() => setIsQuestDropdownOpen(false)}
-                                            >
-                                                {link.icon}
-                                                {link.label}
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
+                                {scenesLink.icon}
+                                {scenesLink.label}
+                            </Link>
                         </li>
                     )}
 
@@ -144,10 +113,7 @@ export default function Navbar() {
                         <li className="relative" ref={dropdownRef}>
                             <button
                                 className="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition"
-                                onClick={() => {
-                                    setIsDropdownOpen(!isDropdownOpen);
-                                    setIsQuestDropdownOpen(false);
-                                }}
+                                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                                 aria-label="마이페이지 메뉴"
                             >
                                 <User size={20} /> 마이페이지 <ChevronDown size={16} />
@@ -223,40 +189,18 @@ export default function Navbar() {
                     {/* 로그인 상태에 따라 모바일 메뉴 변경 */}
                     {session ? (
                         <>
-                            {/* 퀘스트 collapsible 섹션 */}
-                            <li>
-                                <button
-                                    type="button"
-                                    className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isQuestActive ? "text-gray-400" : "text-gray-300"}`}
-                                    onClick={() => setIsMobileQuestOpen((v) => !v)}
-                                    aria-label="모바일 퀘스트 섹션 토글"
-                                    aria-expanded={isMobileQuestOpen}
+                            {/* 씬 (web-adventure) 단일 링크 */}
+                            <li className="text-center">
+                                <Link
+                                    href={scenesLink.href}
+                                    className={`block py-2 ${isScenesActive ? "text-gray-400" : "text-gray-500"
+                                        } hover:text-gray-300 transition flex items-center gap-1`}
+                                    onClick={() => setIsOpen(false)}
+                                    aria-label="모바일 씬 링크"
                                 >
-                                    <span className="flex items-center gap-2">
-                                        <ScrollText size={20} />
-                                        퀘스트
-                                    </span>
-                                    <ChevronDown
-                                        size={18}
-                                        className={`transition transform ${isMobileQuestOpen ? "rotate-180" : ""}`}
-                                    />
-                                </button>
-                                {isMobileQuestOpen && (
-                                    <ul className="pl-6 border-l border-gray-700 ml-2 mt-1 space-y-1">
-                                        {questLinks.map((link) => (
-                                            <li key={link.href}>
-                                                <Link
-                                                    href={link.href}
-                                                    className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
-                                                    onClick={() => setIsOpen(false)}
-                                                >
-                                                    {link.icon}
-                                                    {link.label}
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
+                                    {scenesLink.icon}
+                                    {scenesLink.label}
+                                </Link>
                             </li>
 
                             {/* 마이페이지 collapsible 섹션 */}

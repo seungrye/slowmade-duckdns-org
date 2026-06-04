@@ -1778,7 +1778,7 @@ describe("serializeTownConfigRon", () => {
 
   it("모든 옵션 값 변환 (13 landmark 포함)", () => {
     const ron = serializeTownConfigRon({
-      size: "town", roads: "linear", wealth: "wealthy",
+      size: "town", algorithm: "tinykeep", roads: "linear", wealth: "wealthy",
       defenses: "stone",
       landmarks: [
         "inn", "smithy", "temple", "guard", "market", "manor",
@@ -1800,7 +1800,7 @@ describe("serializeTownConfigRon", () => {
 
   it("빈 landmarks 도 직렬화 가능", () => {
     const ron = serializeTownConfigRon({
-      size: "hamlet", roads: "random", wealth: "poor",
+      size: "hamlet", algorithm: "grid", roads: "random", wealth: "poor",
       defenses: "wooden", landmarks: [], fields: true, environment: "plains",
     });
     expect(ron).toContain("landmarks: [],");
