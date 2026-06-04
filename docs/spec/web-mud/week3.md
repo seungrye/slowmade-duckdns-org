@@ -93,3 +93,13 @@ milestone.md 의 3 주차 정의 구현:
 - `pnpm typecheck` 통과
 - `pnpm build` 통과
 - Blue/Green 무중단 배포
+
+## ✅ 완료 보고 (2026-06-05)
+
+- impl commit: `01cde2a impl(web-adventure): #199 3주차 — 인벤토리 + USE_ITEM + REROLL + 15 씬`
+- 신규 11 파일 + 변경 13 파일 = 24 파일 (1023 insertions, 41 deletions)
+- vitest web-adventure: 5 files 65 tests 통과
+- 전체 vitest: 982 / 985 통과 (사전 PUA 3 무관)
+- typecheck: web-adventure 관련 오류 0 (사전 ron.test.ts town-config 무관)
+- build: `/games/web-adventure/play` 9.2 kB 빌드 성공
+- Blue/Green 무중단 배포 별도 단계로 진행
