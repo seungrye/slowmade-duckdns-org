@@ -32,7 +32,7 @@ describe('parseImageCommand', () => {
 describe('buildPollinationsUrl', () => {
   it('기본 옵션이 포함된 Pollinations URL 을 생성한다', () => {
     const url = buildPollinationsUrl('a cat', { width: 512, height: 512 });
-    expect(url).toMatch(/^https:\/\/image\.pollinations\.ai\/prompt\/a%20cat\?/);
+    expect(url).toMatch(/^https:\/\/gen\.pollinations\.ai\/image\/a%20cat\?/);
     expect(url).toContain('width=512');
     expect(url).toContain('height=512');
     expect(url).toContain('model=flux');
@@ -92,7 +92,7 @@ describe('generateImage', () => {
     // fetch 가 Pollinations URL 로 호출되었는지
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const calledUrl = String(fetchMock.mock.calls[0][0]);
-    expect(calledUrl).toMatch(/^https:\/\/image\.pollinations\.ai\/prompt\/a%20cat/);
+    expect(calledUrl).toMatch(/^https:\/\/gen\.pollinations\.ai\/image\/a%20cat/);
 
     // putObject 가 올바른 인자로 호출
     expect(putObject).toHaveBeenCalledTimes(1);
@@ -147,5 +147,78 @@ describe('generateImage', () => {
         endpoint: 'cdn.example.com',
       }),
     ).rejects.toThrow(/minio down/);
+  });
+
+  it('POLLINATIONS_API_KEY 설정 시 Authorization: Bearer 헤더가 전송된다', async () => {
+    vi.resetModules();
+    const originalKey = process.env.POLLINATIONS_API_KEY;
+    process.env.POLLINATIONS_API_KEY = 'sk_test_enji_xxx';
+
+    try {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        arrayBuffer: () => Promise.resolve(new Uint8Array([1, 2]).buffer),
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      const mod = await import('./imageGen');
+      const putObject = vi.fn().mockResolvedValue(undefined);
+      const minioClient = { putObject } as unknown as Parameters<typeof mod.generateImage>[1]['minioClient'];
+
+      await mod.generateImage('a cat', {
+        minioClient,
+        bucket: 'public',
+        endpoint: 'cdn.example.com',
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+      expect(init).toBeDefined();
+      const headers = init?.headers as Record<string, string> | undefined;
+      expect(headers).toBeDefined();
+      expect(headers!['Authorization']).toBe('Bearer sk_test_enji_xxx');
+    } finally {
+      if (originalKey === undefined) {
+        delete process.env.POLLINATIONS_API_KEY;
+      } else {
+        process.env.POLLINATIONS_API_KEY = originalKey;
+      }
+      vi.resetModules();
+    }
+  });
+
+  it('POLLINATIONS_API_KEY 미설정 시 Authorization 헤더 없이 호출된다', async () => {
+    vi.resetModules();
+    const originalKey = process.env.POLLINATIONS_API_KEY;
+    delete process.env.POLLINATIONS_API_KEY;
+
+    try {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        arrayBuffer: () => Promise.resolve(new Uint8Array([1]).buffer),
+      });
+      globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+      const mod = await import('./imageGen');
+      const putObject = vi.fn().mockResolvedValue(undefined);
+      const minioClient = { putObject } as unknown as Parameters<typeof mod.generateImage>[1]['minioClient'];
+
+      await mod.generateImage('a cat', {
+        minioClient,
+        bucket: 'public',
+        endpoint: 'cdn.example.com',
+      });
+
+      const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      expect(headers['Authorization']).toBeUndefined();
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.POLLINATIONS_API_KEY = originalKey;
+      }
+      vi.resetModules();
+    }
   });
 });

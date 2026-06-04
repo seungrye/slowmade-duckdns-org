@@ -55,6 +55,11 @@ export const env = {
     // painter-bot 사이트 전체 일일 한도 (Pollinations 비용 X, 남용 방지용)
     dailyLimit: intEnv('PAINTER_IMAGE_DAILY_LIMIT', 50),
   },
+
+  pollinations: {
+    // 서버 사이드 secret API key (sk_). 빈 문자열이면 헤더 전송 안 함.
+    apiKey: process.env.POLLINATIONS_API_KEY ?? '',
+  },
 } as const;
 
 export function validateEnv(): void {

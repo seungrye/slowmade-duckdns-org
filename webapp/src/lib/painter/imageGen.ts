@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { env } from '@/lib/env';
 
 export interface PollinationsOptions {
   width?: number;
@@ -20,7 +21,9 @@ export function buildPollinationsUrl(prompt: string, opts: PollinationsOptions):
   const height = opts.height ?? 1024;
   const model = opts.model ?? 'flux';
   const nologo = opts.nologo ?? true;
-  const base = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}`;
+  // gen.pollinations.ai 가 새 표준 (API key 인증 지원). image.pollinations.ai 는 legacy 이며
+  // 익명 IP rate limit 에 걸려 402 반환.
+  const base = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}`;
   const params = new URLSearchParams();
   params.set('width', String(width));
   params.set('height', String(height));
@@ -55,7 +58,11 @@ export async function generateImage(
   opts: GenerateImageOptions,
 ): Promise<{ key: string; url: string }> {
   const url = buildPollinationsUrl(prompt, opts.pollinations ?? {});
-  const res = await fetch(url);
+  const headers: Record<string, string> = {};
+  if (env.pollinations.apiKey) {
+    headers['Authorization'] = `Bearer ${env.pollinations.apiKey}`;
+  }
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     throw new Error(`Pollinations ${res.status}`);
   }
