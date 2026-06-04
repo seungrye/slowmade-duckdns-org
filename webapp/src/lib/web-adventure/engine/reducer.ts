@@ -23,7 +23,8 @@ import { rollProbability } from "./rollDice";
 export type Action =
   | { type: "START_GAME"; character: Character; startScene: string }
   | { type: "MAKE_CHOICE"; choiceId: string; rng?: () => number }
-  | { type: "END_GAME"; endingId: string };
+  | { type: "END_GAME"; endingId: string }
+  | { type: "RESET" };
 
 function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   switch (cond.kind) {
@@ -36,7 +37,26 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   }
 }
 
-/** 씬으로 이동 — 결과 씬이 isEnding 이면 ended 로 전환. */
+/** 씬 onEnter 적용 — setFlags / addItems 를 character 에 반영한 새 character 를 반환. */
+function applyOnEnter(character: Character, scene: Scene): Character {
+  if (!scene.onEnter) return character;
+  const { setFlags, addItems } = scene.onEnter;
+  const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
+  const itemsChanged = addItems && addItems.length > 0;
+  if (!flagsChanged && !itemsChanged) return character;
+  const nextFlags = flagsChanged ? { ...character.flags, ...setFlags } : character.flags;
+  let nextInventory = character.inventory;
+  if (itemsChanged) {
+    const merged = [...character.inventory];
+    for (const it of addItems!) {
+      if (!merged.includes(it)) merged.push(it);
+    }
+    nextInventory = merged;
+  }
+  return { ...character, flags: nextFlags, inventory: nextInventory };
+}
+
+/** 씬으로 이동 — 결과 씬이 isEnding 이면 ended 로 전환. onEnter 적용 후 character 갱신. */
 function moveTo(
   prev: Extract<GameState, { phase: "playing" }>,
   targetSceneId: string,
@@ -46,10 +66,11 @@ function moveTo(
   const target = scenes[targetSceneId];
   if (!target) return prev; // 정의 안 된 씬 — 안전하게 무변화.
   const nextLog = [...prev.log, logEntry];
+  const nextCharacter = applyOnEnter(prev.character, target);
   if (target.isEnding) {
     return {
       phase: "ended",
-      character: prev.character,
+      character: nextCharacter,
       endingId: target.endingId ?? "main",
       finalSceneId: target.id,
       log: nextLog,
@@ -57,7 +78,7 @@ function moveTo(
   }
   return {
     phase: "playing",
-    character: prev.character,
+    character: nextCharacter,
     currentScene: target.id,
     log: nextLog,
   };
@@ -121,6 +142,9 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
         log: [...state.log, `종료 — ${action.endingId}`],
       };
     }
+
+    case "RESET":
+      return { phase: "creating" };
 
     default:
       return state;

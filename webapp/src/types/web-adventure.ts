@@ -48,6 +48,13 @@ export type Scene = {
   choices: Choice[];
   isEnding?: boolean;
   endingId?: "main" | "spirit" | "fail" | "shopkeeper" | "goblin_friend" | "wizard_apprentice";
+  /**
+   * 씬 진입 시 부여될 효과.
+   * - setFlags: character.flags 에 병합 (true/false 설정).
+   * - addItems: character.inventory 에 추가 (중복 방지).
+   * 2 주차에는 setFlags 만 사용하지만, 3 주차 인벤 시스템과의 자연스러운 확장을 위해 함께 정의.
+   */
+  onEnter?: { setFlags?: Record<string, boolean>; addItems?: string[] };
 };
 
 export type SceneRegistry = Record<string, Scene>;

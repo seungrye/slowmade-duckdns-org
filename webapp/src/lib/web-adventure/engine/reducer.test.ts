@@ -43,6 +43,7 @@ describe("gameReducer", () => {
   });
 
   test("MAKE_CHOICE plain 액션이 to 씬으로 이동한다", () => {
+    // 2 주차: town_square_dawn → to_market → market_morning (isEnding=false)
     const state: GameState = {
       phase: "playing",
       character: makeTestCharacter(),
@@ -51,72 +52,113 @@ describe("gameReducer", () => {
     };
     const next = gameReducer(
       state,
-      { type: "MAKE_CHOICE", choiceId: "to_elder" },
+      { type: "MAKE_CHOICE", choiceId: "to_market" },
       scenes as SceneRegistry,
     );
-    // elder_ending 이 isEnding=true 이므로 ended 로 즉시 전환
+    expect(next.phase).toBe("playing");
+    if (next.phase === "playing") {
+      expect(next.currentScene).toBe("market_morning");
+    }
+  });
+
+  test("MAKE_CHOICE plain 액션이 isEnding 씬에 도달하면 ended 로 전환된다", () => {
+    // 장로 집 도착 → 비밀 간식 보유 시 give_snack (conditional) → ending_main (isEnding=true)
+    const state: GameState = {
+      phase: "playing",
+      character: makeTestCharacter({}, "scholar"),
+      currentScene: "elder_house_arrival",
+      log: [],
+    };
+    // flag 부여 — 직접 character.flags 수정.
+    const charWithFlag = { ...state.character, flags: { hasSecretSnack: true } };
+    const next = gameReducer(
+      { ...state, character: charWithFlag },
+      { type: "MAKE_CHOICE", choiceId: "give_snack" },
+      scenes as SceneRegistry,
+    );
     expect(next.phase).toBe("ended");
     if (next.phase === "ended") expect(next.endingId).toBe("main");
   });
 
   test("MAKE_CHOICE probability 액션이 성공 시 onSuccess 씬으로 이동한다", () => {
-    // probability 선택지: dex 12 — onSuccess/onFailure 둘 다 elder_ending (PoC).
-    // 모든 굴림이 성공해도 elder_ending(=isEnding) 에 도달 → ended 로 자동 전환.
+    // market_morning 의 sneak_storage: dex 12 — onSuccess: market_storage_success
     const state: GameState = {
       phase: "playing",
       character: makeTestCharacter({ dex: 10 }),
-      currentScene: "town_square_dawn",
+      currentScene: "market_morning",
       log: [],
     };
     const next = gameReducer(
       state,
-      { type: "MAKE_CHOICE", choiceId: "scout_market", rng: () => 0.99 },
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: () => 0.99 },
       scenes as SceneRegistry,
     );
-    expect(next.phase).toBe("ended");
-    if (next.phase === "ended") {
-      expect(next.finalSceneId).toBe("elder_ending");
+    expect(next.phase).toBe("playing");
+    if (next.phase === "playing") {
+      expect(next.currentScene).toBe("market_storage_success");
+    }
+  });
+
+  test("MAKE_CHOICE probability 액션이 실패 시 onFailure 씬으로 이동한다", () => {
+    const state: GameState = {
+      phase: "playing",
+      character: makeTestCharacter({ dex: 5 }),
+      currentScene: "market_morning",
+      log: [],
+    };
+    const next = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: () => 0.0 },
+      scenes as SceneRegistry,
+    );
+    expect(next.phase).toBe("playing");
+    if (next.phase === "playing") {
+      expect(next.currentScene).toBe("market_caught");
     }
   });
 
   test("MAKE_CHOICE conditional 조건 미충족이면 상태 유지", () => {
-    const lowWisChar = makeTestCharacter({ wis: 5 });
+    // elder_house_arrival 의 give_snack 은 hasSecretSnack flag 필요.
     const state: GameState = {
       phase: "playing",
-      character: lowWisChar,
-      currentScene: "town_square_dawn",
+      character: makeTestCharacter(),
+      currentScene: "elder_house_arrival",
       log: [],
     };
     const next = gameReducer(
       state,
-      { type: "MAKE_CHOICE", choiceId: "secret_shrine" },
+      { type: "MAKE_CHOICE", choiceId: "give_snack" },
       scenes as SceneRegistry,
     );
     expect(next).toEqual(state); // 조건 미충족 → 무변화
   });
 
   test("MAKE_CHOICE conditional 조건 충족이면 to 씬으로 이동한다", () => {
-    const highWisChar = makeTestCharacter({ wis: 8 });
+    const charWithFlag = {
+      ...makeTestCharacter(),
+      flags: { hasSecretSnack: true },
+    };
     const state: GameState = {
       phase: "playing",
-      character: highWisChar,
-      currentScene: "town_square_dawn",
+      character: charWithFlag,
+      currentScene: "elder_house_arrival",
       log: [],
     };
     const next = gameReducer(
       state,
-      { type: "MAKE_CHOICE", choiceId: "secret_shrine" },
+      { type: "MAKE_CHOICE", choiceId: "give_snack" },
       scenes as SceneRegistry,
     );
-    // elder_ending(=isEnding) → ended 자동 전환
+    // ending_main(=isEnding) → ended 자동 전환
     expect(next.phase).toBe("ended");
+    if (next.phase === "ended") expect(next.endingId).toBe("main");
   });
 
   test("END_GAME 액션이 ended phase 로 전환된다", () => {
     const state: GameState = {
       phase: "playing",
       character: makeTestCharacter(),
-      currentScene: "elder_ending",
+      currentScene: "town_square_dawn",
       log: [],
     };
     const next = gameReducer(
@@ -127,7 +169,7 @@ describe("gameReducer", () => {
     expect(next.phase).toBe("ended");
     if (next.phase === "ended") {
       expect(next.endingId).toBe("main");
-      expect(next.finalSceneId).toBe("elder_ending");
+      expect(next.finalSceneId).toBe("town_square_dawn");
     }
   });
 
@@ -146,7 +188,7 @@ describe("gameReducer", () => {
     const initial: GameState = { phase: "creating" };
     const next = gameReducer(
       initial,
-      { type: "MAKE_CHOICE", choiceId: "to_elder" },
+      { type: "MAKE_CHOICE", choiceId: "to_market" },
       scenes as SceneRegistry,
     );
     expect(next).toEqual(initial);
@@ -164,6 +206,87 @@ describe("gameReducer", () => {
       { type: "MAKE_CHOICE", choiceId: "no_such_choice" },
       scenes as SceneRegistry,
     );
+    expect(next).toEqual(state);
+  });
+
+  // 2 주차 추가 — onEnter / RESET / probability 실패 분기 + conditional 차단.
+
+  test("onEnter setFlags 가 목적지 씬 진입 시 character.flags 에 반영된다", () => {
+    // 시장에서 잠입 성공 → market_storage_success → setFlags: { hasSecretSnack: true }
+    const fixedRng = () => 0.99; // 높은 굴림 = 성공 강제
+    const state: GameState = {
+      phase: "playing",
+      character: makeTestCharacter({ dex: 10 }),
+      currentScene: "market_morning",
+      log: [],
+    };
+    const next = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: fixedRng },
+      scenes as SceneRegistry,
+    );
+    expect(next.phase).toBe("playing");
+    if (next.phase === "playing") {
+      expect(next.currentScene).toBe("market_storage_success");
+      expect(next.character.flags.hasSecretSnack).toBe(true);
+    }
+  });
+
+  test("onEnter setFlags 실패 분기 — market_caught 도 flags 반영", () => {
+    const fixedRng = () => 0.0; // 낮은 굴림 = 실패 강제
+    const state: GameState = {
+      phase: "playing",
+      character: makeTestCharacter({ dex: 5 }),
+      currentScene: "market_morning",
+      log: [],
+    };
+    const next = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "sneak_storage", rng: fixedRng },
+      scenes as SceneRegistry,
+    );
+    expect(next.phase).toBe("playing");
+    if (next.phase === "playing") {
+      expect(next.currentScene).toBe("market_caught");
+      expect(next.character.flags.caughtBefore).toBe(true);
+    }
+  });
+
+  test("RESET 액션이 어느 phase 에서든 creating 으로 전환한다", () => {
+    const playing: GameState = {
+      phase: "playing",
+      character: makeTestCharacter(),
+      currentScene: "town_square_dawn",
+      log: ["선택: ..."],
+    };
+    const afterReset = gameReducer(playing, { type: "RESET" }, scenes as SceneRegistry);
+    expect(afterReset).toEqual({ phase: "creating" });
+
+    const ended: GameState = {
+      phase: "ended",
+      character: makeTestCharacter(),
+      endingId: "main",
+      finalSceneId: "ending_main",
+      log: [],
+    };
+    const afterReset2 = gameReducer(ended, { type: "RESET" }, scenes as SceneRegistry);
+    expect(afterReset2).toEqual({ phase: "creating" });
+  });
+
+  test("conditional 차단: flag 없으면 give_snack 무시", () => {
+    // elder_house_arrival 의 give_snack 은 hasSecretSnack flag 필요.
+    const state: GameState = {
+      phase: "playing",
+      character: makeTestCharacter(),
+      currentScene: "elder_house_arrival",
+      log: [],
+    };
+    const next = gameReducer(
+      state,
+      { type: "MAKE_CHOICE", choiceId: "give_snack" },
+      scenes as SceneRegistry,
+    );
+    // 조건 미충족 → 상태 유지
     expect(next).toEqual(state);
   });
 });
