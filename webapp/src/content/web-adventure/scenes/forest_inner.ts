@@ -6,7 +6,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const forestInner: Scene = {
   id: "forest_inner",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/forest.jpg",
   title: "숲 깊은 곳 — 산신령의 흔적",
   body: [
     "안개가 더 짙어진다. 발걸음이 점점 무거워진다.",

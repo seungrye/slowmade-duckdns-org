@@ -4,7 +4,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const endingSpirit: Scene = {
   id: "ending_spirit",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/forest.jpg",
   title: "산신령의 동행 — 비밀 엔딩",
   body: [
     "안개가 걷히자 늙은 산신령이 너의 앞에 섰다.",

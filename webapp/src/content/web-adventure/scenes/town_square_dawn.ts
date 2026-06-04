@@ -6,7 +6,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const townSquareDawn: Scene = {
   id: "town_square_dawn",
-  illustration: "/web-adventure/scenes/town-square-dawn.png",
+  illustration: "/web-adventure/scenes/town-square-dawn.jpg",
   title: "마을 광장의 새벽",
   body: [
     "회색빛 하늘 아래, 마을 광장에 첫 햇살이 닿는다.",

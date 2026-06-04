@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const marketMorning: Scene = {
   id: "market_morning",
-  illustration: "/web-adventure/scenes/town-square-dawn.png",
+  illustration: "/web-adventure/scenes/market.jpg",
   title: "시장 — 아침",
   body: [
     "마을 시장은 새벽부터 분주하다. 좌판마다 상인들이 자리를 잡고 있다.",

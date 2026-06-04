@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const marketStorageSuccess: Scene = {
   id: "market_storage_success",
-  illustration: "/web-adventure/scenes/town-square-dawn.png",
+  illustration: "/web-adventure/scenes/market.jpg",
   title: "비밀 창고 — 성공",
   body: [
     "한 호흡에 좌판 뒤를 빠져나갔다. 박씨의 시선은 다른 손님에게 향해 있다.",

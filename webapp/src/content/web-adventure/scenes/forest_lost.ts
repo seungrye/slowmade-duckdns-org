@@ -4,7 +4,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const forestLost: Scene = {
   id: "forest_lost",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/forest.jpg",
   title: "숲 — 길을 잃다",
   body: [
     "안개가 짙어졌다. 발 밑이 보이지 않는다.",

@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const endingGoblinFriend: Scene = {
   id: "ending_goblin_friend",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/cave.jpg",
   title: "도깨비의 친구 — 엔딩",
   body: [
     "도깨비는 너에게 작은 부적을 건넨다 — *\"이건 우리 표시야.\"*",

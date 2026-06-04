@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const forestEntry: Scene = {
   id: "forest_entry",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/forest.jpg",
   title: "안개 자욱한 숲 입구",
   body: [
     "마을 외곽의 숲 입구. 안개가 무릎까지 올라온다.",

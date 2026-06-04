@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const endingMain: Scene = {
   id: "ending_main",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/elder-house.jpg",
   title: "장로의 비밀 간식 — 메인 엔딩",
   body: [
     "장로는 보따리를 풀어 본다. 익숙한 향, 익숙한 모양.",

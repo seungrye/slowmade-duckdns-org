@@ -6,7 +6,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const forestFindGlasses: Scene = {
   id: "forest_find_glasses",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/forest.jpg",
   title: "이끼 사이의 안경",
   body: [
     "이끼 속에서 둥근 안경이 빛난다. 산신령의 것인가.",

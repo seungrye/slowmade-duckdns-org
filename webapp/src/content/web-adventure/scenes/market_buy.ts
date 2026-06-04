@@ -6,7 +6,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const marketBuy: Scene = {
   id: "market_buy",
-  illustration: "/web-adventure/scenes/town-square-dawn.png",
+  illustration: "/web-adventure/scenes/market.jpg",
   title: "시장의 좌판 — 물건 구매",
   body: [
     "박씨가 잠깐 자리를 비운 사이, 좌판을 살펴본다.",

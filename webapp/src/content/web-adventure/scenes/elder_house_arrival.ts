@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const elderHouseArrival: Scene = {
   id: "elder_house_arrival",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/elder-house.jpg",
   title: "장로의 집 앞",
   body: [
     "낡은 나무 문이 살짝 열려 있다. 안에서는 차 끓이는 향이 새어 나온다.",

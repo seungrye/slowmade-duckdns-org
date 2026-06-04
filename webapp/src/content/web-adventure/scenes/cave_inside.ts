@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const caveInside: Scene = {
   id: "cave_inside",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/cave.jpg",
   title: "동굴 안 — 마법서와 그림자",
   body: [
     "횃불의 빛이 닿자, 동굴의 벽이 푸르게 반짝인다.",

@@ -4,7 +4,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const goblinEncounter: Scene = {
   id: "goblin_encounter",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/cave.jpg",
   title: "도깨비 — 작은 친구",
   body: [
     "도깨비는 작고, 의외로 둥근 얼굴을 하고 있다.",

@@ -4,7 +4,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const forestInnerWithGlasses: Scene = {
   id: "forest_inner_with_glasses",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/forest.jpg",
   title: "산신령의 길 — 보이지 않던 것",
   body: [
     "안경 너머로, 안개 사이에 *은빛 길* 이 분명히 드러난다.",

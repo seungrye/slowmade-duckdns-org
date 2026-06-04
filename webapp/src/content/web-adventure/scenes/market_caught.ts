@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const marketCaught: Scene = {
   id: "market_caught",
-  illustration: "/web-adventure/scenes/town-square-dawn.png",
+  illustration: "/web-adventure/scenes/market.jpg",
   title: "시장 — 들켰다",
   body: [
     "허튼 발걸음에 좌판이 흔들렸다. 박씨의 고함이 시장 전체에 울린다.",

@@ -4,7 +4,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const caveAfterSpellbook: Scene = {
   id: "cave_after_spellbook",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/cave.jpg",
   title: "마법서를 챙겼다",
   body: [
     "낡은 마법서의 가죽 표지가 손에 잡힌다. 한 장을 펼치자 글자가 살짝 빛난다.",

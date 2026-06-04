@@ -5,7 +5,7 @@ import type { Scene } from "@/types/web-adventure";
 
 export const caveEntry: Scene = {
   id: "cave_entry",
-  illustration: "/web-adventure/scenes/elder-house.png",
+  illustration: "/web-adventure/scenes/cave.jpg",
   title: "동굴 입구 — 칠흑의 어둠",
   body: [
     "산기슭에 자리한 검은 동굴. 입구에서부터 한기가 흘러 나온다.",
