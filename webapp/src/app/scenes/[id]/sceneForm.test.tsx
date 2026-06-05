@@ -76,12 +76,12 @@ describe('SceneForm — isEnding 토글', () => {
   it('isEnding 토글 켜면 endingId select 노출', () => {
     render(
       <SceneForm
-        scene={{ ...baseScene, isEnding: true, endingId: 'main' }}
+        scene={{ ...baseScene, isEnding: true, endingId: 'ascension' }}
         onChange={vi.fn()}
       />
     );
     const select = screen.getByLabelText('엔딩 ID') as HTMLSelectElement;
-    expect(select.value).toBe('main');
+    expect(select.value).toBe('ascension');
   });
 
   it('isEnding 켜고 endingId 없으면 validation 메시지', () => {

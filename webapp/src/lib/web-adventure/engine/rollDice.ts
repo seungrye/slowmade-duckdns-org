@@ -24,12 +24,16 @@ export type RollOptions = {
   rng?: () => number;
 };
 
-/** 어빌별 보정 — 일치하는 statKey 면 +2. 그 외 0. */
+/** 성흔 어빌별 보정 — 일치하는 statKey 면 +2. 그 외 0. */
 function abilityBonus(ability: AbilityKey, statKey: StatKey): number {
-  if (ability === "scholar" && statKey === "int") return 2;
-  if (ability === "warrior" && statKey === "str") return 2;
-  if (ability === "silver_tongue" && statKey === "cha") return 2;
-  // lucky 는 재굴림으로 별도 처리 — 보정 없음.
+  // #253 — 〈에테르니아〉 4 성흔:
+  //   lunar(루나)   → int +2
+  //   selene(셀레네) → str +2 (전투)
+  //   hecate(헤카테) → cha +2 (언변/환영)
+  //   none(무흔)    → 마법 없음 (재굴림으로 별도 처리, 보정 없음)
+  if (ability === "lunar" && statKey === "int") return 2;
+  if (ability === "selene" && statKey === "str") return 2;
+  if (ability === "hecate" && statKey === "cha") return 2;
   return 0;
 }
 

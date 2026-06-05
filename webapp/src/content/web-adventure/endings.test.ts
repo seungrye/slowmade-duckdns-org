@@ -5,14 +5,14 @@ import { describe, test, expect } from "vitest";
 import { endingsMeta, getEndingMeta, type EndingMeta } from "./endings";
 
 describe("endingsMeta", () => {
-  test("6 엔딩 모두 정의 (fail / goblin_friend / main / shopkeeper / spirit / wizard_apprentice)", () => {
+  test("6 엔딩 모두 정의 (ascension/revolution/harmony/fall/petrification/sylvan_bond)", () => {
     expect(Object.keys(endingsMeta).sort()).toEqual([
-      "fail",
-      "goblin_friend",
-      "main",
-      "shopkeeper",
-      "spirit",
-      "wizard_apprentice",
+      "ascension",
+      "fall",
+      "harmony",
+      "petrification",
+      "revolution",
+      "sylvan_bond",
     ]);
   });
 
@@ -30,12 +30,12 @@ describe("endingsMeta", () => {
 
   test("getEndingMeta 가 6 엔딩 모두 lookup 가능", () => {
     for (const id of [
-      "main",
-      "spirit",
-      "fail",
-      "shopkeeper",
-      "goblin_friend",
-      "wizard_apprentice",
+      "ascension",
+      "revolution",
+      "fall",
+      "harmony",
+      "sylvan_bond",
+      "petrification",
     ]) {
       const m = getEndingMeta(id);
       expect(m.title).toBeTruthy();

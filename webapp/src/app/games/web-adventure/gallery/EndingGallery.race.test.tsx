@@ -45,7 +45,7 @@ describe('이슈 #250 — 갤러리 race condition (RED)', () => {
       LOCAL_STORAGE_PAST_RUNS_KEY,
       JSON.stringify([
         {
-          endingId: 'main',
+          endingId: 'ascension',
           runIndex: 1,
           finalSceneId: 'ending_main',
           completedAt: '2026-06-06T00:00:00Z',

@@ -37,7 +37,7 @@ const WebAdventurePastRunSchema = new Schema(
     endingId: {
       type: String,
       required: true,
-      enum: ['main', 'spirit', 'fail', 'shopkeeper', 'goblin_friend', 'wizard_apprentice'],
+      enum: ['ascension', 'revolution', 'harmony', 'fall', 'petrification', 'sylvan_bond'],
     },
     finalSceneId: { type: String, required: true },
     character: { type: CharacterSchema, required: true },
@@ -53,7 +53,7 @@ export interface WebAdventurePastRunDoc {
   _id: unknown;
   userEmail: string;
   runIndex: number;
-  endingId: 'main' | 'spirit' | 'fail' | 'shopkeeper' | 'goblin_friend' | 'wizard_apprentice';
+  endingId: 'ascension' | 'revolution' | 'harmony' | 'fall' | 'petrification' | 'sylvan_bond';
   finalSceneId: string;
   character: {
     stats: { str: number; dex: number; int: number; cha: number; con: number; wis: number };

@@ -9,7 +9,7 @@ function makeDoc(overrides: Record<string, unknown> = {}) {
   return new WebAdventurePastRun({
     userEmail: 'tester@example.com',
     runIndex: 1,
-    endingId: 'main',
+    endingId: 'ascension',
     finalSceneId: 'elder_house_ending',
     character: {
       stats: { str: 5, dex: 10, int: 5, cha: 5, con: 5, wis: 5 },
@@ -45,7 +45,7 @@ describe('WebAdventurePastRun 필수 필드', () => {
     expect(makeDoc().validateSync()).toBeUndefined();
   });
   it('endingId 6 종 (main/spirit/fail/shopkeeper/goblin_friend/wizard_apprentice) 모두 허용', () => {
-    for (const id of ['main', 'spirit', 'fail', 'shopkeeper', 'goblin_friend', 'wizard_apprentice']) {
+    for (const id of ['ascension', 'revolution', 'fall', 'harmony', 'sylvan_bond', 'petrification']) {
       expect(makeDoc({ endingId: id }).validateSync()).toBeUndefined();
     }
   });

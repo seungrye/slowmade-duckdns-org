@@ -7,10 +7,10 @@ import EndingGallery from './EndingGallery';
 
 const noRuns: Array<{ endingId: string }> = [];
 const someRuns = [
-  { endingId: 'main' },
-  { endingId: 'main' },
-  { endingId: 'spirit' },
-  { endingId: 'fail' },
+  { endingId: 'ascension' },
+  { endingId: 'ascension' },
+  { endingId: 'revolution' },
+  { endingId: 'fall' },
 ];
 
 describe('EndingGallery', () => {
@@ -24,20 +24,20 @@ describe('EndingGallery', () => {
 
   it('도달한 엔딩만 제목 + epilogue 노출 + 도달 카운트', () => {
     render(<EndingGallery pastRuns={someRuns} />);
-    // main 2 회
-    const mainCard = screen.getByTestId('ending-card-main');
-    expect(mainCard).toHaveTextContent('메인 엔딩');
-    expect(mainCard).toHaveTextContent(/2\s*회/);
-    // spirit / fail 1 회씩
-    expect(screen.getByTestId('ending-card-spirit')).toHaveTextContent(/1\s*회/);
-    expect(screen.getByTestId('ending-card-fail')).toHaveTextContent(/1\s*회/);
-    // 미도달 (shopkeeper / goblin_friend / wizard_apprentice) — ???
-    expect(screen.getByTestId('ending-card-shopkeeper')).toHaveTextContent('???');
+    // ascension 2 회
+    const ascensionCard = screen.getByTestId('ending-card-ascension');
+    expect(ascensionCard).toHaveTextContent('승천');
+    expect(ascensionCard).toHaveTextContent(/2\s*회/);
+    // revolution / fall 1 회씩
+    expect(screen.getByTestId('ending-card-revolution')).toHaveTextContent(/1\s*회/);
+    expect(screen.getByTestId('ending-card-fall')).toHaveTextContent(/1\s*회/);
+    // 미도달 (harmony / petrification / sylvan_bond) — ???
+    expect(screen.getByTestId('ending-card-harmony')).toHaveTextContent('???');
   });
 
   it('전체 도달률 (n/6) 표시', () => {
     render(<EndingGallery pastRuns={someRuns} />);
-    // someRuns 의 unique endingId = {main, spirit, fail} = 3 종
+    // someRuns 의 unique endingId = {ascension, revolution, fall} = 3 종
     expect(screen.getByTestId('gallery-progress')).toHaveTextContent('3 / 6');
   });
 

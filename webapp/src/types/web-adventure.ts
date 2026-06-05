@@ -8,21 +8,43 @@
 /** 캐릭터 6 스탯. 기본값 5. 시작 보너스 +5 분배(스탯당 최대 +2). */
 export type StatKey = "str" | "dex" | "int" | "cha" | "con" | "wis";
 
-/** 어빌리티 1 종 선택. PoC 4 종. 5 주차에 추가 가능. */
-export type AbilityKey = "scholar" | "warrior" | "silver_tongue" | "lucky";
+/**
+ * 〈에테르니아의 추락〉 리프래시 (#253) — 성흔 어빌리티 4 종.
+ *   - lunar    루나 성흔  (학식/지능 +2)
+ *   - selene   셀레네 성흔 (완력/전투 +2)
+ *   - hecate   헤카테 성흔 (언변/환영 +2)
+ *   - none     무흔        (마법 못 씀, 석화병 면역, 재굴림 +3)
+ */
+export type AbilityKey = "lunar" | "selene" | "hecate" | "none";
+
+/** 주인공 — 3 갈래 시작점. */
+export type Protagonist = "kael" | "rin" | "solwen";
+
+/** 엔딩 6 종 — 에테르니아 리프래시. */
+export type EndingId =
+  | "ascension"
+  | "revolution"
+  | "harmony"
+  | "fall"
+  | "petrification"
+  | "sylvan_bond";
 
 export type Character = {
   stats: Record<StatKey, number>;
   hp: number;
   maxHp: number;
   ability: AbilityKey;
-  inventory: string[];
+  /** 주인공 정체성. 3 갈래 시작점 + 일부 전용 엔딩 자격 결정. */
+  protagonist: Protagonist;
   /**
-   * 게임 진행 중 누적되는 마커.
-   * - boolean: 단발성 플래그 (예: caughtBefore).
-   * - number: 4 주차 — 누적 카운터 (예: caughtCount).
-   * 조건 검사 `kind: "flag"` 는 `!!flags[key]` 로 체크하므로 양쪽 모두 호환.
+   * 성흔 침식도 (0-100).
+   *   - 0-49: 정상.
+   *   - 50-79: 디버프 (con/dex 판정 -2, 셀레네 마법 +3).
+   *   - 80-99: 임계 (UI 경고 + 마법 액션 일부 잠금).
+   *   - 100: 자동 petrification 엔딩.
    */
+  stigmaErosion: number;
+  inventory: string[];
   flags: Record<string, boolean | number>;
   rerollsLeft: number;
 };
@@ -78,7 +100,7 @@ export type Scene = {
   body: string[];
   choices: Choice[];
   isEnding?: boolean;
-  endingId?: "main" | "spirit" | "fail" | "shopkeeper" | "goblin_friend" | "wizard_apprentice";
+  endingId?: EndingId;
   /**
    * 씬 진입 시 부여될 효과.
    * - setFlags: character.flags 에 병합 (true/false 설정).

@@ -11,7 +11,9 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     stats: { str: 10, dex: 8, int: 7, cha: 5, con: 6, wis: 4 },
     hp: 6,
     maxHp: 10,
-    ability: 'scholar',
+    ability: 'lunar',
+    protagonist: 'kael',
+    stigmaErosion: 0,
     inventory: ['bread', 'torch'],
     flags: {},
     rerollsLeft: 2,
@@ -52,7 +54,7 @@ describe('StatusPanel', () => {
     expect(screen.getByText('6 / 10')).toBeInTheDocument();
   });
 
-  it('어빌리티 이름과 설명 표시 (scholar)', () => {
+  it('어빌리티 이름과 설명 표시 (루나 성흔)', () => {
     render(
       <StatusPanel
         character={makeCharacter()}
@@ -62,7 +64,7 @@ describe('StatusPanel', () => {
         onReroll={vi.fn()}
       />,
     );
-    expect(screen.getByText('학자의 눈')).toBeInTheDocument();
+    expect(screen.getByText('루나 성흔')).toBeInTheDocument();
   });
 
   it('회차 (runIndex) 표시', () => {

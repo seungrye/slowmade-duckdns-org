@@ -3,13 +3,14 @@
 import { useState } from "react";
 import type { Scene } from "@/types/web-adventure";
 
+// #253 〈에테르니아〉 — CMS 의 endingId 드롭다운.
 const ENDING_IDS: NonNullable<Scene["endingId"]>[] = [
-  "main",
-  "spirit",
-  "fail",
-  "shopkeeper",
-  "goblin_friend",
-  "wizard_apprentice",
+  "ascension",
+  "revolution",
+  "harmony",
+  "fall",
+  "petrification",
+  "sylvan_bond",
 ];
 
 const inputCls = "w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800";

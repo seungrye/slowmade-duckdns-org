@@ -17,7 +17,9 @@ function makeCharacter(): Character {
     stats: { str: 5, dex: 5, int: 5, cha: 5, con: 5, wis: 5 },
     hp: 8,
     maxHp: 10,
-    ability: 'scholar',
+    ability: 'lunar',
+    protagonist: 'kael',
+    stigmaErosion: 0,
     inventory: [],
     flags: {},
     rerollsLeft: 2,
@@ -28,7 +30,7 @@ describe('EndingScreen — 갤러리 진입 링크 (이슈 검토)', () => {
   it('엔딩 갤러리 페이지로 이동하는 링크가 있다 (/games/web-adventure/gallery)', () => {
     render(
       <EndingScreen
-        endingId="main"
+        endingId="ascension"
         character={makeCharacter()}
         log={['로그 1']}
         onRestart={vi.fn()}

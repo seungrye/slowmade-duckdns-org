@@ -38,7 +38,7 @@ export default function CharacterCreator({ onComplete }: Props) {
     con: 0,
     wis: 0,
   });
-  const [ability, setAbility] = useState<AbilityKey>("scholar");
+  const [ability, setAbility] = useState<AbilityKey>("lunar");
 
   const spent = useMemo(
     () => STAT_KEYS.reduce((acc, k) => acc + bonus[k], 0),
@@ -59,7 +59,7 @@ export default function CharacterCreator({ onComplete }: Props) {
 
   const previewCon = BASE_STAT + bonus.con;
   const previewMaxHp = MAX_HP_BASE + previewCon * MAX_HP_PER_CON;
-  const previewRerolls = ability === "lucky" ? LUCKY_REROLLS : 0;
+  const previewRerolls = ability === "none" ? LUCKY_REROLLS : 0;
 
   function submit() {
     if (!canSubmit) return;
@@ -78,9 +78,13 @@ export default function CharacterCreator({ onComplete }: Props) {
       hp: maxHp,
       maxHp,
       ability,
+      // #253 〈에테르니아〉 임시 — Kael(솔라리스 탈영병) 기본 + 침식 0 시작.
+      //   Phase 1b 에서 3 주인공 선택 카드 + 시작 침식도 차등 (Kael 80, Rin 10, Solwen 0).
+      protagonist: "kael",
+      stigmaErosion: 0,
       inventory: [],
       flags: {},
-      rerollsLeft: ability === "lucky" ? LUCKY_REROLLS : 0,
+      rerollsLeft: ability === "none" ? LUCKY_REROLLS : 0,
     };
     onComplete(character);
   }
@@ -166,7 +170,7 @@ export default function CharacterCreator({ onComplete }: Props) {
         <div>
           재굴림 횟수:{" "}
           <span className="font-mono font-bold">{previewRerolls}</span>
-          {ability === "lucky" ? (
+          {ability === "none" ? (
             <span className="text-amber-700"> (행운아 어빌)</span>
           ) : (
             <span className="text-amber-700"> (행운아 어빌 선택 시 +{LUCKY_REROLLS})</span>

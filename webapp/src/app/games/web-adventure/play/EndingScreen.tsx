@@ -26,11 +26,14 @@ const STAT_LABELS: Record<StatKey, string> = {
 
 const STAT_ORDER: StatKey[] = ["str", "dex", "int", "cha", "con", "wis"];
 
-/** 엔딩 종류별 *컨테이너* 톤. 기본 amber, 실패는 회색, 정착은 파랑. */
+/** #253 〈에테르니아〉 — 엔딩별 톤. 다크 판타지 6 색. */
 const ENDING_TONE: Record<string, string> = {
-  fail: "bg-gray-100/80 border-gray-300",
-  shopkeeper: "bg-blue-100/70 border-blue-300",
-  wizard_apprentice: "bg-purple-100/70 border-purple-300",
+  ascension: "bg-indigo-100/70 border-indigo-300",
+  revolution: "bg-orange-100/70 border-orange-400",
+  harmony: "bg-emerald-100/70 border-emerald-300",
+  fall: "bg-gray-200/80 border-gray-400",
+  petrification: "bg-slate-200/80 border-slate-400",
+  sylvan_bond: "bg-lime-100/70 border-lime-400",
 };
 
 export default function EndingScreen({ endingId, character, log, onRestart }: Props) {

@@ -8,13 +8,14 @@
 
 import { endingsMeta, type EndingId } from '@/content/web-adventure/endings';
 
+// #253 〈에테르니아〉 — 6 엔딩 (좋음 → 나쁨 흐름).
 const ENDING_ORDER: EndingId[] = [
-  'main',
-  'spirit',
-  'shopkeeper',
-  'goblin_friend',
-  'wizard_apprentice',
-  'fail',
+  'harmony',
+  'ascension',
+  'revolution',
+  'sylvan_bond',
+  'fall',
+  'petrification',
 ];
 
 interface PastRunSummary {

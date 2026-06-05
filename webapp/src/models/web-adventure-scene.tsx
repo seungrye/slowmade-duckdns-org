@@ -127,7 +127,7 @@ const WebAdventureSceneSchema = new Schema(
     isEnding: { type: Boolean },
     endingId: {
       type: String,
-      enum: ["main", "spirit", "fail", "shopkeeper", "goblin_friend", "wizard_apprentice"],
+      enum: ["ascension", "revolution", "harmony", "fall", "petrification", "sylvan_bond"],
     },
     // #222 — /scenes/graph 노드 좌표 (사용자 드래그로 갱신). optional.
     position: { type: PositionSchema },

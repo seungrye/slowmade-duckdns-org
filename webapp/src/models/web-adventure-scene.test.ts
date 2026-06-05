@@ -43,7 +43,7 @@ describe('WebAdventureScene 필수 필드', () => {
   });
 
   it('choices 는 빈 배열이어도 OK (엔딩 씬)', () => {
-    const doc = makeDoc({ choices: [], isEnding: true, endingId: 'main' });
+    const doc = makeDoc({ choices: [], isEnding: true, endingId: 'ascension' });
     const err = doc.validateSync();
     expect(err).toBeUndefined();
   });
@@ -121,7 +121,7 @@ describe('onEnter / endingId', () => {
   });
 
   it('endingId = main 은 통과', () => {
-    const doc = makeDoc({ isEnding: true, endingId: 'main', choices: [] });
+    const doc = makeDoc({ isEnding: true, endingId: 'ascension', choices: [] });
     const err = doc.validateSync();
     expect(err).toBeUndefined();
   });
