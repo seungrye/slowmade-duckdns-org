@@ -137,3 +137,27 @@ describe('#230 blockquote + 코드블럭 — Nanum Gothic Coding monospace 폰�
     });
   });
 });
+
+import fs from "node:fs";
+import path from "node:path";
+
+describe("globals.css — Google Fonts 공식 패턴 클래스 (#232)", () => {
+  const css = fs.readFileSync(path.resolve("src/app/globals.css"), "utf-8");
+
+  test(".nanum-gothic-coding-regular 클래스 정의 존재", () => {
+    expect(css).toMatch(/\.nanum-gothic-coding-regular\s*\{[^}]*font-family:\s*"Nanum Gothic Coding"/);
+    expect(css).toMatch(/\.nanum-gothic-coding-regular\s*\{[^}]*font-weight:\s*400/);
+  });
+
+  test(".nanum-gothic-coding-bold 클래스 정의 존재", () => {
+    expect(css).toMatch(/\.nanum-gothic-coding-bold\s*\{[^}]*font-family:\s*"Nanum Gothic Coding"/);
+    expect(css).toMatch(/\.nanum-gothic-coding-bold\s*\{[^}]*font-weight:\s*700/);
+  });
+
+  test("두 클래스 모두 monospace fallback 포함", () => {
+    const regular = css.match(/\.nanum-gothic-coding-regular\s*\{[^}]+\}/)?.[0] ?? "";
+    const bold = css.match(/\.nanum-gothic-coding-bold\s*\{[^}]+\}/)?.[0] ?? "";
+    expect(regular).toMatch(/monospace/);
+    expect(bold).toMatch(/monospace/);
+  });
+});

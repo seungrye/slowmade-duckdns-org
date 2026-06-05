@@ -101,3 +101,19 @@ body {
   max-width: 100%;
   height: auto;
 }
+/*
+ * Google Fonts 공식 사용 패턴 — Nanum Gothic Coding 클래스.
+ * blockquote / code 셀렉터 적용과 별개로, 다른 요소에 직접 className 으로 적용 가능.
+ * font-family stack 은 셀렉터 측과 동일하게 "Nanum Gothic Coding", monospace fallback.
+ */
+.nanum-gothic-coding-regular {
+  font-family: "Nanum Gothic Coding", monospace;
+  font-weight: 400;
+  font-style: normal;
+}
+
+.nanum-gothic-coding-bold {
+  font-family: "Nanum Gothic Coding", monospace;
+  font-weight: 700;
+  font-style: normal;
+}
