@@ -10,6 +10,12 @@
 // #226 — router.push 제거, SidePanel 로 인라인 편집.
 //   - 클릭 → setSelectedSceneId.
 //   - 저장 콜백 → scenes state 의 해당 씬 교체 → 노드 data (title 등) 즉시 반영.
+//
+// #231 — bevy-rogue quest CMS 패턴 회수.
+//   - 기본 상태(selectedSceneId=null) → SidePanel 미렌더. 그래프가 full-width.
+//   - 노드 클릭 → SidePanel mount + slide-in (CSS transition 300ms).
+//   - 닫기 → onClose → setSelectedSceneId(null) → unmount.
+//   - "노드를 클릭하면 편집" 안내 메시지 제거 (애초에 패널이 안 보임).
 
 "use client";
 
@@ -92,7 +98,8 @@ export default function GraphPage() {
   useRouter();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // #226 — 사이드패널 편집 대상 씬 id. null = 안내 메시지.
+  // #226 — 사이드패널 편집 대상 씬 id.
+  // #231 — null 시 SidePanel 자체 미렌더 (mount/unmount + slide-in/out).
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // #225 — drag 시작 좌표 기억 (id → {x,y}).
@@ -201,7 +208,7 @@ export default function GraphPage() {
           </Link>
           <h1 className="text-2xl font-bold mt-1">씬 흐름 차트</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            노드 클릭 = 우측 패널 편집 / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre TB
+            노드 클릭 = 우측 패널 편집 (슬라이드인) / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre TB
           </p>
         </div>
         <Legend />
@@ -233,11 +240,13 @@ export default function GraphPage() {
               <Controls />
             </ReactFlow>
           </div>
-          <SidePanel
-            sceneId={selectedSceneId}
-            onClose={() => setSelectedSceneId(null)}
-            onSaved={handleSceneSaved}
-          />
+          {selectedSceneId && (
+            <SidePanel
+              sceneId={selectedSceneId}
+              onClose={() => setSelectedSceneId(null)}
+              onSaved={handleSceneSaved}
+            />
+          )}
         </div>
       )}
     </div>

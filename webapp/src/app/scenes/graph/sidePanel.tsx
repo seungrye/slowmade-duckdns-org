@@ -3,8 +3,13 @@
 // #226 — /scenes/[id] 페이지로 라우팅하지 않고 같은 컴포넌트들을
 // (sceneForm / choiceEditor / conditionBuilder) 재사용해 우측 패널에서 편집.
 //
+// #231 — bevy-rogue quest CMS 패턴 회수.
+//   - sceneId=null 시 → null 반환 (DOM 미렌더). 안내 메시지 제거.
+//   - 부모 (/scenes/graph/page.tsx) 가 `{selectedSceneId && <SidePanel ... />}`
+//     로 조건부 렌더 (= mount/unmount) 하며, 첫 mount 시 slide-in 애니메이션을
+//     주기 위해 패널 자체에 transition + translate-x 토글을 둔다.
+//
 // 동작:
-//   - sceneId=null     → 안내 메시지.
 //   - sceneId 설정     → /api/web-adventure/scenes/[id] 로 로드 → 폼 + 선택지 편집.
 //   - 저장 버튼        → PUT → onSaved 콜백 (page 의 nodes data 갱신).
 //   - 닫기 버튼        → onClose 콜백.
@@ -12,7 +17,6 @@
 // 반응형 (MVP):
 //   - sm 이상: 우측 고정 패널 (w-96).
 //   - sm 미만: bottom drawer (화면 하단 max-h-[80vh] overflow-y-auto).
-//     sceneId 가 있을 때만 drawer 가 펼쳐지도록 transform 으로 토글.
 
 "use client";
 
@@ -28,12 +32,26 @@ interface Props {
 }
 
 export function SidePanel({ sceneId, onClose, onSaved }: Props) {
+  // #231 — sceneId=null 시 컴포넌트 자체를 mount 하지 않는다 (bevy-rogue 패턴).
+  // 부모가 `{selectedSceneId && <SidePanel ... />}` 로 가드해도, 직접 호출자
+  // 안전망으로 같은 분기를 유지한다.
   const [scene, setScene] = useState<Scene | null>(null);
   const [allSceneIds, setAllSceneIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  // #231 — mount 직후 slide-in 을 위해 첫 paint 후 translate-x 를 0 으로 토글.
+  const [slidIn, setSlidIn] = useState(false);
+  useEffect(() => {
+    if (!sceneId) {
+      setSlidIn(false);
+      return;
+    }
+    // 다음 frame 에서 transition 효과로 들어오게 한다.
+    const raf = requestAnimationFrame(() => setSlidIn(true));
+    return () => cancelAnimationFrame(raf);
+  }, [sceneId]);
 
   // sceneId 변경 시 fetch.
   useEffect(() => {
@@ -109,27 +127,27 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
   }
 
   // ── 렌더링 ──────────────────────────────────────────────────────────────────
-  // 컨테이너는 항상 sceneId 속성 + data-testid 제공 (테스트 식별).
-  // sm 이상: side panel. sm 미만: bottom drawer.
+  // #231 — sceneId=null → null 반환 (DOM 미렌더). 부모가 mount/unmount.
+  // 안내 메시지 제거.
+  if (!sceneId) {
+    return null;
+  }
 
+  // 슬라이드인 transition (300ms ease-out).
+  // sm 이상 → 우측에서 들어옴 (translate-x-full → translate-x-0).
+  // sm 미만 → 하단에서 올라옴 (translate-y-full → translate-y-0).
+  const slideClass = slidIn
+    ? "translate-x-0 translate-y-0"
+    : "translate-x-0 translate-y-full sm:translate-x-full sm:translate-y-0";
   const baseAside =
     "bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 overflow-y-auto " +
+    "transition-transform duration-300 ease-out " +
+    slideClass +
+    " " +
     // sm 이상 — 우측 사이드.
     "sm:border-l sm:w-96 sm:max-h-none sm:h-full sm:static " +
     // sm 미만 — bottom drawer.
     "fixed bottom-0 left-0 right-0 max-h-[80vh] border-t sm:border-t-0 shadow-lg sm:shadow-none z-20";
-
-  if (!sceneId) {
-    return (
-      <aside
-        data-testid="side-panel"
-        data-scene-id=""
-        className={baseAside + " p-4 hidden sm:block"}
-      >
-        <p className="text-sm text-gray-500">노드를 클릭하면 편집할 수 있어요.</p>
-      </aside>
-    );
-  }
 
   if (loading) {
     return (

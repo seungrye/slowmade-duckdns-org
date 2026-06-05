@@ -145,20 +145,69 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("/scenes/graph — SidePanel 통합 (#226)", () => {
-  it("페이지 렌더 시 SidePanel 컨테이너 (data-testid='side-panel') 항상 노출", async () => {
+describe("/scenes/graph — SidePanel 통합 (#231)", () => {
+  it("초기 상태 — selectedSceneId=null → SidePanel 미렌더 (data-testid='side-panel' 없음)", async () => {
     const { container } = render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
     const panel = container.querySelector("[data-testid='side-panel']");
-    expect(panel).toBeTruthy();
+    expect(panel).toBeNull();
   });
 
-  it("초기 상태 — sceneId=null → 안내 메시지 노출", async () => {
+  it("초기 상태 — '노드를 클릭하면 편집' 안내 메시지 없음", async () => {
     render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
-    expect(screen.getByText(/노드를 클릭하면 편집/)).toBeTruthy();
+    expect(screen.queryByText(/노드를 클릭하면 편집/)).toBeNull();
+  });
+
+  it("노드 클릭 (드래그<5px) 후 SidePanel 렌더", async () => {
+    const { container } = render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    const onDragStart = flowProps.current.onNodeDragStart as (
+      e: unknown,
+      n: { id: string; position: { x: number; y: number } },
+    ) => void;
+    const onDragStop = flowProps.current.onNodeDragStop as (
+      e: unknown,
+      n: { id: string; position: { x: number; y: number } },
+    ) => void;
+    await act(async () => {
+      onDragStart({}, { id: "scene_01", position: { x: 0, y: 0 } });
+      onDragStop({}, { id: "scene_01", position: { x: 1, y: 1 } });
+    });
+    await act(async () => {});
+    const panel = container.querySelector("[data-testid='side-panel']");
+    expect(panel).toBeTruthy();
+    expect(panel?.getAttribute("data-scene-id")).toBe("scene_01");
+  });
+
+  it("닫기 버튼 → SidePanel 사라짐 (unmount)", async () => {
+    const { container } = render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    const onDragStart = flowProps.current.onNodeDragStart as (
+      e: unknown,
+      n: { id: string; position: { x: number; y: number } },
+    ) => void;
+    const onDragStop = flowProps.current.onNodeDragStop as (
+      e: unknown,
+      n: { id: string; position: { x: number; y: number } },
+    ) => void;
+    await act(async () => {
+      onDragStart({}, { id: "scene_01", position: { x: 0, y: 0 } });
+      onDragStop({}, { id: "scene_01", position: { x: 1, y: 1 } });
+    });
+    await act(async () => {});
+    expect(container.querySelector("[data-testid='side-panel']")).toBeTruthy();
+    // 닫기 버튼 클릭 → SidePanel unmount.
+    const closeBtn = screen.getByRole("button", { name: /닫기/ });
+    await act(async () => {
+      closeBtn.click();
+    });
+    await act(async () => {});
+    expect(container.querySelector("[data-testid='side-panel']")).toBeNull();
   });
 });
 

@@ -51,10 +51,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("/scenes/graph — SidePanel (#226)", () => {
-  it("sceneId=null 일 때 안내 메시지를 표시한다", () => {
-    render(<SidePanel sceneId={null} onClose={() => {}} onSaved={() => {}} />);
-    expect(screen.getByText(/노드를 클릭하면 편집/)).toBeTruthy();
+describe("/scenes/graph — SidePanel (#231)", () => {
+  it("sceneId=null 일 때 null 을 반환한다 (DOM 미렌더)", () => {
+    const { container } = render(
+      <SidePanel sceneId={null} onClose={() => {}} onSaved={() => {}} />,
+    );
+    // 안내 메시지 X, aside 자체 X.
+    expect(container.querySelector("[data-testid='side-panel']")).toBeNull();
+    expect(screen.queryByText(/노드를 클릭하면 편집/)).toBeNull();
   });
 
   it("sceneId 설정 시 fetch 호출 + 로딩 → SceneForm 렌더", async () => {
