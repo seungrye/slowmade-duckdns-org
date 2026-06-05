@@ -91,37 +91,4 @@ body {
     }
   }
 
-/*
- * mermaid 다이어그램 출력 보강 (#243).
- * mermaid 11 의 calculateSvgSizeAttrs(tY) 는 useMaxWidth:true 시 SVG 의 inline
- * style 로 `max-width: <natural>px` 를 박는다 (flowchart 216px, sequence 590px 등).
- * 이 inline 이 부모 폭(max-w-4xl=896px) 보다 작으면 차트만 작아 보임.
- * !important 가 *없으면* inline style 과 specificity 동률 → inline 이 이김.
- * !important 부여로 *모든* mermaid 차트가 부모 폭 가득 (CSS spec: !important
- * author rule > element inline style).
- */
-.mermaid-rendered svg {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: auto !important;
-}
-
-/*
- * #244 — mermaid 의 라벨 measure 단계 보정.
- *   mermaid 11 의 flowchart-v2 는 라벨을 foreignObject 안 div 로 그리고
- *   markdown 처리로 텍스트를 <p> 로 wrap. p 가 block → 부모 max-width 까지
- *   확장 → measure 시 노드 폭 과대 → viewBox 폭 2056 으로 부풀음.
- *   p 를 inline 으로 강제하고 margin/padding 제거해 글자 폭만큼만 측정.
- *   글로벌 selector — mermaid 의 *body 직접 부착하는 측정용 임시 div* 도 잡힘.
- */
-.nodeLabel p,
-.edgeLabel p,
-foreignObject p {
-  display: inline !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* #252 — viz-js 제거 (mermaid 단일화). 위 .mermaid-rendered svg text font-family
- * Helvetica 강제는 viz-js 텍스트 박스 뚫음 회피용이었음 — 더 이상 불필요.
- * mermaid SVG 는 사이트 기본 폰트(Pretendard) 그대로. */
+/* #253 — mermaid 의존 전체 제거 (사용자 결정). 관련 CSS rule 도 함께 제거. */

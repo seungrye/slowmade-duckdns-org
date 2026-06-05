@@ -52,9 +52,8 @@ describe('#232 폰트 변경 전체 되돌리기 — 흔적 0', () => {
     ).rejects.toThrow();
   });
 
-  test('#229 mermaid svg 크기 규칙은 globals.css 에 유지된다', async () => {
+  test('#253 mermaid CSS rule 은 제거되어 더 이상 globals.css 에 없다', async () => {
     const css = await readFile(resolve(projectRoot, 'src/app/globals.css'), 'utf-8');
-    expect(css).toMatch(/\.mermaid-rendered svg/);
-    expect(css).toMatch(/max-width:\s*100%/);
+    expect(css).not.toMatch(/\.mermaid-rendered svg/);
   });
 });
