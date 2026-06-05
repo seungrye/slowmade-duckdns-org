@@ -108,11 +108,29 @@ let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   pushMock.mockClear();
-  fetchMock = vi.fn().mockImplementation(async (url: string) => {
+  fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
     if (url.includes("/api/web-adventure/content/v1")) {
       return {
         ok: true,
         json: async () => ({ success: true, data: { scenes: makeMockScenes() } }),
+      } as Response;
+    }
+    // #226 — SidePanel 의 GET /api/web-adventure/scenes/[id].
+    if (url.includes("/api/web-adventure/scenes/") && (!init || !init.method || init.method === "GET")) {
+      // url 끝의 id 추출.
+      const id = url.split("/api/web-adventure/scenes/")[1] ?? "";
+      const all = makeMockScenes();
+      const found = all.find((s) => (s as { id: string }).id === decodeURIComponent(id));
+      return {
+        ok: true,
+        json: async () => ({ success: true, data: found ?? null }),
+      } as Response;
+    }
+    // SidePanel 의 GET /api/web-adventure/scenes (씬 ID 목록).
+    if (url.endsWith("/api/web-adventure/scenes")) {
+      return {
+        ok: true,
+        json: async () => ({ success: true, data: makeMockScenes() }),
       } as Response;
     }
     if (url.includes("/api/web-adventure/scenes/")) {
@@ -125,6 +143,23 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("/scenes/graph — SidePanel 통합 (#226)", () => {
+  it("페이지 렌더 시 SidePanel 컨테이너 (data-testid='side-panel') 항상 노출", async () => {
+    const { container } = render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    const panel = container.querySelector("[data-testid='side-panel']");
+    expect(panel).toBeTruthy();
+  });
+
+  it("초기 상태 — sceneId=null → 안내 메시지 노출", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    expect(screen.getByText(/노드를 클릭하면 편집/)).toBeTruthy();
+  });
 });
 
 describe("/scenes/graph — 페이지", () => {
@@ -152,11 +187,11 @@ describe("/scenes/graph — 페이지", () => {
     }
   });
 
-  it("노드 클릭 → router.push(`/scenes/{id}`) 호출 (드래그 거리 0 = click)", async () => {
-    render(<GraphPage />);
+  it("노드 클릭 → router.push 호출 X + 사이드패널 활성화 (#226)", async () => {
+    const { container } = render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
-    // #225 — onNodeClick 제거됨. drag start → stop 거리 0 이면 click 으로 처리.
+    // #226 — drag 거리 0 = click → setSelectedSceneId(id). router.push 호출 안함.
     const onDragStart = flowProps.current.onNodeDragStart as (
       e: unknown,
       n: { id: string; position: { x: number; y: number } },
@@ -165,9 +200,16 @@ describe("/scenes/graph — 페이지", () => {
       e: unknown,
       n: { id: string; position: { x: number; y: number } },
     ) => void;
-    onDragStart({}, { id: "scene_01", position: { x: 0, y: 0 } });
-    onDragStop({}, { id: "scene_01", position: { x: 0, y: 0 } });
-    expect(pushMock).toHaveBeenCalledWith("/scenes/scene_01");
+    await act(async () => {
+      onDragStart({}, { id: "scene_01", position: { x: 0, y: 0 } });
+      onDragStop({}, { id: "scene_01", position: { x: 0, y: 0 } });
+    });
+    await act(async () => {});
+    expect(pushMock).not.toHaveBeenCalled();
+    // 사이드패널 컨테이너가 sceneId 를 받아 활성화 표시.
+    const sidePanel = container.querySelector("[data-testid='side-panel']") as HTMLElement;
+    expect(sidePanel).toBeTruthy();
+    expect(sidePanel.getAttribute("data-scene-id")).toBe("scene_01");
   });
 
   it("페이지 상단에 '씬 목록' 으로 돌아가는 링크 노출", async () => {
@@ -258,8 +300,8 @@ describe("/scenes/graph — 드래그 vs 클릭 동작 (#225)", () => {
     expect(typeof flowProps.current.onNodeDragStop).toBe("function");
   });
 
-  it("드래그 < 5px 시 router.push(/scenes/[id]) — click 처리", async () => {
-    render(<GraphPage />);
+  it("드래그 < 5px 시 사이드패널 활성화 — click 처리 (#226)", async () => {
+    const { container } = render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
 
@@ -272,21 +314,28 @@ describe("/scenes/graph — 드래그 vs 클릭 동작 (#225)", () => {
       n: { id: string; position: { x: number; y: number } },
     ) => void;
 
-    onDragStart({}, { id: "scene_01", position: { x: 0, y: 0 } });
-    onDragStop({}, { id: "scene_01", position: { x: 2, y: 3 } });
+    await act(async () => {
+      onDragStart({}, { id: "scene_01", position: { x: 0, y: 0 } });
+      onDragStop({}, { id: "scene_01", position: { x: 2, y: 3 } });
+    });
+    await act(async () => {});
 
-    expect(pushMock).toHaveBeenCalledWith("/scenes/scene_01");
-    // PUT 은 호출되지 않아야 한다.
+    expect(pushMock).not.toHaveBeenCalled();
+    const sidePanel = container.querySelector("[data-testid='side-panel']") as HTMLElement;
+    expect(sidePanel?.getAttribute("data-scene-id")).toBe("scene_01");
+
+    // PUT (위치 저장) 은 호출되지 않아야 한다.
     const putCall = fetchMock.mock.calls.find(
       (c: unknown[]) =>
         typeof c[0] === "string" &&
-        (c[0] as string).includes("/api/web-adventure/scenes/"),
+        (c[0] as string).includes("/api/web-adventure/scenes/scene_01") &&
+        (c[1] as { method?: string } | undefined)?.method === "PUT",
     );
     expect(putCall).toBeUndefined();
   });
 
-  it("드래그 ≥ 5px 시 PUT /api/web-adventure/scenes/[id] — router.push 호출 X", async () => {
-    render(<GraphPage />);
+  it("드래그 ≥ 5px 시 PUT /api/web-adventure/scenes/[id] — 사이드패널 활성화 X (#226)", async () => {
+    const { container } = render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
 
@@ -310,6 +359,8 @@ describe("/scenes/graph — 드래그 vs 클릭 동작 (#225)", () => {
       });
 
       expect(pushMock).not.toHaveBeenCalled();
+      const sidePanel = container.querySelector("[data-testid='side-panel']") as HTMLElement;
+      expect(sidePanel?.getAttribute("data-scene-id")).toBeFalsy();
 
       const putCall = fetchMock.mock.calls.find(
         (c: unknown[]) =>

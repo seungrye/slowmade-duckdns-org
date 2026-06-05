@@ -3,9 +3,13 @@
 // #222 (6 주차):
 //   - 30 씬 fetch (/api/web-adventure/content/v1)
 //   - dagre TB 자동 레이아웃 (savedPosition 있는 노드는 유지)
-//   - 노드 클릭 → /scenes/[id] 이동 (편집 페이지)
+//   - 노드 클릭 → /scenes/[id] 이동 (편집 페이지) — #226 부터 우측 사이드패널 인라인 편집.
 //   - 노드 드래그 → debounce 500ms PUT (position 만)
 //   - 엔딩 6 색 / 엣지 4 종 시각 구분
+//
+// #226 — router.push 제거, SidePanel 로 인라인 편집.
+//   - 클릭 → setSelectedSceneId.
+//   - 저장 콜백 → scenes state 의 해당 씬 교체 → 노드 data (title 등) 즉시 반영.
 
 "use client";
 
@@ -32,6 +36,7 @@ import {
   type SceneWithPosition,
 } from "@/lib/web-adventure/engine/graph";
 import SceneNode from "./sceneNode";
+import { SidePanel } from "./sidePanel";
 
 // 엣지 4 종 색상.
 // plain → 진한 회색 실선.
@@ -77,14 +82,18 @@ const NODE_TYPES: NodeTypes = {
 };
 
 // #225 — 드래그 vs 클릭 판정 임계값 (px).
-// dragStart vs dragStop 거리가 이 값 미만이면 click 으로 간주해 /scenes/[id] 라우팅.
+// dragStart vs dragStop 거리가 이 값 미만이면 click 으로 간주.
 // 이상이면 PUT 으로 위치 저장.
 const DRAG_CLICK_THRESHOLD_PX = 5;
 
 export default function GraphPage() {
-  const router = useRouter();
+  // #226 — router.push 는 더 이상 사용하지 않지만, useRouter 를 호출해
+  // next/navigation 컨텍스트와 호환을 유지한다 (테스트 mock 호환).
+  useRouter();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // #226 — 사이드패널 편집 대상 씬 id. null = 안내 메시지.
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // #225 — drag 시작 좌표 기억 (id → {x,y}).
   // onNodeDragStart 에서 set, onNodeDragStop 에서 비교 후 clear.
@@ -135,8 +144,8 @@ export default function GraphPage() {
     dragStartRef.current[node.id] = { x: node.position.x, y: node.position.y };
   }, []);
 
-  // #225 — 노드 드래그 종료 시:
-  //   - 시작점 대비 거리 < 5px → click 으로 처리 → /scenes/[id] 라우팅.
+  // #225 / #226 — 노드 드래그 종료 시:
+  //   - 시작점 대비 거리 < 5px → click 으로 처리 → setSelectedSceneId (사이드패널).
   //   - 거리 ≥ 5px → debounce 500ms PUT (위치 저장).
   // 라우팅 / PUT 충돌을 방지하기 위해 별도 onNodeClick 핸들러를 두지 않는다.
   const handleNodeDragStop = useCallback<
@@ -152,7 +161,7 @@ export default function GraphPage() {
       const isClick = dx < DRAG_CLICK_THRESHOLD_PX && dy < DRAG_CLICK_THRESHOLD_PX;
 
       if (isClick) {
-        router.push(`/scenes/${id}`);
+        setSelectedSceneId(id);
         return;
       }
 
@@ -167,8 +176,21 @@ export default function GraphPage() {
         });
       }, 500);
     },
-    [router],
+    [],
   );
+
+  // #226 — SidePanel 저장 콜백 → scenes state 의 해당 씬 교체.
+  // ReactFlow 의 rfNodes 가 useMemo 로 scenes 에 의존하므로 자동 재계산 → 노드 data 갱신.
+  const handleSceneSaved = useCallback((updated: Scene) => {
+    setScenes((prev) => {
+      if (!prev) return prev;
+      const idx = prev.findIndex((s) => s.id === updated.id);
+      if (idx < 0) return prev;
+      const next = prev.slice();
+      next[idx] = { ...prev[idx], ...updated } as SceneWithPosition;
+      return next;
+    });
+  }, []);
 
   return (
     <div className="mx-auto px-4 py-6">
@@ -179,7 +201,7 @@ export default function GraphPage() {
           </Link>
           <h1 className="text-2xl font-bold mt-1">씬 흐름 차트</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            노드 클릭 = 편집 / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre TB
+            노드 클릭 = 우측 패널 편집 / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre TB
           </p>
         </div>
         <Legend />
@@ -191,23 +213,31 @@ export default function GraphPage() {
         <p className="text-gray-400">불러오는 중...</p>
       ) : (
         <div
+          className="flex flex-col sm:flex-row gap-0 sm:gap-2"
           style={{ width: "100%", height: "calc(100vh - 200px)", minHeight: 600 }}
           data-graph-container
         >
-          <ReactFlow
-            nodes={rfNodes}
-            edges={rfEdges}
-            nodeTypes={NODE_TYPES}
-            nodesDraggable
-            onNodeDragStart={handleNodeDragStart}
-            onNodeDragStop={handleNodeDragStop}
-            fitView
-            minZoom={0.2}
-            maxZoom={2}
-          >
-            <Background gap={20} size={1} color="#e5e7eb" />
-            <Controls />
-          </ReactFlow>
+          <div className="flex-1 min-w-0 h-full">
+            <ReactFlow
+              nodes={rfNodes}
+              edges={rfEdges}
+              nodeTypes={NODE_TYPES}
+              nodesDraggable
+              onNodeDragStart={handleNodeDragStart}
+              onNodeDragStop={handleNodeDragStop}
+              fitView
+              minZoom={0.2}
+              maxZoom={2}
+            >
+              <Background gap={20} size={1} color="#e5e7eb" />
+              <Controls />
+            </ReactFlow>
+          </div>
+          <SidePanel
+            sceneId={selectedSceneId}
+            onClose={() => setSelectedSceneId(null)}
+            onSaved={handleSceneSaved}
+          />
         </div>
       )}
     </div>
