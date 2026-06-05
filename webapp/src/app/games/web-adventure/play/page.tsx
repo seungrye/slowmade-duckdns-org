@@ -66,7 +66,7 @@ export default function WebAdventurePlayPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">
+      <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4 web-adventure-page">
         <div className="max-w-2xl mx-auto text-center">
           <p className="text-red-700 mb-3">오류: {error}</p>
           <button
@@ -83,7 +83,7 @@ export default function WebAdventurePlayPage() {
 
   if (!scenes) {
     return (
-      <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">
+      <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4 web-adventure-page">
         <div className="max-w-2xl mx-auto text-center text-amber-800">
           씬 데이터 로딩…
         </div>
@@ -152,7 +152,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   }, [state, runIndex]);
 
   return (
-    <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">
+    <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4 web-adventure-page">
       <div className="max-w-5xl mx-auto">
         <header className="mb-4 text-center">
           <h1 className="text-2xl md:text-3xl font-bold">Web Adventure</h1>

@@ -61,7 +61,7 @@ export default function GalleryPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">
+    <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4 web-adventure-page">
       <div className="max-w-5xl mx-auto">
         <header className="mb-4 flex items-center justify-between flex-wrap gap-2">
           <div>

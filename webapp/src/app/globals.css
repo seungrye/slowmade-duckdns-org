@@ -92,3 +92,11 @@ body {
   }
 
 /* #253 — mermaid 의존 전체 제거 (사용자 결정). 관련 CSS rule 도 함께 제거. */
+
+/*
+ * #247 — Web Adventure 페이지에만 Pretendard 폰트 적용 (양피지 색감은 기존
+ * amber-50/100 톤 그대로). 사이트 전체 폰트는 영향 없음.
+ */
+.web-adventure-page {
+  font-family: 'Pretendard Variable', 'Pretendard', sans-serif;
+}

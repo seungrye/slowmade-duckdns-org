@@ -46,6 +46,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             }}
           />
         )}
+        {/* #247 — Pretendard 폰트 (jsdelivr CDN). web-adventure 페이지의
+            .web-adventure-page 클래스에서만 font-family 로 사용. */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
+        />
       </head>
       <body>
         <Providers>
