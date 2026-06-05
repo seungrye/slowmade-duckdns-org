@@ -10,6 +10,7 @@ import {
   LOCAL_STORAGE_PAST_RUNS_KEY,
 } from "@/lib/web-adventure/use-migrate-on-login";
 import { logAdvEvent } from "@/lib/web-adventure/analytics";
+import { buildWorldFlags } from "@/lib/web-adventure/world-flags";
 import Link from "next/link";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
@@ -105,9 +106,43 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
 
   // #238 — 자동 저장 + 마운트 시 복원.
   // #239 — 회차 시스템: ended 진입 시 end-run API 호출 + runIndex +1.
+  // #256 — world flag 부메랑: 이전 회차 endingId → world.* flags 주입.
   const [runIndex, setRunIndex] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [worldFlags, setWorldFlags] = useState<Record<string, boolean>>({});
   const endRunSentRef = useRef<string | null>(null);
+
+  // #256 — 마운트 시 past_runs fetch → worldFlags 계산.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/web-adventure/past-runs");
+        if (!cancelled && res.ok) {
+          const json = (await res.json()) as { data?: Array<{ endingId?: string }> };
+          if (Array.isArray(json?.data)) {
+            setWorldFlags(buildWorldFlags(json.data));
+            return;
+          }
+        }
+      } catch {
+        /* fallback to localStorage */
+      }
+      if (cancelled) return;
+      try {
+        const raw = window.localStorage.getItem(LOCAL_STORAGE_PAST_RUNS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Array<{ endingId?: string }>;
+          if (Array.isArray(parsed)) setWorldFlags(buildWorldFlags(parsed));
+        }
+      } catch {
+        /* 무시 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useAutoSave(state, {
     runIndex,
@@ -202,22 +237,27 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4 web-adventure-page">
       <div className="max-w-5xl mx-auto">
         <header className="mb-4 text-center">
-          <h1 className="text-2xl md:text-3xl font-bold">Web Adventure</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">에테르니아의 추락</h1>
           <p className="text-xs text-amber-700 mt-1">
-            한국형 CYOA · 30 씬 · 6 엔딩 · 회차 누적
+            천체 마법공학 다크 에픽 · 3 주인공 · 6 엔딩 · 세 달이 정렬한다
           </p>
         </header>
 
         {state.phase === "creating" && (
           <CharacterCreator
             onComplete={(character, startScene) => {
-              // #245 — adv_run_started. #251 protagonist 도 함께 기록.
+              // #245 — adv_run_started.
               logAdvEvent("run_started", {
                 ability: character.ability,
                 protagonist: character.protagonist,
                 run_index: runIndex,
               });
-              dispatch({ type: "START_GAME", character, startScene });
+              // #256 — world flag 주입 (이전 회차의 endingId 기반).
+              const charWithFlags = {
+                ...character,
+                flags: { ...character.flags, ...worldFlags },
+              };
+              dispatch({ type: "START_GAME", character: charWithFlags, startScene });
             }}
           />
         )}
