@@ -1,17 +1,13 @@
-// 아이템 카탈로그 — 3 주차 인벤토리 시스템.
+// 〈에테르니아의 추락〉 아이템 카탈로그 (#252 리프래시).
 //
 // 5 종류:
-//   - weapon: 공격력 (5 주차 전투에서 사용)
-//   - consumable: heal — HP 회복 (USE_ITEM 즉시 사용)
-//   - key: unlocks — 특정 씬 분기 (현재는 conditional hasItem 로 표현)
-//   - passive: passiveStat — 보유 시 effectiveStat 에 자동 반영
-//   - quest: 이벤트 트리거 / 분기 조건용 (예: super_tintham_cracker)
+//   - weapon: 공격력 (전투 시뮬레이션 시)
+//   - consumable: heal — HP 회복 또는 stigma 감소 (USE_ITEM 즉시 사용)
+//   - key: unlocks — 특정 씬 분기 (conditional hasItem)
+//   - passive: passiveStat — 보유 시 effectiveStat 자동 반영
+//   - quest: 이벤트 트리거 / 조건용
 //
-// 인벤토리 cap (INVENTORY_CAP = 8) — reducer 가 addItems 시 cap 초과분 무시.
-//
-// #203 — stackable 필드:
-//   - true: 같은 id 를 여러 개 보유 가능 (consumable 만 해당).
-//   - false: 같은 id 가 이미 인벤에 있으면 onEnter.addItems 가 skip (재진입 중복 방지).
+// 인벤토리 cap (INVENTORY_CAP = 8).
 
 import type { StatKey } from "@/types/web-adventure";
 
@@ -22,10 +18,11 @@ export type Item = {
   displayName: string;
   desc: string;
   kind: ItemKind;
-  /** true 면 같은 id 를 여러 개 보유 가능. false 면 onEnter.addItems 가 중복 skip. */
   stackable: boolean;
   attack?: number;
   heal?: number;
+  /** #253 — 사용 시 침식도 감소 (양수 값). 음수면 침식 증가. */
+  stigmaDelta?: number;
   passiveStat?: { stat: StatKey; bonus: number };
   unlocks?: string;
 };
@@ -33,96 +30,94 @@ export type Item = {
 export const INVENTORY_CAP = 8;
 
 export const items: Record<string, Item> = {
-  bread: {
-    id: "bread",
-    displayName: "빵",
-    desc: "갓 구운 빵. 소량 회복.",
+  // ── 주인공 시작 인벤 ────────────────────────────────────────────────
+  patient_gown: {
+    id: "patient_gown",
+    displayName: "환자복",
+    desc: "솔라리스 의무실의 표준 환자복. 카멜레온 같은 회색.",
+    kind: "quest",
+    stackable: false,
+  },
+  medical_bandage: {
+    id: "medical_bandage",
+    displayName: "의료용 붕대",
+    desc: "급한 출혈은 막을 수 있다.",
     kind: "consumable",
     stackable: true,
-    heal: 20,
+    heal: 5,
   },
-  herb: {
-    id: "herb",
-    displayName: "약초",
-    desc: "산에서 자란 약초. 상처를 다스린다.",
-    kind: "consumable",
-    stackable: true,
-    heal: 40,
+  investigator_badge: {
+    id: "investigator_badge",
+    displayName: "수사관 배지",
+    desc: "아이언가드 공국의 신분증. 잘 쓰면 문이 열린다.",
+    kind: "quest",
+    stackable: false,
   },
-  rusty_sword: {
-    id: "rusty_sword",
-    displayName: "녹슨 검",
-    desc: "오래된 검. 그래도 베인다.",
+  service_revolver: {
+    id: "service_revolver",
+    displayName: "지급 권총",
+    desc: "6 발. 가솔린 탄. 정확하지만 시끄럽다.",
+    kind: "weapon",
+    stackable: false,
+    attack: 4,
+  },
+  sylvan_bow: {
+    id: "sylvan_bow",
+    displayName: "정령 활",
+    desc: "세계수 가지로 만든 활. 영수의 분노가 깃들어 있다.",
     kind: "weapon",
     stackable: false,
     attack: 3,
   },
-  torch: {
-    id: "torch",
-    displayName: "횃불",
-    desc: "어둠 속에서도 길을 비춘다.",
-    kind: "key",
-    stackable: false,
-    unlocks: "cave_inside",
+  spirit_herb: {
+    id: "spirit_herb",
+    displayName: "영초",
+    desc: "세계수의 작은 잎. 씹으면 정신이 맑아진다.",
+    kind: "consumable",
+    stackable: true,
+    heal: 8,
   },
-  rusty_key: {
-    id: "rusty_key",
-    displayName: "녹슨 열쇠",
-    desc: "어느 문의 열쇠인지 모른다.",
-    kind: "key",
+
+  // ── 성흔 관련 핵심 아이템 ─────────────────────────────────────────
+  ether_refined_water: {
+    id: "ether_refined_water",
+    displayName: "에테르 정제수",
+    desc: "푸른빛이 도는 액체. 한 모금이면 침식이 잠시 멎는다. 귀하다.",
+    kind: "consumable",
+    stackable: true,
+    stigmaDelta: -3,
+  },
+  mana_stone_fragment: {
+    id: "mana_stone_fragment",
+    displayName: "마력석 파편",
+    desc: "삼키면 마력이 잠시 활성된다. 그러나 몸은 더 굳어간다.",
+    kind: "consumable",
+    stackable: true,
+    stigmaDelta: 5,
+  },
+
+  // ── 분기/퀘스트 아이템 ──────────────────────────────────────────
+  imperial_seal: {
+    id: "imperial_seal",
+    displayName: "사제단 인장",
+    desc: "은빛으로 빛나는 인장. 솔라리스 사제단 고위급의 표식.",
+    kind: "quest",
     stackable: false,
   },
-  spirit_glasses: {
-    id: "spirit_glasses",
-    displayName: "산신령의 안경",
-    desc: "보이지 않는 것을 보게 한다. 지혜 +1.",
+  ether_gas_canister: {
+    id: "ether_gas_canister",
+    displayName: "에테르 가솔린 통",
+    desc: "노란 라벨이 붙은 작은 통. 무겁고 흔들리면 안 된다.",
+    kind: "quest",
+    stackable: true,
+  },
+  spirit_beast_feather: {
+    id: "spirit_beast_feather",
+    displayName: "영수의 깃털",
+    desc: "은은하게 빛나는 깃털. 정령의 일부가 깃들어 있다.",
     kind: "passive",
     stackable: false,
     passiveStat: { stat: "wis", bonus: 1 },
-  },
-  goblin_charm: {
-    id: "goblin_charm",
-    displayName: "도깨비 부적",
-    desc: "도깨비의 우정. 카리스마 +1.",
-    kind: "passive",
-    stackable: false,
-    passiveStat: { stat: "cha", bonus: 1 },
-  },
-  spellbook: {
-    id: "spellbook",
-    displayName: "마법서",
-    desc: "낡았지만 살아 있는 글자들. 지능 +1.",
-    kind: "passive",
-    stackable: false,
-    passiveStat: { stat: "int", bonus: 1 },
-  },
-  market_receipt: {
-    id: "market_receipt",
-    displayName: "시장 영수증",
-    desc: "정당하게 산 증거.",
-    kind: "quest",
-    stackable: false,
-  },
-  super_tintham_cracker: {
-    id: "super_tintham_cracker",
-    displayName: "졸라맛있는 틴탐 크래커",
-    desc: "장로가 사랑하는 그 비밀 간식.",
-    kind: "quest",
-    stackable: false,
-  },
-  scroll: {
-    id: "scroll",
-    displayName: "낡은 두루마리",
-    desc: "글자가 절반쯤 지워진 두루마리.",
-    kind: "quest",
-    stackable: false,
-  },
-  companion_token: {
-    id: "companion_token",
-    displayName: "동행 증표",
-    desc: "누군가가 너와 함께한다는 증거.",
-    kind: "quest",
-    stackable: false,
   },
 };
 

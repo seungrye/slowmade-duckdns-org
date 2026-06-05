@@ -14,7 +14,7 @@ function makeCharacter(overrides: Partial<Character> = {}): Character {
     ability: 'lunar',
     protagonist: 'kael',
     stigmaErosion: 0,
-    inventory: ['bread', 'torch'],
+    inventory: ['medical_bandage', 'ether_refined_water'],
     flags: {},
     rerollsLeft: 2,
     ...overrides,
@@ -80,7 +80,7 @@ describe('StatusPanel', () => {
     expect(screen.getByText(/3회차/)).toBeInTheDocument();
   });
 
-  it('인벤토리 항목 표시 (bread, torch)', () => {
+  it('인벤토리 항목 표시 (medical_bandage, ether_refined_water)', () => {
     render(
       <StatusPanel
         character={makeCharacter()}
@@ -90,9 +90,9 @@ describe('StatusPanel', () => {
         onReroll={vi.fn()}
       />,
     );
-    // 한국어 라벨 (빵, 횃불)
-    expect(screen.getByText(/빵/)).toBeInTheDocument();
-    expect(screen.getByText(/횃불/)).toBeInTheDocument();
+    // 한국어 라벨 (의료용 붕대, 에테르 정제수)
+    expect(screen.getByText(/의료용 붕대/)).toBeInTheDocument();
+    expect(screen.getByText(/에테르 정제수/)).toBeInTheDocument();
   });
 
   it('인벤토리 비어있으면 "비어 있음" 표시', () => {
@@ -141,7 +141,7 @@ describe('StatusPanel', () => {
     const onUseItem = vi.fn();
     render(
       <StatusPanel
-        character={makeCharacter({ inventory: ['bread'] })}
+        character={makeCharacter({ inventory: ['medical_bandage'] })}
         runIndex={1}
         canReroll={false}
         onUseItem={onUseItem}
@@ -150,6 +150,6 @@ describe('StatusPanel', () => {
     );
     const btn = screen.getByRole('button', { name: '사용' });
     fireEvent.click(btn);
-    expect(onUseItem).toHaveBeenCalledWith('bread');
+    expect(onUseItem).toHaveBeenCalledWith('medical_bandage');
   });
 });

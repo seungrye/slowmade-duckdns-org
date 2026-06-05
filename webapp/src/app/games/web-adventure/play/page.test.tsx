@@ -105,10 +105,10 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
 
 // #220 — InventoryStrip 인벤 표시 시 같은 아이템 갯수 묶기.
 describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
-  test("인벤에 bread 2 + torch 1 → '빵 × 2', '횃불' 표시 + '빵 × 1' 비포함", () => {
+  test("인벤에 medical_bandage 2 + ether_refined_water 1 → '빵 × 2', '횃불' 표시 + '빵 × 1' 비포함", () => {
     render(
       <InventoryStrip
-        inventory={["bread", "bread", "torch"]}
+        inventory={["medical_bandage", "medical_bandage", "ether_refined_water"]}
         rerollsLeft={0}
         hp={100}
         maxHp={100}
@@ -117,15 +117,15 @@ describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
         canReroll={false}
       />,
     );
-    expect(screen.getByText(/빵 × 2/)).toBeInTheDocument();
-    expect(screen.getByText(/^횃불$/)).toBeInTheDocument();
-    expect(screen.queryByText(/빵 × 1/)).not.toBeInTheDocument();
+    expect(screen.getByText(/의료용 붕대 × 2/)).toBeInTheDocument();
+    expect(screen.getByText(/^에테르 정제수$/)).toBeInTheDocument();
+    expect(screen.queryByText(/의료용 붕대 × 1/)).not.toBeInTheDocument();
   });
 
-  test("bread 2 보유 시 '사용' 버튼이 1개만 렌더 (각 bread 별이 아니라 그룹된 id 기준)", () => {
+  test("medical_bandage 2 보유 시 '사용' 버튼이 1개만 렌더 (각 medical_bandage 별이 아니라 그룹된 id 기준)", () => {
     render(
       <InventoryStrip
-        inventory={["bread", "bread"]}
+        inventory={["medical_bandage", "medical_bandage"]}
         rerollsLeft={0}
         hp={100}
         maxHp={100}
@@ -141,7 +141,7 @@ describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
   test("count===1 인 아이템은 '× 1' 표시 없이 이름만", () => {
     render(
       <InventoryStrip
-        inventory={["torch", "spirit_glasses"]}
+        inventory={["ether_refined_water", "spirit_beast_feather"]}
         rerollsLeft={0}
         hp={100}
         maxHp={100}
@@ -150,8 +150,8 @@ describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
         canReroll={false}
       />,
     );
-    expect(screen.getByText(/^횃불$/)).toBeInTheDocument();
-    expect(screen.getByText(/^산신령의 안경$/)).toBeInTheDocument();
+    expect(screen.getByText(/^에테르 정제수$/)).toBeInTheDocument();
+    expect(screen.getByText(/^영수의 깃털$/)).toBeInTheDocument();
     expect(screen.queryByText(/× 1/)).not.toBeInTheDocument();
   });
 
@@ -159,7 +159,7 @@ describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
     const onUseItem = vi.fn();
     render(
       <InventoryStrip
-        inventory={["bread", "bread", "herb"]}
+        inventory={["medical_bandage", "medical_bandage", "ether_refined_water"]}
         rerollsLeft={0}
         hp={100}
         maxHp={100}
@@ -169,11 +169,11 @@ describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
       />,
     );
     const useButtons = screen.getAllByRole("button", { name: /사용/ });
-    // bread, herb 각각 한 번씩 — 총 2 개.
+    // medical_bandage(group), ether_refined_water 각각 한 번씩 — 총 2 개.
     expect(useButtons).toHaveLength(2);
     act(() => {
       fireEvent.click(useButtons[0]);
     });
-    expect(onUseItem).toHaveBeenCalledWith("bread");
+    expect(onUseItem).toHaveBeenCalledWith("medical_bandage");
   });
 });
