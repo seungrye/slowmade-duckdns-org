@@ -40,7 +40,6 @@ import {
   buildGraphFromScenes,
   autoLayout,
   type GraphEdge,
-  type GraphNodeData,
   type SceneWithPosition,
 } from "@/lib/web-adventure/engine/graph";
 import SceneNode from "./sceneNode";

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('mermaid', () => ({
   default: {
@@ -45,7 +45,8 @@ describe('MermaidBlock', () => {
     });
   });
 
-  it('"코드 보기" 토글 버튼을 누르면 원본 mermaid 코드가 표시된다', async () => {
+  // #238 — 사용자 명시: "코드보기따위 필요 없어". 토글 button 자체를 없앤다.
+  it('"코드 보기" / "다이어그램 보기" 토글 버튼이 존재하지 않는다 (#238)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg>OK</svg>',
     });
@@ -53,20 +54,16 @@ describe('MermaidBlock', () => {
     render(<MermaidBlock code="graph LR\nX-->Y" />);
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /코드 보기/ })).toBeInTheDocument();
+      // SVG 렌더 후
+      const buttons = screen.queryAllByRole('button');
+      expect(buttons.find((b) => /코드 보기|다이어그램 보기/.test(b.textContent ?? ''))).toBeUndefined();
     });
-
-    fireEvent.click(screen.getByRole('button', { name: /코드 보기/ }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: /다이어그램 보기/ })).toBeInTheDocument();
-    });
-    // 토글 후 원본 코드 노출
-    const matches = screen.getAllByText(/graph LR/);
-    expect(matches.length).toBeGreaterThan(0);
   });
 
-  it('mermaid.initialize 가 모든 차트 타입에 useMaxWidth: false 옵션을 포함한다 (#236)', async () => {
+  // #238 — useMaxWidth: true 로 SVG = 부모 컨테이너 100%.
+  //   #229/#237 의 false 는 natural size (작은 차트 ~200px) 라 wide-screen 에서 점처럼 보임.
+  //   컨테이너 측에서 max-w-4xl (896px) 로 너무 큰 경우만 제한.
+  it('mermaid.initialize 가 모든 차트 타입에 useMaxWidth: true 옵션을 포함한다 (#238)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg>OK</svg>',
     });
@@ -79,24 +76,24 @@ describe('MermaidBlock', () => {
       ).toHaveBeenCalled();
     });
 
-    // #236 — #229 의 false 가 natural size (작은 차트 ~200px) 라 *너무 작아* 보임.
-    // useMaxWidth: false (mermaid 기본) 로 SVG = 부모 width 가득 + 비율 유지. 컨테이너
-    // 측에서 max-w-3xl + mx-auto 로 *너무 큰 경우* 만 제한.
     const initSpy = (mermaid as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize;
     const initArgs = initSpy.mock.calls[0]?.[0];
     expect(initArgs).toEqual(
       expect.objectContaining({
-        flowchart: expect.objectContaining({ useMaxWidth: false }),
-        sequence: expect.objectContaining({ useMaxWidth: false }),
-        state: expect.objectContaining({ useMaxWidth: false }),
-        gantt: expect.objectContaining({ useMaxWidth: false }),
-        class: expect.objectContaining({ useMaxWidth: false }),
-        pie: expect.objectContaining({ useMaxWidth: false }),
+        flowchart: expect.objectContaining({ useMaxWidth: true }),
+        sequence: expect.objectContaining({ useMaxWidth: true }),
+        state: expect.objectContaining({ useMaxWidth: true }),
+        gantt: expect.objectContaining({ useMaxWidth: true }),
+        class: expect.objectContaining({ useMaxWidth: true }),
+        pie: expect.objectContaining({ useMaxWidth: true }),
       })
     );
   });
 
-  it('렌더된 SVG 컨테이너에 max-w-3xl + mx-auto 로 가운데 정렬 (#236)', async () => {
+  // #238 — 컨테이너는 max-w-4xl + mx-auto + block (inline-block 아님).
+  //   inline-block + max-w-full 은 natural width 그대로 사용 → useMaxWidth: false 와 같은 결과.
+  //   block + max-w-4xl 이라야 SVG width 100% 가 의도대로 동작.
+  it('렌더된 SVG 컨테이너에 max-w-4xl + mx-auto 가 적용된다 (#238)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg data-testid="centered-svg">FLOW</svg>',
     });
@@ -110,7 +107,7 @@ describe('MermaidBlock', () => {
     const rendered = container.querySelector('.mermaid-rendered');
     expect(rendered).not.toBeNull();
     const className = rendered?.getAttribute('class') ?? '';
-    expect(className).toMatch(/\binline-block\b/);
-    expect(className).toMatch(/\bmax-w-full\b/);
+    expect(className).toMatch(/\bmax-w-4xl\b/);
+    expect(className).toMatch(/\bmx-auto\b/);
   });
 });

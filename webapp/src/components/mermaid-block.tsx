@@ -5,9 +5,9 @@ import mermaid from 'mermaid';
 
 // mermaid 는 클라이언트 측에서 1회만 초기화 — 중복 호출 방지.
 // securityLevel: "loose" — 한국어 라벨/링크 등을 안전하게 표시하기 위해 sanitize 를 완화.
-// useMaxWidth: false — SVG 가 natural size 로 출력 (작은 차트 = 자연스럽게 작음).
-//   #236 의 true 는 부모 가득 → 작은 차트가 *과대 확대 + 글자 큼* 문제. 다시 false.
-//   컨테이너는 inline-block + max-width: 100% 로 SVG width 에 맞춰 자동 축소.
+// useMaxWidth: true (#238) — SVG width = 부모 컨테이너 100%. 부모는 max-w-4xl
+//   (896px) + mx-auto 로 너무 큰 경우만 제한. natural size (useMaxWidth: false)
+//   는 작은 차트 ~200px 라 wide-screen 에서 점처럼 보이는 문제 (#229/#237 회귀).
 let initialized = false;
 function ensureInit(): void {
   if (initialized) return;
@@ -17,12 +17,12 @@ function ensureInit(): void {
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'Pretendard, sans-serif',
-    flowchart: { useMaxWidth: false, htmlLabels: true },
-    sequence: { useMaxWidth: false },
-    state: { useMaxWidth: false },
-    gantt: { useMaxWidth: false },
-    class: { useMaxWidth: false },
-    pie: { useMaxWidth: false },
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+    sequence: { useMaxWidth: true },
+    state: { useMaxWidth: true },
+    gantt: { useMaxWidth: true },
+    class: { useMaxWidth: true },
+    pie: { useMaxWidth: true },
   });
 }
 
@@ -37,10 +37,11 @@ export interface MermaidBlockProps {
   code: string;
 }
 
+// #238 — "코드 보기" 토글 버튼 + showSource state 완전 제거.
+//   사용자 요청: "코드보기따위 필요 없어".
 export function MermaidBlock({ code }: MermaidBlockProps) {
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showSource, setShowSource] = useState(false);
   const idRef = useRef<string>(`mermaid-${++nextId}`);
 
   useEffect(() => {
@@ -78,29 +79,17 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
   }
 
   return (
-    <div className="my-4 text-center" data-mermaid-block="ok">
+    <div className="my-4" data-mermaid-block="ok">
       {svg ? (
-        // inline-block 으로 컨테이너 width = SVG natural width.
-        // text-align: center (부모) + inline-block 으로 가운데 정렬.
-        // overflow-x-auto 는 SVG 가 부모 width 초과 시 스크롤.
+        // #238 — block + max-w-4xl + mx-auto.
+        //   useMaxWidth: true 와 짝지어 SVG 가 컨테이너 폭(최대 896px) 가득.
+        //   inline-block + max-w-full (#237) 은 natural width 사용 → useMaxWidth: false 와 같은 결과 → 작음.
         <div
-          className="mermaid-rendered overflow-x-auto inline-block max-w-full text-left"
+          className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto"
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
         <pre className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded text-sm">{code}</pre>
-      )}
-      <button
-        type="button"
-        onClick={() => setShowSource((s) => !s)}
-        className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 hover:underline"
-      >
-        {showSource ? '다이어그램 보기' : '코드 보기'}
-      </button>
-      {showSource && (
-        <pre className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded text-sm mt-1 border border-zinc-200 dark:border-zinc-700 whitespace-pre-wrap">
-          {code}
-        </pre>
       )}
     </div>
   );
