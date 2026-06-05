@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { Nanum_Gothic_Coding } from "next/font/google";
 import { env } from "@/lib/env";
 import Providers from "@/components/providers";
 import ThemeSync from "@/components/dark-class-sync";
@@ -10,6 +11,19 @@ import Footer from "@/components/footer";
 import "@/app/globals.css";
 import "@/styles/_keyframe-animations.scss";
 import "@/styles/_variables.scss";
+
+/**
+ * #228 — post 본문(TipTap viewer) 의 blockquote 및 코드블럭(<pre>, inline <code>)
+ * 에 적용할 한글 모노스페이스 폰트. next/font/google 로 self-host 하여 외부 CDN
+ * 의존을 제거하고, CSS variable `--font-nanum-gothic-coding` 로 노출한다.
+ * 실제 적용 셀렉터는 paragraph-node.scss / code-block-node.scss 참조.
+ */
+const nanumGothicCoding = Nanum_Gothic_Coding({
+  weight: ["400", "700"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-nanum-gothic-coding",
+});
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -37,7 +51,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = (cookieStore.get('theme')?.value ?? 'system') as Theme;
 
   return (
-    <html lang="ko" className={theme === 'dark' ? 'dark' : ''}>
+    <html lang="ko" className={`${nanumGothicCoding.variable} ${theme === 'dark' ? 'dark' : ''}`.trim()}>
       <head>
         {theme === 'system' && (
           <script
