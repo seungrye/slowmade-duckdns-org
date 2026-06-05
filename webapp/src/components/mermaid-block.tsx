@@ -39,10 +39,18 @@ export interface MermaidBlockProps {
 
 // #238 — "코드 보기" 토글 버튼 + showSource state 완전 제거.
 //   사용자 요청: "코드보기따위 필요 없어".
+// #239 — mermaid 는 useMaxWidth: true 시 SVG inline style 로
+//   `max-width: <natural>px` 를 박는다 (mermaid 코어 `tY` 함수).
+//   부모 div 가 max-w-4xl(896px) 잡혀도 이 inline max-width 가 작으면 SVG
+//   자체가 그 작은 px 로 제한되어 "영역은 크고 차트는 작음" 현상이 발생.
+//   해결: dangerouslySetInnerHTML 후 useRef 로 svg element 를 찾아
+//   inline maxWidth 를 "100%" 로 강제 덮어쓴다 (background-color 등 다른
+//   inline style 은 보존).
 export function MermaidBlock({ code }: MermaidBlockProps) {
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const idRef = useRef<string>(`mermaid-${++nextId}`);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -67,6 +75,16 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     };
   }, [code]);
 
+  // #239 — SVG 마운트 직후 inline max-width 를 100% 로 override.
+  // svg 가 새로 렌더될 때마다 (svg state 변화) 실행.
+  useEffect(() => {
+    const svgEl = containerRef.current?.querySelector('svg');
+    if (!svgEl) return;
+    svgEl.style.maxWidth = '100%';
+    // 일부 다이어그램은 height attribute 도 작게 잡힐 수 있어 auto 로 풀어준다.
+    svgEl.style.height = 'auto';
+  }, [svg]);
+
   if (error) {
     return (
       <pre
@@ -84,7 +102,9 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
         // #238 — block + max-w-4xl + mx-auto.
         //   useMaxWidth: true 와 짝지어 SVG 가 컨테이너 폭(최대 896px) 가득.
         //   inline-block + max-w-full (#237) 은 natural width 사용 → useMaxWidth: false 와 같은 결과 → 작음.
+        // #239 — ref 로 svg element 를 잡아 inline max-width 를 100% 로 덮어쓴다.
         <div
+          ref={containerRef}
           className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto"
           dangerouslySetInnerHTML={{ __html: svg }}
         />

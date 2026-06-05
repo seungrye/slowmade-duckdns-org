@@ -110,4 +110,30 @@ describe('MermaidBlock', () => {
     expect(className).toMatch(/\bmax-w-4xl\b/);
     expect(className).toMatch(/\bmx-auto\b/);
   });
+
+  // #239 — mermaid 가 useMaxWidth:true 시 SVG inline style 로 `max-width: <natural>px`
+  //   를 박아 부모 div 가 max-w-4xl 잡혀도 SVG 자체가 작게 표시되는 문제.
+  //   사용자 보고: "영역은 엄청 크게, 차트는 너무 작게".
+  //   해결: dangerouslySetInnerHTML 후 svg element 의 inline max-width 를 강제 제거.
+  it('렌더 후 SVG element 의 inline max-width 를 100% 로 override 한다 (#239)', async () => {
+    // mermaid 가 실제 부여하는 형식: width="100%" + style="max-width: 200px;"
+    (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
+      svg: '<svg data-testid="small-svg" width="100%" style="max-width: 200px; background-color: white;">FLOW</svg>',
+    });
+
+    const { container } = render(<MermaidBlock code="graph TD\nA-->B" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('small-svg')).toBeInTheDocument();
+    });
+
+    const svg = container.querySelector('svg') as SVGElement | null;
+    expect(svg).not.toBeNull();
+    // mermaid 가 박은 max-width: 200px 가 100% 로 override 되어야 함.
+    expect(svg?.style.maxWidth).toBe('100%');
+    // width="100%" 는 유지.
+    expect(svg?.getAttribute('width')).toBe('100%');
+    // background-color 같은 다른 style 은 보존.
+    expect(svg?.style.backgroundColor).toBe('white');
+  });
 });
