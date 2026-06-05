@@ -7,7 +7,7 @@ import {
   getScenes,
   START_SCENE_ID,
 } from "@/lib/web-adventure/engine/sceneRegistry";
-import { useAutoSave } from "@/lib/web-adventure/use-auto-save";
+import { useAutoSave, LOCAL_STORAGE_KEY as LOCAL_STORAGE_SAVE_KEY } from "@/lib/web-adventure/use-auto-save";
 import {
   useMigrateOnLogin,
   LOCAL_STORAGE_PAST_RUNS_KEY,
@@ -161,6 +161,23 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         );
       } catch {
         /* quota/private 모드 — 무시 */
+      }
+
+      // #251 — localStorage save 의 진행 데이터 clear (= 회차 종결).
+      //   서버 end-run 의 character/currentSceneId unset 과 대칭.
+      //   다음 마운트 시 useAutoSave 의 onRestore 가 currentSceneId 없으면
+      //   RESTORE skip → creating phase (= '새 모험').
+      try {
+        const rawSave = window.localStorage.getItem(LOCAL_STORAGE_SAVE_KEY);
+        if (rawSave) {
+          const save = JSON.parse(rawSave);
+          delete save.character;
+          delete save.currentSceneId;
+          save.runIndex = (save.runIndex ?? runIndex) + 1;
+          window.localStorage.setItem(LOCAL_STORAGE_SAVE_KEY, JSON.stringify(save));
+        }
+      } catch {
+        /* parse/quota — 무시 */
       }
     }
 
