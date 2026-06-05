@@ -2,23 +2,10 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { mermaidClassToDot, type DotTheme } from './mermaid-class-to-dot';
-
-// #248 — class diagram 만 graphviz/viz-js 로 fallback (mermaid 의 박스 padding 과대).
-// viz-js 의 wasm instance 는 모듈 레벨로 캐싱.
-type VizInstance = { renderString: (dot: string, opts?: { format: string }) => string };
-let vizInstancePromise: Promise<VizInstance> | null = null;
-function getViz(): Promise<VizInstance> {
-  if (vizInstancePromise) return vizInstancePromise;
-  vizInstancePromise = import('@viz-js/viz').then((m) => m.instance()) as Promise<VizInstance>;
-  return vizInstancePromise;
-}
 
 // mermaid 는 클라이언트 측에서 1회만 초기화 — 중복 호출 방지.
 // securityLevel: "loose" — 한국어 라벨/링크 등을 안전하게 표시하기 위해 sanitize 를 완화.
-// useMaxWidth: true (#238) — SVG width = 부모 컨테이너 100%. 부모는 max-w-4xl
-//   (896px) + mx-auto 로 너무 큰 경우만 제한. natural size (useMaxWidth: false)
-//   는 작은 차트 ~200px 라 wide-screen 에서 점처럼 보이는 문제 (#229/#237 회귀).
+// useMaxWidth: true (#238) — SVG width = 부모 컨테이너 100%.
 let initialized = false;
 function ensureInit(): void {
   if (initialized) return;
@@ -28,9 +15,6 @@ function ensureInit(): void {
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'Pretendard, sans-serif',
-    // #248 — mermaid 10 도 class diagram 의 박스 padding 이 과대 (사용자 보고).
-    //   v9.4.3 으로 더 다운그레이드 — 옛 디자인이지만 class diagram 의 박스/
-    //   콘텐츠 비율이 자연스럽고 padding 적당함 (jsdom probe 로 확인).
     flowchart: { useMaxWidth: true, htmlLabels: false },
     sequence: { useMaxWidth: true },
     state: { useMaxWidth: true },
@@ -51,54 +35,20 @@ export interface MermaidBlockProps {
   code: string;
 }
 
-// #238 — "코드 보기" 토글 버튼 + showSource state 완전 제거.
-//   사용자 요청: "코드보기따위 필요 없어".
-// #239 — mermaid 는 useMaxWidth: true 시 SVG inline style 로
-//   `max-width: <natural>px` 를 박는다 (mermaid 코어 `tY` 함수).
-//   부모 div 가 max-w-4xl(896px) 잡혀도 이 inline max-width 가 작으면 SVG
-//   자체가 그 작은 px 로 제한되어 "영역은 크고 차트는 작음" 현상이 발생.
-//   해결: dangerouslySetInnerHTML 후 useRef 로 svg element 를 찾아
-//   inline maxWidth 를 "100%" 로 강제 덮어쓴다 (background-color 등 다른
-//   inline style 은 보존).
-// 현재 사이트 테마 ('light' | 'dark') — html.dark 클래스 기반.
-function getCurrentTheme(): DotTheme {
-  if (typeof document === 'undefined') return 'light';
-  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-}
-
+// #252 — viz-js/graphviz fallback 제거. 사용자 결정: "머메이드로 교체".
+//   class diagram 도 mermaid 로 렌더 (이전에 어색했던 결과 다시 발생).
 export function MermaidBlock({ code }: MermaidBlockProps) {
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [theme, setTheme] = useState<DotTheme>('light');
   const idRef = useRef<string>(`mermaid-${++nextId}`);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // 초기 테마 + html.dark 변경 감지 → setTheme 으로 재렌더 트리거.
-  useEffect(() => {
-    setTheme(getCurrentTheme());
-    const observer = new MutationObserver(() => setTheme(getCurrentTheme()));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
+    ensureInit();
     (async () => {
       try {
-        // #248 — class diagram 만 viz-js (graphviz) 로 fallback.
-        // #250 — theme(light/dark) 에 따라 색상 적용. 테마 변경 시 deps 로 재렌더.
-        if (/^\s*classDiagram\b/.test(code)) {
-          const viz = await getViz();
-          const dot = mermaidClassToDot(code, theme);
-          const rendered = viz.renderString(dot, { format: 'svg' });
-          if (!cancelled) {
-            setSvg(rendered);
-            setError(null);
-          }
-          return;
-        }
-        // 다른 차트 — mermaid.
-        ensureInit();
+        // mermaid v9 는 render 가 동기 string 반환, v10/v11 은 Promise<{svg}>.
         const result = (mermaid as unknown as {
           render: (id: string, code: string) => string | Promise<{ svg: string } | string>;
         }).render(idRef.current, code);
@@ -124,17 +74,11 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     return () => {
       cancelled = true;
     };
-  }, [code, theme]);
+  }, [code]);
 
-  // #241 — paint 전 동기 적용 (useEffect → useLayoutEffect).
-  //   useEffect 는 commit 후 비동기 → 작은 SVG 가 한 프레임 보였다 큼 (flash)
-  //   또는 createRoot 별도 tree 의 타이밍 차이로 적용 자체가 늦음.
-  //   useLayoutEffect 는 commit 직후 paint 전 동기 → 사용자가 *처음부터* 큰 SVG.
-  // 다중 방어:
-  //   1. setAttribute('width','100%') / removeAttribute('height')
-  //   2. inline style override
-  //   3. (className 의 [&_svg]:!w-full !max-w-full !h-auto 가 CSS !important 로
-  //      추가 강제 — JS 가 어떤 이유로 못 박아도 CSS spec 상 inline style 이김)
+  // #245 — mermaid 가 viewBox 를 svg 자체 getBBox() 로 잡아 defs/markers 잔재로
+  //   ~10배 부풀음. g.root BBox 로 재설정. class diagram 은 g.root 가 없거나
+  //   다른 구조라 skip (원본 mermaid 출력 유지).
   useLayoutEffect(() => {
     const svgEl = containerRef.current?.querySelector('svg');
     if (!svgEl) return;
@@ -142,100 +86,8 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     svgEl.removeAttribute('height');
     svgEl.style.maxWidth = '100%';
     svgEl.style.height = 'auto';
-    // #246 — class diagram 은 mermaid 11 자체 측정 버그로 *각 클래스 박스의
-    //   outer-path* 가 콘텐츠보다 5배 큰 좌표로 그려짐 (예: 라벨 9개*24px=216
-    //   인데 outer-path BBox=2094x2118). 이 상태에서 #245 처럼 g.root 의 BBox
-    //   로 viewBox 를 재설정하면 *부풀려진 outer-path 까지 포함* 한 BBox 라
-    //   여전히 어색. 박스 자체를 콘텐츠 영역에 맞춰 재계산하는 우회:
-    //   각 g.node 의 outer-path 를 그 노드의 label-group bounding 으로 줄인다.
-    // #245 — flowchart/state 등은 mermaid 11 이 viewBox 를 svg 자체 getBBox()
-    //   로 잡아 defs/markers 잔재로 ~10배 부풀음. g.root BBox 로 재설정.
-    //   class diagram 은 시도했지만 (#246) mermaid 자체 측정 버그가 깊어 우회
-    //   불가 — 원본 viewBox 유지 (콘텐츠는 잘리지 않고 다 보임, 다만 박스 안
-    //   여백이 큼). #246 의 transform: scale + label-group 기반 viewBox 재계산은
-    //   메서드/속성/박스가 잘려 더 안 좋아 원복.
-    // #251 — viz-js(graphviz) SVG 의 텍스트가 노드 polygon 을 뚫고 나가는 문제.
-    //   graphviz 측정 폰트(Helvetica) 와 브라우저 렌더 폰트(CSS 강제 Helvetica)
-    //   사이에 여전히 미세한 metric 차이 + cellpadding 한계.
-    //   후처리: graphviz 노드의 outer polygon (label-container 의 첫 polygon)
-    //   각각에 대해, 그 노드 안 모든 <text> 의 getComputedTextLength() 의
-    //   max 끝점 vs polygon 오른쪽 경계 비교 → 부족하면 polygon points 의
-    //   max-x 를 그만큼 확장.
-    const isGraphviz = !!svgEl.querySelector('g.node title') && !svgEl.getAttribute('aria-roledescription');
-    if (isGraphviz) {
-      const nodes = svgEl.querySelectorAll<SVGGElement>('g.node');
-      nodes.forEach((node) => {
-        const polygons = node.querySelectorAll<SVGPolygonElement>('polygon');
-        const texts = node.querySelectorAll<SVGTextElement>('text');
-        if (!polygons.length || !texts.length) return;
-        // 각 text 의 right edge (x + textLength)
-        let textMaxRight = -Infinity;
-        let textMinLeft = Infinity;
-        texts.forEach((t) => {
-          try {
-            const x = parseFloat(t.getAttribute('x') ?? '0');
-            const w = t.getComputedTextLength();
-            const anchor = t.getAttribute('text-anchor') ?? 'start';
-            // text-anchor 별 right edge
-            let right: number, left: number;
-            if (anchor === 'middle') {
-              right = x + w / 2;
-              left = x - w / 2;
-            } else if (anchor === 'end') {
-              right = x;
-              left = x - w;
-            } else {
-              right = x + w;
-              left = x;
-            }
-            textMaxRight = Math.max(textMaxRight, right);
-            textMinLeft = Math.min(textMinLeft, left);
-          } catch {
-            /* getComputedTextLength 실패 — 무시 */
-          }
-        });
-        if (!isFinite(textMaxRight)) return;
-        // 외곽 polygon = node 의 첫 polygon (graphviz HTML table 의 outer border)
-        const polyPad = 6; // 텍스트 right + 이만큼 여유
-        polygons.forEach((poly) => {
-          const pointsStr = poly.getAttribute('points');
-          if (!pointsStr) return;
-          const pts = pointsStr.trim().split(/\s+/).map((p) => {
-            const [x, y] = p.split(',').map(parseFloat);
-            return { x, y };
-          });
-          let polyMaxX = -Infinity, polyMinX = Infinity;
-          pts.forEach((p) => {
-            polyMaxX = Math.max(polyMaxX, p.x);
-            polyMinX = Math.min(polyMinX, p.x);
-          });
-          // 텍스트가 polygon 오른쪽을 뚫으면 polygon 의 max-x 를 확장
-          const needRight = textMaxRight + polyPad;
-          if (needRight > polyMaxX) {
-            const newPoints = pts
-              .map((p) => `${p.x === polyMaxX ? needRight : p.x},${p.y}`)
-              .join(' ');
-            poly.setAttribute('points', newPoints);
-          }
-          // 왼쪽도 — 일반적으로 안 뚫지만 안전.
-          const needLeft = textMinLeft - polyPad;
-          if (needLeft < polyMinX) {
-            const newPoints = (poly.getAttribute('points') ?? '')
-              .trim()
-              .split(/\s+/)
-              .map((p) => {
-                const [x, y] = p.split(',').map(parseFloat);
-                return `${x === polyMinX ? needLeft : x},${y}`;
-              })
-              .join(' ');
-            poly.setAttribute('points', newPoints);
-          }
-        });
-      });
-    }
-
     const role = svgEl.getAttribute('aria-roledescription');
-    if (role !== 'class') {
+    if (role !== 'class' && role !== 'classDiagram') {
       const rootG = svgEl.querySelector<SVGGraphicsElement>('g.root');
       if (rootG) {
         try {
@@ -268,11 +120,6 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
   return (
     <div className="my-4" data-mermaid-block="ok">
       {svg ? (
-        // #238 — block + max-w-4xl + mx-auto.
-        // #239/#240 — JS ref override (defense in depth).
-        // #243 — globals.css 의 `.mermaid-rendered svg { width/max-width/height
-        //   !important }` 로 CSS spec 상 inline style 을 확실히 override.
-        //   (#241/#242 의 Tailwind arbitrary variant 는 v4 에서 컴파일 안 됨 — 제거.)
         <div
           ref={containerRef}
           className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto"

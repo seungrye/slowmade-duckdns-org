@@ -122,12 +122,6 @@ foreignObject p {
   padding: 0 !important;
 }
 
-/*
- * #251 — viz-js(graphviz) class diagram 의 SVG text 는 graphviz 측정 시 쓴
- * Helvetica metric 그대로 렌더되어야 텍스트가 박스 안에 들어옴. 사이트 기본
- * 폰트(Pretendard) 가 살짝 넓어 text 가 박스를 뚫음 → Helvetica 강제.
- * (class diagram 안에 한글 라벨이 들어가도 시스템 fallback 폰트로 표시.)
- */
-.mermaid-rendered svg text {
-  font-family: Helvetica, Arial, sans-serif !important;
-}
+/* #252 — viz-js 제거 (mermaid 단일화). 위 .mermaid-rendered svg text font-family
+ * Helvetica 강제는 viz-js 텍스트 박스 뚫음 회피용이었음 — 더 이상 불필요.
+ * mermaid SVG 는 사이트 기본 폰트(Pretendard) 그대로. */
