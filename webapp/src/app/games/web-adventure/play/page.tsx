@@ -3,10 +3,7 @@
 import { useEffect, useReducer, useRef, useState, useCallback } from "react";
 import type { GameState, SceneRegistry } from "@/types/web-adventure";
 import { gameReducer, type Action } from "@/lib/web-adventure/engine/reducer";
-import {
-  getScenes,
-  START_SCENE_ID,
-} from "@/lib/web-adventure/engine/sceneRegistry";
+import { getScenes } from "@/lib/web-adventure/engine/sceneRegistry";
 import { useAutoSave, LOCAL_STORAGE_KEY as LOCAL_STORAGE_SAVE_KEY } from "@/lib/web-adventure/use-auto-save";
 import {
   useMigrateOnLogin,
@@ -213,13 +210,14 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
 
         {state.phase === "creating" && (
           <CharacterCreator
-            onComplete={(character) => {
-              // #245 — adv_run_started.
+            onComplete={(character, startScene) => {
+              // #245 — adv_run_started. #251 protagonist 도 함께 기록.
               logAdvEvent("run_started", {
                 ability: character.ability,
+                protagonist: character.protagonist,
                 run_index: runIndex,
               });
-              dispatch({ type: "START_GAME", character, startScene: START_SCENE_ID });
+              dispatch({ type: "START_GAME", character, startScene });
             }}
           />
         )}

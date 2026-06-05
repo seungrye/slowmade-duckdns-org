@@ -1,35 +1,44 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import type { AbilityKey, Character, StatKey } from "@/types/web-adventure";
-import { ABILITY_KEYS, abilities } from "@/content/web-adventure/abilities";
+// #251 〈에테르니아의 추락〉 — 3 주인공 카드 + 4 성흔 선택 UI.
+//
+// 흐름:
+//   1. 주인공 카드 3 종 (Kael/Rin/Solwen) 중 선택 — 시작 스탯/침식도/씬/인벤이 *자동 차등*.
+//   2. 성흔 4 종 (lunar/selene/hecate/none) 선택.
+//   3. 보너스 5 포인트 분배 (스탯당 최대 +2).
+//   4. '모험 시작' → Character 객체 + startScene 을 함께 onComplete.
+//
+// 기존 단일 주인공/4 어빌 카드 구조를 *3 주인공 × 4 성흔* 의 2 단계로 확장.
 
-// 캐릭터 생성 UI — 기본 5 + 보너스 5 포인트 분배(스탯당 최대 +2) + 어빌 1 선택.
+import { useMemo, useState } from "react";
+import type { AbilityKey, Character, Protagonist, StatKey } from "@/types/web-adventure";
+import { ABILITY_KEYS, abilities } from "@/content/web-adventure/abilities";
+import { PROTAGONIST_ORDER, protagonists } from "@/content/web-adventure/protagonists";
 
 const STAT_KEYS: StatKey[] = ["str", "dex", "int", "cha", "con", "wis"];
 const STAT_LABELS: Record<StatKey, string> = {
-  str: "힘 (str)",
-  dex: "민첩 (dex)",
-  int: "지능 (int)",
-  cha: "카리스마 (cha)",
-  con: "체력 (con)",
-  wis: "지혜 (wis)",
+  str: "완력",
+  dex: "민첩",
+  int: "지능",
+  cha: "언변",
+  con: "체력",
+  wis: "지혜",
 };
 
-const BASE_STAT = 5;
 const BONUS_TOTAL = 5;
 const MAX_BONUS_PER_STAT = 2;
 
-// 3 주차 HP 공식: maxHp = 100 + con * 5 (con 5 기본 → 125, con 7 최대 → 135).
 const MAX_HP_BASE = 100;
 const MAX_HP_PER_CON = 5;
-const LUCKY_REROLLS = 3;
+const NO_STIGMA_REROLLS = 3;
 
 type Props = {
-  onComplete: (character: Character) => void;
+  /** 시작 씬 id 가 주인공마다 다르므로 함께 전달. */
+  onComplete: (character: Character, startScene: string) => void;
 };
 
 export default function CharacterCreator({ onComplete }: Props) {
+  const [protagonist, setProtagonist] = useState<Protagonist>("kael");
   const [bonus, setBonus] = useState<Record<StatKey, number>>({
     str: 0,
     dex: 0,
@@ -39,6 +48,8 @@ export default function CharacterCreator({ onComplete }: Props) {
     wis: 0,
   });
   const [ability, setAbility] = useState<AbilityKey>("lunar");
+
+  const protaMeta = protagonists[protagonist];
 
   const spent = useMemo(
     () => STAT_KEYS.reduce((acc, k) => acc + bonus[k], 0),
@@ -57,50 +68,80 @@ export default function CharacterCreator({ onComplete }: Props) {
     setBonus((b) => ({ ...b, [stat]: b[stat] - 1 }));
   }
 
-  const previewCon = BASE_STAT + bonus.con;
+  const previewCon = protaMeta.baseStats.con + bonus.con;
   const previewMaxHp = MAX_HP_BASE + previewCon * MAX_HP_PER_CON;
-  const previewRerolls = ability === "none" ? LUCKY_REROLLS : 0;
+  const previewRerolls = ability === "none" ? NO_STIGMA_REROLLS : 0;
 
   function submit() {
     if (!canSubmit) return;
     const stats: Record<StatKey, number> = {
-      str: BASE_STAT + bonus.str,
-      dex: BASE_STAT + bonus.dex,
-      int: BASE_STAT + bonus.int,
-      cha: BASE_STAT + bonus.cha,
-      con: BASE_STAT + bonus.con,
-      wis: BASE_STAT + bonus.wis,
+      str: protaMeta.baseStats.str + bonus.str,
+      dex: protaMeta.baseStats.dex + bonus.dex,
+      int: protaMeta.baseStats.int + bonus.int,
+      cha: protaMeta.baseStats.cha + bonus.cha,
+      con: protaMeta.baseStats.con + bonus.con,
+      wis: protaMeta.baseStats.wis + bonus.wis,
     };
-    // 3 주차 HP 공식: 100 + con * 5.
     const maxHp = MAX_HP_BASE + stats.con * MAX_HP_PER_CON;
     const character: Character = {
       stats,
       hp: maxHp,
       maxHp,
       ability,
-      // #253 〈에테르니아〉 임시 — Kael(솔라리스 탈영병) 기본 + 침식 0 시작.
-      //   Phase 1b 에서 3 주인공 선택 카드 + 시작 침식도 차등 (Kael 80, Rin 10, Solwen 0).
-      protagonist: "kael",
-      stigmaErosion: 0,
-      inventory: [],
+      protagonist,
+      stigmaErosion: protaMeta.startStigma,
+      inventory: [...protaMeta.startInventory],
       flags: {},
-      rerollsLeft: ability === "none" ? LUCKY_REROLLS : 0,
+      rerollsLeft: ability === "none" ? NO_STIGMA_REROLLS : 0,
     };
-    onComplete(character);
+    onComplete(character, protaMeta.startScene);
   }
 
   return (
     <section className="rounded-lg bg-amber-100/70 border border-amber-300 p-6 shadow-sm">
-      <h2 className="text-xl font-semibold mb-2">캐릭터 생성</h2>
+      <h2 className="text-xl font-semibold mb-2">시작 인물 선택</h2>
       <p className="text-sm text-amber-800 mb-4">
-        기본 스탯 {BASE_STAT}. 보너스 {BONUS_TOTAL} 포인트를 분배하세요 (스탯당 최대 +
-        {MAX_BONUS_PER_STAT}). 남은 포인트:{" "}
-        <span className="font-bold">{remaining}</span>
+        세 인물 중 하나의 시점으로 〈에테르니아의 추락〉 을 살아낸다. 같은 위기를 다른 각도로
+        보게 될 것이다.
       </p>
 
+      {/* 1. 주인공 3 카드 */}
+      <ul className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        {PROTAGONIST_ORDER.map((p) => {
+          const meta = protagonists[p];
+          const selected = protagonist === p;
+          return (
+            <li key={p}>
+              <button
+                type="button"
+                onClick={() => setProtagonist(p)}
+                aria-pressed={selected}
+                className={`w-full text-left rounded-md border p-3 transition-colors ${
+                  selected
+                    ? "bg-amber-700 text-amber-50 border-amber-800"
+                    : "bg-amber-50 border-amber-200 hover:bg-amber-100"
+                }`}
+              >
+                <div className="font-semibold">{meta.name}</div>
+                <div className={`text-xs mt-0.5 ${selected ? "text-amber-100" : "text-amber-800"}`}>
+                  {meta.oneLine}
+                </div>
+                <div className={`text-xs mt-2 ${selected ? "text-amber-50" : "text-amber-700"}`}>
+                  시작 침식 <span className="font-mono font-bold">{meta.startStigma}</span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="text-xs text-amber-800 mb-3 italic">{protaMeta.description}</p>
+
+      {/* 2. 보너스 분배 */}
+      <h3 className="text-lg font-semibold mb-2">보너스 분배 ({remaining} 남음)</h3>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {STAT_KEYS.map((k) => {
-          const value = BASE_STAT + bonus[k];
+          const value = protaMeta.baseStats[k] + bonus[k];
           const decDisabled = bonus[k] <= 0;
           const incDisabled = remaining <= 0 || bonus[k] >= MAX_BONUS_PER_STAT;
           return (
@@ -108,7 +149,7 @@ export default function CharacterCreator({ onComplete }: Props) {
               key={k}
               className="flex items-center justify-between rounded-md bg-amber-50 border border-amber-200 px-3 py-2"
             >
-              <span className="font-medium">{STAT_LABELS[k]}</span>
+              <span className="font-medium">{STAT_LABELS[k]} ({k})</span>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -135,7 +176,8 @@ export default function CharacterCreator({ onComplete }: Props) {
         })}
       </ul>
 
-      <h3 className="text-lg font-semibold mb-2">어빌리티</h3>
+      {/* 3. 성흔 4 종 */}
+      <h3 className="text-lg font-semibold mb-2">성흔 선택</h3>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {ABILITY_KEYS.map((k) => {
           const a = abilities[k];
@@ -168,13 +210,15 @@ export default function CharacterCreator({ onComplete }: Props) {
           <span className="text-amber-700">(공식: {MAX_HP_BASE} + 체력 × {MAX_HP_PER_CON})</span>
         </div>
         <div>
-          재굴림 횟수:{" "}
-          <span className="font-mono font-bold">{previewRerolls}</span>
+          재굴림 횟수: <span className="font-mono font-bold">{previewRerolls}</span>{" "}
           {ability === "none" ? (
-            <span className="text-amber-700"> (행운아 어빌)</span>
+            <span className="text-amber-700"> (무흔)</span>
           ) : (
-            <span className="text-amber-700"> (행운아 어빌 선택 시 +{LUCKY_REROLLS})</span>
+            <span className="text-amber-700"> (무흔 선택 시 +{NO_STIGMA_REROLLS})</span>
           )}
+        </div>
+        <div>
+          시작 침식: <span className="font-mono font-bold">{protaMeta.startStigma}</span>
         </div>
       </div>
 
@@ -184,7 +228,7 @@ export default function CharacterCreator({ onComplete }: Props) {
         disabled={!canSubmit}
         className="w-full rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 disabled:opacity-40 transition-colors"
       >
-        {canSubmit ? "모험 시작" : `보너스 ${remaining} 포인트 남음`}
+        {canSubmit ? `${protaMeta.name} 으로 시작` : `보너스 ${remaining} 포인트 남음`}
       </button>
     </section>
   );
