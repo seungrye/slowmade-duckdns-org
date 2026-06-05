@@ -51,7 +51,10 @@ export type Character = {
 
 /** 선택지 — 3 종 (plain / probability / conditional). */
 export type Choice =
-  | { kind: "plain"; id: string; label: string; to: string }
+  | { kind: "plain"; id: string; label: string; to: string;
+      /** #253 — 〈에테르니아〉 침식도 변동 (예: 마법 사용 시 +N, 정제수 사용 시 -N). */
+      stigmaDelta?: number;
+    }
   | {
       kind: "probability";
       id: string;
@@ -63,9 +66,14 @@ export type Choice =
       /**
        * 5 주차 (#221) — *일회성 probability 분기* 자동 hidden.
        * 지정된 flag 가 truthy 면 isVisible=false (UI 에서 완전 숨김).
-       * 예: forest_inner 의 look_around 가 glassesFound=true 일 때 숨김.
        */
       hideWhenFlag?: string;
+      /** #253 — 시도(성공/실패 무관) 자체에 따른 침식도 변동. */
+      stigmaDelta?: number;
+      /** #253 — *성공 시에만* 추가로 적용되는 침식도 변동 (별도). */
+      stigmaDeltaOnSuccess?: number;
+      /** #253 — *실패 시에만* 추가로 적용되는 침식도 변동. */
+      stigmaDeltaOnFailure?: number;
     }
   | {
       kind: "conditional";
@@ -75,10 +83,9 @@ export type Choice =
       to: string;
       /**
        * 4 주차: 조건 미충족 시 *완전 숨김* (회색 표시 X).
-       * - true → 조건 미충족 시 isVisible=false (UI 에서 아예 렌더 X).
-       * - false 또는 undefined → 회색 + tooltip (기존 동작 유지).
        */
       hidden?: boolean;
+      stigmaDelta?: number;
     };
 
 export type ChoiceCondition =
@@ -112,6 +119,8 @@ export type Scene = {
     setFlags?: Record<string, boolean>;
     addItems?: string[];
     incrementCounters?: string[];
+    /** #253 — 씬 진입 시 침식도 변동. */
+    stigmaDelta?: number;
   };
 };
 

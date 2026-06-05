@@ -24,6 +24,7 @@ import type {
 } from "@/types/web-adventure";
 import { rollProbability } from "./rollDice";
 import { effectiveStat } from "./stats";
+import { applyStigmaDelta, isFullyPetrified, stigmaDebuff } from "./stigma";
 import { items, INVENTORY_CAP } from "@/content/web-adventure/items";
 
 export type Action =
@@ -39,7 +40,7 @@ export type Action =
 function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   switch (cond.kind) {
     case "minStat":
-      return effectiveStat(character, cond.stat) >= cond.min;
+      return effectiveStat(character, cond.stat) + stigmaDebuff(character, cond.stat) >= cond.min;
     case "hasItem":
       return character.inventory.includes(cond.itemId);
     case "flag": {
@@ -75,14 +76,15 @@ function pushItems(inventory: string[], toAdd: string[]): string[] {
   return result;
 }
 
-/** 씬 onEnter 적용 — setFlags / addItems / incrementCounters 를 character 에 반영. */
+/** 씬 onEnter 적용 — setFlags / addItems / incrementCounters / stigmaDelta 를 character 에 반영. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
-  const { setFlags, addItems, incrementCounters } = scene.onEnter;
+  const { setFlags, addItems, incrementCounters, stigmaDelta } = scene.onEnter;
   const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
   const itemsChanged = addItems && addItems.length > 0;
   const countersChanged = incrementCounters && incrementCounters.length > 0;
-  if (!flagsChanged && !itemsChanged && !countersChanged) return character;
+  const stigmaChanged = typeof stigmaDelta === "number" && stigmaDelta !== 0;
+  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged) return character;
   let nextFlags: Record<string, boolean | number> = character.flags;
   if (flagsChanged || countersChanged) {
     nextFlags = { ...character.flags };
@@ -98,32 +100,52 @@ function applyOnEnter(character: Character, scene: Scene): Character {
   const nextInventory = itemsChanged
     ? pushItems(character.inventory, addItems!)
     : character.inventory;
-  return { ...character, flags: nextFlags, inventory: nextInventory };
+  let next: Character = { ...character, flags: nextFlags, inventory: nextInventory };
+  if (stigmaChanged) next = applyStigmaDelta(next, stigmaDelta);
+  return next;
 }
 
-/** 씬으로 이동 — 결과 씬이 isEnding 이면 ended 로 전환. onEnter 적용 후 character 갱신. */
+/** 씬으로 이동 — 결과 씬이 isEnding 이면 ended 로 전환. onEnter 적용 후 character 갱신.
+ *
+ * #250 — 추가로 *선행 stigmaDelta* (choice 의 stigmaDelta + 성공/실패 별 추가) 도
+ *   onEnter 적용 *전* 에 누적. 그 결과 침식도 100 도달 → 자동 petrification 엔딩
+ *   (target.isEnding 이 아니어도 우선).
+ */
 function moveTo(
   prev: Extract<GameState, { phase: "playing" }>,
   targetSceneId: string,
   scenes: SceneRegistry,
   logEntry: string,
+  preStigmaDelta = 0,
 ): GameState {
   const target = scenes[targetSceneId];
   if (!target) return prev; // 정의 안 된 씬 — 안전하게 무변화.
   const nextLog = [...prev.log, logEntry];
-  const nextCharacter = applyOnEnter(prev.character, target);
+  let character = prev.character;
+  if (preStigmaDelta) character = applyStigmaDelta(character, preStigmaDelta);
+  character = applyOnEnter(character, target);
+  // #250 — 자동 petrification (명시 isEnding 보다 *후순위* — target.isEnding 이 우선).
   if (target.isEnding) {
     return {
       phase: "ended",
-      character: nextCharacter,
-      endingId: target.endingId ?? "main",
+      character,
+      endingId: target.endingId ?? "fall",
       finalSceneId: target.id,
       log: nextLog,
     };
   }
+  if (isFullyPetrified(character)) {
+    return {
+      phase: "ended",
+      character,
+      endingId: "petrification",
+      finalSceneId: target.id,
+      log: [...nextLog, "성흔 침식이 한계에 도달했다. 몸이 굳어간다…"],
+    };
+  }
   return {
     phase: "playing",
-    character: nextCharacter,
+    character,
     currentScene: target.id,
     log: nextLog,
   };
@@ -187,9 +209,10 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
 
       switch (choice.kind) {
         case "plain":
-          return moveTo(state, choice.to, scenes, `선택: ${choice.label}`);
+          return moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0);
         case "probability": {
-          const statValue = effectiveStat(state.character, choice.stat);
+          // #250 — 침식 디버프 (con/dex -2 if stigma>=50) 가 effective stat 에 적용.
+          const statValue = effectiveStat(state.character, choice.stat) + stigmaDebuff(state.character, choice.stat);
           const result = rollProbability({
             stat: statValue,
             ability: state.character.ability,
@@ -199,7 +222,11 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
           });
           const target = result.success ? choice.onSuccess : choice.onFailure;
           const logEntry = `${choice.label} — d20=${result.roll}+${statValue}(+${result.bonus}) vs ${choice.difficulty} → ${result.success ? "성공" : "실패"}`;
-          const next = moveTo(state, target, scenes, logEntry);
+          // #250 — choice 의 stigmaDelta + 성공/실패 별 추가 delta.
+          const successExtra = result.success ? (choice.stigmaDeltaOnSuccess ?? 0) : 0;
+          const failureExtra = !result.success ? (choice.stigmaDeltaOnFailure ?? 0) : 0;
+          const totalDelta = (choice.stigmaDelta ?? 0) + successExtra + failureExtra;
+          const next = moveTo(state, target, scenes, logEntry, totalDelta);
           // probability 판정 결과를 *PlayingState* 라면 메타로 기록 (REROLL 용).
           if (next.phase === "playing") {
             const withMeta: PlayingWithMeta = {
@@ -219,7 +246,7 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
         }
         case "conditional": {
           if (!evalCondition(choice.condition, state.character)) return state;
-          return moveTo(state, choice.to, scenes, `선택: ${choice.label}`);
+          return moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0);
         }
       }
       return state;
