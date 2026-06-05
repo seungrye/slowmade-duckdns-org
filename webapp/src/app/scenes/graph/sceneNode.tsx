@@ -12,8 +12,10 @@
 //   - data-ending-id      endingId (있는 경우)
 //   - data-saved-position true/false (mongo position 저장 여부)
 
-import { Handle, Position } from "@xyflow/react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { GraphNodeData } from "@/lib/web-adventure/engine/graph";
+
+type SceneNodeType = Node<GraphNodeData, "scene">;
 
 const ENDING_ICON: Record<string, string> = {
   main: "🍪",
@@ -34,12 +36,12 @@ const ENDING_COLOR: Record<string, string> = {
   wizard_apprentice: "bg-indigo-300 text-indigo-900 border-indigo-700",
 };
 
-type Props = {
-  id: string;
-  data: GraphNodeData;
-};
+// ReactFlow 가 자동으로 selected/dragging 등을 NodeProps 로 전달.
+// #234 — selected 시 노란 ring 으로 시각 피드백 (시작 노드의 isStart ring 과
+// 색만 다름: 시작=amber-400, 선택=yellow-300 굵게 + offset).
+type Props = NodeProps<SceneNodeType>;
 
-export default function SceneNode({ id, data }: Props) {
+export default function SceneNode({ id, data, selected }: Props) {
   const isEnding = data.isEnding === true;
   const isStart = data.isStart === true;
   const endingColor = data.endingId ? ENDING_COLOR[data.endingId] : "";
@@ -48,14 +50,20 @@ export default function SceneNode({ id, data }: Props) {
   const baseClass = isEnding
     ? `${endingColor} border-2`
     : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 border border-gray-400";
-  const startBorder = isStart ? "ring-4 ring-amber-400" : "";
+  // 우선순위: selected > isStart (선택 시 노란 굵은 ring 으로 덮어쓰기).
+  const ringClass = selected
+    ? "ring-4 ring-yellow-300 ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
+    : isStart
+      ? "ring-4 ring-amber-400"
+      : "";
 
   return (
     <div
       data-graph-node-id={id}
       data-ending-id={data.endingId ?? undefined}
       data-saved-position={data.savedPosition ? "true" : "false"}
-      className={`${baseClass} ${startBorder} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs shadow-sm cursor-grab active:cursor-grabbing flex flex-col justify-center`}
+      data-selected={selected ? "true" : "false"}
+      className={`${baseClass} ${ringClass} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs shadow-sm cursor-grab active:cursor-grabbing flex flex-col justify-center transition-shadow`}
       title={`${id}\n${data.title}`}
     >
       <Handle type="target" position={Position.Top} />
