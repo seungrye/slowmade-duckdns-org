@@ -20,5 +20,6 @@ export const forestFindGlasses: Scene = {
       to: "forest_inner",
     },
   ],
-  onEnter: { addItems: ["spirit_glasses"] },
+  // 5 주차 (#221) — forest_inner 의 look_around 재진입 시 자동 hidden.
+  onEnter: { addItems: ["spirit_glasses"], setFlags: { glassesFound: true } },
 };

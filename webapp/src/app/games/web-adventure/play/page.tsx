@@ -7,10 +7,10 @@ import {
   getScenes,
   START_SCENE_ID,
 } from "@/lib/web-adventure/engine/sceneRegistry";
-import { items } from "@/content/web-adventure/items";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
 import EndingScreen from "./EndingScreen";
+import InventoryStrip from "./InventoryStrip";
 
 // CSR 플레이 화면 — reducer 기반 상태 머신.
 //
@@ -24,74 +24,6 @@ import EndingScreen from "./EndingScreen";
 //   ended    → EndingScreen
 
 const initialState: GameState = { phase: "creating" };
-
-/** 인벤토리 1 줄 표시 — 3 주차 간단 UI. 본격 사이드 패널은 5 주차. */
-function InventoryStrip({
-  inventory,
-  rerollsLeft,
-  hp,
-  maxHp,
-  onUseItem,
-  onReroll,
-  canReroll,
-}: {
-  inventory: string[];
-  rerollsLeft: number;
-  hp: number;
-  maxHp: number;
-  onUseItem: (itemId: string) => void;
-  onReroll: () => void;
-  canReroll: boolean;
-}) {
-  return (
-    <div className="rounded-md bg-amber-100/70 border border-amber-300 p-3 mb-3 text-sm">
-      <div className="flex flex-wrap gap-x-4 gap-y-1 items-center">
-        <span>
-          HP <span className="font-mono font-bold">{hp}</span> / {maxHp}
-        </span>
-        <span>
-          재굴림{" "}
-          <span className="font-mono font-bold">{rerollsLeft}</span>
-        </span>
-        {canReroll && rerollsLeft > 0 && (
-          <button
-            type="button"
-            onClick={onReroll}
-            className="rounded bg-amber-700 text-amber-50 px-2 py-0.5 text-xs hover:bg-amber-800"
-          >
-            직전 판정 다시 굴리기
-          </button>
-        )}
-      </div>
-      {inventory.length === 0 ? (
-        <div className="mt-1 text-amber-700 italic">가방: 비어 있음</div>
-      ) : (
-        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-1">
-          <span className="text-amber-800">가방:</span>
-          {inventory.map((id, idx) => {
-            const item = items[id];
-            if (!item) return <span key={`${id}-${idx}`}>{id}</span>;
-            return (
-              <span key={`${id}-${idx}`} className="inline-flex items-center gap-1">
-                <span>{item.displayName}</span>
-                {item.kind === "consumable" && (
-                  <button
-                    type="button"
-                    onClick={() => onUseItem(id)}
-                    className="rounded bg-amber-700 text-amber-50 px-1.5 py-0.5 text-xs hover:bg-amber-800"
-                    title={item.desc}
-                  >
-                    사용
-                  </button>
-                )}
-              </span>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 type PlayingMeta = GameState & { lastProbability?: unknown };
 

@@ -31,5 +31,6 @@ export const caveAfterSpellbook: Scene = {
       to: "cave_entry",
     },
   ],
-  onEnter: { addItems: ["spellbook"] },
+  // 5 주차 (#221) — cave_inside 재진입 시 take_spellbook 자동 hidden.
+  onEnter: { addItems: ["spellbook"], setFlags: { spellbookTaken: true } },
 };

@@ -257,6 +257,8 @@ describe("#203 addItems 중복 방지 (재진입 시)", () => {
     // cave_after_spellbook 의 onEnter.addItems: ["spellbook"].
     // START_GAME 으로 cave_after_spellbook 진입 → spellbook 1 추가.
     // 동일 씬 재진입 시 (cave_inside → take_spellbook → cave_after_spellbook) → skip.
+    // 5 주차 (#221): take_spellbook 은 spellbookTaken=true 시 hidden+blocked 이므로
+    // 재진입 검증을 위해 *수동으로 flag clear* 후 재선택 (onEnter 의 stackable 로직만 검증).
     const character = makeTestCharacter();
     let state: GameState = {
       phase: "creating",
@@ -271,12 +273,24 @@ describe("#203 addItems 중복 방지 (재진입 시)", () => {
       // 1차 진입 — spellbook 1 개.
       expect(state.character.inventory.filter((id) => id === "spellbook").length).toBe(1);
     }
-    // 2차 진입 — back_to_cave → take_spellbook → cave_after_spellbook.
+    // 2차 진입 — back_to_cave → (#221 flag clear) → take_spellbook → cave_after_spellbook.
     state = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "back_to_cave" },
       scenes as SceneRegistry,
     );
+    // #221 gating 우회 — onEnter stackable 검증이 본 테스트 의도.
+    if (state.phase === "playing") {
+      const { spellbookTaken: _drop, ...restFlags } = state.character.flags as Record<
+        string,
+        boolean | number
+      >;
+      void _drop;
+      state = {
+        ...state,
+        character: { ...state.character, flags: restFlags },
+      };
+    }
     state = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "take_spellbook" },
@@ -292,6 +306,8 @@ describe("#203 addItems 중복 방지 (재진입 시)", () => {
   test("stackable bread/herb 두 번 진입 시 인벤에 각각 2개, non-stackable torch 는 1개", () => {
     // market_buy onEnter.addItems: ["bread", "torch", "herb"].
     // 두 번 진입 시 bread/herb 는 stackable=true → 2 개, torch 는 stackable=false → 1 개.
+    // 5 주차 (#221): buy_supplies 는 marketBought=true 시 hidden+blocked 이므로
+    // 재진입 검증을 위해 *수동으로 flag clear* 후 재선택 (onEnter 의 stackable 로직만 검증).
     const character = makeTestCharacter();
     let state: GameState = { phase: "creating" };
     state = gameReducer(
@@ -312,6 +328,18 @@ describe("#203 addItems 중복 방지 (재진입 시)", () => {
       { type: "MAKE_CHOICE", choiceId: "to_market" },
       scenes as SceneRegistry,
     );
+    // #221 gating 우회 — onEnter stackable 검증이 본 테스트 의도.
+    if (state.phase === "playing") {
+      const { marketBought: _drop, ...restFlags } = state.character.flags as Record<
+        string,
+        boolean | number
+      >;
+      void _drop;
+      state = {
+        ...state,
+        character: { ...state.character, flags: restFlags },
+      };
+    }
     state = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "buy_supplies" },

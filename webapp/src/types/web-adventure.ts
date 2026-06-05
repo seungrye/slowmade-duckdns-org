@@ -38,6 +38,12 @@ export type Choice =
       difficulty: number;
       onSuccess: string;
       onFailure: string;
+      /**
+       * 5 주차 (#221) — *일회성 probability 분기* 자동 hidden.
+       * 지정된 flag 가 truthy 면 isVisible=false (UI 에서 완전 숨김).
+       * 예: forest_inner 의 look_around 가 glassesFound=true 일 때 숨김.
+       */
+      hideWhenFlag?: string;
     }
   | {
       kind: "conditional";
@@ -56,7 +62,12 @@ export type Choice =
 export type ChoiceCondition =
   | { kind: "minStat"; stat: StatKey; min: number }
   | { kind: "hasItem"; itemId: string }
-  | { kind: "flag"; key: string }
+  /**
+   * 5 주차 (#221) — `expect` 로 반전 매치 지원.
+   * - expect 미정의 또는 true → flag 가 truthy 일 때 충족 (기존 동작).
+   * - expect=false → flag 가 미설정/falsy 일 때 충족 (일회성 분기 자동 hidden 용).
+   */
+  | { kind: "flag"; key: string; expect?: boolean }
   /** 4 주차 — 누적 카운터 (예: caughtCount) 가 min 이상일 때 충족. */
   | { kind: "minFlag"; key: string; min: number };
 

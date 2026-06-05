@@ -263,3 +263,74 @@ describe("isChoiceVisible (4 주차)", () => {
     expect(isChoiceAvailable(choice, noTorch)).toBe(false);
   });
 });
+
+// 5 주차 (#221) — flag expect=false (반전 매치). 일회성 분기 자동 hidden 용.
+describe("flag expect (반전 매치, #221)", () => {
+  test("flag expect=false 시 flag 미설정이면 isAvailable=true", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "flag", key: "peddlerMet", expect: false },
+      to: "peddler",
+    };
+    const character = makeTestCharacter();
+    expect(isChoiceAvailable(choice, character)).toBe(true);
+  });
+
+  test("flag expect=false 시 flag true 면 isAvailable=false", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "flag", key: "peddlerMet", expect: false },
+      to: "peddler",
+    };
+    const character = makeTestCharacter({ flags: { peddlerMet: true } });
+    expect(isChoiceAvailable(choice, character)).toBe(false);
+  });
+
+  test("flag expect 미정의 시 기본값 true (기존 동작 보존)", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "flag", key: "hasSecretSnack" },
+      to: "y",
+    };
+    // flag 없을 때 false
+    expect(isChoiceAvailable(choice, makeTestCharacter())).toBe(false);
+    // flag true 일 때 true
+    const c = makeTestCharacter({ flags: { hasSecretSnack: true } });
+    expect(isChoiceAvailable(choice, c)).toBe(true);
+  });
+
+  test("flag expect=true 명시 시 기본값과 동일", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "flag", key: "hasSecretSnack", expect: true },
+      to: "y",
+    };
+    expect(isChoiceAvailable(choice, makeTestCharacter())).toBe(false);
+    const c = makeTestCharacter({ flags: { hasSecretSnack: true } });
+    expect(isChoiceAvailable(choice, c)).toBe(true);
+  });
+
+  test("flag expect=false + hidden=true 면 한 번 방문 후 isVisible=false (완전 숨김)", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "flag", key: "peddlerMet", expect: false },
+      to: "peddler",
+      hidden: true,
+    };
+    // 미방문 시 보임
+    expect(isChoiceVisible(choice, makeTestCharacter())).toBe(true);
+    // 방문 후 숨김
+    const visited = makeTestCharacter({ flags: { peddlerMet: true } });
+    expect(isChoiceVisible(choice, visited)).toBe(false);
+  });
+});

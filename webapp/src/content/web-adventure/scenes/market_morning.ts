@@ -1,5 +1,6 @@
 // 시장 — 아침. 확률 판정 진입 씬.
 // 비밀 창고 잠입 (민첩 12) — 성공: 비밀 간식 / 실패: 들킴.
+// 5 주차 (#221): 좌판 구매 (buy_supplies) 는 일회성 — 방문 후 자동 hidden.
 
 import type { Scene } from "@/types/web-adventure";
 
@@ -14,10 +15,13 @@ export const marketMorning: Scene = {
   ],
   choices: [
     {
-      kind: "plain",
+      // 5 주차 (#221) — 한 번 구매 후 자동 숨김.
+      kind: "conditional",
       id: "buy_supplies",
       label: "좌판에서 물건을 산다",
+      condition: { kind: "flag", key: "marketBought", expect: false },
       to: "market_buy",
+      hidden: true,
     },
     {
       kind: "probability",

@@ -13,10 +13,13 @@ export const caveInside: Scene = {
   ],
   choices: [
     {
-      kind: "plain",
+      // 5 주차 (#221) — 한 번 챙긴 후 자동 숨김.
+      kind: "conditional",
       id: "take_spellbook",
       label: "마법서를 챙긴다",
+      condition: { kind: "flag", key: "spellbookTaken", expect: false },
       to: "cave_after_spellbook",
+      hidden: true,
     },
     {
       kind: "probability",

@@ -19,6 +19,10 @@ const ChoiceConditionSchema = new Schema(
     min: { type: Number },
     itemId: { type: String },
     key: { type: String },
+    // 5 주차 (#221) — flag 조건의 *반전 매치* (expect=false 시 flag 미설정일 때 충족).
+    // 미정의 시 default true (기존 동작 보존). mongoose 가 자동으로 false 를 채워넣지 않도록
+    // default 를 명시하지 않는다.
+    expect: { type: Boolean },
   },
   { _id: false },
 );
@@ -54,6 +58,8 @@ const ChoiceSchema = new Schema(
     condition: { type: ChoiceConditionSchema },
     // 4 주차 — conditional 의 *완전 숨김* 모드 (조건 미충족 시 UI 에서 렌더 X).
     hidden: { type: Boolean },
+    // 5 주차 (#221) — probability 의 *일회성 자동 hidden* (해당 flag truthy 면 UI 에서 렌더 X).
+    hideWhenFlag: { type: String },
   },
   { _id: false },
 );

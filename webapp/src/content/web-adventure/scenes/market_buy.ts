@@ -20,5 +20,6 @@ export const marketBuy: Scene = {
       to: "town_square_dawn",
     },
   ],
-  onEnter: { addItems: ["bread", "torch", "herb"] },
+  // 5 주차 (#221) — market_morning 재진입 시 buy_supplies 자동 hidden.
+  onEnter: { addItems: ["bread", "torch", "herb"], setFlags: { marketBought: true } },
 };

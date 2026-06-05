@@ -40,8 +40,12 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       return effectiveStat(character, cond.stat) >= cond.min;
     case "hasItem":
       return character.inventory.includes(cond.itemId);
-    case "flag":
-      return !!character.flags[cond.key];
+    case "flag": {
+      // 5 주차 (#221) — expect 로 반전 매치. 미정의 시 기본값 true (기존 동작 보존).
+      const expected = cond.expect ?? true;
+      const actual = character.flags[cond.key] === true;
+      return actual === expected;
+    }
     case "minFlag": {
       const v = character.flags[cond.key];
       const num = typeof v === "number" ? v : v === true ? 1 : 0;

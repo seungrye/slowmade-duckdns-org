@@ -33,8 +33,12 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       return effectiveStat(character, cond.stat) >= cond.min;
     case "hasItem":
       return character.inventory.includes(cond.itemId);
-    case "flag":
-      return !!character.flags[cond.key];
+    case "flag": {
+      // 5 주차 (#221) — expect 로 반전 매치. 미정의 시 기본값 true (기존 동작 보존).
+      const expected = cond.expect ?? true;
+      const actual = character.flags[cond.key] === true;
+      return actual === expected;
+    }
     case "minFlag": {
       const v = character.flags[cond.key];
       const num = typeof v === "number" ? v : v === true ? 1 : 0;
@@ -50,13 +54,21 @@ export function isChoiceAvailable(choice: Choice, character: Character): boolean
 
 /**
  * 4 주차 — 조건 선택지의 *완전 숨김 모드*.
+ * 5 주차 (#221) — probability 의 hideWhenFlag 지원.
  *
- * - plain / probability → 항상 visible.
+ * - plain → 항상 visible.
+ * - probability → hideWhenFlag 지정 시 해당 flag truthy 면 hidden, 아니면 visible.
  * - conditional + hidden=true → 조건 미충족 시 false (UI 에서 렌더 X).
  * - conditional + hidden=false/undefined → 항상 true (회색 + tooltip 처리는 UI 가 한다).
  */
 export function isChoiceVisible(choice: Choice, character: Character): boolean {
-  if (choice.kind === "plain" || choice.kind === "probability") return true;
+  if (choice.kind === "plain") return true;
+  if (choice.kind === "probability") {
+    if (choice.hideWhenFlag && character.flags[choice.hideWhenFlag] === true) {
+      return false;
+    }
+    return true;
+  }
   if (!choice.hidden) return true;
   return evalCondition(choice.condition, character);
 }

@@ -37,4 +37,6 @@ export const peddler: Scene = {
       to: "town_square_dawn",
     },
   ],
+  // 5 주차 (#221) — 광장 재진입 시 일회성 진입 선택지 자동 hidden.
+  onEnter: { setFlags: { peddlerMet: true } },
 };

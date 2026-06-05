@@ -11,6 +11,7 @@ import type {
 } from "@/types/web-adventure";
 import { gameReducer } from "@/lib/web-adventure/engine/reducer";
 import { scenes, START_SCENE_ID } from "@/lib/web-adventure/engine/sceneRegistry";
+import { isChoiceVisible } from "@/lib/web-adventure/engine/choiceFilter";
 
 function makeTestCharacter(
   overrides: Partial<Record<StatKey, number>> = {},
@@ -336,6 +337,111 @@ describe("web-adventure 시나리오", () => {
     expect(new Set(ids)).toEqual(
       new Set(["main", "spirit", "fail", "shopkeeper", "goblin_friend", "wizard_apprentice"]),
     );
+  });
+
+  // ─── 5 주차 (#221) — 일회성 분기 자동 hidden ───────────────────────────
+
+  // 각 부모 씬의 일회성 선택지가 *방문 후* visibleChoices 에서 사라져야 한다.
+  // 동일한 시뮬레이션 유틸: 현재 씬의 *visible* choices 추출.
+  function visibleAt(state: GameState): string[] {
+    if (state.phase !== "playing") return [];
+    const scene = scenes[state.currentScene];
+    return scene.choices
+      .filter((c) => isChoiceVisible(c, state.character))
+      .map((c) => c.id);
+  }
+
+  test("광장에서 행상인 방문 후 다시 광장 → to_peddler 선택지 숨김", () => {
+    const lowRng = () => 0.0;
+    let state: GameState = startGame(makeTestCharacter({ cha: 3 }));
+    // 일회성 진입 (실패 시 광장 복귀 — 단 onEnter 가 부모 진입 직전이 아니라 peddler 진입 시 동작)
+    state = makeChoice(state, "to_peddler", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("peddler");
+    // peddler 진입 → onEnter setFlags peddlerMet=true
+    state = makeChoice(state, "leave_peddler", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+    // town_square_dawn 재진입 — peddler 선택지가 없어야 함
+    const visible = visibleAt(state);
+    expect(visible).not.toContain("to_peddler");
+  });
+
+  test("광장에서 동행자 방문 후 다시 광장 → to_companion 선택지 숨김", () => {
+    const lowRng = () => 0.0;
+    let state: GameState = startGame(makeTestCharacter({ cha: 3 }));
+    state = makeChoice(state, "to_companion", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("companion_meeting");
+    state = makeChoice(state, "decline_companion", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+    const visible = visibleAt(state);
+    expect(visible).not.toContain("to_companion");
+  });
+
+  test("산기슭 방문 후 다시 광장 → to_mountain_foot 선택지 숨김", () => {
+    const lowRng = () => 0.0;
+    let state: GameState = startGame(makeTestCharacter({ wis: 3 }));
+    state = makeChoice(state, "to_mountain_foot", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("mountain_foot");
+    state = makeChoice(state, "back_to_square_from_foot", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+    const visible = visibleAt(state);
+    expect(visible).not.toContain("to_mountain_foot");
+  });
+
+  test("시장 buy_supplies 후 시장 재진입 → buy_supplies 선택지 숨김", () => {
+    let state: GameState = startGame(makeTestCharacter());
+    state = makeChoice(state, "to_market");
+    if (state.phase === "playing") expect(state.currentScene).toBe("market_morning");
+    state = makeChoice(state, "buy_supplies");
+    if (state.phase === "playing") expect(state.currentScene).toBe("market_buy");
+    state = makeChoice(state, "back_to_square");
+    if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+    state = makeChoice(state, "to_market");
+    if (state.phase === "playing") expect(state.currentScene).toBe("market_morning");
+    const visible = visibleAt(state);
+    expect(visible).not.toContain("buy_supplies");
+  });
+
+  test("숲에서 forest_find_glasses 방문 후 forest_inner 재진입 → look_around 선택지 숨김", () => {
+    const highRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ wis: 7 }));
+    state = makeChoice(state, "to_forest", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_entry");
+    state = makeChoice(state, "go_deeper", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_inner");
+    state = makeChoice(state, "look_around", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_find_glasses");
+    state = makeChoice(state, "back_inner", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("forest_inner");
+    const visible = visibleAt(state);
+    expect(visible).not.toContain("look_around");
+  });
+
+  test("동굴에서 spellbook 획득 후 cave_inside 재진입 → take_spellbook 선택지 숨김", () => {
+    const fixedRng = () => 0.99;
+    const char = makeTestCharacter();
+    char.inventory = ["torch"];
+    let state: GameState = startGame(char);
+    state = makeChoice(state, "to_cave", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_entry");
+    state = makeChoice(state, "enter_with_torch", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_inside");
+    state = makeChoice(state, "take_spellbook", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_after_spellbook");
+    state = makeChoice(state, "back_to_cave", fixedRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("cave_inside");
+    const visible = visibleAt(state);
+    expect(visible).not.toContain("take_spellbook");
+  });
+
+  test("회차 정상 종결 — 일회성 hidden 추가 후에도 메인 엔딩 도달 가능", () => {
+    const highRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ dex: 10 }));
+    state = makeChoice(state, "to_market", highRng);
+    state = makeChoice(state, "sneak_storage", highRng);
+    state = makeChoice(state, "to_elder", highRng);
+    state = makeChoice(state, "give_snack", highRng);
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("main");
   });
 
   test("USE_ITEM bread 시 HP +20 회복 및 인벤에서 제거", () => {

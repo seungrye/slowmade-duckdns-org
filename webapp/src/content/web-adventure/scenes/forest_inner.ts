@@ -23,6 +23,7 @@ export const forestInner: Scene = {
     },
     {
       // 3 주차 미니 fix — wis 10 판정 ✓ 시 안경 획득 씬으로.
+      // 5 주차 (#221) — glassesFound 플래그 set 후 자동 hidden (이미 안경을 찾았음).
       kind: "probability",
       id: "look_around",
       label: "주변을 살핀다",
@@ -30,6 +31,7 @@ export const forestInner: Scene = {
       difficulty: 10,
       onSuccess: "forest_find_glasses",
       onFailure: "forest_inner",
+      hideWhenFlag: "glassesFound",
     },
     {
       // 안경 없을 때의 *지혜 판정* (난이도 13, 안경 없으면 어렵다).
