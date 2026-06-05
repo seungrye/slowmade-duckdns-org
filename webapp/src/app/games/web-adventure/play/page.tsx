@@ -9,10 +9,12 @@ import {
 } from "@/lib/web-adventure/engine/sceneRegistry";
 import { useAutoSave } from "@/lib/web-adventure/use-auto-save";
 import { useMigrateOnLogin } from "@/lib/web-adventure/use-migrate-on-login";
+import Link from "next/link";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
 import EndingScreen from "./EndingScreen";
 import StatusPanel from "./StatusPanel";
+import MobileDrawer from "./MobileDrawer";
 
 // CSR 플레이 화면 — reducer 기반 상태 머신.
 //
@@ -103,6 +105,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   // #238 — 자동 저장 + 마운트 시 복원.
   // #239 — 회차 시스템: ended 진입 시 end-run API 호출 + runIndex +1.
   const [runIndex, setRunIndex] = useState(1);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const endRunSentRef = useRef<string | null>(null);
 
   useAutoSave(state, {
@@ -161,15 +164,39 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         )}
 
         {state.phase === "playing" && scenes[state.currentScene] && (
-          <div className="md:grid md:grid-cols-[1fr_280px] md:gap-4">
-            <div>
-              <SceneRenderer
-                scene={scenes[state.currentScene]}
-                character={state.character}
-                onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
-              />
+          <>
+            {/* 모바일 햄버거 — fixed 우상단. 데스크탑은 사이드 패널이 보이므로 숨김. */}
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="md:hidden fixed top-3 right-3 z-30 rounded bg-amber-700 text-amber-50 px-3 py-1.5 text-sm shadow"
+              aria-label="상태 메뉴 열기"
+            >
+              ☰ 상태
+            </button>
+
+            <div className="md:grid md:grid-cols-[1fr_280px] md:gap-4">
+              <div>
+                <SceneRenderer
+                  scene={scenes[state.currentScene]}
+                  character={state.character}
+                  onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
+                />
+              </div>
+              {/* 데스크탑 사이드 패널 */}
+              <div className="hidden md:block">
+                <StatusPanel
+                  character={state.character}
+                  runIndex={runIndex}
+                  onUseItem={(itemId) => dispatch({ type: "USE_ITEM", itemId })}
+                  onReroll={() => dispatch({ type: "REROLL" })}
+                  canReroll={Boolean((state as PlayingMeta).lastProbability)}
+                />
+              </div>
             </div>
-            <div className="mt-4 md:mt-0">
+
+            {/* 모바일 drawer — 같은 StatusPanel + 갤러리 링크 */}
+            <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)}>
               <StatusPanel
                 character={state.character}
                 runIndex={runIndex}
@@ -177,8 +204,16 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                 onReroll={() => dispatch({ type: "REROLL" })}
                 canReroll={Boolean((state as PlayingMeta).lastProbability)}
               />
-            </div>
-          </div>
+              <div className="mt-3 pt-2 border-t border-amber-300">
+                <Link
+                  href="/games/web-adventure/gallery"
+                  className="block text-center rounded bg-amber-700 text-amber-50 px-3 py-2 text-sm hover:bg-amber-800"
+                >
+                  🏆 엔딩 갤러리
+                </Link>
+              </div>
+            </MobileDrawer>
+          </>
         )}
 
         {state.phase === "ended" && (
