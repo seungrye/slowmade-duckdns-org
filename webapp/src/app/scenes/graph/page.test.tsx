@@ -439,3 +439,117 @@ describe("#233 — 순수 클릭 (onNodeClick) 분기", () => {
     expect(code).toMatch(/setSelectedSceneId\(node\.id\)/);
   });
 });
+
+// #235 — 패널 닫기 시 highlight off + 선택 노드 카메라 중앙 이동.
+// A. rfNodes 의 selected 필드가 selectedSceneId 에 따라 부착되어야 함.
+// B. ReactFlowProvider 로 GraphInner 가 wrap 되어 useReactFlow 가 사용 가능.
+// C. selectedSceneId 변경 시 setTimeout 350ms 후 setCenter 호출.
+describe("/scenes/graph — #235 패널 닫기 highlight off + 카메라 중앙 이동", () => {
+  beforeEach(() => {
+    flowProps.current = {};
+  });
+
+  it("초기 상태 — 모든 노드의 selected=false (selectedSceneId=null)", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    const nodes = (flowProps.current.nodes ?? []) as Array<{
+      id: string;
+      selected?: boolean;
+    }>;
+    expect(nodes.length).toBe(30);
+    for (const n of nodes) {
+      expect(n.selected).toBe(false);
+    }
+  });
+
+  it("노드 클릭 후 해당 노드만 selected=true, 나머지는 false", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    const onNodeClick = flowProps.current.onNodeClick as (
+      e: unknown,
+      n: { id: string },
+    ) => void;
+    await act(async () => {
+      onNodeClick({}, { id: "scene_01" });
+    });
+    await act(async () => {});
+    const nodes = (flowProps.current.nodes ?? []) as Array<{
+      id: string;
+      selected?: boolean;
+    }>;
+    const selected = nodes.find((n) => n.id === "scene_01");
+    expect(selected?.selected).toBe(true);
+    const others = nodes.filter((n) => n.id !== "scene_01");
+    for (const n of others) {
+      expect(n.selected).toBe(false);
+    }
+  });
+
+  it("닫기 버튼 클릭 → 모든 노드 selected=false (highlight off)", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    const onNodeClick = flowProps.current.onNodeClick as (
+      e: unknown,
+      n: { id: string },
+    ) => void;
+    await act(async () => {
+      onNodeClick({}, { id: "scene_01" });
+    });
+    await act(async () => {});
+    // 선택된 상태 확인.
+    let nodes = (flowProps.current.nodes ?? []) as Array<{
+      id: string;
+      selected?: boolean;
+    }>;
+    expect(nodes.find((n) => n.id === "scene_01")?.selected).toBe(true);
+
+    // 닫기 버튼 → onClose → setSelectedSceneId(null).
+    const closeBtn = screen.getByRole("button", { name: /닫기/ });
+    await act(async () => {
+      closeBtn.click();
+    });
+    await act(async () => {});
+
+    nodes = (flowProps.current.nodes ?? []) as Array<{
+      id: string;
+      selected?: boolean;
+    }>;
+    for (const n of nodes) {
+      expect(n.selected).toBe(false);
+    }
+  });
+
+  test("page.tsx 에 ReactFlowProvider + GraphInner 구조 존재", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // GraphPage 는 ReactFlowProvider 로 GraphInner 를 wrap.
+    expect(code).toMatch(/ReactFlowProvider/);
+    expect(code).toMatch(/GraphInner/);
+  });
+
+  test("page.tsx 에 useReactFlow + setCenter 호출 존재", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    expect(code).toMatch(/useReactFlow\(\)/);
+    expect(code).toMatch(/setCenter\(/);
+  });
+
+  test("page.tsx 에 useMemo deps 로 selectedSceneId 포함 + selected 필드 부착", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // useMemo 안에서 selected: n.id === selectedSceneId 또는 유사 패턴.
+    expect(code).toMatch(/selected:\s*[a-zA-Z_]+\.id\s*===\s*selectedSceneId/);
+    // deps 배열에 selectedSceneId.
+    expect(code).toMatch(/\[scenes,\s*selectedSceneId\]/);
+  });
+
+  test("page.tsx 에 setTimeout 350ms + setCenter zoom/duration 옵션 존재", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // 350ms setTimeout — 사이드패널 슬라이드인 (300ms) 후 setCenter.
+    // 화살표 본문이 여러 줄/콤마 포함이라도 매칭되도록 끝에 350) 만 검사.
+    expect(code).toMatch(/,\s*350\s*\)/);
+    // setCenter 의 옵션 객체: zoom: 1.2, duration: 400.
+    expect(code).toMatch(/zoom:\s*1\.2/);
+    expect(code).toMatch(/duration:\s*400/);
+  });
+});

@@ -24,9 +24,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   MarkerType,
+  useReactFlow,
   type Edge,
   type Node,
   type NodeTypes,
@@ -92,10 +94,22 @@ const NODE_TYPES: NodeTypes = {
 // 이상이면 PUT 으로 위치 저장.
 const DRAG_CLICK_THRESHOLD_PX = 5;
 
+// #235 — ReactFlowProvider 안에서 useReactFlow 가 동작하도록 본문을 분리.
+// GraphPage 는 단순히 Provider 로 GraphInner 를 wrap.
 export default function GraphPage() {
+  return (
+    <ReactFlowProvider>
+      <GraphInner />
+    </ReactFlowProvider>
+  );
+}
+
+function GraphInner() {
   // #226 — router.push 는 더 이상 사용하지 않지만, useRouter 를 호출해
   // next/navigation 컨텍스트와 호환을 유지한다 (테스트 mock 호환).
   useRouter();
+  // #235 — 카메라 이동용 setCenter 훅.
+  const { setCenter } = useReactFlow();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // #226 — 사이드패널 편집 대상 씬 id.
@@ -139,9 +153,30 @@ export default function GraphPage() {
       type: "scene",
       data: n.data as unknown as Record<string, unknown>,
       draggable: true,
+      // #235 — 선택 상태를 rfNodes 에 부착.
+      // selectedSceneId===null 시 모든 노드 selected=false → ring highlight off.
+      selected: n.id === selectedSceneId,
     }));
     return { rfNodes: rfn, rfEdges: toReactFlowEdges(edges) };
-  }, [scenes]);
+  }, [scenes, selectedSceneId]);
+
+  // #235 — 선택 노드를 캔버스 중앙으로 이동.
+  // SidePanel 슬라이드인 (300ms transition) 직후 setCenter 호출.
+  // ReactFlow 가 flex-1 컨테이너 안이므로 패널이 차지하는 우측은 자동 제외 →
+  // 컨테이너 내 가운데 = 사용자 시각상 캔버스 중앙.
+  useEffect(() => {
+    if (!selectedSceneId) return;
+    const node = rfNodes.find((n) => n.id === selectedSceneId);
+    if (!node) return;
+    const timer = setTimeout(() => {
+      setCenter(
+        node.position.x + 90, // 노드 width 180 / 2.
+        node.position.y + 30, // 노드 height 60 / 2.
+        { zoom: 1.2, duration: 400 },
+      );
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [selectedSceneId, rfNodes, setCenter]);
 
   // #225 — 드래그 시작점 저장.
   // ReactFlow 는 노드 mousedown 시 (이동 없어도) onNodeDragStart 를 발화.

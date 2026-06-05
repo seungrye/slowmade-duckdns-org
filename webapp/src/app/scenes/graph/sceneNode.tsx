@@ -50,11 +50,13 @@ export default function SceneNode({ id, data, selected }: Props) {
   const baseClass = isEnding
     ? `${endingColor} border-2`
     : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 border border-gray-400";
-  // 우선순위: selected > isStart (선택 시 노란 굵은 ring 으로 덮어쓰기).
+  // 우선순위: selected (노란) > isStart (보라 — selected 와 색 구분).
+  // #235 사용자 피드백: 시작 노드의 amber-400 이 selected 의 yellow-300 과
+  // 시각적으로 너무 비슷 → 시작 노드를 violet 으로 변경.
   const ringClass = selected
     ? "ring-4 ring-yellow-300 ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
     : isStart
-      ? "ring-4 ring-amber-400"
+      ? "ring-4 ring-violet-500"
       : "";
 
   return (
