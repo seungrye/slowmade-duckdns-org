@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useState, useCallback } from "react";
+import { useEffect, useReducer, useRef, useState, useCallback } from "react";
 import type { GameState, SceneRegistry } from "@/types/web-adventure";
 import { gameReducer, type Action } from "@/lib/web-adventure/engine/reducer";
 import {
@@ -97,12 +97,15 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   );
 
   // #238 — 자동 저장 + 마운트 시 복원.
-  //   runIndex 는 #239 의 회차 시스템 통합 전까지 1 고정 (단일 진행 중 save).
+  // #239 — 회차 시스템: ended 진입 시 end-run API 호출 + runIndex +1.
+  const [runIndex, setRunIndex] = useState(1);
+  const endRunSentRef = useRef<string | null>(null);
+
   useAutoSave(state, {
-    runIndex: 1,
+    runIndex,
     onRestore: (payload) => {
-      // 복원 시 scenes 에 존재하는 sceneId 인지 확인.
       if (scenes[payload.currentSceneId]) {
+        setRunIndex(payload.runIndex);
         dispatch({
           type: "RESTORE",
           character: payload.character,
@@ -111,6 +114,29 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
       }
     },
   });
+
+  // #239 — ended 진입 시 한 번만 end-run POST → save 의 runIndex+1 + past_run 적치.
+  //   서버 401(비로그인) 은 silent skip. 같은 runIndex 중복 전송 방지.
+  useEffect(() => {
+    if (state.phase !== "ended") return;
+    const sentKey = `${runIndex}:${state.endingId}`;
+    if (endRunSentRef.current === sentKey) return;
+    endRunSentRef.current = sentKey;
+    void fetch("/api/web-adventure/end-run", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endingId: state.endingId,
+        finalSceneId: state.finalSceneId,
+      }),
+    })
+      .then((res) => {
+        if (res.ok) setRunIndex((n) => n + 1);
+      })
+      .catch(() => {
+        /* 네트워크/auth 실패 silent — 다음 게임 시작 시 save 갱신으로 회복 */
+      });
+  }, [state, runIndex]);
 
   return (
     <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">
