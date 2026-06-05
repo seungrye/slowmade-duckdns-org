@@ -8,6 +8,7 @@ import {
   START_SCENE_ID,
 } from "@/lib/web-adventure/engine/sceneRegistry";
 import { useAutoSave } from "@/lib/web-adventure/use-auto-save";
+import { useMigrateOnLogin } from "@/lib/web-adventure/use-migrate-on-login";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
 import EndingScreen from "./EndingScreen";
@@ -95,6 +96,9 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     (s: GameState, action: Action) => gameReducer(s, action, scenes),
     initialState,
   );
+
+  // #240 — 로그인 직후 localStorage 의 save/past_runs → 서버 이전 (한 번만).
+  useMigrateOnLogin();
 
   // #238 — 자동 저장 + 마운트 시 복원.
   // #239 — 회차 시스템: ended 진입 시 end-run API 호출 + runIndex +1.

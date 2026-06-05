@@ -7,6 +7,11 @@ import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 
 // next/font 가 jsdom 에서 깨지지 않도록 stub.
+// #240 — useMigrateOnLogin 이 useSession 호출. 테스트는 SessionProvider 없음 → mock.
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ status: "unauthenticated", data: null }),
+}));
+
 vi.mock("next/font/google", () => ({
   Manrope: () => ({ className: "manrope" }),
 }));
