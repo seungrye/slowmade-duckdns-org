@@ -146,7 +146,11 @@ describe('MermaidBlock', () => {
   //   결정적 fix: 컨테이너 className 에 child selector + !important — CSS spec
   //   상 !important 가 inline style 보다 항상 우선. mermaid 가 어떤 inline
   //   style 을 박아도 항상 부모 폭 가득.
-  it('컨테이너 className 에 [&_svg]:!max-w-full / [&_svg]:!w-full 가 적용된다 (#241)', async () => {
+  // #242 — Tailwind v4 의 important suffix `!` (v3 의 prefix 가 아님).
+  //   #241 의 `[&_svg]:!w-full` 은 v4 에서 !important 가 컴파일에 안 들어감 —
+  //   실제 출력 CSS: `.mermaid-rendered svg{max-width:100%;height:auto}` (!important 없음).
+  //   v4 문법: `[&_svg]:w-full!` (suffix `!`).
+  it('컨테이너 className 에 v4 important suffix 적용 [&_svg]:w-full! 등 (#242)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg data-testid="forced-svg">FLOW</svg>',
     });
@@ -159,9 +163,9 @@ describe('MermaidBlock', () => {
 
     const rendered = container.querySelector('.mermaid-rendered');
     const className = rendered?.getAttribute('class') ?? '';
-    expect(className).toMatch(/\[&_svg\]:!max-w-full/);
-    expect(className).toMatch(/\[&_svg\]:!w-full/);
-    expect(className).toMatch(/\[&_svg\]:!h-auto/);
+    expect(className).toMatch(/\[&_svg\]:w-full!/);
+    expect(className).toMatch(/\[&_svg\]:max-w-full!/);
+    expect(className).toMatch(/\[&_svg\]:h-auto!/);
   });
 
   // #240 — 사용자 보고: "플로우차트만 작음, 시퀀스는 정상".

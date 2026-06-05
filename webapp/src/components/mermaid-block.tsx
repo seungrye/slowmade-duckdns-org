@@ -109,14 +109,15 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
       {svg ? (
         // #238 — block + max-w-4xl + mx-auto.
         // #239/#240 — JS ref override (defense in depth).
-        // #241 — child selector + !important — Tailwind arbitrary selector.
-        //   `[&_svg]:!w-full` = `.mermaid-rendered svg { width: 100% !important; }`.
+        // #241 — child selector + !important — Tailwind v4 arbitrary selector.
+        //   v4 부터 important 는 *suffix* `!` (v3 의 prefix `!w-full` 은 v4 에서
+        //   !important 가 컴파일에 안 들어감 — #242 실제 CSS 출력 확인).
+        //   v4 문법: `[&_svg]:w-full!` → `.mermaid-rendered svg { width: 100% !important }`.
         //   CSS spec: !important 의 author rule 이 element 의 inline style 보다 우선.
         //   mermaid 가 박는 `style="max-width: 216px"` 도 이 CSS 가 override.
-        //   결정적으로 *모든 차트 타입* 이 부모 폭(max-w-4xl=896px) 가득.
         <div
           ref={containerRef}
-          className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto [&_svg]:!w-full [&_svg]:!max-w-full [&_svg]:!h-auto"
+          className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto [&_svg]:w-full! [&_svg]:max-w-full! [&_svg]:h-auto!"
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
