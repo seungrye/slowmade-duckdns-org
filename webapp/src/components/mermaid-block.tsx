@@ -96,24 +96,34 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     svgEl.removeAttribute('height');
     svgEl.style.maxWidth = '100%';
     svgEl.style.height = 'auto';
-    // #245 — mermaid 11 의 flowchart-v2 / stateDiagram 등은 viewBox 를 svg
-    //   자체의 getBBox() 로 설정 → defs/markers/측정 잔재 등이 BBox 를 부풀려
-    //   viewBox 가 그래프 실제 크기의 ~10배로 잡힘 (예: g.root BBox=208x417 인데
-    //   viewBox=2056x2056). 컨테이너만 크고 그래프 압축 표시.
-    //   해결: g.root 의 BBox 로 viewBox 강제 재설정.
-    const rootG = svgEl.querySelector<SVGGraphicsElement>('g.root');
-    if (rootG) {
-      try {
-        const bb = rootG.getBBox();
-        if (bb.width > 0 && bb.height > 0) {
-          const pad = 8;
-          svgEl.setAttribute(
-            'viewBox',
-            `${bb.x - pad} ${bb.y - pad} ${bb.width + 2 * pad} ${bb.height + 2 * pad}`
-          );
+    // #246 — class diagram 은 mermaid 11 자체 측정 버그로 *각 클래스 박스의
+    //   outer-path* 가 콘텐츠보다 5배 큰 좌표로 그려짐 (예: 라벨 9개*24px=216
+    //   인데 outer-path BBox=2094x2118). 이 상태에서 #245 처럼 g.root 의 BBox
+    //   로 viewBox 를 재설정하면 *부풀려진 outer-path 까지 포함* 한 BBox 라
+    //   여전히 어색. 박스 자체를 콘텐츠 영역에 맞춰 재계산하는 우회:
+    //   각 g.node 의 outer-path 를 그 노드의 label-group bounding 으로 줄인다.
+    // #245 — flowchart/state 등은 mermaid 11 이 viewBox 를 svg 자체 getBBox()
+    //   로 잡아 defs/markers 잔재로 ~10배 부풀음. g.root BBox 로 재설정.
+    //   class diagram 은 시도했지만 (#246) mermaid 자체 측정 버그가 깊어 우회
+    //   불가 — 원본 viewBox 유지 (콘텐츠는 잘리지 않고 다 보임, 다만 박스 안
+    //   여백이 큼). #246 의 transform: scale + label-group 기반 viewBox 재계산은
+    //   메서드/속성/박스가 잘려 더 안 좋아 원복.
+    const role = svgEl.getAttribute('aria-roledescription');
+    if (role !== 'class') {
+      const rootG = svgEl.querySelector<SVGGraphicsElement>('g.root');
+      if (rootG) {
+        try {
+          const bb = rootG.getBBox();
+          if (bb.width > 0 && bb.height > 0) {
+            const pad = 8;
+            svgEl.setAttribute(
+              'viewBox',
+              `${bb.x - pad} ${bb.y - pad} ${bb.width + 2 * pad} ${bb.height + 2 * pad}`
+            );
+          }
+        } catch {
+          /* getBBox 가 detached/invisible SVG 에서 던질 수 있음 — 무시 */
         }
-      } catch {
-        // getBBox 가 detached/invisible SVG 에서 던질 수 있음 — 무시.
       }
     }
   }, [svg]);
