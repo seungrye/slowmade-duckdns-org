@@ -9,6 +9,16 @@ vi.mock('mermaid', () => ({
   },
 }));
 
+// #248 — class diagram 은 viz-js 로 fallback. 테스트에선 wasm 로딩 회피용 mock.
+vi.mock('@viz-js/viz', () => ({
+  instance: vi.fn().mockResolvedValue({
+    renderString: vi.fn(
+      (dot: string) =>
+        `<svg data-testid="viz-svg" data-dot-len="${dot.length}"><text>${dot.includes('Character') ? 'CHAR' : 'X'}</text></svg>`
+    ),
+  }),
+}));
+
 import mermaid from 'mermaid';
 import { MermaidBlock, __resetMermaidInitForTest } from './mermaid-block';
 
@@ -221,6 +231,17 @@ describe('MermaidBlock', () => {
     expect(svgEl).not.toBeNull();
     // bb=(5,10,200,400) + pad=8 → viewBox="-3 2 216 416"
     expect(svgEl?.getAttribute('viewBox')).toBe('-3 2 216 416');
+  });
+
+  // #248 — classDiagram 으로 시작하는 코드는 mermaid 가 아닌 viz-js 로 렌더.
+  it('classDiagram 코드는 viz-js(graphviz) 로 fallback 한다 (#248)', async () => {
+    render(<MermaidBlock code={`classDiagram\nclass Character {\n  +Stats stats\n}`} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('viz-svg')).toBeInTheDocument();
+    });
+    // mermaid.render 는 호출되지 않아야 한다.
+    expect((mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render).not.toHaveBeenCalled();
   });
 
   // #245 추가: g.root 가 없으면 (sequence/gantt/pie 등) viewBox 건드리지 않는다.

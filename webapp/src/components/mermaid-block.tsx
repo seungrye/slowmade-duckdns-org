@@ -2,6 +2,17 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
+import { mermaidClassToDot } from './mermaid-class-to-dot';
+
+// #248 — class diagram 만 graphviz/viz-js 로 fallback (mermaid 의 박스 padding 과대).
+// viz-js 의 wasm instance 는 모듈 레벨로 캐싱.
+type VizInstance = { renderString: (dot: string, opts?: { format: string }) => string };
+let vizInstancePromise: Promise<VizInstance> | null = null;
+function getViz(): Promise<VizInstance> {
+  if (vizInstancePromise) return vizInstancePromise;
+  vizInstancePromise = import('@viz-js/viz').then((m) => m.instance()) as Promise<VizInstance>;
+  return vizInstancePromise;
+}
 
 // mermaid 는 클라이언트 측에서 1회만 초기화 — 중복 호출 방지.
 // securityLevel: "loose" — 한국어 라벨/링크 등을 안전하게 표시하기 위해 sanitize 를 완화.
@@ -57,11 +68,21 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
 
   useEffect(() => {
     let cancelled = false;
-    ensureInit();
     (async () => {
       try {
-        // mermaid v9 는 render 가 동기 string 반환, v10/v11 은 Promise<{svg}>.
-        // 양쪽 다 받도록 처리.
+        // #248 — class diagram 만 viz-js (graphviz) 로 fallback.
+        if (/^\s*classDiagram\b/.test(code)) {
+          const viz = await getViz();
+          const dot = mermaidClassToDot(code);
+          const rendered = viz.renderString(dot, { format: 'svg' });
+          if (!cancelled) {
+            setSvg(rendered);
+            setError(null);
+          }
+          return;
+        }
+        // 다른 차트 — mermaid.
+        ensureInit();
         const result = (mermaid as unknown as {
           render: (id: string, code: string) => string | Promise<{ svg: string } | string>;
         }).render(idRef.current, code);
