@@ -34,24 +34,28 @@ interface ThemeColors {
   edgeLabel: string;
 }
 
+// #250 — 사이트 브랜드 색상 (보라/violet) 톤에 맞춤.
+//   site 의 --tt-brand-color: 50=#efeeff, 100=#dedbff, 200=#c3bdff,
+//     500=#6229ff(메인), 600=#5400e5, 700=#4b00cc.
+//   site 의 --background/--foreground: light(#fff/#171717), dark(#0a0a0a/#ededed).
 const THEMES: Record<DotTheme, ThemeColors> = {
-  // 라이트: 라벤더 톤 (#249 초기 디자인).
+  // 라이트: 브랜드 50/100 의 라벤더 + 200 의 보더.
   light: {
-    bgNode: '#eaeaf5',
-    bgHeader: '#d4d4f0',
-    border: '#9ca3af',
-    text: '#1f2937',
-    edge: '#6b7280',
-    edgeLabel: '#374151',
+    bgNode: '#efeeff',
+    bgHeader: '#dedbff',
+    border: '#c3bdff',
+    text: '#171717',
+    edge: '#6229ff',
+    edgeLabel: '#4b00cc',
   },
-  // 다크: 어두운 회색 + 밝은 텍스트 (Tailwind zinc 계열).
+  // 다크: 어두운 보라 톤 + 브랜드 200 의 보더 액센트.
   dark: {
-    bgNode: '#27272a',
-    bgHeader: '#3f3f46',
-    border: '#52525b',
-    text: '#e4e4e7',
-    edge: '#a1a1aa',
-    edgeLabel: '#d4d4d8',
+    bgNode: '#1f1a35',
+    bgHeader: '#2e2549',
+    border: '#5440a0',
+    text: '#ededed',
+    edge: '#a59cd8',
+    edgeLabel: '#c3bdff',
   },
 };
 
@@ -117,14 +121,21 @@ export function mermaidClassToDot(code: string, theme: DotTheme = 'light'): stri
   out.push('digraph G {');
   out.push('  rankdir=TB');
   out.push('  bgcolor="transparent"');
+  // #251 — fontname 을 graphviz wasm 이 *embed* 한 표준 sans-serif "Helvetica" 로.
+  //   "Pretendard, sans-serif" 박았더니 wasm 에 폰트 없어 fallback 으로 *훨씬
+  //   좁게* 측정 + SVG 는 Pretendard 로 렌더되어 텍스트가 td 폭을 넘어감.
+  //   Helvetica 면 graphviz 측정 ≈ 브라우저 렌더 (둘 다 표준 sans-serif metric).
   out.push(
-    `  node [shape=plaintext fontname="Pretendard, sans-serif" fontsize=12 fontcolor="${c.text}"]`
+    `  node [shape=plaintext fontname="Helvetica" fontsize=12 fontcolor="${c.text}"]`
   );
   out.push(
-    `  edge [fontname="Pretendard, sans-serif" fontsize=10 color="${c.edge}" fontcolor="${c.edgeLabel}"]`
+    `  edge [fontname="Helvetica" fontsize=10 color="${c.edge}" fontcolor="${c.edgeLabel}"]`
   );
 
-  // 노드 — HTML-like label 의 table 로 클래스명 + 멤버 표시
+  // 노드 — HTML-like label 의 table 로 클래스명 + 멤버 표시.
+  // #251 — cellpadding 6 → 14 로 증가. graphviz wasm 의 폰트 metric 측정과
+  //   실제 렌더 시 Pretendard 폭 차이로 긴 텍스트(예: +String[] inventory)가
+  //   td 경계를 넘어가는 문제 흡수 (사용자: '글자가 박스를 뚫고 지나가네').
   for (const [name, members] of classes) {
     const memberHtml =
       members.length === 0
@@ -133,7 +144,7 @@ export function mermaidClassToDot(code: string, theme: DotTheme = 'light'): stri
             .map((m) => escapeHtml(m).trim())
             .join('<br align="left"/>')}<br align="left"/></td></tr>`;
     out.push(
-      `  ${name} [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="${c.bgNode}" color="${c.border}">` +
+      `  ${name} [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="14" bgcolor="${c.bgNode}" color="${c.border}">` +
         `<tr><td bgcolor="${c.bgHeader}" align="center"><b>${escapeHtml(name)}</b></td></tr>` +
         memberHtml +
         `</table>>]`

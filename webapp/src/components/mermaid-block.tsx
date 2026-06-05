@@ -154,6 +154,86 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     //   불가 — 원본 viewBox 유지 (콘텐츠는 잘리지 않고 다 보임, 다만 박스 안
     //   여백이 큼). #246 의 transform: scale + label-group 기반 viewBox 재계산은
     //   메서드/속성/박스가 잘려 더 안 좋아 원복.
+    // #251 — viz-js(graphviz) SVG 의 텍스트가 노드 polygon 을 뚫고 나가는 문제.
+    //   graphviz 측정 폰트(Helvetica) 와 브라우저 렌더 폰트(CSS 강제 Helvetica)
+    //   사이에 여전히 미세한 metric 차이 + cellpadding 한계.
+    //   후처리: graphviz 노드의 outer polygon (label-container 의 첫 polygon)
+    //   각각에 대해, 그 노드 안 모든 <text> 의 getComputedTextLength() 의
+    //   max 끝점 vs polygon 오른쪽 경계 비교 → 부족하면 polygon points 의
+    //   max-x 를 그만큼 확장.
+    const isGraphviz = !!svgEl.querySelector('g.node title') && !svgEl.getAttribute('aria-roledescription');
+    if (isGraphviz) {
+      const nodes = svgEl.querySelectorAll<SVGGElement>('g.node');
+      nodes.forEach((node) => {
+        const polygons = node.querySelectorAll<SVGPolygonElement>('polygon');
+        const texts = node.querySelectorAll<SVGTextElement>('text');
+        if (!polygons.length || !texts.length) return;
+        // 각 text 의 right edge (x + textLength)
+        let textMaxRight = -Infinity;
+        let textMinLeft = Infinity;
+        texts.forEach((t) => {
+          try {
+            const x = parseFloat(t.getAttribute('x') ?? '0');
+            const w = t.getComputedTextLength();
+            const anchor = t.getAttribute('text-anchor') ?? 'start';
+            // text-anchor 별 right edge
+            let right: number, left: number;
+            if (anchor === 'middle') {
+              right = x + w / 2;
+              left = x - w / 2;
+            } else if (anchor === 'end') {
+              right = x;
+              left = x - w;
+            } else {
+              right = x + w;
+              left = x;
+            }
+            textMaxRight = Math.max(textMaxRight, right);
+            textMinLeft = Math.min(textMinLeft, left);
+          } catch {
+            /* getComputedTextLength 실패 — 무시 */
+          }
+        });
+        if (!isFinite(textMaxRight)) return;
+        // 외곽 polygon = node 의 첫 polygon (graphviz HTML table 의 outer border)
+        const polyPad = 6; // 텍스트 right + 이만큼 여유
+        polygons.forEach((poly) => {
+          const pointsStr = poly.getAttribute('points');
+          if (!pointsStr) return;
+          const pts = pointsStr.trim().split(/\s+/).map((p) => {
+            const [x, y] = p.split(',').map(parseFloat);
+            return { x, y };
+          });
+          let polyMaxX = -Infinity, polyMinX = Infinity;
+          pts.forEach((p) => {
+            polyMaxX = Math.max(polyMaxX, p.x);
+            polyMinX = Math.min(polyMinX, p.x);
+          });
+          // 텍스트가 polygon 오른쪽을 뚫으면 polygon 의 max-x 를 확장
+          const needRight = textMaxRight + polyPad;
+          if (needRight > polyMaxX) {
+            const newPoints = pts
+              .map((p) => `${p.x === polyMaxX ? needRight : p.x},${p.y}`)
+              .join(' ');
+            poly.setAttribute('points', newPoints);
+          }
+          // 왼쪽도 — 일반적으로 안 뚫지만 안전.
+          const needLeft = textMinLeft - polyPad;
+          if (needLeft < polyMinX) {
+            const newPoints = (poly.getAttribute('points') ?? '')
+              .trim()
+              .split(/\s+/)
+              .map((p) => {
+                const [x, y] = p.split(',').map(parseFloat);
+                return `${x === polyMinX ? needLeft : x},${y}`;
+              })
+              .join(' ');
+            poly.setAttribute('points', newPoints);
+          }
+        });
+      });
+    }
+
     const role = svgEl.getAttribute('aria-roledescription');
     if (role !== 'class') {
       const rootG = svgEl.querySelector<SVGGraphicsElement>('g.root');

@@ -113,19 +113,20 @@ class X {
     expect(dot).toMatch(/\}$/);
   });
 
-  // #250 — theme 인자에 따라 색상 변경
-  it('theme="light" 기본: 라벤더 톤 색상 (#eaeaf5 / #d4d4f0)', () => {
+  // #250 — theme 인자에 따라 색상 변경 (사이트 브랜드 보라 톤).
+  it('theme="light" 기본: 사이트 brand color 50/100/200 톤 (#efeeff / #dedbff)', () => {
     const dot = mermaidClassToDot('classDiagram\nclass A');
-    expect(dot).toContain('#eaeaf5'); // bgNode
-    expect(dot).toContain('#d4d4f0'); // bgHeader
-    expect(dot).toContain('#1f2937'); // text
+    expect(dot).toContain('#efeeff'); // bgNode = brand-50
+    expect(dot).toContain('#dedbff'); // bgHeader = brand-100
+    expect(dot).toContain('#c3bdff'); // border = brand-200
+    expect(dot).toContain('#171717'); // text = site foreground
   });
 
-  it('theme="dark": Tailwind zinc 계열 색상 (#27272a / #3f3f46 / #e4e4e7)', () => {
+  it('theme="dark": 어두운 보라 톤 + brand-200 보더 액센트 (#1f1a35 / #2e2549)', () => {
     const dot = mermaidClassToDot('classDiagram\nclass A', 'dark');
-    expect(dot).toContain('#27272a'); // bgNode (dark)
-    expect(dot).toContain('#3f3f46'); // bgHeader (dark)
-    expect(dot).toContain('#e4e4e7'); // text (밝은)
-    expect(dot).not.toContain('#eaeaf5'); // light bgNode 안 들어가야
+    expect(dot).toContain('#1f1a35'); // bgNode (dark 보라)
+    expect(dot).toContain('#2e2549'); // bgHeader
+    expect(dot).toContain('#ededed'); // text = site foreground
+    expect(dot).not.toContain('#efeeff'); // light bgNode 안 들어가야
   });
 });
