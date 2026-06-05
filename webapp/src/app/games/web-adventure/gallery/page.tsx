@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import EndingGallery from './EndingGallery';
 import { LOCAL_STORAGE_PAST_RUNS_KEY } from '@/lib/web-adventure/use-migrate-on-login';
+import { logAdvEvent } from '@/lib/web-adventure/analytics';
 
 interface PastRun {
   endingId: string;
@@ -20,6 +21,11 @@ interface PastRun {
 
 export default function GalleryPage() {
   const [pastRuns, setPastRuns] = useState<PastRun[] | null>(null);
+
+  // #245 — adv_gallery_view (마운트 시 1회).
+  useEffect(() => {
+    logAdvEvent('gallery_view');
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

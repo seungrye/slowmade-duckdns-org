@@ -9,6 +9,7 @@ import {
 } from "@/lib/web-adventure/engine/sceneRegistry";
 import { useAutoSave } from "@/lib/web-adventure/use-auto-save";
 import { useMigrateOnLogin } from "@/lib/web-adventure/use-migrate-on-login";
+import { logAdvEvent } from "@/lib/web-adventure/analytics";
 import Link from "next/link";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
@@ -124,11 +125,16 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
 
   // #239 — ended 진입 시 한 번만 end-run POST → save 의 runIndex+1 + past_run 적치.
   //   서버 401(비로그인) 은 silent skip. 같은 runIndex 중복 전송 방지.
+  // #245 — adv_ending_reached 도 같이 발화.
   useEffect(() => {
     if (state.phase !== "ended") return;
     const sentKey = `${runIndex}:${state.endingId}`;
     if (endRunSentRef.current === sentKey) return;
     endRunSentRef.current = sentKey;
+    logAdvEvent("ending_reached", {
+      ending_id: state.endingId,
+      run_index: runIndex,
+    });
     void fetch("/api/web-adventure/end-run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -157,9 +163,14 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
 
         {state.phase === "creating" && (
           <CharacterCreator
-            onComplete={(character) =>
-              dispatch({ type: "START_GAME", character, startScene: START_SCENE_ID })
-            }
+            onComplete={(character) => {
+              // #245 — adv_run_started.
+              logAdvEvent("run_started", {
+                ability: character.ability,
+                run_index: runIndex,
+              });
+              dispatch({ type: "START_GAME", character, startScene: START_SCENE_ID });
+            }}
           />
         )}
 
@@ -180,7 +191,18 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                 <SceneRenderer
                   scene={scenes[state.currentScene]}
                   character={state.character}
-                  onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
+                  onChoose={(choiceId) => {
+                    // #245 — adv_choice_made.
+                    if (state.phase === "playing") {
+                      const choice = scenes[state.currentScene]?.choices.find((c) => c.id === choiceId);
+                      logAdvEvent("choice_made", {
+                        scene_id: state.currentScene,
+                        choice_id: choiceId,
+                        choice_kind: choice?.kind,
+                      });
+                    }
+                    dispatch({ type: "MAKE_CHOICE", choiceId });
+                  }}
                 />
               </div>
               {/* 데스크탑 사이드 패널 */}
