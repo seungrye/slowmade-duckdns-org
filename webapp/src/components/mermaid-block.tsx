@@ -77,11 +77,19 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
 
   // #239 — SVG 마운트 직후 inline max-width 를 100% 로 override.
   // svg 가 새로 렌더될 때마다 (svg state 변화) 실행.
+  // #240 — width/height attribute 도 강제: mermaid 의
+  //   calculateSvgSizeAttrs(tY) 가 useMaxWidth:true 시 width="100%" + style="max-width:<Npx>"
+  //   박지만, natural width(N) 가 부모(896)보다 작으면 SVG 가 N px 로 제한되어
+  //   "영역만 크고 차트 작음" (예: 플로우차트 TD). useMaxWidth:false 분기로
+  //   진입한 경우엔 width="<Npx>" 가 attribute 로 박혀 더 단단히 잡힘.
+  //   해결: width attribute='100%' 강제 + height attribute 제거 + style 도 동일.
+  //   결과: 시퀀스(원래도 큰) + 플로우차트(작던) 모두 부모 폭 가득.
   useEffect(() => {
     const svgEl = containerRef.current?.querySelector('svg');
     if (!svgEl) return;
+    svgEl.setAttribute('width', '100%');
+    svgEl.removeAttribute('height');
     svgEl.style.maxWidth = '100%';
-    // 일부 다이어그램은 height attribute 도 작게 잡힐 수 있어 auto 로 풀어준다.
     svgEl.style.height = 'auto';
   }, [svg]);
 

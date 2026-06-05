@@ -136,4 +136,36 @@ describe('MermaidBlock', () => {
     // background-color 같은 다른 style 은 보존.
     expect(svg?.style.backgroundColor).toBe('white');
   });
+
+  // #240 — 사용자 보고: "플로우차트만 작음, 시퀀스는 정상".
+  //   원인 진단: mermaid 코어 calculateSvgSizeAttrs(tY) 는 useMaxWidth:true 시
+  //   `width="100%"` + `style="max-width: <natural>px"` 박음 — 모든 차트 공통.
+  //   차이는 natural width: 시퀀스(가로 배치) ≫ 896px → max-width 가 부모보다
+  //   커서 제한 안 함 → 정상. 플로우차트(TD, 세로 배치) ~200px → max-width:200px
+  //   → SVG 가 200px 로 제한 → 작음. 추가로 mermaid 가 useMaxWidth:false 분기로
+  //   진입할 경우 width=<px>, height=<px> attribute 가 박혀 CSS width 100% 를
+  //   덮을 수 있음.
+  //   해결: width attribute 도 '100%' 강제 + height attribute 제거.
+  it('mermaid 가 width/height 를 px attribute 로 박은 경우에도 부모 폭 가득 (#240)', async () => {
+    // useMaxWidth:false 분기 시뮬레이션 — width/height 가 px attribute.
+    (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
+      svg: '<svg data-testid="px-svg" width="200" height="300">FLOW</svg>',
+    });
+
+    const { container } = render(<MermaidBlock code="graph TD\nA-->B" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('px-svg')).toBeInTheDocument();
+    });
+
+    const svg = container.querySelector('svg') as SVGElement | null;
+    expect(svg).not.toBeNull();
+    // width attribute = '100%' 로 override.
+    expect(svg?.getAttribute('width')).toBe('100%');
+    // height attribute 는 제거 (auto 비율 유지 위해).
+    expect(svg?.hasAttribute('height')).toBe(false);
+    // inline style 도 안전.
+    expect(svg?.style.maxWidth).toBe('100%');
+    expect(svg?.style.height).toBe('auto');
+  });
 });
