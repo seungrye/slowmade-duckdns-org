@@ -164,6 +164,77 @@ describe('MermaidBlock', () => {
     expect(rendered).not.toBeNull();
   });
 
+  // #244 — mermaid 11 의 flowchart-v2 가 라벨을 markdown 처리해 <p> 로 wrap.
+  //   p 가 block element 라 measure 시 부모 max-width(200) 까지 확장 → 노드 폭
+  //   과대 측정 → viewBox 부풀음. initialize 에 markdownAutoWrap: false 박아
+  //   라벨 측정 정상화. (단독으론 viewBox 문제 해결 못 함 — #245 와 함께.)
+  it('mermaid.initialize 가 markdownAutoWrap: false 를 포함한다 (#244)', async () => {
+    (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
+      svg: '<svg>OK</svg>',
+    });
+
+    render(<MermaidBlock code="graph TD\nA-->B" />);
+
+    await waitFor(() => {
+      expect(
+        (mermaid as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize
+      ).toHaveBeenCalled();
+    });
+
+    const initSpy = (mermaid as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize;
+    const initArgs = initSpy.mock.calls[0]?.[0];
+    expect(initArgs).toEqual(expect.objectContaining({ markdownAutoWrap: false }));
+  });
+
+  // #245 — mermaid 의 setupGraphViewbox 는 svg.getBBox() 로 viewBox 잡지만
+  //   svg 안 defs/markers/측정 잔재가 BBox 를 부풀려 viewBox 가 그래프 실제
+  //   크기의 ~10배. 플로우차트 g.root BBox=208x417 인데 viewBox=2056x2056 →
+  //   컨테이너만 크고 차트 압축. 사용자: "영역은 엄청 크게, 차트는 너무 작게".
+  //   해결: useLayoutEffect 에서 g.root.getBBox() 로 viewBox 재설정.
+  //   (jsdom 은 SVGGraphicsElement.getBBox 미지원 → polyfill 필요.)
+  it('렌더 후 g.root 의 BBox 로 svg viewBox 재설정 (#245)', async () => {
+    // SVGElement.prototype.getBBox polyfill — bb = (5, 10, 200, 400)
+    const proto = (globalThis as unknown as { SVGElement: { prototype: SVGElement } })
+      .SVGElement.prototype as SVGElement & {
+        getBBox?: () => { x: number; y: number; width: number; height: number };
+      };
+    proto.getBBox = () => ({ x: 5, y: 10, width: 200, height: 400 });
+
+    (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
+      svg:
+        '<svg data-testid="vb-svg" width="100%" style="max-width: 2000px" viewBox="-48 -48 2056 2056">' +
+        '<g class="root"><g class="nodes"></g></g>' +
+        '</svg>',
+    });
+
+    const { container } = render(<MermaidBlock code="graph TD\nA-->B" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('vb-svg')).toBeInTheDocument();
+    });
+
+    const svgEl = container.querySelector('svg');
+    expect(svgEl).not.toBeNull();
+    // bb=(5,10,200,400) + pad=8 → viewBox="-3 2 216 416"
+    expect(svgEl?.getAttribute('viewBox')).toBe('-3 2 216 416');
+  });
+
+  // #245 추가: g.root 가 없으면 (sequence/gantt/pie 등) viewBox 건드리지 않는다.
+  it('g.root 가 없으면 viewBox 를 변경하지 않는다 (#245)', async () => {
+    (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
+      svg: '<svg data-testid="seq-svg" viewBox="-50 -10 697 363"></svg>',
+    });
+
+    const { container } = render(<MermaidBlock code="sequenceDiagram\nA->>B: hi" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('seq-svg')).toBeInTheDocument();
+    });
+
+    const svgEl = container.querySelector('svg');
+    expect(svgEl?.getAttribute('viewBox')).toBe('-50 -10 697 363');
+  });
+
   // #240 — 사용자 보고: "플로우차트만 작음, 시퀀스는 정상".
   //   원인 진단: mermaid 코어 calculateSvgSizeAttrs(tY) 는 useMaxWidth:true 시
   //   `width="100%"` + `style="max-width: <natural>px"` 박음 — 모든 차트 공통.
