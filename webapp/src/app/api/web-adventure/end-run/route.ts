@@ -33,16 +33,25 @@ export async function POST(req: NextRequest) {
     return apiError('진행 중인 save 가 없습니다.', 404);
   }
 
-  // 1. past_run 적치 (같은 runIndex 가 이미 있으면 unique index 충돌 → 409).
+  // #252 — past_run 적치를 *upsert* 로 변경.
+  //   이전 회차에서 save 갱신이 실패했거나 자동저장 race 로 save.runIndex 가
+  //   기존 past_run.runIndex 와 동일한 상태에 빠지면, create 방식은 unique
+  //   index 충돌(E11000) 로 throw → 400 → save 도 갱신 안 됨 → 새 엔딩이
+  //   갤러리에 안 보임. (userEmail, runIndex) 키로 upsert 하면 *마지막 도달*
+  //   endingId 가 덮어쓰여 일관 유지.
   try {
-    await WebAdventurePastRun.create({
-      userEmail: session.user.email,
-      runIndex: save.runIndex,
-      endingId: body.endingId,
-      finalSceneId: body.finalSceneId,
-      character: save.character,
-      completedAt: new Date(),
-    });
+    await WebAdventurePastRun.findOneAndUpdate(
+      { userEmail: session.user.email, runIndex: save.runIndex },
+      {
+        userEmail: session.user.email,
+        runIndex: save.runIndex,
+        endingId: body.endingId,
+        finalSceneId: body.finalSceneId,
+        character: save.character,
+        completedAt: new Date(),
+      },
+      { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : '회차 적치 실패';
     return apiError(message, 400);
