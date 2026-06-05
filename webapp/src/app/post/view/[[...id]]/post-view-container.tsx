@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { JSONContent } from '@tiptap/react';
 import { RichContentViewer } from '@/components/rich-web-editor/viewer';
 import LikeSection from './like.section';
@@ -10,6 +10,7 @@ import RevisionHistorySection from './revision-history.section';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import PostScrollDepth from '@/components/post-scroll-depth';
+import { MermaidPostEnhancer } from '@/components/mermaid-post-enhancer';
 
 interface PostData {
   _id: string;
@@ -24,6 +25,7 @@ interface PostData {
 
 export default function PostViewContainer({ post }: { post: PostData }) {
   const [isHistoryView, setIsHistoryView] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   if (isHistoryView) {
     return (
@@ -70,8 +72,13 @@ export default function PostViewContainer({ post }: { post: PostData }) {
       </header>
 
       <div className="border border-gray-300 dark:border-gray-700 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
-        <div className="p-4 transition-all duration-300 ease-in-out flex-1">
+        <div className="p-4 transition-all duration-300 ease-in-out flex-1" ref={bodyRef}>
           <RichContentViewer content={post.jsonContent as JSONContent} waitRenderComplete={true} />
+          {/*
+            mermaid 후처리 — TipTap viewer 가 렌더한 `<pre><code class="language-mermaid">` 를
+            클라이언트 측에서 MermaidBlock 으로 교체. 본문(jsonContent) 변경 시 재실행.
+          */}
+          <MermaidPostEnhancer containerRef={bodyRef} contentKey={post._id} />
         </div>
 
         {post.tags && post.tags.length > 0 && (
