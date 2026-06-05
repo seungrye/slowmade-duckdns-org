@@ -83,6 +83,16 @@ ChoiceSchema.path("kind").validate(function (kind: string) {
   return true;
 }, "Choice 의 kind 별 필수 필드가 누락되었습니다.");
 
+// ── position (#222) ─────────────────────────────────────────────────────────
+// /scenes/graph 의 ReactFlow 노드 좌표. optional — 미설정 시 dagre 자동.
+const PositionSchema = new Schema(
+  {
+    x: { type: Number, required: true },
+    y: { type: Number, required: true },
+  },
+  { _id: false },
+);
+
 // ── onEnter ────────────────────────────────────────────────────────────────
 const OnEnterSchema = new Schema(
   {
@@ -119,6 +129,8 @@ const WebAdventureSceneSchema = new Schema(
       type: String,
       enum: ["main", "spirit", "fail", "shopkeeper", "goblin_friend", "wizard_apprentice"],
     },
+    // #222 — /scenes/graph 노드 좌표 (사용자 드래그로 갱신). optional.
+    position: { type: PositionSchema },
   },
   { timestamps: true },
 );
@@ -138,6 +150,8 @@ export interface WebAdventureSceneDoc {
   };
   isEnding?: boolean;
   endingId?: string;
+  /** #222 — /scenes/graph 노드 좌표. optional. */
+  position?: { x: number; y: number };
   createdAt: Date;
   updatedAt: Date;
 }

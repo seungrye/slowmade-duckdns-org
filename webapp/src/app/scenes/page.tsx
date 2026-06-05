@@ -81,13 +81,22 @@ export default function ScenesPage() {
     <div className="mx-auto px-4 py-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <h1 className="text-2xl font-bold">씬 목록</h1>
-        <button
-          type="button"
-          onClick={() => setCreating(true)}
-          className="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-        >
-          + 새 씬
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/scenes/graph"
+            className="px-3 py-2 text-sm rounded-lg border border-gray-400 hover:border-blue-400 hover:text-blue-500"
+            aria-label="씬 차트 보기"
+          >
+            차트 보기
+          </Link>
+          <button
+            type="button"
+            onClick={() => setCreating(true)}
+            className="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+          >
+            + 새 씬
+          </button>
+        </div>
       </div>
 
       <div className="mb-4">
