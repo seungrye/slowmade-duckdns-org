@@ -92,12 +92,16 @@ body {
   }
 
 /*
- * mermaid 다이어그램 출력 보강.
- * - mermaid.initialize 에서 useMaxWidth: false 로 SVG natural size 출력.
- * - 컨테이너는 flex justify-center 로 가운데 정렬(컴포넌트 측에서 클래스 부여).
- * - 큰 다이어그램은 컨테이너 width 까지 축소(max-width: 100%), 비율 유지(height: auto).
+ * mermaid 다이어그램 출력 보강 (#243).
+ * mermaid 11 의 calculateSvgSizeAttrs(tY) 는 useMaxWidth:true 시 SVG 의 inline
+ * style 로 `max-width: <natural>px` 를 박는다 (flowchart 216px, sequence 590px 등).
+ * 이 inline 이 부모 폭(max-w-4xl=896px) 보다 작으면 차트만 작아 보임.
+ * !important 가 *없으면* inline style 과 specificity 동률 → inline 이 이김.
+ * !important 부여로 *모든* mermaid 차트가 부모 폭 가득 (CSS spec: !important
+ * author rule > element inline style).
  */
 .mermaid-rendered svg {
-  max-width: 100%;
-  height: auto;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
 }
