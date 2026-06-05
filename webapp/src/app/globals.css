@@ -78,7 +78,7 @@ body {
   display: none;
 }
 
-/* add the code bellow */ 
+/* add the code bellow */
 @layer utilities {
       /* Hide scrollbar for Chrome, Safari and Opera */
       .no-scrollbar::-webkit-scrollbar {
@@ -90,3 +90,14 @@ body {
           scrollbar-width: none;  /* Firefox */
     }
   }
+
+/*
+ * mermaid 다이어그램 출력 보강.
+ * - mermaid.initialize 에서 useMaxWidth: false 로 SVG natural size 출력.
+ * - 컨테이너는 flex justify-center 로 가운데 정렬(컴포넌트 측에서 클래스 부여).
+ * - 큰 다이어그램은 컨테이너 width 까지 축소(max-width: 100%), 비율 유지(height: auto).
+ */
+.mermaid-rendered svg {
+  max-width: 100%;
+  height: auto;
+}
