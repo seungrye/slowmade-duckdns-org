@@ -36,6 +36,17 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // #248 — mermaid v9 의 mindmap 다이어그램 모듈이 `cytoscape/dist/cytoscape.umd.js` 를
+  //   ESM import 시도하지만 cytoscape 3.34 의 exports field 가 그 경로의 import 키를
+  //   노출 안 함 → 빌드 실패. mindmap 은 우리 안 씀 (그릴 일 없음) — alias false 로 무시.
+  webpack: (config) => {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'cytoscape/dist/cytoscape.umd.js': false,
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

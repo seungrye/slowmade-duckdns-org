@@ -17,9 +17,9 @@ function ensureInit(): void {
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'Pretendard, sans-serif',
-    // #247 — mermaid 11 → 10.9.6 다운그레이드. v11 의 class diagram 측정 버그
-    //   (outer-path 가 콘텐츠보다 5배 큼) 회피 + flowchart-v2 의 viewBox 과대도
-    //   v10 에서는 발생 안 함. v10 에 markdownAutoWrap 옵션 없음 — 제거.
+    // #248 — mermaid 10 도 class diagram 의 박스 padding 이 과대 (사용자 보고).
+    //   v9.4.3 으로 더 다운그레이드 — 옛 디자인이지만 class diagram 의 박스/
+    //   콘텐츠 비율이 자연스럽고 padding 적당함 (jsdom probe 로 확인).
     flowchart: { useMaxWidth: true, htmlLabels: false },
     sequence: { useMaxWidth: true },
     state: { useMaxWidth: true },
@@ -60,7 +60,18 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     ensureInit();
     (async () => {
       try {
-        const { svg: rendered } = await mermaid.render(idRef.current, code);
+        // mermaid v9 는 render 가 동기 string 반환, v10/v11 은 Promise<{svg}>.
+        // 양쪽 다 받도록 처리.
+        const result = (mermaid as unknown as {
+          render: (id: string, code: string) => string | Promise<{ svg: string } | string>;
+        }).render(idRef.current, code);
+        let rendered: string;
+        if (typeof result === 'string') {
+          rendered = result;
+        } else {
+          const r = await result;
+          rendered = typeof r === 'string' ? r : r.svg;
+        }
         if (!cancelled) {
           setSvg(rendered);
           setError(null);
