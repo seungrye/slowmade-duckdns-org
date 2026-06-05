@@ -23,8 +23,41 @@
 //   - 네임스페이스 / 노트
 //   - 제네릭 타입 표기
 
+export type DotTheme = 'light' | 'dark';
+
+interface ThemeColors {
+  bgNode: string;
+  bgHeader: string;
+  border: string;
+  text: string;
+  edge: string;
+  edgeLabel: string;
+}
+
+const THEMES: Record<DotTheme, ThemeColors> = {
+  // 라이트: 라벤더 톤 (#249 초기 디자인).
+  light: {
+    bgNode: '#eaeaf5',
+    bgHeader: '#d4d4f0',
+    border: '#9ca3af',
+    text: '#1f2937',
+    edge: '#6b7280',
+    edgeLabel: '#374151',
+  },
+  // 다크: 어두운 회색 + 밝은 텍스트 (Tailwind zinc 계열).
+  dark: {
+    bgNode: '#27272a',
+    bgHeader: '#3f3f46',
+    border: '#52525b',
+    text: '#e4e4e7',
+    edge: '#a1a1aa',
+    edgeLabel: '#d4d4d8',
+  },
+};
+
 /** mermaid classDiagram 코드 → graphviz dot. */
-export function mermaidClassToDot(code: string): string {
+export function mermaidClassToDot(code: string, theme: DotTheme = 'light'): string {
+  const c = THEMES[theme];
   const lines = code
     .split('\n')
     .map((l) => l.trim())
@@ -85,10 +118,10 @@ export function mermaidClassToDot(code: string): string {
   out.push('  rankdir=TB');
   out.push('  bgcolor="transparent"');
   out.push(
-    '  node [shape=plaintext fontname="Pretendard, sans-serif" fontsize=12 fontcolor="#1f2937"]'
+    `  node [shape=plaintext fontname="Pretendard, sans-serif" fontsize=12 fontcolor="${c.text}"]`
   );
   out.push(
-    '  edge [fontname="Pretendard, sans-serif" fontsize=10 color="#6b7280" fontcolor="#374151"]'
+    `  edge [fontname="Pretendard, sans-serif" fontsize=10 color="${c.edge}" fontcolor="${c.edgeLabel}"]`
   );
 
   // 노드 — HTML-like label 의 table 로 클래스명 + 멤버 표시
@@ -100,8 +133,8 @@ export function mermaidClassToDot(code: string): string {
             .map((m) => escapeHtml(m).trim())
             .join('<br align="left"/>')}<br align="left"/></td></tr>`;
     out.push(
-      `  ${name} [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="#eaeaf5" color="#9ca3af">` +
-        `<tr><td bgcolor="#d4d4f0" align="center"><b>${escapeHtml(name)}</b></td></tr>` +
+      `  ${name} [label=<<table border="1" cellborder="0" cellspacing="0" cellpadding="6" bgcolor="${c.bgNode}" color="${c.border}">` +
+        `<tr><td bgcolor="${c.bgHeader}" align="center"><b>${escapeHtml(name)}</b></td></tr>` +
         memberHtml +
         `</table>>]`
     );

@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
-import { mermaidClassToDot } from './mermaid-class-to-dot';
+import { mermaidClassToDot, type DotTheme } from './mermaid-class-to-dot';
 
 // #248 — class diagram 만 graphviz/viz-js 로 fallback (mermaid 의 박스 padding 과대).
 // viz-js 의 wasm instance 는 모듈 레벨로 캐싱.
@@ -60,20 +60,36 @@ export interface MermaidBlockProps {
 //   해결: dangerouslySetInnerHTML 후 useRef 로 svg element 를 찾아
 //   inline maxWidth 를 "100%" 로 강제 덮어쓴다 (background-color 등 다른
 //   inline style 은 보존).
+// 현재 사이트 테마 ('light' | 'dark') — html.dark 클래스 기반.
+function getCurrentTheme(): DotTheme {
+  if (typeof document === 'undefined') return 'light';
+  return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+}
+
 export function MermaidBlock({ code }: MermaidBlockProps) {
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setTheme] = useState<DotTheme>('light');
   const idRef = useRef<string>(`mermaid-${++nextId}`);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // 초기 테마 + html.dark 변경 감지 → setTheme 으로 재렌더 트리거.
+  useEffect(() => {
+    setTheme(getCurrentTheme());
+    const observer = new MutationObserver(() => setTheme(getCurrentTheme()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         // #248 — class diagram 만 viz-js (graphviz) 로 fallback.
+        // #250 — theme(light/dark) 에 따라 색상 적용. 테마 변경 시 deps 로 재렌더.
         if (/^\s*classDiagram\b/.test(code)) {
           const viz = await getViz();
-          const dot = mermaidClassToDot(code);
+          const dot = mermaidClassToDot(code, theme);
           const rendered = viz.renderString(dot, { format: 'svg' });
           if (!cancelled) {
             setSvg(rendered);
@@ -108,7 +124,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     return () => {
       cancelled = true;
     };
-  }, [code]);
+  }, [code, theme]);
 
   // #241 — paint 전 동기 적용 (useEffect → useLayoutEffect).
   //   useEffect 는 commit 후 비동기 → 작은 SVG 가 한 프레임 보였다 큼 (flash)
