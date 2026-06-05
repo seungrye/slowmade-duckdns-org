@@ -5,10 +5,9 @@ import mermaid from 'mermaid';
 
 // mermaid 는 클라이언트 측에서 1회만 초기화 — 중복 호출 방지.
 // securityLevel: "loose" — 한국어 라벨/링크 등을 안전하게 표시하기 위해 sanitize 를 완화.
-//   (post 본문은 작성자(인증 사용자) 가 직접 입력하므로 XSS 위험은 통제 범위.)
-// useMaxWidth: false — mermaid 기본값(true)은 SVG 를 부모 컨테이너 100% width 로
-//   확장해서 작은 다이어그램조차 과대 표시됨. 차트 타입별로 false 명시 → natural size
-//   출력 + CSS 측에서 가운데 정렬·최대 width 제한.
+// useMaxWidth: true (기본) — SVG 가 부모 컨테이너 width 가득 채움. 비율 유지.
+//   대신 .mermaid-rendered 컨테이너에 max-width: 800px + 가운데 정렬로 *과대* 제한.
+//   #229 의 false 는 natural size 라 작은 차트가 200px 정도로 *너무 작아* 보임 → 복귀.
 let initialized = false;
 function ensureInit(): void {
   if (initialized) return;
@@ -18,12 +17,12 @@ function ensureInit(): void {
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'Pretendard, sans-serif',
-    flowchart: { useMaxWidth: false, htmlLabels: true },
-    sequence: { useMaxWidth: false },
-    state: { useMaxWidth: false },
-    gantt: { useMaxWidth: false },
-    class: { useMaxWidth: false },
-    pie: { useMaxWidth: false },
+    flowchart: { useMaxWidth: true, htmlLabels: true },
+    sequence: { useMaxWidth: true },
+    state: { useMaxWidth: true },
+    gantt: { useMaxWidth: true },
+    class: { useMaxWidth: true },
+    pie: { useMaxWidth: true },
   });
 }
 
@@ -82,7 +81,7 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     <div className="my-4" data-mermaid-block="ok">
       {svg ? (
         <div
-          className="mermaid-rendered overflow-x-auto flex justify-center"
+          className="mermaid-rendered overflow-x-auto mx-auto max-w-3xl"
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (

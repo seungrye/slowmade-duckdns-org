@@ -66,7 +66,7 @@ describe('MermaidBlock', () => {
     expect(matches.length).toBeGreaterThan(0);
   });
 
-  it('mermaid.initialize 가 모든 차트 타입에 useMaxWidth: false 옵션을 포함한다', async () => {
+  it('mermaid.initialize 가 모든 차트 타입에 useMaxWidth: true 옵션을 포함한다 (#236)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg>OK</svg>',
     });
@@ -79,21 +79,24 @@ describe('MermaidBlock', () => {
       ).toHaveBeenCalled();
     });
 
+    // #236 — #229 의 false 가 natural size (작은 차트 ~200px) 라 *너무 작아* 보임.
+    // useMaxWidth: true (mermaid 기본) 로 SVG = 부모 width 가득 + 비율 유지. 컨테이너
+    // 측에서 max-w-3xl + mx-auto 로 *너무 큰 경우* 만 제한.
     const initSpy = (mermaid as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize;
     const initArgs = initSpy.mock.calls[0]?.[0];
     expect(initArgs).toEqual(
       expect.objectContaining({
-        flowchart: expect.objectContaining({ useMaxWidth: false }),
-        sequence: expect.objectContaining({ useMaxWidth: false }),
-        state: expect.objectContaining({ useMaxWidth: false }),
-        gantt: expect.objectContaining({ useMaxWidth: false }),
-        class: expect.objectContaining({ useMaxWidth: false }),
-        pie: expect.objectContaining({ useMaxWidth: false }),
+        flowchart: expect.objectContaining({ useMaxWidth: true }),
+        sequence: expect.objectContaining({ useMaxWidth: true }),
+        state: expect.objectContaining({ useMaxWidth: true }),
+        gantt: expect.objectContaining({ useMaxWidth: true }),
+        class: expect.objectContaining({ useMaxWidth: true }),
+        pie: expect.objectContaining({ useMaxWidth: true }),
       })
     );
   });
 
-  it('렌더된 SVG 컨테이너에 flex justify-center 클래스가 적용되어 중앙 정렬된다', async () => {
+  it('렌더된 SVG 컨테이너에 max-w-3xl + mx-auto 로 가운데 정렬 (#236)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg data-testid="centered-svg">FLOW</svg>',
     });
@@ -107,7 +110,7 @@ describe('MermaidBlock', () => {
     const rendered = container.querySelector('.mermaid-rendered');
     expect(rendered).not.toBeNull();
     const className = rendered?.getAttribute('class') ?? '';
-    expect(className).toMatch(/\bflex\b/);
-    expect(className).toMatch(/\bjustify-center\b/);
+    expect(className).toMatch(/\bmx-auto\b/);
+    expect(className).toMatch(/\bmax-w-3xl\b/);
   });
 });
