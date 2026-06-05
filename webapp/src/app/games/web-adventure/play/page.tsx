@@ -8,7 +8,10 @@ import {
   START_SCENE_ID,
 } from "@/lib/web-adventure/engine/sceneRegistry";
 import { useAutoSave } from "@/lib/web-adventure/use-auto-save";
-import { useMigrateOnLogin } from "@/lib/web-adventure/use-migrate-on-login";
+import {
+  useMigrateOnLogin,
+  LOCAL_STORAGE_PAST_RUNS_KEY,
+} from "@/lib/web-adventure/use-migrate-on-login";
 import { logAdvEvent } from "@/lib/web-adventure/analytics";
 import Link from "next/link";
 import CharacterCreator from "./CharacterCreator";
@@ -126,11 +129,41 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   // #239 — ended 진입 시 한 번만 end-run POST → save 의 runIndex+1 + past_run 적치.
   //   서버 401(비로그인) 은 silent skip. 같은 runIndex 중복 전송 방지.
   // #245 — adv_ending_reached 도 같이 발화.
+  // #250 — 서버 응답과 무관하게 localStorage 에 *동기 append* (이슈 #250).
+  //   비로그인이면 갤러리 fallback 만 의지. 로그인이면 race 보호 (end-run insert
+  //   가 끝나기 전 갤러리 진입해도 localStorage 의 최신 도달분이 보임). dedup
+  //   runIndex 기준.
   useEffect(() => {
     if (state.phase !== "ended") return;
     const sentKey = `${runIndex}:${state.endingId}`;
     if (endRunSentRef.current === sentKey) return;
     endRunSentRef.current = sentKey;
+
+    // localStorage 의 past-runs 에 append (dedup by runIndex).
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(LOCAL_STORAGE_PAST_RUNS_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(arr) ? arr : [];
+        const filtered = list.filter(
+          (r: { runIndex?: number }) => r?.runIndex !== runIndex,
+        );
+        filtered.push({
+          endingId: state.endingId,
+          runIndex,
+          finalSceneId: state.finalSceneId,
+          character: state.character,
+          completedAt: new Date().toISOString(),
+        });
+        window.localStorage.setItem(
+          LOCAL_STORAGE_PAST_RUNS_KEY,
+          JSON.stringify(filtered),
+        );
+      } catch {
+        /* quota/private 모드 — 무시 */
+      }
+    }
+
     logAdvEvent("ending_reached", {
       ending_id: state.endingId,
       run_index: runIndex,

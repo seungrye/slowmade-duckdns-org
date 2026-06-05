@@ -27,33 +27,41 @@ export default function GalleryPage() {
     logAdvEvent('gallery_view');
   }, []);
 
+  // #250 — 서버 응답이 200 이라도 localStorage 의 최신 도달분(race 또는 비로그인
+  //   write) 을 *합집합* 으로 표시. dedup 은 runIndex 기준, 서버 우선.
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      let serverList: PastRun[] = [];
       try {
         const res = await fetch('/api/web-adventure/past-runs', { method: 'GET' });
-        if (!cancelled && res.ok) {
+        if (res.ok) {
           const json = (await res.json()) as { data?: PastRun[] };
-          if (Array.isArray(json?.data)) {
-            setPastRuns(json.data);
-            return;
-          }
+          if (Array.isArray(json?.data)) serverList = json.data;
         }
       } catch {
-        /* 네트워크 실패 — 로컬 fallback */
+        /* 네트워크 실패 — localStorage 만으로 */
       }
       if (cancelled) return;
+
+      let localList: PastRun[] = [];
       try {
         const raw = window.localStorage.getItem(LOCAL_STORAGE_PAST_RUNS_KEY);
         if (raw) {
-          const parsed = JSON.parse(raw) as PastRun[];
-          setPastRuns(Array.isArray(parsed) ? parsed : []);
-          return;
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) localList = parsed as PastRun[];
         }
       } catch {
         /* parse 실패 — 무시 */
       }
-      setPastRuns([]);
+
+      // dedup by runIndex (server 우선).
+      const serverIdx = new Set(serverList.map((r) => r.runIndex));
+      const merged = [
+        ...serverList,
+        ...localList.filter((r) => !serverIdx.has(r.runIndex)),
+      ];
+      setPastRuns(merged);
     })();
     return () => {
       cancelled = true;

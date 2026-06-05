@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { Character, StatKey } from "@/types/web-adventure";
 import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
 
@@ -71,13 +72,22 @@ export default function EndingScreen({ endingId, character, log, onRestart }: Pr
         </ul>
       </details>
 
-      <button
-        type="button"
-        onClick={onRestart}
-        className="inline-block rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 transition-colors"
-      >
-        다시 시작
-      </button>
+      <div className="flex gap-2 justify-center flex-wrap">
+        <button
+          type="button"
+          onClick={onRestart}
+          className="inline-block rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 transition-colors"
+        >
+          다시 시작
+        </button>
+        {/* #250 — 엔딩 도달 후 갤러리 진입 동선. */}
+        <Link
+          href="/games/web-adventure/gallery"
+          className="inline-block rounded-md border border-amber-700 text-amber-800 px-5 py-2 font-semibold hover:bg-amber-100 transition-colors"
+        >
+          🏆 엔딩 갤러리
+        </Link>
+      </div>
     </section>
   );
 }
