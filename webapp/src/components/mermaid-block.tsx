@@ -17,11 +17,9 @@ function ensureInit(): void {
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'Pretendard, sans-serif',
-    // #244 — markdownAutoWrap: false 로 라벨이 <p> 로 wrap 안 됨.
-    //   true(기본) 시 라벨 measure 단계에 p(block) 가 부모 max-width(200) 까지
-    //   확장 → 노드당 ~200px → 5 노드 viewBox=2056 으로 과대 → 컨테이너 큰데
-    //   차트 작아 보임 (사용자가 처음부터 지적).
-    markdownAutoWrap: false,
+    // #247 — mermaid 11 → 10.9.6 다운그레이드. v11 의 class diagram 측정 버그
+    //   (outer-path 가 콘텐츠보다 5배 큼) 회피 + flowchart-v2 의 viewBox 과대도
+    //   v10 에서는 발생 안 함. v10 에 markdownAutoWrap 옵션 없음 — 제거.
     flowchart: { useMaxWidth: true, htmlLabels: false },
     sequence: { useMaxWidth: true },
     state: { useMaxWidth: true },

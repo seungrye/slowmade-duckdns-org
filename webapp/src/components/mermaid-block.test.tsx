@@ -164,11 +164,10 @@ describe('MermaidBlock', () => {
     expect(rendered).not.toBeNull();
   });
 
-  // #244 — mermaid 11 의 flowchart-v2 가 라벨을 markdown 처리해 <p> 로 wrap.
-  //   p 가 block element 라 measure 시 부모 max-width(200) 까지 확장 → 노드 폭
-  //   과대 측정 → viewBox 부풀음. initialize 에 markdownAutoWrap: false 박아
-  //   라벨 측정 정상화. (단독으론 viewBox 문제 해결 못 함 — #245 와 함께.)
-  it('mermaid.initialize 가 markdownAutoWrap: false 를 포함한다 (#244)', async () => {
+  // #247 — mermaid 10.9.6 로 다운그레이드. v10 은 markdownAutoWrap 옵션을
+  //   지원하지 않고, class diagram 의 측정 버그도 없어 옵션 제거.
+  //   대신 flowchart.htmlLabels: false 가 유지되는지 확인.
+  it('mermaid.initialize 가 flowchart.htmlLabels: false 를 포함하고 markdownAutoWrap 옵션은 없다 (#247)', async () => {
     (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
       svg: '<svg>OK</svg>',
     });
@@ -183,7 +182,12 @@ describe('MermaidBlock', () => {
 
     const initSpy = (mermaid as unknown as { initialize: ReturnType<typeof vi.fn> }).initialize;
     const initArgs = initSpy.mock.calls[0]?.[0];
-    expect(initArgs).toEqual(expect.objectContaining({ markdownAutoWrap: false }));
+    expect(initArgs).toEqual(
+      expect.objectContaining({
+        flowchart: expect.objectContaining({ htmlLabels: false }),
+      })
+    );
+    expect(initArgs).not.toHaveProperty('markdownAutoWrap');
   });
 
   // #245 — mermaid 의 setupGraphViewbox 는 svg.getBBox() 로 viewBox 잡지만
