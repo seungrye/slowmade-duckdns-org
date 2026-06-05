@@ -8,7 +8,7 @@ import type {
   Choice,
   StatKey,
 } from "@/types/web-adventure";
-import { isChoiceAvailable, getUnavailableReason } from "./choiceFilter";
+import { isChoiceAvailable, getUnavailableReason, isChoiceVisible } from "./choiceFilter";
 
 function makeTestCharacter(
   overrides: Partial<Record<StatKey, number>> & {
@@ -185,5 +185,81 @@ describe("getUnavailableReason", () => {
     const reason = getUnavailableReason(choice, makeTestCharacter());
     expect(reason).not.toBeNull();
     expect(reason).toContain("횃불");
+  });
+});
+
+// 4 주차 — 조건 선택지 *숨김 모드*.
+describe("isChoiceVisible (4 주차)", () => {
+  test("plain choice 는 항상 visible", () => {
+    const choice: Choice = { kind: "plain", id: "x", label: "...", to: "y" };
+    expect(isChoiceVisible(choice, makeTestCharacter())).toBe(true);
+  });
+
+  test("probability choice 는 항상 visible", () => {
+    const choice: Choice = {
+      kind: "probability",
+      id: "x",
+      label: "...",
+      stat: "dex",
+      difficulty: 12,
+      onSuccess: "a",
+      onFailure: "b",
+    };
+    expect(isChoiceVisible(choice, makeTestCharacter())).toBe(true);
+  });
+
+  test("hidden=true conditional 미충족 시 isVisible=false (완전 숨김)", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "minStat", stat: "wis", min: 13 },
+      to: "y",
+      hidden: true,
+    };
+    const lowWis = makeTestCharacter({ wis: 5 });
+    expect(isChoiceVisible(choice, lowWis)).toBe(false);
+    expect(isChoiceAvailable(choice, lowWis)).toBe(false);
+  });
+
+  test("hidden=true conditional 충족 시 isVisible=true", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "minStat", stat: "wis", min: 8 },
+      to: "y",
+      hidden: true,
+    };
+    const highWis = makeTestCharacter({ wis: 9 });
+    expect(isChoiceVisible(choice, highWis)).toBe(true);
+    expect(isChoiceAvailable(choice, highWis)).toBe(true);
+  });
+
+  test("hidden=false conditional 은 미충족이어도 isVisible=true (회색 표시)", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "minStat", stat: "wis", min: 8 },
+      to: "y",
+      hidden: false,
+    };
+    const lowWis = makeTestCharacter({ wis: 5 });
+    expect(isChoiceVisible(choice, lowWis)).toBe(true);
+    expect(isChoiceAvailable(choice, lowWis)).toBe(false);
+  });
+
+  test("hidden 미정의 conditional 은 회색 표시 (isAvailable=false + isVisible=true)", () => {
+    const choice: Choice = {
+      kind: "conditional",
+      id: "x",
+      label: "...",
+      condition: { kind: "hasItem", itemId: "torch" },
+      to: "y",
+    };
+    const noTorch = makeTestCharacter();
+    expect(isChoiceVisible(noTorch ? choice : choice, noTorch)).toBe(true);
+    expect(isChoiceAvailable(choice, noTorch)).toBe(false);
   });
 });

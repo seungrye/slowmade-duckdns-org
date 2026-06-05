@@ -14,7 +14,7 @@ import { Schema, model, models, Model } from "mongoose";
 // ── Choice 의 condition (conditional 종류일 때만 사용) ─────────────────────
 const ChoiceConditionSchema = new Schema(
   {
-    kind: { type: String, enum: ["minStat", "hasItem", "flag"], required: true },
+    kind: { type: String, enum: ["minStat", "hasItem", "flag", "minFlag"], required: true },
     stat: { type: String },
     min: { type: Number },
     itemId: { type: String },
@@ -52,6 +52,8 @@ const ChoiceSchema = new Schema(
 
     // conditional
     condition: { type: ChoiceConditionSchema },
+    // 4 주차 — conditional 의 *완전 숨김* 모드 (조건 미충족 시 UI 에서 렌더 X).
+    hidden: { type: Boolean },
   },
   { _id: false },
 );
@@ -82,6 +84,8 @@ const OnEnterSchema = new Schema(
     // default 를 명시적으로 undefined 로 — mongoose 가 array 타입에 자동으로
     // 빈 배열을 부여하지 않도록 막는다 (idempotent migration 위함).
     addItems: { type: [String], default: undefined },
+    // 4 주차 — 누적 카운터 (예: caughtCount) +1 씩 누적.
+    incrementCounters: { type: [String], default: undefined },
   },
   { _id: false },
 );
@@ -121,7 +125,11 @@ export interface WebAdventureSceneDoc {
   illustration: string;
   body: string[];
   choices: Array<Record<string, unknown>>;
-  onEnter?: { setFlags?: Map<string, boolean>; addItems?: string[] };
+  onEnter?: {
+    setFlags?: Map<string, boolean>;
+    addItems?: string[];
+    incrementCounters?: string[];
+  };
   isEnding?: boolean;
   endingId?: string;
   createdAt: Date;

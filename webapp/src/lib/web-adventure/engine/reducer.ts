@@ -42,6 +42,11 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       return character.inventory.includes(cond.itemId);
     case "flag":
       return !!character.flags[cond.key];
+    case "minFlag": {
+      const v = character.flags[cond.key];
+      const num = typeof v === "number" ? v : v === true ? 1 : 0;
+      return num >= cond.min;
+    }
   }
 }
 
@@ -64,14 +69,26 @@ function pushItems(inventory: string[], toAdd: string[]): string[] {
   return result;
 }
 
-/** 씬 onEnter 적용 — setFlags / addItems 를 character 에 반영. cap 8 초과 시 초과분 무시. */
+/** 씬 onEnter 적용 — setFlags / addItems / incrementCounters 를 character 에 반영. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
-  const { setFlags, addItems } = scene.onEnter;
+  const { setFlags, addItems, incrementCounters } = scene.onEnter;
   const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
   const itemsChanged = addItems && addItems.length > 0;
-  if (!flagsChanged && !itemsChanged) return character;
-  const nextFlags = flagsChanged ? { ...character.flags, ...setFlags } : character.flags;
+  const countersChanged = incrementCounters && incrementCounters.length > 0;
+  if (!flagsChanged && !itemsChanged && !countersChanged) return character;
+  let nextFlags: Record<string, boolean | number> = character.flags;
+  if (flagsChanged || countersChanged) {
+    nextFlags = { ...character.flags };
+    if (flagsChanged && setFlags) Object.assign(nextFlags, setFlags);
+    if (countersChanged && incrementCounters) {
+      for (const key of incrementCounters) {
+        const prev = nextFlags[key];
+        const prevNum = typeof prev === "number" ? prev : 0;
+        nextFlags[key] = prevNum + 1;
+      }
+    }
+  }
   const nextInventory = itemsChanged
     ? pushItems(character.inventory, addItems!)
     : character.inventory;

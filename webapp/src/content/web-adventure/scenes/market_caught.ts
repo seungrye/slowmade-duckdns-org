@@ -1,5 +1,6 @@
 // 시장 비밀 창고 잠입 — 실패 분기.
-// caughtBefore 플래그 부여 (3 주차 이후 NPC 호감도 / 추가 분기에 활용).
+// 3 주차: caughtBefore 플래그 부여.
+// 4 주차: caughtCount 누적 + 3 회 이상 시 *뒷골목 → 추방* 분기.
 
 import type { Scene } from "@/types/web-adventure";
 
@@ -18,6 +19,18 @@ export const marketCaught: Scene = {
       label: "광장으로 돌아간다",
       to: "town_square_dawn",
     },
+    {
+      // 4 주차 — 3 회 이상 들킨 경우에만 노출 (hidden=true).
+      kind: "conditional",
+      id: "to_back_alley",
+      label: "뒷골목으로 숨어 든다",
+      condition: { kind: "minFlag", key: "caughtCount", min: 3 },
+      to: "market_back_alley",
+      hidden: true,
+    },
   ],
-  onEnter: { setFlags: { caughtBefore: true } },
+  onEnter: {
+    setFlags: { caughtBefore: true },
+    incrementCounters: ["caughtCount"],
+  },
 };

@@ -4,8 +4,13 @@ import type { Character, Choice } from "@/types/web-adventure";
 import { estimateSuccessPercent } from "@/lib/web-adventure/engine/rollDice";
 import { effectiveStat } from "@/lib/web-adventure/engine/stats";
 import { items } from "@/content/web-adventure/items";
+import {
+  isChoiceAvailable,
+  isChoiceVisible,
+} from "@/lib/web-adventure/engine/choiceFilter";
 
 // 선택지 리스트 — 종류별 (plain/probability/conditional) 렌더.
+// 4 주차: conditional + hidden=true 미충족 시 *완전 숨김*.
 
 const STAT_LABELS_SHORT: Record<string, string> = {
   str: "힘",
@@ -16,6 +21,12 @@ const STAT_LABELS_SHORT: Record<string, string> = {
   wis: "지혜",
 };
 
+const FLAG_LABEL_KO: Record<string, string> = {
+  hasSecretSnack: "비밀 간식",
+  caughtBefore: "이전에 들킨 적 있음",
+  caughtCount: "들킨 횟수",
+};
+
 type Props = {
   choices: Choice[];
   character: Character;
@@ -23,13 +34,16 @@ type Props = {
 };
 
 export default function ChoiceList({ choices, character, onChoose }: Props) {
-  if (choices.length === 0) {
+  // 4 주차 — hidden 모드: 보이지 않는 선택지를 사전 필터.
+  const visibleChoices = choices.filter((c) => isChoiceVisible(c, character));
+
+  if (visibleChoices.length === 0) {
     return <p className="text-amber-700 italic">선택할 수 있는 행동이 없다.</p>;
   }
 
   return (
     <ul className="space-y-2">
-      {choices.map((c) => {
+      {visibleChoices.map((c) => {
         if (c.kind === "plain") {
           return (
             <li key={c.id}>
@@ -66,19 +80,21 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
             </li>
           );
         }
-        // conditional — 3 주차: minStat 은 effectiveStat 사용, hasItem 은 displayName 라벨.
-        let allowed = true;
+        // conditional — hidden=false 또는 미정의 시 회색 표시 (isChoiceVisible 가 true 임을 보장).
+        const allowed = isChoiceAvailable(c, character);
         let reason = "";
         if (c.condition.kind === "minStat") {
-          allowed = effectiveStat(character, c.condition.stat) >= c.condition.min;
           reason = `${STAT_LABELS_SHORT[c.condition.stat] ?? c.condition.stat} ${c.condition.min} 이상 필요`;
         } else if (c.condition.kind === "hasItem") {
-          allowed = character.inventory.includes(c.condition.itemId);
           const item = items[c.condition.itemId];
           reason = `아이템 필요: ${item ? item.displayName : c.condition.itemId}`;
+        } else if (c.condition.kind === "flag") {
+          const label = FLAG_LABEL_KO[c.condition.key] ?? c.condition.key;
+          reason = `${label} 필요`;
         } else {
-          allowed = !!character.flags[c.condition.key];
-          reason = `조건 필요: ${c.condition.key}`;
+          // minFlag
+          const label = FLAG_LABEL_KO[c.condition.key] ?? c.condition.key;
+          reason = `${label} ${c.condition.min} 이상 필요`;
         }
         return (
           <li key={c.id}>

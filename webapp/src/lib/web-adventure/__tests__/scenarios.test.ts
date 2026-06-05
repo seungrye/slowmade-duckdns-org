@@ -243,6 +243,101 @@ describe("web-adventure 시나리오", () => {
     }
   });
 
+  // ─── 4 주차 — 신규 엔딩 시나리오 ───────────────────────────────────────
+
+  test("fail 엔딩 도달 (시장 잠입 실패 3 회 → 추방)", () => {
+    const lowRng = () => 0.0;
+    let state: GameState = startGame(makeTestCharacter({ dex: 3 }));
+
+    // 1차 들킴
+    state = makeChoice(state, "to_market", lowRng);
+    state = makeChoice(state, "sneak_storage", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("market_caught");
+    state = makeChoice(state, "retreat", lowRng);
+
+    // 2차 들킴
+    state = makeChoice(state, "to_market", lowRng);
+    state = makeChoice(state, "sneak_storage", lowRng);
+    state = makeChoice(state, "retreat", lowRng);
+
+    // 3차 들킴 — 이번엔 market_caught 에서 dark_alley 선택 (뒷골목) → ending_fail
+    state = makeChoice(state, "to_market", lowRng);
+    state = makeChoice(state, "sneak_storage", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("market_caught");
+    if (state.phase === "playing") {
+      expect(state.character.flags.caughtBefore).toBe(true);
+      // 3회 누적 카운트 검증 — flag 누적용 caughtCount.
+      expect((state.character.flags as Record<string, unknown>).caughtCount).toBeDefined();
+    }
+    state = makeChoice(state, "to_back_alley", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("market_back_alley");
+    state = makeChoice(state, "to_fail", lowRng);
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("fail");
+  });
+
+  test("shopkeeper 엔딩 도달 (광장 → 행상인 → 정착 선택)", () => {
+    const highRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ cha: 9 }));
+
+    state = makeChoice(state, "to_peddler", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("peddler");
+
+    state = makeChoice(state, "settle_market", highRng);
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("shopkeeper");
+  });
+
+  test("wizard_apprentice 엔딩 도달 (산기슭 → 마법사 wis 11 ✓ → int 13 ✓ → 제자)", () => {
+    const highRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ wis: 9, int: 10 }));
+
+    state = makeChoice(state, "to_mountain_foot", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("mountain_foot");
+
+    state = makeChoice(state, "find_wizard", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("wizard_meeting");
+
+    state = makeChoice(state, "become_apprentice", highRng);
+    expect(state.phase).toBe("ended");
+    if (state.phase === "ended") expect(state.endingId).toBe("wizard_apprentice");
+  });
+
+  test("conditional hidden=true: 산기슭 → 마법사 미충족 시 선택지 자체가 없음", () => {
+    // wis 5 라 probability 실패 — find_wizard 가 plain 으로 노출되지 않음.
+    const lowRng = () => 0.0;
+    let state: GameState = startGame(makeTestCharacter({ wis: 5 }));
+    state = makeChoice(state, "to_mountain_foot", lowRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("mountain_foot");
+    // 실패 시 *광장 복귀*.
+    state = makeChoice(state, "find_wizard", lowRng);
+    // 실패 분기 → 광장 복귀.
+    if (state.phase === "playing") expect(state.currentScene).toBe("town_square_dawn");
+  });
+
+  test("companion_meeting 카리 12 ✓ → companion_token 획득", () => {
+    const highRng = () => 0.99;
+    let state: GameState = startGame(makeTestCharacter({ cha: 10 }));
+
+    state = makeChoice(state, "to_companion", highRng);
+    if (state.phase === "playing") expect(state.currentScene).toBe("companion_meeting");
+
+    state = makeChoice(state, "befriend_companion", highRng);
+    if (state.phase === "playing") {
+      expect(state.character.inventory).toContain("companion_token");
+    }
+  });
+
+  test("회차 6 종 모두 도달 가능 — 6 엔딩 모두 sceneRegistry 에 존재한다", () => {
+    const ids = Object.values(scenes)
+      .filter((s) => s.isEnding)
+      .map((s) => s.endingId)
+      .filter(Boolean);
+    expect(new Set(ids)).toEqual(
+      new Set(["main", "spirit", "fail", "shopkeeper", "goblin_friend", "wizard_apprentice"]),
+    );
+  });
+
   test("USE_ITEM bread 시 HP +20 회복 및 인벤에서 제거", () => {
     let state: GameState = startGame(makeTestCharacter());
     state = makeChoice(state, "to_market");

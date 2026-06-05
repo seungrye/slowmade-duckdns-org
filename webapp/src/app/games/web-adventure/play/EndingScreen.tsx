@@ -1,10 +1,11 @@
 "use client";
 
 import type { Character, StatKey } from "@/types/web-adventure";
-import { getEndingMeta } from "@/content/web-adventure/endings";
+import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
 
 // 엔딩 화면 — 제목/에필로그/최종 스탯/선택 로그/다시 시작.
 // state.phase === "ended" 일 때만 렌더된다.
+// 4 주차: 엔딩별 icon + 엔딩 종류별 색감 분기 (light tinting).
 
 type Props = {
   endingId: string;
@@ -24,12 +25,27 @@ const STAT_LABELS: Record<StatKey, string> = {
 
 const STAT_ORDER: StatKey[] = ["str", "dex", "int", "cha", "con", "wis"];
 
+/** 엔딩 종류별 *컨테이너* 톤. 기본 amber, 실패는 회색, 정착은 파랑. */
+const ENDING_TONE: Record<string, string> = {
+  fail: "bg-gray-100/80 border-gray-300",
+  shopkeeper: "bg-blue-100/70 border-blue-300",
+  wizard_apprentice: "bg-purple-100/70 border-purple-300",
+};
+
 export default function EndingScreen({ endingId, character, log, onRestart }: Props) {
   const meta = getEndingMeta(endingId);
+  const tone = ENDING_TONE[endingId] ?? "bg-amber-100/70 border-amber-300";
   return (
-    <section className="rounded-lg bg-amber-100/70 border border-amber-300 p-6 shadow-sm text-center">
+    <section
+      className={`rounded-lg ${tone} border p-6 shadow-sm text-center transition-colors`}
+      data-testid="ending-screen"
+      data-ending-id={endingId}
+    >
+      <div className="text-5xl mb-3" aria-hidden>
+        {meta.icon}
+      </div>
       <h2 className="text-2xl font-bold mb-3">{meta.title}</h2>
-      <p className="mb-5 text-amber-900 leading-relaxed">{meta.epilogue}</p>
+      <p className="mb-5 text-amber-900 leading-relaxed whitespace-pre-line">{meta.epilogue}</p>
 
       <section className="mb-5 text-left">
         <h3 className="text-lg font-semibold mb-2 text-center">최종 스탯</h3>

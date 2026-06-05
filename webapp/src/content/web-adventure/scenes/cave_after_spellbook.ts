@@ -1,4 +1,5 @@
 // 마법서 채집 후 — onEnter 로 spellbook 추가.
+// 4 주차: cave_treasure 분기 추가.
 
 import type { Scene } from "@/types/web-adventure";
 
@@ -16,6 +17,12 @@ export const caveAfterSpellbook: Scene = {
       id: "back_to_cave",
       label: "동굴 안을 더 살핀다",
       to: "cave_inside",
+    },
+    {
+      kind: "plain",
+      id: "to_cave_treasure",
+      label: "마법서 옆 *낡은 두루마리* 를 살핀다",
+      to: "cave_treasure",
     },
     {
       kind: "plain",

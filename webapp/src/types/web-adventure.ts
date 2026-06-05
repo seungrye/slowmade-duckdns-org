@@ -17,7 +17,13 @@ export type Character = {
   maxHp: number;
   ability: AbilityKey;
   inventory: string[];
-  flags: Record<string, boolean>;
+  /**
+   * 게임 진행 중 누적되는 마커.
+   * - boolean: 단발성 플래그 (예: caughtBefore).
+   * - number: 4 주차 — 누적 카운터 (예: caughtCount).
+   * 조건 검사 `kind: "flag"` 는 `!!flags[key]` 로 체크하므로 양쪽 모두 호환.
+   */
+  flags: Record<string, boolean | number>;
   rerollsLeft: number;
 };
 
@@ -33,12 +39,26 @@ export type Choice =
       onSuccess: string;
       onFailure: string;
     }
-  | { kind: "conditional"; id: string; label: string; condition: ChoiceCondition; to: string };
+  | {
+      kind: "conditional";
+      id: string;
+      label: string;
+      condition: ChoiceCondition;
+      to: string;
+      /**
+       * 4 주차: 조건 미충족 시 *완전 숨김* (회색 표시 X).
+       * - true → 조건 미충족 시 isVisible=false (UI 에서 아예 렌더 X).
+       * - false 또는 undefined → 회색 + tooltip (기존 동작 유지).
+       */
+      hidden?: boolean;
+    };
 
 export type ChoiceCondition =
   | { kind: "minStat"; stat: StatKey; min: number }
   | { kind: "hasItem"; itemId: string }
-  | { kind: "flag"; key: string };
+  | { kind: "flag"; key: string }
+  /** 4 주차 — 누적 카운터 (예: caughtCount) 가 min 이상일 때 충족. */
+  | { kind: "minFlag"; key: string; min: number };
 
 export type Scene = {
   id: string;
@@ -52,9 +72,14 @@ export type Scene = {
    * 씬 진입 시 부여될 효과.
    * - setFlags: character.flags 에 병합 (true/false 설정).
    * - addItems: character.inventory 에 추가 (중복 방지).
-   * 2 주차에는 setFlags 만 사용하지만, 3 주차 인벤 시스템과의 자연스러운 확장을 위해 함께 정의.
+   * - incrementCounters: 4 주차 — 누적 카운터 (예: caughtCount) +1 씩 누적.
+   *   flags 와 같은 객체를 공유 (boolean | number 호환).
    */
-  onEnter?: { setFlags?: Record<string, boolean>; addItems?: string[] };
+  onEnter?: {
+    setFlags?: Record<string, boolean>;
+    addItems?: string[];
+    incrementCounters?: string[];
+  };
 };
 
 export type SceneRegistry = Record<string, Scene>;

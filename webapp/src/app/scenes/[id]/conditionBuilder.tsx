@@ -29,6 +29,8 @@ function emptyForKind(kind: ChoiceCondition["kind"]): ChoiceCondition {
       return { kind: "hasItem", itemId: "" };
     case "flag":
       return { kind: "flag", key: "" };
+    case "minFlag":
+      return { kind: "minFlag", key: "", min: 1 };
   }
 }
 
@@ -47,6 +49,7 @@ export function ConditionBuilder({ condition, onChange }: Props) {
           <option value="minStat">스탯 최소값 (minStat)</option>
           <option value="hasItem">아이템 소지 (hasItem)</option>
           <option value="flag">플래그 (flag)</option>
+          <option value="minFlag">플래그 최소값 (minFlag)</option>
         </select>
       </label>
 
@@ -108,6 +111,33 @@ export function ConditionBuilder({ condition, onChange }: Props) {
             className={inputCls}
           />
         </label>
+      )}
+
+      {condition.kind === "minFlag" && (
+        <div className="flex items-center gap-2 text-xs">
+          <label className="flex items-center gap-1 flex-1">
+            <span className="text-gray-500 shrink-0">플래그</span>
+            <input
+              aria-label="minFlag key"
+              value={condition.key}
+              onChange={(e) => onChange({ ...condition, key: e.target.value })}
+              onPointerDown={stopPropagation}
+              placeholder="예: caughtCount"
+              className={inputCls}
+            />
+          </label>
+          <label className="flex items-center gap-1 w-32">
+            <span className="text-gray-500 shrink-0">최소</span>
+            <input
+              aria-label="minFlag min"
+              type="number"
+              value={condition.min}
+              onChange={(e) => onChange({ ...condition, min: Number(e.target.value) })}
+              onPointerDown={stopPropagation}
+              className={inputCls}
+            />
+          </label>
+        </div>
       )}
     </div>
   );

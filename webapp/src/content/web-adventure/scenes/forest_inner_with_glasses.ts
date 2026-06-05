@@ -1,4 +1,5 @@
-// 숲 깊은 곳 — 안경을 통해 본 신성한 광경. 산신령 엔딩 직행.
+// 숲 깊은 곳 — 안경을 통해 본 신성한 광경. 산신령 엔딩 직행 또는 *더 깊이* 분기.
+// 4 주차: forest_deep 분기 추가.
 
 import type { Scene } from "@/types/web-adventure";
 
@@ -16,6 +17,12 @@ export const forestInnerWithGlasses: Scene = {
       id: "meet_spirit_directly",
       label: "산신령에게 다가간다",
       to: "ending_spirit",
+    },
+    {
+      kind: "plain",
+      id: "go_to_forest_deep",
+      label: "은빛 길의 *더 깊은 곳* 으로 향한다",
+      to: "forest_deep",
     },
   ],
 };

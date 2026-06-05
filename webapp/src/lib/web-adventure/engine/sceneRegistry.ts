@@ -7,6 +7,8 @@
 //     SceneRegistry 로 반환한다. 모듈-level 캐시 + inflight Promise 싱글톤으로
 //     동시 호출을 단일 fetch 로 합친다.
 //   - `resetSceneCache()` 는 테스트 / 강제 새로고침 헬퍼.
+//
+// 4 주차: 18 → 30 씬 (산기슭/마법사/행상인/동료/숲 깊이/동굴 보물/뒷골목 + 3 엔딩).
 
 import type { Scene, SceneRegistry } from "@/types/web-adventure";
 import { townSquareDawn } from "@/content/web-adventure/scenes/town_square_dawn";
@@ -27,6 +29,19 @@ import { goblinEncounter } from "@/content/web-adventure/scenes/goblin_encounter
 import { endingMain } from "@/content/web-adventure/scenes/ending_main";
 import { endingSpirit } from "@/content/web-adventure/scenes/ending_spirit";
 import { endingGoblinFriend } from "@/content/web-adventure/scenes/ending_goblin_friend";
+// 4 주차 신규 12 씬.
+import { mountainFoot } from "@/content/web-adventure/scenes/mountain_foot";
+import { wizardMeeting } from "@/content/web-adventure/scenes/wizard_meeting";
+import { peddler } from "@/content/web-adventure/scenes/peddler";
+import { peddlerSuccess } from "@/content/web-adventure/scenes/peddler_success";
+import { companionMeeting } from "@/content/web-adventure/scenes/companion_meeting";
+import { companionSuccess } from "@/content/web-adventure/scenes/companion_success";
+import { forestDeep } from "@/content/web-adventure/scenes/forest_deep";
+import { caveTreasure } from "@/content/web-adventure/scenes/cave_treasure";
+import { marketBackAlley } from "@/content/web-adventure/scenes/market_back_alley";
+import { endingFail } from "@/content/web-adventure/scenes/ending_fail";
+import { endingShopkeeper } from "@/content/web-adventure/scenes/ending_shopkeeper";
+import { endingWizardApprentice } from "@/content/web-adventure/scenes/ending_wizard_apprentice";
 
 export const scenes: SceneRegistry = {
   [townSquareDawn.id]: townSquareDawn,
@@ -47,6 +62,19 @@ export const scenes: SceneRegistry = {
   [endingMain.id]: endingMain,
   [endingSpirit.id]: endingSpirit,
   [endingGoblinFriend.id]: endingGoblinFriend,
+  // 4 주차 신규.
+  [mountainFoot.id]: mountainFoot,
+  [wizardMeeting.id]: wizardMeeting,
+  [peddler.id]: peddler,
+  [peddlerSuccess.id]: peddlerSuccess,
+  [companionMeeting.id]: companionMeeting,
+  [companionSuccess.id]: companionSuccess,
+  [forestDeep.id]: forestDeep,
+  [caveTreasure.id]: caveTreasure,
+  [marketBackAlley.id]: marketBackAlley,
+  [endingFail.id]: endingFail,
+  [endingShopkeeper.id]: endingShopkeeper,
+  [endingWizardApprentice.id]: endingWizardApprentice,
 };
 
 export const START_SCENE_ID = townSquareDawn.id;

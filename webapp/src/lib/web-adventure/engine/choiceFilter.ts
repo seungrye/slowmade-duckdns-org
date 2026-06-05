@@ -35,11 +35,29 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       return character.inventory.includes(cond.itemId);
     case "flag":
       return !!character.flags[cond.key];
+    case "minFlag": {
+      const v = character.flags[cond.key];
+      const num = typeof v === "number" ? v : v === true ? 1 : 0;
+      return num >= cond.min;
+    }
   }
 }
 
 export function isChoiceAvailable(choice: Choice, character: Character): boolean {
   if (choice.kind === "plain" || choice.kind === "probability") return true;
+  return evalCondition(choice.condition, character);
+}
+
+/**
+ * 4 주차 — 조건 선택지의 *완전 숨김 모드*.
+ *
+ * - plain / probability → 항상 visible.
+ * - conditional + hidden=true → 조건 미충족 시 false (UI 에서 렌더 X).
+ * - conditional + hidden=false/undefined → 항상 true (회색 + tooltip 처리는 UI 가 한다).
+ */
+export function isChoiceVisible(choice: Choice, character: Character): boolean {
+  if (choice.kind === "plain" || choice.kind === "probability") return true;
+  if (!choice.hidden) return true;
   return evalCondition(choice.condition, character);
 }
 
@@ -53,6 +71,10 @@ export function getUnavailableReason(choice: Choice, character: Character): stri
     case "flag": {
       const label = FLAG_LABEL_KO[c.key] ?? c.key;
       return `${label} 필요`;
+    }
+    case "minFlag": {
+      const label = FLAG_LABEL_KO[c.key] ?? c.key;
+      return `${label} ${c.min} 이상 필요`;
     }
     case "hasItem": {
       const item = items[c.itemId];
