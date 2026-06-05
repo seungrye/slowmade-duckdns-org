@@ -25,7 +25,7 @@ const navLinks = [
     { href: "/tags", label: "태그", description: "태그 클라우드 보기", icon: <Layers size={20} /> },
     // #219 — navbar 게임 메뉴는 web-adventure 로 교체. bevy-rogue 라우트
     // (/games/bevy-rogue) 자체는 라이브 유지(URL 직접 접근 가능).
-    { href: "/games/web-adventure", label: "게임", description: "Web Adventure (한국형 CYOA)", icon: <Gamepad2 size={20} /> },
+    { href: "/games/web-adventure", label: "게임", description: "에테르니아의 추락 — 다크 에픽 CYOA", icon: <Gamepad2 size={20} /> },
 ];
 
 const myPageLinks = [

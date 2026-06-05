@@ -137,6 +137,49 @@ describe('StatusPanel', () => {
     expect(screen.queryByRole('button', { name: /재굴림|다시 굴리기/ })).toBeNull();
   });
 
+  // #259 — 성흔 침식 시각화.
+  it('침식도 0-49 — 정상 표시 (경고 없음)', () => {
+    render(
+      <StatusPanel
+        character={makeCharacter({ stigmaErosion: 30 })}
+        runIndex={1}
+        canReroll={false}
+        onUseItem={vi.fn()}
+        onReroll={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'normal');
+    expect(screen.getByText('30 / 100')).toBeInTheDocument();
+  });
+
+  it('침식도 50-79 — 디버프 단계 표시', () => {
+    render(
+      <StatusPanel
+        character={makeCharacter({ stigmaErosion: 65 })}
+        runIndex={1}
+        canReroll={false}
+        onUseItem={vi.fn()}
+        onReroll={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'debuff');
+    expect(screen.getByText(/손끝이 딱딱하게 굳어갑니다/)).toBeInTheDocument();
+  });
+
+  it('침식도 80+ — 임계 단계 경고 + 푸른 결정 이펙트', () => {
+    render(
+      <StatusPanel
+        character={makeCharacter({ stigmaErosion: 88 })}
+        runIndex={1}
+        canReroll={false}
+        onUseItem={vi.fn()}
+        onReroll={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'critical');
+    expect(screen.getByText(/체온이 느껴지지 않습니다/)).toBeInTheDocument();
+  });
+
   it('consumable 아이템에 "사용" 버튼 + 클릭 시 onUseItem(itemId)', () => {
     const onUseItem = vi.fn();
     render(
