@@ -12,7 +12,7 @@ import { useMigrateOnLogin } from "@/lib/web-adventure/use-migrate-on-login";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
 import EndingScreen from "./EndingScreen";
-import InventoryStrip from "./InventoryStrip";
+import StatusPanel from "./StatusPanel";
 
 // CSR 플레이 화면 — reducer 기반 상태 머신.
 //
@@ -144,7 +144,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
 
   return (
     <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <header className="mb-4 text-center">
           <h1 className="text-2xl md:text-3xl font-bold">Web Adventure</h1>
           <p className="text-xs text-amber-700 mt-1">
@@ -161,22 +161,24 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         )}
 
         {state.phase === "playing" && scenes[state.currentScene] && (
-          <>
-            <InventoryStrip
-              inventory={state.character.inventory}
-              rerollsLeft={state.character.rerollsLeft}
-              hp={state.character.hp}
-              maxHp={state.character.maxHp}
-              onUseItem={(itemId) => dispatch({ type: "USE_ITEM", itemId })}
-              onReroll={() => dispatch({ type: "REROLL" })}
-              canReroll={Boolean((state as PlayingMeta).lastProbability)}
-            />
-            <SceneRenderer
-              scene={scenes[state.currentScene]}
-              character={state.character}
-              onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
-            />
-          </>
+          <div className="md:grid md:grid-cols-[1fr_280px] md:gap-4">
+            <div>
+              <SceneRenderer
+                scene={scenes[state.currentScene]}
+                character={state.character}
+                onChoose={(choiceId) => dispatch({ type: "MAKE_CHOICE", choiceId })}
+              />
+            </div>
+            <div className="mt-4 md:mt-0">
+              <StatusPanel
+                character={state.character}
+                runIndex={runIndex}
+                onUseItem={(itemId) => dispatch({ type: "USE_ITEM", itemId })}
+                onReroll={() => dispatch({ type: "REROLL" })}
+                canReroll={Boolean((state as PlayingMeta).lastProbability)}
+              />
+            </div>
+          </div>
         )}
 
         {state.phase === "ended" && (
