@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { Nanum_Gothic_Coding } from "next/font/google";
 import { env } from "@/lib/env";
 import Providers from "@/components/providers";
 import ThemeSync from "@/components/dark-class-sync";
@@ -13,17 +12,14 @@ import "@/styles/_keyframe-animations.scss";
 import "@/styles/_variables.scss";
 
 /**
- * #228 — post 본문(TipTap viewer) 의 blockquote 및 코드블럭(<pre>, inline <code>)
- * 에 적용할 한글 모노스페이스 폰트. next/font/google 로 self-host 하여 외부 CDN
- * 의존을 제거하고, CSS variable `--font-nanum-gothic-coding` 로 노출한다.
- * 실제 적용 셀렉터는 paragraph-node.scss / code-block-node.scss 참조.
+ * #230 — post 본문(TipTap viewer) 의 blockquote / 코드블럭(<pre>, inline <code>)
+ * 에 적용할 한글 모노스페이스 폰트 *Nanum Gothic Coding* 은 *Google Fonts CDN*
+ * 으로 직접 link 한다. (#228 의 `next/font/google` self-host 는 Next.js 의 자동
+ * `<link rel="preload" .../>` 로 응답 헤더가 폭주 → nginx 502 → 사이트 트래픽
+ * 낭비. 사용자 의도 = "클라이언트에서 구글에 접속해서 폰트 서빙 받으면 되잖아.")
+ * 적용 셀렉터는 paragraph-node.scss / code-block-node.scss 의 font-family
+ * 스택 1순위에 "Nanum Gothic Coding" 폰트명을 직접 명시.
  */
-const nanumGothicCoding = Nanum_Gothic_Coding({
-  weight: ["400", "700"],
-  subsets: ["latin"],
-  display: "swap",
-  variable: "--font-nanum-gothic-coding",
-});
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -51,8 +47,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = (cookieStore.get('theme')?.value ?? 'system') as Theme;
 
   return (
-    <html lang="ko" className={`${nanumGothicCoding.variable} ${theme === 'dark' ? 'dark' : ''}`.trim()}>
+    <html lang="ko" className={theme === 'dark' ? 'dark' : ''}>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding:wght@400;700&display=swap"
+          rel="stylesheet"
+        />
         {theme === 'system' && (
           <script
             dangerouslySetInnerHTML={{

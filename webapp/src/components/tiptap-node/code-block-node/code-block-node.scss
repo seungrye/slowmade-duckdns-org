@@ -53,14 +53,14 @@
    ===================== */
 .tiptap.ProseMirror {
   // Inline code
-  // #228 — Nanum Gothic Coding 한글 모노스페이스 (CSS variable 은 layout.tsx
-  // 의 next/font/google 가 <html> 에 부착). .tiptap.ProseMirror 셀렉터 내부로
-  // 격리되어 post 본문 안에서만 적용된다.
+  // #230 — Nanum Gothic Coding 한글 모노스페이스 (폰트 파일은 layout.tsx 의
+  // Google Fonts CDN <link> 가 클라이언트에 직접 로드한다). .tiptap.ProseMirror
+  // 셀렉터 내부로 격리되어 post 본문 안에서만 적용된다.
   code {
     background-color: var(--tt-inline-code-bg-color);
     color: var(--tt-inline-code-text-color);
     border: 1px solid var(--tt-inline-code-border-color);
-    font-family: var(--font-nanum-gothic-coding), "D2Coding", "JetBrains Mono NL", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: "Nanum Gothic Coding", "D2Coding", "JetBrains Mono NL", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.875em;
     line-height: 1.4;
     border-radius: 6px/0.375rem;
@@ -85,7 +85,7 @@
       border-radius: 0;
       -webkit-text-fill-color: inherit;
       color: inherit;
-      font-family: var(--font-nanum-gothic-coding), "D2Coding", "JetBrains Mono NL", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: "Nanum Gothic Coding", "D2Coding", "JetBrains Mono NL", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       padding: 0;
     }
   }

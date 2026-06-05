@@ -158,10 +158,11 @@
     padding-top: 0.375em;
     padding-bottom: 0.375em;
     margin: 1.5rem 0;
-    // #228 — Nanum Gothic Coding 한글 모노스페이스 (CSS variable 은 layout.tsx
-    // 의 next/font/google 가 <html> 에 부착). 셀렉터가 .tiptap.ProseMirror
-    // 내부에 격리되어 있어 post 본문(TipTap viewer/editor) 안에만 적용된다.
-    font-family: var(--font-nanum-gothic-coding), "D2Coding", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    // #230 — Nanum Gothic Coding 한글 모노스페이스 (폰트 파일은 layout.tsx
+    // 의 Google Fonts CDN <link> 가 클라이언트에 직접 로드한다). 셀렉터가
+    // .tiptap.ProseMirror 내부에 격리되어 있어 post 본문(TipTap viewer/editor)
+    // 안에만 적용된다.
+    font-family: "Nanum Gothic Coding", "D2Coding", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
     p {
       margin-top: 0;
