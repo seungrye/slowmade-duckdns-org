@@ -332,13 +332,14 @@ describe("/scenes/graph — 드래그 vs 클릭 동작 (#225)", () => {
     expect(flowProps.current.nodesDraggable).toBe(true);
   });
 
-  it("onNodeClick 핸들러 제거 (드래그/클릭 충돌 방지)", async () => {
+  it("onNodeClick 핸들러 전달 (#233 — 순수 클릭 시 setSelectedSceneId)", async () => {
     render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
-    // onNodeClick 은 더 이상 ReactFlow 에 전달되지 않는다.
-    // (라우팅은 onNodeDragStop 안에서 거리 판정 후 처리)
-    expect(flowProps.current.onNodeClick).toBeUndefined();
+    // #225 가정 정정: ReactFlow 는 순수 클릭(움직임 0) 시 onNodeDragStart/Stop
+    // 자체를 발화하지 않아 isClick 분기 도달 X → 클릭 영원히 무시.
+    // #233 — onNodeClick 다시 전달, drag(< 5px) 와 click(움직임 0) 양쪽 모두 처리.
+    expect(typeof flowProps.current.onNodeClick).toBe("function");
   });
 
   it("onNodeDragStart / onNodeDragStop 핸들러 전달", async () => {
@@ -425,5 +426,16 @@ describe("/scenes/graph — 드래그 vs 클릭 동작 (#225)", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+import fs from "node:fs";
+import path from "node:path";
+
+describe("#233 — 순수 클릭 (onNodeClick) 분기", () => {
+  test("page.tsx 에 onNodeClick prop + setSelectedSceneId 호출 존재", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    expect(code).toMatch(/onNodeClick=\{/);
+    expect(code).toMatch(/setSelectedSceneId\(node\.id\)/);
   });
 });

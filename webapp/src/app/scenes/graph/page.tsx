@@ -232,6 +232,10 @@ export default function GraphPage() {
               nodesDraggable
               onNodeDragStart={handleNodeDragStart}
               onNodeDragStop={handleNodeDragStop}
+              // #233 — ReactFlow 는 순수 클릭(움직임 0) 시 onNodeDragStart/Stop
+              // 자체를 발화하지 않는다. handleNodeDragStop 의 isClick 분기는 작은
+              // 드래그(< 5px) 에만 도달하므로, 순수 클릭은 onNodeClick 으로 처리.
+              onNodeClick={(_, node) => setSelectedSceneId(node.id)}
               fitView
               minZoom={0.2}
               maxZoom={2}
