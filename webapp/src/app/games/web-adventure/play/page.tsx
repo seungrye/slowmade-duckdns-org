@@ -151,7 +151,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         <header className="mb-4 text-center">
           <h1 className="text-2xl md:text-3xl font-bold">Web Adventure</h1>
           <p className="text-xs text-amber-700 mt-1">
-            3 주차 데모 — 15 씬 + 인벤토리 + USE_ITEM + 재굴림
+            한국형 CYOA · 30 씬 · 6 엔딩 · 회차 누적
           </p>
         </header>
 
