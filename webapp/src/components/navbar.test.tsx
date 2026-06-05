@@ -111,6 +111,41 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
   });
 });
 
+// #219 — 게임 메뉴를 bevy-rogue → web-adventure 로 교체.
+// bevy-rogue 라우트(/games/bevy-rogue) 자체는 라이브 유지(URL 직접 접근 가능)지만
+// navbar 노출은 web-adventure 만.
+describe('Navbar — 게임 메뉴 (#219: bevy-rogue → web-adventure 교체)', () => {
+  beforeEach(() => {
+    pathnameMock.mockReturnValue('/');
+    vi.mocked(useSession).mockReturnValue({
+      data: null, status: 'unauthenticated', update: vi.fn(),
+    } as unknown as ReturnType<typeof useSession>);
+  });
+
+  it('데스크탑: 게임 메뉴 링크가 /games/web-adventure 를 가리킨다', () => {
+    render(<Navbar />);
+    const link = screen.getByRole('link', { name: /게임/ });
+    expect(link.getAttribute('href')).toBe('/games/web-adventure');
+  });
+
+  it('데스크탑: /games/bevy-rogue 링크가 노출되지 않는다', () => {
+    render(<Navbar />);
+    const links = screen.getAllByRole('link');
+    const bevyLinks = links.filter((l) => l.getAttribute('href') === '/games/bevy-rogue');
+    expect(bevyLinks).toHaveLength(0);
+  });
+
+  it('모바일: 게임 메뉴 링크가 /games/web-adventure', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    const links = screen.getAllByRole('link');
+    const webAdvLinks = links.filter((l) => l.getAttribute('href') === '/games/web-adventure');
+    expect(webAdvLinks.length).toBeGreaterThanOrEqual(1);
+    const bevyLinks = links.filter((l) => l.getAttribute('href') === '/games/bevy-rogue');
+    expect(bevyLinks).toHaveLength(0);
+  });
+});
+
 describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/');
