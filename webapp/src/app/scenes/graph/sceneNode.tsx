@@ -55,7 +55,7 @@ export default function SceneNode({ id, data }: Props) {
       data-graph-node-id={id}
       data-ending-id={data.endingId ?? undefined}
       data-saved-position={data.savedPosition ? "true" : "false"}
-      className={`${baseClass} ${startBorder} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs shadow-sm cursor-pointer flex flex-col justify-center`}
+      className={`${baseClass} ${startBorder} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs shadow-sm cursor-grab active:cursor-grabbing flex flex-col justify-center`}
       title={`${id}\n${data.title}`}
     >
       <Handle type="target" position={Position.Top} />

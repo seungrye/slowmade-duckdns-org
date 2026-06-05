@@ -19,7 +19,6 @@ import {
   MarkerType,
   type Edge,
   type Node,
-  type NodeMouseHandler,
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -77,11 +76,19 @@ const NODE_TYPES: NodeTypes = {
   scene: SceneNode as unknown as NodeTypes[string],
 };
 
+// #225 — 드래그 vs 클릭 판정 임계값 (px).
+// dragStart vs dragStop 거리가 이 값 미만이면 click 으로 간주해 /scenes/[id] 라우팅.
+// 이상이면 PUT 으로 위치 저장.
+const DRAG_CLICK_THRESHOLD_PX = 5;
+
 export default function GraphPage() {
   const router = useRouter();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // #225 — drag 시작 좌표 기억 (id → {x,y}).
+  // onNodeDragStart 에서 set, onNodeDragStop 에서 비교 후 clear.
+  const dragStartRef = useRef<Record<string, { x: number; y: number }>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -120,29 +127,45 @@ export default function GraphPage() {
     return { rfNodes: rfn, rfEdges: toReactFlowEdges(edges) };
   }, [scenes]);
 
-  // 노드 드래그 끝 → debounce 500ms PUT.
-  // jsdom 테스트 환경에서도 호출되도록 try/catch 로 감싼다.
-  const handleNodeDragStop = useCallback<
+  // #225 — 드래그 시작점 저장.
+  // ReactFlow 는 노드 mousedown 시 (이동 없어도) onNodeDragStart 를 발화.
+  const handleNodeDragStart = useCallback<
     (e: React.MouseEvent, node: Node) => void
   >((_e, node) => {
-    const id = node.id;
-    if (debounceRef.current[id]) clearTimeout(debounceRef.current[id]);
-    debounceRef.current[id] = setTimeout(() => {
-      void fetch(`/api/web-adventure/scenes/${encodeURIComponent(id)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ position: { x: node.position.x, y: node.position.y } }),
-      }).catch(() => {
-        /* 일시 오류는 무시 — 다음 드래그가 재시도 */
-      });
-    }, 500);
+    dragStartRef.current[node.id] = { x: node.position.x, y: node.position.y };
   }, []);
 
-  // 노드 클릭 → /scenes/[id]. SceneNode 의 data-graph-node-id 가 onClick 으로
-  // 직접 받는 게 더 robust 하므로 ReactFlow 의 onNodeClick 과 함께 fallback.
-  const handleNodeClick: NodeMouseHandler = useCallback(
+  // #225 — 노드 드래그 종료 시:
+  //   - 시작점 대비 거리 < 5px → click 으로 처리 → /scenes/[id] 라우팅.
+  //   - 거리 ≥ 5px → debounce 500ms PUT (위치 저장).
+  // 라우팅 / PUT 충돌을 방지하기 위해 별도 onNodeClick 핸들러를 두지 않는다.
+  const handleNodeDragStop = useCallback<
+    (e: React.MouseEvent, node: Node) => void
+  >(
     (_e, node) => {
-      router.push(`/scenes/${node.id}`);
+      const id = node.id;
+      const start = dragStartRef.current[id];
+      delete dragStartRef.current[id];
+
+      const dx = start ? Math.abs(node.position.x - start.x) : Infinity;
+      const dy = start ? Math.abs(node.position.y - start.y) : Infinity;
+      const isClick = dx < DRAG_CLICK_THRESHOLD_PX && dy < DRAG_CLICK_THRESHOLD_PX;
+
+      if (isClick) {
+        router.push(`/scenes/${id}`);
+        return;
+      }
+
+      if (debounceRef.current[id]) clearTimeout(debounceRef.current[id]);
+      debounceRef.current[id] = setTimeout(() => {
+        void fetch(`/api/web-adventure/scenes/${encodeURIComponent(id)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ position: { x: node.position.x, y: node.position.y } }),
+        }).catch(() => {
+          /* 일시 오류는 무시 — 다음 드래그가 재시도 */
+        });
+      }, 500);
     },
     [router],
   );
@@ -156,7 +179,7 @@ export default function GraphPage() {
           </Link>
           <h1 className="text-2xl font-bold mt-1">씬 흐름 차트</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            노드 클릭 = 편집 / 노드 드래그 = 위치 저장 / 자동 레이아웃 = dagre TB
+            노드 클릭 = 편집 / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre TB
           </p>
         </div>
         <Legend />
@@ -175,7 +198,8 @@ export default function GraphPage() {
             nodes={rfNodes}
             edges={rfEdges}
             nodeTypes={NODE_TYPES}
-            onNodeClick={handleNodeClick}
+            nodesDraggable
+            onNodeDragStart={handleNodeDragStart}
             onNodeDragStop={handleNodeDragStop}
             fitView
             minZoom={0.2}
