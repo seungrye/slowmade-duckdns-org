@@ -17,7 +17,12 @@ function ensureInit(): void {
     theme: 'default',
     securityLevel: 'loose',
     fontFamily: 'Pretendard, sans-serif',
-    flowchart: { useMaxWidth: true, htmlLabels: true },
+    // #244 — markdownAutoWrap: false 로 라벨이 <p> 로 wrap 안 됨.
+    //   true(기본) 시 라벨 measure 단계에 p(block) 가 부모 max-width(200) 까지
+    //   확장 → 노드당 ~200px → 5 노드 viewBox=2056 으로 과대 → 컨테이너 큰데
+    //   차트 작아 보임 (사용자가 처음부터 지적).
+    markdownAutoWrap: false,
+    flowchart: { useMaxWidth: true, htmlLabels: false },
     sequence: { useMaxWidth: true },
     state: { useMaxWidth: true },
     gantt: { useMaxWidth: true },
@@ -91,6 +96,26 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     svgEl.removeAttribute('height');
     svgEl.style.maxWidth = '100%';
     svgEl.style.height = 'auto';
+    // #245 — mermaid 11 의 flowchart-v2 / stateDiagram 등은 viewBox 를 svg
+    //   자체의 getBBox() 로 설정 → defs/markers/측정 잔재 등이 BBox 를 부풀려
+    //   viewBox 가 그래프 실제 크기의 ~10배로 잡힘 (예: g.root BBox=208x417 인데
+    //   viewBox=2056x2056). 컨테이너만 크고 그래프 압축 표시.
+    //   해결: g.root 의 BBox 로 viewBox 강제 재설정.
+    const rootG = svgEl.querySelector<SVGGraphicsElement>('g.root');
+    if (rootG) {
+      try {
+        const bb = rootG.getBBox();
+        if (bb.width > 0 && bb.height > 0) {
+          const pad = 8;
+          svgEl.setAttribute(
+            'viewBox',
+            `${bb.x - pad} ${bb.y - pad} ${bb.width + 2 * pad} ${bb.height + 2 * pad}`
+          );
+        }
+      } catch {
+        // getBBox 가 detached/invisible SVG 에서 던질 수 있음 — 무시.
+      }
+    }
   }, [svg]);
 
   if (error) {

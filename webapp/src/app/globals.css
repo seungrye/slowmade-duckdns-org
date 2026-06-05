@@ -105,3 +105,19 @@ body {
   max-width: 100% !important;
   height: auto !important;
 }
+
+/*
+ * #244 — mermaid 의 라벨 measure 단계 보정.
+ *   mermaid 11 의 flowchart-v2 는 라벨을 foreignObject 안 div 로 그리고
+ *   markdown 처리로 텍스트를 <p> 로 wrap. p 가 block → 부모 max-width 까지
+ *   확장 → measure 시 노드 폭 과대 → viewBox 폭 2056 으로 부풀음.
+ *   p 를 inline 으로 강제하고 margin/padding 제거해 글자 폭만큼만 측정.
+ *   글로벌 selector — mermaid 의 *body 직접 부착하는 측정용 임시 div* 도 잡힘.
+ */
+.nodeLabel p,
+.edgeLabel p,
+foreignObject p {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
