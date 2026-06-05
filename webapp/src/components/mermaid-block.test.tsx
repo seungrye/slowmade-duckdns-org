@@ -137,6 +137,33 @@ describe('MermaidBlock', () => {
     expect(svg?.style.backgroundColor).toBe('white');
   });
 
+  // #241 — jsdom + mermaid 11 실제 render 결과 (probe 로 확인):
+  //   flowchart: width="100%" + style="max-width: 216px"  ← 부모(896)의 24%, 사용자 "작음"
+  //   sequence:  width="100%" + style="max-width: 590px"  ← 부모의 65%, 사용자 "정상"
+  //   둘 다 동일 mermaid 코어 함수 calculateSvgSizeAttrs(tY) 통과 — 차이는
+  //   natural BBox 만. JS 의 svgEl.style.maxWidth='100%' override 만으론 불안:
+  //   별도 createRoot 의 effect 타이밍, dynamic chunk 로딩 race 등.
+  //   결정적 fix: 컨테이너 className 에 child selector + !important — CSS spec
+  //   상 !important 가 inline style 보다 항상 우선. mermaid 가 어떤 inline
+  //   style 을 박아도 항상 부모 폭 가득.
+  it('컨테이너 className 에 [&_svg]:!max-w-full / [&_svg]:!w-full 가 적용된다 (#241)', async () => {
+    (mermaid as unknown as { render: ReturnType<typeof vi.fn> }).render.mockResolvedValue({
+      svg: '<svg data-testid="forced-svg">FLOW</svg>',
+    });
+
+    const { container } = render(<MermaidBlock code="graph TD\nA-->B" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('forced-svg')).toBeInTheDocument();
+    });
+
+    const rendered = container.querySelector('.mermaid-rendered');
+    const className = rendered?.getAttribute('class') ?? '';
+    expect(className).toMatch(/\[&_svg\]:!max-w-full/);
+    expect(className).toMatch(/\[&_svg\]:!w-full/);
+    expect(className).toMatch(/\[&_svg\]:!h-auto/);
+  });
+
   // #240 — 사용자 보고: "플로우차트만 작음, 시퀀스는 정상".
   //   원인 진단: mermaid 코어 calculateSvgSizeAttrs(tY) 는 useMaxWidth:true 시
   //   `width="100%"` + `style="max-width: <natural>px"` 박음 — 모든 차트 공통.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 
 // mermaid 는 클라이언트 측에서 1회만 초기화 — 중복 호출 방지.
@@ -75,16 +75,16 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     };
   }, [code]);
 
-  // #239 — SVG 마운트 직후 inline max-width 를 100% 로 override.
-  // svg 가 새로 렌더될 때마다 (svg state 변화) 실행.
-  // #240 — width/height attribute 도 강제: mermaid 의
-  //   calculateSvgSizeAttrs(tY) 가 useMaxWidth:true 시 width="100%" + style="max-width:<Npx>"
-  //   박지만, natural width(N) 가 부모(896)보다 작으면 SVG 가 N px 로 제한되어
-  //   "영역만 크고 차트 작음" (예: 플로우차트 TD). useMaxWidth:false 분기로
-  //   진입한 경우엔 width="<Npx>" 가 attribute 로 박혀 더 단단히 잡힘.
-  //   해결: width attribute='100%' 강제 + height attribute 제거 + style 도 동일.
-  //   결과: 시퀀스(원래도 큰) + 플로우차트(작던) 모두 부모 폭 가득.
-  useEffect(() => {
+  // #241 — paint 전 동기 적용 (useEffect → useLayoutEffect).
+  //   useEffect 는 commit 후 비동기 → 작은 SVG 가 한 프레임 보였다 큼 (flash)
+  //   또는 createRoot 별도 tree 의 타이밍 차이로 적용 자체가 늦음.
+  //   useLayoutEffect 는 commit 직후 paint 전 동기 → 사용자가 *처음부터* 큰 SVG.
+  // 다중 방어:
+  //   1. setAttribute('width','100%') / removeAttribute('height')
+  //   2. inline style override
+  //   3. (className 의 [&_svg]:!w-full !max-w-full !h-auto 가 CSS !important 로
+  //      추가 강제 — JS 가 어떤 이유로 못 박아도 CSS spec 상 inline style 이김)
+  useLayoutEffect(() => {
     const svgEl = containerRef.current?.querySelector('svg');
     if (!svgEl) return;
     svgEl.setAttribute('width', '100%');
@@ -108,12 +108,15 @@ export function MermaidBlock({ code }: MermaidBlockProps) {
     <div className="my-4" data-mermaid-block="ok">
       {svg ? (
         // #238 — block + max-w-4xl + mx-auto.
-        //   useMaxWidth: true 와 짝지어 SVG 가 컨테이너 폭(최대 896px) 가득.
-        //   inline-block + max-w-full (#237) 은 natural width 사용 → useMaxWidth: false 와 같은 결과 → 작음.
-        // #239 — ref 로 svg element 를 잡아 inline max-width 를 100% 로 덮어쓴다.
+        // #239/#240 — JS ref override (defense in depth).
+        // #241 — child selector + !important — Tailwind arbitrary selector.
+        //   `[&_svg]:!w-full` = `.mermaid-rendered svg { width: 100% !important; }`.
+        //   CSS spec: !important 의 author rule 이 element 의 inline style 보다 우선.
+        //   mermaid 가 박는 `style="max-width: 216px"` 도 이 CSS 가 override.
+        //   결정적으로 *모든 차트 타입* 이 부모 폭(max-w-4xl=896px) 가득.
         <div
           ref={containerRef}
-          className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto"
+          className="mermaid-rendered overflow-x-auto block max-w-4xl mx-auto [&_svg]:!w-full [&_svg]:!max-w-full [&_svg]:!h-auto"
           dangerouslySetInnerHTML={{ __html: svg }}
         />
       ) : (
