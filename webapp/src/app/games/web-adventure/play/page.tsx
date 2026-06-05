@@ -7,6 +7,7 @@ import {
   getScenes,
   START_SCENE_ID,
 } from "@/lib/web-adventure/engine/sceneRegistry";
+import { useAutoSave } from "@/lib/web-adventure/use-auto-save";
 import CharacterCreator from "./CharacterCreator";
 import SceneRenderer from "./SceneRenderer";
 import EndingScreen from "./EndingScreen";
@@ -94,6 +95,22 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     (s: GameState, action: Action) => gameReducer(s, action, scenes),
     initialState,
   );
+
+  // #238 — 자동 저장 + 마운트 시 복원.
+  //   runIndex 는 #239 의 회차 시스템 통합 전까지 1 고정 (단일 진행 중 save).
+  useAutoSave(state, {
+    runIndex: 1,
+    onRestore: (payload) => {
+      // 복원 시 scenes 에 존재하는 sceneId 인지 확인.
+      if (scenes[payload.currentSceneId]) {
+        dispatch({
+          type: "RESTORE",
+          character: payload.character,
+          currentSceneId: payload.currentSceneId,
+        });
+      }
+    },
+  });
 
   return (
     <main className="min-h-screen bg-amber-50 text-amber-950 py-6 px-4">

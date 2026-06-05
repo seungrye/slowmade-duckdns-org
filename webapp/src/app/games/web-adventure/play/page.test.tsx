@@ -89,7 +89,12 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     await waitFor(() =>
       expect(screen.getByText(/캐릭터 생성/)).toBeInTheDocument(),
     );
-    expect(mockFetch).toHaveBeenCalledTimes(2);
+    // #238 — useAutoSave 가 마운트 시 /api/web-adventure/save GET 추가 호출.
+    // 여기서는 *content fetch* 만 카운트 (재시도 → 1차 실패 + 2차 성공).
+    const contentCalls = mockFetch.mock.calls.filter((args: unknown[]) =>
+      String(args[0]).includes('/content/v1'),
+    );
+    expect(contentCalls.length).toBe(2);
   });
 });
 

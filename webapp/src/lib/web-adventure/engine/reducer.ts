@@ -32,7 +32,9 @@ export type Action =
   | { type: "USE_ITEM"; itemId: string }
   | { type: "REROLL"; rng?: () => number }
   | { type: "END_GAME"; endingId: string }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  // #238 — 저장에서 불러올 때. character + currentSceneId 로 playing 즉시 진입.
+  | { type: "RESTORE"; character: Character; currentSceneId: string };
 
 function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   switch (cond.kind) {
@@ -291,6 +293,14 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
 
     case "RESET":
       return { phase: "creating" };
+
+    case "RESTORE":
+      return {
+        phase: "playing",
+        character: action.character,
+        currentScene: action.currentSceneId,
+        log: [],
+      };
 
     default:
       return state;

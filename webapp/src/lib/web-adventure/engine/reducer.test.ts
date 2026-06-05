@@ -370,6 +370,25 @@ describe("gameReducer", () => {
     }
   });
 
+  // #238 — 저장에서 불러오기.
+  test("RESTORE 는 character + currentSceneId 로 playing state 를 즉시 복원한다", () => {
+    const character = makeTestCharacter({}, "scholar");
+    character.hp = 7;
+    character.inventory = ["torch"];
+    const restored = gameReducer(
+      { phase: "creating" },
+      { type: "RESTORE", character, currentSceneId: "cave_entry" },
+      scenes as SceneRegistry,
+    );
+    expect(restored.phase).toBe("playing");
+    if (restored.phase === "playing") {
+      expect(restored.currentScene).toBe("cave_entry");
+      expect(restored.character.hp).toBe(7);
+      expect(restored.character.inventory).toContain("torch");
+      expect(restored.log).toEqual([]);
+    }
+  });
+
   test("REROLL 은 rerollsLeft 가 0 이면 무효", () => {
     const noReroll = makeTestCharacter({}, "scholar");
     noReroll.rerollsLeft = 0;
