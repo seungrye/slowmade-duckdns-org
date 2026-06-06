@@ -108,6 +108,25 @@ seungrye ALL=(root) NOPASSWD: /bin/systemctl start webapp@*, \
 
 (systemctl/nginx 의 절대 경로는 `which` 로 확인해서 맞춰 넣을 것.)
 
+### 6. nginx sites 파일 코드화 (재해 복구)
+
+`/etc/nginx/sites-enabled/slowmade.duckdns.org` 의 *최신 내용* 을 `scripts/deploy/slowmade.duckdns.org.nginx` 로 git 추적한다. 새 도메인/cert/header 변경 시 항상 둘을 동기화.
+
+```bash
+# 변경 → git 으로 회수
+sudo cp /etc/nginx/sites-enabled/slowmade.duckdns.org \
+    /home/seungrye/site/scripts/deploy/slowmade.duckdns.org.nginx
+sudo chown $USER:$USER scripts/deploy/slowmade.duckdns.org.nginx
+git add scripts/deploy/slowmade.duckdns.org.nginx && git commit
+
+# 재해 복구 (서버 재구축)
+sudo install -m 0644 scripts/deploy/slowmade.duckdns.org.nginx \
+    /etc/nginx/sites-enabled/slowmade.duckdns.org
+sudo nginx -t && sudo nginx -s reload
+```
+
+ssl 경로 (`/etc/letsencrypt/...`) 는 표준 경로라 공개 안전. 실 인증서는 별도 systemd timer / certbot 으로 갱신.
+
 ## 일상 배포
 
 ```bash

@@ -26,7 +26,7 @@ UPSTREAM_SRC="$REPO_DIR/scripts/deploy/webapp-upstream.conf"
 UPSTREAM_DST="${WEBAPP_UPSTREAM_DST:-/etc/nginx/conf.d/webapp-upstream.conf}"
 PORT_BLUE=3010
 PORT_GREEN=3011
-HEALTH_PATH="/api/health"
+HEALTH_PATH="/api/health?deep=true"  # #282 — mongo ping 까지 검사.
 HEALTH_TIMEOUT_SEC=60
 HEALTH_INTERVAL_SEC=2
 
