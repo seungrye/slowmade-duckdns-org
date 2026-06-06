@@ -24,6 +24,10 @@ const CharacterSchema = new Schema(
     hp: { type: Number, required: true },
     maxHp: { type: Number, required: true },
     ability: { type: String, required: true },
+    // #287 〈에테르니아〉 — 주인공 정체성 + 침식. strict mode 에서 schema 누락이면
+    //   직렬화 시 *사라짐* → RESTORE 후 회차 정보 손실. 반드시 명시.
+    protagonist: { type: String, required: true }, // kael | rin | solwen
+    stigmaErosion: { type: Number, required: true, min: 0, max: 100 },
     inventory: { type: [String], required: true, default: [] },
     // flags: 임의 string key → boolean. Mongoose 의 Map<Boolean>.
     flags: { type: Map, of: Boolean, default: {} },
@@ -51,6 +55,8 @@ export interface WebAdventureSaveDoc {
     hp: number;
     maxHp: number;
     ability: string;
+    protagonist: string;
+    stigmaErosion: number;
     inventory: string[];
     flags: Map<string, boolean> | Record<string, boolean>;
     rerollsLeft: number;

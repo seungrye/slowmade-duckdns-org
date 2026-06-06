@@ -16,6 +16,8 @@ function makeDoc(overrides: Record<string, unknown> = {}) {
       hp: 8,
       maxHp: 10,
       ability: 'scholar',
+      protagonist: 'kael',
+      stigmaErosion: 70,
       inventory: ['super_tintham_cracker'],
       flags: {},
       rerollsLeft: 1,
@@ -48,5 +50,14 @@ describe('WebAdventurePastRun 필수 필드', () => {
     for (const id of ['ascension', 'revolution', 'fall', 'harmony', 'sylvan_bond', 'petrification']) {
       expect(makeDoc({ endingId: id }).validateSync()).toBeUndefined();
     }
+  });
+
+  // #287 — protagonist + stigmaErosion 보존 (snapshot 의미 보장).
+  it('character.protagonist + stigmaErosion 보존', () => {
+    const doc = makeDoc();
+    expect(doc.validateSync()).toBeUndefined();
+    const obj = doc.toObject() as { character: { protagonist: string; stigmaErosion: number } };
+    expect(obj.character.protagonist).toBe('kael');
+    expect(obj.character.stigmaErosion).toBe(70);
   });
 });

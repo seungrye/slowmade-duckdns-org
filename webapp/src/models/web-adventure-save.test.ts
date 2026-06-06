@@ -16,6 +16,8 @@ function makeDoc(overrides: Record<string, unknown> = {}) {
       hp: 10,
       maxHp: 10,
       ability: 'scholar',
+      protagonist: 'kael',
+      stigmaErosion: 50,
       inventory: [],
       flags: {},
       rerollsLeft: 3,
@@ -97,6 +99,8 @@ describe('WebAdventureSave 정상 케이스', () => {
         hp: 10,
         maxHp: 10,
         ability: 'scholar',
+        protagonist: 'kael',
+        stigmaErosion: 50,
         inventory: ['bread', 'torch'],
         flags: {},
         rerollsLeft: 3,
@@ -116,11 +120,57 @@ describe('WebAdventureSave 정상 케이스', () => {
         hp: 10,
         maxHp: 10,
         ability: 'scholar',
+        protagonist: 'kael',
+        stigmaErosion: 50,
         inventory: [],
         flags: { caughtBefore: true, visited_market: true },
         rerollsLeft: 3,
       },
     });
     expect(doc.validateSync()).toBeUndefined();
+  });
+
+  // #287 〈에테르니아〉 — character.protagonist + stigmaErosion 보존.
+  // strict mode 에서 schema 누락 시 *직렬화 단계에서 사라짐* → round-trip 실패.
+  it('character.protagonist 가 schema 에 정의되어 round-trip 보존', () => {
+    const doc = makeDoc({
+      character: {
+        stats: { str: 5, dex: 6, int: 7, cha: 4, con: 4, wis: 5 },
+        hp: 18,
+        maxHp: 18,
+        ability: 'lunar',
+        protagonist: 'kael',
+        stigmaErosion: 80,
+        inventory: ['ether_refined_water'],
+        flags: {},
+        rerollsLeft: 0,
+      },
+    });
+    expect(doc.validateSync()).toBeUndefined();
+    const obj = doc.toObject() as {
+      character: { protagonist: string; stigmaErosion: number };
+    };
+    expect(obj.character.protagonist).toBe('kael');
+    expect(obj.character.stigmaErosion).toBe(80);
+  });
+
+  it('character.stigmaErosion 이 0-100 범위 검증', () => {
+    const tooLow = makeDoc({
+      character: {
+        stats: { str: 5, dex: 5, int: 5, cha: 5, con: 5, wis: 5 },
+        hp: 10, maxHp: 10, ability: 'lunar', protagonist: 'kael',
+        stigmaErosion: -1, inventory: [], flags: {}, rerollsLeft: 0,
+      },
+    });
+    expect(tooLow.validateSync()?.errors?.['character.stigmaErosion']).toBeDefined();
+
+    const tooHigh = makeDoc({
+      character: {
+        stats: { str: 5, dex: 5, int: 5, cha: 5, con: 5, wis: 5 },
+        hp: 10, maxHp: 10, ability: 'lunar', protagonist: 'kael',
+        stigmaErosion: 101, inventory: [], flags: {}, rerollsLeft: 0,
+      },
+    });
+    expect(tooHigh.validateSync()?.errors?.['character.stigmaErosion']).toBeDefined();
   });
 });
