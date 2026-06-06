@@ -105,6 +105,34 @@ test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
     await expect(page.locator("[data-testid='world-flag-fall']")).toBeVisible();
   });
 
+  test("회차 부메랑 활성 — world.harmony_kept flag 시 echo_of_harmony hidden 분기 가시 (#309)", async ({
+    context,
+  }) => {
+    const page = await context.newPage();
+    // RESTORE 로 climax_revolution_path 에 직접 진입 + character.flags 에 world.harmony_kept.
+    // echo_of_harmony hidden 분기가 해금되어 표시.
+    await context.addInitScript(() => {
+      window.localStorage.setItem(
+        "web-adventure:save:v1",
+        JSON.stringify({
+          runIndex: 2,
+          currentSceneId: "climax_revolution_path",
+          character: {
+            stats: { str: 5, dex: 6, int: 7, cha: 4, con: 4, wis: 5 },
+            hp: 18, maxHp: 18, ability: "lunar", protagonist: "kael",
+            stigmaErosion: 50,
+            inventory: [],
+            flags: { "world.harmony_kept": true },
+            rerollsLeft: 0,
+          },
+        }),
+      );
+    });
+    await page.goto("/games/web-adventure/play");
+    // climax_revolution_path 진입 후 분기들 — echo_of_harmony 표시 확인.
+    await expect(page.getByText(/조화의 메아리|echo/i)).toBeVisible({ timeout: 15000 });
+  });
+
   test("USE_ITEM — 정제수 사용 → 침식 감소 + 인벤 소모 (#307)", async ({ context }) => {
     const page = await context.newPage();
     // 침식 60 + 정제수 1 RESTORE → '사용' 클릭 → 침식 57.
