@@ -49,6 +49,7 @@ PATCHES=(
   scripts/seed-stat-balance.mjs         # #319 6 스탯 균형 + hasItem 활성화
   scripts/seed-wis-activation.mjs       # #320 wis 활용 + 1
   scripts/seed-ability-branches.mjs     # #321 4 성흔 차별화 분기
+  scripts/seed-feather-use.mjs          # #322 인벤 활용 — spirit_beast_feather
 )
 
 run_one() {
