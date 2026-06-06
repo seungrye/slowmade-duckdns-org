@@ -17,6 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:seed-idempotency": "vitest run --config vitest.seed.config.mts",
+    "test:all": "pnpm typecheck && pnpm lint && pnpm test && pnpm test:seed-idempotency",
+    "verify:web-adventure": "pnpm lint:web-adventure:structure && pnpm lint:web-adventure:reachability",
     "e2e": "playwright test",
     "e2e:install": "playwright install chromium"
   },
