@@ -15,7 +15,22 @@
 
 # next.js
 /.next/
+/.next-3010/
+/.next-3011/
+/.next-tmp/
 /out/
+
+# Playwright (#277)
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# painter 캐시 (재실행 가능, 크다)
+/scripts/painter-scene-prompts-cache.json
+/scripts/painter-scene-results.json
+
+# content 자동 백업 — 운영 환경 별 별도 보관 (push 대상 아님)
+/scripts/backups/
 
 # production
 /build
