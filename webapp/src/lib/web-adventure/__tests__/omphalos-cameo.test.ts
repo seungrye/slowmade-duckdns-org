@@ -31,7 +31,8 @@ describe("omphalos_cameo (#274)", () => {
     expect(s).toBeTruthy();
     expect(s.choices.length).toBe(3);
     const ids = s.choices.map((c: Choice) => c.id);
-    expect(ids).toEqual(expect.arrayContaining(["persuade_join", "exchange_intel", "walk_past"]));
+    // #321 — walk_past plain → hecate_illusion ability conditional 로 교체.
+    expect(ids).toEqual(expect.arrayContaining(["persuade_join", "exchange_intel", "hecate_illusion"]));
   });
 
   it("3 분기 모두 omphalos_station 으로 합류", () => {
