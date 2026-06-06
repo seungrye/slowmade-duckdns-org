@@ -146,12 +146,10 @@
 
 1. **Scene 05 omphalos_outskirts** 옴팔로스 외곽 — 역 / 블랙마켓 분기.
 2. **Scene 06 omphalos_blackmarket** 정보상에게 *사제단 의식 진실* 구입 (`knowsAscensionPlot` flag).
-3. **Scene 07 omphalos_station** 가솔린 열차 — 5 선택지로 5 분기:
-   - `sabotage_with_knowledge` [knowsAscensionPlot 필요, hidden] → harmony 길.
-   - `derail` [완력 con 15] → revolution 또는 fall.
-   - `hijack` [지능 int 14] → revolution 또는 fall.
-   - `spirit_swallow` [spiritBeastDied 필요, hidden] → sylvan_bond 길.
-   - `priest_deal` [int 8+] → ascension 길.
+3. **Scene 07 omphalos_station** 가솔린 열차 — 분기 *3 단계 트리* (#262 — UX 정책: 한 씬 ≤ 3 분기).
+   - `path_steel` → **Scene 07a station_path_steel** — `derail` [str 15] / `hijack` [int 14] → climax_revolution_path 또는 climax_fall_path. 실패 시 `stigmaDeltaOnFailure` 추가 침식.
+   - `path_knowledge` → **Scene 07b station_knowledge_branch** — `sabotage_with_knowledge` [knowsAscensionPlot, hidden] → climax_harmony_path / `priest_deal` [int **7+** — Solwen 차단 design 의도] → climax_ascension_path.
+   - `path_spirit` → **Scene 07c station_spirit_branch** — `spirit_swallow` [spiritBeastDied, hidden] → climax_sylvan_path.
 
 ### 5.2 클라이맥스 8 씬
 
@@ -169,7 +167,7 @@
 
 | 엔딩 | 아이콘 | Kael | Rin | Solwen | 주요 조건 |
 |---|---|---|---|---|---|
-| **ascension** 승천 | ✨ | ◎ | ○ | ✗ | 사제단 거래. int 8+. |
+| **ascension** 승천 | ✨ | ◎ | ◎ | ✗ | 사제단 거래. int **7+**. Solwen design 차단. |
 | **revolution** 혁명 | ⚙️ | ○ | ◎ | ○ | str 15 또는 int 14 + 동참. |
 | **harmony** 조화 | ☯ | ○ | ○ | ○ | `knowsAscensionPlot` + wis 17. |
 | **fall** 추락 | 💀 | △ | △ | △ | 시간 제한 실패 / 거절. |
@@ -206,18 +204,62 @@
 
 ---
 
-## 8. 후속 계획 (현재 placeholder, 다음 작업)
+## 8. 침식 가속 시스템 (#263 / #264)
 
-- [ ] painter-bot 으로 각 씬 다크 톤 일러스트 생성 (현재 placeholder-square.svg)
-- [ ] StatusPanel 의 침식도 시각화 (80+ 시 푸른 결정 이펙트, 심장 박동)
-- [ ] 옴팔로스의 *블랙마켓에서 다른 주인공과 짧은 마주침* (Harmony 진입 자격 flag)
-- [ ] 사이드 NPC: 군의관 / 정보상 / 영수 / 행상인 (이름 + 1-2 줄 대사)
-- [ ] e2e 통합 테스트의 *mongo content fetch* mock + 실제 씬 그래프 시뮬레이션
-- [ ] 페이지 헤더 문구를 〈에테르니아의 추락〉 톤으로 (현재 "한국형 CYOA")
+침식이 단순 *주인공 결정* 만의 함수가 아닌, *환경* 과 *마법 실패* 의 누적이다.
+
+| 트리거 | delta | 위치 |
+|---|---|---|
+| 환경 (`onEnter.stigmaDelta`) | +1~+3 | 옴팔로스 외곽/역/블랙마켓, 4 climax 씬, station 간 단계 |
+| 마법 확률 *실패* (`stigmaDeltaOnFailure`) | +2~+10 | 셀레네/헤카테/마법공학/지혜 분기. 지혜 의식 동조는 +10 (최대 부담) |
+| 마법 확률 *성공/공통* (`stigmaDelta`) | +2~+3 | 동일 분기들 |
+| 아이템 사용 (`item.stigmaDelta`) | -3 (정제수) / +5 (마력석 파편) | USE_ITEM 시 |
+| 자연 누적 (∑ ≥ 100) | — | reducer 가 자동 `petrification` ending 으로 전환 |
+
+## 9. Harmony 자격 확장 (#265)
+
+블랙마켓 진입 시 두 flag 가 동시에 set:
+
+- `knowsAscensionPlot` — sabotage_with_knowledge 자격
+- `sawOtherProtagonist` — *다른 주인공과의 짧은 마주침* (Harmony 의 "함께 숨 쉰다" 톤 강화). 추후 신규 분기 자격으로 사용.
+
+## 10. UI/그래프 (#270)
+
+- **Legend** — 〈에테르니아〉 6 엔딩 라벨 (✨ 승천 / ⚙️ 혁명 / ☯ 조화 / 💀 추락 / 🗿 석화 / 🌿 정령의 결속) + 엣지 4 종.
+- **ENDING_COLOR** (sceneNode.tsx) — 6 색 매핑 (amber/red/emerald/gray/indigo/lime).
+- **ENDING_ICON** — `endings.ts` 의 `endingsMeta.icon` 을 단일 소스.
+
+## 11. 통합 e2e 매트릭스 (#269)
+
+`src/lib/web-adventure/__tests__/integration-e2e.test.ts` — 실제 mongo 그래프 + reducer 시뮬레이션:
+
+| 시나리오 | 검증 단계 수 |
+|---|---|
+| Kael → Revolution (path_steel/derail) | 8 |
+| Kael → Ascension (path_knowledge/priest_deal int 7) | 9 |
+| Kael → Harmony (knowsAscensionPlot + still_the_engine) | 9 |
+| Kael → Fall (reject_revolution) | 8 |
+| Rin → Revolution | 8 |
+| Solwen → Sylvan Bond (spiritBeastDied + spirit_swallow) | 8 |
+| Kael → Petrification (파편 4 USE → 100 자동) | 4 |
+
+결정적 RNG `() => 0.99` 주입으로 모든 probability success 보장.
+
+## 12. 후속 계획
+
+- [ ] painter-bot 으로 각 씬 다크 톤 일러스트 생성 (현재 placeholder-square.svg) — **외부 quota 대기**
+- [x] StatusPanel 의 침식도 시각화 (80+ 시 푸른 결정 이펙트, 심장 박동) — #259
+- [x] 옴팔로스의 *블랙마켓에서 다른 주인공과 짧은 마주침* (Harmony 진입 자격 flag) — #265
+- [x] 사이드 NPC: 군의관 / 정보상 / 영수 / 행상인 (이름 + 1-2 줄 대사) — #260, #267
+- [x] e2e 통합 테스트의 *mongo content fetch* mock + 실제 씬 그래프 시뮬레이션 — #269
+- [ ] 페이지 헤더 문구를 〈에테르니아의 추락〉 톤으로 — 일부 #268 (CharacterCreator)
+- [ ] Phase 2 — 옴팔로스 *심층* 확장 (H)
+- [ ] Phase 3 — 엔딩별 후일담 씬 (I)
+- [ ] 다중 회차 매트릭스 명시 + 테스트 (J)
 
 ---
 
-## 9. 변경 이력
+## 변경 이력
 
 - **#249** (Phase 1a) 모델 변경 + 백업.
 - **#250** reducer 침식 카운터.
@@ -227,4 +269,17 @@
 - **#254** Solwen 1막 적치.
 - **#255** 옴팔로스 2-3막.
 - **#256** 6 엔딩 + world flag 부메랑.
-- **#257** e2e 풀 플레이 통합.
+- **#257** e2e 풀 플레이 (최소 그래프).
+- **#258** CharacterCreator 스탯 분배 제거 + USE_ITEM stigmaDelta 통합.
+- **#259** StatusPanel 침식 시각화 (debuff/critical 단계).
+- **#260** 사이드 NPC 추가 대사 (act1).
+- **#261** 정제수/파편 획득 위치 5 씬 + ascension priest_deal int 7 fix.
+- **#262** omphalos_station 5 → 3 분기 (station_path_steel/knowledge_branch/spirit_branch).
+- **#263** 마법 확률 *실패* 시 stigmaDeltaOnFailure (6 분기, +2~+10).
+- **#264** 환경 침식 onEnter.stigmaDelta (10 씬, +1~+3).
+- **#265** Harmony 자격 확장 — sawOtherProtagonist flag.
+- **#266** EndingGallery 6 신규 엔딩 검증.
+- **#267** 약한 씬 (≤2줄) 4 곳에 NPC 대사 (≥3줄 lint).
+- **#268** CharacterCreator 다크 에픽 톤 ("너의 운명을 선택하라").
+- **#269** 통합 e2e — 실제 mongo 그래프 7 시나리오 + `omphalos_outskirts` content 버그 발견·수정.
+- **#270** graph 범례 + sceneNode 색상 — 옛 사극 → 〈에테르니아〉 6 엔딩 매핑.

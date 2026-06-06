@@ -23,6 +23,14 @@ pnpm test:watch   # Vitest watch 모드
 
 # 단일 테스트 파일 실행 (webapp/ 디렉터리 안에서 실행)
 pnpm vitest run src/lib/__tests__/sort.test.ts
+
+# Web Adventure 콘텐츠 lint
+pnpm lint:web-adventure              # 본문 길이/문단 lint (#248)
+MONGO_URI=... pnpm lint:web-adventure:structure   # 그래프 구조 lint (#271)
+
+# Playwright e2e (#277)
+pnpm e2e:install                                  # chromium 다운로드 (1회)
+PLAYWRIGHT_BASE_URL=http://localhost:3010 pnpm e2e
 ```
 
 ## 작업 규칙
