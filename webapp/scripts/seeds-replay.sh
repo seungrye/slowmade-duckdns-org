@@ -47,6 +47,7 @@ PATCHES=(
   scripts/seed-story-flow-balance.mjs    # #284 act1 본문 균형 + Kael 환경 침식
   scripts/seed-failure-bypass.mjs        # #318 RNG 실패 → 우회 씬 (HP/침식 패널티)
   scripts/seed-stat-balance.mjs         # #319 6 스탯 균형 + hasItem 활성화
+  scripts/seed-wis-activation.mjs       # #320 wis 활용 + 1
 )
 
 run_one() {
