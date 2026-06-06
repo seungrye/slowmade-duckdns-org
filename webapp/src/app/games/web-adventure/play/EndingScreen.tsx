@@ -109,14 +109,14 @@ export default function EndingScreen({ endingId, character, log, onRestart }: Pr
         <button
           type="button"
           onClick={onRestart}
-          className="inline-block rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 transition-colors"
+          className="inline-block rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-900 focus-visible:ring-offset-2 transition-colors"
         >
           다시 시작
         </button>
         {/* #250 — 엔딩 도달 후 갤러리 진입 동선. */}
         <Link
           href="/games/web-adventure/gallery"
-          className="inline-block rounded-md border border-amber-700 text-amber-800 px-5 py-2 font-semibold hover:bg-amber-100 transition-colors"
+          className="inline-block rounded-md border border-amber-700 text-amber-800 px-5 py-2 font-semibold hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-2 transition-colors"
         >
           🏆 엔딩 갤러리
         </Link>

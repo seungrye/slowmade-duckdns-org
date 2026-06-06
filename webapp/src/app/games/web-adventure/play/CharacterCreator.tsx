@@ -210,7 +210,7 @@ export default function CharacterCreator({ onComplete }: Props) {
       <button
         type="button"
         onClick={submit}
-        className="w-full rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 transition-colors"
+        className="w-full rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-900 focus-visible:ring-offset-2 transition-colors"
       >
         {protaMeta.name} 의 운명으로 발을 내딛는다
       </button>

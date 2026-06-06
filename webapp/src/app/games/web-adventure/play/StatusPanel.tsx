@@ -155,7 +155,7 @@ export default function StatusPanel({
           <button
             type="button"
             onClick={onReroll}
-            className="rounded bg-amber-700 text-amber-50 px-2 py-0.5 hover:bg-amber-800"
+            className="rounded bg-amber-700 text-amber-50 px-2 py-0.5 hover:bg-amber-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-900 focus-visible:ring-offset-1"
           >
             재굴림: 다시 굴리기
           </button>

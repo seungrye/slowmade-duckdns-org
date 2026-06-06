@@ -77,7 +77,7 @@ export default function GalleryPage() {
           <div>
             <Link
               href="/games/web-adventure/play"
-              className="text-xs text-amber-700 hover:underline"
+              className="text-xs text-amber-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 rounded"
             >
               ← 모험으로 돌아가기
             </Link>
