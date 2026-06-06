@@ -223,6 +223,18 @@
 - `knowsAscensionPlot` — sabotage_with_knowledge 자격
 - `sawOtherProtagonist` — *다른 주인공과의 짧은 마주침* (Harmony 의 "함께 숨 쉰다" 톤 강화). 추후 신규 분기 자격으로 사용.
 
+## 9.5 act1 회차 부메랑 (#283)
+
+이전 회차의 결과가 *다음 회차의 act1 진행* 도 살짝 다르게 만든다. 본 분기 흐름 유지 + *짧은 우회 가지* (hidden conditional).
+
+| 씬 | 조건 flag | hidden 분기 | 효과 |
+|---|---|---|---|
+| `kael_corridor` | `world.last_one_fell` | `crystal_path_memory` — 옛 카엘의 결정체 빛 안내 | → kael_corridor_clear, 침식 -2 |
+| `rin_evidence` | `world.revolution_won` | `iron_underground` — 본부 보고 우회 | → rin_underground, betrayal 우회 |
+| `solwen_combat` | `world.sylvan_awoke` | `spirit_guidance` — 영수의 노래 안내 | → solwen_grief, 침식 -3 |
+
+매트릭스 (#272/#276) 가 *climax 단계* 의 회차 부메랑이라면, 본 시스템은 *act1 단계* 의 약한 부메랑. *덜 극적이지만 매 회차 진행에 영향*.
+
 ## 10. UI/그래프 (#270)
 
 - **Legend** — 〈에테르니아〉 6 엔딩 라벨 (✨ 승천 / ⚙️ 혁명 / ☯ 조화 / 💀 추락 / 🗿 석화 / 🌿 정령의 결속) + 엣지 4 종.
