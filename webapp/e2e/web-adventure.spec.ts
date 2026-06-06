@@ -104,4 +104,27 @@ test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
     await expect(page.locator("[data-testid='world-flag-harmony']")).toBeVisible();
     await expect(page.locator("[data-testid='world-flag-fall']")).toBeVisible();
   });
+
+  test("모바일 viewport — 햄버거 → drawer 열림 → 닫기 → drawer 숨김 (#296)", async ({
+    browser,
+  }) => {
+    // 모바일 viewport (iPhone 12 mini).
+    const ctx = await browser.newContext({ viewport: { width: 375, height: 667 } });
+    const page = await ctx.newPage();
+    await page.goto("/games/web-adventure/play");
+    // 시작 버튼 → playing 진입.
+    await page.getByRole("button", { name: /운명으로 발을 내딛는다/ }).click();
+    // 햄버거 버튼 (md:hidden) 가시.
+    const hamburger = page.getByRole("button", { name: /상태 메뉴 열기/ });
+    await expect(hamburger).toBeVisible({ timeout: 15000 });
+    // 클릭 → drawer 열림 (aria-modal=true).
+    await hamburger.click();
+    const drawer = page.locator("[data-testid='mobile-drawer']");
+    await expect(drawer).toHaveAttribute("aria-modal", "true");
+    await expect(drawer).toHaveAttribute("aria-hidden", "false");
+    // 닫기 버튼 클릭 → drawer 닫힘.
+    await page.getByRole("button", { name: "닫기" }).click();
+    await expect(drawer).toHaveAttribute("aria-hidden", "true");
+    await ctx.close();
+  });
 });

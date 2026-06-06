@@ -105,6 +105,99 @@ const SCENARIOS: Scenario[] = [
     ],
   },
   {
+    // Rin → Ascension: int 7 충족, blackmarket → knowledge_branch → priest_deal.
+    protagonist: "rin",
+    endingId: "ascension",
+    steps: [
+      { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "to_supervisor" },
+      { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "to_omphalos" },
+      { kind: "choice", id: "to_market" },
+      { kind: "choice", id: "to_station_after" },
+      { kind: "choice", id: "path_knowledge" },
+      { kind: "choice", id: "priest_deal" },
+      { kind: "choice", id: "ascend" },
+    ],
+  },
+  {
+    // Rin → Harmony: knowsAscensionPlot → sabotage → still_the_engine.
+    protagonist: "rin",
+    endingId: "harmony",
+    steps: [
+      { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "to_supervisor" },
+      { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "to_omphalos" },
+      { kind: "choice", id: "to_market" },
+      { kind: "choice", id: "to_station_after" },
+      { kind: "choice", id: "path_knowledge" },
+      { kind: "choice", id: "sabotage_with_knowledge" },
+      { kind: "choice", id: "still_the_engine" },
+    ],
+  },
+  {
+    // Rin → Fall: derail 후 reject_revolution.
+    protagonist: "rin",
+    endingId: "fall",
+    steps: [
+      { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "to_supervisor" },
+      { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "to_omphalos" },
+      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "path_steel" },
+      { kind: "choice", id: "derail" },
+      { kind: "choice", id: "reject_revolution" },
+    ],
+  },
+  {
+    // Solwen → Revolution: grove → grief → omphalos → station → derail (str 6 충족).
+    protagonist: "solwen",
+    endingId: "revolution",
+    steps: [
+      { kind: "choice", id: "arrow_first" },
+      { kind: "choice", id: "shoot_canister" },
+      { kind: "choice", id: "to_revenge" },
+      { kind: "choice", id: "to_omphalos" },
+      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "path_steel" },
+      { kind: "choice", id: "derail" },
+      { kind: "choice", id: "join_revolution" },
+    ],
+  },
+  {
+    // Solwen → Harmony: knowsAscensionPlot 충족 후 sabotage. int 5 < 7 이라 priest_deal 차단.
+    protagonist: "solwen",
+    endingId: "harmony",
+    steps: [
+      { kind: "choice", id: "arrow_first" },
+      { kind: "choice", id: "shoot_canister" },
+      { kind: "choice", id: "to_revenge" },
+      { kind: "choice", id: "to_omphalos" },
+      { kind: "choice", id: "to_market" },
+      { kind: "choice", id: "to_station_after" },
+      { kind: "choice", id: "path_knowledge" },
+      { kind: "choice", id: "sabotage_with_knowledge" },
+      { kind: "choice", id: "still_the_engine" },
+    ],
+  },
+  {
+    // Solwen → Fall: derail 후 reject_revolution.
+    protagonist: "solwen",
+    endingId: "fall",
+    steps: [
+      { kind: "choice", id: "arrow_first" },
+      { kind: "choice", id: "shoot_canister" },
+      { kind: "choice", id: "to_revenge" },
+      { kind: "choice", id: "to_omphalos" },
+      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "path_steel" },
+      { kind: "choice", id: "derail" },
+      { kind: "choice", id: "reject_revolution" },
+    ],
+  },
+  {
     protagonist: "solwen",
     endingId: "sylvan_bond",
     steps: [
