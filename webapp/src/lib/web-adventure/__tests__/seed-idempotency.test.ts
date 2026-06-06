@@ -6,7 +6,7 @@
 //
 // 실 mongo 백업 → replay → 새 백업 → 의미있는 필드 diff (== 0).
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
 import { resolve } from "path";
 
