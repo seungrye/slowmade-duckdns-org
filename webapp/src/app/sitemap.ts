@@ -11,6 +11,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 1,
     },
+    // #311 web-adventure 공개 영역 sitemap 등록.
+    {
+      url: `${URL}/games/web-adventure`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
+    {
+      url: `${URL}/games/web-adventure/play`,
+      lastModified: new Date(),
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
+      url: `${URL}/games/web-adventure/gallery`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
   ];
 
   const posts = await getAllPosts();
