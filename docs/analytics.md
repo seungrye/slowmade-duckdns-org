@@ -42,7 +42,7 @@ Firebase Analytics에는 이벤트를 보는 곳이 두 군데 있고, 동작 �
 | 이벤트 | 발생 시점 | 파라미터 |
 |---|---|---|
 | `adv_run_started` | 캐릭터 생성 → START_GAME | `ability`, `protagonist`, `run_index` |
-| `adv_choice_made` | 선택지 클릭 | `scene_id`, `choice_id`, `choice_kind` |
+| `adv_choice_made` | 선택지 클릭 | `scene_id`, `choice_id`, `choice_kind`, `protagonist`, `stigma_erosion`, `run_index` |
 | `adv_ending_reached` | ended 진입 | `ending_id`, `run_index`, `protagonist`, `stigma_erosion` |
 | `adv_petrification_auto` | 침식 100 자동 전환 | `protagonist`, `run_index` |
 | `adv_stigma_critical` | 침식 80 첫 도달 (회차당 1) | `protagonist`, `run_index`, `stigma_erosion` |

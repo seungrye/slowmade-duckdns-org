@@ -314,13 +314,17 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                   scene={scenes[state.currentScene]}
                   character={state.character}
                   onChoose={(choiceId) => {
-                    // #245 — adv_choice_made.
+                    // #245 — adv_choice_made. #285: protagonist + stigma_erosion 추가.
+                    //   회차/시한부 분석을 위해 그 시점의 *주인공/침식* 캡처.
                     if (state.phase === "playing") {
                       const choice = scenes[state.currentScene]?.choices.find((c) => c.id === choiceId);
                       logAdvEvent("choice_made", {
                         scene_id: state.currentScene,
                         choice_id: choiceId,
                         choice_kind: choice?.kind,
+                        protagonist: state.character.protagonist,
+                        stigma_erosion: state.character.stigmaErosion,
+                        run_index: runIndex,
                       });
                     }
                     dispatch({ type: "MAKE_CHOICE", choiceId });
