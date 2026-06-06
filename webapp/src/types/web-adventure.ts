@@ -98,7 +98,9 @@ export type ChoiceCondition =
    */
   | { kind: "flag"; key: string; expect?: boolean }
   /** 4 주차 — 누적 카운터 (예: caughtCount) 가 min 이상일 때 충족. */
-  | { kind: "minFlag"; key: string; min: number };
+  | { kind: "minFlag"; key: string; min: number }
+  /** #321 〈에테르니아〉 — 4 성흔별 특수 분기. character.ability 가 일치할 때만 해금. */
+  | { kind: "ability"; required: AbilityKey };
 
 export type Scene = {
   id: string;

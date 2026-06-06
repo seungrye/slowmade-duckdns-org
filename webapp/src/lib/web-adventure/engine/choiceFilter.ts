@@ -44,6 +44,9 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       const num = typeof v === "number" ? v : v === true ? 1 : 0;
       return num >= cond.min;
     }
+    // #321 — 4 성흔.
+    case "ability":
+      return character.ability === cond.required;
   }
 }
 
@@ -92,6 +95,12 @@ export function getUnavailableReason(choice: Choice, character: Character): stri
       const item = items[c.itemId];
       const label = item ? item.displayName : c.itemId;
       return `아이템 필요: ${label}`;
+    }
+    case "ability": {
+      const ABILITY_KO: Record<string, string> = {
+        lunar: "루나", selene: "셀레네", hecate: "헤카테", none: "무흔",
+      };
+      return `성흔 필요: ${ABILITY_KO[c.required] ?? c.required}`;
     }
   }
 }

@@ -54,6 +54,9 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       const num = typeof v === "number" ? v : v === true ? 1 : 0;
       return num >= cond.min;
     }
+    // #321 — 4 성흔 (lunar/selene/hecate/none) 별 특수 분기.
+    case "ability":
+      return character.ability === cond.required;
   }
 }
 

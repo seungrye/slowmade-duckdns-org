@@ -48,6 +48,7 @@ PATCHES=(
   scripts/seed-failure-bypass.mjs        # #318 RNG 실패 → 우회 씬 (HP/침식 패널티)
   scripts/seed-stat-balance.mjs         # #319 6 스탯 균형 + hasItem 활성화
   scripts/seed-wis-activation.mjs       # #320 wis 활용 + 1
+  scripts/seed-ability-branches.mjs     # #321 4 성흔 차별화 분기
 )
 
 run_one() {
