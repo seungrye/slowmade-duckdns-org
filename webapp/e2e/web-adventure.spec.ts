@@ -105,6 +105,36 @@ test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
     await expect(page.locator("[data-testid='world-flag-fall']")).toBeVisible();
   });
 
+  test("USE_ITEM — 정제수 사용 → 침식 감소 + 인벤 소모 (#307)", async ({ context }) => {
+    const page = await context.newPage();
+    // 침식 60 + 정제수 1 RESTORE → '사용' 클릭 → 침식 57.
+    await context.addInitScript(() => {
+      window.localStorage.setItem(
+        "web-adventure:save:v1",
+        JSON.stringify({
+          runIndex: 1,
+          currentSceneId: "kael_infirmary",
+          character: {
+            stats: { str: 5, dex: 6, int: 7, cha: 4, con: 4, wis: 5 },
+            hp: 18, maxHp: 18, ability: "lunar", protagonist: "kael",
+            stigmaErosion: 60,
+            inventory: ["ether_refined_water"],
+            flags: {}, rerollsLeft: 0,
+          },
+        }),
+      );
+    });
+    await page.goto("/games/web-adventure/play");
+    await expect(page.getByRole("button").filter({ hasText: /\[/ }).first()).toBeVisible({
+      timeout: 15000,
+    });
+    const useBtn = page.getByRole("button", { name: /사용/ }).first();
+    await expect(useBtn).toBeVisible();
+    await useBtn.click();
+    // 침식 60 - 3 = 57. 데스크탑/모바일 양쪽 표시 가능 — first().
+    await expect(page.getByText(/57\s*\/\s*100/).first()).toBeVisible({ timeout: 5000 });
+  });
+
   test("자동 petrification — 침식 99 RESTORE → 분기 클릭 → ended (#302)", async ({ context }) => {
     const page = await context.newPage();
     // localStorage 에 침식 99 Kael + kael_infirmary 현재씬 주입.
