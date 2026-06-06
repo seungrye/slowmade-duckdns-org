@@ -46,6 +46,7 @@ PATCHES=(
   scripts/seed-npc-names.mjs             # #278 NPC 이름 부여
   scripts/seed-story-flow-balance.mjs    # #284 act1 본문 균형 + Kael 환경 침식
   scripts/seed-failure-bypass.mjs        # #318 RNG 실패 → 우회 씬 (HP/침식 패널티)
+  scripts/seed-stat-balance.mjs         # #319 6 스탯 균형 + hasItem 활성화
 )
 
 run_one() {
