@@ -27,6 +27,9 @@ describe("InventoryStrip", () => {
         maxHp={10}
         rerollsLeft={0}
         inventory={["patient_gown", "patient_gown", "patient_gown"]}
+        onUseItem={() => {}}
+        onReroll={() => {}}
+        canReroll={false}
       />,
     );
     expect(screen.getByText(/환자복/)).toBeInTheDocument();
@@ -40,6 +43,9 @@ describe("InventoryStrip", () => {
         maxHp={10}
         rerollsLeft={0}
         inventory={["ether_refined_water", "mana_stone_fragment"]}
+        onUseItem={() => {}}
+        onReroll={() => {}}
+        canReroll={false}
       />,
     );
     expect(screen.getByText(/정제수/)).toBeInTheDocument();
