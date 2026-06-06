@@ -35,6 +35,23 @@ Firebase Analytics에는 이벤트를 보는 곳이 두 군데 있고, 동작 �
 - **특징**: 구간당 페이지 방문 1회만 전송 (중복 없음)
 - **구현**: `webapp/src/components/post-scroll-depth.tsx`
 
+### Web Adventure — `adv_*` 이벤트 (#245 / #273)
+
+〈에테르니아의 추락〉 게임의 핵심 모먼트.
+
+| 이벤트 | 발생 시점 | 파라미터 |
+|---|---|---|
+| `adv_run_started` | 캐릭터 생성 → START_GAME | `ability`, `protagonist`, `run_index` |
+| `adv_choice_made` | 선택지 클릭 | `scene_id`, `choice_id`, `choice_kind` |
+| `adv_ending_reached` | ended 진입 | `ending_id`, `run_index`, `protagonist`, `stigma_erosion` |
+| `adv_petrification_auto` | 침식 100 자동 전환 | `protagonist`, `run_index` |
+| `adv_stigma_critical` | 침식 80 첫 도달 (회차당 1) | `protagonist`, `run_index`, `stigma_erosion` |
+| `adv_world_flag_applied` | 회차 부메랑 flag 가 적용된 새 회차 | `flags`, `flag_count`, `run_index` |
+| `adv_save_persisted` | 서버 자동 저장 성공 | `scene_id`, `run_index` |
+| `adv_gallery_view` | 갤러리 페이지 방문 | (none) |
+
+- **구현**: `webapp/src/lib/web-adventure/analytics.ts` + 발화는 `play/page.tsx`, `use-auto-save.ts`, `gallery/page.tsx`.
+
 ### Performance Monitoring (자동 수집)
 - **수집 항목**: 페이지 로드 시간(FCP, FID), 네트워크 요청 타이밍(fetch/XHR)
 - **확인 위치**: Firebase Console → Performance

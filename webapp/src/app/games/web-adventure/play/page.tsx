@@ -111,6 +111,8 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [worldFlags, setWorldFlags] = useState<Record<string, boolean>>({});
   const endRunSentRef = useRef<string | null>(null);
+  // #273 — 침식 80 첫 도달 트래킹 (회차당 1 회). useRef 로 sentinel.
+  const stigmaCriticalSentRef = useRef<number | null>(null);
 
   // #256 — 마운트 시 past_runs fetch → worldFlags 계산.
   useEffect(() => {
@@ -143,6 +145,19 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
       cancelled = true;
     };
   }, []);
+
+  // #273 — 침식이 80 (critical) 처음 도달한 회차에 한 번만 발화.
+  useEffect(() => {
+    if (state.phase !== "playing") return;
+    if (state.character.stigmaErosion < 80) return;
+    if (stigmaCriticalSentRef.current === runIndex) return;
+    stigmaCriticalSentRef.current = runIndex;
+    logAdvEvent("stigma_critical", {
+      stigma_erosion: state.character.stigmaErosion,
+      protagonist: state.character.protagonist,
+      run_index: runIndex,
+    });
+  }, [state, runIndex]);
 
   useAutoSave(state, {
     runIndex,
@@ -216,7 +231,17 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     logAdvEvent("ending_reached", {
       ending_id: state.endingId,
       run_index: runIndex,
+      protagonist: state.character.protagonist,
+      stigma_erosion: state.character.stigmaErosion,
     });
+    // #273 — 자동 petrification (stigma ≥ 100 자동 전환) 별도 트래킹.
+    //   현재 콘텐츠에 petrification 으로의 *분기* 가 없어 *항상* 자동.
+    if (state.endingId === "petrification") {
+      logAdvEvent("petrification_auto", {
+        protagonist: state.character.protagonist,
+        run_index: runIndex,
+      });
+    }
     void fetch("/api/web-adventure/end-run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -257,6 +282,15 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                 ...character,
                 flags: { ...character.flags, ...worldFlags },
               };
+              // #273 — 부메랑 flag 가 *실제 적용* 된 회차 트래킹.
+              const appliedFlags = Object.keys(worldFlags).filter((k) => worldFlags[k]);
+              if (appliedFlags.length > 0) {
+                logAdvEvent("world_flag_applied", {
+                  flags: appliedFlags.join(","),
+                  flag_count: appliedFlags.length,
+                  run_index: runIndex,
+                });
+              }
               dispatch({ type: "START_GAME", character: charWithFlags, startScene });
             }}
           />

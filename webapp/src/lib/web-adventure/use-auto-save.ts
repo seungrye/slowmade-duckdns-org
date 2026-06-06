@@ -93,8 +93,7 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
     return () => {
       cancelled = true;
     };
-    // 마운트 시 1회.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 마운트 시 1회 — onRestore 는 ref 로 전달, deps 없음이 의도.
   }, []);
 
   // ── state 변경 시 디바운스 저장
@@ -113,9 +112,21 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-      }).catch(() => {
-        /* 네트워크 실패 — localStorage 만으로도 다음 세션에서 복원 가능 */
-      });
+      })
+        .then((res) => {
+          if (res.ok) {
+            // #273 — adv_save_persisted (서버 저장 성공 시).
+            void import('./analytics').then(({ logAdvEvent }) => {
+              logAdvEvent('save_persisted', {
+                scene_id: payload.currentSceneId,
+                run_index: payload.runIndex,
+              });
+            });
+          }
+        })
+        .catch(() => {
+          /* 네트워크 실패 — localStorage 만으로도 다음 세션에서 복원 가능 */
+        });
     }, debounceMs);
     return () => clearTimeout(timer);
   }, [state, runIndex, debounceMs]);
