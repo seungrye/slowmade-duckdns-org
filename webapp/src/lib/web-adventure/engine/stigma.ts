@@ -43,3 +43,12 @@ export function applyStigmaDelta(character: Character, delta: number): Character
 export function isFullyPetrified(character: Character): boolean {
   return character.stigmaErosion >= STIGMA_MAX;
 }
+
+/**
+ * #318 — HP 0 도달 → 자동 fall 엔딩.
+ * 시나리오 ending (caught/chase 등) 은 *진짜 막다른 결정* 에만, 대부분의 game over 는
+ * HP/침식 누적으로.
+ */
+export function isDead(character: Character): boolean {
+  return character.hp <= 0;
+}

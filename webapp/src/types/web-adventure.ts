@@ -121,6 +121,8 @@ export type Scene = {
     incrementCounters?: string[];
     /** #253 — 씬 진입 시 침식도 변동. */
     stigmaDelta?: number;
+    /** #318 — 씬 진입 시 HP 변동 (음수 = 데미지, 양수 = 회복). 0 도달 시 자동 fall ending. */
+    hpDelta?: number;
   };
 };
 

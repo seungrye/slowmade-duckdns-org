@@ -15,7 +15,12 @@ const ALL_ENDINGS = [
   'fall', 'petrification', 'sylvan_bond',
 ];
 const START_SCENES = ['kael_infirmary', 'rin_harbor', 'solwen_grove'];
-const AUTO_ENDING_SCENES = ['ending_petrification']; // reducer 자동 전환.
+const AUTO_ENDING_SCENES = [
+  'ending_petrification',
+  // #318 — isDead/isFullyPetrified 자동 ending 잔재. RNG 실패가 우회 씬으로 가도록
+  //   redirect 됐지만 옛 시나리오 ending 씬 자체는 보존 (역사적 dead-end).
+  'kael_caught', 'rin_chase', 'rin_caught',
+];
 
 const RESET = '\x1b[0m';
 const RED = '\x1b[31m';

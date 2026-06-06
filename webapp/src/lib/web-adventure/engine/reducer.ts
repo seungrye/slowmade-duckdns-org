@@ -24,7 +24,7 @@ import type {
 } from "@/types/web-adventure";
 import { rollProbability } from "./rollDice";
 import { effectiveStat } from "./stats";
-import { applyStigmaDelta, isFullyPetrified, stigmaDebuff } from "./stigma";
+import { applyStigmaDelta, isFullyPetrified, isDead, stigmaDebuff } from "./stigma";
 import { items, INVENTORY_CAP } from "@/content/web-adventure/items";
 
 export type Action =
@@ -79,12 +79,19 @@ function pushItems(inventory: string[], toAdd: string[]): string[] {
 /** 씬 onEnter 적용 — setFlags / addItems / incrementCounters / stigmaDelta 를 character 에 반영. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
-  const { setFlags, addItems, incrementCounters, stigmaDelta } = scene.onEnter;
+  const { setFlags, addItems, incrementCounters, stigmaDelta, hpDelta } = scene.onEnter as {
+    setFlags?: Record<string, boolean>;
+    addItems?: string[];
+    incrementCounters?: string[];
+    stigmaDelta?: number;
+    hpDelta?: number; // #318 — HP 변화 (음수=데미지, 양수=회복).
+  };
   const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
   const itemsChanged = addItems && addItems.length > 0;
   const countersChanged = incrementCounters && incrementCounters.length > 0;
   const stigmaChanged = typeof stigmaDelta === "number" && stigmaDelta !== 0;
-  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged) return character;
+  const hpChanged = typeof hpDelta === "number" && hpDelta !== 0 && Number.isFinite(hpDelta);
+  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged && !hpChanged) return character;
   let nextFlags: Record<string, boolean | number> = character.flags;
   if (flagsChanged || countersChanged) {
     nextFlags = { ...character.flags };
@@ -102,6 +109,11 @@ function applyOnEnter(character: Character, scene: Scene): Character {
     : character.inventory;
   let next: Character = { ...character, flags: nextFlags, inventory: nextInventory };
   if (stigmaChanged) next = applyStigmaDelta(next, stigmaDelta);
+  // #318 — HP 적용 (clamp [0, maxHp]).
+  if (hpChanged) {
+    const safeHp = Math.max(0, Math.min(next.maxHp, next.hp + hpDelta));
+    next = { ...next, hp: safeHp };
+  }
   return next;
 }
 
@@ -141,6 +153,16 @@ function moveTo(
       endingId: "petrification",
       finalSceneId: target.id,
       log: [...nextLog, "성흔 침식이 한계에 도달했다. 몸이 굳어간다…"],
+    };
+  }
+  // #318 — HP 0 자동 fall ending. RNG 실패가 즉시 시나리오 ending 아닌 *누적 데미지* 로.
+  if (isDead(character)) {
+    return {
+      phase: "ended",
+      character,
+      endingId: "fall",
+      finalSceneId: target.id,
+      log: [...nextLog, "체력이 한계에 도달했다. 더 이상 일어설 수 없다…"],
     };
   }
   return {
@@ -284,6 +306,16 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
           endingId: "petrification",
           finalSceneId: state.currentScene,
           log: [...nextLog, "성흔 침식이 한계에 도달했다. 몸이 굳어간다…"],
+        };
+      }
+      // #318 — HP 0 자동 fall ending (USE_ITEM 의 stigmaDelta +N 후 HP cap 같이 검사).
+      if (isDead(nextCharacter)) {
+        return {
+          phase: "ended",
+          character: nextCharacter,
+          endingId: "fall",
+          finalSceneId: state.currentScene,
+          log: [...nextLog, "체력이 한계에 도달했다. 더 이상 일어설 수 없다…"],
         };
       }
       return { ...state, character: nextCharacter, log: nextLog };

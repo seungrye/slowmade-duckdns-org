@@ -45,6 +45,7 @@ PATCHES=(
   scripts/seed-act1-boomerang.mjs        # #283 act1 부메랑 3 분기
   scripts/seed-npc-names.mjs             # #278 NPC 이름 부여
   scripts/seed-story-flow-balance.mjs    # #284 act1 본문 균형 + Kael 환경 침식
+  scripts/seed-failure-bypass.mjs        # #318 RNG 실패 → 우회 씬 (HP/침식 패널티)
 )
 
 run_one() {
