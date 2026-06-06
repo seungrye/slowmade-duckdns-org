@@ -46,4 +46,33 @@ describe("EndingScreen 후일담 (#275)", () => {
       expect(meta.aftermath!.length).toBeGreaterThan(10);
     }
   });
+
+  // #294 — 최종 침식 표시 (시한부 톤).
+  it("최종 침식 표시 — 침식 80 미만 일반 톤", () => {
+    render(
+      <EndingScreen
+        endingId="revolution"
+        character={{ ...sampleChar, stigmaErosion: 30 }}
+        log={[]}
+        onRestart={() => {}}
+      />,
+    );
+    const el = screen.getByTestId("ending-final-stigma");
+    expect(el).toHaveTextContent("30 / 100");
+    expect(el.className).not.toMatch(/bg-indigo/);
+  });
+
+  it("최종 침식 100 → indigo 강조 + 자동 petrification 인디케이션", () => {
+    render(
+      <EndingScreen
+        endingId="petrification"
+        character={{ ...sampleChar, stigmaErosion: 100 }}
+        log={[]}
+        onRestart={() => {}}
+      />,
+    );
+    const el = screen.getByTestId("ending-final-stigma");
+    expect(el).toHaveTextContent("100 / 100");
+    expect(el.className).toMatch(/bg-indigo-100/);
+  });
 });

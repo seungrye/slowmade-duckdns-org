@@ -72,6 +72,20 @@ export default function EndingScreen({ endingId, character, log, onRestart }: Pr
             </li>
           ))}
         </ul>
+        {/* #294 — 최종 침식 표시. 시한부 톤 게임의 *마지막 숨결* — endingId 와 함께 의미. */}
+        <div
+          data-testid="ending-final-stigma"
+          className={`mt-2 flex justify-between rounded border px-3 py-1 text-sm ${
+            character.stigmaErosion >= 100
+              ? "bg-indigo-100 border-indigo-300 text-indigo-900 font-semibold"
+              : character.stigmaErosion >= 80
+                ? "bg-indigo-50 border-indigo-200 text-indigo-800"
+                : "bg-amber-50 border-amber-200"
+          }`}
+        >
+          <span>성흔 침식</span>
+          <span className="font-mono">{character.stigmaErosion} / 100</span>
+        </div>
       </section>
 
       <details className="text-left mb-5 text-sm text-amber-800">
