@@ -53,6 +53,7 @@ PATCHES=(
   scripts/seed-falling-lunar.mjs        # #323 kael_falling lunar 분기
   scripts/seed-solwen-wis-minstat.mjs   # #324 Solwen wis 7+ minStat
   scripts/seed-selene-branch.mjs        # #325 selene 분기 (solwen_combat_hard)
+  scripts/seed-str-climb.mjs            # #326 str 활용 (kael_cargo_container)
 )
 
 run_one() {
