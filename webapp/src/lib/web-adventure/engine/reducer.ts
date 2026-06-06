@@ -339,13 +339,21 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
     case "RESET":
       return { phase: "creating" };
 
-    case "RESTORE":
+    case "RESTORE": {
+      // #288 — 옛 localStorage save (#258 이전, 〈에테르니아〉 리프래시 이전)
+      //   에 protagonist / stigmaErosion 누락 가능. 안전 기본값 보정.
+      const restored: Character = {
+        ...action.character,
+        protagonist: action.character.protagonist ?? "kael",
+        stigmaErosion: action.character.stigmaErosion ?? 0,
+      };
       return {
         phase: "playing",
-        character: action.character,
+        character: restored,
         currentScene: action.currentSceneId,
         log: [],
       };
+    }
 
     default:
       return state;
