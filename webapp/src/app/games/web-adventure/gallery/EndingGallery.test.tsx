@@ -45,4 +45,31 @@ describe('EndingGallery', () => {
     render(<EndingGallery pastRuns={noRuns} />);
     expect(screen.getByTestId('gallery-progress')).toHaveTextContent('0 / 6');
   });
+
+  it('#266 6 신규 엔딩 — 각 카드의 icon+title 이 메타와 일치', () => {
+    const allRuns = [
+      { endingId: 'ascension' },
+      { endingId: 'revolution' },
+      { endingId: 'harmony' },
+      { endingId: 'fall' },
+      { endingId: 'petrification' },
+      { endingId: 'sylvan_bond' },
+    ];
+    render(<EndingGallery pastRuns={allRuns} />);
+    const expected: Array<[string, string, string]> = [
+      ['ascension', '✨', '승천'],
+      ['revolution', '⚙️', '혁명'],
+      ['harmony', '☯', '조화'],
+      ['fall', '💀', '추락'],
+      ['petrification', '🗿', '석화'],
+      ['sylvan_bond', '🌿', '정령의 결속'],
+    ];
+    for (const [id, icon, titleHead] of expected) {
+      const card = screen.getByTestId(`ending-card-${id}`);
+      expect(card).toHaveTextContent(icon);
+      expect(card).toHaveTextContent(titleHead);
+      expect(card.getAttribute('data-reached')).toBe('true');
+    }
+    expect(screen.getByTestId('gallery-progress')).toHaveTextContent('6 / 6');
+  });
 });
