@@ -23,7 +23,7 @@ function makeChar(partial: Partial<Character> = {}): Character {
 
 function makeScene(over: Partial<Scene> & { id: string }): Scene {
   return {
-    id: over.id,
+    
     title: over.id,
     illustration: "/x.svg",
     body: ["b"],

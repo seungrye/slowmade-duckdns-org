@@ -10,7 +10,6 @@ import type { Choice } from "@/types/web-adventure";
 
 function makeScene(over: Partial<SceneWithPosition> & { id: string }): SceneWithPosition {
   return {
-    id: over.id,
     title: over.id,
     illustration: "/x.svg",
     body: ["body"],
