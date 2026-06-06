@@ -31,12 +31,8 @@ const updates = [
       '정보상이 너의 손에 쥐여준 종이쪽지의 끝에 작은 글씨가 있다. "*그들 중 하나는 너를 알고 있다. 다른 둘은 너와 같은 적을 본다. 만나라.*"',
     ],
   },
-  {
-    id: 'omphalos_station',
-    appendBody: [
-      '저 멀리 사제단의 사자가 차가운 미소로 말한다. "*이것은 막을 수 있는 것이 아니다. 단지 — 너가 그 안에 *포함될지*, *제외될지* 선택할 뿐.*"',
-    ],
-  },
+  // #304 — omphalos_station 의 사자 대사는 *seed-station-restructure 가 이미 포함* (body 정의 시).
+  //   여기서 append 하면 station-restructure 후속 시 중복. 제거.
 ];
 
 async function main() {
@@ -48,9 +44,21 @@ async function main() {
       console.log('skip (없음):', u.id);
       continue;
     }
-    const body = [...(cur.body ?? []), ...u.appendBody];
+    // #304 idempotent — 이미 append 된 라인 skip (재실행 안전).
+    const body = [...(cur.body ?? [])];
+    let added = 0;
+    for (const line of u.appendBody) {
+      if (!body.includes(line)) {
+        body.push(line);
+        added++;
+      }
+    }
+    if (added === 0) {
+      console.log('skip (이미 추가):', u.id);
+      continue;
+    }
     await Scene.findOneAndUpdate({ id: u.id }, { body });
-    console.log('appendBody:', u.id, `(+${u.appendBody.length})`);
+    console.log('appendBody:', u.id, `(+${added})`);
   }
   await mongoose.disconnect();
 }
