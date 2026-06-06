@@ -262,12 +262,14 @@
 - [ ] painter-bot 으로 각 씬 다크 톤 일러스트 생성 (현재 placeholder-square.svg) — **외부 quota 대기**
 - [x] StatusPanel 의 침식도 시각화 (80+ 시 푸른 결정 이펙트, 심장 박동) — #259
 - [x] 옴팔로스의 *블랙마켓에서 다른 주인공과 짧은 마주침* (Harmony 진입 자격 flag) — #265
-- [x] 사이드 NPC: 군의관 / 정보상 / 영수 / 행상인 (이름 + 1-2 줄 대사) — #260, #267
+- [x] 사이드 NPC: 군의관 / 정보상 / 영수 / 행상인 (이름 + 1-2 줄 대사) — #260, #267, #278 (이름 부여)
 - [x] e2e 통합 테스트의 *mongo content fetch* mock + 실제 씬 그래프 시뮬레이션 — #269
-- [ ] 페이지 헤더 문구를 〈에테르니아의 추락〉 톤으로 — 일부 #268 (CharacterCreator)
-- [ ] Phase 2 — 옴팔로스 *심층* 확장 (H)
-- [ ] Phase 3 — 엔딩별 후일담 씬 (I)
-- [ ] 다중 회차 매트릭스 명시 + 테스트 (J)
+- [x] 페이지 헤더 문구를 〈에테르니아의 추락〉 톤으로 — #268, #284 (Rin/Solwen 도입 강화)
+- [x] Phase 2 — 옴팔로스 *심층* 확장 (omphalos_cameo) — #274
+- [x] Phase 3 — 엔딩별 후일담 씬 — #275 (endingsMeta.aftermath + EndingScreen)
+- [x] 다중 회차 매트릭스 명시 + 테스트 — #276 (6 world flag), #283 (act1 부메랑), #272 (climax echo_of_harmony / ashen_informant)
+- [ ] 운영 모니터링 (Sentry / 에러 추적) — 미설정
+- [ ] CI/CD GitHub Actions — 미설정
 
 ---
 
@@ -295,3 +297,34 @@
 - **#268** CharacterCreator 다크 에픽 톤 ("너의 운명을 선택하라").
 - **#269** 통합 e2e — 실제 mongo 그래프 7 시나리오 + `omphalos_outskirts` content 버그 발견·수정.
 - **#270** graph 범례 + sceneNode 색상 — 옛 사극 → 〈에테르니아〉 6 엔딩 매핑.
+- **#271** content 구조 lint (orphan / dead-end / 3분기 / dangling / 도달성) + CLI.
+- **#272** climax echo_of_harmony / ashen_informant (회차 부메랑 첫 활용).
+- **#273** analytics 4 신규 (petrification_auto / stigma_critical / world_flag_applied / save_persisted).
+- **#274** omphalos_cameo 신규 씬 + blackmarket meet_cameo hidden.
+- **#275** endingsMeta.aftermath + EndingScreen 분리 표시.
+- **#276** 6 world flag 매트릭스 완성 (blessed_descent / iron_lookout / crystal_echo / forest_recognized).
+- **#277** Playwright 실 브라우저 e2e 인프라.
+- **#278** NPC 5 이름 부여 (벤딕트/호프만/그라모르/흰눈/마릭) + hidden 분기 dimmed.
+- **#279** mongo content 정기 backup CLI + 회전.
+- **#280** WorldFlagBanner — 갤러리에 적용 flag 가시화.
+- **#281** next lint → eslint CLI flat config.
+- **#282** nginx 코드화 + /api/health?deep=true (mongo ping).
+- **#283** act1 부메랑 3 분기 (crystal_path_memory / iron_underground / spirit_guidance).
+- **#284** act1 본문 균형 (Rin/Solwen 5줄) + Kael 환경 침식.
+- **#285** adv_choice_made — protagonist/stigma_erosion/run_index 추가.
+- **#286** branch-reachability — 13 conditional 분기 도달성 검증.
+- **#287** CharacterSchema (Save+PastRun) protagonist + stigmaErosion 필드 추가.
+- **#288** RESTORE 옛 데이터 호환 (?? 0 fallback).
+- **#289** localStorage past_runs character 제거 + 200 trim + migrate/end-run hydrate.
+- **#290** NaN/Infinity stigma 방어 — applyStigmaDelta + RESTORE + hydrate.
+- **#291** CharacterCreator 시작 침식 디버프 미리보기.
+- **#292** getScenes 자동 retry (500/1500ms backoff).
+- **#293** past-runs API limit 페이지네이션 (기본 500 / max 5000).
+- **#294** EndingScreen 최종 침식 표시.
+- **#295** CharacterCreator 시작 인벤 + EndingScreen 주인공 이름.
+- **#296** MobileDrawer role=dialog + focus 관리.
+- **#297** nginx /api/ 별도 location — upstream Cache-Control 보존.
+- **#298, #299** ChoiceList/CharacterCreator/StatusPanel/EndingScreen/gallery focus-visible.
+- **#300** integration-e2e 7→13 시나리오 + choiceFilter/endingResolver/inventory 단위.
+- **#301** graph 단위 + ChoiceList/InventoryStrip 단위.
+- **#302** 자동 petrification e2e.
