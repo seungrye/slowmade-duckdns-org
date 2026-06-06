@@ -50,7 +50,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
               <button
                 type="button"
                 onClick={() => onChoose(c.id)}
-                className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 transition-colors"
+                className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 transition-colors"
               >
                 {c.label}
               </button>
@@ -70,7 +70,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
               <button
                 type="button"
                 onClick={() => onChoose(c.id)}
-                className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 transition-colors flex justify-between items-center"
+                className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 transition-colors flex justify-between items-center"
               >
                 <span>{c.label}</span>
                 <span className="text-sm text-amber-800 ml-3 shrink-0">
