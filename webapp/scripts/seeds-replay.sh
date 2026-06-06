@@ -7,6 +7,9 @@
 # 사용 (mongo 초기화 후 또는 전체 재구축 시):
 #   MONGO_URI=mongodb://127.0.0.1:27017/handmade-site \
 #     ./scripts/seeds-replay.sh
+#
+# DRY_RUN — 실 mongo 변경 없이 스크립트 순서/이름만 출력:
+#   DRY_RUN=1 ./scripts/seeds-replay.sh
 
 set -euo pipefail
 
@@ -51,6 +54,10 @@ run_one() {
     return 1
   fi
   echo "── ▶ $script"
+  if [ "${DRY_RUN:-}" = "1" ] || [ "${DRY_RUN:-}" = "true" ]; then
+    echo "  (DRY_RUN — 실 실행 안 함)"
+    return 0
+  fi
   node "$script"
 }
 
