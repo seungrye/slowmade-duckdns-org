@@ -199,12 +199,17 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
           endingId: state.endingId,
           runIndex,
           finalSceneId: state.finalSceneId,
-          character: state.character,
+          // #289 — character snapshot 제거. EndingGallery/buildWorldFlags 모두
+          //   endingId 만 사용. character 포함 시 1 회차 ~260B 누적 → 만 회차에
+          //   quota 5MB 절반 차지 → 운영 시 silent skip.
+          //   진짜 snapshot 은 *서버 past-runs* 에만 보관.
           completedAt: new Date().toISOString(),
         });
+        // 최근 200 회차만 유지 — buildWorldFlags 는 *unique endingId* 만 필요.
+        const trimmed = filtered.slice(-200);
         window.localStorage.setItem(
           LOCAL_STORAGE_PAST_RUNS_KEY,
-          JSON.stringify(filtered),
+          JSON.stringify(trimmed),
         );
       } catch {
         /* quota/private 모드 — 무시 */

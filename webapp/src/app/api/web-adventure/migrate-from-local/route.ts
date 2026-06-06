@@ -24,9 +24,11 @@ interface PastRunPayload {
   runIndex: number;
   endingId: string;
   finalSceneId: string;
-  character: unknown;
+  character?: unknown;
   completedAt?: string;
 }
+
+import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
 
 interface MigratePayload {
   save?: AutoSavePayload;
@@ -87,7 +89,8 @@ export async function POST(req: NextRequest) {
         runIndex: r.runIndex,
         endingId: r.endingId,
         finalSceneId: r.finalSceneId,
-        character: r.character,
+        // #289 — 옛 localStorage 의 character snapshot 호환 (protagonist/stigmaErosion 보정).
+        character: hydrateCharacterSnapshot(r.character),
         completedAt: r.completedAt ? new Date(r.completedAt) : new Date(),
       }));
     if (toInsert.length > 0) {

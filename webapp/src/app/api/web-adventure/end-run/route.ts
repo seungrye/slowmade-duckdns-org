@@ -13,6 +13,7 @@ import { apiSuccess, apiError } from '@/lib/api-response';
 import WebAdventureSave from '@/models/web-adventure-save';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
 import { auth } from '@/auth';
+import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
         runIndex: save.runIndex,
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
-        character: save.character,
+        // #289 — 옛 save (#287 schema 적용 전) 의 character 호환.
+        character: hydrateCharacterSnapshot(save.character),
         completedAt: new Date(),
       },
       { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },
