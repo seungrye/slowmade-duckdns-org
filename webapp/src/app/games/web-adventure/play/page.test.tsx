@@ -40,7 +40,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     expect(screen.getByText(/씬 데이터 로딩/)).toBeInTheDocument();
   });
 
-  test("fetch 실패 시 error 메시지 + 재시도 버튼", async () => {
+  test("fetch 실패 시 error 메시지 + 재시도 버튼 (#292 — retry 3 회 모두 fail 후)", async () => {
     vi.stubGlobal(
       "fetch",
       vi
@@ -48,11 +48,12 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
         .mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
     );
     render(<PlayPage />);
-    await waitFor(() =>
-      expect(screen.getByText(/오류/)).toBeInTheDocument(),
-    );
+    // #292 — getScenes 가 retry (500 + 1500ms backoff). 총 ~2 초 후 error 표시.
+    await waitFor(() => expect(screen.getByText(/오류/)).toBeInTheDocument(), {
+      timeout: 5000,
+    });
     expect(screen.getByRole("button", { name: /재시도/ })).toBeInTheDocument();
-  });
+  }, 8000);
 
   test("scenes 로드 후 CharacterCreator 표시", async () => {
     const sceneList = Object.values(staticScenes);
@@ -73,8 +74,11 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
   });
 
   test("재시도 버튼 클릭 시 fetch 재호출", async () => {
+    // #292 — 첫 *3 호출 모두 fail* (retry 다 소진) → 사용자가 재시도 → 4번째 호출 성공.
     const mockFetch = vi
       .fn()
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
+      .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
       .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
       .mockResolvedValueOnce({
         ok: true,
@@ -86,21 +90,22 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     render(<PlayPage />);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /재시도/ })).toBeInTheDocument(),
+    // 첫 retry batch (3 호출) 모두 fail → 재시도 버튼.
+    await waitFor(
+      () => expect(screen.getByRole("button", { name: /재시도/ })).toBeInTheDocument(),
+      { timeout: 5000 },
     );
     fireEvent.click(screen.getByRole("button", { name: /재시도/ }));
 
     await waitFor(() =>
       expect(screen.getByText(/너의 운명을 선택하라/)).toBeInTheDocument(),
     );
-    // #238 — useAutoSave 가 마운트 시 /api/web-adventure/save GET 추가 호출.
-    // 여기서는 *content fetch* 만 카운트 (재시도 → 1차 실패 + 2차 성공).
+    // #292 — content fetch 카운트: 첫 batch 3 (retry 모두 fail) + 재시도 1 = 4.
     const contentCalls = mockFetch.mock.calls.filter((args: unknown[]) =>
       String(args[0]).includes('/content/v1'),
     );
-    expect(contentCalls.length).toBe(2);
-  });
+    expect(contentCalls.length).toBe(4);
+  }, 10000);
 });
 
 // #220 — InventoryStrip 인벤 표시 시 같은 아이템 갯수 묶기.
