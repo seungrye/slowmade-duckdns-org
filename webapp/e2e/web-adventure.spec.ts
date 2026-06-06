@@ -105,6 +105,42 @@ test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
     await expect(page.locator("[data-testid='world-flag-fall']")).toBeVisible();
   });
 
+  test("자동 petrification — 침식 99 RESTORE → 분기 클릭 → ended (#302)", async ({ context }) => {
+    const page = await context.newPage();
+    // localStorage 에 침식 99 Kael + kael_infirmary 현재씬 주입.
+    //   RESTORE → playing 진입 → 첫 분기 (grab_scalpel) 클릭 → kael_corridor 이동
+    //   → onEnter.stigmaDelta +1 → stigma 100 → 자동 petrification ending.
+    await context.addInitScript(() => {
+      window.localStorage.setItem(
+        "web-adventure:save:v1",
+        JSON.stringify({
+          runIndex: 1,
+          currentSceneId: "kael_infirmary",
+          character: {
+            stats: { str: 5, dex: 6, int: 7, cha: 4, con: 4, wis: 5 },
+            hp: 18,
+            maxHp: 18,
+            ability: "lunar",
+            protagonist: "kael",
+            stigmaErosion: 99,
+            inventory: [],
+            flags: {},
+            rerollsLeft: 0,
+          },
+        }),
+      );
+    });
+    await page.goto("/games/web-adventure/play");
+    // RESTORE 직후 playing 진입. 첫 분기 (probability stat=con).
+    const firstChoice = page.getByRole("button").filter({ hasText: /\[/ }).first();
+    await expect(firstChoice).toBeVisible({ timeout: 15000 });
+    await firstChoice.click();
+    // 다음 씬 진입 시 onEnter +1 → 100 자동 petrification ending.
+    await expect(page.locator("[data-ending-id='petrification']")).toBeVisible({
+      timeout: 10000,
+    });
+  });
+
   test("ended → EndingScreen → 다시 시작 → creating phase (#301)", async ({ page }) => {
     // localStorage 에 *침식 100 직전* 직접 주입 → 마운트 → 자동 petrification 트리거 가능?
     // 더 안전: localStorage 에 *완료된 회차* 만 주입 후 갤러리 → 다시 시작 동선 검증.
