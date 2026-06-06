@@ -50,6 +50,7 @@ PATCHES=(
   scripts/seed-wis-activation.mjs       # #320 wis 활용 + 1
   scripts/seed-ability-branches.mjs     # #321 4 성흔 차별화 분기
   scripts/seed-feather-use.mjs          # #322 인벤 활용 — spirit_beast_feather
+  scripts/seed-falling-lunar.mjs        # #323 kael_falling lunar 분기
 )
 
 run_one() {
