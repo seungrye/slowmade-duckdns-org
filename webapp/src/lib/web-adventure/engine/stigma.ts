@@ -25,9 +25,17 @@ export function stigmaDebuff(character: Character, stat: StatKey): number {
   return 0;
 }
 
-/** 침식도 가감 — clamp [0, 100]. character 의 *복사본* 반환. */
+/**
+ * 침식도 가감 — clamp [0, 100]. character 의 *복사본* 반환.
+ *
+ * #290 NaN/Infinity 방어 — 옛 localStorage 또는 손상된 입력에서 NaN 이 들어오면
+ * `??` 가 차단 못 함 (NaN 은 nullish 아님). Math.max(0, Math.min(100, NaN)) = NaN
+ * → character 전체 부정. 시작과 delta 양쪽 *유한 number 만* 허용.
+ */
 export function applyStigmaDelta(character: Character, delta: number): Character {
-  const next = Math.max(0, Math.min(STIGMA_MAX, character.stigmaErosion + delta));
+  const safeStart = Number.isFinite(character.stigmaErosion) ? character.stigmaErosion : 0;
+  const safeDelta = Number.isFinite(delta) ? delta : 0;
+  const next = Math.max(0, Math.min(STIGMA_MAX, safeStart + safeDelta));
   return { ...character, stigmaErosion: next };
 }
 

@@ -342,10 +342,13 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
     case "RESTORE": {
       // #288 — 옛 localStorage save (#258 이전, 〈에테르니아〉 리프래시 이전)
       //   에 protagonist / stigmaErosion 누락 가능. 안전 기본값 보정.
+      // #290 — `??` 가 NaN 차단 못 함 (NaN 은 nullish 아님). NaN/Infinity 도 0 으로.
+      const erosion = action.character.stigmaErosion;
+      const safeErosion = typeof erosion === "number" && Number.isFinite(erosion) ? erosion : 0;
       const restored: Character = {
         ...action.character,
         protagonist: action.character.protagonist ?? "kael",
-        stigmaErosion: action.character.stigmaErosion ?? 0,
+        stigmaErosion: safeErosion,
       };
       return {
         phase: "playing",

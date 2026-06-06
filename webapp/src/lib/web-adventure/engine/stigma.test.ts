@@ -64,6 +64,22 @@ describe('applyStigmaDelta', () => {
     const c = applyStigmaDelta(makeCharacter(95), 10);
     expect(c.stigmaErosion).toBe(100);
   });
+
+  // #290 — NaN/Infinity 방어.
+  it('character.stigmaErosion 이 NaN 이면 0 으로 정규화 (delta 적용)', () => {
+    const c = applyStigmaDelta(makeCharacter(NaN), 5);
+    expect(c.stigmaErosion).toBe(5);
+  });
+
+  it('delta 가 NaN 이면 0 으로 적용 (현재값 보존)', () => {
+    const c = applyStigmaDelta(makeCharacter(50), NaN);
+    expect(c.stigmaErosion).toBe(50);
+  });
+
+  it('Infinity character + Infinity delta → 0 (양쪽 차단)', () => {
+    const c = applyStigmaDelta(makeCharacter(Infinity), Infinity);
+    expect(c.stigmaErosion).toBe(0);
+  });
 });
 
 describe('isFullyPetrified', () => {

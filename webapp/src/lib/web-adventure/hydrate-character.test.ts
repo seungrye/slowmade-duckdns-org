@@ -56,4 +56,22 @@ describe("hydrateCharacterSnapshot (#289)", () => {
     expect(out.protagonist).toBe("solwen");
     expect(out.stats).toEqual({ str: 5, dex: 5, int: 5, cha: 5, con: 5, wis: 5 });
   });
+
+  // #290 — NaN/Infinity 차단.
+  it.each([
+    ["NaN", NaN],
+    ["Infinity", Infinity],
+    ["-Infinity", -Infinity],
+  ])("stigmaErosion 이 %s 면 0 으로 보정", (_, value) => {
+    const broken = { protagonist: "kael", stigmaErosion: value };
+    expect(hydrateCharacterSnapshot(broken).stigmaErosion).toBe(0);
+  });
+
+  it("hp/maxHp/rerollsLeft 도 NaN 차단", () => {
+    const broken = { hp: NaN, maxHp: NaN, rerollsLeft: NaN };
+    const out = hydrateCharacterSnapshot(broken);
+    expect(out.hp).toBe(10);
+    expect(out.maxHp).toBe(10);
+    expect(out.rerollsLeft).toBe(0);
+  });
 });
