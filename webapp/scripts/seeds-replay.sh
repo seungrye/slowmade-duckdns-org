@@ -52,6 +52,7 @@ PATCHES=(
   scripts/seed-feather-use.mjs          # #322 인벤 활용 — spirit_beast_feather
   scripts/seed-falling-lunar.mjs        # #323 kael_falling lunar 분기
   scripts/seed-solwen-wis-minstat.mjs   # #324 Solwen wis 7+ minStat
+  scripts/seed-selene-branch.mjs        # #325 selene 분기 (solwen_combat_hard)
 )
 
 run_one() {
