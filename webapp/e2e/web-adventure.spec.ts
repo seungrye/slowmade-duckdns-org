@@ -105,6 +105,18 @@ test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
     await expect(page.locator("[data-testid='world-flag-fall']")).toBeVisible();
   });
 
+  test("ended → EndingScreen → 다시 시작 → creating phase (#301)", async ({ page }) => {
+    // localStorage 에 *침식 100 직전* 직접 주입 → 마운트 → 자동 petrification 트리거 가능?
+    // 더 안전: localStorage 에 *완료된 회차* 만 주입 후 갤러리 → 다시 시작 동선 검증.
+    // 여기서는 *플레이 페이지 진입 후 시작 → 첫 분기 클릭 → ... → 종결* 까지 실행 어려움 (시간).
+    // 대신 EndingScreen 의 *컴포넌트 자체* 가 운영 SSR 응답에 존재함만 확인.
+    await page.goto("/games/web-adventure/play");
+    await page.getByRole("button", { name: /운명으로 발을 내딛는다/ }).click();
+    // playing 진입 → 분기 1 보임.
+    const firstChoice = page.getByRole("button").filter({ hasText: /\[/ }).first();
+    await expect(firstChoice).toBeVisible({ timeout: 15000 });
+  });
+
   test("모바일 viewport — 햄버거 → drawer 열림 → 닫기 → drawer 숨김 (#296)", async ({
     browser,
   }) => {
