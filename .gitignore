@@ -22,6 +22,10 @@ coverage/
 # 포트별 next 빌드 캐시
 .next-*/
 
+# Playwright 산출물 (cwd 실수로 site/ 에 생긴 경우 대비)
+/test-results/
+/playwright-report/
+
 # bevy-rogue WASM 산출물 — bevy-rogue repo 가 publish-to-site.sh 로 채움.
 # (A안 — 산출물은 site 의 git 에 절대 커밋하지 않는다.)
 /webapp/public/games/bevy-rogue/
