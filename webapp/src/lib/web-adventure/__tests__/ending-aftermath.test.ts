@@ -4,12 +4,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";
 
+// #327 — ending_petrification 씬은 *reducer 자동 ending* 잔재로 삭제됨.
+//   EndingScreen 이 endingsMeta 만 사용하므로 씬 데이터 불필요.
 const ENDING_IDS = [
   "ending_ascension",
   "ending_revolution",
   "ending_harmony",
   "ending_fall",
-  "ending_petrification",
   "ending_sylvan_bond",
 ];
 
