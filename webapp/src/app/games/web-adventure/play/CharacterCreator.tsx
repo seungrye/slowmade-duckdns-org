@@ -13,6 +13,7 @@ import { useState } from "react";
 import type { AbilityKey, Character, Protagonist, StatKey } from "@/types/web-adventure";
 import { ABILITY_KEYS, abilities } from "@/content/web-adventure/abilities";
 import { PROTAGONIST_ORDER, protagonists } from "@/content/web-adventure/protagonists";
+import { items } from "@/content/web-adventure/items";
 
 const STAT_KEYS: StatKey[] = ["str", "dex", "int", "cha", "con", "wis"];
 const STAT_LABELS: Record<StatKey, string> = {
@@ -95,7 +96,19 @@ export default function CharacterCreator({ onComplete }: Props) {
         })}
       </ul>
 
-      <p className="text-xs text-amber-800 mb-3 italic">{protaMeta.description}</p>
+      <p className="text-xs text-amber-800 mb-2 italic">{protaMeta.description}</p>
+      {/* #295 — 시작 인벤 표시. 사용자가 *어느 도구로 시작* 하는지 미리 파악. */}
+      {protaMeta.startInventory.length > 0 && (
+        <p
+          data-testid="start-inventory-list"
+          className="text-xs text-amber-700 mb-3"
+        >
+          시작 소지품:{" "}
+          {protaMeta.startInventory
+            .map((id) => items[id]?.displayName ?? id)
+            .join(", ")}
+        </p>
+      )}
 
       {/* 2. 시작 스탯 표시 (수정 불가) */}
       <div className="mb-6">

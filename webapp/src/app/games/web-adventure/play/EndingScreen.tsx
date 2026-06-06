@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { Character, StatKey } from "@/types/web-adventure";
+import type { Character, Protagonist, StatKey } from "@/types/web-adventure";
 import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
+import { protagonists } from "@/content/web-adventure/protagonists";
 
 // 엔딩 화면 — 제목/에필로그/최종 스탯/선택 로그/다시 시작.
 // state.phase === "ended" 일 때만 렌더된다.
@@ -48,7 +49,14 @@ export default function EndingScreen({ endingId, character, log, onRestart }: Pr
       <div className="text-5xl mb-3" aria-hidden>
         {meta.icon}
       </div>
-      <h2 className="text-2xl font-bold mb-3">{meta.title}</h2>
+      <h2 className="text-2xl font-bold mb-1">{meta.title}</h2>
+      {/* #295 — 주인공 이름 표시. *어느 주인공이* 이 엔딩에 도달했는지 명시. */}
+      <p
+        data-testid="ending-protagonist"
+        className="text-sm text-amber-700 mb-3"
+      >
+        {protagonists[character.protagonist as Protagonist]?.name ?? character.protagonist}
+      </p>
       <p className="mb-3 text-amber-900 leading-relaxed whitespace-pre-line">{meta.epilogue}</p>
       {meta.aftermath && (
         <p
