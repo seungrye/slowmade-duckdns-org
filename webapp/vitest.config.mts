@@ -21,6 +21,12 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    exclude: [
+      'node_modules/**',
+      // #305 — seed-idempotency.test 는 child_process 로 seeds-replay 실행 → 동시 다른
+      //   mongo 테스트와 race + OverwriteModelError. 별도 명령 (pnpm test:seed) 으로 분리.
+      'src/lib/web-adventure/__tests__/seed-idempotency.test.ts',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
