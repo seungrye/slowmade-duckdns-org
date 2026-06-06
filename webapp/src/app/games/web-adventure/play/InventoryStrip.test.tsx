@@ -7,7 +7,7 @@ import InventoryStrip from "./InventoryStrip";
 
 describe("InventoryStrip", () => {
   it("HP / 재굴림 표시", () => {
-    render(<InventoryStrip hp={8} maxHp={10} rerollsLeft={2} inventory={[]} />);
+    render(<InventoryStrip hp={8} maxHp={10} rerollsLeft={2} inventory={[]} onUseItem={() => {}} onReroll={() => {}} canReroll={false} />);
     expect(screen.getByText(/8/)).toBeInTheDocument();
     expect(screen.getByText(/\/ 10/)).toBeInTheDocument();
     // 재굴림 숫자 (2 가 있는 span)
@@ -16,7 +16,7 @@ describe("InventoryStrip", () => {
   });
 
   it("빈 인벤 → '비어 있음' 메시지", () => {
-    render(<InventoryStrip hp={10} maxHp={10} rerollsLeft={0} inventory={[]} />);
+    render(<InventoryStrip hp={10} maxHp={10} rerollsLeft={0} inventory={[]} onUseItem={() => {}} onReroll={() => {}} canReroll={false} />);
     expect(screen.getByText(/비어 있음/)).toBeInTheDocument();
   });
 
