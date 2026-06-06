@@ -60,6 +60,19 @@ server {
 		proxy_cache_bypass $http_upgrade;
 	}
 
+	location /api/ {
+		proxy_pass http://webapp;
+		proxy_http_version 1.1;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection 'upgrade';
+		proxy_set_header Host $host;
+		proxy_cache_bypass $http_upgrade;
+
+		# #297 API 는 upstream 의 Cache-Control 그대로 (max-age=60 + SWR=300). 보안 헤더만 추가.
+		add_header X-Content-Type-Options "nosniff" always;
+		add_header X-Frame-Options "DENY" always;
+	}
+
 	location / {
 		proxy_pass http://webapp;  # Next.js dev/prod server
 		proxy_http_version 1.1;
