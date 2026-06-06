@@ -259,16 +259,34 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
       if (item.kind !== "consumable") return state;
       if (!state.character.inventory.includes(action.itemId)) return state;
       const heal = item.heal ?? 0;
+      const stigmaDelta = item.stigmaDelta ?? 0;
       const nextHp = Math.min(state.character.maxHp, state.character.hp + heal);
-      return {
-        ...state,
-        character: {
-          ...state.character,
-          hp: nextHp,
-          inventory: removeFirst(state.character.inventory, action.itemId),
-        },
-        log: [...state.log, `사용: ${item.displayName} (+${heal} HP)`],
+      // #258 — items.stigmaDelta 적용 (정제수 -3, 마력석 파편 +5 등).
+      let nextCharacter: Character = {
+        ...state.character,
+        hp: nextHp,
+        inventory: removeFirst(state.character.inventory, action.itemId),
       };
+      if (stigmaDelta) nextCharacter = applyStigmaDelta(nextCharacter, stigmaDelta);
+      // 로그: heal / stigma 둘 다 반영.
+      const logParts: string[] = [];
+      if (heal > 0) logParts.push(`+${heal} HP`);
+      if (stigmaDelta !== 0) {
+        logParts.push(`성흔 침식 ${stigmaDelta > 0 ? "+" : ""}${stigmaDelta}`);
+      }
+      const logEntry = `사용: ${item.displayName}${logParts.length ? ` (${logParts.join(", ")})` : ""}`;
+      const nextLog = [...state.log, logEntry];
+      // #258 — 침식 100 도달 시 자동 petrification 엔딩 (씬 이동 없이 즉시 종결).
+      if (isFullyPetrified(nextCharacter)) {
+        return {
+          phase: "ended",
+          character: nextCharacter,
+          endingId: "petrification",
+          finalSceneId: state.currentScene,
+          log: [...nextLog, "성흔 침식이 한계에 도달했다. 몸이 굳어간다…"],
+        };
+      }
+      return { ...state, character: nextCharacter, log: nextLog };
     }
 
     case "REROLL": {
