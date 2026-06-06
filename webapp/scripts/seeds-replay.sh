@@ -54,6 +54,7 @@ PATCHES=(
   scripts/seed-solwen-wis-minstat.mjs   # #324 Solwen wis 7+ minStat
   scripts/seed-selene-branch.mjs        # #325 selene 분기 (solwen_combat_hard)
   scripts/seed-str-climb.mjs            # #326 str 활용 (kael_cargo_container)
+  scripts/seed-final-resort.mjs         # #327 orphan 4 씬 정리 (재이용 + 삭제)
 )
 
 run_one() {

@@ -113,10 +113,9 @@ describe("실 콘텐츠 lint (#271)", () => {
     const r = lintSceneContent(registry, {
       startSceneIds: ["kael_infirmary", "rin_harbor", "solwen_grove"],
       requiredEndings: ALL_ENDINGS,
-      // reducer 자동 전환 (stigma ≥ 100) — 그래프 분기 target 없는 정상 케이스.
-      // #318 — 시나리오 ending 잔재 *_caught/_chase 는 reducer 의 isDead/isFullyPetrified
-      //   자동 ending 시 trigger. 그래프 분기 target 없는 정상 케이스.
-      autoEndingSceneIds: ["ending_petrification", "kael_caught", "rin_chase", "rin_caught"],
+      // #327 — *_caught/_chase 가 우회 씬의 자결 plain 분기로 *재이용* 되어 reachable.
+      //   ending_petrification 도 삭제 (자동 ending 잔재). 화이트리스트 빈 배열로.
+      autoEndingSceneIds: [],
     });
     // 실패 시 위반 전체 출력.
     if (r.issues.length > 0) {
