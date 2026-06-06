@@ -49,7 +49,15 @@ export default function EndingScreen({ endingId, character, log, onRestart }: Pr
         {meta.icon}
       </div>
       <h2 className="text-2xl font-bold mb-3">{meta.title}</h2>
-      <p className="mb-5 text-amber-900 leading-relaxed whitespace-pre-line">{meta.epilogue}</p>
+      <p className="mb-3 text-amber-900 leading-relaxed whitespace-pre-line">{meta.epilogue}</p>
+      {meta.aftermath && (
+        <p
+          data-testid="ending-aftermath"
+          className="mb-5 text-sm text-amber-800/80 italic leading-relaxed border-t border-amber-300/60 pt-3 whitespace-pre-line"
+        >
+          {meta.aftermath}
+        </p>
+      )}
 
       <section className="mb-5 text-left">
         <h3 className="text-lg font-semibold mb-2 text-center">최종 스탯</h3>
