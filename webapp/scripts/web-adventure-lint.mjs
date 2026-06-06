@@ -77,16 +77,11 @@ async function main() {
         }
       }
     }
-    // ending id 충돌 — 같은 endingId 가 두 씬에서.
-    if (isEnding && s.endingId) {
-      if (endingMap.has(s.endingId)) {
-        issues.push({
-          level: 'ERROR',
-          msg: `endingId '${s.endingId}' 가 이미 '${endingMap.get(s.endingId)}' 에 사용됨`,
-        });
-      } else {
-        endingMap.set(s.endingId, s.id);
-      }
+    // #317 〈에테르니아〉 — endingId 가 *여러 씬* 에서 사용 가능 (fall 이 rin_chase /
+    //   rin_caught / ending_fall 3 곳, petrification 이 kael_caught / ending_petrification 2 곳).
+    //   이건 *시나리오 다양성* 디자인. 단순 첫 등장만 기록 (충돌 ERROR 제거).
+    if (isEnding && s.endingId && !endingMap.has(s.endingId)) {
+      endingMap.set(s.endingId, s.id);
     }
 
     if (issues.length === 0) continue;
@@ -102,8 +97,8 @@ async function main() {
   console.log(`\n총 ${scenes.length} 씬: ${RED}${errors} error${RESET}, ${YELLOW}${warns} warn${RESET}`);
   if (errors === 0 && warns === 0) console.log(`${GREEN}✓ 깔끔${RESET}`);
 
-  // 엔딩 도달 6 종 모두 정의됐는지 확인.
-  for (const expected of ['main', 'spirit', 'fail', 'shopkeeper', 'goblin_friend', 'wizard_apprentice']) {
+  // #317 〈에테르니아〉 6 endingId — 옛 사극 endingId 에서 갱신.
+  for (const expected of ['ascension', 'revolution', 'harmony', 'fall', 'petrification', 'sylvan_bond']) {
     if (!endingMap.has(expected)) {
       console.log(`${RED}MISSING ending '${expected}' — 정의 안 됨${RESET}`);
       errors++;
