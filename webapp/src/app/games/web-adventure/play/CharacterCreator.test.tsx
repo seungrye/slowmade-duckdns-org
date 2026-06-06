@@ -61,4 +61,21 @@ describe('CharacterCreator (#258 스탯 분배 제거)', () => {
     expect(character.ability).toBe('none');
     expect(character.rerollsLeft).toBe(3);
   });
+
+  // #291 — 시작 침식 ≥ 50 시 con/dex 디버프 미리 표시.
+  it('Kael 선택 → 시작 침식 80 디버프 경고 표시 + 체력/민첩 -2 effective', () => {
+    render(<CharacterCreator onComplete={vi.fn()} />);
+    // 기본 Kael — 침식 80 카드 활성.
+    expect(screen.getByTestId('stigma-debuff-warning')).toBeInTheDocument();
+    expect(screen.getByTestId('stigma-debuff-warning')).toHaveTextContent(/80/);
+    // -2 표시 (체력 4-2 / 민첩 6-2)
+    expect(screen.getByText(/\(4-2\)/)).toBeInTheDocument();
+    expect(screen.getByText(/\(6-2\)/)).toBeInTheDocument();
+  });
+
+  it('Solwen 선택 → 시작 침식 0 → 디버프 경고 미표시', () => {
+    render(<CharacterCreator onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { pressed: false, name: /솔벤|Solwen/i }));
+    expect(screen.queryByTestId('stigma-debuff-warning')).toBeNull();
+  });
 });

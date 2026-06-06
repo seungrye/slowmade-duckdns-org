@@ -101,16 +101,51 @@ export default function CharacterCreator({ onComplete }: Props) {
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-amber-900 mb-2">시작 능력치</h3>
         <ul className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-          {STAT_KEYS.map((k) => (
-            <li
-              key={k}
-              className="rounded-md bg-amber-50 border border-amber-200 px-2 py-1 text-center text-xs"
-            >
-              <div className="text-amber-700">{STAT_LABELS[k]}</div>
-              <div className="font-mono font-bold text-base">{protaMeta.baseStats[k]}</div>
-            </li>
-          ))}
+          {STAT_KEYS.map((k) => {
+            // #291 — 시작 침식 50+ 시 con/dex -2 디버프 미리 표시.
+            //   Kael (시작 80) 카드 선택 시 사용자가 *바로 디버프 인지*.
+            const debuffed =
+              protaMeta.startStigma >= 50 && (k === "con" || k === "dex");
+            const effective = debuffed
+              ? protaMeta.baseStats[k] - 2
+              : protaMeta.baseStats[k];
+            return (
+              <li
+                key={k}
+                className={`rounded-md border px-2 py-1 text-center text-xs ${
+                  debuffed
+                    ? "bg-indigo-50 border-indigo-300"
+                    : "bg-amber-50 border-amber-200"
+                }`}
+                title={
+                  debuffed
+                    ? `침식 ${protaMeta.startStigma} → ${STAT_LABELS[k]} -2 디버프`
+                    : undefined
+                }
+              >
+                <div className={debuffed ? "text-indigo-700" : "text-amber-700"}>
+                  {STAT_LABELS[k]}
+                </div>
+                <div className="font-mono font-bold text-base">
+                  {effective}
+                  {debuffed && (
+                    <span className="text-xs text-indigo-600 ml-1">
+                      ({protaMeta.baseStats[k]}-2)
+                    </span>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
+        {protaMeta.startStigma >= 50 && (
+          <p
+            data-testid="stigma-debuff-warning"
+            className="mt-2 text-xs text-indigo-700"
+          >
+            ⚠️ 시작 침식 {protaMeta.startStigma} — 체력·민첩 -2 디버프 (50 이상).
+          </p>
+        )}
       </div>
 
       {/* 3. 성흔 4 종 */}
