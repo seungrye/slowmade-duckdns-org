@@ -50,34 +50,24 @@ import { SidePanel } from "./sidePanel";
 // probability success → 초록 실선.
 // probability failure → 빨강 점선.
 // conditional → 파랑 실선 (hidden=true 면 점선).
-function edgeStyleForKind(data: GraphEdge["data"]): {
-  stroke: string;
-  strokeDasharray?: string;
-} {
-  if (!data) return { stroke: "#6b7280" };
-  if (data.kind === "plain") return { stroke: "#374151" };
-  if (data.kind === "probability") {
-    if (data.branch === "success") return { stroke: "#16a34a" };
-    return { stroke: "#dc2626", strokeDasharray: "6 4" };
-  }
-  if (data.kind === "conditional") {
-    return data.hidden
-      ? { stroke: "#9ca3af", strokeDasharray: "4 3" }
-      : { stroke: "#2563eb" };
-  }
-  return { stroke: "#6b7280" };
-}
+// edgeStyleForKind 는 ./edgeStyle.ts (page 컴포넌트 export 제약 회피).
+import { edgeStyleForKind } from "./edgeStyle";
 
 function toReactFlowEdges(edges: GraphEdge[]): Edge[] {
   return edges.map((e) => {
-    const { stroke, strokeDasharray } = edgeStyleForKind(e.data);
+    const { stroke, strokeDasharray, opacity } = edgeStyleForKind(e.data);
     return {
       id: e.id,
       source: e.source,
       target: e.target,
       label: e.data?.label,
-      labelStyle: { fontSize: 10, fill: stroke },
-      style: { stroke, strokeWidth: 1.5, ...(strokeDasharray ? { strokeDasharray } : {}) },
+      labelStyle: { fontSize: 10, fill: stroke, ...(opacity ? { opacity } : {}) },
+      style: {
+        stroke,
+        strokeWidth: 1.5,
+        ...(strokeDasharray ? { strokeDasharray } : {}),
+        ...(opacity ? { opacity } : {}),
+      },
       markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
       data: e.data as unknown as Record<string, unknown>,
     };
@@ -291,25 +281,28 @@ function GraphInner() {
   );
 }
 
-// 우측 상단 범례 — 엔딩 6 색 + 엣지 4 종.
+// #270 〈에테르니아의 추락〉 — 6 엔딩 + 엣지 4 종 범례.
 function Legend() {
   return (
     <div className="text-xs space-y-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded p-2 shadow-sm">
-      <div className="font-bold mb-1">범례</div>
+      <div className="font-bold mb-1">범례 — 〈에테르니아의 추락〉</div>
       <div className="flex flex-wrap gap-x-3 gap-y-1">
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-amber-200 border border-amber-500" /> 🍪 메인</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-green-200 border border-green-600" /> 🌲 산신령</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-gray-300 border border-gray-500" /> 💀 실패</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-blue-200 border border-blue-600" /> 🏪 상인</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-purple-200 border border-purple-600" /> 👹 도깨비</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-indigo-300 border border-indigo-700" /> 📚 마법사</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-amber-200 border border-amber-500" /> ✨ 승천</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-red-200 border border-red-600" /> ⚙️ 혁명</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-emerald-200 border border-emerald-600" /> ☯ 조화</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-gray-300 border border-gray-500" /> 💀 추락</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-indigo-300 border border-indigo-700" /> 🗿 석화</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-lime-200 border border-lime-600" /> 🌿 정령의 결속</span>
       </div>
       <div className="border-t border-gray-200 dark:border-gray-600 pt-1 mt-1 flex flex-wrap gap-x-3 gap-y-1">
-        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-gray-700" /> plain</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-violet-500" /> ⭐ 시작 씬</span>
+      </div>
+      <div className="border-t border-gray-200 dark:border-gray-600 pt-1 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-gray-700" /> 일반 분기</span>
         <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-green-600" /> 확률 성공</span>
         <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-red-600 border-dashed" /> 확률 실패</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-blue-600" /> 조건</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-gray-400 border-dashed" /> 조건 hidden</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-blue-600" /> 조건 분기</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-gray-400 border-dashed" /> 조건 (숨김)</span>
       </div>
     </div>
   );

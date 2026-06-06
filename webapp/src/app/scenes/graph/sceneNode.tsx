@@ -14,26 +14,19 @@
 
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { GraphNodeData } from "@/lib/web-adventure/engine/graph";
+import { endingsMeta } from "@/content/web-adventure/endings";
 
 type SceneNodeType = Node<GraphNodeData, "scene">;
 
-const ENDING_ICON: Record<string, string> = {
-  main: "🍪",
-  spirit: "🌲",
-  fail: "💀",
-  shopkeeper: "🏪",
-  goblin_friend: "👹",
-  wizard_apprentice: "📚",
-};
-
-// endingId → tailwind 색 (배경 + 글씨).
+// #270 〈에테르니아〉 6 엔딩 — endingsMeta 단일 소스.
+// Tailwind 색 매핑만 graph 전용 (배경/테두리/글씨 색조).
 const ENDING_COLOR: Record<string, string> = {
-  main: "bg-amber-200 text-amber-900 border-amber-500",
-  spirit: "bg-green-200 text-green-900 border-green-600",
-  fail: "bg-gray-300 text-gray-700 border-gray-500",
-  shopkeeper: "bg-blue-200 text-blue-900 border-blue-600",
-  goblin_friend: "bg-purple-200 text-purple-900 border-purple-600",
-  wizard_apprentice: "bg-indigo-300 text-indigo-900 border-indigo-700",
+  ascension: "bg-amber-200 text-amber-900 border-amber-500",      // 금빛 — 신계 승천
+  revolution: "bg-red-200 text-red-900 border-red-600",           // 핏빛 강철 — 혁명
+  harmony: "bg-emerald-200 text-emerald-900 border-emerald-600",  // 조화 — 세 달
+  fall: "bg-gray-300 text-gray-700 border-gray-500",              // 잿더미 — 추락
+  petrification: "bg-indigo-300 text-indigo-900 border-indigo-700", // 푸른 결정 — 석화
+  sylvan_bond: "bg-lime-200 text-lime-900 border-lime-600",       // 숲 — 세계수
 };
 
 // ReactFlow 가 자동으로 selected/dragging 등을 NodeProps 로 전달.
@@ -45,7 +38,11 @@ export default function SceneNode({ id, data, selected }: Props) {
   const isEnding = data.isEnding === true;
   const isStart = data.isStart === true;
   const endingColor = data.endingId ? ENDING_COLOR[data.endingId] : "";
-  const endingIcon = data.endingId ? ENDING_ICON[data.endingId] : "";
+  // endingsMeta 단일 소스 — endings.ts 변경 시 자동 반영.
+  const endingIcon =
+    data.endingId && data.endingId in endingsMeta
+      ? endingsMeta[data.endingId as keyof typeof endingsMeta].icon
+      : "";
 
   const baseClass = isEnding
     ? `${endingColor} border-2`

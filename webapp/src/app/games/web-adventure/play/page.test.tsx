@@ -68,7 +68,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     );
     render(<PlayPage />);
     await waitFor(() =>
-      expect(screen.getByText(/시작 인물 선택/)).toBeInTheDocument(),
+      expect(screen.getByText(/너의 운명을 선택하라/)).toBeInTheDocument(),
     );
   });
 
@@ -92,7 +92,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     fireEvent.click(screen.getByRole("button", { name: /재시도/ }));
 
     await waitFor(() =>
-      expect(screen.getByText(/시작 인물 선택/)).toBeInTheDocument(),
+      expect(screen.getByText(/너의 운명을 선택하라/)).toBeInTheDocument(),
     );
     // #238 — useAutoSave 가 마운트 시 /api/web-adventure/save GET 추가 호출.
     // 여기서는 *content fetch* 만 카운트 (재시도 → 1차 실패 + 2차 성공).

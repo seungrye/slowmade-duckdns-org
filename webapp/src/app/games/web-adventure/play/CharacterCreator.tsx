@@ -59,10 +59,10 @@ export default function CharacterCreator({ onComplete }: Props) {
 
   return (
     <section className="rounded-lg bg-amber-100/70 border border-amber-300 p-6 shadow-sm">
-      <h2 className="text-xl font-semibold mb-2">시작 인물 선택</h2>
+      <h2 className="text-xl font-semibold mb-2">너의 운명을 선택하라</h2>
       <p className="text-sm text-amber-800 mb-4">
-        세 인물 중 하나의 시점으로 〈에테르니아의 추락〉 을 살아낸다. 같은 위기를 다른 각도로
-        보게 될 것이다.
+        세 달이 정렬하는 마지막 사흘, 세 개의 시선이 같은 종말을 향해 걷는다. 한 사람의
+        선택이 세계의 모양을 바꾼다. 그러나 그 손에는 — *침식의 흔적* 이 함께 따른다.
       </p>
 
       {/* 1. 주인공 3 카드 */}
@@ -114,7 +114,7 @@ export default function CharacterCreator({ onComplete }: Props) {
       </div>
 
       {/* 3. 성흔 4 종 */}
-      <h3 className="text-lg font-semibold mb-2">성흔 선택</h3>
+      <h3 className="text-lg font-semibold mb-2">너의 핏줄에 흐르는 성흔</h3>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
         {ABILITY_KEYS.map((k) => {
           const a = abilities[k];
@@ -164,7 +164,7 @@ export default function CharacterCreator({ onComplete }: Props) {
         onClick={submit}
         className="w-full rounded-md bg-amber-700 text-amber-50 px-5 py-2 font-semibold hover:bg-amber-800 transition-colors"
       >
-        {protaMeta.name} 으로 시작
+        {protaMeta.name} 의 운명으로 발을 내딛는다
       </button>
     </section>
   );

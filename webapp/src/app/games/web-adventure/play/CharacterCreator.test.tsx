@@ -22,14 +22,14 @@ describe('CharacterCreator (#258 스탯 분배 제거)', () => {
     expect(screen.getByText('셀레네 성흔')).toBeInTheDocument();
     expect(screen.getByText('헤카테 성흔')).toBeInTheDocument();
     expect(screen.getByText('무흔')).toBeInTheDocument();
-    const btn = screen.getByRole('button', { name: /으로 시작/ });
+    const btn = screen.getByRole('button', { name: /운명으로 발을 내딛는다/ });
     expect(btn).not.toBeDisabled();
   });
 
   it('Kael 기본 선택 → 모험 시작 클릭 시 protagonist=kael + startScene=kael_infirmary', () => {
     const onComplete = vi.fn();
     render(<CharacterCreator onComplete={onComplete} />);
-    fireEvent.click(screen.getByRole('button', { name: /으로 시작/ }));
+    fireEvent.click(screen.getByRole('button', { name: /운명으로 발을 내딛는다/ }));
     expect(onComplete).toHaveBeenCalledOnce();
     const [character, startScene] = onComplete.mock.calls[0];
     expect(character.protagonist).toBe('kael');
@@ -44,7 +44,7 @@ describe('CharacterCreator (#258 스탯 분배 제거)', () => {
     const onComplete = vi.fn();
     render(<CharacterCreator onComplete={onComplete} />);
     fireEvent.click(screen.getByText(/솔벤 \(Solwen\)/));
-    fireEvent.click(screen.getByRole('button', { name: /으로 시작/ }));
+    fireEvent.click(screen.getByRole('button', { name: /운명으로 발을 내딛는다/ }));
     const [character, startScene] = onComplete.mock.calls[0];
     expect(character.protagonist).toBe('solwen');
     expect(character.stigmaErosion).toBe(0);
@@ -56,7 +56,7 @@ describe('CharacterCreator (#258 스탯 분배 제거)', () => {
     const onComplete = vi.fn();
     render(<CharacterCreator onComplete={onComplete} />);
     fireEvent.click(screen.getByText('무흔'));
-    fireEvent.click(screen.getByRole('button', { name: /으로 시작/ }));
+    fireEvent.click(screen.getByRole('button', { name: /운명으로 발을 내딛는다/ }));
     const [character] = onComplete.mock.calls[0];
     expect(character.ability).toBe('none');
     expect(character.rerollsLeft).toBe(3);
