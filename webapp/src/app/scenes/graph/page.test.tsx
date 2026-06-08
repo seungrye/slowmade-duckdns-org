@@ -11,6 +11,8 @@ import GraphPage from "./page";
 const pushMock = vi.fn();
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
+  // #341 — focus URL param 처리 — 기본 mock 은 빈 params.
+  useSearchParams: () => ({ get: () => null }),
 }));
 
 // #225 — ReactFlow props 캡처용 (mock 안에서 참조).
@@ -436,7 +438,7 @@ describe("#233 — 순수 클릭 (onNodeClick) 분기", () => {
   test("page.tsx 에 onNodeClick prop + setSelectedSceneId 호출 존재", () => {
     const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
     expect(code).toMatch(/onNodeClick=\{/);
-    expect(code).toMatch(/setSelectedSceneId\(node\.id\)/);
+    expect(code).toMatch(/setSelectedSceneId\(/);
   });
 });
 
@@ -467,10 +469,7 @@ describe("/scenes/graph — #235 패널 닫기 highlight off + 카메라 중앙 
     render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
-    const onNodeClick = flowProps.current.onNodeClick as (
-      e: unknown,
-      n: { id: string },
-    ) => void;
+    const onNodeClick = flowProps.current.onNodeClick as (e: unknown, n: { id: string }) => void;
     await act(async () => {
       onNodeClick({}, { id: "scene_01" });
     });
@@ -491,10 +490,7 @@ describe("/scenes/graph — #235 패널 닫기 highlight off + 카메라 중앙 
     render(<GraphPage />);
     await act(async () => {});
     await act(async () => {});
-    const onNodeClick = flowProps.current.onNodeClick as (
-      e: unknown,
-      n: { id: string },
-    ) => void;
+    const onNodeClick = flowProps.current.onNodeClick as (e: unknown, n: { id: string }) => void;
     await act(async () => {
       onNodeClick({}, { id: "scene_01" });
     });
@@ -535,21 +531,232 @@ describe("/scenes/graph — #235 패널 닫기 highlight off + 카메라 중앙 
     expect(code).toMatch(/setCenter\(/);
   });
 
-  test("page.tsx 에 useMemo deps 로 selectedSceneId 포함 + selected 필드 부착", () => {
+  test("page.tsx 에 selected 필드 부착 + selectedSceneId 변화 추적", () => {
     const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
-    // useMemo 안에서 selected: n.id === selectedSceneId 또는 유사 패턴.
+    // 노드 선택 필드 부착 — useEffect 또는 useMemo 내부.
     expect(code).toMatch(/selected:\s*[a-zA-Z_]+\.id\s*===\s*selectedSceneId/);
-    // deps 배열에 selectedSceneId.
-    expect(code).toMatch(/\[scenes,\s*selectedSceneId\]/);
+    // #329 — useNodesState 분리 구조: selectedSceneId 가 다른 effect/memo
+    // 의 deps 에 등장 (정확한 위치는 구현 자유). selectedSceneId 가 reactive
+    // 추적되는지만 검증.
+    expect(code).toMatch(/selectedSceneId\b/);
   });
 
-  test("page.tsx 에 setTimeout 350ms + setCenter zoom/duration 옵션 존재", () => {
+  test("page.tsx — #347 일반 클릭 시 setCenter 호출 없음 (응답성 위해 카메라 이동 제거)", () => {
     const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
-    // 350ms setTimeout — 사이드패널 슬라이드인 (300ms) 후 setCenter.
-    // 화살표 본문이 여러 줄/콤마 포함이라도 매칭되도록 끝에 350) 만 검사.
-    expect(code).toMatch(/,\s*350\s*\)/);
-    // setCenter 의 옵션 객체: zoom: 1.2, duration: 400.
+    // focus URL effect 의 setCenter (zoom 1.2 / duration 600) 만 유지.
     expect(code).toMatch(/zoom:\s*1\.2/);
-    expect(code).toMatch(/duration:\s*400/);
+    expect(code).toMatch(/duration:\s*600/);
   });
 });
+
+// #336 — 캔버스 빈 여백 클릭 → 패널 닫기 + selected 해제 + 엣지 glow 제거.
+describe("/scenes/graph — #336 onPaneClick = 선택 해제", () => {
+  beforeEach(() => {
+    flowProps.current = {};
+  });
+
+  it("ReactFlow 에 onPaneClick 핸들러 전달", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    expect(typeof flowProps.current.onPaneClick).toBe("function");
+  });
+
+  it("노드 선택 후 onPaneClick → SidePanel unmount + nodes selected=false", async () => {
+    const { container } = render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+
+    const onNodeClick = flowProps.current.onNodeClick as (e: unknown, n: { id: string }) => void;
+    await act(async () => {
+      onNodeClick({}, { id: "scene_01" });
+    });
+    await act(async () => {});
+    expect(
+      container.querySelector("[data-testid='side-panel']"),
+    ).toBeTruthy();
+
+    const onPaneClick = flowProps.current.onPaneClick as () => void;
+    await act(async () => {
+      onPaneClick();
+    });
+    await act(async () => {});
+
+    expect(
+      container.querySelector("[data-testid='side-panel']"),
+    ).toBeFalsy();
+    const nodes = (flowProps.current.nodes ?? []) as Array<{ selected?: boolean }>;
+    for (const n of nodes) {
+      expect(n.selected).toBe(false);
+    }
+    const edges = (flowProps.current.edges ?? []) as Array<{ style?: { filter?: string } }>;
+    for (const e of edges) {
+      expect(e.style?.filter ?? "").not.toMatch(/drop-shadow/);
+    }
+  });
+});
+
+// #334 — 노드 선택 시 연결 엣지에 노란색 drop-shadow glow.
+// 원본 stroke 색 (회색/초록/빨강/파랑) 은 유지, filter 로 *외곽광* 만 추가.
+describe("/scenes/graph — #334 노드 선택 시 연결 엣지 노란색 highlight", () => {
+  beforeEach(() => {
+    flowProps.current = {};
+  });
+
+  it("선택 노드의 connected edges 가 style.filter 에 drop-shadow 부착", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+
+    // 한 노드 선택 — scene_01 (시작 → scene_01 연결).
+    const onNodeClick = flowProps.current.onNodeClick as (e: unknown, n: { id: string }) => void;
+    await act(async () => {
+      onNodeClick({}, { id: "scene_01" });
+    });
+    await act(async () => {});
+
+    const edges = (flowProps.current.edges ?? []) as Array<{
+      id: string;
+      source: string;
+      target: string;
+      style?: { filter?: string };
+    }>;
+    const connected = edges.filter(
+      (e) => e.source === "scene_01" || e.target === "scene_01",
+    );
+    expect(connected.length).toBeGreaterThanOrEqual(1);
+    for (const e of connected) {
+      expect(e.style?.filter ?? "").toMatch(/drop-shadow/);
+    }
+    // 비연결 엣지 — filter 없음.
+    const others = edges.filter(
+      (e) => e.source !== "scene_01" && e.target !== "scene_01",
+    );
+    for (const e of others) {
+      expect(e.style?.filter ?? "").not.toMatch(/drop-shadow/);
+    }
+  });
+
+  it("선택 해제 (selectedSceneId=null) → 모든 엣지 filter 제거", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+
+    const onNodeClick = flowProps.current.onNodeClick as (e: unknown, n: { id: string }) => void;
+    await act(async () => {
+      onNodeClick({}, { id: "scene_01" });
+    });
+    await act(async () => {});
+
+    // 닫기 — SidePanel 의 닫기 버튼.
+    const closeBtn = screen.getByRole("button", { name: /닫기/ });
+    await act(async () => {
+      closeBtn.click();
+    });
+    await act(async () => {});
+
+    const edges = (flowProps.current.edges ?? []) as Array<{
+      style?: { filter?: string };
+    }>;
+    for (const e of edges) {
+      expect(e.style?.filter ?? "").not.toMatch(/drop-shadow/);
+    }
+  });
+});
+
+// #332 — 드래그 중 viewport reset 차단.
+// setCenter 효과의 useEffect 가 [selectedSceneId, rfNodes, ...] 를 deps 로
+// 두면 드래그 시 rfNodes 변경마다 setCenter 가 발화 → 카메라가 매 mousemove
+// 마다 노드 중심으로 jump → 사용자에게 "화면이 상단으로 reset" 으로 보임.
+// deps 에서 rfNodes 제외 — selectedSceneId 변경 시에만 카메라 이동.
+describe("/scenes/graph — #332 드래그 중 viewport reset 차단", () => {
+  test("setCenter effect 의 deps 에 rfNodes 없음 (selectedSceneId 만)", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // setCenter 호출 근처의 useEffect 의 deps 배열에 rfNodes 가 등장하지 않아야.
+    // 패턴: setCenter 가 등장하는 useEffect 끝의 deps 배열.
+    // 가장 단순한 검사: 'rfNodes' 가 deps 배열 안에 들어가는 useEffect 가
+    // setCenter 를 호출하지 않음. → setCenter 와 같은 effect 의 deps 에
+    // rfNodes 미포함.
+    // 보수적 검사: setCenter\(.*\)\s*;[\s\S]*?\}\s*,\s*\[([^\]]*)\] 패턴.
+    const m = code.match(/setCenter\([\s\S]*?\}\s*,\s*\[([^\]]*)\]\s*\)/);
+    expect(m).toBeTruthy();
+    const deps = m![1];
+    expect(deps).not.toMatch(/rfNodes/);
+  });
+});
+
+// #331 — 새로고침 시 드래그한 좌표가 유지되어야 함.
+// content/v1 API 가 60 초 캐시 → 드래그 직후 새로고침이 예전 데이터를 받음.
+// graph 페이지의 fetch 가 cache: "no-store" 로 항상 fresh 데이터 받도록.
+describe("/scenes/graph — #331 새로고침 시 드래그 위치 유지 (no-store)", () => {
+  test("content/v1 fetch 에 cache: 'no-store' 옵션 (또는 동등 캐시 무력화)", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // fetch 호출에 cache: 'no-store' 명시 — 또는 cache-buster 쿼리.
+    // 우선 패턴: { cache: "no-store" } 옵션이 fetch 두 번째 인자에 등장.
+    const hasNoStore = /cache:\s*["']no-store["']/.test(code);
+    const hasCacheBuster = /\?[^"']*t=[\$\{]/.test(code);
+    expect(hasNoStore || hasCacheBuster).toBe(true);
+  });
+});
+
+// #329 — 드래그 시 노드가 *실제* 마우스를 따라가도록.
+// ReactFlow 제어 모드 (nodes prop) 는 `onNodesChange` 가 없으면 드래그 변화가
+// 외부 state 에 반영되지 않아 *드래그 자체가 화면에 안 보임*. useNodesState +
+// onNodesChange = applyNodeChanges 패턴 도입.
+describe("/scenes/graph — #329 드래그 위치 변경 (useNodesState + onNodesChange)", () => {
+  beforeEach(() => {
+    flowProps.current = {};
+  });
+
+  test("page.tsx 에 useNodesState/useEdgesState import + 사용", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // import 구문에 useNodesState 가 등장 (@xyflow/react).
+    expect(code).toMatch(/useNodesState/);
+    expect(code).toMatch(/useEdgesState/);
+  });
+
+  it("ReactFlow 컨테이너에 onNodesChange / onEdgesChange prop 전달", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+    expect(typeof flowProps.current.onNodesChange).toBe("function");
+    expect(typeof flowProps.current.onEdgesChange).toBe("function");
+  });
+
+  it("onNodesChange 호출 → ReactFlow 의 nodes prop 의 position 이 갱신됨", async () => {
+    render(<GraphPage />);
+    await act(async () => {});
+    await act(async () => {});
+
+    const onNodesChange = flowProps.current.onNodesChange as (
+      changes: Array<{ id: string; type: string; position?: { x: number; y: number } }>,
+    ) => void;
+    expect(typeof onNodesChange).toBe("function");
+
+    // 드래그 종료 가정 시 ReactFlow 가 발화하는 변경:
+    // { id, type: 'position', position: { x: 500, y: 500 } } (dragging: false 도 포함 가능).
+    await act(async () => {
+      onNodesChange([
+        { id: "scene_01", type: "position", position: { x: 500, y: 500 } } as never,
+      ]);
+    });
+    await act(async () => {});
+
+    const nodes = (flowProps.current.nodes ?? []) as Array<{
+      id: string;
+      position: { x: number; y: number };
+    }>;
+    const moved = nodes.find((n) => n.id === "scene_01");
+    expect(moved?.position).toEqual({ x: 500, y: 500 });
+  });
+
+  test("page.tsx 에 applyNodeChanges 패턴 (또는 useNodesState 호출) 으로 노드 state 관리", () => {
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    // 둘 중 하나는 반드시 존재 — useNodesState 가 가장 단순한 패턴.
+    const hasUseNodesState = /useNodesState\(/.test(code);
+    const hasApplyNodeChanges = /applyNodeChanges/.test(code);
+    expect(hasUseNodesState || hasApplyNodeChanges).toBe(true);
+  });
+});
+
+

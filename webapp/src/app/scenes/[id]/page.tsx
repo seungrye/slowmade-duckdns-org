@@ -64,6 +64,10 @@ export default function SceneEditPage({ params }: Props) {
         const json = await res.json().catch(() => ({}));
         setError(json.message ?? "저장 실패");
       } else {
+        // 응답 body 의 갱신된 scene 으로 state 갱신 — revisionCount UI 즉시 반영.
+        // 사용자 보고 #revisionCount-stale fix.
+        const json = (await res.json().catch(() => ({}))) as { data?: Scene };
+        if (json.data) setScene(json.data);
         setSavedAt(new Date().toLocaleTimeString("ko-KR"));
       }
     } catch (e) {
@@ -111,6 +115,20 @@ export default function SceneEditPage({ params }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {savedAt && <span className="text-xs text-gray-500">{savedAt} 저장됨</span>}
+          {/* 옛 quest CMS 패턴 — 리비전 보기: 별도 페이지로 이동. */}
+          <Link
+            href={`/scenes/${encodeURIComponent(scene.id)}/revisions`}
+            className="px-3 py-1.5 text-sm rounded border border-amber-300 text-amber-700 dark:text-amber-300 hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+          >
+            리비전 보기 ({(scene as typeof scene & { revisionCount?: number }).revisionCount ?? 0}개)
+          </Link>
+          {/* #341 — 차트 보기: graph 페이지로 이동 + 해당 노드 focus + zoom 1.2 + 패널 자동 오픈. */}
+          <Link
+            href={`/scenes/graph?focus=${encodeURIComponent(scene.id)}`}
+            className="px-3 py-1.5 text-sm rounded border border-blue-300 text-blue-600 hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
+          >
+            차트에서 보기
+          </Link>
           <button
             type="button"
             onClick={handleSave}

@@ -54,13 +54,11 @@ const TARGET_IDS = [
   "kael_cargo_container",
   "kael_falling",
   "kael_caught",
-  // Rin 1막
+  // Rin 1막 — rin_chase / rin_caught 는 #328 dead orphan 정리에서 삭제됨.
   "rin_harbor",
   "rin_evidence",
   "rin_betrayal",
   "rin_underground",
-  "rin_chase",
-  "rin_caught",
   // Solwen 1막
   "solwen_grove",
   "solwen_combat",
@@ -77,12 +75,11 @@ const TARGET_IDS = [
   "climax_sylvan_path",
   "climax_ascension_path",
   "climax_fall_path",
-  // 6 엔딩
+  // 5 엔딩 — ending_petrification 은 #327 에서 삭제 (자동 ending, 씬 데이터 미사용).
   "ending_ascension",
   "ending_revolution",
   "ending_harmony",
   "ending_fall",
-  "ending_petrification",
   "ending_sylvan_bond",
 ];
 
@@ -251,8 +248,18 @@ try {
   const startCount = todayQuotaDoc?.count ?? 0;
   console.log(`[painter-scenes] 오늘 quota 시작: ${startCount}/${PAINTER_DAILY_LIMIT}`);
 
-  // 대상 씬 fetch
-  const ids = ONLY_IDS ?? TARGET_IDS;
+  // 대상 씬 fetch — ONLY_IDS 지정 시 그것, 아니면 *현재 mongo 의 placeholder 인
+  // 모든 씬* 동적 fetch (시드 신설에 자동 대응).
+  let ids;
+  if (ONLY_IDS) {
+    ids = ONLY_IDS;
+  } else {
+    const placeholderScenes = await WebAdventureScene.find({
+      illustration: /placeholder/,
+    }, { id: 1 }).lean();
+    ids = placeholderScenes.map((s) => s.id);
+    console.log(`[painter-scenes] 동적 placeholder 대상: ${ids.length} 씬`);
+  }
   const scenes = await WebAdventureScene.find({ id: { $in: ids } }).lean();
   const sceneById = new Map(scenes.map((s) => [s.id, s]));
 

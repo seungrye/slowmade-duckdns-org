@@ -131,6 +131,9 @@ const WebAdventureSceneSchema = new Schema(
     },
     // #222 — /scenes/graph 노드 좌표 (사용자 드래그로 갱신). optional.
     position: { type: PositionSchema },
+    // 옛 quest CMS 패턴 — Scene 의 *현재 리비전 번호*. PUT 마다 +1.
+    // 기존 씬은 정의되지 않은 상태로 잔존 — 첫 PUT 시 default 0 + $inc 1 = 1.
+    revisionCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
@@ -152,6 +155,8 @@ export interface WebAdventureSceneDoc {
   endingId?: string;
   /** #222 — /scenes/graph 노드 좌표. optional. */
   position?: { x: number; y: number };
+  /** 옛 quest CMS 패턴 — 현재 리비전 번호. PUT 마다 +1. */
+  revisionCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }

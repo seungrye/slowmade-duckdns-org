@@ -23,7 +23,13 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
   // 1. 신규 씬 upsert.
-  await Scene.findOneAndUpdate({ id: NEW_SCENE.id }, NEW_SCENE, { upsert: true, new: true });
+  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  const curNew = await Scene.findOne({ id: NEW_SCENE.id }).lean();
+  const newUpdate = { ...NEW_SCENE };
+  if (curNew && curNew.illustration && !curNew.illustration.includes('placeholder')) {
+    newUpdate.illustration = curNew.illustration;
+  }
+  await Scene.findOneAndUpdate({ id: NEW_SCENE.id }, newUpdate, { upsert: true, new: true });
   console.log('upsert:', NEW_SCENE.id);
 
   // 2. kael_cargo_container/climb_in plain → str probability.

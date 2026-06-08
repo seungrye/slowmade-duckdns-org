@@ -96,8 +96,14 @@ async function main() {
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
   // 1. 신규 씬 upsert.
+  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
   for (const s of NEW_SCENES) {
-    await Scene.findOneAndUpdate({ id: s.id }, s, { upsert: true, new: true });
+    const cur = await Scene.findOne({ id: s.id }).lean();
+    const update = { ...s };
+    if (cur && cur.illustration && !cur.illustration.includes('placeholder')) {
+      update.illustration = cur.illustration;
+    }
+    await Scene.findOneAndUpdate({ id: s.id }, update, { upsert: true, new: true });
     console.log('upsert:', s.id);
   }
 

@@ -38,13 +38,15 @@ test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
     await expect(choiceButtons.first()).toBeVisible();
   });
 
-  test("/scenes/graph — 범례 〈에테르니아〉 6 엔딩 라벨 (#270)", async ({ page }) => {
+  test("/scenes/graph — 범례 단순화: 🏁 엔딩 / ⭐ 시작 / 연결선 (#335)", async ({ page }) => {
     await page.goto("/scenes/graph");
-    // 페이지 자체 로드 — title 보이거나 fallback.
-    // Legend 의 6 엔딩 텍스트 확인.
-    for (const label of ["✨ 승천", "⚙️ 혁명", "☯ 조화", "💀 추락", "🗿 석화", "🌿 정령의 결속"]) {
-      // 범례 + 그래프 노드 양쪽에 동일 라벨이 있을 수 있다 — 범례의 첫 매칭만 확인.
-      await expect(page.locator(`text=${label}`).first()).toBeVisible({ timeout: 20000 });
+    // #335 — 6 엔딩 개별 라인 제거. 통일된 "🏁 엔딩 씬" 1 라인.
+    await expect(page.locator(`text=🏁 엔딩 씬`).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.locator(`text=⭐ 시작 씬`).first()).toBeVisible({ timeout: 20000 });
+    // 옛 6 엔딩 라벨은 더 이상 범례에 없음.
+    for (const label of ["✨ 승천", "⚙️ 혁명", "☯ 조화", "🗿 석화", "🌿 정령의 결속"]) {
+      const found = await page.locator(`text=${label}`).count();
+      expect(found, `${label} 옛 라벨이 여전히 범례에 있음`).toBe(0);
     }
   });
 

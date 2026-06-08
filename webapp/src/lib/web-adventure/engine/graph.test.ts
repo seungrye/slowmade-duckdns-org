@@ -44,6 +44,28 @@ describe("buildGraphFromScenes — nodes", () => {
     expect(nodes[0].data.savedPosition).toEqual({ x: 100, y: 200 });
     expect(nodes[0].position).toEqual({ x: 100, y: 200 });
   });
+
+  // #333 — 시작 씬 화이트리스트 갱신.
+  // 옛 사극 시절의 단일 시작 (town_square_dawn) 잔재 제거.
+  // 〈에테르니아〉 는 3 주인공 — kael_infirmary / rin_harbor / solwen_grove
+  // 모두 시작 씬 으로 인식되어 ⭐ + violet ring 표시.
+  it("kael_infirmary / rin_harbor / solwen_grove 모두 isStart=true", () => {
+    const { nodes } = buildGraphFromScenes([
+      makeScene({ id: "kael_infirmary" }),
+      makeScene({ id: "rin_harbor" }),
+      makeScene({ id: "solwen_grove" }),
+      makeScene({ id: "other" }),
+    ]);
+    expect(nodes.find((n) => n.id === "kael_infirmary")?.data.isStart).toBe(true);
+    expect(nodes.find((n) => n.id === "rin_harbor")?.data.isStart).toBe(true);
+    expect(nodes.find((n) => n.id === "solwen_grove")?.data.isStart).toBe(true);
+    expect(nodes.find((n) => n.id === "other")?.data.isStart).toBeUndefined();
+  });
+
+  it("옛 town_square_dawn 은 더 이상 isStart=true 아님", () => {
+    const { nodes } = buildGraphFromScenes([makeScene({ id: "town_square_dawn" })]);
+    expect(nodes[0].data.isStart).toBeUndefined();
+  });
 });
 
 describe("buildGraphFromScenes — edges", () => {

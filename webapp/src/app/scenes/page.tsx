@@ -169,6 +169,14 @@ export default function ScenesPage() {
                   <span className="font-mono">{s.id}</span>
                   <span>·</span>
                   <span>선택지 {s.choices?.length ?? 0}</span>
+                  {/* 옛 quest CMS 패턴 — 현재 리비전 번호 badge. v0 도 명시 (정보 일관성). */}
+                  <span>·</span>
+                  <span
+                    className="inline-flex px-1.5 py-0.5 text-xs rounded bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-200"
+                    title="현재 리비전 번호"
+                  >
+                    v{(s as Scene & { revisionCount?: number }).revisionCount ?? 0}
+                  </span>
                   {s.isEnding && (
                     <>
                       <span>·</span>

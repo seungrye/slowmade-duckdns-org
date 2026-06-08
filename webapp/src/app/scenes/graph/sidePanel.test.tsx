@@ -26,6 +26,20 @@ function makeScene(id = "scene_01") {
 }
 
 beforeEach(() => {
+  // jsdom 에 window.matchMedia 없음 — sm 매치 = true (desktop 가정).
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (q: string) => ({
+      matches: q.includes("min-width: 640px"),
+      media: q,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+      onchange: null,
+    }),
+  });
   fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
     if (url.includes("/api/web-adventure/scenes/scene_01") && (!init || !init.method || init.method === "GET")) {
       return {
@@ -113,6 +127,76 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     const arg = onSaved.mock.calls[0]![0] as { title: string; id: string };
     expect(arg.title).toBe("변경된 제목");
     expect(arg.id).toBe("scene_01");
+  });
+
+  // #340 — header 의 sticky top-0 제거. 스크롤 시 자연스럽게 흐름.
+  it("패널 header 에 sticky top-0 클래스 없음 (일반 흐름)", async () => {
+    render(<SidePanel sceneId="scene_01" onClose={vi.fn()} onSaved={vi.fn()} />);
+    await act(async () => {});
+    await act(async () => {});
+    const panel = screen.getByTestId("side-panel");
+    const header = panel.querySelector("header");
+    expect(header).toBeTruthy();
+    expect(header!.className).not.toMatch(/sticky/);
+    expect(header!.className).not.toMatch(/top-0/);
+  });
+
+  // #339 — 모바일 fullscreen (네비 제외) — top-[60px] + max-h 해제.
+  it("baseAside 가 top-[60px] fixed 모바일 fullscreen 클래스 포함", async () => {
+    render(<SidePanel sceneId="s1" onClose={vi.fn()} onSaved={vi.fn()} />);
+    await act(async () => {});
+    await act(async () => {});
+    const panel = screen.getByTestId("side-panel") as HTMLElement;
+    expect(panel.className).toMatch(/top-\[60px\]/);
+    // 옛 max-h-[80vh] 잔재 없음.
+    expect(panel.className).not.toMatch(/max-h-\[80vh\]/);
+  });
+
+  // #338 — 가로 크기 조절 핸들.
+  it("리사이즈 핸들이 패널 좌측에 존재 (data-testid='side-panel-resize')", async () => {
+    render(<SidePanel sceneId="s1" onClose={vi.fn()} onSaved={vi.fn()} />);
+    await act(async () => {});
+    await act(async () => {});
+    const handle = screen.getByTestId("side-panel-resize");
+    expect(handle).toBeTruthy();
+    // cursor-col-resize 스타일.
+    expect((handle as HTMLElement).className).toMatch(/cursor-col-resize/);
+  });
+
+  it("핸들 드래그 → 패널 width 변경 (mousedown → mousemove → mouseup)", async () => {
+    render(<SidePanel sceneId="s1" onClose={vi.fn()} onSaved={vi.fn()} />);
+    await act(async () => {});
+    await act(async () => {});
+
+    const panel = screen.getByTestId("side-panel") as HTMLElement;
+    const handle = screen.getByTestId("side-panel-resize") as HTMLElement;
+    const before = panel.style.width;
+
+    // 마우스 클라이언트 X = 1000 → 800 (왼쪽으로 200px = 패널 200 px 더 넓어짐).
+    await act(async () => {
+      fireEvent.mouseDown(handle, { clientX: 1000 });
+    });
+    await act(async () => {
+      fireEvent.mouseMove(window, { clientX: 800 });
+    });
+    await act(async () => {
+      fireEvent.mouseUp(window);
+    });
+
+    const after = panel.style.width;
+    expect(after).not.toBe(before);
+    // 숫자 px 형태.
+    expect(after).toMatch(/^\d+px$/);
+  });
+
+  // 옛 quest CMS 패턴 — RevisionHistorySection 은 별도 /scenes/[id]/revisions 페이지로 이동.
+  // SidePanel 에서 *제거* 됨을 검증.
+  it("SidePanel 에는 RevisionHistorySection 의 '변경 이력' 토글이 *부재*", async () => {
+    render(<SidePanel sceneId="scene_01" onClose={() => {}} onSaved={() => {}} />);
+    await act(async () => {});
+    await act(async () => {});
+    // 더 이상 변경 이력 라벨이 패널 안에 표시되지 않아야 한다.
+    expect(screen.queryByRole("button", { name: /변경 이력/ })).toBeNull();
   });
 
   it("SceneForm 의 제목 변경이 즉시 input value 에 반영된다 (controlled)", async () => {

@@ -24,15 +24,16 @@ describe("ChoiceList", () => {
     expect(onChoose).toHaveBeenCalledWith("p");
   });
 
-  it("probability — 확률% 표시 + 클릭 콜백", () => {
+  it("probability — '[확률 N%]' 표시 + 클릭 콜백", () => {
     const onChoose = vi.fn();
     const c: Choice = {
       kind: "probability", id: "pr", label: "치기", stat: "str",
       difficulty: 12, onSuccess: "ok", onFailure: "fail",
     };
     render(<ChoiceList choices={[c]} character={makeChar()} onChoose={onChoose} />);
-    // % 표시.
-    expect(screen.getByText(/\d+%/)).toBeInTheDocument();
+    // 라벨 = '[확률 N%]'. 옛 '[힘 N%]' 같은 stat 명 부재.
+    expect(screen.getByText(/\[확률 \d+%\]/)).toBeInTheDocument();
+    expect(screen.queryByText(/\[힘 \d+%\]/)).toBeNull();
     fireEvent.click(screen.getByText(/치기/));
     expect(onChoose).toHaveBeenCalledWith("pr");
   });

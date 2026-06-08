@@ -9,11 +9,11 @@
 //        · plain → 1 edge (source → target, data.kind='plain')
 //        · probability → 2 edges (success, failure / data.branch)
 //        · conditional → 1 edge (data.kind='conditional', data.hidden=choice.hidden)
-//   2. autoLayout(nodes, edges): position 없는 노드만 dagre TB 로 자동 배치.
+//   2. autoLayout(nodes, edges): position 없는 노드만 dagre LR 로 자동 배치.
 //      - savedPosition 있는 노드는 그 좌표 유지.
 //
 // 외부 의존성:
-//   - @dagrejs/dagre (3.x) — TB rank, nodesep=80, ranksep=120.
+//   - @dagrejs/dagre (3.x) — LR rank, nodesep=80, ranksep=120.
 
 import dagre from "@dagrejs/dagre";
 import type { Scene } from "@/types/web-adventure";
@@ -24,7 +24,27 @@ export type SceneWithPosition = Scene & {
   position?: { x: number; y: number };
 };
 
-export const START_SCENE_ID = "town_square_dawn";
+// #333 — 〈에테르니아〉 3 주인공 화이트리스트.
+// 옛 사극 단일 시작 (town_square_dawn) 잔재 제거.
+// content-lint 의 startSceneIds 와 일관.
+export const START_SCENE_IDS = [
+  "kael_infirmary",
+  "rin_harbor",
+  "solwen_grove",
+] as const;
+
+const START_SCENE_SET = new Set<string>(START_SCENE_IDS);
+
+/**
+ * 옛 단일 상수 호환 — 첫 시작 씬 (kael_infirmary) 을 가리킨다.
+ * 신규 코드는 `START_SCENE_IDS` 또는 `isStartScene()` 사용.
+ * @deprecated 2026-06 이후 제거 예정. START_SCENE_IDS 사용.
+ */
+export const START_SCENE_ID: (typeof START_SCENE_IDS)[number] = START_SCENE_IDS[0];
+
+export function isStartScene(sceneId: string): boolean {
+  return START_SCENE_SET.has(sceneId);
+}
 
 export type GraphNodeData = {
   /** 표시 라벨 */
@@ -76,7 +96,7 @@ export function buildGraphFromScenes(
     };
     if (scene.isEnding) data.isEnding = true;
     if (scene.endingId) data.endingId = scene.endingId;
-    if (scene.id === START_SCENE_ID) data.isStart = true;
+    if (isStartScene(scene.id)) data.isStart = true;
     if (savedPosition) data.savedPosition = savedPosition;
     return {
       id: scene.id,
@@ -146,7 +166,9 @@ export function autoLayout(
 
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 80, ranksep: 120 });
+  // #344 — handle 이 Left(target)/Right(source) 로 변경됨에 따라 dagre 도 LR
+  // 로 동기. 노드가 좌→우 흐름 + edge 자연스럽게 수평.
+  g.setGraph({ rankdir: "LR", nodesep: 80, ranksep: 120 });
 
   for (const n of nodes) {
     g.setNode(n.id, { width: nodeWidth, height: nodeHeight });

@@ -107,6 +107,19 @@ describe('Choice kind 별 필드 검증', () => {
   });
 });
 
+describe('revisionCount 필드 (옛 quest CMS version 패턴)', () => {
+  it('revisionCount 미정의 시 default 0', () => {
+    const doc = makeDoc();
+    // 미명시 시 기본값 0.
+    expect((doc as unknown as { revisionCount: number }).revisionCount).toBe(0);
+  });
+
+  it('revisionCount 명시 값 그대로 유지', () => {
+    const doc = makeDoc({ revisionCount: 5 });
+    expect((doc as unknown as { revisionCount: number }).revisionCount).toBe(5);
+  });
+});
+
 describe('onEnter / endingId', () => {
   it('onEnter.addItems 배열을 받는다', () => {
     const doc = makeDoc({ onEnter: { addItems: ['spellbook'] } });

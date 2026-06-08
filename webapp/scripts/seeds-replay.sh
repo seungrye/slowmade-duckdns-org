@@ -55,6 +55,7 @@ PATCHES=(
   scripts/seed-selene-branch.mjs        # #325 selene 분기 (solwen_combat_hard)
   scripts/seed-str-climb.mjs            # #326 str 활용 (kael_cargo_container)
   scripts/seed-final-resort.mjs         # #327 orphan 4 씬 정리 (재이용 + 삭제)
+  scripts/seed-345-branch-divergence.mjs # #345 6 씬 probability 분기별 다른 흐름 분리
 )
 
 run_one() {

@@ -164,8 +164,14 @@ async function main() {
   );
 
   // 멱등 — upsert by id.
+  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
   for (const s of scenes) {
-    await Scene.findOneAndUpdate({ id: s.id }, s, {
+    const cur = await Scene.findOne({ id: s.id }).lean();
+    const update = { ...s };
+    if (cur && cur.illustration && !cur.illustration.includes('placeholder')) {
+      update.illustration = cur.illustration;
+    }
+    await Scene.findOneAndUpdate({ id: s.id }, update, {
       upsert: true,
       new: true,
       setDefaultsOnInsert: true,

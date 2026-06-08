@@ -70,7 +70,13 @@ async function main() {
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
   // 1) 신규 omphalos_cameo upsert.
-  await Scene.findOneAndUpdate({ id: newScene.id }, newScene, { upsert: true, new: true });
+  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  const curCameo = await Scene.findOne({ id: newScene.id }).lean();
+  const cameoUpdate = { ...newScene };
+  if (curCameo && curCameo.illustration && !curCameo.illustration.includes('placeholder')) {
+    cameoUpdate.illustration = curCameo.illustration;
+  }
+  await Scene.findOneAndUpdate({ id: newScene.id }, cameoUpdate, { upsert: true, new: true });
   console.log('upsert: omphalos_cameo (3 분기)');
 
   // 2) omphalos_blackmarket 에 meet_cameo hidden 분기 추가 (3 분기 한도 검증).

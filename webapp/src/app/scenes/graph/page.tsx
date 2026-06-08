@@ -2,7 +2,7 @@
 //
 // #222 (6 주차):
 //   - 30 씬 fetch (/api/web-adventure/content/v1)
-//   - dagre TB 자동 레이아웃 (savedPosition 있는 노드는 유지)
+//   - dagre LR 자동 레이아웃 (savedPosition 있는 노드는 유지)
 //   - 노드 클릭 → /scenes/[id] 이동 (편집 페이지) — #226 부터 우측 사이드패널 인라인 편집.
 //   - 노드 드래그 → debounce 500ms PUT (position 만)
 //   - 엔딩 6 색 / 엣지 4 종 시각 구분
@@ -19,9 +19,10 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -29,6 +30,8 @@ import {
   Controls,
   MarkerType,
   useReactFlow,
+  useNodesState,
+  useEdgesState,
   type Edge,
   type Node,
   type NodeTypes,
@@ -97,13 +100,22 @@ function GraphInner() {
   // #226 — router.push 는 더 이상 사용하지 않지만, useRouter 를 호출해
   // next/navigation 컨텍스트와 호환을 유지한다 (테스트 mock 호환).
   useRouter();
+  // #341 — /scenes/[id] 의 '차트에서 보기' 버튼이 ?focus=<id> 로 진입.
+  // mount + scenes 로드 후 그 노드 selectedSceneId 설정 + setCenter(zoom: 1.2).
+  const searchParams = useSearchParams();
+  const focusParam = searchParams?.get("focus") ?? null;
   // #235 — 카메라 이동용 setCenter 훅.
-  const { setCenter } = useReactFlow();
+  // #330 — getZoom 추가: 선택 시 *현재 zoom 유지* (확대 금지).
+  // #341/fix — getNodes: focus URL 진입의 setTimeout 안에서 *최신* 노드 좌표
+  // 가 필요. closure 의 rfNodes 는 stale (마운트 시점 빈 배열).
+  const { setCenter, getZoom, getNodes, setNodes, setEdges } = useReactFlow();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // #226 — 사이드패널 편집 대상 씬 id.
   // #231 — null 시 SidePanel 자체 미렌더 (mount/unmount + slide-in/out).
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  // #341 — focus URL 진입으로 인한 selectedSceneId 인지. 그때만 zoom 1.2 강제.
+  const initialFocusAppliedRef = useRef(false);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   // #225 — drag 시작 좌표 기억 (id → {x,y}).
   // onNodeDragStart 에서 set, onNodeDragStop 에서 비교 후 clear.
@@ -113,7 +125,11 @@ function GraphInner() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/web-adventure/content/v1");
+        // #331 — cache: "no-store" — 드래그한 좌표를 새로고침 시 즉시 받기
+        // 위함. content/v1 의 max-age=60 캐시가 PUT 직후 새로고침을 stale
+        // 데이터로 채우는 문제 차단. graph 페이지는 admin 도구라 매번 fresh
+        // fetch 비용 허용.
+        const res = await fetch("/api/web-adventure/content/v1", { cache: "no-store" });
         if (!res.ok) throw new Error(`fetch ${res.status}`);
         const json = (await res.json()) as {
           data?: { scenes?: SceneWithPosition[] };
@@ -132,8 +148,16 @@ function GraphInner() {
     };
   }, []);
 
-  const { rfNodes, rfEdges } = useMemo(() => {
-    if (!scenes) return { rfNodes: [] as Node[], rfEdges: [] as Edge[] };
+  // #347 — uncontrolled 패턴: ReactFlow 의 *내부 store* 만 사용.
+  //   외부 useNodesState 시 매 mousemove 마다 외부 state 갱신 → 컴포넌트 re-render
+  //   → 노드 드래그 응답성 큰 부담. setNodes/setEdges 가 internal store 만 갱신.
+  //   ReactFlow 의 `nodes`/`edges` prop 안 줌 → uncontrolled 모드 활성.
+
+  // scenes 가 fetch 되면 노드/엣지 state 를 초기 배치 (dagre autoLayout + savedPosition).
+  // 사용자가 드래그로 옮긴 위치는 state 에 남고 mongo 에 PUT 저장됨.
+  // 다음 fetch 시 scene.position 으로 다시 들어와 savedPosition 으로 인식.
+  useEffect(() => {
+    if (!scenes) return;
     const { nodes, edges } = buildGraphFromScenes(scenes);
     const laid = autoLayout(nodes, edges);
     const rfn: Node[] = laid.map((n) => ({
@@ -142,30 +166,90 @@ function GraphInner() {
       type: "scene",
       data: n.data as unknown as Record<string, unknown>,
       draggable: true,
-      // #235 — 선택 상태를 rfNodes 에 부착.
-      // selectedSceneId===null 시 모든 노드 selected=false → ring highlight off.
+      // #235 — 선택 상태 부착. selectedSceneId 변경 시 별도 effect 로 갱신.
       selected: n.id === selectedSceneId,
     }));
-    return { rfNodes: rfn, rfEdges: toReactFlowEdges(edges) };
-  }, [scenes, selectedSceneId]);
+    setNodes(rfn);
+    setEdges(toReactFlowEdges(edges));
+    // selectedSceneId 가 의도 deps 가 아닌 이유: 셀렉트 변경 시 *씬 데이터 재배치*
+    // 하지 않고 *selected 필드만* 갱신 (다음 effect). 여기 deps 에 포함하면 매번
+    // 드래그 위치 초기화.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes]);
 
-  // #235 — 선택 노드를 캔버스 중앙으로 이동.
-  // SidePanel 슬라이드인 (300ms transition) 직후 setCenter 호출.
-  // ReactFlow 가 flex-1 컨테이너 안이므로 패널이 차지하는 우측은 자동 제외 →
-  // 컨테이너 내 가운데 = 사용자 시각상 캔버스 중앙.
+  // #341 — focus URL param 처리: scenes 가 로드된 후 그 노드를 *선택* + 카메라
+  // 중앙 + zoom 1.2 로 확대. 한 번만 (initialFocusAppliedRef 가드).
+  // selectedSceneId 변경 시 다른 노드 클릭은 #330 정책 (현재 zoom 유지) 그대로.
   useEffect(() => {
-    if (!selectedSceneId) return;
-    const node = rfNodes.find((n) => n.id === selectedSceneId);
-    if (!node) return;
+    if (!scenes || !focusParam || initialFocusAppliedRef.current) return;
+    const target = scenes.find((s) => s.id === focusParam);
+    if (!target) return;
+    initialFocusAppliedRef.current = true;
+    setSelectedSceneId(focusParam);
+    // 노드 좌표 — scene.position (savedPosition) 또는 autoLayout 후 rfNodes 에서 찾기.
     const timer = setTimeout(() => {
-      setCenter(
-        node.position.x + 90, // 노드 width 180 / 2.
-        node.position.y + 30, // 노드 height 60 / 2.
-        { zoom: 1.2, duration: 400 },
-      );
-    }, 350);
+      const node = getNodes().find((n) => n.id === focusParam);
+      if (!node) return;
+      setCenter(node.position.x + 90, node.position.y + 30, {
+        zoom: 1.2,
+        duration: 600,
+      });
+    }, 400);
     return () => clearTimeout(timer);
-  }, [selectedSceneId, rfNodes, setCenter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenes, focusParam]);
+
+  // #235/#329/#346 — selectedSceneId 변경 시 noded.selected 필드 동기화.
+  //   - selectedCount > 1 (shift+multi-select) 시 보존 — 깨뜨리지 않음.
+  //   - no-op 시 *동일 reference* 반환 — 무한 루프 차단.
+  useEffect(() => {
+    setNodes((nodes) => {
+      const selectedCount = nodes.filter((n) => n.selected).length;
+      if (selectedCount > 1) return nodes;
+      const needsUpdate = nodes.some(
+        (n) => n.selected !== (n.id === selectedSceneId),
+      );
+      if (!needsUpdate) return nodes;
+      return nodes.map((n) =>
+        n.selected === (n.id === selectedSceneId)
+          ? n
+          : { ...n, selected: n.id === selectedSceneId },
+      );
+    });
+  }, [selectedSceneId]);
+
+  // #334/#347 — 선택 노드의 connected edges 에 노란 drop-shadow glow.
+  // 변경 없는 edge 는 *동일 reference* 반환 — 114 edge 모두 spread 부담 차단.
+  useEffect(() => {
+    setEdges((edges) => {
+      let changed = false;
+      const next = edges.map((e) => {
+        const isConnected =
+          selectedSceneId !== null &&
+          (e.source === selectedSceneId || e.target === selectedSceneId);
+        const currentStyle = (e.style ?? {}) as CSSProperties;
+        const hasFilter = typeof currentStyle.filter === "string" && currentStyle.filter.includes("drop-shadow");
+        // 동일 상태면 그대로.
+        if (isConnected === hasFilter) return e;
+        changed = true;
+        const { filter: _drop, ...rest } = currentStyle;
+        void _drop;
+        const nextStyle: CSSProperties = isConnected
+          ? {
+              ...rest,
+              filter:
+                "drop-shadow(0 0 4px #fde047) drop-shadow(0 0 6px #fde047)",
+            }
+          : rest;
+        return { ...e, style: nextStyle };
+      });
+      return changed ? next : edges;
+    });
+  }, [selectedSceneId]);
+
+  // #235 (제거) — 노드 클릭 시 setCenter 카메라 이동 제거.
+  //   #347: 69 노드 + 114 edge 환경에서 *클릭 응답성 저하 주요 원인*.
+  //   focus URL 진입 시 (#341) 만 직접 setCenter — 그것은 *명시 의도* 라 유지.
 
   // #225 — 드래그 시작점 저장.
   // ReactFlow 는 노드 mousedown 시 (이동 없어도) onNodeDragStart 를 발화.
@@ -180,9 +264,9 @@ function GraphInner() {
   //   - 거리 ≥ 5px → debounce 500ms PUT (위치 저장).
   // 라우팅 / PUT 충돌을 방지하기 위해 별도 onNodeClick 핸들러를 두지 않는다.
   const handleNodeDragStop = useCallback<
-    (e: React.MouseEvent, node: Node) => void
+    (e: React.MouseEvent, node: Node, nodes: Node[]) => void
   >(
-    (_e, node) => {
+    (_e, node, nodes) => {
       const id = node.id;
       const start = dragStartRef.current[id];
       delete dragStartRef.current[id];
@@ -196,16 +280,21 @@ function GraphInner() {
         return;
       }
 
-      if (debounceRef.current[id]) clearTimeout(debounceRef.current[id]);
-      debounceRef.current[id] = setTimeout(() => {
-        void fetch(`/api/web-adventure/scenes/${encodeURIComponent(id)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ position: { x: node.position.x, y: node.position.y } }),
-        }).catch(() => {
-          /* 일시 오류는 무시 — 다음 드래그가 재시도 */
-        });
-      }, 500);
+      // #346 — 다수 함께 드래그 시 각 노드 별 PUT. nodes 비어있으면 단일 node.
+      const dragged = nodes && nodes.length > 0 ? nodes : [node];
+      for (const n of dragged) {
+        const nid = n.id;
+        if (debounceRef.current[nid]) clearTimeout(debounceRef.current[nid]);
+        debounceRef.current[nid] = setTimeout(() => {
+          void fetch(`/api/web-adventure/scenes/${encodeURIComponent(nid)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ position: { x: n.position.x, y: n.position.y } }),
+          }).catch(() => {
+            /* 일시 오류는 무시 — 다음 드래그가 재시도 */
+          });
+        }, 500);
+      }
     },
     [],
   );
@@ -232,7 +321,7 @@ function GraphInner() {
           </Link>
           <h1 className="text-2xl font-bold mt-1">씬 흐름 차트</h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            노드 클릭 = 우측 패널 편집 (슬라이드인) / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre TB
+            노드 클릭 = 우측 패널 편집 (슬라이드인) / 노드 드래그 = 위치 저장 (자동 mongo) / 자동 레이아웃 = dagre LR
           </p>
         </div>
         <Legend />
@@ -250,8 +339,11 @@ function GraphInner() {
         >
           <div className="flex-1 min-w-0 h-full">
             <ReactFlow
-              nodes={rfNodes}
-              edges={rfEdges}
+              // #347 — uncontrolled: defaultNodes/defaultEdges 빈 배열 명시.
+              //   useReactFlow().setNodes/setEdges 로 비동기 fetch 후 갱신.
+              //   드래그 시 외부 state 갱신 X → 컴포넌트 재 렌더 없음.
+              defaultNodes={[]}
+              defaultEdges={[]}
               nodeTypes={NODE_TYPES}
               nodesDraggable
               onNodeDragStart={handleNodeDragStart}
@@ -259,7 +351,23 @@ function GraphInner() {
               // #233 — ReactFlow 는 순수 클릭(움직임 0) 시 onNodeDragStart/Stop
               // 자체를 발화하지 않는다. handleNodeDragStop 의 isClick 분기는 작은
               // 드래그(< 5px) 에만 도달하므로, 순수 클릭은 onNodeClick 으로 처리.
-              onNodeClick={(_, node) => setSelectedSceneId(node.id)}
+              // #346 — multi-select: shift+클릭/drag select. shift 키 안 누른
+              //   클릭만 단일 선택 강제. shift+click 은 ReactFlow 가 알아서 추가
+              //   선택 (multiSelectionKeyCode 기본값="Shift").
+              multiSelectionKeyCode="Shift"
+              onNodeClick={(e, node) => {
+                if ((e as React.MouseEvent).shiftKey) return;
+                setSelectedSceneId(node.id);
+              }}
+              // 2+ 다수 선택 시 SidePanel unmount.
+              onSelectionChange={({ nodes: selNodes }) => {
+                if (selNodes.length > 1) setSelectedSceneId(null);
+              }}
+              // #336 — 캔버스 빈 여백 클릭 → 패널 닫기 + selected 해제 + 엣지
+              // glow 제거. setSelectedSceneId(null) 한 번이면 useEffect 들이
+              // 모두 동기화 — SidePanel unmount + 노드 selected=false + 엣지
+              // filter 제거.
+              onPaneClick={() => setSelectedSceneId(null)}
               fitView
               minZoom={0.2}
               maxZoom={2}
@@ -281,21 +389,23 @@ function GraphInner() {
   );
 }
 
-// #270 〈에테르니아의 추락〉 — 6 엔딩 + 엣지 4 종 범례.
+// #270 〈에테르니아의 추락〉 — 노드/엣지 범례.
+// #335 — 6 엔딩 개별 색 라인 제거. 엔딩 노드는 단일 색 (amber) 으로 통일.
 function Legend() {
   return (
     <div className="text-xs space-y-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded p-2 shadow-sm">
       <div className="font-bold mb-1">범례 — 〈에테르니아의 추락〉</div>
       <div className="flex flex-wrap gap-x-3 gap-y-1">
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-amber-200 border border-amber-500" /> ✨ 승천</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-red-200 border border-red-600" /> ⚙️ 혁명</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-emerald-200 border border-emerald-600" /> ☯ 조화</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-gray-300 border border-gray-500" /> 💀 추락</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-indigo-300 border border-indigo-700" /> 🗿 석화</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-lime-200 border border-lime-600" /> 🌿 정령의 결속</span>
-      </div>
-      <div className="border-t border-gray-200 dark:border-gray-600 pt-1 mt-1 flex flex-wrap gap-x-3 gap-y-1">
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded bg-amber-200 border border-amber-500" /> 🏁 엔딩 씬</span>
         <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-violet-500" /> ⭐ 시작 씬</span>
+        {/* #334 — 선택 노드의 연결 엣지 노란 glow. */}
+        <span className="flex items-center gap-1">
+          <span
+            className="inline-block w-5 border-t-2 border-gray-700"
+            style={{ filter: "drop-shadow(0 0 4px #fde047) drop-shadow(0 0 6px #fde047)" }}
+          />{" "}
+          선택 노드 연결선
+        </span>
       </div>
       <div className="border-t border-gray-200 dark:border-gray-600 pt-1 mt-1 flex flex-wrap gap-x-3 gap-y-1">
         <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-gray-700" /> 일반 분기</span>

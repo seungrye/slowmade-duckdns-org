@@ -39,6 +39,12 @@ export interface LintOptions {
    * stigma ≥ 100 자동). ORPHAN 검출 + UNREACHABLE_ENDING 검출에서 제외.
    */
   autoEndingSceneIds?: string[];
+  /**
+   * reducer 가 *씬 데이터 없이* 직접 ending 으로 전환하는 endingId 들 (#327 이후
+   * ending_petrification 씬을 삭제했으므로 화이트리스트는 endingId 기반으로도
+   * 필요). UNREACHABLE_ENDING 검출에서 제외.
+   */
+  autoEndingIds?: EndingId[];
 }
 
 export interface LintResult {
@@ -141,7 +147,7 @@ export function lintSceneContent(
   //    그래프 도달성 검사에서 제외 (e2e 가 별도 검증).
   if (options.requiredEndings && options.requiredEndings.length > 0) {
     const reached = bfsReachableEndings(registry, options.startSceneIds);
-    const autoEndingIds = new Set<EndingId>();
+    const autoEndingIds = new Set<EndingId>(options.autoEndingIds ?? []);
     for (const sceneId of autoEndings) {
       const s = registry[sceneId];
       if (s?.isEnding && s.endingId) autoEndingIds.add(s.endingId as EndingId);

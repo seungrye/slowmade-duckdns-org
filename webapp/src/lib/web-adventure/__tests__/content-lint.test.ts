@@ -114,8 +114,10 @@ describe("실 콘텐츠 lint (#271)", () => {
       startSceneIds: ["kael_infirmary", "rin_harbor", "solwen_grove"],
       requiredEndings: ALL_ENDINGS,
       // #327 — *_caught/_chase 가 우회 씬의 자결 plain 분기로 *재이용* 되어 reachable.
-      //   ending_petrification 도 삭제 (자동 ending 잔재). 화이트리스트 빈 배열로.
+      //   ending_petrification 은 삭제 (자동 ending 잔재). 씬이 없으므로 endingId
+      //   화이트리스트로 직접 처리.
       autoEndingSceneIds: [],
+      autoEndingIds: ["petrification"],
     });
     // 실패 시 위반 전체 출력.
     if (r.issues.length > 0) {

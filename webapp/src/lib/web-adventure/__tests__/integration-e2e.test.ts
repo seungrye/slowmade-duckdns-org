@@ -35,13 +35,15 @@ const SCENARIOS: Scenario[] = [
     protagonist: "kael",
     endingId: "revolution",
     steps: [
-      { kind: "choice", id: "grab_scalpel" },     // kael_infirmary → kael_corridor
+      { kind: "choice", id: "grab_scalpel" },     // kael_infirmary → kael_corridor_blade (#345)
+      { kind: "choice", id: "continue" },         // kael_corridor_blade → kael_corridor
       { kind: "choice", id: "to_cargo_dock" },    // → kael_cargo_container
       { kind: "choice", id: "climb_in" },         // → kael_falling
       { kind: "choice", id: "rise_to_ground" },   // → omphalos_outskirts
       { kind: "choice", id: "to_station" },       // → omphalos_station
       { kind: "choice", id: "path_steel" },       // → station_path_steel
-      { kind: "choice", id: "derail" },           // probability success → climax_revolution_path
+      { kind: "choice", id: "derail" },           // probability success → climax_revolution_path_derail (#345)
+      { kind: "choice", id: "continue" },         // → climax_revolution_path
       { kind: "choice", id: "join_revolution" },  // → ending_revolution
     ],
   },
@@ -50,6 +52,7 @@ const SCENARIOS: Scenario[] = [
     endingId: "ascension",
     steps: [
       { kind: "choice", id: "grab_scalpel" },
+      { kind: "choice", id: "continue" },          // #345 — kael_corridor_blade → kael_corridor
       { kind: "choice", id: "to_cargo_dock" },
       { kind: "choice", id: "climb_in" },
       { kind: "choice", id: "rise_to_ground" },
@@ -65,6 +68,7 @@ const SCENARIOS: Scenario[] = [
     endingId: "harmony",
     steps: [
       { kind: "choice", id: "grab_scalpel" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_cargo_dock" },
       { kind: "choice", id: "climb_in" },
       { kind: "choice", id: "rise_to_ground" },
@@ -80,13 +84,15 @@ const SCENARIOS: Scenario[] = [
     endingId: "fall",
     steps: [
       { kind: "choice", id: "grab_scalpel" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_cargo_dock" },
       { kind: "choice", id: "climb_in" },
       { kind: "choice", id: "rise_to_ground" },
       { kind: "choice", id: "to_station" },
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
-      { kind: "choice", id: "reject_revolution" },   // → ending_fall
+      { kind: "choice", id: "continue" },          // #345 — climax_revolution_path_derail → climax_revolution_path
+      { kind: "choice", id: "reject_revolution" }, // → ending_fall
     ],
   },
   {
@@ -95,12 +101,15 @@ const SCENARIOS: Scenario[] = [
     endingId: "revolution",
     steps: [
       { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "continue" },          // #345 — rin_evidence_breach → rin_evidence
       { kind: "choice", id: "to_supervisor" },
       { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "continue" },          // #345 — rin_underground_shot → rin_underground
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_station" },
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "join_revolution" },
     ],
   },
@@ -110,8 +119,10 @@ const SCENARIOS: Scenario[] = [
     endingId: "ascension",
     steps: [
       { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_supervisor" },
       { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_market" },
       { kind: "choice", id: "to_station_after" },
@@ -126,8 +137,10 @@ const SCENARIOS: Scenario[] = [
     endingId: "harmony",
     steps: [
       { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_supervisor" },
       { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_market" },
       { kind: "choice", id: "to_station_after" },
@@ -142,12 +155,15 @@ const SCENARIOS: Scenario[] = [
     endingId: "fall",
     steps: [
       { kind: "choice", id: "shoot_lock" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_supervisor" },
       { kind: "choice", id: "shoot_first" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_station" },
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "reject_revolution" },
     ],
   },
@@ -157,12 +173,15 @@ const SCENARIOS: Scenario[] = [
     endingId: "revolution",
     steps: [
       { kind: "choice", id: "arrow_first" },
+      { kind: "choice", id: "continue" },          // #345 — solwen_combat_arrow → solwen_combat
       { kind: "choice", id: "shoot_canister" },
+      { kind: "choice", id: "continue" },          // #345 — solwen_grief_canister → solwen_grief
       { kind: "choice", id: "to_revenge" },
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_station" },
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "join_revolution" },
     ],
   },
@@ -172,7 +191,9 @@ const SCENARIOS: Scenario[] = [
     endingId: "harmony",
     steps: [
       { kind: "choice", id: "arrow_first" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "shoot_canister" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_revenge" },
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_market" },
@@ -188,12 +209,15 @@ const SCENARIOS: Scenario[] = [
     endingId: "fall",
     steps: [
       { kind: "choice", id: "arrow_first" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "shoot_canister" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_revenge" },
       { kind: "choice", id: "to_omphalos" },
       { kind: "choice", id: "to_station" },
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
+      { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "reject_revolution" },
     ],
   },
@@ -201,8 +225,10 @@ const SCENARIOS: Scenario[] = [
     protagonist: "solwen",
     endingId: "sylvan_bond",
     steps: [
-      { kind: "choice", id: "arrow_first" },          // solwen_grove → solwen_combat
-      { kind: "choice", id: "shoot_canister" },       // → solwen_grief (spiritBeastDied)
+      { kind: "choice", id: "arrow_first" },          // solwen_grove → solwen_combat_arrow (#345)
+      { kind: "choice", id: "continue" },             // → solwen_combat
+      { kind: "choice", id: "shoot_canister" },       // → solwen_grief_canister (#345)
+      { kind: "choice", id: "continue" },             // → solwen_grief (spiritBeastDied)
       { kind: "choice", id: "to_revenge" },           // → solwen_departure
       { kind: "choice", id: "to_omphalos" },          // → omphalos_outskirts
       { kind: "choice", id: "to_station" },
@@ -221,7 +247,8 @@ const SCENARIOS: Scenario[] = [
     protagonist: "kael",
     endingId: "petrification",
     steps: [
-      { kind: "choice", id: "grab_scalpel" },         // → kael_corridor (+ ether_refined_water 자동)
+      { kind: "choice", id: "grab_scalpel" },         // → kael_corridor_blade (#345)
+      { kind: "choice", id: "continue" },             // → kael_corridor (+ ether_refined_water 자동)
       { kind: "choice", id: "forge_id" },             // → kael_corridor_clear (probability success)
       { kind: "choice", id: "to_cargo_dock_after_id" }, // → kael_cargo_container (+ mana_stone_fragment)
       { kind: "choice", id: "climb_in" },             // → kael_falling

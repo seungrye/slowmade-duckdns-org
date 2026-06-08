@@ -142,8 +142,14 @@ const updates = [
 async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
+  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
   for (const u of updates) {
-    await Scene.findOneAndUpdate({ id: u.id }, u, { upsert: true, new: true, setDefaultsOnInsert: true });
+    const cur = await Scene.findOne({ id: u.id }).lean();
+    const update = { ...u };
+    if (cur && cur.illustration && !cur.illustration.includes('placeholder')) {
+      update.illustration = cur.illustration;
+    }
+    await Scene.findOneAndUpdate({ id: u.id }, update, { upsert: true, new: true, setDefaultsOnInsert: true });
     console.log('upsert:', u.id, `(${u.choices.length} 분기)`);
   }
   await mongoose.disconnect();

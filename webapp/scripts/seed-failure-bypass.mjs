@@ -92,7 +92,9 @@ const FAILURE_REDIRECTS = [
   // Kael
   { sceneId: 'kael_infirmary', choiceId: 'grab_scalpel', newFailure: 'kael_struggled' },
   { sceneId: 'kael_infirmary', choiceId: 'overload_panel', newFailure: 'kael_struggled' },
-  { sceneId: 'kael_infirmary', choiceId: 'fake_flatline', newFailure: 'kael_struggled' },
+  // fake_flatline 은 *지능 14 가사 위장* — 실패 시 *즉시 적발 → 석화* 가 원래
+  // 시드 의도 (kael_caught = Scene 01b — 적발). 우회 씬 redirect 제거.
+  // { sceneId: 'kael_infirmary', choiceId: 'fake_flatline', newFailure: 'kael_struggled' },
   { sceneId: 'kael_corridor', choiceId: 'forge_id', newFailure: 'kael_caught_minor' },
   // Rin
   { sceneId: 'rin_harbor', choiceId: 'shoot_lock', newFailure: 'rin_pursued' },
@@ -108,8 +110,14 @@ async function main() {
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
   // 1. 신규 씬 upsert.
+  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
   for (const scene of NEW_SCENES) {
-    await Scene.findOneAndUpdate({ id: scene.id }, scene, { upsert: true, new: true });
+    const cur = await Scene.findOne({ id: scene.id }).lean();
+    const update = { ...scene };
+    if (cur && cur.illustration && !cur.illustration.includes('placeholder')) {
+      update.illustration = cur.illustration;
+    }
+    await Scene.findOneAndUpdate({ id: scene.id }, update, { upsert: true, new: true });
     console.log('upsert:', scene.id, `(hpΔ${scene.onEnter.hpDelta}, stigmaΔ+${scene.onEnter.stigmaDelta})`);
   }
 

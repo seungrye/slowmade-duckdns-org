@@ -12,49 +12,46 @@
 //   - data-ending-id      endingId (있는 경우)
 //   - data-saved-position true/false (mongo position 저장 여부)
 
+import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { GraphNodeData } from "@/lib/web-adventure/engine/graph";
 import { endingsMeta } from "@/content/web-adventure/endings";
 
 type SceneNodeType = Node<GraphNodeData, "scene">;
 
-// #270 〈에테르니아〉 6 엔딩 — endingsMeta 단일 소스.
-// Tailwind 색 매핑만 graph 전용 (배경/테두리/글씨 색조).
-const ENDING_COLOR: Record<string, string> = {
-  ascension: "bg-amber-200 text-amber-900 border-amber-500",      // 금빛 — 신계 승천
-  revolution: "bg-red-200 text-red-900 border-red-600",           // 핏빛 강철 — 혁명
-  harmony: "bg-emerald-200 text-emerald-900 border-emerald-600",  // 조화 — 세 달
-  fall: "bg-gray-300 text-gray-700 border-gray-500",              // 잿더미 — 추락
-  petrification: "bg-indigo-300 text-indigo-900 border-indigo-700", // 푸른 결정 — 석화
-  sylvan_bond: "bg-lime-200 text-lime-900 border-lime-600",       // 숲 — 세계수
-};
+// #335 — 모든 엔딩 단일 색 (amber). 6 endingId 차이는 *icon* 으로만 구분.
+// 그래프 시인성: 종류별 6 색 매핑이 시각 노이즈 → 일반 노드 vs 엔딩 노드 구분
+// 만 유지. 범례의 6 엔딩 라인도 제거 (개별 색 의미 없음).
+const ENDING_COLOR_SINGLE = "bg-amber-200 text-amber-900 border-amber-500";
 
 // ReactFlow 가 자동으로 selected/dragging 등을 NodeProps 로 전달.
 // #234 — selected 시 노란 ring 으로 시각 피드백 (시작 노드의 isStart ring 과
 // 색만 다름: 시작=amber-400, 선택=yellow-300 굵게 + offset).
 type Props = NodeProps<SceneNodeType>;
 
-export default function SceneNode({ id, data, selected }: Props) {
+// #347 — React.memo: 69 노드 × 매 ReactFlow render 마다 re-render 부담 차단.
+// props (id/data/selected/dragging 등) 변화 시만 렌더.
+function SceneNodeInner({ id, data, selected }: Props) {
   const isEnding = data.isEnding === true;
   const isStart = data.isStart === true;
-  const endingColor = data.endingId ? ENDING_COLOR[data.endingId] : "";
   // endingsMeta 단일 소스 — endings.ts 변경 시 자동 반영.
   const endingIcon =
     data.endingId && data.endingId in endingsMeta
       ? endingsMeta[data.endingId as keyof typeof endingsMeta].icon
       : "";
 
+  // #335 — 엔딩 노드는 *단일 색* (amber). endingId 별 색 매핑 제거.
   const baseClass = isEnding
-    ? `${endingColor} border-2`
+    ? `${ENDING_COLOR_SINGLE} border-2`
     : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 border border-gray-400";
-  // 우선순위: selected (노란) > isStart (보라 — selected 와 색 구분).
-  // #235 사용자 피드백: 시작 노드의 amber-400 이 selected 의 yellow-300 과
-  // 시각적으로 너무 비슷 → 시작 노드를 violet 으로 변경.
-  const ringClass = selected
-    ? "ring-4 ring-yellow-300 ring-offset-2 ring-offset-white dark:ring-offset-gray-900"
-    : isStart
-      ? "ring-4 ring-violet-500"
-      : "";
+  // 우선순위: selected (노란 glow) > isStart (보라 ring — 색 구분).
+  // #235 — 시작 노드 violet (amber 와 차별).
+  // #337 — 선택 노드: ring → *노란 glow* (box-shadow). 연결 엣지의 노란
+  // drop-shadow glow (#334) 와 일관된 시각 언어.
+  const ringClass = !selected && isStart ? "ring-4 ring-violet-500" : "";
+  const glowStyle = selected
+    ? { boxShadow: "0 0 8px #fde047, 0 0 16px #fde047" }
+    : undefined;
 
   return (
     <div
@@ -62,17 +59,21 @@ export default function SceneNode({ id, data, selected }: Props) {
       data-ending-id={data.endingId ?? undefined}
       data-saved-position={data.savedPosition ? "true" : "false"}
       data-selected={selected ? "true" : "false"}
-      className={`${baseClass} ${ringClass} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs shadow-sm cursor-grab active:cursor-grabbing flex flex-col justify-center transition-shadow`}
+      className={`${baseClass} ${ringClass} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs ${selected ? "" : "shadow-sm"} cursor-grab active:cursor-grabbing flex flex-col justify-center transition-shadow`}
       title={`${id}\n${data.title}`}
+      style={glowStyle}
     >
-      <Handle type="target" position={Position.Top} />
+      <Handle type="target" position={Position.Left} />
       <div className="font-bold truncate flex items-center gap-1">
         {endingIcon && <span>{endingIcon}</span>}
         {isStart && <span>⭐</span>}
         <span className="truncate">{data.title}</span>
       </div>
       <div className="text-[10px] font-mono opacity-70 truncate">{id}</div>
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="source" position={Position.Right} />
     </div>
   );
 }
+
+const SceneNode = memo(SceneNodeInner);
+export default SceneNode;

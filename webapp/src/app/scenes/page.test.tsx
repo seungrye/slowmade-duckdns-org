@@ -15,6 +15,8 @@ const mockScenes = Array.from({ length: 18 }).map((_, i) => ({
   choices: i % 2 === 0 ? [{ kind: 'plain', id: 'c1', label: '계속', to: 'scene_00' }] : [],
   isEnding: i === 17,
   endingId: i === 17 ? 'main' : undefined,
+  // 옛 quest CMS 패턴 — 씬마다 revision 카운트.
+  revisionCount: i,
 }));
 
 beforeEach(() => {
@@ -64,5 +66,17 @@ describe('ScenesPage — 목록', () => {
     render(<ScenesPage />);
     await act(async () => {});
     expect(screen.getByText('+ 새 씬')).toBeTruthy();
+  });
+
+  // 옛 quest CMS 패턴 — 각 행에 v{revisionCount} 칩.
+  it('각 행에 v{revisionCount} 형식의 리비전 badge 가 노출된다', async () => {
+    const { container } = render(<ScenesPage />);
+    await act(async () => {});
+    // scene_03 → v3, scene_05 → v5 등.
+    expect(container.textContent).toContain('v3');
+    expect(container.textContent).toContain('v5');
+    expect(container.textContent).toContain('v17');
+    // v0 도 명시 (scene_00).
+    expect(container.textContent).toContain('v0');
   });
 });
