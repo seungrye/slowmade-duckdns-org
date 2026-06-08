@@ -61,7 +61,9 @@ function SceneNodeInner({ id, data, selected }: Props) {
       data-selected={selected ? "true" : "false"}
       className={`${baseClass} ${ringClass} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs ${selected ? "" : "shadow-sm"} cursor-grab active:cursor-grabbing flex flex-col justify-center transition-shadow`}
       title={`${id}\n${data.title}`}
-      style={glowStyle}
+      // #347/will-change — 드래그/줌 시 transform 갱신을 GPU 합성층에 격리.
+      //   브라우저 hint 로 painting 비용 절감 → 노드 드래그 응답성 개선.
+      style={{ willChange: "transform", ...glowStyle }}
     >
       <Handle type="target" position={Position.Left} />
       <div className="font-bold truncate flex items-center gap-1">
