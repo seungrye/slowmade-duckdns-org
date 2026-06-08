@@ -15,29 +15,46 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: () => null }),
 }));
 
-// #225 — ReactFlow props 캡처용 (mock 안에서 참조).
-// vi.hoisted 로 mock 보다 먼저 평가.
+// #225/#347 — ReactFlow props 캡처용 + uncontrolled 패턴 mock store.
+//   useReactFlow().setNodes/setEdges 호출 결과를 mockStore 에 저장 +
+//   ReactFlowStub 가 그것을 렌더 + flowProps.nodes/edges 에 노출.
 const flowProps = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+const mockStore = vi.hoisted(() => ({
+  nodes: [] as Array<{ id: string; type?: string; data?: Record<string, unknown>; selected?: boolean; position?: { x: number; y: number } }>,
+  edges: [] as Array<{ id: string; source: string; target: string; style?: { filter?: string } }>,
+  // mock store 변경 시 GraphInner 재렌더 트리거하는 listener 등록.
+  listeners: new Set<() => void>(),
+}));
 
-// ReactFlow mock — onNodeDrag*, nodesDraggable 등 props 캡처.
-// 실제 마운트는 노드 클릭 / 드래그 검증에 방해되므로 가짜 컨테이너 + 자식 노드 렌더.
 vi.mock("@xyflow/react", async () => {
   const actual = await vi.importActual<typeof import("@xyflow/react")>(
     "@xyflow/react",
   );
+  const React = await vi.importActual<typeof import("react")>("react");
   type ReactFlowProps = {
-    nodes?: Array<{ id: string; type?: string; data?: Record<string, unknown> }>;
     nodeTypes?: Record<string, React.ComponentType<{ id: string; data: unknown }>>;
     children?: React.ReactNode;
     [k: string]: unknown;
   };
   const ReactFlowStub = (props: ReactFlowProps) => {
-    Object.assign(flowProps.current, props);
-    const { nodes, nodeTypes } = props;
-    // .react-flow + .react-flow__node.draggable wrapper 로 노드 렌더.
+    // 컴포넌트 재 렌더 — mockStore 변경 시 trigger 위한 listener 등록.
+    const [, force] = React.useState(0);
+    React.useEffect(() => {
+      const listener = () => force((v) => v + 1);
+      mockStore.listeners.add(listener);
+      return () => {
+        mockStore.listeners.delete(listener);
+      };
+    }, []);
+    // props 캡처 + mockStore 의 현재 nodes/edges 도 함께 노출.
+    Object.assign(flowProps.current, props, {
+      nodes: mockStore.nodes,
+      edges: mockStore.edges,
+    });
+    const { nodeTypes } = props;
     return (
       <div className="react-flow">
-        {(nodes ?? []).map((n) => {
+        {mockStore.nodes.map((n) => {
           const Comp = n.type && nodeTypes ? nodeTypes[n.type] : undefined;
           return (
             <div key={n.id} className="react-flow__node draggable">
@@ -48,13 +65,36 @@ vi.mock("@xyflow/react", async () => {
       </div>
     );
   };
+  const notify = () => {
+    for (const l of mockStore.listeners) l();
+  };
   return {
     ...actual,
     ReactFlow: ReactFlowStub,
     Background: () => null,
     Controls: () => null,
-    // Handle 도 zustand provider 의존 → stub.
     Handle: () => null,
+    useReactFlow: () => ({
+      setNodes: (updater: unknown) => {
+        const next =
+          typeof updater === "function"
+            ? (updater as (n: typeof mockStore.nodes) => typeof mockStore.nodes)(mockStore.nodes)
+            : (updater as typeof mockStore.nodes);
+        mockStore.nodes = next;
+        notify();
+      },
+      setEdges: (updater: unknown) => {
+        const next =
+          typeof updater === "function"
+            ? (updater as (e: typeof mockStore.edges) => typeof mockStore.edges)(mockStore.edges)
+            : (updater as typeof mockStore.edges);
+        mockStore.edges = next;
+        notify();
+      },
+      setCenter: vi.fn(),
+      getZoom: () => 1,
+      getNodes: () => mockStore.nodes,
+    }),
   };
 });
 
@@ -109,6 +149,11 @@ function makeMockScenes() {
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
+  // mockStore reset (uncontrolled 패턴 — 매 테스트 fresh).
+  mockStore.nodes = [];
+  mockStore.edges = [];
+  mockStore.listeners.clear();
+  flowProps.current = {};
   pushMock.mockClear();
   fetchMock = vi.fn().mockImplementation(async (url: string, init?: RequestInit) => {
     if (url.includes("/api/web-adventure/content/v1")) {
@@ -699,63 +744,22 @@ describe("/scenes/graph — #331 새로고침 시 드래그 위치 유지 (no-st
   });
 });
 
-// #329 — 드래그 시 노드가 *실제* 마우스를 따라가도록.
-// ReactFlow 제어 모드 (nodes prop) 는 `onNodesChange` 가 없으면 드래그 변화가
-// 외부 state 에 반영되지 않아 *드래그 자체가 화면에 안 보임*. useNodesState +
-// onNodesChange = applyNodeChanges 패턴 도입.
-describe("/scenes/graph — #329 드래그 위치 변경 (useNodesState + onNodesChange)", () => {
+// #347 — uncontrolled 패턴 전환: nodes/edges prop 안 줌 + useReactFlow().setNodes
+// 로 internal store 갱신. 드래그 시 외부 state 갱신 없음 → 컴포넌트 재 렌더 없음.
+describe("/scenes/graph — #347 uncontrolled 패턴 (defaultNodes/setNodes)", () => {
   beforeEach(() => {
     flowProps.current = {};
   });
 
-  test("page.tsx 에 useNodesState/useEdgesState import + 사용", () => {
+  test("page.tsx — defaultNodes/defaultEdges prop + useReactFlow().setNodes 패턴", () => {
     const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
-    // import 구문에 useNodesState 가 등장 (@xyflow/react).
-    expect(code).toMatch(/useNodesState/);
-    expect(code).toMatch(/useEdgesState/);
-  });
-
-  it("ReactFlow 컨테이너에 onNodesChange / onEdgesChange prop 전달", async () => {
-    render(<GraphPage />);
-    await act(async () => {});
-    await act(async () => {});
-    expect(typeof flowProps.current.onNodesChange).toBe("function");
-    expect(typeof flowProps.current.onEdgesChange).toBe("function");
-  });
-
-  it("onNodesChange 호출 → ReactFlow 의 nodes prop 의 position 이 갱신됨", async () => {
-    render(<GraphPage />);
-    await act(async () => {});
-    await act(async () => {});
-
-    const onNodesChange = flowProps.current.onNodesChange as (
-      changes: Array<{ id: string; type: string; position?: { x: number; y: number } }>,
-    ) => void;
-    expect(typeof onNodesChange).toBe("function");
-
-    // 드래그 종료 가정 시 ReactFlow 가 발화하는 변경:
-    // { id, type: 'position', position: { x: 500, y: 500 } } (dragging: false 도 포함 가능).
-    await act(async () => {
-      onNodesChange([
-        { id: "scene_01", type: "position", position: { x: 500, y: 500 } } as never,
-      ]);
-    });
-    await act(async () => {});
-
-    const nodes = (flowProps.current.nodes ?? []) as Array<{
-      id: string;
-      position: { x: number; y: number };
-    }>;
-    const moved = nodes.find((n) => n.id === "scene_01");
-    expect(moved?.position).toEqual({ x: 500, y: 500 });
-  });
-
-  test("page.tsx 에 applyNodeChanges 패턴 (또는 useNodesState 호출) 으로 노드 state 관리", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
-    // 둘 중 하나는 반드시 존재 — useNodesState 가 가장 단순한 패턴.
-    const hasUseNodesState = /useNodesState\(/.test(code);
-    const hasApplyNodeChanges = /applyNodeChanges/.test(code);
-    expect(hasUseNodesState || hasApplyNodeChanges).toBe(true);
+    expect(code).toMatch(/defaultNodes=\{/);
+    expect(code).toMatch(/defaultEdges=\{/);
+    // useReactFlow 의 setNodes/setEdges 사용.
+    expect(code).toMatch(/setNodes\(/);
+    expect(code).toMatch(/setEdges\(/);
+    // 옛 nodes={} edges={} (controlled prop) 부재.
+    expect(code).not.toMatch(/<ReactFlow[^>]*\s+nodes=\{/s);
   });
 });
 

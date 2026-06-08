@@ -43,7 +43,14 @@ vi.mock("@xyflow/react", async () => {
     Panel: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
     Handle: () => null,
     Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
-    useReactFlow: () => ({ fitView: vi.fn(), setNodes: vi.fn() }),
+    useReactFlow: () => ({
+      fitView: vi.fn(),
+      setNodes: vi.fn(),
+      setEdges: vi.fn(),
+      setCenter: vi.fn(),
+      getZoom: () => 1,
+      getNodes: () => [],
+    }),
     useNodesState: () => [[], vi.fn(), vi.fn()],
     useEdgesState: () => [[], vi.fn(), vi.fn()],
   };
