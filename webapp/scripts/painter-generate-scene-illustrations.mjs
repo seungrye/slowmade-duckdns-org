@@ -406,8 +406,11 @@ try {
       callMs,
     });
 
-    // Pollinations 부담 회피용 sleep (마지막 항목 제외)
-    if (i < ids.length - 1) await sleep(2500);
+    // 씬 사이 sleep — Gemini 분당 quota 회피용.
+    //   기본 2500ms (Pollinations 부담 완화).
+    //   PAINTER_BETWEEN_SCENES_MS 환경 변수로 override (예: 65000 = 분당 1).
+    const betweenMs = parseInt(process.env.PAINTER_BETWEEN_SCENES_MS ?? "2500", 10);
+    if (i < ids.length - 1) await sleep(betweenMs);
   }
 
   // 보고
