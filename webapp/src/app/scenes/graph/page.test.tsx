@@ -15,6 +15,26 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => ({ get: () => null }),
 }));
 
+// #347 — autoLayout 을 sync grid mock 으로 대체.
+//   elkjs 의 async resolve 가 vitest 환경의 act 와 잘 호환되지 않아 hang.
+//   좌표 정확도는 vitest 검증 대상 아님 — savedPosition 유지 + grid 좌표.
+vi.mock("@/lib/web-adventure/engine/graph", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/web-adventure/engine/graph")>(
+    "@/lib/web-adventure/engine/graph",
+  );
+  return {
+    ...actual,
+    autoLayout: async (
+      nodes: Array<{ id: string; data?: { savedPosition?: { x: number; y: number } } }>,
+    ) => {
+      return nodes.map((n, i) => ({
+        ...n,
+        position: n.data?.savedPosition ?? { x: (i % 8) * 200, y: Math.floor(i / 8) * 100 },
+      }));
+    },
+  };
+});
+
 // #225/#347 — ReactFlow props 캡처용 + uncontrolled 패턴 mock store.
 //   useReactFlow().setNodes/setEdges 호출 결과를 mockStore 에 저장 +
 //   ReactFlowStub 가 그것을 렌더 + flowProps.nodes/edges 에 노출.

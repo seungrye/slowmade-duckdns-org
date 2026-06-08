@@ -152,13 +152,13 @@ describe("buildGraphFromScenes — edges", () => {
   });
 });
 
-describe("autoLayout", () => {
-  it("savedPosition 없는 노드는 dagre 가 좌표 할당 (음수 아닌 finite)", () => {
+describe("autoLayout (elk)", () => {
+  it("savedPosition 없는 노드는 elk 가 좌표 할당 (finite)", async () => {
     const { nodes, edges } = buildGraphFromScenes([
       makeScene({ id: "a", choices: [{ kind: "plain", id: "p", label: "x", to: "b" }] }),
       makeScene({ id: "b" }),
     ]);
-    const laid = autoLayout(nodes, edges);
+    const laid = await autoLayout(nodes, edges);
     expect(laid).toHaveLength(2);
     for (const n of laid) {
       expect(Number.isFinite(n.position.x)).toBe(true);
@@ -166,13 +166,13 @@ describe("autoLayout", () => {
     }
   });
 
-  it("savedPosition 있는 노드는 그 좌표 유지", () => {
+  it("savedPosition 있는 노드는 그 좌표 유지", async () => {
     const fixed = { x: 999, y: 888 };
     const { nodes, edges } = buildGraphFromScenes([
       makeScene({ id: "a", position: fixed }),
       makeScene({ id: "b" }),
     ]);
-    const laid = autoLayout(nodes, edges);
+    const laid = await autoLayout(nodes, edges);
     const aNode = laid.find((n) => n.id === "a")!;
     expect(aNode.position).toEqual(fixed);
   });

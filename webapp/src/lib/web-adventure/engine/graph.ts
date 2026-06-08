@@ -1,6 +1,7 @@
-// graph.ts — Scene[] → ReactFlow nodes/edges 변환 + dagre 자동 레이아웃.
+// graph.ts — Scene[] → ReactFlow nodes/edges 변환 + 자동 레이아웃.
 //
 // #222 (6 주차) — /scenes/graph 편집 차트.
+// #347 — dagre → elkjs (더 빠른 layered layout).
 //
 // 책임:
 //   1. buildGraphFromScenes(scenes): Scene[] → { nodes, edges }
@@ -9,13 +10,16 @@
 //        · plain → 1 edge (source → target, data.kind='plain')
 //        · probability → 2 edges (success, failure / data.branch)
 //        · conditional → 1 edge (data.kind='conditional', data.hidden=choice.hidden)
-//   2. autoLayout(nodes, edges): position 없는 노드만 dagre LR 로 자동 배치.
+//   2. autoLayout(nodes, edges) [async]: position 없는 노드만 elk LR 로 자동 배치.
 //      - savedPosition 있는 노드는 그 좌표 유지.
+//      - dagre 보다 *큰 그래프 (69 노드)* 에서 빠른 레이아웃 + 더 깔끔한 결과.
 //
 // 외부 의존성:
-//   - @dagrejs/dagre (3.x) — LR rank, nodesep=80, ranksep=120.
+//   - elkjs (0.11+) — layered algorithm, LR direction.
 
-import dagre from "@dagrejs/dagre";
+// elkjs main entry — workerless. bundled (web worker) 는 vitest jsdom 환경에서
+// worker 부재로 hang. main 은 동기 알고리즘 모두 포함.
+import ELK from "elkjs";
 import type { Scene } from "@/types/web-adventure";
 
 // position 필드는 Scene 타입에 아직 정식 추가되지 않았으므로 *확장 타입* 으로 받는다.
@@ -155,39 +159,62 @@ export function buildGraphFromScenes(
   return { nodes, edges };
 }
 
-/** dagre 자동 레이아웃. savedPosition 있는 노드는 그대로 유지. */
-export function autoLayout(
+/**
+ * elk 자동 레이아웃 (async). savedPosition 있는 노드는 그대로 유지.
+ * #347 — dagre → elkjs. layered algorithm + LR direction.
+ */
+export async function autoLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
   opts?: { nodeWidth?: number; nodeHeight?: number },
-): GraphNode[] {
+): Promise<GraphNode[]> {
   const nodeWidth = opts?.nodeWidth ?? 180;
   const nodeHeight = opts?.nodeHeight ?? 60;
 
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  // #344 — handle 이 Left(target)/Right(source) 로 변경됨에 따라 dagre 도 LR
-  // 로 동기. 노드가 좌→우 흐름 + edge 자연스럽게 수평.
-  g.setGraph({ rankdir: "LR", nodesep: 80, ranksep: 120 });
-
-  for (const n of nodes) {
-    g.setNode(n.id, { width: nodeWidth, height: nodeHeight });
+  // savedPosition 없는 노드만 layout 대상.
+  const layoutTargets = nodes.filter((n) => !n.data.savedPosition);
+  if (layoutTargets.length === 0) {
+    // 모두 savedPosition — layout 호출 skip.
+    return nodes.map((n) =>
+      n.data.savedPosition
+        ? { ...n, position: { ...n.data.savedPosition } }
+        : n,
+    );
   }
-  for (const e of edges) {
-    // dagre 가 인식 가능한 노드 간의 엣지만 추가 (target 미지정 dangling 방지).
-    if (g.hasNode(e.source) && g.hasNode(e.target)) {
-      g.setEdge(e.source, e.target);
+
+  const targetIds = new Set(layoutTargets.map((n) => n.id));
+  const elk = new ELK();
+  const graph = {
+    id: "root",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "RIGHT", // LR
+      "elk.spacing.nodeNode": "80",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "120",
+    },
+    children: layoutTargets.map((n) => ({
+      id: n.id,
+      width: nodeWidth,
+      height: nodeHeight,
+    })),
+    edges: edges
+      .filter((e) => targetIds.has(e.source) && targetIds.has(e.target))
+      .map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] })),
+  };
+
+  const result = await elk.layout(graph);
+  const posMap = new Map<string, { x: number; y: number }>();
+  for (const c of result.children ?? []) {
+    if (c.id && typeof c.x === "number" && typeof c.y === "number") {
+      posMap.set(c.id, { x: c.x, y: c.y });
     }
   }
-  dagre.layout(g);
 
   return nodes.map((n) => {
     if (n.data.savedPosition) {
       return { ...n, position: { ...n.data.savedPosition } };
     }
-    const laid = g.node(n.id);
-    const x = laid ? laid.x - nodeWidth / 2 : 0;
-    const y = laid ? laid.y - nodeHeight / 2 : 0;
-    return { ...n, position: { x, y } };
+    const laid = posMap.get(n.id);
+    return { ...n, position: laid ?? { x: 0, y: 0 } };
   });
 }

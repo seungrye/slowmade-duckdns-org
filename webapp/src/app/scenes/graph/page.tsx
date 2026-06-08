@@ -153,27 +153,31 @@ function GraphInner() {
   //   → 노드 드래그 응답성 큰 부담. setNodes/setEdges 가 internal store 만 갱신.
   //   ReactFlow 의 `nodes`/`edges` prop 안 줌 → uncontrolled 모드 활성.
 
-  // scenes 가 fetch 되면 노드/엣지 state 를 초기 배치 (dagre autoLayout + savedPosition).
-  // 사용자가 드래그로 옮긴 위치는 state 에 남고 mongo 에 PUT 저장됨.
-  // 다음 fetch 시 scene.position 으로 다시 들어와 savedPosition 으로 인식.
+  // scenes 가 fetch 되면 노드/엣지 state 를 초기 배치 (elk autoLayout + savedPosition).
+  // #347 — autoLayout 이 async (elkjs) 로 변경 → useEffect 안에서 await.
   useEffect(() => {
     if (!scenes) return;
-    const { nodes, edges } = buildGraphFromScenes(scenes);
-    const laid = autoLayout(nodes, edges);
-    const rfn: Node[] = laid.map((n) => ({
-      id: n.id,
-      position: n.position,
-      type: "scene",
-      data: n.data as unknown as Record<string, unknown>,
-      draggable: true,
-      // #235 — 선택 상태 부착. selectedSceneId 변경 시 별도 effect 로 갱신.
-      selected: n.id === selectedSceneId,
-    }));
-    setNodes(rfn);
-    setEdges(toReactFlowEdges(edges));
-    // selectedSceneId 가 의도 deps 가 아닌 이유: 셀렉트 변경 시 *씬 데이터 재배치*
-    // 하지 않고 *selected 필드만* 갱신 (다음 effect). 여기 deps 에 포함하면 매번
-    // 드래그 위치 초기화.
+    let cancelled = false;
+    (async () => {
+      const { nodes, edges } = buildGraphFromScenes(scenes);
+      const laid = await autoLayout(nodes, edges);
+      if (cancelled) return;
+      const rfn: Node[] = laid.map((n) => ({
+        id: n.id,
+        position: n.position,
+        type: "scene",
+        data: n.data as unknown as Record<string, unknown>,
+        draggable: true,
+        // focusParam 도 함께 — autoLayout async 완료 시점에 selectedSceneId
+        // closure 가 stale 일 수 있음 (focus URL effect 가 그 사이 setSelectedSceneId 호출).
+        selected: n.id === selectedSceneId || n.id === focusParam,
+      }));
+      setNodes(rfn);
+      setEdges(toReactFlowEdges(edges));
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes]);
 
