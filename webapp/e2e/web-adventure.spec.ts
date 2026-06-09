@@ -14,6 +14,12 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("web-adventure 실 브라우저 e2e (#277)", () => {
+  // #351 — e2e 환경: typewriter OFF (본문 즉시 표시 — 분기 가시 안정).
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      try { localStorage.setItem("web-adventure:typewriter", "off"); } catch {}
+    });
+  });
   test("플레이 페이지 — CharacterCreator 마운트 + 주인공 카드 3 종", async ({ page }) => {
     await page.goto("/games/web-adventure/play");
     await expect(page.getByRole("heading", { name: /에테르니아의 추락/ }).first()).toBeVisible();
