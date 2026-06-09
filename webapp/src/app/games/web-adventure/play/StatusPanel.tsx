@@ -17,6 +17,7 @@ import type { Character, StatKey } from '@/types/web-adventure';
 import { abilities } from '@/content/web-adventure/abilities';
 import { items } from '@/content/web-adventure/items';
 import { groupInventory, formatGroupedItem } from '@/lib/web-adventure/engine/inventory';
+import PlayOptionsSection from './PlayOptionsSection';
 
 const STAT_KEYS: Array<{ key: StatKey; label: string }> = [
   { key: 'str', label: 'STR' },
@@ -191,6 +192,9 @@ export default function StatusPanel({
           </ul>
         )}
       </div>
+
+      {/* #351/v3 — 플레이 옵션 */}
+      <PlayOptionsSection />
     </aside>
   );
 }
