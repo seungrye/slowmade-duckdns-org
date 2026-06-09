@@ -40,7 +40,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "to_cargo_dock" },    // → kael_cargo_container
       { kind: "choice", id: "climb_in" },         // → kael_falling
       { kind: "choice", id: "rise_to_ground" },   // → omphalos_outskirts
-      { kind: "choice", id: "to_station" },       // → omphalos_station
+      { kind: "choice", id: "to_station" },       // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },         // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_steel" },       // → station_path_steel
       { kind: "choice", id: "derail" },           // probability success → climax_revolution_path_derail (#345)
       { kind: "choice", id: "continue" },         // → climax_revolution_path
@@ -88,7 +89,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "to_cargo_dock" },
       { kind: "choice", id: "climb_in" },
       { kind: "choice", id: "rise_to_ground" },
-      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "to_station" },         // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },           // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
       { kind: "choice", id: "continue" },          // #345 — climax_revolution_path_derail → climax_revolution_path
@@ -106,7 +108,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "shoot_first" },
       { kind: "choice", id: "continue" },          // #345 — rin_underground_shot → rin_underground
       { kind: "choice", id: "to_omphalos" },
-      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "to_station" },         // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },           // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
       { kind: "choice", id: "continue" },          // #345
@@ -160,7 +163,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "shoot_first" },
       { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_omphalos" },
-      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "to_station" },         // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },           // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
       { kind: "choice", id: "continue" },          // #345
@@ -178,7 +182,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "continue" },          // #345 — solwen_grief_canister → solwen_grief
       { kind: "choice", id: "to_revenge" },
       { kind: "choice", id: "to_omphalos" },
-      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "to_station" },         // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },           // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
       { kind: "choice", id: "continue" },          // #345
@@ -214,7 +219,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "continue" },          // #345
       { kind: "choice", id: "to_revenge" },
       { kind: "choice", id: "to_omphalos" },
-      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "to_station" },         // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },           // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_steel" },
       { kind: "choice", id: "derail" },
       { kind: "choice", id: "continue" },          // #345
@@ -231,7 +237,8 @@ const SCENARIOS: Scenario[] = [
       { kind: "choice", id: "continue" },             // → solwen_grief (spiritBeastDied)
       { kind: "choice", id: "to_revenge" },           // → solwen_departure
       { kind: "choice", id: "to_omphalos" },          // → omphalos_outskirts
-      { kind: "choice", id: "to_station" },
+      { kind: "choice", id: "to_station" },           // → omphalos_infiltration (#349)
+      { kind: "choice", id: "sneak_in" },             // probability success → omphalos_station (#349)
       { kind: "choice", id: "path_spirit" },
       { kind: "choice", id: "spirit_swallow" },       // flag 조건 충족
       { kind: "choice", id: "embrace_sylvan" },

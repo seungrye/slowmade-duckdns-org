@@ -56,6 +56,7 @@ PATCHES=(
   scripts/seed-str-climb.mjs            # #326 str 활용 (kael_cargo_container)
   scripts/seed-final-resort.mjs         # #327 orphan 4 씬 정리 (재이용 + 삭제)
   scripts/seed-345-branch-divergence.mjs # #345 6 씬 probability 분기별 다른 흐름 분리
+  scripts/seed-349-narrative-strengthening.mjs # #349 시나리오 개연성 보강 (사제단 의식 정체 + 침투 씬)
 )
 
 run_one() {

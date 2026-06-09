@@ -79,6 +79,7 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
     // 1) 회차 1 — Kael → Harmony 완주.
     const r1Steps: string[] = [
       "grab_scalpel",
+      "continue",        // #345 — kael_corridor_blade → kael_corridor.
       "to_cargo_dock",
       "climb_in",
       "rise_to_ground",
@@ -107,12 +108,15 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
     //    climax_harmony_path → ending_harmony 도달.
     const r2Steps: string[] = [
       "grab_scalpel",
+      "continue",        // #345 — kael_corridor_blade → kael_corridor.
       "to_cargo_dock",
       "climb_in",
       "rise_to_ground",
       "to_station",
+      "sneak_in",        // #349 — omphalos_infiltration probability success → omphalos_station.
       "path_steel",
       "derail",
+      "continue",        // #345 — climax_revolution_path_derail → climax_revolution_path.
       "echo_of_harmony", // hidden 해금 (world.harmony_kept) → climax_harmony_path.
       "still_the_engine",
     ];
@@ -135,12 +139,15 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
     let s = startState("kael", loaded, {}); // 빈 flags.
     const path: string[] = [
       "grab_scalpel",
+      "continue",        // #345 — kael_corridor_blade → kael_corridor.
       "to_cargo_dock",
       "climb_in",
       "rise_to_ground",
       "to_station",
+      "sneak_in",        // #349 — omphalos_infiltration probability success → omphalos_station.
       "path_steel",
       "derail",
+      "continue",        // #345 — climax_revolution_path_derail → climax_revolution_path.
     ];
     for (const id of path) {
       s = gameReducer(s, { type: "MAKE_CHOICE", choiceId: id, rng: RNG }, loaded);
