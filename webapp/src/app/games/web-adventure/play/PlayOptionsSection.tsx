@@ -36,34 +36,37 @@ function Toggle({
   onChange: (next: boolean) => void;
   testid: string;
 }) {
+  // 전체 영역 = button (role=switch). 라벨/힌트/스위치 모두 클릭 가능.
   return (
-    <label
-      className="flex items-start justify-between gap-2 cursor-pointer select-none py-1"
-      data-testid={testid}
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className="w-full flex items-start justify-between gap-2 select-none py-1 text-left cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 rounded"
+      data-testid={`${testid}-switch`}
+      data-checked={checked ? "true" : "false"}
     >
-      <div className="flex-1">
-        <div className="text-xs text-amber-900">{label}</div>
-        {hint && <div className="text-[10px] text-amber-700/80">{hint}</div>}
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        aria-label={label}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 ${
+      <span className="flex-1">
+        <span className="block text-xs text-amber-900">{label}</span>
+        {hint && (
+          <span className="block text-[10px] text-amber-700/80">{hint}</span>
+        )}
+      </span>
+      <span
+        aria-hidden
+        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
           checked ? "bg-amber-700" : "bg-amber-300"
         }`}
-        data-testid={`${testid}-switch`}
-        data-checked={checked ? "true" : "false"}
       >
         <span
           className={`inline-block h-4 w-4 rounded-full bg-amber-50 transition-transform ${
             checked ? "translate-x-4" : "translate-x-0.5"
           }`}
         />
-      </button>
-    </label>
+      </span>
+    </button>
   );
 }
 
@@ -81,6 +84,11 @@ export default function PlayOptionsSection() {
     setVisitedCount(getVisitedScenes().size);
   }, []);
 
+  // details open 시 *현재 카운트* 다시 평가 — 게임 진행 중 갱신.
+  function refreshCount() {
+    setVisitedCount(getVisitedScenes().size);
+  }
+
   if (!mounted) {
     return (
       <details className="mt-2 border-t border-amber-300 pt-2" data-testid="play-options">
@@ -95,6 +103,7 @@ export default function PlayOptionsSection() {
     <details
       className="mt-2 border-t border-amber-300 pt-2"
       data-testid="play-options"
+      onToggle={refreshCount}
     >
       <summary className="cursor-pointer text-xs text-amber-800">
         ⚙️ 옵션

@@ -45,10 +45,11 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
     if (!getTypewriterEnabled()) return true;
     if (getSkipVisitedEnabled() && isSceneVisited(scene.id)) return true;
     return false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scene.id]);
 
-  const allComplete = skipAll || skipSequential || lastDone;
+  // 본문 빈 씬 = 즉시 완료 — ChoiceList 영구 숨김 방지.
+  const emptyBody = scene.body.length === 0;
+  const allComplete = skipAll || skipSequential || lastDone || emptyBody;
 
   useEffect(() => {
     setOpacity(0);
@@ -109,7 +110,8 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
         })}
       </div>
 
-      {/* #351/v2 — ChoiceList 는 모든 본문 완료 후 fade-in. */}
+      {/* #351/v2 — ChoiceList 는 모든 본문 완료 후 fade-in.
+          `inert` (#351/v3) 로 *키보드 탭 포커스* 까지 차단 — a11y. */}
       <div
         className="transition-opacity duration-300 ease-out"
         style={{
@@ -117,6 +119,7 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
           pointerEvents: allComplete ? "auto" : "none",
         }}
         aria-hidden={!allComplete}
+        inert={!allComplete}
         data-choices-visible={allComplete ? "true" : "false"}
       >
         <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />

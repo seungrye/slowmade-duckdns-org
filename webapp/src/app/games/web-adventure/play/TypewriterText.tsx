@@ -15,6 +15,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { getTypewriterEnabled } from "@/lib/web-adventure/play/typewriter-options";
 
 interface Props {
   text: string;
@@ -44,12 +45,8 @@ function shouldDisableTypewriter(): boolean {
       /* 무시 */
     }
   }
-  // 4) localStorage 토글 — 사용자 설정.
-  try {
-    if (window.localStorage.getItem("web-adventure:typewriter") === "off") return true;
-  } catch {
-    /* 무시 */
-  }
+  // 4) 사용자 옵션 (typewriter-options.ts) — 단일 출처.
+  if (!getTypewriterEnabled()) return true;
   return false;
 }
 
