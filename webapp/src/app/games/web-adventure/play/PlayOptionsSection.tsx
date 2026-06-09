@@ -111,8 +111,8 @@ export default function PlayOptionsSection() {
       <div className="mt-2 space-y-1.5">
         <Toggle
           testid="opt-typewriter"
-          label="타이프라이터 효과"
-          hint="OFF — 본문 즉시 표시."
+          label="본문 순차 표시"
+          hint="OFF — 본문 전체 즉시 표시."
           checked={typewriterOn}
           onChange={(next) => {
             setTypewriterOn(next);

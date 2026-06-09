@@ -4,7 +4,6 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { Character, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
-import TypewriterText from "./TypewriterText";
 import {
   getSkipVisitedEnabled,
   getTypewriterEnabled,
@@ -18,26 +17,32 @@ type Props = {
   onChoose: (choiceId: string) => void;
 };
 
+/** 문단 사이 간격 (ms). */
+const STEP_MS = 700;
+
 /**
- * 씬 렌더러 — fade-in + #351 타이프라이터 + #351/v3 옵션.
+ * 씬 렌더러 — 본문 *문단별 순차 fade-in* (#351/v4).
  *
- * 본문 출력:
- *   - 문단 별 *순차* 타이프라이터 — 한 문단 완료 후 다음 문단 시작.
- *   - 본문 영역 클릭 = 모든 문단 즉시 전체 (skipAll).
- *   - 모든 본문 완료 후 ChoiceList fade-in.
+ * 이전 타이프라이터(글자 단위 + onComplete 체인)는 콜백 누락 시 다음 문단이
+ * 멈추는 버그가 있어, *타이머 기반* 문단 reveal 로 교체. 콜백 의존 없음.
  *
- * 자동 즉시 표시 조건 (= skipSequential):
+ * 동작:
+ *   - 문단을 STEP_MS 간격으로 한 줄씩 추가 (각 문단 fade-in).
+ *   - 본문 영역 클릭 = 전체 즉시 표시 (skipAll).
+ *   - 모든 문단 표시 후 ChoiceList fade-in (그 전엔 미렌더 → 공간 미점유).
+ *
+ * 즉시 표시 조건 (= skipSequential):
  *   - vitest / playwright / SSR — 자동 환경.
- *   - 사용자 OFF (localStorage: web-adventure:typewriter=off).
+ *   - 사용자 OFF (옵션).
  *   - 방문 자동 skip ON + 이전 방문 기록.
  */
 export default function SceneRenderer({ scene, character, onChoose }: Props) {
+  const total = scene.body.length;
   const [opacity, setOpacity] = useState<0 | 100>(0);
-  const [activeIdx, setActiveIdx] = useState(0);
+  const [revealCount, setRevealCount] = useState(0);
+  const [choicesReady, setChoicesReady] = useState(false);
   const [skipAll, setSkipAll] = useState(false);
-  const [lastDone, setLastDone] = useState(false);
 
-  // 자동 즉시 표시 판정 — scene 변경 마다 재평가 (옵션 토글 즉시 반영).
   const skipSequential = useMemo(() => {
     if (process.env.NODE_ENV === "test") return true;
     if (process.env.NEXT_PUBLIC_TYPEWRITER === "off") return true;
@@ -47,20 +52,42 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
     return false;
   }, [scene.id]);
 
-  // 본문 빈 씬 = 즉시 완료 — ChoiceList 영구 숨김 방지.
-  const emptyBody = scene.body.length === 0;
-  const allComplete = skipAll || skipSequential || lastDone || emptyBody;
-
+  // 씬 진입 — fade + 방문 기록.
   useEffect(() => {
     setOpacity(0);
-    setActiveIdx(0);
-    setSkipAll(false);
-    setLastDone(false);
     const id = window.setTimeout(() => setOpacity(100), 16);
-    // 방문 기록 추가 — *진입 즉시* 기록. 다음 방문부터 자동 skip 대상.
     markSceneVisited(scene.id);
     return () => window.clearTimeout(id);
   }, [scene.id]);
+
+  // 문단 순차 reveal — 타이머 기반.
+  useEffect(() => {
+    if (skipAll || skipSequential || total === 0) {
+      setRevealCount(total);
+      return;
+    }
+    setRevealCount(1);
+    let n = 1;
+    const id = window.setInterval(() => {
+      n += 1;
+      setRevealCount(n);
+      if (n >= total) window.clearInterval(id);
+    }, STEP_MS);
+    return () => window.clearInterval(id);
+  }, [scene.id, skipSequential, skipAll, total]);
+
+  // ChoiceList 표시 — 모든 문단 노출 후 한 박자 뒤.
+  useEffect(() => {
+    if (skipAll || skipSequential || total === 0) {
+      setChoicesReady(true);
+      return;
+    }
+    if (revealCount >= total) {
+      const id = window.setTimeout(() => setChoicesReady(true), STEP_MS);
+      return () => window.clearTimeout(id);
+    }
+    setChoicesReady(false);
+  }, [scene.id, revealCount, skipAll, skipSequential, total]);
 
   return (
     <article
@@ -86,33 +113,20 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
         className="space-y-2 mb-5"
         onClick={() => setSkipAll(true)}
         data-typewriter-area
+        style={{ cursor: revealCount < total ? "pointer" : undefined }}
       >
-        {scene.body.map((p, i) => {
-          // 자동 즉시 / skipAll 일 땐 모든 문단 동시 렌더.
-          // 그 외에는 *현재 활성 문단* 까지만.
-          if (!skipAll && !skipSequential && i > activeIdx) return null;
-          const isLast = i === scene.body.length - 1;
-          return (
-            <TypewriterText
-              key={`${scene.id}-${i}`}
-              text={p}
-              forceSkip={skipAll}
-              onComplete={() => {
-                // 현재 활성 문단 *완료* → 다음 문단 활성.
-                if (i === activeIdx && i < scene.body.length - 1) {
-                  setActiveIdx(i + 1);
-                }
-                // 마지막 문단 *완료* → ChoiceList fade-in 트리거.
-                if (isLast) setLastDone(true);
-              }}
-            />
-          );
-        })}
+        {scene.body.slice(0, revealCount).map((p, i) => (
+          <p
+            key={`${scene.id}-${i}`}
+            className="leading-relaxed web-adventure-fade-in"
+          >
+            {p}
+          </p>
+        ))}
       </div>
 
-      {/* #351/v2 — ChoiceList 는 모든 본문 완료 *전엔 미렌더* (공간 미점유).
-          완료 후 마운트되며 fade-in. */}
-      {allComplete && (
+      {/* ChoiceList — 모든 문단 노출 *전엔 미렌더* (공간 미점유). */}
+      {choicesReady && (
         <div className="web-adventure-fade-in" data-choices-visible="true">
           <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />
         </div>
