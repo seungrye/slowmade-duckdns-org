@@ -110,20 +110,13 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
         })}
       </div>
 
-      {/* #351/v2 — ChoiceList 는 모든 본문 완료 후 fade-in.
-          `inert` (#351/v3) 로 *키보드 탭 포커스* 까지 차단 — a11y. */}
-      <div
-        className="transition-opacity duration-300 ease-out"
-        style={{
-          opacity: allComplete ? 1 : 0,
-          pointerEvents: allComplete ? "auto" : "none",
-        }}
-        aria-hidden={!allComplete}
-        inert={!allComplete}
-        data-choices-visible={allComplete ? "true" : "false"}
-      >
-        <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />
-      </div>
+      {/* #351/v2 — ChoiceList 는 모든 본문 완료 *전엔 미렌더* (공간 미점유).
+          완료 후 마운트되며 fade-in. */}
+      {allComplete && (
+        <div className="web-adventure-fade-in" data-choices-visible="true">
+          <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />
+        </div>
+      )}
     </article>
   );
 }

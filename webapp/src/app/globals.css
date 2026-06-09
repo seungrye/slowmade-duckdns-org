@@ -100,3 +100,23 @@ body {
 .web-adventure-page {
   font-family: 'Pretendard Variable', 'Pretendard', sans-serif;
 }
+
+/* #351 — 타이프라이터 본문 완료 후 선택지 페이드인. */
+@keyframes web-adventure-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.web-adventure-fade-in {
+  animation: web-adventure-fade-in 300ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .web-adventure-fade-in {
+    animation: none;
+  }
+}
