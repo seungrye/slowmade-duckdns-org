@@ -47,6 +47,9 @@ async function main() {
   }
 
   // ── P1: omphalos_caught_at_gate 신설 ─────────────────────────────────
+  // ending_petrification 씬 자체는 #327 에서 삭제됨 (자동 ending 으로 처리).
+  // 그래서 plain.to 가 dangling — 본 씬 자체를 *isEnding=true + endingId=petrification*
+  // 로 만들어 *진입 즉시 ending* 으로 처리. body 의 *끌려간다* 분위기와 연속.
   const NEW_SCENE = {
     id: 'omphalos_caught_at_gate',
     illustration: '/web-adventure/scenes/placeholder-square.svg',
@@ -56,14 +59,9 @@ async function main() {
       '"사제단의 정제소로 — 산 채로 인계되는 마지막 가솔린."',
       '너의 외투 안 *인장* / *권총* / *깃털* 도 — 모두 빼앗긴다. 너는 묶인 채 *호송 열차의 화물칸* 으로 끌려간다.',
     ],
-    choices: [
-      {
-        kind: 'plain',
-        id: 'surrender_to_refinery',
-        label: '저항할 힘이 — 남아있지 않다.',
-        to: 'ending_petrification',
-      },
-    ],
+    choices: [],
+    isEnding: true,
+    endingId: 'petrification',
     onEnter: { hpDelta: -5, stigmaDelta: 4 },
   };
   const curGate = await Scene.findOne({ id: NEW_SCENE.id }).lean();
