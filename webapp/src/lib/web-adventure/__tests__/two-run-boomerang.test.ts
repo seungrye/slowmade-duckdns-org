@@ -83,6 +83,8 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
       "to_cargo_dock",
       "climb_in",
       "rise_to_ground",
+      "leave_wreckage",  // #353 — kael_wreckage_hub → kael_truth_gate.
+      "leave_uncertain", // #353 — kael_truth_gate → omphalos_outskirts (단서 스킵).
       "to_market",
       "to_station_after",
       "path_knowledge",
@@ -112,6 +114,8 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
       "to_cargo_dock",
       "climb_in",
       "rise_to_ground",
+      "leave_wreckage",  // #353 — kael_wreckage_hub → kael_truth_gate.
+      "leave_uncertain", // #353 — kael_truth_gate → omphalos_outskirts (단서 스킵).
       "to_station",
       "sneak_in",        // #349 — omphalos_infiltration probability success → omphalos_station.
       "path_steel",
@@ -143,6 +147,8 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
       "to_cargo_dock",
       "climb_in",
       "rise_to_ground",
+      "leave_wreckage",  // #353 — kael_wreckage_hub → kael_truth_gate.
+      "leave_uncertain", // #353 — kael_truth_gate → omphalos_outskirts (단서 스킵).
       "to_station",
       "sneak_in",        // #349 — omphalos_infiltration probability success → omphalos_station.
       "path_steel",
