@@ -48,7 +48,9 @@ describe("START_GAME", () => {
     if (next.phase !== "playing") return;
     expect(next.currentScene).toBe("s1");
     expect(next.character.protagonist).toBe("kael");
-    expect(next.log).toEqual(["게임 시작 — 시작"]);
+    // #348 — log = ▶ 제목 (id) + 들여쓰기 본문.
+    expect(next.log[0]).toBe("▶ 시작 (s1)");
+    expect(next.log[1]).toMatch(/^ {2}/);
   });
 
   it("playing 상태에서 START_GAME → 무시", () => {

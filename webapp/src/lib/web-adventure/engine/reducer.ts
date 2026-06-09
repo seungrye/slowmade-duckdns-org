@@ -135,7 +135,14 @@ function moveTo(
 ): GameState {
   const target = scenes[targetSceneId];
   if (!target) return prev; // 정의 안 된 씬 — 안전하게 무변화.
-  const nextLog = [...prev.log, logEntry];
+  // #348 — 흐름 로그: 선택 라벨 + 다음 씬 의 제목/본문 push.
+  //   EndingScreen 의 *선택 로그* 가 풍부해져 시나리오 연결 검토 가능.
+  const nextLog = [
+    ...prev.log,
+    `→ ${logEntry}`,
+    `▶ ${target.title} (${target.id})`,
+    ...target.body.map((b) => `  ${b}`),
+  ];
   let character = prev.character;
   if (preStigmaDelta) character = applyStigmaDelta(character, preStigmaDelta);
   character = applyOnEnter(character, target);
@@ -221,7 +228,11 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
         phase: "playing",
         character: startedCharacter,
         currentScene: action.startScene,
-        log: [`게임 시작 — ${startScene.title}`],
+        // #348 — 시작 씬 의 제목 + 본문 도 흐름 로그 에 포함.
+        log: [
+          `▶ ${startScene.title} (${startScene.id})`,
+          ...startScene.body.map((b) => `  ${b}`),
+        ],
       };
     }
 

@@ -97,11 +97,41 @@ export default function EndingScreen({ endingId, character, log, onRestart }: Pr
       </section>
 
       <details className="text-left mb-5 text-sm text-amber-800">
-        <summary className="cursor-pointer">선택 로그</summary>
-        <ul className="mt-2 space-y-1 pl-4 list-disc">
-          {log.map((entry, i) => (
-            <li key={i}>{entry}</li>
-          ))}
+        <summary className="cursor-pointer">📜 지금까지의 흐름 ({log.length} 항목)</summary>
+        {/* #348 — 흐름 로그: prefix 별 시각 구분 */}
+        <ul className="mt-2 space-y-1 max-h-[60vh] overflow-y-auto pr-2">
+          {log.map((entry, i) => {
+            // ▶ 씬 진입 (제목) — 강조.
+            if (entry.startsWith("▶ ")) {
+              return (
+                <li key={i} className="font-semibold text-amber-900 pt-2 first:pt-0">
+                  {entry}
+                </li>
+              );
+            }
+            // → 선택 라벨 — 이탤릭.
+            if (entry.startsWith("→ ")) {
+              return (
+                <li key={i} className="italic text-amber-700 pl-3">
+                  {entry}
+                </li>
+              );
+            }
+            // "  " (들여쓰기) — 씬 본문 — 회색.
+            if (entry.startsWith("  ")) {
+              return (
+                <li key={i} className="text-gray-700 dark:text-gray-300 pl-3 whitespace-pre-line">
+                  {entry.slice(2)}
+                </li>
+              );
+            }
+            // 기타 (사건 — 침식 한계, HP 0, 종료 등) — 빨강.
+            return (
+              <li key={i} className="text-red-700 dark:text-red-400 pl-3">
+                {entry}
+              </li>
+            );
+          })}
         </ul>
       </details>
 
