@@ -33,15 +33,6 @@ const initialState: GameState = { phase: "creating" };
 
 type PlayingMeta = GameState & { lastProbability?: unknown };
 
-// #348 — 지금까지의 씬 흐름 누적 (시나리오 연결 검토용).
-//   각 씬: 본문 + 사용자가 선택한 분기 라벨.
-interface HistoryItem {
-  sceneId: string;
-  title: string;
-  body: string[];
-  chosenLabel?: string;
-}
-
 export default function WebAdventurePlayPage() {
   const [scenes, setScenes] = useState<SceneRegistry | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,26 +100,6 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     (s: GameState, action: Action) => gameReducer(s, action, scenes),
     initialState,
   );
-
-  // #348 — 씬 흐름 누적 (시나리오 검토용).
-  const [history, setHistory] = useState<HistoryItem[]>([]);
-  useEffect(() => {
-    if (state.phase !== "playing") return;
-    const current = scenes?.[state.currentScene];
-    if (!current) return;
-    setHistory((prev) => {
-      // 같은 씬 중복 push 차단 (재 마운트 / 동일 씬 reducer 재발화 대비).
-      if (prev.length > 0 && prev[prev.length - 1]!.sceneId === state.currentScene) return prev;
-      return [
-        ...prev,
-        { sceneId: state.currentScene, title: current.title, body: current.body },
-      ];
-    });
-  }, [state.phase, state.phase === "playing" ? state.currentScene : null, scenes]);
-  // creating 또는 ended 진입 시 history 초기화.
-  useEffect(() => {
-    if (state.phase === "creating") setHistory([]);
-  }, [state.phase]);
 
   // #240 — 로그인 직후 localStorage 의 save/past_runs → 서버 이전 (한 번만).
   useMigrateOnLogin();
@@ -344,39 +315,12 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
 
             <div className="md:grid md:grid-cols-[1fr_280px] md:gap-4">
               <div>
-                {/* #348 — 지금까지의 씬 흐름 (접힘 기본). 시나리오 연결 검토용. */}
-                {history.length > 1 && (
-                  <details className="mb-3 rounded-lg bg-amber-50/40 border border-amber-300/60 text-sm">
-                    <summary className="cursor-pointer px-3 py-2 text-amber-800 font-semibold select-none">
-                      📜 지금까지의 흐름 ({history.length - 1} 씬)
-                    </summary>
-                    <ol className="px-4 pb-3 pt-1 space-y-3 max-h-[60vh] overflow-y-auto">
-                      {history.slice(0, -1).map((h, i) => (
-                        <li key={`${h.sceneId}-${i}`} className="space-y-1">
-                          <div className="font-semibold text-gray-800 dark:text-gray-200 text-xs">
-                            {i + 1}. {h.title}
-                            <span className="ml-2 text-[10px] font-mono opacity-60">{h.sceneId}</span>
-                          </div>
-                          {h.body.map((b, j) => (
-                            <p key={j} className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
-                              {b}
-                            </p>
-                          ))}
-                          {h.chosenLabel && (
-                            <p className="text-xs italic text-amber-700 dark:text-amber-400">
-                              → {h.chosenLabel}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                )}
                 <SceneRenderer
                   scene={scenes[state.currentScene]}
                   character={state.character}
                   onChoose={(choiceId) => {
                     // #245 — adv_choice_made. #285: protagonist + stigma_erosion 추가.
+                    //   회차/시한부 분석을 위해 그 시점의 *주인공/침식* 캡처.
                     if (state.phase === "playing") {
                       const choice = scenes[state.currentScene]?.choices.find((c) => c.id === choiceId);
                       logAdvEvent("choice_made", {
@@ -387,17 +331,6 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                         stigma_erosion: state.character.stigmaErosion,
                         run_index: runIndex,
                       });
-                      // #348 — 마지막 history 의 chosenLabel 기록.
-                      if (choice) {
-                        setHistory((prev) =>
-                          prev.length > 0
-                            ? [
-                                ...prev.slice(0, -1),
-                                { ...prev[prev.length - 1]!, chosenLabel: choice.label },
-                              ]
-                            : prev,
-                        );
-                      }
                     }
                     dispatch({ type: "MAKE_CHOICE", choiceId });
                   }}
