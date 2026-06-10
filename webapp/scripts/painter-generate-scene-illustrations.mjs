@@ -34,6 +34,11 @@ const siteRoot = path.resolve(webappRoot, "..");
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
+const ALL = args.includes("--all"); // placeholder 무시, 전체 씬 재생성.
+// 씬당 배리에이션 장수 (seed 변형). 기본 3.
+const VARIATIONS = parseInt(process.env.PAINTER_VARIATIONS ?? "3", 10);
+// 배리에이션 사이 sleep (ms). Pollinations 부담 완화. 기본 3초.
+const BETWEEN_VARIATIONS_MS = parseInt(process.env.PAINTER_BETWEEN_VARIATIONS_MS ?? "3000", 10);
 const ONLY_ARG = args.find((a) => a.startsWith("--only="));
 const ONLY_IDS = ONLY_ARG ? ONLY_ARG.slice("--only=".length).split(",").filter(Boolean) : null;
 const PROMPT_CACHE_ARG = args.find((a) => a.startsWith("--prompt-cache="));
@@ -180,6 +185,28 @@ function isRateLimit(err) {
   return /\b(429|RESOURCE_EXHAUSTED|quota|rate)\b/i.test(msg);
 }
 
+// Pollinations rate limit(402/429/5xx) 시 지수 백오프 재시도.
+//   대기: 2,4,8,16,32,64,128,256s ... cap 300s. rate limit 풀릴 때까지 기다린다.
+//   rate limit 이 아닌 에러는 즉시 throw.
+async function withBackoff(fn, label = "gen") {
+  const MAX = parseInt(process.env.PAINTER_MAX_RETRIES ?? "8", 10);
+  let lastErr;
+  for (let attempt = 0; attempt <= MAX; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const msg = String(e?.message ?? e);
+      const retriable = /\b(402|429|RESOURCE_EXHAUSTED|rate|500|502|503|504)\b/i.test(msg);
+      if (!retriable || attempt === MAX) throw e;
+      const waitMs = Math.min(2 ** (attempt + 1) * 1000, 300000);
+      console.log(`  [backoff ${label}] ${msg.slice(0, 30)} — ${Math.round(waitMs / 1000)}s 후 재시도 ${attempt + 1}/${MAX}`);
+      await sleep(waitMs);
+    }
+  }
+  throw lastErr;
+}
+
 async function generateKoreanPromptFromBody(title, body, geminiKey) {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
   const userInput = `씬 제목: ${title}\n\n씬 묘사:\n${body.join("\n")}`;
@@ -256,6 +283,10 @@ try {
   let ids;
   if (ONLY_IDS) {
     ids = ONLY_IDS;
+  } else if (ALL) {
+    const allScenes = await WebAdventureScene.find({}, { id: 1 }).lean();
+    ids = allScenes.map((s) => s.id);
+    console.log(`[painter-scenes] 전체 재생성 대상: ${ids.length} 씬 × ${VARIATIONS} 장`);
   } else {
     const placeholderScenes = await WebAdventureScene.find({
       illustration: /placeholder/,
@@ -317,12 +348,18 @@ try {
     const idx = `[${i + 1}/${ids.length}]`;
     console.log(`${idx} ${id} — ${scene.title}`);
 
+    // override 가 있으면 AI(Gemma/번역) 를 *전혀 호출하지 않음* — 영어 prompt 직접 사용.
+    //   koreanPrompt 는 기록용일 뿐이라 cache 값 또는 placeholder 로 충분.
+    const enOverride = englishOverrides.get(id);
     let koreanPrompt;
     const cached = promptCache.get(id);
-    if (cached) {
+    if (enOverride) {
+      koreanPrompt = cached ?? "(영어 override 직접 사용 — AI 미호출)";
+    } else if (cached) {
       koreanPrompt = cached;
       console.log(`  prompt(KR) [cached]: ${koreanPrompt}`);
     } else {
+      // AI 호출 — 사용자 정책상 분당 1회로 제한 (override 미보유 씬만 해당).
       try {
         koreanPrompt = await generateKoreanPromptFromBody(scene.title, scene.body, process.env.GEMINI_API_KEY);
       } catch (e) {
@@ -331,6 +368,8 @@ try {
         continue;
       }
       console.log(`  prompt(KR): ${koreanPrompt}`);
+      // 다음 AI 호출까지 분당 1회 (사용자 정책). override 없는 씬 사이에서만 적용.
+      await sleep(parseInt(process.env.PAINTER_AI_INTERVAL_MS ?? "60000", 10));
     }
 
     if (DRY_RUN) {
@@ -338,76 +377,88 @@ try {
       continue;
     }
 
-    // quota 체크 (원자적 +1)
-    const allowed = await tryConsumeDailyQuota();
-    if (!allowed) {
-      if (!quotaWarned) {
-        console.error(`  [quota] 일일 한도 ${PAINTER_DAILY_LIMIT} 초과 — 이후 씬 중단.`);
-        quotaWarned = true;
+    // 씬당 VARIATIONS 장 생성 (seed 변형) → illustrations[].
+    const callStart = Date.now();
+    const { generateImage } = imageGenMod;
+    const urls = [];
+    let usedEnPrompt = enOverride ?? null;
+    let quotaHit = false;
+    for (let v = 0; v < VARIATIONS; v++) {
+      // quota 체크 (원자적 +1, 장당).
+      const allowed = await tryConsumeDailyQuota();
+      if (!allowed) {
+        if (!quotaWarned) {
+          console.error(`  [quota] 일일 한도 ${PAINTER_DAILY_LIMIT} 초과 — 중단.`);
+          quotaWarned = true;
+        }
+        quotaHit = true;
+        break;
       }
-      results.push({ id, ok: false, stage: "quota", error: "daily-limit-exceeded" });
-      break;
+      try {
+        let gen;
+        if (enOverride) {
+          gen = await withBackoff(
+            () =>
+              generateImage(enOverride, {
+                minioClient: getMinioClient(),
+                bucket: process.env.MINIO_BUCKET,
+                endpoint: process.env.MINIO_ENDPOINT,
+                pollinations: { seed: v },
+              }),
+            `${id} v${v + 1}`,
+          );
+        } else {
+          const r = await withBackoff(
+            () =>
+              translateAndGenerate(koreanPrompt, {
+                minioClient: getMinioClient(),
+                bucket: process.env.MINIO_BUCKET,
+                endpoint: process.env.MINIO_ENDPOINT,
+                geminiApiKey: process.env.GEMINI_API_KEY,
+                pollinations: { seed: v },
+              }),
+            `${id} v${v + 1}`,
+          );
+          gen = { key: r.key, url: r.url };
+          usedEnPrompt = r.translatedPrompt;
+        }
+        urls.push(gen.url);
+        console.log(`  [${v + 1}/${VARIATIONS}] ${gen.url}`);
+      } catch (e) {
+        console.error(`  [painter v${v + 1}] 실패(백오프 소진):`, String(e?.message ?? e).slice(0, 150));
+        // 이 배리에이션만 실패 — 나머지 계속.
+      }
+      if (v < VARIATIONS - 1) await sleep(BETWEEN_VARIATIONS_MS);
     }
 
-    // Pollinations + MinIO
-    const callStart = Date.now();
-    let painterResult;
-    const enOverride = englishOverrides.get(id);
-    try {
-      if (enOverride) {
-        // 사전 번역된 영어 prompt 직접 사용 — Gemini 번역 우회.
-        const { generateImage } = imageGenMod;
-        const gen = await generateImage(enOverride, {
-          minioClient: getMinioClient(),
-          bucket: process.env.MINIO_BUCKET,
-          endpoint: process.env.MINIO_ENDPOINT,
-        });
-        painterResult = {
-          key: gen.key,
-          url: gen.url,
-          originalPrompt: koreanPrompt,
-          translatedPrompt: enOverride,
-          usedPrompt: enOverride,
-        };
-      } else {
-        painterResult = await translateAndGenerate(koreanPrompt, {
-          minioClient: getMinioClient(),
-          bucket: process.env.MINIO_BUCKET,
-          endpoint: process.env.MINIO_ENDPOINT,
-          geminiApiKey: process.env.GEMINI_API_KEY,
-        });
-      }
-    } catch (e) {
-      console.error(`  [painter] 실패:`, String(e?.message ?? e).slice(0, 200));
-      results.push({ id, ok: false, stage: "painter", koreanPrompt, error: String(e?.message ?? e) });
-      // 다음 씬으로 (이미 quota 소비는 발생 — Pollinations 부담 회피용 의도적 sleep)
+    if (urls.length === 0) {
+      results.push({ id, ok: false, stage: "painter", koreanPrompt, error: quotaHit ? "quota" : "all-variations-failed" });
+      if (quotaHit) break;
       await sleep(2000);
       continue;
     }
     const callMs = Date.now() - callStart;
-    console.log(`  painter OK (${callMs}ms): ${painterResult.url}`);
-    if (painterResult.translatedPrompt) {
-      console.log(`  prompt(EN): ${painterResult.translatedPrompt}`);
-    }
+    console.log(`  painter OK (${callMs}ms): ${urls.length}장`);
 
-    // Scene.illustration update
+    // illustration = 첫 장(호환), illustrations = 전체 배리에이션.
     await WebAdventureScene.updateOne(
       { id: scene.id },
-      { $set: { illustration: painterResult.url } },
+      { $set: { illustration: urls[0], illustrations: urls } },
     );
-    console.log(`  mongo update OK\n`);
+    console.log(`  mongo update OK (${urls.length}장)\n`);
 
     results.push({
       id,
       title: scene.title,
       ok: true,
       koreanPrompt,
-      englishPrompt: painterResult.translatedPrompt,
-      usedPrompt: painterResult.usedPrompt,
-      minioKey: painterResult.key,
-      url: painterResult.url,
+      englishPrompt: usedEnPrompt,
+      usedPrompt: usedEnPrompt,
+      urls,
+      url: urls[0],
       callMs,
     });
+    if (quotaHit) break;
 
     // 씬 사이 sleep — Gemini 분당 quota 회피용.
     //   기본 2500ms (Pollinations 부담 완화).

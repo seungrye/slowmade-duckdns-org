@@ -105,6 +105,8 @@ export type ChoiceCondition =
 export type Scene = {
   id: string;
   illustration: string;
+  /** 배리에이션 이미지 배열. 비면 illustration 단일 사용. */
+  illustrations?: string[];
   title: string;
   body: string[];
   choices: Choice[];

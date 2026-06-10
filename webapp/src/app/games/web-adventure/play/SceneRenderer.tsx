@@ -15,10 +15,21 @@ type Props = {
   scene: Scene;
   character: Character;
   onChoose: (choiceId: string) => void;
+  /** 회차 — 배리에이션 이미지 선택 seed (회차마다 다른 그림). */
+  runIndex?: number;
 };
 
 /** 문단 사이 간격 (ms). */
 const STEP_MS = 700;
+
+/** 문자열 → 32bit 정수 해시 (배리에이션 결정적 선택용). */
+function hashString(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = (h * 31 + s.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h);
+}
 
 /**
  * 씬 렌더러 — 본문 *문단별 순차 fade-in* (#351/v4).
@@ -36,8 +47,19 @@ const STEP_MS = 700;
  *   - 사용자 OFF (옵션).
  *   - 방문 자동 skip ON + 이전 방문 기록.
  */
-export default function SceneRenderer({ scene, character, onChoose }: Props) {
+export default function SceneRenderer({ scene, character, onChoose, runIndex = 1 }: Props) {
   const total = scene.body.length;
+
+  // 배리에이션 선택 — (회차 + 씬 id) 결정적 해시. 같은 회차 같은 씬은 항상 같은 그림,
+  // 회차가 바뀌면 변화. 랜덤이 아니라 hydration 안전. illustrations 없으면 단일 fallback.
+  const chosenIllustration = useMemo(() => {
+    const arr =
+      scene.illustrations && scene.illustrations.length > 0
+        ? scene.illustrations
+        : [scene.illustration];
+    if (arr.length === 1) return arr[0];
+    return arr[hashString(`${runIndex}:${scene.id}`) % arr.length];
+  }, [scene.id, scene.illustration, scene.illustrations, runIndex]);
   const [opacity, setOpacity] = useState<0 | 100>(0);
   const [revealCount, setRevealCount] = useState(0);
   const [choicesReady, setChoicesReady] = useState(false);
@@ -98,7 +120,7 @@ export default function SceneRenderer({ scene, character, onChoose }: Props) {
     >
       <div className="relative w-full aspect-[16/9] rounded-md overflow-hidden bg-amber-200 mb-4">
         <Image
-          src={scene.illustration}
+          src={chosenIllustration}
           alt={`${scene.title} 일러스트`}
           fill
           sizes="(max-width: 768px) 100vw, 640px"

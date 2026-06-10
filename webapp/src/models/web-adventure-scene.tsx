@@ -114,6 +114,8 @@ const WebAdventureSceneSchema = new Schema(
     id: { type: String, required: true, unique: true, index: true },
     title: { type: String, required: true },
     illustration: { type: String, required: true },
+    // 배리에이션 이미지 배열. 진입 시 (회차+씬) 결정적 선택. 비면 illustration fallback.
+    illustrations: { type: [String], default: [] },
     body: {
       type: [String],
       required: true,
@@ -144,6 +146,7 @@ export interface WebAdventureSceneDoc {
   id: string;
   title: string;
   illustration: string;
+  illustrations?: string[];
   body: string[];
   choices: Array<Record<string, unknown>>;
   onEnter?: {

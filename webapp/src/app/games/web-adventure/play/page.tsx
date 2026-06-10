@@ -335,6 +335,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                 <SceneRenderer
                   scene={scenes[state.currentScene]}
                   character={state.character}
+                  runIndex={runIndex}
                   onChoose={(choiceId) => {
                     // #245 — adv_choice_made. #285: protagonist + stigma_erosion 추가.
                     //   회차/시한부 분석을 위해 그 시점의 *주인공/침식* 캡처.
