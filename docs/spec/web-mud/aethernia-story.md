@@ -4,6 +4,9 @@
 
 천체 마법공학 다크 에픽. 3 주인공 × 6 엔딩 × 회차 부메랑 시스템.
 
+
+> 📌 **분기·씬 구조는 DB 가 정답(single source).** 실시간 구조는 [씬 흐름 차트 /scenes/graph](https://slowmade.duckdns.org/scenes/graph), 검증은 `pnpm verify:web-adventure`. 세계관·이미지 설정은 [세계관 & 이미지 가이드 Post](https://slowmade.duckdns.org/post/view/6a292e1d6c7315b6be066016). 이 문서는 *세계관·시스템 개념* 중심이며, 아래 막 구조는 개요만 — 씬 단위 분기는 graph 를 보세요.
+
 ---
 
 ## 1. 세계관 핵심
@@ -80,169 +83,25 @@ RNG 실패 = *즉시 게임오버* 가 아닌 *누적 데미지*. 우회 씬에�
 
 ---
 
-## 4. 1막 — 각자의 추락과 각성
+## 4-6. 막 구조 (상세 분기는 /scenes/graph)
 
-### 4.1 Kael 경로 (10 씬)
+> ⚠️ 씬 단위 분기 트리는 이 문서에서 제거했습니다. 80 씬으로 늘며(추리 시퀀스·호프만 콜백·정찰병 부분성공·분기 31씬 등) ASCII 트리가 계속 stale 되어, DB·graph·lint 를 single source 로 삼습니다.
 
-```
-kael_infirmary (시작, probability 3)
-  ├ grab_scalpel       (con 12) ✓→ kael_corridor ✗→ kael_struggled
-  ├ overload_panel     (str 10) ✓→ kael_corridor ✗→ kael_struggled  (+stigma 3)
-  └ fake_flatline      (int 14) ✓→ kael_corridor ✗→ kael_struggled
+### 1막 — 각자의 추락과 각성
+- **Kael** (솔라리스): 의무동 폐기 통보 → 탈출 → 가솔린 컨테이너 추락 → *폐기물 잔해장(추리: 자신이 연료였음을 파헤침)* → 옴팔로스 외곽
+- **Rin** (아이언가드): 검은 연기의 항만 수사 → 사제단 인장 입수 → 상관(호프만)의 배신 → 지하 잠적 → *(호프만을 살려보냈다면 추적자로 재등장)* → 옴팔로스
+- **Solwen** (네오엘프): 안개 숲 전투 → 영수의 죽음 → 숲을 떠남 → 옴팔로스
 
-kael_struggled (우회 #318, HPΔ-5 침식+10)
-  ├ to_corridor_injured → kael_corridor
-  └ [자결] surrender_petrify → kael_caught  (#327, endingId=petrification)
+### 2-3막 — 옴팔로스 합류
+세 주인공 모두 `omphalos_outskirts` 로 수렴. 외곽 → (블랙마켓 / 다른 주인공 카메오) → 정거장 → **강철 / 지식 / 영혼** 3 길.
 
-kael_corridor (분기 3)
-  ├ to_cargo_dock        (plain) → kael_cargo_container
-  ├ forge_id             (int 15) ✓→ kael_corridor_clear ✗→ kael_caught_minor
-  └ [world.last_one_fell] crystal_path_memory (hidden) → kael_corridor_clear
+### Climax — 3 길 → 6 엔딩
+- **강철**: 탈선·탈취(혁명/추락) + *정찰병 희생 부분성공(약화된 의식 → 조화의 문)*
+- **지식**: 사제단 거래(승천) / 음모 파훼(조화)
+- **영혼**: 세계수 각성(정령의 결속)
+- 회차 부메랑(6 world flag)으로 hidden 분기 해금.
 
-kael_corridor_clear     → kael_cargo_container
-kael_caught_minor       (HPΔ-3 침식+3) → kael_cargo_container
-
-kael_cargo_container (분기 1)
-  └ climb_in (str 12) ✓→ kael_falling ✗→ kael_cargo_climb_failed  (#326)
-kael_cargo_climb_failed → kael_falling
-
-kael_falling (분기 2)
-  ├ rise_to_ground       (con 12) ✓→ omphalos_outskirts ✗→ kael_falling_aftermath  (#319)
-  └ [lunar] lunar_navigation (hidden, 침식+1) → omphalos_outskirts  (#323)
-kael_falling_aftermath → omphalos_outskirts
-
-kael_caught (자결 ending, petrification)
-```
-
-### 4.2 Rin 경로 (8 씬)
-
-```
-rin_harbor (시작, probability 3)
-  ├ shoot_lock     (dex 13) ✓→ rin_evidence ✗→ rin_pursued
-  ├ sneak_closer   (dex 11) ✓→ rin_evidence ✗→ rin_pursued
-  └ badge_arrest   (cha 14) ✓→ rin_evidence ✗→ rin_pursued
-
-rin_pursued (우회 #318, HPΔ-5 침식+5)
-  ├ to_evidence_pursued → rin_evidence
-  └ [자수] surrender_chase → rin_chase  (#327, endingId=fall)
-
-rin_evidence (분기 3)
-  ├ to_supervisor (plain) → rin_betrayal
-  ├ to_press      (plain) → rin_betrayal
-  └ [world.revolution_won] iron_underground (hidden) → rin_underground
-
-rin_betrayal (probability 3)
-  ├ shoot_first     (dex 14) ✓→ rin_underground ✗→ rin_betrayal_aftermath
-  ├ talk_down       (cha 15) ✓→ rin_underground ✗→ rin_betrayal_aftermath
-  └ window_escape   (dex 12) ✓→ rin_underground ✗→ rin_betrayal_aftermath
-
-rin_betrayal_aftermath (우회 #318, HPΔ-10 침식+10)
-  ├ to_underground_wounded → rin_underground
-  └ [자결] surrender_caught → rin_caught  (#327, endingId=fall)
-
-rin_underground → omphalos_outskirts
-rin_chase / rin_caught (시나리오 ending)
-```
-
-### 4.3 Solwen 경로 (5 씬)
-
-```
-solwen_grove (시작, probability 3)
-  ├ arrow_first    (dex 11) ✓→ solwen_combat ✗→ solwen_combat_hard
-  ├ wake_spirit    (wis 13) ✓→ solwen_combat ✗→ solwen_combat_hard
-  └ frighten_chant (cha 12) ✓→ solwen_combat ✗→ solwen_combat_hard
-
-solwen_combat (분기 3)
-  ├ shoot_canister  (dex 12) → solwen_grief
-  ├ shield_spirit   (wis 13) → solwen_grief
-  └ [world.sylvan_awoke] spirit_guidance (hidden, 침식-3) → solwen_grief
-
-solwen_combat_hard (분기 2)
-  ├ to_grief (plain) → solwen_grief
-  └ [selene] selene_strike (hidden, 침식+3) → solwen_grief  (#325)
-
-solwen_grief (onEnter: setFlags spiritBeastDied)
-  ├ to_revenge (plain) → solwen_departure
-  └ [wis 7+ minStat] wisdom_vision (hidden, 침식-2) → solwen_departure  (#324, Solwen 전용)
-
-solwen_departure → omphalos_outskirts
-```
-
----
-
-## 5. 2-3막 — 옴팔로스 합류
-
-세 주인공 모두 `omphalos_outskirts` 로 수렴.
-
-```
-omphalos_outskirts (분기 3)
-  ├ to_station   (plain) → omphalos_station
-  ├ to_market    (plain) → omphalos_blackmarket
-  └ [world.revolution_won] iron_lookout (hidden) → omphalos_station
-
-omphalos_blackmarket (onEnter: setFlags knowsAscensionPlot + sawOtherProtagonist)
-  ├ to_station_after (plain) → omphalos_station
-  ├ [sawOtherProtagonist] meet_cameo (hidden) → omphalos_cameo
-  └ [world.world_fell] ashen_informant (hidden, 침식-3) → omphalos_station
-
-omphalos_cameo (다른 주인공 카메오, onEnter 침식+1)
-  ├ persuade_join    (cha 13) → omphalos_station
-  ├ exchange_intel   (wis 13) → omphalos_station  (#320)
-  └ [hecate] hecate_illusion (hidden, 침식+2) → omphalos_station  (#321)
-
-omphalos_station (3 접근 방식)
-  ├ path_steel     → station_path_steel
-  ├ path_knowledge → station_knowledge_branch
-  └ path_spirit    → station_spirit_branch
-```
-
-### 5.1 세부 분기 트리
-
-```
-station_path_steel (분기 3)
-  ├ derail            (str 15) → climax_revolution_path / climax_fall_path
-  ├ hijack            (int 14) → climax_revolution_path / climax_fall_path
-  └ back_to_station   → omphalos_station
-
-station_knowledge_branch (분기 3)
-  ├ [knowsAscensionPlot] sabotage_with_knowledge (hidden) → climax_harmony_path
-  ├ [int 7+ minStat] priest_deal (hidden, 침식 -2 ability bonus) → climax_ascension_path  (Solwen 차단 design)
-  └ back_to_station_2 → omphalos_station
-
-station_spirit_branch (분기 2)
-  ├ [spiritBeastDied] spirit_swallow (hidden) → climax_sylvan_path  (Solwen 전용)
-  └ back_to_station_3 → omphalos_station
-```
-
----
-
-## 6. Climax — 5 길
-
-```
-climax_revolution_path (분기 3)
-  ├ join_revolution (plain)                                → ending_revolution
-  ├ reject_revolution (plain, 시나리오)                    → ending_fall  ⚠ 막다른 거절
-  └ [world.harmony_kept] echo_of_harmony (hidden)          → climax_harmony_path  (회차 부메랑)
-
-climax_ascension_path (분기 2)
-  ├ ascend (plain)                                          → ending_ascension
-  └ [world.solaris_strong] blessed_descent (hidden, 침식-2) → ending_ascension  (회차 부메랑)
-
-climax_harmony_path (분기 2)
-  ├ still_the_engine (wis 17, 실패 시 침식+10 자동 petrification 위험)
-                                                            → ending_harmony
-  └ [world.last_one_fell] crystal_echo (hidden, 침식-5)     → ending_harmony  (회차 부메랑)
-
-climax_sylvan_path (분기 3)
-  ├ embrace_sylvan (plain)                                  → ending_sylvan_bond
-  ├ [world.sylvan_awoke] forest_recognized (hidden, 침식-3) → ending_sylvan_bond  (회차 부메랑)
-  └ [hasItem: spirit_beast_feather] feather_song (hidden, 침식-5)
-                                                            → ending_sylvan_bond  (#322 인벤 활용)
-
-climax_fall_path → ending_fall (witness_fall)
-```
-
----
+상세 분기·조건·확률·도달성은 **/scenes/graph** + `pnpm verify:web-adventure` 로 확인하세요.
 
 ## 7. 6 Ending + 도달 매트릭스
 
