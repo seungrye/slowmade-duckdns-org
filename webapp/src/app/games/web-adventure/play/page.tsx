@@ -392,6 +392,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
             endingId={state.endingId}
             character={state.character}
             log={state.log}
+            finalScene={scenes[state.finalSceneId]}
             onRestart={() => dispatch({ type: "RESET" })}
           />
         )}

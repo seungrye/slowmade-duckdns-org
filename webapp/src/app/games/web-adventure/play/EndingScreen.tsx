@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import type { Character, Protagonist, StatKey } from "@/types/web-adventure";
+import type { Character, Protagonist, Scene, StatKey } from "@/types/web-adventure";
 import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
 import { protagonists } from "@/content/web-adventure/protagonists";
 
@@ -13,6 +14,8 @@ type Props = {
   endingId: string;
   character: Character;
   log: string[];
+  /** 마지막 씬 — *발각/죽음 전환 씬*(id 가 ending_ 아님)이면 본문을 엔딩 위에 표시. */
+  finalScene?: Scene;
   onRestart: () => void;
 };
 
@@ -37,15 +40,46 @@ const ENDING_TONE: Record<string, string> = {
   sylvan_bond: "bg-lime-100/70 border-lime-400",
 };
 
-export default function EndingScreen({ endingId, character, log, onRestart }: Props) {
+export default function EndingScreen({ endingId, character, log, finalScene, onRestart }: Props) {
   const meta = getEndingMeta(endingId);
   const tone = ENDING_TONE[endingId] ?? "bg-amber-100/70 border-amber-300";
+  // ending_* 씬은 본문=epilogue 라 생략. 발각/죽음 전환 씬만 본문을 엔딩 위에 표시.
+  const transitionBody =
+    finalScene && !finalScene.id.startsWith("ending_") && finalScene.body?.length
+      ? finalScene.body
+      : null;
   return (
     <section
       className={`rounded-lg ${tone} border p-6 shadow-sm text-center transition-colors`}
       data-testid="ending-screen"
       data-ending-id={endingId}
     >
+      {/* 엔딩 일러스트 — finalScene 의 이미지 (발각/엔딩 씬). 이모지만 있던 화면을 채움. */}
+      {finalScene?.illustration && (
+        <div className="relative w-full aspect-[16/9] rounded-md overflow-hidden mb-4 border border-black/10">
+          <Image
+            src={finalScene.illustration}
+            alt={`${meta.title} 일러스트`}
+            fill
+            sizes="(max-width: 768px) 100vw, 640px"
+            className="object-cover"
+            unoptimized
+          />
+        </div>
+      )}
+      {transitionBody && finalScene && (
+        <div
+          className="mb-5 text-left border-b border-amber-300/60 pb-4"
+          data-testid="ending-transition-scene"
+        >
+          <h3 className="text-lg font-bold mb-2 text-center">{finalScene.title}</h3>
+          {transitionBody.map((p, i) => (
+            <p key={i} className="mb-1 text-amber-900 leading-relaxed whitespace-pre-line">
+              {p.replace(/\*/g, "")}
+            </p>
+          ))}
+        </div>
+      )}
       <div className="text-5xl mb-3" aria-hidden>
         {meta.icon}
       </div>
