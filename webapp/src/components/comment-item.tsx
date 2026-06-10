@@ -5,6 +5,7 @@ import { Manrope } from 'next/font/google';
 import type { Session } from "next-auth";
 import type { Comment } from "@/types/comment.d";
 import CommentInput from "./comment-input";
+import CommentContent from "./comment-content";
 
 const manrope = Manrope({ subsets: ['latin'] });
 
@@ -64,7 +65,9 @@ export default function CommentItem({
                 {new Date(c.createdAt).toLocaleString()}
               </span>
             </div>
-            <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">{c.content}</p>
+            <div className="mt-1">
+              <CommentContent content={c.content} />
+            </div>
             {c.imageUrl && (
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -122,19 +125,19 @@ export default function CommentItem({
                 {new Date(c.createdAt).toLocaleString()}
               </span>
             </div>
-            <p className="text-gray-700 dark:text-gray-300 mt-1 whitespace-pre-wrap">
+            <div className="mt-1">
               {c.parent && (
                 <a
                   href={`#comment-${c.parent._id}`}
                   onClick={(e) => { e.preventDefault(); onParentClick(c.parent?._id ?? null); }}
-                  className="text-blue-600 hover:underline mr-2 p-1 bg-blue-50 dark:bg-blue-900/30 rounded-md"
+                  className="inline-block text-blue-600 hover:underline mb-1 p-1 bg-blue-50 dark:bg-blue-900/30 rounded-md"
                   aria-label={`부모 댓글로 이동: @${c.parent.author}`}
                 >
                   {c.parent.author}
                 </a>
               )}
-              {c.content}
-            </p>
+              <CommentContent content={c.content} />
+            </div>
             <button
               className="text-sm text-blue-600 hover:underline mt-2"
               onClick={() => onReplyToggle(c._id)}
