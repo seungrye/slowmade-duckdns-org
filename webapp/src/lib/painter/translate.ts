@@ -21,9 +21,13 @@ const TRANSLATE_SYSTEM_PROMPT = `You are a translator that converts Korean image
 - Translate poetically — capture mood, not just literal words.
 - Return ONLY the translated prompt. No explanation, no quotes.`;
 
-// 빠른 응답이 중요 (Pollinations 앞단). 안정 모델 위주.
+// 빠른 응답이 중요 (Pollinations 앞단). RPD 한도 우선 — Gemma 4(RPD 1,500 +
+// TPM 무제한)를 메인으로, 신세대 Gemini 를 폴백으로. (2.5 Flash 는 RPD 20 으로
+// 배치에서 금방 소진되어 최후순위.)
 const TRANSLATE_MODEL_CHAIN = [
-  'gemini-2.5-flash',
+  'gemma-4-26b-a4b-it',
+  'gemma-4-31b-it',
+  'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
 ];
 

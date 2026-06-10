@@ -184,9 +184,12 @@ async function generateKoreanPromptFromBody(title, body, geminiKey) {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
   const userInput = `씬 제목: ${title}\n\n씬 묘사:\n${body.join("\n")}`;
 
-  // 모델 + 재시도 매트릭스: flash 3회 시도 (간격 backoff) → flash-lite 3회 시도.
+  // 모델 + 재시도 매트릭스. RPD 한도 우선 — Gemma 4(RPD 1,500 + TPM 무제한)를
+  // 메인으로, 신세대 Gemini 를 폴백. (2.5 Flash 는 RPD 20 으로 배치에서 금방 소진.)
   const PLANS = [
-    { model: "gemini-2.5-flash",       waits: [0, 8000, 20000] },
+    { model: "gemma-4-26b-a4b-it",     waits: [0, 8000, 20000] },
+    { model: "gemma-4-31b-it",         waits: [0, 8000, 20000] },
+    { model: "gemini-3.1-flash-lite",  waits: [0, 8000, 20000] },
     { model: "gemini-2.5-flash-lite",  waits: [0, 8000, 20000] },
   ];
   let lastErr;

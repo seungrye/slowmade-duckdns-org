@@ -27,14 +27,15 @@ function isAllowedOrigin(req: NextRequest): boolean {
   return origin.startsWith(siteUrl) || referer.startsWith(siteUrl);
 }
 
-// Gemini 모델 fallback chain.
+// 모델 fallback chain.
 // - 첫 번째 모델이 503(과부하)/429(쿼터)/네트워크 타임아웃으로 실패하면 다음 모델로 재시도.
-// - "*-latest" alias 는 가끔 503 으로 응답하기 때문에 안정적인 stable 모델을 먼저 둔다.
+// - RPD 한도 우선: Gemma 4(RPD 1,500 + TPM 무제한)를 메인으로, 신세대 Gemini 를
+//   폴백. (2.5 Flash 는 RPD 20 으로 트래픽 시 금방 소진되어 최후순위.)
 const GEMINI_MODEL_CHAIN = [
-  'gemini-2.5-flash',
+  'gemma-4-26b-a4b-it',
+  'gemma-4-31b-it',
+  'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
-  'gemini-flash-lite-latest',
-  'gemini-flash-latest',
 ];
 
 function isTransientGeminiError(err: unknown): boolean {
