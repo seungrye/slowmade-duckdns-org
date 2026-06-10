@@ -1,6 +1,8 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from "react";
+import toast from "react-hot-toast";
+import { validateCommentMarkdown } from "@/lib/comment-markdown-validate";
 
 interface CommentInputProps {
   onSubmit: (content: string) => Promise<boolean>;
@@ -81,6 +83,12 @@ export default function CommentInput({
 
   const handleClick = async () => {
     const content = textareaRef.current?.value ?? '';
+    // 마크다운 문법 에러가 있으면 등록하지 않고 토스트로 안내.
+    const mdError = validateCommentMarkdown(content);
+    if (mdError) {
+      toast.error(mdError);
+      return;
+    }
     const success = await onSubmit(content);
     if (success && textareaRef.current) {
       textareaRef.current.value = '';
