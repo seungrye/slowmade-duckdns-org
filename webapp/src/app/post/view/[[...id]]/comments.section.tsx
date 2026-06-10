@@ -14,7 +14,17 @@ export default function Comments({ postId }: Props) {
   const { data: session } = useSession();
   const { comments, submitting, fetchComments, submitComment, deleteComment } = useComments(postId);
   const [openReplyFor, setOpenReplyFor] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const commentRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+
+  const toggleCollapse = useCallback((id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     fetchComments();
@@ -83,27 +93,35 @@ export default function Comments({ postId }: Props) {
     if (comments.length === 0) return null;
     return comments
       .filter(c => (c.parent ? c.parent._id : null) === parentId)
-      .map((c: Comment) => (
-        <CommentItem
-          key={c._id}
-          comment={c}
-          isNested={Boolean(parentId)}
-          session={session}
-          openReplyFor={openReplyFor}
-          onReplyToggle={(id) => setOpenReplyFor(prev => prev === id ? null : id)}
-          onDelete={handleDelete}
-          onParentClick={handleParentClick}
-          onRef={(el) => {
-            if (el) commentRefs.current.set(c._id, el);
-            else commentRefs.current.delete(c._id);
-          }}
-          onReplySubmit={handleReplySubmit}
-          submitting={submitting}
-        >
-          {renderComments(c._id)}
-        </CommentItem>
-      ));
-  }, [comments, openReplyFor, submitting, session, handleDelete, handleParentClick, handleReplySubmit]);
+      .map((c: Comment) => {
+        const childCount = comments.filter(
+          (cc) => (cc.parent ? cc.parent._id : null) === c._id,
+        ).length;
+        return (
+          <CommentItem
+            key={c._id}
+            comment={c}
+            isNested={Boolean(parentId)}
+            session={session}
+            openReplyFor={openReplyFor}
+            onReplyToggle={(id) => setOpenReplyFor(prev => prev === id ? null : id)}
+            onDelete={handleDelete}
+            onParentClick={handleParentClick}
+            onRef={(el) => {
+              if (el) commentRefs.current.set(c._id, el);
+              else commentRefs.current.delete(c._id);
+            }}
+            onReplySubmit={handleReplySubmit}
+            submitting={submitting}
+            childCount={childCount}
+            isCollapsed={collapsed.has(c._id)}
+            onToggleCollapse={toggleCollapse}
+          >
+            {renderComments(c._id)}
+          </CommentItem>
+        );
+      });
+  }, [comments, openReplyFor, submitting, session, handleDelete, handleParentClick, handleReplySubmit, collapsed, toggleCollapse]);
 
   return (
     <section id="comments-section">

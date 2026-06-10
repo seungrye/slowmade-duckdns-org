@@ -20,6 +20,12 @@ interface CommentItemProps {
   onRef: (el: HTMLDivElement | null) => void;
   onReplySubmit: (parentId: string, content: string) => Promise<boolean>;
   submitting: boolean;
+  /** 직속 자식(답글) 수 — 0 이면 접기 토글 미표시. */
+  childCount?: number;
+  /** 이 코멘트의 자식들이 접혀 있는지. */
+  isCollapsed?: boolean;
+  /** 접기 토글. */
+  onToggleCollapse?: (id: string) => void;
   children?: React.ReactNode;
 }
 
@@ -34,9 +40,25 @@ export default function CommentItem({
   onRef,
   onReplySubmit,
   submitting,
+  childCount = 0,
+  isCollapsed = false,
+  onToggleCollapse,
   children,
 }: CommentItemProps) {
   const indentClass = isNested ? "ml-6 md:ml-12 " : "";
+  // 접기 토글 버튼 (자식 있을 때만).
+  const collapseBtn =
+    childCount > 0 && onToggleCollapse ? (
+      <button
+        type="button"
+        className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:underline mt-2"
+        onClick={() => onToggleCollapse(c._id)}
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed ? `답글 ${childCount}개 펼치기` : `답글 ${childCount}개 접기`}
+      >
+        {isCollapsed ? `▶ 답글 ${childCount}개 펼치기` : `▼ 답글 ${childCount}개 접기`}
+      </button>
+    ) : null;
 
   return (
     <Fragment>
@@ -90,15 +112,18 @@ export default function CommentItem({
                 </div>
               </div>
             )}
-            {session?.user && (
-              <button
-                className="text-sm text-purple-600 hover:underline mt-2"
-                onClick={() => onReplyToggle(c._id)}
-                aria-label="Open reply form"
-              >
-                Reply
-              </button>
-            )}
+            <div className="flex items-center gap-3">
+              {session?.user && (
+                <button
+                  className="text-sm text-purple-600 hover:underline mt-2"
+                  onClick={() => onReplyToggle(c._id)}
+                  aria-label="Open reply form"
+                >
+                  Reply
+                </button>
+              )}
+              {collapseBtn}
+            </div>
             {openReplyFor === c._id && (
               <CommentInput
                 inputId={`reply-${c._id}`}
@@ -138,22 +163,26 @@ export default function CommentItem({
               )}
               <CommentContent content={c.content} />
             </div>
-            <button
-              className="text-sm text-blue-600 hover:underline mt-2"
-              onClick={() => onReplyToggle(c._id)}
-              aria-label="Open reply form"
-            >
-              Reply
-            </button>
-
-            {session?.user?.email === c.authorId?.email && (
+            <div className="flex items-center gap-3">
               <button
-                className="text-sm text-red-600 hover:underline mt-2 ml-4"
-                onClick={() => onDelete(c._id)}
+                className="text-sm text-blue-600 hover:underline mt-2"
+                onClick={() => onReplyToggle(c._id)}
+                aria-label="Open reply form"
               >
-                Delete
+                Reply
               </button>
-            )}
+
+              {session?.user?.email === c.authorId?.email && (
+                <button
+                  className="text-sm text-red-600 hover:underline mt-2"
+                  onClick={() => onDelete(c._id)}
+                >
+                  Delete
+                </button>
+              )}
+
+              {collapseBtn}
+            </div>
 
             {openReplyFor === c._id && (
               <CommentInput
@@ -166,7 +195,7 @@ export default function CommentItem({
           </div>
         </div>
       )}
-      {children}
+      {!isCollapsed && children}
     </Fragment>
   );
 }
