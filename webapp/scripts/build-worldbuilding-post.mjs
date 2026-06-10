@@ -99,6 +99,30 @@ const DOC = [
     '🌿 정령의 결속(sylvan_bond) — 솟아오른 세계수 뿌리, 이끼로 돌아간 강철, 깨어난 영수',
   ] },
 
+  { h: 2, t: '7. 시간대 / 날씨 팔레트 (분위기 변주)' },
+  { p: '같은 장소라도 시간대·날씨로 분위기를 변주할 수 있습니다. *씬 본문에 정해진 분위기가 최우선* (예: 밤 항만, 새벽 본부) — 본문과 충돌하지 않는 선에서, 단조로움을 깰 때 아래 키워드를 한두 개 더합니다.' },
+  { h: 3, t: '시간대' },
+  { bullets: [
+    '새벽 — dawn, first light, cold morning haze',
+    '낮 — daylight, overcast noon',
+    '황혼 — dusk, twilight, sunset glow on steel',
+    '밤 — night, deep night, moonlit (세 달이 보이면 three moons)',
+  ] },
+  { h: 3, t: '날씨 / 대기' },
+  { bullets: [
+    '맑음/흐림 — clear sky, overcast, heavy clouds',
+    '비 — rain, rainy, wet reflective ground, rain streaks',
+    '안개 — fog, thick mist, low haze',
+    '눈/재 — snow, falling ash, ember drift (화염 장면)',
+    '폭풍 — storm, lightning, wind-blown smoke',
+  ] },
+  { p: '예: 옴팔로스 정거장(밤+안개 기본) → *비 오는 밤*(rain, wet reflective rails)으로 변주. 솔라리스 첨탑 → *황혼*(dusk, sunset glow on steel)으로 장엄하게.' },
+
+  { h: 2, t: '8. 회피 키워드 (사람·텍스트 금지)' },
+  { p: '⚠️ 우리가 쓰는 **FLUX 모델은 negative prompt 슬롯을 지원하지 않습니다** (Pollinations 에서 negative 는 zimage 전용). 그래서 회피 항목은 *포지티브 prompt 끝에* `no people, no person...` 형태로 명시합니다. 인물이 자꾸 나오는 씬은 아래를 더 강하게 붙이세요.' },
+  { code: 'no people, no person, no humans, no human figures, no silhouettes, no faces, no hands, no crowd, no portrait, no character, no text, no watermark, no signature, no logo, no UI, empty scene, environment only' },
+  { p: '스타일 일탈(사실적/3D)도 막으려면: not photorealistic, not 3D render, flat dot pixel art 를 함께. (단 prompt 가 너무 길면 핵심 키워드가 희석되니, 문제되는 항목만 골라 붙이는 게 좋습니다.)' },
+
   { p: '— 이 문서는 스토리 바이블(docs/spec/web-mud/aethernia-story.md)과 기존 씬 본문에서 추출·정리한 것입니다. 설정 오류나 보강할 장소/사물이 있으면 알려주세요.' },
 ];
 
