@@ -111,6 +111,52 @@ export function SceneForm({ scene, onChange }: Props) {
           </span>
         </label>
 
+        {/* 배리에이션 이미지 리스트뷰 — illustrations[] (없으면 illustration 단일). */}
+        {(() => {
+          const imgs =
+            scene.illustrations && scene.illustrations.length > 0
+              ? scene.illustrations
+              : scene.illustration
+                ? [scene.illustration]
+                : [];
+          if (imgs.length === 0) return null;
+          return (
+            <div className="block">
+              <span className="block text-xs text-gray-500 mb-1">
+                이미지{" "}
+                {scene.illustrations && scene.illustrations.length > 0
+                  ? `(배리에이션 ${scene.illustrations.length}장)`
+                  : "(단일)"}
+              </span>
+              <div className="flex gap-2 flex-wrap">
+                {imgs.map((url, i) => (
+                  <a
+                    key={`${url}-${i}`}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative block w-24 h-24 rounded overflow-hidden border border-gray-200 dark:border-gray-700 hover:ring-2 hover:ring-blue-400"
+                    title={`배리에이션 ${i + 1} (새 탭)`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`배리에이션 ${i + 1}`}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                    {url === scene.illustration && (
+                      <span className="absolute bottom-0 left-0 bg-black/60 text-white text-[9px] px-1 rounded-tr">
+                        대표
+                      </span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         <label className="block">
           <span className="block text-xs text-gray-500 mb-0.5">본문 (한 줄당 한 문단)</span>
           <textarea
