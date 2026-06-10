@@ -94,9 +94,12 @@ export default function Comments({ postId }: Props) {
     return comments
       .filter(c => (c.parent ? c.parent._id : null) === parentId)
       .map((c: Comment) => {
-        const childCount = comments.filter(
-          (cc) => (cc.parent ? cc.parent._id : null) === c._id,
-        ).length;
+        // 최상위 댓글에만 접기 — "답글 N개" 는 *스레드 전체 후손 수*.
+        const countDescendants = (id: string): number => {
+          const kids = comments.filter((cc) => (cc.parent ? cc.parent._id : null) === id);
+          return kids.reduce((sum, k) => sum + 1 + countDescendants(k._id), 0);
+        };
+        const childCount = parentId === null ? countDescendants(c._id) : 0;
         return (
           <CommentItem
             key={c._id}

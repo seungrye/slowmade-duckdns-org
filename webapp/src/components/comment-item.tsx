@@ -46,9 +46,9 @@ export default function CommentItem({
   children,
 }: CommentItemProps) {
   const indentClass = isNested ? "ml-6 md:ml-12 " : "";
-  // 접기 토글 버튼 (자식 있을 때만).
+  // 접기 토글 버튼 — *최상위 댓글*에만 (스레드 단위 접기). 자식 답글엔 없음.
   const collapseBtn =
-    childCount > 0 && onToggleCollapse ? (
+    !isNested && childCount > 0 && onToggleCollapse ? (
       <button
         type="button"
         className="text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:underline mt-2"
