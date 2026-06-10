@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
   if (typeof body.endingId !== 'string' || typeof body.finalSceneId !== 'string') {
     return apiError('endingId, finalSceneId 는 필수입니다.', 400);
   }
+  // 경로 시퀀스 (선택) — 문자열만, 최대 300 (무한 루프 방어).
+  const scenePath = Array.isArray(body.scenePath)
+    ? body.scenePath.filter((s: unknown): s is string => typeof s === 'string').slice(0, 300)
+    : [];
 
   await connectToDB();
   const save = await WebAdventureSave.findOne({
@@ -48,6 +52,7 @@ export async function POST(req: NextRequest) {
         runIndex: save.runIndex,
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
+        scenePath,
         // #289 — 옛 save (#287 schema 적용 전) 의 character 호환.
         character: hydrateCharacterSnapshot(save.character),
         completedAt: new Date(),

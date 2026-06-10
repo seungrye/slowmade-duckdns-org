@@ -113,6 +113,8 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   const endRunSentRef = useRef<string | null>(null);
   // #273 — 침식 80 첫 도달 트래킹 (회차당 1 회). useRef 로 sentinel.
   const stigmaCriticalSentRef = useRef<number | null>(null);
+  // 거쳐간 씬 시퀀스 추적 (경로 분포 통계용) — end-run 시 서버로 전송.
+  const scenePathRef = useRef<string[]>([]);
 
   // #256 — 마운트 시 past_runs fetch → worldFlags 계산.
   useEffect(() => {
@@ -158,6 +160,20 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
       run_index: runIndex,
     });
   }, [state, runIndex]);
+
+  // 경로 추적 — playing 중 currentScene 이 바뀌면 시퀀스에 append.
+  //   creating(회차 시작 전)으로 돌아오면 초기화. RESTORE(이어하기)는 중간부터라
+  //   경로가 불완전할 수 있으나 대부분 새 모험이라 허용.
+  useEffect(() => {
+    if (state.phase === "playing") {
+      const path = scenePathRef.current;
+      if (path[path.length - 1] !== state.currentScene) {
+        path.push(state.currentScene);
+      }
+    } else if (state.phase === "creating") {
+      scenePathRef.current = [];
+    }
+  }, [state]);
 
   useAutoSave(state, {
     runIndex,
@@ -253,6 +269,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
       body: JSON.stringify({
         endingId: state.endingId,
         finalSceneId: state.finalSceneId,
+        scenePath: scenePathRef.current,
       }),
     })
       .then((res) => {

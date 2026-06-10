@@ -43,6 +43,8 @@ const WebAdventurePastRunSchema = new Schema(
       enum: ['ascension', 'revolution', 'harmony', 'fall', 'petrification', 'sylvan_bond'],
     },
     finalSceneId: { type: String, required: true },
+    // 시작 → 종료까지 거쳐간 씬 id 시퀀스 (경로 분포 통계용). 기존 데이터엔 없음.
+    scenePath: { type: [String], default: [] },
     character: { type: CharacterSchema, required: true },
     completedAt: { type: Date, required: true, default: () => new Date() },
   },
@@ -58,6 +60,7 @@ export interface WebAdventurePastRunDoc {
   runIndex: number;
   endingId: 'ascension' | 'revolution' | 'harmony' | 'fall' | 'petrification' | 'sylvan_bond';
   finalSceneId: string;
+  scenePath: string[];
   character: {
     stats: { str: number; dex: number; int: number; cha: number; con: number; wis: number };
     hp: number;
