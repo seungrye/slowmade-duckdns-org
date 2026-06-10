@@ -29,11 +29,12 @@ function isAllowedOrigin(req: NextRequest): boolean {
 
 // 모델 fallback chain.
 // - 첫 번째 모델이 503(과부하)/429(쿼터)/네트워크 타임아웃으로 실패하면 다음 모델로 재시도.
-// - RPD 한도 우선: Gemma 4(RPD 1,500 + TPM 무제한)를 메인으로, 신세대 Gemini 를
-//   폴백. (2.5 Flash 는 RPD 20 으로 트래픽 시 금방 소진되어 최후순위.)
+// - enji 는 *대화 품질* 우선 → Gemma 4 31B(dense, knowledge 벤치 61 vs 26B 49)를
+//   먼저. 둘 다 RPD 1,500 이라 한도는 동일하고, 31B 는 느리지만 대화엔 품질이 중요.
+//   (painter 는 배치 속도 위해 26B 우선 — 거긴 작업이 단순.) 이후 신세대 Gemini 폴백.
 const GEMINI_MODEL_CHAIN = [
-  'gemma-4-26b-a4b-it',
   'gemma-4-31b-it',
+  'gemma-4-26b-a4b-it',
   'gemini-3.1-flash-lite',
   'gemini-2.5-flash-lite',
 ];
