@@ -131,18 +131,29 @@ describe("MAKE_CHOICE — probability", () => {
     fail: makeScene({ id: "fail" }),
   };
 
-  it("RNG 0.99 (roll 20) → 성공 → onSuccess", () => {
+  it("RNG 0.99 → pendingRoll(성공, 전이 보류) → CONFIRM_ROLL → onSuccess", () => {
     let state: GameState = { phase: "creating" };
     state = gameReducer(state, { type: "START_GAME", character: makeChar(), startScene: "a" }, reg);
     state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "roll", rng: () => 0.99 }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
+    // 즉시 전이하지 않음 — 판정 대기.
+    expect(state.currentScene).toBe("a");
+    expect(state.pendingRoll?.success).toBe(true);
+    expect(state.pendingRoll?.target).toBe("ok");
+    state = gameReducer(state, { type: "CONFIRM_ROLL" }, reg);
+    if (state.phase !== "playing") throw new Error("expected playing");
     expect(state.currentScene).toBe("ok");
+    expect(state.pendingRoll).toBeUndefined();
   });
 
-  it("RNG 0 (roll 1) → 실패 → onFailure", () => {
+  it("RNG 0 → pendingRoll(실패) → CONFIRM_ROLL → onFailure", () => {
     let state: GameState = { phase: "creating" };
     state = gameReducer(state, { type: "START_GAME", character: makeChar(), startScene: "a" }, reg);
     state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "roll", rng: () => 0 }, reg);
+    if (state.phase !== "playing") throw new Error("expected playing");
+    expect(state.currentScene).toBe("a");
+    expect(state.pendingRoll?.success).toBe(false);
+    state = gameReducer(state, { type: "CONFIRM_ROLL" }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
     expect(state.currentScene).toBe("fail");
   });
@@ -193,30 +204,59 @@ describe("RESET", () => {
 });
 
 describe("REROLL", () => {
-  it("playing + 직전 probability 성공 후 재굴림 → 다른 결과 가능 + rerollsLeft -1", () => {
-    const reg: SceneRegistry = {
-      a: makeScene({
-        id: "a",
-        choices: [{
-          kind: "probability", id: "roll", label: "roll",
-          stat: "str", difficulty: 18, // 어려움
-          onSuccess: "ok", onFailure: "fail",
-        }],
-      }),
-      ok: makeScene({ id: "ok" }),
-      fail: makeScene({ id: "fail" }),
-    };
+  const reg: SceneRegistry = {
+    a: makeScene({
+      id: "a",
+      choices: [{
+        kind: "probability", id: "roll", label: "roll",
+        stat: "str", difficulty: 18, // 어려움
+        onSuccess: "ok", onFailure: "fail",
+      }],
+    }),
+    ok: makeScene({ id: "ok" }),
+    fail: makeScene({ id: "fail" }),
+  };
+
+  it("pendingRoll(실패) → REROLL(성공) → 결과 갱신 + rerollsLeft -1 → CONFIRM → onSuccess", () => {
     let state: GameState = { phase: "creating" };
     state = gameReducer(state, { type: "START_GAME", character: makeChar({ rerollsLeft: 2 }), startScene: "a" }, reg);
-    // 실패 (RNG 0)
+    // 실패 (RNG 0) — pendingRoll, 전이 보류.
     state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "roll", rng: () => 0 }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
-    expect(state.currentScene).toBe("fail");
-    const charBefore = state.character;
-    // REROLL — RNG 0.99 (roll 20) 성공
+    expect(state.pendingRoll?.success).toBe(false);
+    expect(state.currentScene).toBe("a");
+    // REROLL — RNG 0.99 (roll 20) 성공 → pendingRoll 갱신, rerollsLeft -1, 아직 전이 X.
     state = gameReducer(state, { type: "REROLL", rng: () => 0.99 }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
+    expect(state.pendingRoll?.success).toBe(true);
+    expect(state.character.rerollsLeft).toBe(1);
+    expect(state.currentScene).toBe("a");
+    // 확정 → 비로소 전이.
+    state = gameReducer(state, { type: "CONFIRM_ROLL" }, reg);
+    if (state.phase !== "playing") throw new Error("expected playing");
     expect(state.currentScene).toBe("ok");
-    expect(state.character.rerollsLeft).toBe(charBefore.rerollsLeft - 1);
+  });
+
+  it("rerollsLeft 0 → REROLL 무시 (state 무변화)", () => {
+    let state: GameState = { phase: "creating" };
+    state = gameReducer(state, { type: "START_GAME", character: makeChar({ rerollsLeft: 0 }), startScene: "a" }, reg);
+    state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "roll", rng: () => 0 }, reg);
+    const before = state;
+    const after = gameReducer(state, { type: "REROLL", rng: () => 0.99 }, reg);
+    expect(after).toEqual(before);
+  });
+});
+
+describe("onEnter.rerollDelta", () => {
+  it("진입 씬 onEnter.rerollDelta → rerollsLeft 보충", () => {
+    const reg: SceneRegistry = {
+      a: makeScene({ id: "a", choices: [{ kind: "plain", id: "go", label: "go", to: "b" }] }),
+      b: makeScene({ id: "b", onEnter: { rerollDelta: 1 } }),
+    };
+    let state: GameState = { phase: "creating" };
+    state = gameReducer(state, { type: "START_GAME", character: makeChar({ rerollsLeft: 1 }), startScene: "a" }, reg);
+    state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "go" }, reg);
+    if (state.phase !== "playing") throw new Error("expected playing");
+    expect(state.character.rerollsLeft).toBe(2);
   });
 });

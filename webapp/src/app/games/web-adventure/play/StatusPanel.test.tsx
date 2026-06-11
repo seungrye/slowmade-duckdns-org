@@ -28,9 +28,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={character}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     for (const stat of ['STR', 'DEX', 'INT', 'CHA', 'CON', 'WIS']) {
@@ -45,9 +43,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter()}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByText(/HP/)).toBeInTheDocument();
@@ -59,9 +55,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter()}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByText('루나 성흔')).toBeInTheDocument();
@@ -72,9 +66,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter()}
         runIndex={3}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByText(/3회차/)).toBeInTheDocument();
@@ -85,9 +77,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter()}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     // 한국어 라벨 (의료용 붕대, 에테르 정제수)
@@ -100,40 +90,17 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter({ inventory: [] })}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByText(/비어 있음/)).toBeInTheDocument();
   });
 
-  it('canReroll=true + rerollsLeft>0 → 재굴림 버튼 노출 + 클릭 시 onReroll', () => {
-    const onReroll = vi.fn();
+  it('재굴림 잔여 횟수 표시 + 버튼 없음 (버튼은 판정 결과 화면으로 이동)', () => {
     render(
-      <StatusPanel
-        character={makeCharacter()}
-        runIndex={1}
-        canReroll={true}
-        onUseItem={vi.fn()}
-        onReroll={onReroll}
-      />,
+      <StatusPanel character={makeCharacter()} runIndex={1} onUseItem={vi.fn()} />,
     );
-    const btn = screen.getByRole('button', { name: /재굴림|다시 굴리기/ });
-    fireEvent.click(btn);
-    expect(onReroll).toHaveBeenCalledTimes(1);
-  });
-
-  it('canReroll=false → 재굴림 버튼 안 보임', () => {
-    render(
-      <StatusPanel
-        character={makeCharacter()}
-        runIndex={1}
-        canReroll={false}
-        onUseItem={vi.fn()}
-        onReroll={vi.fn()}
-      />,
-    );
+    expect(screen.getByText('재굴림')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /재굴림|다시 굴리기/ })).toBeNull();
   });
 
@@ -143,9 +110,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter({ stigmaErosion: 30 })}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'normal');
@@ -157,9 +122,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter({ stigmaErosion: 65 })}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'debuff');
@@ -171,9 +134,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter({ stigmaErosion: 88 })}
         runIndex={1}
-        canReroll={false}
         onUseItem={vi.fn()}
-        onReroll={vi.fn()}
       />,
     );
     expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'critical');
@@ -186,9 +147,7 @@ describe('StatusPanel', () => {
       <StatusPanel
         character={makeCharacter({ inventory: ['medical_bandage'] })}
         runIndex={1}
-        canReroll={false}
         onUseItem={onUseItem}
-        onReroll={vi.fn()}
       />,
     );
     const btn = screen.getByRole('button', { name: '사용' });

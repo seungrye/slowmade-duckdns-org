@@ -127,15 +127,40 @@ export type Scene = {
     stigmaDelta?: number;
     /** #318 — 씬 진입 시 HP 변동 (음수 = 데미지, 양수 = 회복). 0 도달 시 자동 fall ending. */
     hpDelta?: number;
+    /** 재굴림 횟수 변동 (양수 = 보충). 주인공 무관 재굴림 보충 이벤트용. */
+    rerollDelta?: number;
   };
 };
 
 export type SceneRegistry = Record<string, Scene>;
 
 /** GameState — phase 별 discriminated union. */
+/**
+ * probability 판정 *대기* 상태 — 결과를 보여주고 재굴림/계속을 선택하기 위한 메타.
+ * 선택 즉시 전이하지 않고 pendingRoll 에 보관 → CONFIRM_ROLL 시 비로소 전이.
+ */
+export type PendingRoll = {
+  choiceId: string;
+  label: string;
+  roll: number; // d20
+  bonus: number; // 성흔 보너스
+  statValue: number; // 침식 디버프 반영된 effective stat
+  difficulty: number;
+  success: boolean;
+  target: string; // 확정 시 이동할 씬 (성공/실패 분기)
+  totalDelta: number; // 확정 시 적용할 침식 delta
+};
+
 export type GameState =
   | { phase: "creating" }
-  | { phase: "playing"; character: Character; currentScene: string; log: string[] }
+  | {
+      phase: "playing";
+      character: Character;
+      currentScene: string;
+      log: string[];
+      /** probability 판정 대기 — 있으면 결과+재굴림/계속 UI 표시, ChoiceList 숨김. */
+      pendingRoll?: PendingRoll;
+    }
   | {
       phase: "ended";
       character: Character;

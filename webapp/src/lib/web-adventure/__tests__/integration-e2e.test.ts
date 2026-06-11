@@ -103,11 +103,15 @@ function solve(
       const rngs =
         choice.kind === "probability" ? [RNG_SUCCESS, RNG_FAIL] : [RNG_SUCCESS];
       for (const rng of rngs) {
-        const next = gameReducer(
+        let next = gameReducer(
           state,
           { type: "MAKE_CHOICE", choiceId: choice.id, rng },
           scenes,
         );
+        // probability 는 즉시 전이하지 않고 pendingRoll → CONFIRM_ROLL 로 확정.
+        if (next.phase === "playing" && next.pendingRoll) {
+          next = gameReducer(next, { type: "CONFIRM_ROLL" }, scenes);
+        }
         // 무효(조건 미충족 등) → 같은 씬에 머무름 → 스킵. probability 는 항상 전이.
         if (
           choice.kind !== "probability" &&

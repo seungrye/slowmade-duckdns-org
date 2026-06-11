@@ -33,9 +33,7 @@ const STAT_BAR_MAX = 18;
 export interface StatusPanelProps {
   character: Character;
   runIndex: number;
-  canReroll: boolean;
   onUseItem: (itemId: string) => void;
-  onReroll: () => void;
 }
 
 // #259 — 침식 단계.
@@ -59,9 +57,7 @@ const STIGMA_BAR_COLOR: Record<StigmaLevel, string> = {
 export default function StatusPanel({
   character,
   runIndex,
-  canReroll,
   onUseItem,
-  onReroll,
 }: StatusPanelProps) {
   const ability = abilities[character.ability];
   const grouped = groupInventory(character.inventory);
@@ -147,20 +143,11 @@ export default function StatusPanel({
         })}
       </div>
 
-      {/* 재굴림 */}
+      {/* 재굴림 잔여 횟수 (버튼은 판정 결과 화면에서). */}
       <div className="flex items-center justify-between mb-2 text-xs">
         <span>
           재굴림 <span className="font-mono font-bold">{character.rerollsLeft}</span>
         </span>
-        {canReroll && character.rerollsLeft > 0 && (
-          <button
-            type="button"
-            onClick={onReroll}
-            className="rounded bg-amber-700 text-amber-50 px-2 py-0.5 hover:bg-amber-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-900 focus-visible:ring-offset-1"
-          >
-            재굴림: 다시 굴리기
-          </button>
-        )}
       </div>
 
       {/* 인벤토리 */}

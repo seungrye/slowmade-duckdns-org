@@ -32,6 +32,8 @@ export type Action =
   | { type: "MAKE_CHOICE"; choiceId: string; rng?: () => number }
   | { type: "USE_ITEM"; itemId: string }
   | { type: "REROLL"; rng?: () => number }
+  // probability 판정 대기(pendingRoll)를 확정 — 비로소 씬 전이 + stigma/hp 적용.
+  | { type: "CONFIRM_ROLL" }
   | { type: "END_GAME"; endingId: string }
   | { type: "RESET" }
   // #238 — 저장에서 불러올 때. character + currentSceneId 로 playing 즉시 진입.
@@ -82,19 +84,21 @@ function pushItems(inventory: string[], toAdd: string[]): string[] {
 /** 씬 onEnter 적용 — setFlags / addItems / incrementCounters / stigmaDelta 를 character 에 반영. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
-  const { setFlags, addItems, incrementCounters, stigmaDelta, hpDelta } = scene.onEnter as {
+  const { setFlags, addItems, incrementCounters, stigmaDelta, hpDelta, rerollDelta } = scene.onEnter as {
     setFlags?: Record<string, boolean>;
     addItems?: string[];
     incrementCounters?: string[];
     stigmaDelta?: number;
     hpDelta?: number; // #318 — HP 변화 (음수=데미지, 양수=회복).
+    rerollDelta?: number; // 재굴림 횟수 변화 (양수=보충).
   };
   const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
   const itemsChanged = addItems && addItems.length > 0;
   const countersChanged = incrementCounters && incrementCounters.length > 0;
   const stigmaChanged = typeof stigmaDelta === "number" && stigmaDelta !== 0;
   const hpChanged = typeof hpDelta === "number" && hpDelta !== 0 && Number.isFinite(hpDelta);
-  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged && !hpChanged) return character;
+  const rerollChanged = typeof rerollDelta === "number" && rerollDelta !== 0 && Number.isFinite(rerollDelta);
+  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged && !hpChanged && !rerollChanged) return character;
   let nextFlags: Record<string, boolean | number> = character.flags;
   if (flagsChanged || countersChanged) {
     nextFlags = { ...character.flags };
@@ -116,6 +120,10 @@ function applyOnEnter(character: Character, scene: Scene): Character {
   if (hpChanged) {
     const safeHp = Math.max(0, Math.min(next.maxHp, next.hp + hpDelta));
     next = { ...next, hp: safeHp };
+  }
+  // 재굴림 보충 (음수 방지).
+  if (rerollChanged) {
+    next = { ...next, rerollsLeft: Math.max(0, next.rerollsLeft + rerollDelta) };
   }
   return next;
 }
@@ -194,27 +202,50 @@ function removeFirst(arr: string[], target: string): string[] {
   return [...arr.slice(0, i), ...arr.slice(i + 1)];
 }
 
-/**
- * 마지막 probability 결정 — REROLL 이 *직전 판정 씬* 으로 되돌아가 다시 굴리기 위한 메타.
- * 단순 설계: state.log 마지막 entry 가 probability 판정이면 그 직전 씬 + choiceId 를 알 수 없으니,
- * playing 상태에 *pendingReroll* 메타를 두는 대신, **방금 도달한 씬의 *역참조*** 로 처리.
- *
- * 더 단순: REROLL 은 *현재 씬* 으로 들어오기 *직전의 probability choice* 를 다시 굴린다.
- * 이를 위해 playing 상태에 lastProbability 메타를 둔다.
- */
 type PlayingState = Extract<GameState, { phase: "playing" }>;
-type LastProbability = {
-  prevSceneId: string;
-  choiceId: string;
-  stat: import("@/types/web-adventure").StatKey;
-  difficulty: number;
-  onSuccess: string;
-  onFailure: string;
-};
+type ProbabilityChoice = Extract<
+  import("@/types/web-adventure").Choice,
+  { kind: "probability" }
+>;
 
-// playing state 에 lastProbability 메타 부착 (옵셔널).
-// GameState 타입을 깨지 않고 런타임 필드만 추가 — Object spread 사용.
-type PlayingWithMeta = PlayingState & { lastProbability?: LastProbability };
+/**
+ * probability 판정 → pendingRoll 생성 (씬 전이 *보류*). 결과만 보관하고 currentScene 유지.
+ * 사용자가 결과를 보고 재굴림/계속(CONFIRM_ROLL)을 정한다. MAKE_CHOICE/REROLL 공유.
+ * stigma delta 는 *확정(CONFIRM_ROLL) 시* 적용되므로 여기선 totalDelta 만 보관.
+ */
+function buildPendingRoll(
+  state: PlayingState,
+  choice: ProbabilityChoice,
+  rng?: () => number,
+): PlayingState {
+  const statValue =
+    effectiveStat(state.character, choice.stat) + stigmaDebuff(state.character, choice.stat);
+  const result = rollProbability({
+    stat: statValue,
+    ability: state.character.ability,
+    statKey: choice.stat,
+    difficulty: choice.difficulty,
+    rng,
+  });
+  const target = result.success ? choice.onSuccess : choice.onFailure;
+  const successExtra = result.success ? (choice.stigmaDeltaOnSuccess ?? 0) : 0;
+  const failureExtra = !result.success ? (choice.stigmaDeltaOnFailure ?? 0) : 0;
+  const totalDelta = (choice.stigmaDelta ?? 0) + successExtra + failureExtra;
+  return {
+    ...state,
+    pendingRoll: {
+      choiceId: choice.id,
+      label: choice.label,
+      roll: result.roll,
+      bonus: result.bonus,
+      statValue,
+      difficulty: choice.difficulty,
+      success: result.success,
+      target,
+      totalDelta,
+    },
+  };
+}
 
 export function gameReducer(state: GameState, action: Action, scenes: SceneRegistry): GameState {
   switch (action.type) {
@@ -246,40 +277,9 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
       switch (choice.kind) {
         case "plain":
           return moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0);
-        case "probability": {
-          // #250 — 침식 디버프 (con/dex -2 if stigma>=50) 가 effective stat 에 적용.
-          const statValue = effectiveStat(state.character, choice.stat) + stigmaDebuff(state.character, choice.stat);
-          const result = rollProbability({
-            stat: statValue,
-            ability: state.character.ability,
-            statKey: choice.stat,
-            difficulty: choice.difficulty,
-            rng: action.rng,
-          });
-          const target = result.success ? choice.onSuccess : choice.onFailure;
-          const logEntry = `${choice.label} — d20=${result.roll}+${statValue}(+${result.bonus}) vs ${choice.difficulty} → ${result.success ? "성공" : "실패"}`;
-          // #250 — choice 의 stigmaDelta + 성공/실패 별 추가 delta.
-          const successExtra = result.success ? (choice.stigmaDeltaOnSuccess ?? 0) : 0;
-          const failureExtra = !result.success ? (choice.stigmaDeltaOnFailure ?? 0) : 0;
-          const totalDelta = (choice.stigmaDelta ?? 0) + successExtra + failureExtra;
-          const next = moveTo(state, target, scenes, logEntry, totalDelta);
-          // probability 판정 결과를 *PlayingState* 라면 메타로 기록 (REROLL 용).
-          if (next.phase === "playing") {
-            const withMeta: PlayingWithMeta = {
-              ...next,
-              lastProbability: {
-                prevSceneId: state.currentScene,
-                choiceId: choice.id,
-                stat: choice.stat,
-                difficulty: choice.difficulty,
-                onSuccess: choice.onSuccess,
-                onFailure: choice.onFailure,
-              },
-            };
-            return withMeta;
-          }
-          return next;
-        }
+        case "probability":
+          // 즉시 전이하지 않고 *판정 대기*(pendingRoll). 결과를 보고 재굴림/계속 선택.
+          return buildPendingRoll(state, choice, action.rng);
         case "conditional": {
           if (!evalCondition(choice.condition, state.character)) return state;
           return moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0);
@@ -336,39 +336,33 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
     }
 
     case "REROLL": {
-      if (state.phase !== "playing") return state;
-      const meta = (state as PlayingWithMeta).lastProbability;
-      if (!meta) return state;
+      // 대기 중(pendingRoll) 판정을 *같은 씬*에서 다시 굴린다 (전이 전, 횟수 -1).
+      if (state.phase !== "playing" || !state.pendingRoll) return state;
       if (state.character.rerollsLeft <= 0) return state;
-      // 이전 씬 으로 *복원* — 단, 실제 씬 전환은 필요 없음. 대신 *재굴림 결과로 다시 moveTo*.
-      const statValue = effectiveStat(state.character, meta.stat);
-      const result = rollProbability({
-        stat: statValue,
-        ability: state.character.ability,
-        statKey: meta.stat,
-        difficulty: meta.difficulty,
-        rng: action.rng,
-      });
-      const target = result.success ? meta.onSuccess : meta.onFailure;
-      // 재굴림은 prevSceneId 기준 으로 시뮬레이션 — log 에 재굴림 표시.
-      const logEntry = `재굴림 — d20=${result.roll}+${statValue}(+${result.bonus}) vs ${meta.difficulty} → ${result.success ? "성공" : "실패"}`;
-      // rerollsLeft -1 + 이전 씬 *복원* 한 state 를 base 로 다시 moveTo.
-      const reverted: PlayingState = {
-        ...state,
-        character: { ...state.character, rerollsLeft: state.character.rerollsLeft - 1 },
-        currentScene: meta.prevSceneId,
+      const scene = scenes[state.currentScene];
+      if (!scene) return state;
+      const choice = findChoice(scene, state.pendingRoll.choiceId);
+      if (!choice || choice.kind !== "probability") return state;
+      const next = buildPendingRoll(state, choice, action.rng);
+      return {
+        ...next,
+        character: { ...next.character, rerollsLeft: state.character.rerollsLeft - 1 },
       };
-      // moveTo 가 onEnter 를 *다시* 적용하므로, *이전 씬으로 복귀했다가* 다시 *재굴림 결과 씬* 으로 이동.
-      // 단, 직전 실패 씬의 onEnter 가 flag 를 부여한 경우 중복 적용 방지를 위해 log 만 append 후 moveTo.
-      const moved = moveTo(reverted, target, scenes, logEntry);
-      if (moved.phase === "playing") {
-        const withMeta: PlayingWithMeta = {
-          ...moved,
-          lastProbability: meta,
-        };
-        return withMeta;
-      }
-      return moved;
+    }
+
+    case "CONFIRM_ROLL": {
+      // 대기 중 판정을 확정 — 비로소 씬 전이 + stigma/hp 적용.
+      if (state.phase !== "playing" || !state.pendingRoll) return state;
+      const pr = state.pendingRoll;
+      const logEntry = `${pr.label} — d20=${pr.roll}+${pr.statValue}(+${pr.bonus}) vs ${pr.difficulty} → ${pr.success ? "성공" : "실패"}`;
+      // pendingRoll 제거한 base 에서 moveTo (전이 + delta).
+      const base: PlayingState = {
+        phase: "playing",
+        character: state.character,
+        currentScene: state.currentScene,
+        log: state.log,
+      };
+      return moveTo(base, pr.target, scenes, logEntry, pr.totalDelta);
     }
 
     case "END_GAME": {

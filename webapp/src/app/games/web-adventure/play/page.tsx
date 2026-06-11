@@ -31,7 +31,6 @@ import MobileDrawer from "./MobileDrawer";
 
 const initialState: GameState = { phase: "creating" };
 
-type PlayingMeta = GameState & { lastProbability?: unknown };
 
 export default function WebAdventurePlayPage() {
   const [scenes, setScenes] = useState<SceneRegistry | null>(null);
@@ -336,6 +335,10 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                   scene={scenes[state.currentScene]}
                   character={state.character}
                   runIndex={runIndex}
+                  pendingRoll={state.pendingRoll}
+                  rerollsLeft={state.character.rerollsLeft}
+                  onReroll={() => dispatch({ type: "REROLL" })}
+                  onConfirm={() => dispatch({ type: "CONFIRM_ROLL" })}
                   onChoose={(choiceId) => {
                     // #245 — adv_choice_made. #285: protagonist + stigma_erosion 추가.
                     //   회차/시한부 분석을 위해 그 시점의 *주인공/침식* 캡처.
@@ -360,8 +363,6 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                   character={state.character}
                   runIndex={runIndex}
                   onUseItem={(itemId) => dispatch({ type: "USE_ITEM", itemId })}
-                  onReroll={() => dispatch({ type: "REROLL" })}
-                  canReroll={Boolean((state as PlayingMeta).lastProbability)}
                 />
               </div>
             </div>
@@ -372,8 +373,6 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                 character={state.character}
                 runIndex={runIndex}
                 onUseItem={(itemId) => dispatch({ type: "USE_ITEM", itemId })}
-                onReroll={() => dispatch({ type: "REROLL" })}
-                canReroll={Boolean((state as PlayingMeta).lastProbability)}
               />
               <div className="mt-3 pt-2 border-t border-amber-300">
                 <Link

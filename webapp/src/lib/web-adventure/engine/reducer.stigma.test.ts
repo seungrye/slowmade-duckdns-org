@@ -82,11 +82,12 @@ describe("reducer + stigma", () => {
     const scenes = makeScenes();
     const state: GameState = { phase: "playing", character: makeChar(0), currentScene: "a", log: [] };
     // rng 0.99 → 성공.
-    const next = gameReducer(
+    let next = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "magic", rng: () => 0.99 },
       scenes,
     );
+    if (next.phase === "playing" && next.pendingRoll) next = gameReducer(next, { type: "CONFIRM_ROLL" }, scenes);
     expect(next.phase).toBe("playing");
     if (next.phase === "playing") {
       // success → onSuccess=b (onEnter stigma+10)
@@ -122,11 +123,12 @@ describe("reducer + stigma", () => {
     };
     // c 로 가는 magic 실패 시 (rng 0.0) → choice stigma+5 (성공시 +2 안 적용)
     // c 는 일반 씬. 99+5 = 104 → clamp 100 → 자동 petrification (c 가 isEnding 아님).
-    const next = gameReducer(
+    let next = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "magic", rng: () => 0.0 },
       scenes,
     );
+    if (next.phase === "playing" && next.pendingRoll) next = gameReducer(next, { type: "CONFIRM_ROLL" }, scenes);
     expect(next.phase).toBe("ended");
     if (next.phase === "ended") {
       expect(next.endingId).toBe("petrification");
@@ -173,7 +175,7 @@ describe("reducer + stigma", () => {
       scenesHard,
     );
     expect(noDebuff.phase).toBe("playing");
-    if (noDebuff.phase === "playing") expect(noDebuff.currentScene).toBe("b");
+    if (noDebuff.phase === "playing") expect(noDebuff.pendingRoll?.target).toBe("b");
 
     // stigma 50: 11+8=19 < 21 → 실패 → c.
     const debuff = gameReducer(
@@ -182,6 +184,6 @@ describe("reducer + stigma", () => {
       scenesHard,
     );
     expect(debuff.phase).toBe("playing");
-    if (debuff.phase === "playing") expect(debuff.currentScene).toBe("c");
+    if (debuff.phase === "playing") expect(debuff.pendingRoll?.target).toBe("c");
   });
 });

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import type { Character, Scene } from "@/types/web-adventure";
+import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
 import {
   getSkipVisitedEnabled,
@@ -17,6 +17,11 @@ type Props = {
   onChoose: (choiceId: string) => void;
   /** 회차 — 배리에이션 이미지 선택 seed (회차마다 다른 그림). */
   runIndex?: number;
+  /** probability 판정 대기 — 있으면 ChoiceList 대신 결과+재굴림/계속 표시. */
+  pendingRoll?: PendingRoll;
+  rerollsLeft?: number;
+  onReroll?: () => void;
+  onConfirm?: () => void;
 };
 
 /** 문단 사이 간격 (ms). */
@@ -47,7 +52,16 @@ function hashString(s: string): number {
  *   - 사용자 OFF (옵션).
  *   - 방문 자동 skip ON + 이전 방문 기록.
  */
-export default function SceneRenderer({ scene, character, onChoose, runIndex = 1 }: Props) {
+export default function SceneRenderer({
+  scene,
+  character,
+  onChoose,
+  runIndex = 1,
+  pendingRoll,
+  rerollsLeft = 0,
+  onReroll,
+  onConfirm,
+}: Props) {
   const total = scene.body.length;
 
   // 배리에이션 선택 — (회차 + 씬 id) 결정적 해시. 같은 회차 같은 씬은 항상 같은 그림,
@@ -147,12 +161,55 @@ export default function SceneRenderer({ scene, character, onChoose, runIndex = 1
         ))}
       </div>
 
-      {/* ChoiceList — 모든 문단 노출 *전엔 미렌더* (공간 미점유). */}
-      {choicesReady && (
-        <div className="web-adventure-fade-in" data-choices-visible="true">
-          <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />
-        </div>
-      )}
+      {/* 판정 대기(pendingRoll) → 결과 + 재굴림/계속. 없으면 ChoiceList. */}
+      {choicesReady &&
+        (pendingRoll ? (
+          <div className="web-adventure-fade-in" data-testid="roll-result">
+            <div
+              className={`rounded-lg border p-4 ${
+                pendingRoll.success
+                  ? "bg-emerald-50 border-emerald-300"
+                  : "bg-rose-50 border-rose-300"
+              }`}
+            >
+              <p className="text-sm text-gray-600 mb-1">{pendingRoll.label}</p>
+              <p className="font-mono text-sm mb-1">
+                d20={pendingRoll.roll} + {pendingRoll.statValue}
+                {pendingRoll.bonus ? ` (+${pendingRoll.bonus})` : ""} vs{" "}
+                {pendingRoll.difficulty}
+              </p>
+              <p
+                className={`text-lg font-bold ${
+                  pendingRoll.success ? "text-emerald-700" : "text-rose-700"
+                }`}
+              >
+                {pendingRoll.success ? "성공!" : "실패…"}
+              </p>
+              <div className="mt-3 flex gap-2 flex-wrap">
+                {rerollsLeft > 0 && onReroll && (
+                  <button
+                    type="button"
+                    onClick={onReroll}
+                    className="rounded-md bg-amber-600 text-white px-4 py-2 text-sm font-semibold hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-800"
+                  >
+                    🎲 재굴림 ({rerollsLeft})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onConfirm}
+                  className="rounded-md bg-blue-600 text-white px-4 py-2 text-sm font-semibold hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-800"
+                >
+                  계속 →
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="web-adventure-fade-in" data-choices-visible="true">
+            <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />
+          </div>
+        ))}
     </article>
   );
 }

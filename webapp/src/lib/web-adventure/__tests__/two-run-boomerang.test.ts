@@ -94,6 +94,7 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
     let s1 = startState("kael", loaded);
     for (const id of r1Steps) {
       s1 = gameReducer(s1, { type: "MAKE_CHOICE", choiceId: id, rng: RNG }, loaded);
+      if (s1.phase === "playing" && s1.pendingRoll) s1 = gameReducer(s1, { type: "CONFIRM_ROLL" }, loaded);
       if (s1.phase === "ended") break;
     }
     expect(s1.phase).toBe("ended");
@@ -127,6 +128,7 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
     let s2 = startState("kael", loaded, flags);
     for (const id of r2Steps) {
       s2 = gameReducer(s2, { type: "MAKE_CHOICE", choiceId: id, rng: RNG }, loaded);
+      if (s2.phase === "playing" && s2.pendingRoll) s2 = gameReducer(s2, { type: "CONFIRM_ROLL" }, loaded);
       if (s2.phase === "ended") break;
     }
     expect(s2.phase).toBe("ended");
@@ -157,6 +159,7 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
     ];
     for (const id of path) {
       s = gameReducer(s, { type: "MAKE_CHOICE", choiceId: id, rng: RNG }, loaded);
+      if (s.phase === "playing" && s.pendingRoll) s = gameReducer(s, { type: "CONFIRM_ROLL" }, loaded);
     }
     // 현재 climax_revolution_path. echo_of_harmony 시도 → 분기 차단.
     const before = s;
