@@ -61,6 +61,8 @@
     "browser-image-compression": "^2.0.2",
     "clsx": "^2.1.1",
     "diff": "^9.0.0",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "elkjs": "^0.11.1",
     "firebase": "^12.12.1",
     "katex": "^0.16.45",
@@ -82,6 +84,7 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "tiptap-extension-resize-image": "^1.3.3",
+    "web-worker": "1.5.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -103,5 +106,10 @@
     "tailwindcss": "^4.1.18",
     "typescript": "^5.9.3",
     "vitest": "^4.1.8"
+  },
+  "pnpm": {
+    "overrides": {
+      "web-worker": "1.5.0"
+    }
   }
 }
