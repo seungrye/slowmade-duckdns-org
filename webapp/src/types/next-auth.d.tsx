@@ -4,6 +4,7 @@ declare module "next-auth" {
     interface Session {
         user: {
             token: string;
+            isOwner?: boolean;
         } & DefaultSession["user"];
     }
 

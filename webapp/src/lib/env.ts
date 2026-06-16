@@ -60,6 +60,13 @@ export const env = {
     // 서버 사이드 secret API key (sk_). 빈 문자열이면 헤더 전송 안 함.
     apiKey: process.env.POLLINATIONS_API_KEY ?? '',
   },
+
+  // owner-only hidden 메뉴 접근 허용 이메일. 비어 있으면 모든 owner 가드 차단.
+  ownerEmail: process.env.OWNER_EMAIL ?? '',
+
+  // stock-automator 데몬이 /api/ingest/* 호출 시 X-Ingest-Key 헤더로 검증.
+  // 빈 문자열이면 ingest 전부 차단 (Default secure).
+  stockIngestKey: process.env.STOCK_INGEST_KEY ?? '',
 } as const;
 
 export function validateEnv(): void {

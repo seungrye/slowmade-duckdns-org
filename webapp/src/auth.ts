@@ -3,6 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
 import { connectToDB } from "@/lib/db";
 import UserModel from "@/models/user";
+import { env } from "@/lib/env";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
@@ -47,6 +48,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const secret = (token as Record<string, unknown>).secret;
       if (secret && session.user) {
         session.user.token = secret as string;
+      }
+      // owner 플래그 — UI 메뉴 노출용. server 측 가드는 항상 requireOwner 로 재검증.
+      if (session.user?.email && env.ownerEmail) {
+        session.user.isOwner = session.user.email === env.ownerEmail;
       }
       return session;
     },

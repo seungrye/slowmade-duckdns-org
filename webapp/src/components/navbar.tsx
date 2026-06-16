@@ -18,6 +18,7 @@ import {
     Settings,
     Gamepad2,
     BookOpen,
+    LineChart,
 } from "lucide-react";
 
 const navLinks = [
@@ -46,24 +47,50 @@ const scenesLink = {
     icon: <BookOpen size={20} />,
 };
 
+// owner 전용 hidden "주식" 묶음 — session.user.isOwner 가 true 일 때만 노출.
+// 마이페이지 패턴과 동일한 드롭다운 그룹.
+const stocksLinks = [
+    {
+        href: "/admin/stocks",
+        label: "종목 차트",
+        description: "KOSPI200 / S&P500 / NASDAQ-100 종가 차트",
+        icon: <LineChart size={20} />,
+    },
+    {
+        href: "/admin/portfolio",
+        label: "매매 차트",
+        description: "포트폴리오 시계열 + 매매 마커",
+        icon: <LineChart size={20} />,
+    },
+];
+
 export default function Navbar() {
     const { data: session } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [isStocksDropdownOpen, setIsStocksDropdownOpen] = useState(false);
     const pathname = usePathname();
     const dropdownRef = useRef<HTMLLIElement>(null);
+    const stocksDropdownRef = useRef<HTMLLIElement>(null);
 
     const isScenesActive = pathname === "/scenes" || pathname.startsWith("/scenes/");
+    const isStocksGroupActive =
+        pathname.startsWith("/admin/stocks") || pathname.startsWith("/admin/portfolio");
     const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
+    const isOwner = Boolean(session?.user?.isOwner);
 
     // 모바일 메뉴 내부 collapsible 섹션 상태.
-    // 활성 라우트면 시작부터 펴진 상태로(사용자가 현재 위치한 그룹을 바로 인지하도록).
     const [isMobileMyPageOpen, setIsMobileMyPageOpen] = useState<boolean>(isMyPageActive);
+    const [isMobileStocksOpen, setIsMobileStocksOpen] = useState<boolean>(isStocksGroupActive);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (dropdownRef.current && !dropdownRef.current.contains(target)) {
                 setIsDropdownOpen(false);
+            }
+            if (stocksDropdownRef.current && !stocksDropdownRef.current.contains(target)) {
+                setIsStocksDropdownOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -106,6 +133,36 @@ export default function Navbar() {
                                 {scenesLink.icon}
                                 {scenesLink.label}
                             </Link>
+                        </li>
+                    )}
+
+                    {/* 주식 — owner 전용 드롭다운 (종목 차트 + 매매 차트) */}
+                    {isOwner && (
+                        <li className="relative" ref={stocksDropdownRef}>
+                            <button
+                                className={`flex items-center gap-1 transition ${isStocksGroupActive ? "text-gray-400" : "text-gray-500"
+                                    } hover:text-gray-300`}
+                                onClick={() => setIsStocksDropdownOpen((v) => !v)}
+                                aria-label="주식 메뉴"
+                            >
+                                <LineChart size={20} /> 주식 <ChevronDown size={16} />
+                            </button>
+                            {isStocksDropdownOpen && (
+                                <ul className="absolute right-0 mt-2 w-48 bg-gray-800 shadow-lg rounded-lg overflow-hidden z-20">
+                                    {stocksLinks.map((link) => (
+                                        <li key={link.href}>
+                                            <Link
+                                                href={link.href}
+                                                className="px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
+                                                onClick={() => setIsStocksDropdownOpen(false)}
+                                            >
+                                                {link.icon}
+                                                {link.label}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </li>
                     )}
 
@@ -204,6 +261,45 @@ export default function Navbar() {
                                     {scenesLink.label}
                                 </Link>
                             </li>
+
+                            {/* 주식 — owner 전용 모바일 collapsible 섹션 */}
+                            {isOwner && (
+                                <li>
+                                    <button
+                                        type="button"
+                                        className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isStocksGroupActive ? "text-gray-400" : "text-gray-300"}`}
+                                        onClick={() => setIsMobileStocksOpen((v) => !v)}
+                                        aria-label="모바일 주식 섹션 토글"
+                                        aria-expanded={isMobileStocksOpen}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <LineChart size={20} />
+                                            주식
+                                        </span>
+                                        <ChevronDown
+                                            size={16}
+                                            className={`transition-transform ${isMobileStocksOpen ? "rotate-180" : ""}`}
+                                        />
+                                    </button>
+                                    {isMobileStocksOpen && (
+                                        <ul className="pl-6 space-y-1">
+                                            {stocksLinks.map((link) => (
+                                                <li key={link.href} className="text-center">
+                                                    <Link
+                                                        href={link.href}
+                                                        className={`block py-2 ${pathname.startsWith(link.href) ? "text-gray-400" : "text-gray-500"
+                                                            } hover:text-gray-300 transition flex items-center gap-1`}
+                                                        onClick={() => setIsOpen(false)}
+                                                    >
+                                                        {link.icon}
+                                                        {link.label}
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </li>
+                            )}
 
                             {/* 마이페이지 collapsible 섹션 */}
                             <li>
