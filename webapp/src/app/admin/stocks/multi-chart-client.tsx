@@ -151,6 +151,7 @@ export default function MultiChartClient({ stocks }: Props) {
   const [showMA, setShowMA] = useState(true);
   const [showTrades, setShowTrades] = useState(true);
   const [range, setRange] = useState<RangeKey>("1M"); // 기본 월 보기
+  const [anchorEnd, setAnchorEnd] = useState<string>(() => ymd(new Date())); // 창 우측 끝(이동 기준)
   const [byTicker, setByTicker] = useState<Record<string, SeriesPoint[]>>({});
   const [tradesByTicker, setTradesByTicker] = useState<Record<string, Trade[]>>({});
   const [missing, setMissing] = useState<string[]>([]);
@@ -207,9 +208,10 @@ export default function MultiChartClient({ stocks }: Props) {
     let cancelled = false;
     setLoading(true);
     const enc = encodeURIComponent(selected.join(","));
-    // 기간 → 조회 창(from/to). limit 은 일봉 기준 창 크기를 덮도록(API 가 5000 캡).
+    // 기간 → 조회 창(from/to). anchorEnd 가 우측 끝(chevron 이동 기준).
+    // limit 은 일봉 기준 창 크기를 덮도록(API 가 5000 캡).
     const cfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
-    const to = ymd(new Date());
+    const to = anchorEnd;
     const from = addMonths(to, -cfg.months);
     const limit = Math.min(5000, cfg.months * 31 + 5);
     const q = `tickers=${enc}&from=${from}&to=${to}&limit=${limit}`;
@@ -237,7 +239,7 @@ export default function MultiChartClient({ stocks }: Props) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [selected, range]);
+  }, [selected, range, anchorEnd]);
 
   const addTicker = useCallback(
     (ticker: string) => {
@@ -416,6 +418,18 @@ export default function MultiChartClient({ stocks }: Props) {
     };
   }, [selected, byTicker, tradesByTicker, normalize, showMA, showTrades, metaByTicker, range]);
 
+  // 기간 창(표시·chevron). anchorEnd = 우측 끝, 좌/우로 기간만큼 이동(미래로는 오늘까지).
+  const rangeCfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
+  const windowFrom = addMonths(anchorEnd, -rangeCfg.months);
+  const atToday = anchorEnd >= ymd(new Date());
+  const shift = (dir: -1 | 1) => {
+    const today = ymd(new Date());
+    setAnchorEnd((prev) => {
+      const next = addMonths(prev, dir * rangeCfg.months);
+      return next > today ? today : next;
+    });
+  };
+
   return (
     <div>
       {/* 시장 탭 — KR / US 분리. 통화가 다른 종목 한 차트 섞임 방지. */}
@@ -562,25 +576,55 @@ export default function MultiChartClient({ stocks }: Props) {
           )}
         </form>
 
-        <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-sm w-fit">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              type="button"
-              onClick={() => setRange(r.key)}
-              className={
-                "px-3 py-1 border-l first:border-l-0 border-gray-300 " +
-                (range === r.key
-                  ? "bg-blue-600 text-white font-medium"
-                  : "bg-white text-gray-600 hover:bg-gray-50")
-              }
-              title={
-                { D: "일봉", W: "주봉", M: "월봉" }[r.tick] + " 기준"
-              }
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => shift(-1)}
+            className="px-2 py-1 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            title="이전 기간"
+            aria-label="이전 기간"
+          >
+            ‹
+          </button>
+          <div className="inline-flex rounded-md border border-gray-300 overflow-hidden w-fit">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                type="button"
+                onClick={() => {
+                  setRange(r.key);
+                  setAnchorEnd(ymd(new Date())); // 기간 바꾸면 최신 구간으로
+                }}
+                className={
+                  "px-3 py-1 border-l first:border-l-0 border-gray-300 " +
+                  (range === r.key
+                    ? "bg-blue-600 text-white font-medium"
+                    : "bg-white text-gray-600 hover:bg-gray-50")
+                }
+                title={{ D: "일봉", W: "주봉", M: "월봉" }[r.tick] + " 기준"}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => shift(1)}
+            disabled={atToday}
+            className={
+              "px-2 py-1 rounded border border-gray-300 " +
+              (atToday
+                ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                : "bg-white text-gray-600 hover:bg-gray-50")
+            }
+            title={atToday ? "최신 구간입니다" : "다음 기간"}
+            aria-label="다음 기간"
+          >
+            ›
+          </button>
+          <span className="text-xs text-gray-400 tabular-nums">
+            {windowFrom} ~ {anchorEnd}
+          </span>
         </div>
 
         <div className="flex flex-wrap items-center gap-4 text-sm">
