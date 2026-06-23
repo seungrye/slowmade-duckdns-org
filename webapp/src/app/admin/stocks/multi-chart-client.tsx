@@ -49,13 +49,6 @@ function parseTickersFromUrl(raw: string | null): string[] {
   return raw.split(",").map((t) => t.trim()).filter(Boolean).slice(0, MAX_SELECTED);
 }
 
-function normalizeSeries(series: SeriesPoint[]): SeriesPoint[] {
-  if (series.length === 0) return series;
-  const base = series[0].close;
-  if (!base) return series;
-  return series.map((p) => ({ date: p.date, close: (p.close / base) * 100 }));
-}
-
 function sma(series: SeriesPoint[], window: number): Array<[string, number | null]> {
   const out: Array<[string, number | null]> = [];
   for (let i = 0; i < series.length; i++) {
@@ -83,6 +76,10 @@ const RANGES: { key: RangeKey; label: string; months: number; tick: Tick }[] = [
   { key: "5Y", label: "5년", months: 60, tick: "W" },
   { key: "10Y", label: "10년", months: 120, tick: "M" },
 ];
+
+// SMA60(60틱) warmup — 보이는 구간 시작부터 이동평균이 연속되도록 추가로 받을 개월수.
+// D: 60거래일≈3개월, W: 60주≈15개월, M: 60개월(여유 62).
+const WARMUP_MONTHS: Record<Tick, number> = { D: 3, W: 15, M: 62 };
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -213,15 +210,18 @@ export default function MultiChartClient({ stocks }: Props) {
     const cfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
     const to = anchorEnd;
     const from = addMonths(to, -cfg.months);
-    const limit = Math.min(5000, cfg.months * 31 + 5);
-    const q = `tickers=${enc}&from=${from}&to=${to}&limit=${limit}`;
+    // SMA60(60틱)이 보이는 구간 시작부터 연속되도록 prices 는 warmup 만큼 더 받는다.
+    const warmup = WARMUP_MONTHS[cfg.tick];
+    const priceFrom = addMonths(from, -warmup);
+    const priceLimit = Math.min(5000, (cfg.months + warmup) * 31 + 5);
+    const tradeLimit = Math.min(5000, cfg.months * 31 + 5);
     Promise.all([
-      fetch(`/api/admin/stocks/prices?${q}`).then(
-        (r) => r.json() as Promise<PricesResponse>,
-      ),
-      fetch(`/api/admin/stocks/trades?${q}`).then(
-        (r) => r.json() as Promise<TradesResponse>,
-      ),
+      fetch(
+        `/api/admin/stocks/prices?tickers=${enc}&from=${priceFrom}&to=${to}&limit=${priceLimit}`,
+      ).then((r) => r.json() as Promise<PricesResponse>),
+      fetch(
+        `/api/admin/stocks/trades?tickers=${enc}&from=${from}&to=${to}&limit=${tradeLimit}`,
+      ).then((r) => r.json() as Promise<TradesResponse>),
     ])
       .then(([prices, trades]) => {
         if (cancelled) return;
@@ -277,17 +277,20 @@ export default function MultiChartClient({ stocks }: Props) {
     const series: ESeries = [];
     const legendData: string[] = [];
 
-    // 기간별 자동 틱으로 다운샘플(일/주/월). 종목별로 한 번 계산해 축·시리즈에 공유.
-    const tick = (RANGES.find((r) => r.key === range) ?? RANGES[0]).tick;
+    // 기간별 자동 틱으로 다운샘플(일/주/월). dsByTicker 는 warmup 포함(SMA 연속용),
+    // winFrom 이전은 화면에서 가린다. 종목별로 한 번 계산해 축·시리즈에 공유.
+    const rcfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
+    const tick = rcfg.tick;
+    const winFrom = addMonths(anchorEnd, -rcfg.months); // 보이는 구간 시작
     const dsByTicker: Record<string, SeriesPoint[]> = {};
     for (const t of selected) dsByTicker[t] = downsample(byTicker[t] ?? [], tick);
 
     // xAxis 의 category data 명시 — echarts 가 series 등장 순서로 자동 수집하면
-    // 종목별 휴장일 차이로 순서가 깨짐. union dates sort 후 명시.
+    // 종목별 휴장일 차이로 순서가 깨짐. union dates sort 후 명시. 보이는 구간만.
     const dateSet = new Set<string>();
     for (const t of selected) {
-      for (const p of dsByTicker[t]) dateSet.add(p.date);
-      for (const tr of tradesByTicker[t] ?? []) dateSet.add(tr.date);
+      for (const p of dsByTicker[t]) if (p.date >= winFrom) dateSet.add(p.date);
+      for (const tr of tradesByTicker[t] ?? []) if (tr.date >= winFrom) dateSet.add(tr.date);
     }
     const xAxisDates = Array.from(dateSet).sort();
 
@@ -295,17 +298,21 @@ export default function MultiChartClient({ stocks }: Props) {
       const t = selected[i];
       const color = COLORS[i % COLORS.length];
       const meta = metaByTicker[t];
-      const rawSeries = dsByTicker[t] ?? [];
-      const sorted = rawSeries.slice().sort((a, b) => a.date.localeCompare(b.date));
-      const transformed = normalize ? normalizeSeries(sorted) : sorted;
-      const closeData = transformed.map((p) => [p.date, p.close] as [string, number]);
+      // full = warmup 포함(SMA 계산용). 정규화 기준(base)은 *보이는 구간 첫 종가*.
+      const full = (dsByTicker[t] ?? [])
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const firstVisible = full.find((p) => p.date >= winFrom);
+      const base = normalize ? firstVisible?.close ?? full[0]?.close ?? 0 : 0;
+      const adj = (price: number) => (normalize && base ? (price / base) * 100 : price);
+      const normFull: SeriesPoint[] = full.map((p) => ({ date: p.date, close: adj(p.close) }));
+      const closeData = normFull
+        .filter((p) => p.date >= winFrom)
+        .map((p) => [p.date, p.close] as [string, number]);
       const labelClose = `${t} ${meta?.name ?? ""}`.trim();
       legendData.push(labelClose);
 
-      const trades = tradesByTicker[t] ?? [];
-      const base = sorted.length > 0 ? sorted[0].close : 0;
-      const adj = (price: number) =>
-        normalize && base ? (price / base) * 100 : price;
+      const trades = (tradesByTicker[t] ?? []).filter((tr) => tr.date >= winFrom);
 
       series.push({
         type: "line",
@@ -363,8 +370,9 @@ export default function MultiChartClient({ stocks }: Props) {
       }
 
       if (showMA) {
-        const sma20 = sma(transformed, 20);
-        const sma60 = sma(transformed, 60);
+        // warmup 포함 normFull 로 계산 후 보이는 구간만 — 시작부터 연속 출력.
+        const sma20 = sma(normFull, 20).filter(([d]) => d >= winFrom);
+        const sma60 = sma(normFull, 60).filter(([d]) => d >= winFrom);
         series.push({
           type: "line",
           name: `${t} SMA20`,
@@ -416,7 +424,7 @@ export default function MultiChartClient({ stocks }: Props) {
       ],
       series,
     };
-  }, [selected, byTicker, tradesByTicker, normalize, showMA, showTrades, metaByTicker, range]);
+  }, [selected, byTicker, tradesByTicker, normalize, showMA, showTrades, metaByTicker, range, anchorEnd]);
 
   // 기간 창(표시·chevron). anchorEnd = 우측 끝, 좌/우로 기간만큼 이동(미래로는 오늘까지).
   const rangeCfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
@@ -468,8 +476,8 @@ export default function MultiChartClient({ stocks }: Props) {
       <div className="relative w-full h-[520px] mb-6">
         {selected.length > 0 && echartsOption && (
           <>
-            {/* 기간 프리셋 — 차트 우상단, 상단 경계에 30%만 걸치게 위로 뺌 */}
-            <div className="absolute -top-[21px] right-2 z-10 flex items-center gap-2">
+            {/* 기간 프리셋 — 차트 우상단, 상단 경계에 50% 걸치게 위로 뺌 */}
+            <div className="absolute -top-[15px] right-2 z-10 flex items-center gap-2">
               <span className="text-xs text-gray-400 tabular-nums bg-white/80 px-1 rounded">
                 {windowFrom} ~ {anchorEnd}
               </span>
@@ -510,7 +518,7 @@ export default function MultiChartClient({ stocks }: Props) {
               onClick={() => shift(1)}
               disabled={atToday}
               className={
-                "absolute right-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 shadow-sm flex items-center justify-center text-lg leading-none " +
+                "absolute -right-[25px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 shadow-sm flex items-center justify-center text-lg leading-none " +
                 (atToday
                   ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                   : "bg-white/90 text-gray-600 hover:bg-gray-50")
