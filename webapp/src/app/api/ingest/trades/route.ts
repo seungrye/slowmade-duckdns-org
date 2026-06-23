@@ -11,6 +11,7 @@ type TradeRecord = {
   action: "buy" | "sell";
   strategy?: string; // "infinite" | "trend" 등. 전략 구분(옵션).
   qty: number;
+  cumulativeQty?: number; // 체결 후 누적 보유 수량(옵션).
   price: number;
   amount?: number;
   currency?: string;
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
             action: t.action,
             strategy: t.strategy ?? "",
             qty: t.qty,
+            cumulativeQty: t.cumulativeQty ?? 0,
             price: t.price,
             amount: t.amount ?? t.price * t.qty,
             currency: t.currency ?? "KRW",

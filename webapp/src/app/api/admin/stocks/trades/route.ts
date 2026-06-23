@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   await connectToDB();
   const docs = await StockTrade.find(query)
-    .select({ ticker: 1, action: 1, strategy: 1, date: 1, time: 1, price: 1, qty: 1, env: 1, _id: 0 })
+    .select({ ticker: 1, action: 1, strategy: 1, date: 1, time: 1, price: 1, qty: 1, cumulativeQty: 1, env: 1, _id: 0 })
     .sort({ ticker: 1, time: 1 })
     .lean();
 

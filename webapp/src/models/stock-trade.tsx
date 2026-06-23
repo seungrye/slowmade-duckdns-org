@@ -18,6 +18,7 @@ const StockTradeSchema = new Schema(
     action: { type: String, required: true, enum: ["buy", "sell"] },
     strategy: { type: String, default: "", index: true },
     qty: { type: Number, required: true },
+    cumulativeQty: { type: Number, default: 0 }, // 체결 후 종목 누적 보유 수량(전량 매도 뒤 0)
     price: { type: Number, required: true },
     amount: { type: Number, default: 0 },
     currency: { type: String, default: "KRW" },

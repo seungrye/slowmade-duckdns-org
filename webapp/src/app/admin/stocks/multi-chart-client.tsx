@@ -30,6 +30,7 @@ type Trade = {
   strategy?: string; // "infinite" | "trend" 등. 전략 구분(마커 모양).
   price: number;
   qty: number;
+  cumulativeQty?: number; // 체결 후 누적 보유 수량.
   env: "paper" | "real";
 };
 
@@ -269,12 +270,17 @@ export default function MultiChartClient({ stocks }: Props) {
         s === "infinite" ? "triangle" : s === "trend" ? "diamond" : "circle";
       const stratLabel = (s?: string) =>
         s === "infinite" ? "무한매수" : s === "trend" ? "추세추종" : "기타";
+      type MarkerPoint = { value: [string, number]; qty: number; cum: number };
       const pushMarkers = (action: "buy" | "sell", clr: string, krLabel: string) => {
-        const group: Record<string, Array<[string, number]>> = {};
+        const group: Record<string, MarkerPoint[]> = {};
         for (const tr of trades) {
           if (tr.action !== action) continue;
           const key = tr.strategy ?? "";
-          (group[key] ??= []).push([tr.date, adj(tr.price)]);
+          (group[key] ??= []).push({
+            value: [tr.date, adj(tr.price)],
+            qty: tr.qty,
+            cum: tr.cumulativeQty ?? 0,
+          });
         }
         for (const [strat, pts] of Object.entries(group)) {
           if (pts.length === 0) continue;
@@ -288,8 +294,12 @@ export default function MultiChartClient({ stocks }: Props) {
             itemStyle: { color: clr, borderColor: clr },
             tooltip: {
               trigger: "item",
-              formatter: (p: { value: [string, number] }) =>
-                `${t} ${krLabel} · ${stratLabel(strat)}<br/>${p.value[0]} · ${normalize ? p.value[1].toFixed(2) : p.value[1].toLocaleString()}`,
+              formatter: (p: { data: MarkerPoint }) => {
+                const v = p.data.value;
+                const px = normalize ? v[1].toFixed(2) : v[1].toLocaleString();
+                return `${t} ${krLabel} · ${stratLabel(strat)}<br/>${v[0]} · ${px}`
+                  + `<br/>수량 ${p.data.qty} · 누적 ${p.data.cum}`;
+              },
             },
           } as never);
         }
