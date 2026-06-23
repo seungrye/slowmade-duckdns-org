@@ -72,6 +72,45 @@ function sma(series: SeriesPoint[], window: number): Array<[string, number | nul
 
 type Market = "KR" | "US";
 
+// 기간 프리셋 — months: 조회 창, tick: 자동 틱(일 D / 주 W / 월 M). 기본 월(1M).
+type RangeKey = "1M" | "3M" | "1Y" | "3Y" | "5Y" | "10Y";
+type Tick = "D" | "W" | "M";
+const RANGES: { key: RangeKey; label: string; months: number; tick: Tick }[] = [
+  { key: "1M", label: "월", months: 1, tick: "D" },
+  { key: "3M", label: "분기", months: 3, tick: "D" },
+  { key: "1Y", label: "년", months: 12, tick: "D" },
+  { key: "3Y", label: "3년", months: 36, tick: "W" },
+  { key: "5Y", label: "5년", months: 60, tick: "W" },
+  { key: "10Y", label: "10년", months: 120, tick: "M" },
+];
+
+function ymd(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function addMonths(dateStr: string, delta: number): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCMonth(d.getUTCMonth() + delta);
+  return ymd(d);
+}
+
+// 일봉을 틱 버킷의 마지막 값으로 다운샘플(실제 날짜 보존). 주봉=월요일 키, 월봉=YYYY-MM.
+function bucketKey(date: string, tick: Tick): string {
+  if (tick === "D") return date;
+  if (tick === "M") return date.slice(0, 7);
+  const d = new Date(date + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // 주 시작(월)
+  return ymd(d);
+}
+
+function downsample(series: SeriesPoint[], tick: Tick): SeriesPoint[] {
+  if (tick === "D") return series;
+  const sorted = series.slice().sort((a, b) => a.date.localeCompare(b.date));
+  const lastByBucket = new Map<string, SeriesPoint>();
+  for (const p of sorted) lastByBucket.set(bucketKey(p.date, tick), p); // 버킷 마지막 값
+  return Array.from(lastByBucket.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export default function MultiChartClient({ stocks }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
@@ -111,6 +150,7 @@ export default function MultiChartClient({ stocks }: Props) {
   const [normalize, setNormalize] = useState(false);
   const [showMA, setShowMA] = useState(true);
   const [showTrades, setShowTrades] = useState(true);
+  const [range, setRange] = useState<RangeKey>("1M"); // 기본 월 보기
   const [byTicker, setByTicker] = useState<Record<string, SeriesPoint[]>>({});
   const [tradesByTicker, setTradesByTicker] = useState<Record<string, Trade[]>>({});
   const [missing, setMissing] = useState<string[]>([]);
@@ -167,11 +207,17 @@ export default function MultiChartClient({ stocks }: Props) {
     let cancelled = false;
     setLoading(true);
     const enc = encodeURIComponent(selected.join(","));
+    // 기간 → 조회 창(from/to). limit 은 일봉 기준 창 크기를 덮도록(API 가 5000 캡).
+    const cfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
+    const to = ymd(new Date());
+    const from = addMonths(to, -cfg.months);
+    const limit = Math.min(5000, cfg.months * 31 + 5);
+    const q = `tickers=${enc}&from=${from}&to=${to}&limit=${limit}`;
     Promise.all([
-      fetch(`/api/admin/stocks/prices?tickers=${enc}`).then(
+      fetch(`/api/admin/stocks/prices?${q}`).then(
         (r) => r.json() as Promise<PricesResponse>,
       ),
-      fetch(`/api/admin/stocks/trades?tickers=${enc}`).then(
+      fetch(`/api/admin/stocks/trades?${q}`).then(
         (r) => r.json() as Promise<TradesResponse>,
       ),
     ])
@@ -191,7 +237,7 @@ export default function MultiChartClient({ stocks }: Props) {
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  }, [selected]);
+  }, [selected, range]);
 
   const addTicker = useCallback(
     (ticker: string) => {
@@ -229,11 +275,16 @@ export default function MultiChartClient({ stocks }: Props) {
     const series: ESeries = [];
     const legendData: string[] = [];
 
+    // 기간별 자동 틱으로 다운샘플(일/주/월). 종목별로 한 번 계산해 축·시리즈에 공유.
+    const tick = (RANGES.find((r) => r.key === range) ?? RANGES[0]).tick;
+    const dsByTicker: Record<string, SeriesPoint[]> = {};
+    for (const t of selected) dsByTicker[t] = downsample(byTicker[t] ?? [], tick);
+
     // xAxis 의 category data 명시 — echarts 가 series 등장 순서로 자동 수집하면
     // 종목별 휴장일 차이로 순서가 깨짐. union dates sort 후 명시.
     const dateSet = new Set<string>();
     for (const t of selected) {
-      for (const p of byTicker[t] ?? []) dateSet.add(p.date);
+      for (const p of dsByTicker[t]) dateSet.add(p.date);
       for (const tr of tradesByTicker[t] ?? []) dateSet.add(tr.date);
     }
     const xAxisDates = Array.from(dateSet).sort();
@@ -242,7 +293,7 @@ export default function MultiChartClient({ stocks }: Props) {
       const t = selected[i];
       const color = COLORS[i % COLORS.length];
       const meta = metaByTicker[t];
-      const rawSeries = byTicker[t] ?? [];
+      const rawSeries = dsByTicker[t] ?? [];
       const sorted = rawSeries.slice().sort((a, b) => a.date.localeCompare(b.date));
       const transformed = normalize ? normalizeSeries(sorted) : sorted;
       const closeData = transformed.map((p) => [p.date, p.close] as [string, number]);
@@ -363,7 +414,7 @@ export default function MultiChartClient({ stocks }: Props) {
       ],
       series,
     };
-  }, [selected, byTicker, tradesByTicker, normalize, showMA, showTrades, metaByTicker]);
+  }, [selected, byTicker, tradesByTicker, normalize, showMA, showTrades, metaByTicker, range]);
 
   return (
     <div>
@@ -510,6 +561,27 @@ export default function MultiChartClient({ stocks }: Props) {
             </ul>
           )}
         </form>
+
+        <div className="inline-flex rounded-md border border-gray-300 overflow-hidden text-sm w-fit">
+          {RANGES.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => setRange(r.key)}
+              className={
+                "px-3 py-1 border-l first:border-l-0 border-gray-300 " +
+                (range === r.key
+                  ? "bg-blue-600 text-white font-medium"
+                  : "bg-white text-gray-600 hover:bg-gray-50")
+              }
+              title={
+                { D: "일봉", W: "주봉", M: "월봉" }[r.tick] + " 기준"
+              }
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
 
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <label className="inline-flex items-center gap-2 cursor-pointer">
