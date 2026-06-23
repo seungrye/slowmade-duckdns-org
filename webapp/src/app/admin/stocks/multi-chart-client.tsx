@@ -465,7 +465,63 @@ export default function MultiChartClient({ stocks }: Props) {
         })}
       </div>
 
-      <div className="w-full h-[520px] mb-6">
+      <div className="relative w-full h-[520px] mb-6">
+        {selected.length > 0 && echartsOption && (
+          <>
+            {/* 기간 프리셋 — 차트 우상단 */}
+            <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+              <span className="text-xs text-gray-400 tabular-nums bg-white/80 px-1 rounded">
+                {windowFrom} ~ {anchorEnd}
+              </span>
+              <div className="inline-flex rounded-md border border-gray-300 overflow-hidden bg-white/90 text-sm shadow-sm">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.key}
+                    type="button"
+                    onClick={() => {
+                      setRange(r.key);
+                      setAnchorEnd(ymd(new Date())); // 기간 바꾸면 최신 구간으로
+                    }}
+                    className={
+                      "px-3 py-1 border-l first:border-l-0 border-gray-300 " +
+                      (range === r.key
+                        ? "bg-blue-600 text-white font-medium"
+                        : "text-gray-600 hover:bg-gray-50")
+                    }
+                    title={{ D: "일봉", W: "주봉", M: "월봉" }[r.tick] + " 기준"}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* chevron — 차트 좌/우 수직 중앙, 동그란 버튼 */}
+            <button
+              type="button"
+              onClick={() => shift(-1)}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white/90 text-gray-600 shadow-sm hover:bg-gray-50 flex items-center justify-center text-lg leading-none"
+              title="이전 기간"
+              aria-label="이전 기간"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={() => shift(1)}
+              disabled={atToday}
+              className={
+                "absolute right-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 shadow-sm flex items-center justify-center text-lg leading-none " +
+                (atToday
+                  ? "bg-gray-100 text-gray-300 cursor-not-allowed"
+                  : "bg-white/90 text-gray-600 hover:bg-gray-50")
+              }
+              title={atToday ? "최신 구간입니다" : "다음 기간"}
+              aria-label="다음 기간"
+            >
+              ›
+            </button>
+          </>
+        )}
         {selected.length === 0 || !echartsOption ? (
           <div className="h-full flex items-center justify-center text-sm text-gray-400 border border-dashed rounded">
             아래에서 종목을 추가하면 차트가 그려집니다.
@@ -575,57 +631,6 @@ export default function MultiChartClient({ stocks }: Props) {
             </ul>
           )}
         </form>
-
-        <div className="flex items-center gap-2 text-sm">
-          <button
-            type="button"
-            onClick={() => shift(-1)}
-            className="px-2 py-1 rounded border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-            title="이전 기간"
-            aria-label="이전 기간"
-          >
-            ‹
-          </button>
-          <div className="inline-flex rounded-md border border-gray-300 overflow-hidden w-fit">
-            {RANGES.map((r) => (
-              <button
-                key={r.key}
-                type="button"
-                onClick={() => {
-                  setRange(r.key);
-                  setAnchorEnd(ymd(new Date())); // 기간 바꾸면 최신 구간으로
-                }}
-                className={
-                  "px-3 py-1 border-l first:border-l-0 border-gray-300 " +
-                  (range === r.key
-                    ? "bg-blue-600 text-white font-medium"
-                    : "bg-white text-gray-600 hover:bg-gray-50")
-                }
-                title={{ D: "일봉", W: "주봉", M: "월봉" }[r.tick] + " 기준"}
-              >
-                {r.label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => shift(1)}
-            disabled={atToday}
-            className={
-              "px-2 py-1 rounded border border-gray-300 " +
-              (atToday
-                ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                : "bg-white text-gray-600 hover:bg-gray-50")
-            }
-            title={atToday ? "최신 구간입니다" : "다음 기간"}
-            aria-label="다음 기간"
-          >
-            ›
-          </button>
-          <span className="text-xs text-gray-400 tabular-nums">
-            {windowFrom} ~ {anchorEnd}
-          </span>
-        </div>
 
         <div className="flex flex-wrap items-center gap-4 text-sm">
           <label className="inline-flex items-center gap-2 cursor-pointer">
