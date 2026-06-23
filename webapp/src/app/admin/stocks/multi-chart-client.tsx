@@ -27,6 +27,7 @@ type Trade = {
   date: string;
   time: string;
   action: "buy" | "sell";
+  strategy?: string; // "infinite" | "trend" 등. 전략 구분(마커 모양).
   price: number;
   qty: number;
   env: "paper" | "real";
@@ -252,13 +253,6 @@ export default function MultiChartClient({ stocks }: Props) {
       const adj = (price: number) =>
         normalize && base ? (price / base) * 100 : price;
 
-      const buyPoints: Array<[string, number]> = trades
-        .filter((tr) => tr.action === "buy")
-        .map((tr) => [tr.date, adj(tr.price)]);
-      const sellPoints: Array<[string, number]> = trades
-        .filter((tr) => tr.action === "sell")
-        .map((tr) => [tr.date, adj(tr.price)]);
-
       series.push({
         type: "line",
         name: labelClose,
@@ -269,37 +263,40 @@ export default function MultiChartClient({ stocks }: Props) {
         emphasis: { focus: "series" },
       });
 
-      // 매매 마커 — 별도 scatter series. legend 에는 종목 line 만 노출.
-      if (showTrades && buyPoints.length > 0) {
-        series.push({
-          type: "scatter",
-          name: `${t} 매수`,
-          data: buyPoints,
-          symbol: "triangle",
-          symbolSize: 12,
-          itemStyle: { color: "#dc2626", borderColor: "#dc2626" },
-          tooltip: {
-            trigger: "item",
-            formatter: (p: { value: [string, number] }) =>
-              `${t} 매수<br/>${p.value[0]} · ${normalize ? p.value[1].toFixed(2) : p.value[1].toLocaleString()}`,
-          },
-        } as never);
-      }
-      if (showTrades && sellPoints.length > 0) {
-        series.push({
-          type: "scatter",
-          name: `${t} 매도`,
-          data: sellPoints,
-          symbol: "triangle",
-          symbolRotate: 180,
-          symbolSize: 12,
-          itemStyle: { color: "#2563eb", borderColor: "#2563eb" },
-          tooltip: {
-            trigger: "item",
-            formatter: (p: { value: [string, number] }) =>
-              `${t} 매도<br/>${p.value[0]} · ${normalize ? p.value[1].toFixed(2) : p.value[1].toLocaleString()}`,
-          },
-        } as never);
+      // 매매 마커 — 색=매수(빨강)/매도(파랑), 모양=전략(무한매수 ▲ / 추세 ◆ / 기타 ●).
+      // 전략별로 scatter series 를 나눠 모양과 툴팁으로 구분한다. legend 엔 종목 line 만 노출.
+      const stratSymbol = (s?: string) =>
+        s === "infinite" ? "triangle" : s === "trend" ? "diamond" : "circle";
+      const stratLabel = (s?: string) =>
+        s === "infinite" ? "무한매수" : s === "trend" ? "추세추종" : "기타";
+      const pushMarkers = (action: "buy" | "sell", clr: string, krLabel: string) => {
+        const group: Record<string, Array<[string, number]>> = {};
+        for (const tr of trades) {
+          if (tr.action !== action) continue;
+          const key = tr.strategy ?? "";
+          (group[key] ??= []).push([tr.date, adj(tr.price)]);
+        }
+        for (const [strat, pts] of Object.entries(group)) {
+          if (pts.length === 0) continue;
+          series.push({
+            type: "scatter",
+            name: `${t} ${krLabel} ${stratLabel(strat)}`,
+            data: pts,
+            symbol: stratSymbol(strat),
+            symbolRotate: action === "sell" && stratSymbol(strat) === "triangle" ? 180 : 0,
+            symbolSize: 12,
+            itemStyle: { color: clr, borderColor: clr },
+            tooltip: {
+              trigger: "item",
+              formatter: (p: { value: [string, number] }) =>
+                `${t} ${krLabel} · ${stratLabel(strat)}<br/>${p.value[0]} · ${normalize ? p.value[1].toFixed(2) : p.value[1].toLocaleString()}`,
+            },
+          } as never);
+        }
+      };
+      if (showTrades) {
+        pushMarkers("buy", "#dc2626", "매수");
+        pushMarkers("sell", "#2563eb", "매도");
       }
 
       if (showMA) {

@@ -9,6 +9,7 @@ type TradeRecord = {
   env: "paper" | "real";
   ticker: string;
   action: "buy" | "sell";
+  strategy?: string; // "infinite" | "trend" 등. 전략 구분(옵션).
   qty: number;
   price: number;
   amount?: number;
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
             env: t.env,
             ticker: t.ticker,
             action: t.action,
+            strategy: t.strategy ?? "",
             qty: t.qty,
             price: t.price,
             amount: t.amount ?? t.price * t.qty,
