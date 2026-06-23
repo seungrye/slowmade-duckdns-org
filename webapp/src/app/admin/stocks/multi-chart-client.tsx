@@ -468,8 +468,8 @@ export default function MultiChartClient({ stocks }: Props) {
       <div className="relative w-full h-[520px] mb-6">
         {selected.length > 0 && echartsOption && (
           <>
-            {/* 기간 프리셋 — 차트 우상단 */}
-            <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+            {/* 기간 프리셋 — 차트 우상단, 상단 경계에 30%만 걸치게 위로 뺌 */}
+            <div className="absolute -top-[21px] right-2 z-10 flex items-center gap-2">
               <span className="text-xs text-gray-400 tabular-nums bg-white/80 px-1 rounded">
                 {windowFrom} ~ {anchorEnd}
               </span>
@@ -499,7 +499,7 @@ export default function MultiChartClient({ stocks }: Props) {
             <button
               type="button"
               onClick={() => shift(-1)}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white/90 text-gray-600 shadow-sm hover:bg-gray-50 flex items-center justify-center text-lg leading-none"
+              className="absolute -left-[25px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white/90 text-gray-600 shadow-sm hover:bg-gray-50 flex items-center justify-center text-lg leading-none"
               title="이전 기간"
               aria-label="이전 기간"
             >
