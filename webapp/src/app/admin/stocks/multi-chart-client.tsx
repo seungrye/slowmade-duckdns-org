@@ -77,9 +77,9 @@ const RANGES: { key: RangeKey; label: string; months: number; tick: Tick }[] = [
   { key: "10Y", label: "10년", months: 120, tick: "M" },
 ];
 
-// SMA60(60틱) warmup — 보이는 구간 시작부터 이동평균이 연속되도록 추가로 받을 개월수.
-// D: 60거래일≈3개월, W: 60주≈15개월, M: 60개월(여유 62).
-const WARMUP_MONTHS: Record<Tick, number> = { D: 3, W: 15, M: 62 };
+// SMA60(60거래일) warmup — 이동평균은 항상 일봉 60거래일 기준이라 틱과 무관하게 고정.
+// 60거래일 ≈ 3개월, 휴장 여유로 4개월.
+const SMA_WARMUP_MONTHS = 4;
 
 function ymd(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -210,8 +210,8 @@ export default function MultiChartClient({ stocks }: Props) {
     const cfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
     const to = anchorEnd;
     const from = addMonths(to, -cfg.months);
-    // SMA60(60틱)이 보이는 구간 시작부터 연속되도록 prices 는 warmup 만큼 더 받는다.
-    const warmup = WARMUP_MONTHS[cfg.tick];
+    // SMA60(60거래일)이 보이는 구간 시작부터 연속되도록 prices 는 warmup 만큼 더 받는다.
+    const warmup = SMA_WARMUP_MONTHS;
     const priceFrom = addMonths(from, -warmup);
     const priceLimit = Math.min(5000, (cfg.months + warmup) * 31 + 5);
     const tradeLimit = Math.min(5000, cfg.months * 31 + 5);
@@ -298,17 +298,25 @@ export default function MultiChartClient({ stocks }: Props) {
       const t = selected[i];
       const color = COLORS[i % COLORS.length];
       const meta = metaByTicker[t];
-      // full = warmup 포함(SMA 계산용). 정규화 기준(base)은 *보이는 구간 첫 종가*.
-      const full = (dsByTicker[t] ?? [])
+      // 가격선은 틱 다운샘플. 이동평균선은 보기(주/월봉)와 무관하게 *항상 일봉 기준
+      // 20/60 거래일*로 계산해 tick 날짜에 샘플 → 어느 기간이든 동일한 20일선·60일선.
+      const dsFull = (dsByTicker[t] ?? [])
         .slice()
         .sort((a, b) => a.date.localeCompare(b.date));
-      const firstVisible = full.find((p) => p.date >= winFrom);
-      const base = normalize ? firstVisible?.close ?? full[0]?.close ?? 0 : 0;
+      const dailyFull = (byTicker[t] ?? [])
+        .slice()
+        .sort((a, b) => a.date.localeCompare(b.date));
+      const firstVisible =
+        dailyFull.find((p) => p.date >= winFrom) ?? dsFull.find((p) => p.date >= winFrom);
+      const base = normalize ? firstVisible?.close ?? dailyFull[0]?.close ?? 0 : 0;
       const adj = (price: number) => (normalize && base ? (price / base) * 100 : price);
-      const normFull: SeriesPoint[] = full.map((p) => ({ date: p.date, close: adj(p.close) }));
-      const closeData = normFull
+      const closeData = dsFull
         .filter((p) => p.date >= winFrom)
-        .map((p) => [p.date, p.close] as [string, number]);
+        .map((p) => [p.date, adj(p.close)] as [string, number]);
+      // 일봉 SMA(20/60 거래일) → 날짜별 맵(tick 날짜에 샘플하기 위함).
+      const normDaily: SeriesPoint[] = dailyFull.map((p) => ({ date: p.date, close: adj(p.close) }));
+      const ma20Map = new Map(sma(normDaily, 20));
+      const ma60Map = new Map(sma(normDaily, 60));
       const labelClose = `${t} ${meta?.name ?? ""}`.trim();
       legendData.push(labelClose);
 
@@ -370,9 +378,14 @@ export default function MultiChartClient({ stocks }: Props) {
       }
 
       if (showMA) {
-        // warmup 포함 normFull 로 계산 후 보이는 구간만 — 시작부터 연속 출력.
-        const sma20 = sma(normFull, 20).filter(([d]) => d >= winFrom);
-        const sma60 = sma(normFull, 60).filter(([d]) => d >= winFrom);
+        // 일봉 SMA 를 화면 tick 날짜에 샘플 — 보이는 구간 시작부터 연속.
+        const visDates = dsFull.filter((p) => p.date >= winFrom).map((p) => p.date);
+        const sma20 = visDates.map(
+          (d) => [d, ma20Map.get(d) ?? null] as [string, number | null],
+        );
+        const sma60 = visDates.map(
+          (d) => [d, ma60Map.get(d) ?? null] as [string, number | null],
+        );
         series.push({
           type: "line",
           name: `${t} SMA20`,
