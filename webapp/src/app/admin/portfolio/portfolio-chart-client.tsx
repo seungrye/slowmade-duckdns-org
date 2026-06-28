@@ -67,8 +67,13 @@ export default function PortfolioChartClient() {
     };
   }, [env, currency]);
 
+  // 해당 (env,currency)에 매매가 한 건이라도 있는지. 매매 없는 시장은 라인을 숨긴다
+  // (포트폴리오 스냅샷은 매매와 무관하게 매일 쌓이므로, 매매 0건이면 차트가 의미 없다).
+  const hasTrades = !!data && Object.keys(data.tradesByDate ?? {}).length > 0;
+
   const option = useMemo<EChartsOption | null>(() => {
     if (!data || data.history.length === 0) return null;
+    if (Object.keys(data.tradesByDate ?? {}).length === 0) return null; // 매매 없는 시장 숨김
 
     const dates = data.history.map((h) => h.dateStr);
     const totalData = data.history.map((h) => h.totalValue);
@@ -312,7 +317,9 @@ export default function PortfolioChartClient() {
           </div>
         ) : !option ? (
           <div className="h-full flex items-center justify-center text-sm text-gray-400 border border-dashed rounded">
-            데이터가 없습니다 (사이클이 한 번도 안 돌았거나 아직 백필 전).
+            {data && data.history.length > 0 && !hasTrades
+              ? "매매 내역이 없어 차트를 표시하지 않습니다."
+              : "데이터가 없습니다 (사이클이 한 번도 안 돌았거나 아직 백필 전)."}
           </div>
         ) : (
           <ReactECharts
@@ -325,7 +332,7 @@ export default function PortfolioChartClient() {
         )}
       </div>
 
-      {data && data.history.length > 0 && (
+      {data && data.history.length > 0 && hasTrades && (
         <div className="text-xs text-gray-500 flex flex-wrap gap-4">
           <span>총 {data.history.length} 사이클</span>
           <span>
