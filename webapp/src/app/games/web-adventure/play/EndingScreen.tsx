@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Character, Protagonist, Scene, StatKey } from "@/types/web-adventure";
 import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
 import { protagonists } from "@/content/web-adventure/protagonists";
+import { renderInline } from "@/lib/web-adventure/play/render-inline";
 
 // 엔딩 화면 — 제목/에필로그/최종 스탯/선택 로그/다시 시작.
 // state.phase === "ended" 일 때만 렌더된다.
@@ -75,7 +76,7 @@ export default function EndingScreen({ endingId, character, log, finalScene, onR
           <h3 className="text-lg font-bold mb-2 text-center">{finalScene.title}</h3>
           {transitionBody.map((p, i) => (
             <p key={i} className="mb-1 text-amber-900 leading-relaxed whitespace-pre-line">
-              {p.replace(/\*/g, "")}
+              {renderInline(p)}
             </p>
           ))}
         </div>

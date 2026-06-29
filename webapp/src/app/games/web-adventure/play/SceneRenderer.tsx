@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
+import { renderInline } from "@/lib/web-adventure/play/render-inline";
 import {
   getSkipVisitedEnabled,
   getTypewriterEnabled,
@@ -156,7 +157,7 @@ export default function SceneRenderer({
             key={`${scene.id}-${i}`}
             className="leading-relaxed web-adventure-fade-in"
           >
-            {p}
+            {renderInline(p)}
           </p>
         ))}
       </div>
