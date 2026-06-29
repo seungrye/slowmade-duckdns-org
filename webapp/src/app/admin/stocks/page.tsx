@@ -35,7 +35,7 @@ export default async function StocksMultiChartPage() {
   }));
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main className="mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-2">종목 차트</h1>
       <p className="text-sm text-gray-500 mb-6">
         owner 전용 · 종목을 추가하면 같은 차트에 종가 line 이 그려집니다 (최대 8 종목)

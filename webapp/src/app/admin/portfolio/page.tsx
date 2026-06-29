@@ -16,7 +16,7 @@ export default async function PortfolioPage() {
   if (guard instanceof NextResponse) notFound();
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8">
+    <main className="mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-2">매매 차트</h1>
       <p className="text-sm text-gray-500 mb-6">
         owner 전용 · 사이클별 portfolio 시계열 + 매매 마커 (▲ 매수만 / ▼ 매도만 / ■ 둘 다)
