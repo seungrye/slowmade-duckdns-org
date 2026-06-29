@@ -427,10 +427,7 @@ export default function MultiChartClient({ stocks }: Props) {
       yAxis: {
         type: "value",
         scale: true,
-        axisLabel: {
-          fontSize: 11,
-          formatter: (v: number) => (normalize ? v.toFixed(0) : v.toLocaleString()),
-        },
+        axisLabel: { show: false },   // y축 값 숨김 — 호버 시 툴팁으로 확인
       },
       dataZoom: [
         { type: "inside", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
