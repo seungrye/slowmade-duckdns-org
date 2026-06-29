@@ -85,7 +85,10 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
       "rise_to_ground",
       "leave_wreckage",  // #353 — kael_wreckage_hub → kael_truth_gate.
       "leave_uncertain", // #353 — kael_truth_gate → omphalos_outskirts (단서 스킵).
-      "to_market",
+      "to_station",       // #356 — outskirts → omphalos_infiltration.
+      "sneak_in",         // infiltration → omphalos_arrival_stealth (probability).
+      "into_plaza",       // arrival_stealth → omphalos_plaza.
+      "to_market",        // plaza → omphalos_blackmarket (knowsAscensionPlot).
       "to_station_after",
       "path_knowledge",
       "sabotage_with_knowledge",
@@ -118,7 +121,9 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
       "leave_wreckage",  // #353 — kael_wreckage_hub → kael_truth_gate.
       "leave_uncertain", // #353 — kael_truth_gate → omphalos_outskirts (단서 스킵).
       "to_station",
-      "sneak_in",        // #349 — omphalos_infiltration probability success → omphalos_station.
+      "sneak_in",        // #356 — infiltration → omphalos_arrival_stealth.
+      "into_plaza",      // arrival_stealth → omphalos_plaza.
+      "to_station_main", // plaza → omphalos_station.
       "path_steel",
       "derail",
       "continue",        // #345 — climax_revolution_path_derail → climax_revolution_path.
@@ -152,7 +157,9 @@ describe("회차 부메랑 통합 e2e (#272)", () => {
       "leave_wreckage",  // #353 — kael_wreckage_hub → kael_truth_gate.
       "leave_uncertain", // #353 — kael_truth_gate → omphalos_outskirts (단서 스킵).
       "to_station",
-      "sneak_in",        // #349 — omphalos_infiltration probability success → omphalos_station.
+      "sneak_in",        // #356 — infiltration → omphalos_arrival_stealth.
+      "into_plaza",      // arrival_stealth → omphalos_plaza.
+      "to_station_main", // plaza → omphalos_station.
       "path_steel",
       "derail",
       "continue",        // #345 — climax_revolution_path_derail → climax_revolution_path.
