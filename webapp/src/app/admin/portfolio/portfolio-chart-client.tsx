@@ -187,7 +187,7 @@ export default function PortfolioChartClient() {
     return {
       animation: false,
       legend: { bottom: 0, textStyle: { fontSize: 11 } },
-      grid: { left: 80, right: 16, top: 16, bottom: 72 },
+      grid: { left: 24, right: 16, top: 16, bottom: 72 },
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross" },
@@ -243,11 +243,7 @@ export default function PortfolioChartClient() {
       yAxis: {
         type: "value",
         scale: true,
-        axisLabel: {
-          fontSize: 11,
-          formatter: (v: number) =>
-            currency === "USD" ? `$${v.toLocaleString()}` : v.toLocaleString(),
-        },
+        axisLabel: { show: false },   // y축 값 숨김 — 호버 시 툴팁으로 확인
       },
       dataZoom: [
         { type: "inside", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
