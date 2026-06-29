@@ -517,7 +517,7 @@ export default function MultiChartClient({ stocks }: Props) {
             <button
               type="button"
               onClick={() => shift(-1)}
-              className="absolute -left-[25px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white/90 text-gray-600 shadow-sm hover:bg-gray-50 flex items-center justify-center text-lg leading-none"
+              className="absolute -left-[8px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 bg-white/90 text-gray-600 shadow-sm hover:bg-gray-50 flex items-center justify-center text-lg leading-none"
               title="이전 기간"
               aria-label="이전 기간"
             >
@@ -528,7 +528,7 @@ export default function MultiChartClient({ stocks }: Props) {
               onClick={() => shift(1)}
               disabled={atToday}
               className={
-                "absolute -right-[25px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 shadow-sm flex items-center justify-center text-lg leading-none " +
+                "absolute -right-[8px] top-1/2 -translate-y-1/2 z-10 w-9 h-9 rounded-full border border-gray-300 shadow-sm flex items-center justify-center text-lg leading-none " +
                 (atToday
                   ? "bg-gray-100 text-gray-300 cursor-not-allowed"
                   : "bg-white/90 text-gray-600 hover:bg-gray-50")
