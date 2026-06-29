@@ -47,6 +47,11 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
     // #321 — 4 성흔.
     case "ability":
       return character.ability === cond.required;
+    // #359 각성.
+    case "stigmaAtLeast":
+      return character.stigmaErosion >= cond.min;
+    case "all":
+      return cond.conditions.every((c) => evalCondition(c, character));
   }
 }
 
@@ -76,10 +81,8 @@ export function isChoiceVisible(choice: Choice, character: Character): boolean {
   return evalCondition(choice.condition, character);
 }
 
-export function getUnavailableReason(choice: Choice, character: Character): string | null {
-  if (choice.kind === "plain" || choice.kind === "probability") return null;
-  if (evalCondition(choice.condition, character)) return null;
-  const c = choice.condition;
+function reasonForCondition(c: ChoiceCondition, character: Character): string | null {
+  if (evalCondition(c, character)) return null;
   switch (c.kind) {
     case "minStat":
       return `${STAT_LABEL_KO[c.stat]} ${c.min} 이상 필요`;
@@ -102,5 +105,19 @@ export function getUnavailableReason(choice: Choice, character: Character): stri
       };
       return `성흔 필요: ${ABILITY_KO[c.required] ?? c.required}`;
     }
+    // #359 각성.
+    case "stigmaAtLeast":
+      return `침식도 ${c.min} 이상 필요`;
+    case "all": {
+      const parts = c.conditions
+        .map((sub) => reasonForCondition(sub, character))
+        .filter((s): s is string => s !== null);
+      return parts.length ? parts.join(" · ") : null;
+    }
   }
+}
+
+export function getUnavailableReason(choice: Choice, character: Character): string | null {
+  if (choice.kind === "plain" || choice.kind === "probability") return null;
+  return reasonForCondition(choice.condition, character);
 }

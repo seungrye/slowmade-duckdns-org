@@ -14,6 +14,13 @@ const MATRIX: Record<string, { sceneId: string; choiceId: string }> = {
   "world.revolution_won": { sceneId: "omphalos_outskirts", choiceId: "iron_lookout" },
   "world.last_one_fell": { sceneId: "climax_harmony_path", choiceId: "crystal_echo" },
   "world.sylvan_awoke": { sceneId: "climax_sylvan_path", choiceId: "forest_recognized" },
+  // #359 각성 루트 회차 부메랑.
+  "world.truth_freed": { sceneId: "kael_vale_trust", choiceId: "prior_truth" },
+  "world.false_god": { sceneId: "kael_awaken_climax", choiceId: "false_god_echo" },
+  // #361 린 각성 루트 회차 부메랑.
+  "world.regent_rules": { sceneId: "rin_crossroads", choiceId: "regent_echo" },
+  "world.purged": { sceneId: "rin_vale_pursuit", choiceId: "purged_trace" },
+  "world.wanderer": { sceneId: "rin_fall_throne", choiceId: "wanderer_echo" },
 };
 
 let loaded: SceneRegistry | null = null;

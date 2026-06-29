@@ -10,6 +10,11 @@
 //   fall          → world.world_fell      (모든 도시 잿더미)
 //   petrification → world.last_one_fell   (이전 카운트 강화)
 //   sylvan_bond   → world.sylvan_awoke    (영수 깨어남)
+//   liberation    → world.truth_freed     (성흔 진실 폭로 — 다음 회차 각성 단서 유리)
+//   usurpation    → world.false_god        (찬탈자가 신좌 — 사제단 교리 변질)
+//   regency       → world.regent_rules     (타락자가 제국 고위층 — 권력 구도 변질)
+//   purge         → world.purged           (숙청당함 — 다음 회차 동료의 경계/공백)
+//   wayfarer      → world.wanderer          (떠난 자 — 어딘가의 소문으로 남음)
 
 import type { EndingId } from "@/types/web-adventure";
 
@@ -20,6 +25,11 @@ export const ENDING_TO_WORLD_FLAG: Record<EndingId, string> = {
   fall: "world.world_fell",
   petrification: "world.last_one_fell",
   sylvan_bond: "world.sylvan_awoke",
+  liberation: "world.truth_freed",
+  usurpation: "world.false_god",
+  regency: "world.regent_rules",
+  purge: "world.purged",
+  wayfarer: "world.wanderer",
 };
 
 export interface PastRunForFlags {

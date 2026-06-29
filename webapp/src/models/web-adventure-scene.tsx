@@ -14,7 +14,7 @@ import { Schema, model, models, Model } from "mongoose";
 // ── Choice 의 condition (conditional 종류일 때만 사용) ─────────────────────
 const ChoiceConditionSchema = new Schema(
   {
-    kind: { type: String, enum: ["minStat", "hasItem", "flag", "minFlag"], required: true },
+    kind: { type: String, enum: ["minStat", "hasItem", "flag", "minFlag", "ability", "stigmaAtLeast", "all"], required: true },
     stat: { type: String },
     min: { type: Number },
     itemId: { type: String },
@@ -129,7 +129,7 @@ const WebAdventureSceneSchema = new Schema(
     isEnding: { type: Boolean },
     endingId: {
       type: String,
-      enum: ["ascension", "revolution", "harmony", "fall", "petrification", "sylvan_bond"],
+      enum: ["ascension", "revolution", "harmony", "fall", "petrification", "sylvan_bond", "liberation", "usurpation", "regency", "purge", "wayfarer"],
     },
     // #222 — /scenes/graph 노드 좌표 (사용자 드래그로 갱신). optional.
     position: { type: PositionSchema },

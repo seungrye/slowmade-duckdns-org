@@ -38,6 +38,14 @@ const TARGETS: { protagonist: Protagonist; endingId: EndingId }[] = [
   { protagonist: "solwen", endingId: "harmony" },
   { protagonist: "solwen", endingId: "fall" },
   { protagonist: "solwen", endingId: "sylvan_bond" },
+  // #356 — 옴팔로스 네오엘프 동맹(ally_sylvan)으로 비-솔웬도 sylvan_bond 도달(비선형).
+  { protagonist: "kael", endingId: "sylvan_bond" },
+  { protagonist: "rin", endingId: "sylvan_bond" },
+  // #359 — 카엘 각성 루트(옴팔로스 우회 독립 스토리) 전용 엔딩.
+  { protagonist: "kael", endingId: "liberation" },
+  { protagonist: "kael", endingId: "usurpation" },
+  // #361 — 린 각성 엔딩(liberation/regency/purge/wayfarer)은 분기가 옴팔로스 직전이라
+  //   동적 솔버가 거대 그래프 DFS 에 시간을 소진한다. 명시 경로 테스트로 따로 검증(아래).
 ];
 
 const RNG_SUCCESS = () => 0.99; // roll = 20 (probability 성공).
@@ -201,6 +209,41 @@ describe("통합 e2e — 실제 mongo 그래프 완주 (#269)", () => {
     if (state.phase === "ended") {
       expect(state.endingId).toBe("petrification");
       expect(state.character.stigmaErosion).toBe(100);
+    }
+  });
+
+  // #361 — 린 각성 루트(신념과 타락) 명시 경로. 동적 솔버는 분기가 옴팔로스 직전이라
+  //   거대 그래프 DFS 로 시간을 소진하므로, choiceId 시퀀스로 직접 완주 검증.
+  test("rin 각성 루트 명시 경로 → liberation/regency/purge/wayfarer (#361)", () => {
+    if (!loaded) return;
+    const meta = protagonists.rin;
+    const con = meta.baseStats.con;
+    const baseChar = (): Character => ({
+      stats: meta.baseStats, hp: 10 + con * 2, maxHp: 10 + con * 2,
+      ability: "lunar", protagonist: "rin",
+      stigmaErosion: meta.startStigma, inventory: [...meta.startInventory], flags: {}, rerollsLeft: 3,
+    });
+    // rin_underground 부터 강제 시작(앞 메인 경로는 기존 TARGETS 가 커버). failAt 의 probability 만 실패.
+    function run(choices: string[], failAt?: string): GameState {
+      let state: GameState = { phase: "playing", character: baseChar(), currentScene: "rin_underground", log: [] };
+      for (const c of choices) {
+        if (state.phase !== "playing") break;
+        const rng = c === failAt ? RNG_FAIL : RNG_SUCCESS;
+        state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: c, rng }, loaded!);
+        if (state.phase === "playing" && state.pendingRoll) state = gameReducer(state, { type: "CONFIRM_ROLL" }, loaded!);
+      }
+      return state;
+    }
+    const cases: { ending: EndingId; path: string[]; failAt?: string }[] = [
+      { ending: "liberation", path: ["pursue_vale", "follow_trail", "approach_slow", "keep_faith", "embrace_pyre", "seize_awakening", "cast_the_truth"] },
+      { ending: "regency", path: ["pursue_vale", "follow_trail", "approach_slow", "take_deal", "to_throne", "secure_power"] },
+      { ending: "purge", path: ["pursue_vale", "follow_trail", "approach_slow", "take_deal", "to_throne", "secure_power"], failAt: "secure_power" },
+      { ending: "wayfarer", path: ["pursue_vale", "follow_trail", "approach_slow", "keep_faith", "embrace_pyre", "turn_back", "walk_away"] },
+    ];
+    for (const { ending, path, failAt } of cases) {
+      const final = run(path, failAt);
+      expect(final.phase, `rin → ${ending}`).toBe("ended");
+      if (final.phase === "ended") expect(final.endingId).toBe(ending);
     }
   });
 });

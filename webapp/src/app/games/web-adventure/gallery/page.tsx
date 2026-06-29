@@ -115,6 +115,11 @@ function WorldFlagBanner({ pastRuns }: { pastRuns: Array<{ endingId: string }> }
     fall: '💀 잿더미 메아리 (이전 추락)',
     petrification: '🗿 결정체의 빛 (이전 석화)',
     sylvan_bond: '🌿 영수의 기억 (이전 정령 결속)',
+    liberation: '🔓 풀려난 진실 (이전 해방)',
+    usurpation: '👁 거짓 신좌 (이전 찬탈)',
+    regency: '👑 변질된 권력 (이전 권좌)',
+    purge: '🩸 지워진 이름 (이전 숙청)',
+    wayfarer: '🧭 떠난 자의 소문 (이전 여로)',
   };
 
   return (

@@ -59,6 +59,12 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
     // #321 — 4 성흔 (lunar/selene/hecate/none) 별 특수 분기.
     case "ability":
       return character.ability === cond.required;
+    // #359 각성 — 침식도 임계.
+    case "stigmaAtLeast":
+      return character.stigmaErosion >= cond.min;
+    // #359 각성 — 복합 AND (모든 하위 조건 충족).
+    case "all":
+      return cond.conditions.every((c) => evalCondition(c, character));
   }
 }
 

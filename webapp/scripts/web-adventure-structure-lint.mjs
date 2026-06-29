@@ -13,6 +13,10 @@ import mongoose from 'mongoose';
 const ALL_ENDINGS = [
   'ascension', 'revolution', 'harmony',
   'fall', 'petrification', 'sylvan_bond',
+  // #359 각성 루트 전용.
+  'liberation', 'usurpation',
+  // #361 린 각성 루트(신념과 타락).
+  'regency', 'purge', 'wayfarer',
 ];
 const START_SCENES = ['kael_infirmary', 'rin_harbor', 'solwen_grove'];
 // #327 — 자동 ending 잔재 0 (kael_caught/rin_chase/rin_caught 우회 씬에서 재이용,

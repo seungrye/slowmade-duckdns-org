@@ -95,6 +95,14 @@ export const items: Record<string, Item> = {
     stackable: true,
     stigmaDelta: 5,
   },
+  // #359 각성 — 침식 억제 장치. 보유 자체가 각성 조건(다중 게이트의 하나).
+  stigma_suppressor: {
+    id: "stigma_suppressor",
+    displayName: "성흔 억제기",
+    desc: "연구자가 건넨 룬 장치. 폭주하는 마력을 붙들어, 선택받지 못한 몸으로도 각성의 순간을 버티게 한다.",
+    kind: "quest",
+    stackable: false,
+  },
 
   // ── 분기/퀘스트 아이템 ──────────────────────────────────────────
   imperial_seal: {

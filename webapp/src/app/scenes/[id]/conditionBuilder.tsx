@@ -33,6 +33,10 @@ function emptyForKind(kind: ChoiceCondition["kind"]): ChoiceCondition {
       return { kind: "minFlag", key: "", min: 1 };
     case "ability":
       return { kind: "ability", required: "lunar" };
+    case "stigmaAtLeast":
+      return { kind: "stigmaAtLeast", min: 70 };
+    case "all":
+      return { kind: "all", conditions: [] };
   }
 }
 

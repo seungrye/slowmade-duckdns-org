@@ -27,7 +27,14 @@ export type EndingId =
   | "harmony"
   | "fall"
   | "petrification"
-  | "sylvan_bond";
+  | "sylvan_bond"
+  /** #359 각성 루트 전용 엔딩 — 옴팔로스를 우회한 독립 스토리의 결말. */
+  | "liberation"
+  | "usurpation"
+  /** #361 린 각성 루트(신념과 타락) 엔딩. regency=타락 생존, purge=타살死(범용), wayfarer=열린 결말. */
+  | "regency"
+  | "purge"
+  | "wayfarer";
 
 export type Character = {
   stats: Record<StatKey, number>;
@@ -100,7 +107,11 @@ export type ChoiceCondition =
   /** 4 주차 — 누적 카운터 (예: caughtCount) 가 min 이상일 때 충족. */
   | { kind: "minFlag"; key: string; min: number }
   /** #321 〈에테르니아〉 — 4 성흔별 특수 분기. character.ability 가 일치할 때만 해금. */
-  | { kind: "ability"; required: AbilityKey };
+  | { kind: "ability"; required: AbilityKey }
+  /** #359 각성 — 침식도(stigmaErosion) 가 min 이상일 때 충족. */
+  | { kind: "stigmaAtLeast"; min: number }
+  /** #359 각성 — 복합 AND. 모든 하위 조건을 만족할 때 충족(각성 다중 조건 게이트용). */
+  | { kind: "all"; conditions: ChoiceCondition[] };
 
 export type Scene = {
   id: string;

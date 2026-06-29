@@ -95,10 +95,15 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
         } else if (c.condition.kind === "minFlag") {
           const label = FLAG_LABEL_KO[c.condition.key] ?? c.condition.key;
           reason = `${label} ${c.condition.min} 이상 필요`;
-        } else {
+        } else if (c.condition.kind === "ability") {
           // #321 ability — 4 성흔별.
           const ABILITY_KO: Record<string, string> = { lunar: "루나", selene: "셀레네", hecate: "헤카테", none: "무흔" };
           reason = `성흔 필요: ${ABILITY_KO[c.condition.required] ?? c.condition.required}`;
+        } else if (c.condition.kind === "stigmaAtLeast") {
+          reason = `침식도 ${c.condition.min} 이상 필요`;
+        } else {
+          // #359 all — 복합 조건.
+          reason = "여러 조건 충족 필요";
         }
         return (
           <li key={c.id}>
