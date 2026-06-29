@@ -414,7 +414,7 @@ export default function MultiChartClient({ stocks }: Props) {
         bottom: 0,
         textStyle: { fontSize: 11 },
       },
-      grid: { left: 60, right: 16, top: 16, bottom: 72 },
+      grid: { left: 16, right: 16, top: 16, bottom: 72 },
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "cross" },
