@@ -47,7 +47,9 @@ export const env = {
     commentCount1000: intEnv('ACHIEVEMENT_COMMENT_COUNT_1000_POINTS', 500),
   },
 
-  siteUrl: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
+  // canonical/OG/sitemap/metadata 용 사이트 URL. SITE_URL(메인 도메인)을 우선하고,
+  // 없으면 NEXTAUTH_URL 로 fallback(하위호환). 로그인 콜백은 NEXTAUTH_URL 이 그대로 담당.
+  siteUrl: process.env.SITE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
   geminiApiKey: process.env.GEMINI_API_KEY ?? '',
 
   enjiImage: {

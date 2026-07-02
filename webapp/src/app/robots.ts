@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
+import { env } from '@/lib/env';
 
-const URL = 'https://slowmade.duckdns.org'; // 여기에 실제 웹사이트 도메인을 입력하세요.
+const URL = env.siteUrl; // canonical 도메인(SITE_URL, 없으면 NEXTAUTH_URL fallback).
 
 export default function robots(): MetadataRoute.Robots {
   return {

@@ -1,7 +1,8 @@
 import { getAllPosts } from '@/lib/posts';
 import { MetadataRoute } from 'next';
+import { env } from '@/lib/env';
 
-const URL = 'https://slowmade.duckdns.org';
+const URL = env.siteUrl;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
