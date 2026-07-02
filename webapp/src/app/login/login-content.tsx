@@ -4,7 +4,6 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { FcGoogle } from "react-icons/fc";
-import { FaGithub } from "react-icons/fa";
 
 export default function LoginContent() {
     const searchParams = useSearchParams();
@@ -33,15 +32,6 @@ export default function LoginContent() {
                 >
                     <FcGoogle size={20} className="mr-2" />
                     Google 계정으로 로그인
-                </button>
-
-                <button
-                    onClick={() => signIn("github")}
-                    className="flex items-center justify-center w-full bg-gray-900 text-white rounded-lg px-4 py-2 shadow-sm hover:bg-gray-800 transition"
-                    aria-label="GitHub 로그인"
-                >
-                    <FaGithub size={20} className="mr-2" />
-                    GitHub 계정으로 로그인
                 </button>
             </div>
         </div>
