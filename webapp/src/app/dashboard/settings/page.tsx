@@ -2,8 +2,7 @@
 
 import { useState, useEffect, FormEvent } from 'react';
 import { useSession } from 'next-auth/react';
-
-type Theme = 'light' | 'dark' | 'system';
+import { Theme, storeTheme, applyTheme } from '@/lib/theme';
 
 /**
  * 설정 폼을 렌더링하고, 설정 값을 불러오고 저장하는 로직을 담당합니다.
@@ -55,6 +54,9 @@ function SettingsForm() {
 
             const savedSettings = await res.json();
             setInitialTheme(savedSettings.data?.theme); // 저장 후 현재 상태를 초기 상태로 업데이트
+            // localStorage 를 원본으로 갱신하고 즉시 화면에 반영(다음 SSR 대기 없이).
+            storeTheme(theme);
+            applyTheme(theme);
             setMessage('✅ 설정이 저장되었습니다.');
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';

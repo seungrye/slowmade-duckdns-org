@@ -27,108 +27,114 @@ function mockMatchMedia(matches: boolean) {
 }
 
 describe('ThemeSync', () => {
-  // system 테마 — prefers-color-scheme 감지
-  describe('system 테마', () => {
-    beforeEach(() => {
-      document.documentElement.classList.remove('dark');
-    });
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.classList.remove('dark');
+    vi.clearAllMocks();
+  });
 
-    it('시스템이 다크 모드이면 마운트 시 dark 클래스를 추가한다', () => {
+  // 초기 테마는 localStorage 에서 읽는다(쿠키/prop 아님).
+  describe('localStorage 초기 테마 (system)', () => {
+    it('시스템이 다크면 마운트 시 dark 클래스를 추가한다', () => {
+      localStorage.setItem('theme', 'system');
       mockMatchMedia(true);
-      render(<ThemeSync initialTheme="system" />);
+      render(<ThemeSync />);
       expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
 
-    it('시스템이 라이트 모드이면 마운트 시 dark 클래스를 추가하지 않는다', () => {
+    it('시스템이 라이트면 dark 클래스를 추가하지 않는다', () => {
+      localStorage.setItem('theme', 'system');
       mockMatchMedia(false);
-      render(<ThemeSync initialTheme="system" />);
+      render(<ThemeSync />);
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
 
-    it('시스템 테마 변경 이벤트에 반응해 dark 클래스를 토글한다', () => {
+    it('저장값이 없으면 system 으로 폴백한다', () => {
+      mockMatchMedia(true);
+      render(<ThemeSync />);
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
+
+    it('시스템 테마 변경 이벤트에 반응해 토글한다', () => {
+      localStorage.setItem('theme', 'system');
       const mq = mockMatchMedia(false);
-      render(<ThemeSync initialTheme="system" />);
+      render(<ThemeSync />);
 
       mq.dispatchChange(true);
       expect(document.documentElement.classList.contains('dark')).toBe(true);
-
       mq.dispatchChange(false);
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
 
-    it('언마운트 시 이벤트 리스너를 제거한다', () => {
+    it('언마운트 시 리스너를 제거한다', () => {
+      localStorage.setItem('theme', 'system');
       const mq = mockMatchMedia(false);
-      const { unmount } = render(<ThemeSync initialTheme="system" />);
+      const { unmount } = render(<ThemeSync />);
       unmount();
       expect(mq.removeEventListener).toHaveBeenCalled();
     });
   });
 
-  // 고정 테마 — prefers-color-scheme 무시
-  // dark/light 테마는 .dark 클래스 기반으로 동작 (globals.css @custom-variant dark)
-  // SSR에서 <html class="dark">로 이미 설정되므로 ThemeSync는 로그인 동기화만 담당
-  describe('dark/light 테마', () => {
-    beforeEach(() => {
-      document.documentElement.classList.remove('dark');
-    });
-
-    it('dark 테마이면 시스템 변경 이벤트에 반응하지 않는다', () => {
+  // 고정 테마(dark/light)는 client 가 마운트 시 직접 적용(SSR 은 테마를 모름).
+  describe('고정 테마 (dark/light)', () => {
+    it('dark 면 마운트 시 dark 를 붙이고 시스템 변경을 무시한다', () => {
+      localStorage.setItem('theme', 'dark');
       const mq = mockMatchMedia(false);
-      render(<ThemeSync initialTheme="dark" />);
+      render(<ThemeSync />);
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
 
       mq.dispatchChange(false);
-      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
 
-    it('light 테마이면 시스템이 다크여도 dark 클래스를 추가하지 않는다', () => {
+    it('light 면 시스템이 다크여도 dark 를 붙이지 않는다', () => {
+      localStorage.setItem('theme', 'light');
       const mq = mockMatchMedia(true);
-      render(<ThemeSync initialTheme="light" />);
+      render(<ThemeSync />);
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
 
       mq.dispatchChange(true);
       expect(document.documentElement.classList.contains('dark')).toBe(false);
     });
   });
 
-  // 로그인 시 DB 테마 동기화
+  // 로그인 시 DB(user.settings.theme)를 원본으로 localStorage 를 갱신하고 적용한다.
   describe('로그인 시 DB 테마 동기화', () => {
-    beforeEach(() => {
-      document.documentElement.classList.remove('dark');
-      vi.clearAllMocks();
-    });
-
-    it('authenticated 상태가 되면 /api/user/settings 를 조회해 dark 테마를 적용한다', async () => {
+    async function authenticate() {
       const { useSession } = await import('next-auth/react');
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(useSession).mockReturnValue({ status: 'authenticated', data: null as any, update: vi.fn() });
+    }
 
+    it('DB dark 를 적용하고 localStorage 를 갱신한다', async () => {
+      await authenticate();
       mockMatchMedia(false);
       global.fetch = vi.fn().mockResolvedValueOnce({
         json: () => Promise.resolve({ data: { theme: 'dark' } }),
       } as Response);
 
-      render(<ThemeSync initialTheme="system" />);
+      render(<ThemeSync />);
 
       await waitFor(() => {
         expect(document.documentElement.classList.contains('dark')).toBe(true);
       });
+      expect(localStorage.getItem('theme')).toBe('dark');
     });
 
-    it('authenticated 상태가 되면 /api/user/settings 를 조회해 light 테마를 적용한다', async () => {
-      const { useSession } = await import('next-auth/react');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      vi.mocked(useSession).mockReturnValue({ status: 'authenticated', data: null as any, update: vi.fn() });
-
+    it('DB light 를 적용하고 localStorage 를 갱신한다', async () => {
+      await authenticate();
       mockMatchMedia(true);
       document.documentElement.classList.add('dark');
       global.fetch = vi.fn().mockResolvedValueOnce({
         json: () => Promise.resolve({ data: { theme: 'light' } }),
       } as Response);
 
-      render(<ThemeSync initialTheme="system" />);
+      render(<ThemeSync />);
 
       await waitFor(() => {
         expect(document.documentElement.classList.contains('dark')).toBe(false);
       });
+      expect(localStorage.getItem('theme')).toBe('light');
     });
   });
 });

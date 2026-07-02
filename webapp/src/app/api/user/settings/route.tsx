@@ -41,12 +41,9 @@ export async function PUT(request: Request) {
       { new: true, upsert: true, projection: { settings: 1 } }
     );
 
-    const response = apiSuccess(updatedUser?.settings);
-    response.headers.set(
-      'Set-Cookie',
-      `theme=${theme}; Path=/; Max-Age=${60 * 60 * 24 * 365}; SameSite=Lax`
-    );
-    return response;
+    // 테마는 client(localStorage)에서 관리하므로 쿠키를 더 이상 세팅하지 않는다.
+    // DB(user.settings.theme)는 원본으로 유지되고 ThemeSync 가 로그인 시 동기화한다.
+    return apiSuccess(updatedUser?.settings);
   } catch (error) {
     console.error('Error updating user settings:', error);
     return apiError('Internal Server Error', 500);
