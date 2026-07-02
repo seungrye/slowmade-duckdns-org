@@ -501,7 +501,7 @@ import path from "node:path";
 
 describe("#233 — 순수 클릭 (onNodeClick) 분기", () => {
   test("page.tsx 에 onNodeClick prop + setSelectedSceneId 호출 존재", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     expect(code).toMatch(/onNodeClick=\{/);
     expect(code).toMatch(/setSelectedSceneId\(/);
   });
@@ -584,20 +584,20 @@ describe("/scenes/graph — #235 패널 닫기 highlight off + 카메라 중앙 
   });
 
   test("page.tsx 에 ReactFlowProvider + GraphInner 구조 존재", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     // GraphPage 는 ReactFlowProvider 로 GraphInner 를 wrap.
     expect(code).toMatch(/ReactFlowProvider/);
     expect(code).toMatch(/GraphInner/);
   });
 
   test("page.tsx 에 useReactFlow + setCenter 호출 존재", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     expect(code).toMatch(/useReactFlow\(\)/);
     expect(code).toMatch(/setCenter\(/);
   });
 
   test("page.tsx 에 selected 필드 부착 + selectedSceneId 변화 추적", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     // 노드 선택 필드 부착 — useEffect 또는 useMemo 내부.
     expect(code).toMatch(/selected:\s*[a-zA-Z_]+\.id\s*===\s*selectedSceneId/);
     // #329 — useNodesState 분리 구조: selectedSceneId 가 다른 effect/memo
@@ -607,7 +607,7 @@ describe("/scenes/graph — #235 패널 닫기 highlight off + 카메라 중앙 
   });
 
   test("page.tsx — #347 일반 클릭 시 setCenter 호출 없음 (응답성 위해 카메라 이동 제거)", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     // focus URL effect 의 setCenter (zoom 1.2 / duration 600) 만 유지.
     expect(code).toMatch(/zoom:\s*1\.2/);
     expect(code).toMatch(/duration:\s*600/);
@@ -736,7 +736,7 @@ describe("/scenes/graph — #334 노드 선택 시 연결 엣지 노란색 highl
 // deps 에서 rfNodes 제외 — selectedSceneId 변경 시에만 카메라 이동.
 describe("/scenes/graph — #332 드래그 중 viewport reset 차단", () => {
   test("setCenter effect 의 deps 에 rfNodes 없음 (selectedSceneId 만)", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     // setCenter 호출 근처의 useEffect 의 deps 배열에 rfNodes 가 등장하지 않아야.
     // 패턴: setCenter 가 등장하는 useEffect 끝의 deps 배열.
     // 가장 단순한 검사: 'rfNodes' 가 deps 배열 안에 들어가는 useEffect 가
@@ -755,7 +755,7 @@ describe("/scenes/graph — #332 드래그 중 viewport reset 차단", () => {
 // graph 페이지의 fetch 가 cache: "no-store" 로 항상 fresh 데이터 받도록.
 describe("/scenes/graph — #331 새로고침 시 드래그 위치 유지 (no-store)", () => {
   test("content/v1 fetch 에 cache: 'no-store' 옵션 (또는 동등 캐시 무력화)", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     // fetch 호출에 cache: 'no-store' 명시 — 또는 cache-buster 쿼리.
     // 우선 패턴: { cache: "no-store" } 옵션이 fetch 두 번째 인자에 등장.
     const hasNoStore = /cache:\s*["']no-store["']/.test(code);
@@ -772,7 +772,7 @@ describe("/scenes/graph — #347 uncontrolled 패턴 (defaultNodes/setNodes)", (
   });
 
   test("page.tsx — defaultNodes/defaultEdges prop + useReactFlow().setNodes 패턴", () => {
-    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/page.tsx"), "utf-8");
+    const code = fs.readFileSync(path.resolve("src/app/scenes/graph/graph-client.tsx"), "utf-8");
     expect(code).toMatch(/defaultNodes=\{/);
     expect(code).toMatch(/defaultEdges=\{/);
     // useReactFlow 의 setNodes/setEdges 사용.
