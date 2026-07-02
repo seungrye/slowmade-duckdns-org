@@ -1,9 +1,10 @@
 'use client';
 import FloatingMenu from "@/app/floating-menu.section";
 import InfinitPostList, { InfinitPostListRef } from "@/app/infinite-post.section";
+import { GetPostType } from "@/types/posts.d";
 import { useCallback, useRef, useState } from "react";
 
-export default function ContentSection() {
+export default function ContentSection({ initialPosts = [] }: { initialPosts?: GetPostType[] }) {
   const listRef = useRef<InfinitPostListRef>(null);
   const [topmostPostId, setTopmostPostId] = useState<string | null>(null);
 
@@ -67,7 +68,7 @@ export default function ContentSection() {
     <>
       <section className="mt-12">
         <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-200 mb-4">🔥 최신 유머</h2>
-        <InfinitPostList ref={listRef} onTopmostVisiblePostChange={setTopmostPostId} />
+        <InfinitPostList ref={listRef} initialPosts={initialPosts} onTopmostVisiblePostChange={setTopmostPostId} />
       </section>
 
       {/* 우측 하단 플로팅 메뉴 */}

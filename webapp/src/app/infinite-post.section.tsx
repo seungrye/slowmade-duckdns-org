@@ -13,15 +13,19 @@ export interface InfinitPostListRef {
 
 interface InfinitPostListProps {
   onTopmostVisiblePostChange?: (postId: string | null) => void;
+  // 서버(page.tsx)에서 SSR 로드한 첫 페이지. 있으면 초기 CSR fetch 를 건너뛴다.
+  initialPosts?: GetPostType[];
 }
 
 // The component is wrapped in forwardRef to receive a ref from its parent.
-const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange }, ref) => {
-  const [posts, setPosts] = useState<GetPostType[]>([]);
+const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange, initialPosts = [] }, ref) => {
+  const [posts, setPosts] = useState<GetPostType[]>(initialPosts);
   // 각 PostItem 엘리먼트에 대한 ref를 저장합니다.
   const postItemRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-  const [page, setPage] = useState<number>(1);
-  const [hasMore, setHasMore] = useState(true);
+  // SSR 로 첫 페이지가 채워졌으면 다음 무한스크롤은 2페이지부터. 없으면 기존대로 1부터.
+  const [page, setPage] = useState<number>(initialPosts.length > 0 ? 2 : 1);
+  // 초기값이 limit(9) 미만이면 더 없음. 없거나 9건이면 추가 로드 여지 있음.
+  const [hasMore, setHasMore] = useState(initialPosts.length === 0 || initialPosts.length >= 9);
   const [isLoading, setIsLoading] = useState(false); // 1. 로딩 상태 추가
   const loaderRef = useRef<HTMLDivElement>(null);
 
