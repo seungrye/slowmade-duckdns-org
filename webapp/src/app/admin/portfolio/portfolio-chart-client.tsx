@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
@@ -39,14 +39,20 @@ function formatMoney(v: number, currency: Currency): string {
   return `${Math.round(v).toLocaleString()}원`;
 }
 
-export default function PortfolioChartClient() {
+export default function PortfolioChartClient({ initialData }: { initialData?: PortfolioResponse }) {
   const router = useRouter();
   const [env, setEnv] = useState<Env>("paper");
   const [currency, setCurrency] = useState<Currency>("KRW");
-  const [data, setData] = useState<PortfolioResponse | null>(null);
+  const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(false);
+  // SSR(page.tsx)로 기본(paper,KRW) 데이터가 주입되면 첫 fetch 를 건너뛴다. 이후 탭 변경은 fetch.
+  const skipNextFetch = useRef(!!initialData);
 
   useEffect(() => {
+    if (skipNextFetch.current) {
+      skipNextFetch.current = false;
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     fetch(`/api/admin/portfolio?env=${env}&currency=${currency}`)
