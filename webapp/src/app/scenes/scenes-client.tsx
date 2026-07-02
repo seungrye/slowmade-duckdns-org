@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Scene } from "@/types/web-adventure";
 
-export default function ScenesPage() {
+export default function ScenesClient({ initialScenes = [] }: { initialScenes?: Scene[] }) {
   const router = useRouter();
-  const [scenes, setScenes] = useState<Scene[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [scenes, setScenes] = useState<Scene[]>(initialScenes);
+  const [loading, setLoading] = useState(initialScenes.length === 0);
   const [query, setQuery] = useState("");
   const [creating, setCreating] = useState(false);
   const [newId, setNewId] = useState("");
@@ -23,7 +23,11 @@ export default function ScenesPage() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, []);
+  // SSR(page.tsx)로 초기 목록이 주입되면 첫 fetch 를 건너뛴다. 없으면 기존 CSR 동작.
+  useEffect(() => {
+    if (initialScenes.length === 0) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return scenes;
