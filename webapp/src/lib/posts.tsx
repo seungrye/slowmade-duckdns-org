@@ -284,6 +284,16 @@ export async function updatePostViews(_id: string): Promise<void> {
   }
 }
 
+/**
+ * 삭제되지 않은 모든 글의 _id 목록. post/view 의 generateStaticParams 에서
+ * ISR 정적 생성 대상 경로를 만드는 데 쓴다(빌드 후 작성된 글은 dynamicParams 로 on-demand).
+ */
+export async function getAllPostIds(): Promise<string[]> {
+  await connectToDB();
+  const posts = await Post.find({ isDeleted: { $ne: true } }, '_id').lean();
+  return posts.map((p) => String(p._id));
+}
+
 
 /**
  * 특정 태그를 포함하는 모든 게시글을 검색합니다.
