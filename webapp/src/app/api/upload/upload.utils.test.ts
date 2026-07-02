@@ -29,6 +29,13 @@ describe('buildPublicUrl', () => {
     expect(buildPublicUrl('storage.example.com', 'my-bucket', 'thumbnails/123-my photo.jpg'))
       .toBe('https://storage.example.com/my-bucket/thumbnails/123-my%20photo.jpg');
   });
+
+  // apex 경로(A안): host 에 경로(/s3)가 포함돼도 올바른 apex URL 을 만든다.
+  // MINIO_PUBLIC_HOST=slowmade.duckdns.org/s3 → https://slowmade.duckdns.org/s3/<bucket>/<key>
+  it('host 에 경로(/s3)가 포함되면 apex 경로 URL 을 만든다', () => {
+    expect(buildPublicUrl('slowmade.duckdns.org/s3', 'handmade-site', '123-photo.jpg'))
+      .toBe('https://slowmade.duckdns.org/s3/handmade-site/123-photo.jpg');
+  });
 });
 
 describe('validateUploadFormData', () => {

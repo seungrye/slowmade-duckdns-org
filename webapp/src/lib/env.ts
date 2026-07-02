@@ -9,7 +9,11 @@ export const env = {
   mongoUri: process.env.MONGO_URI ?? '',
 
   minio: {
+    // MinIO 서버 연결용 host (path 불가 — S3 클라이언트 endPoint 로 사용).
     endpoint: process.env.MINIO_ENDPOINT ?? '',
+    // 브라우저에 노출할 public URL base. apex 경로(예: slowmade.duckdns.org/s3)를 써서
+    // minio-api 서브도메인 DNS 간헐 실패를 우회한다. 미설정이면 endpoint 로 fallback(하위호환).
+    publicHost: process.env.MINIO_PUBLIC_HOST || process.env.MINIO_ENDPOINT || '',
     accessKey: process.env.MINIO_ACCESSKEY ?? '',
     secretKey: process.env.MINIO_SECRETKEY ?? '',
     bucket: process.env.MINIO_BUCKET ?? '',

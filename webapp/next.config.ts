@@ -21,6 +21,15 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        // apex 경로(A안) — minio-api 서브도메인 DNS 간헐 실패 우회. 신규 이미지 URL.
+        protocol: 'https',
+        hostname: 'slowmade.duckdns.org',
+        port: '',
+        pathname: '/s3/**',
+        search: '',
+      },
+      {
+        // 기존 이미지 URL 하위호환(마이그레이션 완료 후 제거 가능).
         protocol: 'https',
         hostname: 'minio-api.slowmade.duckdns.org',
         port: '',

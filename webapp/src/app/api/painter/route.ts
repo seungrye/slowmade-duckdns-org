@@ -85,7 +85,7 @@ async function handlePainterRequest(
     const result = await translateAndGenerate(prompt, {
       minioClient: getMinioClient(),
       bucket: env.minio.bucket,
-      endpoint: env.minio.endpoint,
+      endpoint: env.minio.publicHost, // public URL 은 apex 경로(publicHost) 기반
       geminiApiKey: env.geminiApiKey,
     });
 

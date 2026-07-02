@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
     return apiError("Upload failed", 500);
   }
 
-  const url = buildPublicUrl(env.minio.endpoint, bucket, fileName);
-  const thumbnailUrl = buildPublicUrl(env.minio.endpoint, bucket, `thumbnails/${fileName}`);
+  // public URL 은 publicHost(apex 경로) 기반 — 서버 연결은 endpoint(host) 그대로.
+  const url = buildPublicUrl(env.minio.publicHost, bucket, fileName);
+  const thumbnailUrl = buildPublicUrl(env.minio.publicHost, bucket, `thumbnails/${fileName}`);
 
   console.log("File uploaded successfully:", url);
 
