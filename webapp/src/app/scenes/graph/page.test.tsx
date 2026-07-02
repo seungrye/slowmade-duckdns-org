@@ -5,7 +5,7 @@
 import type * as React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, act, screen } from "@testing-library/react";
-import GraphPage from "./page";
+import GraphPage from "./graph-client";
 
 // next/navigation mock — useRouter().push 호출 추적.
 const pushMock = vi.fn();
