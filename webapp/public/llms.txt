@@ -12,11 +12,11 @@
 
 ## 콘텐츠 구조
 
-- `/` — 게시글 목록 (최신순/댓글순 정렬)
-- `/post/view/[id]` — 게시글 상세
-- `/tags` — 태그 클라우드
-- `/tags/[tag]` — 태그별 게시글 목록
-- `/sitemap.xml` — 전체 URL 목록
+- [게시글 목록](https://handmade.r-e.kr/) — 최신순/댓글순 정렬
+- [태그 클라우드](https://handmade.r-e.kr/tags) — 태그 기반 탐색
+- [사이트맵 (전체 URL 목록)](https://handmade.r-e.kr/sitemap.xml)
+
+게시글 상세는 `/post/view/[id]`, 태그별 목록은 `/tags/[tag]` 형식의 URL 입니다.
 
 ## 크롤 안내
 
