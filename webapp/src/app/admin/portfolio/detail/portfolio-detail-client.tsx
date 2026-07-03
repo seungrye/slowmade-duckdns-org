@@ -61,6 +61,8 @@ function sma(closes: number[], window: number): (number | null)[] {
   });
 }
 
+type ChartInstance = { dispatchAction: (payload: { type: string; name?: string }) => void };
+
 export default function PortfolioDetailClient({
   env,
   currency,
@@ -73,17 +75,19 @@ export default function PortfolioDetailClient({
   const label = (tk: string) => names[tk] ?? tk;
   const tickers = Object.keys(pricesByTicker);
 
+  // center 날짜에 매매된 종목만 기본 표시(legend on), 나머지는 꺼둠.
+  const centerTickers = useMemo(
+    () => new Set(center ? trades.filter((t) => t.date === center).map((t) => t.ticker) : []),
+    [center, trades],
+  );
+  const isOn = (tk: string) => centerTickers.size === 0 || centerTickers.has(tk);
+  const tickerLabelSet = useMemo(() => new Set(tickers.map((tk) => label(tk))), [pricesByTicker, names]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const option = useMemo<EChartsOption>(() => {
     // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
     const allDates = Array.from(
       new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
     ).sort();
-
-    // center 날짜에 매매된 종목만 기본 표시(legend on), 나머지는 꺼둠.
-    const centerTickers = new Set(
-      center ? trades.filter((t) => t.date === center).map((t) => t.ticker) : [],
-    );
-    const isOn = (tk: string) => centerTickers.size === 0 || centerTickers.has(tk);
 
     const legendNames: string[] = [];
     const selected: Record<string, boolean> = {};
@@ -106,11 +110,9 @@ export default function PortfolioDetailClient({
       const nameClose = label(tk);
       const name20 = `${label(tk)}·20`;
       const name60 = `${label(tk)}·60`;
-      legendNames.push(nameClose, name20, name60);
-      const on = isOn(tk);
-      selected[nameClose] = on;
-      selected[name20] = on;
-      selected[name60] = on;
+      // 범례엔 종목명만 노출 — 20/60일선은 legendselectchanged 에서 종가와 함께 토글(아래 onEvents).
+      legendNames.push(nameClose);
+      selected[nameClose] = isOn(tk);
 
       // 매매 마커 — 종가 series 의 markPoint 로 붙여, 종가 legend 토글 시 함께 켜지고 꺼짐.
       const tks = trades.filter((t) => t.ticker === tk);
@@ -167,6 +169,28 @@ export default function PortfolioDetailClient({
     };
   }, [pricesByTicker, trades, names, center]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 범례엔 종목명만 있으므로, 종목 종가를 켜고/끌 때 그 종목의 20/60일선도 같이 토글.
+  const handleLegendToggle = (
+    params: { name?: string; selected?: Record<string, boolean> },
+    chart: ChartInstance,
+  ) => {
+    const name = params.name;
+    if (!name || !tickerLabelSet.has(name)) return; // 종목명 항목만 처리(재귀 방지)
+    const on = params.selected?.[name] ?? false;
+    const type = on ? "legendSelect" : "legendUnSelect";
+    chart.dispatchAction({ type, name: `${name}·20` });
+    chart.dispatchAction({ type, name: `${name}·60` });
+  };
+
+  // 초기: 기본 꺼진(center 아닌) 종목의 20/60일선을 숨긴다(범례엔 없어 selected 로 못 잡음).
+  const handleChartReady = (chart: ChartInstance) => {
+    tickers.forEach((tk) => {
+      if (isOn(tk)) return;
+      chart.dispatchAction({ type: "legendUnSelect", name: `${label(tk)}·20` });
+      chart.dispatchAction({ type: "legendUnSelect", name: `${label(tk)}·60` });
+    });
+  };
+
   const marketLabel = `${env === "paper" ? "모의" : "실전"} · ${currency === "KRW" ? "국장" : "미장"}`;
   const tradesDesc = [...trades].reverse(); // 최신 매매가 위로
   const historyDesc = [...history].reverse();
@@ -180,12 +204,19 @@ export default function PortfolioDetailClient({
         </Link>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        {center ? `${center} 매매 종목` : "매매 종목"}을 기본 표시(종가·20일선·60일선). 범례를 눌러 다른 종목/이동평균선을 켜고 끌 수 있습니다. 종가 실선, 20일선 파선, 60일선 점선. 매수(▲)/매도(▼) 마커.
+        {center ? `${center} 매매 종목` : "매매 종목"}을 기본 표시. 범례에서 종목을 켜고 끄면 종가·20일선·60일선이 함께 토글됩니다. 종가 실선, 20일선 파선, 60일선 점선. 매수(▲)/매도(▼) 마커.
       </p>
 
       {tickers.length > 0 ? (
         <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[420px]">
-          <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
+          <ReactECharts
+            option={option}
+            onChartReady={handleChartReady}
+            onEvents={{ legendselectchanged: handleLegendToggle }}
+            style={{ width: "100%", height: "100%" }}
+            notMerge
+            lazyUpdate
+          />
         </div>
       ) : (
         <p className="text-gray-400 py-12 text-center">이 조합에 매매 종목 주가 데이터가 없습니다.</p>
