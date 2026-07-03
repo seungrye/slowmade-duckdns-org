@@ -277,18 +277,17 @@ export default function Navbar() {
                                             주식
                                         </span>
                                         <ChevronDown
-                                            size={16}
-                                            className={`transition-transform ${isMobileStocksOpen ? "rotate-180" : ""}`}
+                                            size={18}
+                                            className={`transition transform ${isMobileStocksOpen ? "rotate-180" : ""}`}
                                         />
                                     </button>
                                     {isMobileStocksOpen && (
-                                        <ul className="pl-6 space-y-1">
+                                        <ul className="pl-6 border-l border-gray-700 ml-2 mt-1 space-y-1">
                                             {stocksLinks.map((link) => (
-                                                <li key={link.href} className="text-center">
+                                                <li key={link.href}>
                                                     <Link
                                                         href={link.href}
-                                                        className={`block py-2 ${pathname.startsWith(link.href) ? "text-gray-400" : "text-gray-500"
-                                                            } hover:text-gray-300 transition flex items-center gap-1`}
+                                                        className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname.startsWith(link.href) ? "text-gray-400" : "text-gray-300"}`}
                                                         onClick={() => setIsOpen(false)}
                                                     >
                                                         {link.icon}
