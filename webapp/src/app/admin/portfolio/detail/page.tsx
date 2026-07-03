@@ -46,10 +46,11 @@ export default async function PortfolioDetailPage(props: {
 
   const tickers = Array.from(new Set(trades.map((t) => t.ticker)));
 
-  // 주가는 최근 90일만 조회 — 종목이 많은 미장 detail 의 조회·렌더 부담 축소.
+  // 주가는 최근 ~180일 조회 — 종목 선택 차트의 SMA60(60거래일) 이동평균이 충분히
+  // 보이도록 warmup 포함. 렌더는 선택 1종목뿐이라 부담 작다.
   // date 는 "YYYY-MM-DD" 문자열이라 사전순 비교($gte)가 날짜순과 일치.
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 90);
+  cutoff.setDate(cutoff.getDate() - 180);
   const fromDate = cutoff.toISOString().slice(0, 10);
   const priceDocs = tickers.length
     ? await StockDailyPrice.find({ ticker: { $in: tickers }, date: { $gte: fromDate } })
