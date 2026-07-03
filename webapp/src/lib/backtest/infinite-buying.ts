@@ -12,8 +12,22 @@ export const DEFAULT_SPLITS = 40;
 export const DEFAULT_TAKE_PROFIT_PCT = 0.1;
 export const DEFAULT_LOC_PREMIUM_PCT = 0.12;
 
-// 원본은 파이썬 round(x, 2) — 은행가 반올림이지만 통화 2자리라 실무상 반올림과 동일 취급.
-const round2 = (x: number) => Math.round(x * 100) / 100;
+// 원본 파이썬 round(x, 2) 재현. 대부분은 엔진의 정확한 십진 반올림(toFixed)이 파이썬과
+// 일치하지만, 정확히 .xx5 tie 는 toFixed 가 half-up(→위), 파이썬은 half-to-even(짝수쪽)이라
+// 어긋난다. tie 만 감지해 짝수쪽으로 보정한다.
+function round2(x: number): number {
+  // 참값을 15자리까지 펼쳐 3번째 소수 이하를 본다. 정확히 "5" 뒤가 전부 0 인 이진-정확한
+  // .xx5 만 진짜 tie → 파이썬처럼 half-to-even. 그 외(예 32.725=float상 미세 위)는
+  // 3번째 이하가 5000..1 등으로 드러나므로 toFixed(2) 가 파이썬과 같은 방향으로 반올림한다.
+  const dec = x.toFixed(17).split(".")[1] ?? "";
+  const isTie = dec[2] === "5" && /^0*$/.test(dec.slice(3));
+  if (isTie) {
+    const twoDigit = Math.floor(x * 100); // .xx5 의 정수부(xx) — 32.125*100=3212.5 는 정확
+    const even = twoDigit % 2 === 0 ? twoDigit : twoDigit + 1;
+    return even / 100;
+  }
+  return Number(x.toFixed(2));
+}
 const qtyFor = (budget: number, price: number) => (price <= 0 ? 0 : Math.floor(budget / price));
 
 export function dailyBudget(cfg: InfiniteConfig): number {
