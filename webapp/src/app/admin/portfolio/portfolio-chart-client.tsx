@@ -273,13 +273,9 @@ export default function PortfolioChartClient({ initialData }: { initialData?: Po
     if (!stats) return;
     const tickers = Array.from(new Set([...stats.buyTickers, ...stats.sellTickers]));
     if (tickers.length === 0) return;
-    const market = currency === "KRW" ? "kr" : "us";
-    const params2 = new URLSearchParams({
-      market,
-      [market]: tickers.join(","),
-      center: date,
-    });
-    router.push(`/admin/stocks?${params2.toString()}`);
+    // 매매 상세 페이지로 이동 — 그 env·통화의 매매 종목 주가+마커 차트와 매매/포트폴리오 표.
+    const params2 = new URLSearchParams({ env, currency, center: date });
+    router.push(`/admin/portfolio/detail?${params2.toString()}`);
   };
 
   return (
