@@ -7,7 +7,9 @@ import type { Comment } from "@/types/comment.d";
 import CommentInput from "./comment-input";
 import CommentContent from "./comment-content";
 
-const manrope = Manrope({ subsets: ['latin'] });
+// enji(AI) 댓글 작성자명에만 쓰이는 폰트 — 드물게 사용되므로 preload 하지 않아
+// "preloaded but not used" 경고를 피하고, 로드 지연은 swap 으로 fallback 표시.
+const manrope = Manrope({ subsets: ['latin'], preload: false, display: 'swap' });
 
 interface CommentItemProps {
   comment: Comment;
