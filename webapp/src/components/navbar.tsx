@@ -19,6 +19,7 @@ import {
     Gamepad2,
     BookOpen,
     LineChart,
+    FlaskConical,
 } from "lucide-react";
 
 const navLinks = [
@@ -62,6 +63,12 @@ const stocksLinks = [
         description: "포트폴리오 시계열 + 매매 마커",
         icon: <LineChart size={20} />,
     },
+    {
+        href: "/admin/backtest",
+        label: "백테스트",
+        description: "무한매수법 과거 시뮬레이션",
+        icon: <FlaskConical size={20} />,
+    },
 ];
 
 export default function Navbar() {
@@ -75,7 +82,9 @@ export default function Navbar() {
 
     const isScenesActive = pathname === "/scenes" || pathname.startsWith("/scenes/");
     const isStocksGroupActive =
-        pathname.startsWith("/admin/stocks") || pathname.startsWith("/admin/portfolio");
+        pathname.startsWith("/admin/stocks") ||
+        pathname.startsWith("/admin/portfolio") ||
+        pathname.startsWith("/admin/backtest");
     const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
     const isOwner = Boolean(session?.user?.isOwner);
 
