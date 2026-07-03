@@ -128,7 +128,9 @@ export default function PortfolioDetailClient({
       </p>
 
       {Object.keys(pricesByTicker).length > 0 ? (
-        <ReactECharts option={option} style={{ height: 420 }} notMerge lazyUpdate />
+        <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[420px]">
+          <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
+        </div>
       ) : (
         <p className="text-gray-400 py-12 text-center">이 조합에 매매 종목 주가 데이터가 없습니다.</p>
       )}

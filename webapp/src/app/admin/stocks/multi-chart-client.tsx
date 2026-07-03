@@ -483,7 +483,7 @@ export default function MultiChartClient({ stocks }: Props) {
         })}
       </div>
 
-      <div className="relative w-full h-[520px] mb-6">
+      <div className="relative w-full aspect-[4/3] sm:aspect-auto sm:h-[520px] mb-6">
         {selected.length > 0 && echartsOption && (
           <>
             {/* 기간 프리셋 — 차트 우상단, 상단 경계에 50% 걸치게 위로 뺌 */}

@@ -308,7 +308,7 @@ export default function PortfolioChartClient({ initialData }: { initialData?: Po
         )}
       </div>
 
-      <div className="w-full h-[520px] mb-4">
+      <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[520px] mb-4">
         {loading ? (
           <div className="h-full flex items-center justify-center text-sm text-gray-400 border border-dashed rounded">
             로딩 중...
