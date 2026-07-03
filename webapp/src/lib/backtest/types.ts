@@ -56,3 +56,18 @@ export interface BacktestResult {
   equityCurve: EquityPoint[];
   totalPnl: number; // 매도 실현손익 합계
 }
+
+/** 추세추종 설정(원본 TrendConfig 의 백테스트 조정 파라미터). */
+export interface TrendConfig {
+  principal: number; // 진입 시 이 금액만큼 시장가 매수
+  shortMa: number; // 단기 이동평균 (기본 20)
+  longMa: number; // 장기 이동평균 (기본 60)
+}
+
+/** 추세추종 전략이 보는 상태 — history 는 최신순 종가(오늘=history[0]). */
+export interface TrendState {
+  price: number;
+  holdingQty: number;
+  avgPrice: number;
+  history: number[];
+}
