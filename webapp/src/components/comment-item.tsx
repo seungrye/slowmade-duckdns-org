@@ -71,6 +71,8 @@ export default function CommentItem({
           className={`${indentClass}border border-gray-200 dark:border-gray-700 rounded-lg rounded-br-none p-4`}
         >
           <p className="text-gray-500 italic">{c.content}</p>
+          {/* 삭제된 최상위 댓글의 자식들은 기본 접힘 — 펼치기 토글로 볼 수 있게. */}
+          {collapseBtn}
         </div>
       ) : c.isEnji ? (
         <div

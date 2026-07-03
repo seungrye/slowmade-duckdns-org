@@ -96,4 +96,52 @@ describe('CommentItem', () => {
     );
     expect(screen.getByTestId('child')).toBeInTheDocument();
   });
+
+  it('삭제된 최상위 댓글이 자식을 가지면 펼치기 버튼을 표시한다', () => {
+    const deleted = { ...baseComment, isDeleted: true, content: '삭제된 댓글입니다.' };
+    render(
+      <CommentItem
+        {...defaultProps}
+        comment={deleted as never}
+        childCount={3}
+        isCollapsed
+        onToggleCollapse={vi.fn()}
+      >
+        <div data-testid="child">대댓글</div>
+      </CommentItem>
+    );
+    expect(screen.getByText(/답글 3개 펼치기/)).toBeInTheDocument();
+  });
+
+  it('삭제된 댓글이 접혀 있으면(isCollapsed) 자식을 숨긴다', () => {
+    const deleted = { ...baseComment, isDeleted: true, content: '삭제됨' };
+    render(
+      <CommentItem
+        {...defaultProps}
+        comment={deleted as never}
+        childCount={2}
+        isCollapsed
+        onToggleCollapse={vi.fn()}
+      >
+        <div data-testid="child">대댓글</div>
+      </CommentItem>
+    );
+    expect(screen.queryByTestId('child')).not.toBeInTheDocument();
+  });
+
+  it('삭제된 댓글의 펼치기 버튼 클릭 시 onToggleCollapse를 호출한다', () => {
+    const onToggleCollapse = vi.fn();
+    const deleted = { ...baseComment, isDeleted: true, content: '삭제됨' };
+    render(
+      <CommentItem
+        {...defaultProps}
+        comment={deleted as never}
+        childCount={2}
+        isCollapsed
+        onToggleCollapse={onToggleCollapse}
+      />
+    );
+    fireEvent.click(screen.getByText(/펼치기/));
+    expect(onToggleCollapse).toHaveBeenCalledWith('c1');
+  });
 });

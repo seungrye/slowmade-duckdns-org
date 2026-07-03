@@ -16,6 +16,7 @@ export default function Comments({ postId }: Props) {
   const [openReplyFor, setOpenReplyFor] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const commentRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const collapseInitDone = useRef(false);
 
   const toggleCollapse = useCallback((id: string) => {
     setCollapsed((prev) => {
@@ -29,6 +30,18 @@ export default function Comments({ postId }: Props) {
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
+
+  // 삭제된 최상위 댓글의 자식들은 기본 접힘 — 사용자가 펼치면 볼 수 있음(최초 로드 1회).
+  useEffect(() => {
+    if (collapseInitDone.current || comments.length === 0) return;
+    collapseInitDone.current = true;
+    const deletedTopIds = comments
+      .filter((c) => c.parent == null && c.isDeleted)
+      .map((c) => c._id);
+    if (deletedTopIds.length > 0) {
+      setCollapsed((prev) => new Set([...prev, ...deletedTopIds]));
+    }
+  }, [comments]);
 
   useEffect(() => {
     const handleRenderComplete = () => {
