@@ -100,13 +100,11 @@ export default function PortfolioDetailClient({
     return {
       tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
       legend: { type: "scroll", data: [...tickers.map(label), "매수", "매도"], bottom: 0 },
-      grid: { left: 16, right: 16, top: 24, bottom: 56, containLabel: true },
+      grid: { left: 16, right: 16, top: 24, bottom: 32, containLabel: true },
       xAxis: { type: "category", data: allDates },
       yAxis: { type: "value", scale: true, axisLabel: { show: false } },
-      dataZoom: [
-        { type: "slider", start: center ? 60 : 0, end: 100 },
-        { type: "inside" },
-      ],
+      // 하단 슬라이더(브러시)는 감추고 휠/드래그 줌(inside)만 — center 면 최근 구간을 확대.
+      dataZoom: [{ type: "inside", start: center ? 60 : 0, end: 100 }],
       series: [...lineSeries, ...markerSeries],
     };
   }, [pricesByTicker, trades, names, center]); // eslint-disable-line react-hooks/exhaustive-deps
