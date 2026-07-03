@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
@@ -36,6 +36,14 @@ type Props = {
   history: HistoryPoint[];
 };
 
+// 종목별 색 팔레트 — 종가/20일선/60일선을 같은 색으로, 선 스타일로 구분.
+const PALETTE = [
+  "#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de",
+  "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc", "#c14953",
+  "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
+  "#ff7c43", "#ffa600", "#488f31", "#de425b", "#69b3a2",
+];
+
 function formatMoney(v: number, currency: Currency): string {
   if (currency === "USD") {
     return `$${v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -64,77 +72,100 @@ export default function PortfolioDetailClient({
 }: Props) {
   const label = (tk: string) => names[tk] ?? tk;
   const tickers = Object.keys(pricesByTicker);
-  const [selectedTicker, setSelectedTicker] = useState<string>(tickers[0] ?? "");
 
   const option = useMemo<EChartsOption>(() => {
-    const rows = pricesByTicker[selectedTicker] ?? [];
-    const dates = rows.map((r) => r.date);
-    const closes = rows.map((r) => r.close);
-    const ma20 = sma(closes, 20);
-    const ma60 = sma(closes, 60);
+    // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
+    const allDates = Array.from(
+      new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
+    ).sort();
 
-    // 선택 종목의 매매만 마커로.
-    const tks = trades.filter((t) => t.ticker === selectedTicker);
-    const buyData = tks.filter((t) => t.action === "buy").map((t) => [t.date, t.price]);
-    const sellData = tks.filter((t) => t.action === "sell").map((t) => [t.date, t.price]);
+    // center 날짜에 매매된 종목만 기본 표시(legend on), 나머지는 꺼둠.
+    const centerTickers = new Set(
+      center ? trades.filter((t) => t.date === center).map((t) => t.ticker) : [],
+    );
+    const isOn = (tk: string) => centerTickers.size === 0 || centerTickers.has(tk);
+
+    const legendNames: string[] = [];
+    const selected: Record<string, boolean> = {};
+    const series: NonNullable<EChartsOption["series"]> = [];
+
+    tickers.forEach((tk, idx) => {
+      const color = PALETTE[idx % PALETTE.length];
+      const rows = pricesByTicker[tk];
+      const priceMap = new Map(rows.map((r) => [r.date, r.close]));
+      const closeSeq = rows.map((r) => r.close);
+      const ma20Seq = sma(closeSeq, 20);
+      const ma60Seq = sma(closeSeq, 60);
+      const ma20Map = new Map(rows.map((r, i) => [r.date, ma20Seq[i]]));
+      const ma60Map = new Map(rows.map((r, i) => [r.date, ma60Seq[i]]));
+
+      const closeData = allDates.map((d) => priceMap.get(d) ?? null);
+      const ma20Data = allDates.map((d) => ma20Map.get(d) ?? null);
+      const ma60Data = allDates.map((d) => ma60Map.get(d) ?? null);
+
+      const nameClose = label(tk);
+      const name20 = `${label(tk)}·20`;
+      const name60 = `${label(tk)}·60`;
+      legendNames.push(nameClose, name20, name60);
+      const on = isOn(tk);
+      selected[nameClose] = on;
+      selected[name20] = on;
+      selected[name60] = on;
+
+      // 매매 마커 — 종가 series 의 markPoint 로 붙여, 종가 legend 토글 시 함께 켜지고 꺼짐.
+      const tks = trades.filter((t) => t.ticker === tk);
+      const markData = [
+        ...tks.filter((t) => t.action === "buy").map((t) => ({
+          name: "매수", coord: [t.date, t.price], symbol: "triangle", symbolSize: 12, itemStyle: { color: "#dc2626" },
+        })),
+        ...tks.filter((t) => t.action === "sell").map((t) => ({
+          name: "매도", coord: [t.date, t.price], symbol: "triangle", symbolRotate: 180, symbolSize: 12, itemStyle: { color: "#2563eb" },
+        })),
+      ];
+
+      series.push(
+        {
+          name: nameClose,
+          type: "line",
+          showSymbol: false,
+          connectNulls: true,
+          data: closeData,
+          itemStyle: { color },
+          lineStyle: { width: 2 },
+          markPoint: markData.length ? { data: markData, label: { show: false } } : undefined,
+        },
+        {
+          name: name20,
+          type: "line",
+          showSymbol: false,
+          connectNulls: true,
+          data: ma20Data,
+          itemStyle: { color },
+          lineStyle: { width: 1, type: "dashed", opacity: 0.7 },
+        },
+        {
+          name: name60,
+          type: "line",
+          showSymbol: false,
+          connectNulls: true,
+          data: ma60Data,
+          itemStyle: { color },
+          lineStyle: { width: 1, type: "dotted", opacity: 0.7 },
+        },
+      );
+    });
 
     return {
       tooltip: { trigger: "axis", axisPointer: { type: "cross" } },
-      legend: { type: "scroll", data: [label(selectedTicker), "20일선", "60일선", "매수", "매도"], bottom: 0 },
-      grid: { left: 16, right: 16, top: 24, bottom: 32, containLabel: true },
-      xAxis: { type: "category", data: dates },
+      legend: { type: "scroll", data: legendNames, selected, bottom: 0 },
+      grid: { left: 16, right: 16, top: 24, bottom: 48, containLabel: true },
+      xAxis: { type: "category", data: allDates },
       yAxis: { type: "value", scale: true, axisLabel: { show: false } },
       // 하단 슬라이더(브러시)는 감추고 휠/드래그 줌(inside)만 — center 면 최근 구간을 확대.
       dataZoom: [{ type: "inside", start: center ? 60 : 0, end: 100 }],
-      series: [
-        {
-          name: label(selectedTicker),
-          type: "line",
-          showSymbol: false,
-          connectNulls: true,
-          data: closes,
-          lineStyle: { width: 2 },
-        },
-        {
-          name: "20일선",
-          type: "line",
-          showSymbol: false,
-          connectNulls: true,
-          data: ma20,
-          lineStyle: { width: 1, opacity: 0.9 },
-          itemStyle: { color: "#f59e0b" },
-        },
-        {
-          name: "60일선",
-          type: "line",
-          showSymbol: false,
-          connectNulls: true,
-          data: ma60,
-          lineStyle: { width: 1, opacity: 0.9 },
-          itemStyle: { color: "#8b5cf6" },
-        },
-        {
-          name: "매수",
-          type: "scatter",
-          data: buyData,
-          symbol: "triangle",
-          symbolSize: 11,
-          itemStyle: { color: "#dc2626" },
-          z: 5,
-        },
-        {
-          name: "매도",
-          type: "scatter",
-          data: sellData,
-          symbol: "triangle",
-          symbolRotate: 180,
-          symbolSize: 11,
-          itemStyle: { color: "#2563eb" },
-          z: 5,
-        },
-      ],
+      series,
     };
-  }, [pricesByTicker, trades, names, selectedTicker, center]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pricesByTicker, trades, names, center]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const marketLabel = `${env === "paper" ? "모의" : "실전"} · ${currency === "KRW" ? "국장" : "미장"}`;
   const tradesDesc = [...trades].reverse(); // 최신 매매가 위로
@@ -149,35 +180,13 @@ export default function PortfolioDetailClient({
         </Link>
       </div>
       <p className="text-sm text-gray-500 mb-4">
-        종목별 종가 + 20/60일선 + 매수(▲)/매도(▼) 마커, 매매 기록과 날짜별 포트폴리오.
+        {center ? `${center} 매매 종목` : "매매 종목"}을 기본 표시(종가·20일선·60일선). 범례를 눌러 다른 종목/이동평균선을 켜고 끌 수 있습니다. 종가 실선, 20일선 파선, 60일선 점선. 매수(▲)/매도(▼) 마커.
       </p>
 
       {tickers.length > 0 ? (
-        <>
-          {/* 종목 선택 — 고른 한 종목의 종가·이동평균·매매를 차트로. 종목 1개면 생략. */}
-          {tickers.length > 1 && (
-            <div className="flex flex-wrap gap-1 mb-3">
-              {tickers.map((tk) => (
-                <button
-                  key={tk}
-                  type="button"
-                  onClick={() => setSelectedTicker(tk)}
-                  className={
-                    "px-2.5 py-1 text-xs rounded border transition " +
-                    (tk === selectedTicker
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800")
-                  }
-                >
-                  {label(tk)}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[420px]">
-            <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
-          </div>
-        </>
+        <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[420px]">
+          <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
+        </div>
       ) : (
         <p className="text-gray-400 py-12 text-center">이 조합에 매매 종목 주가 데이터가 없습니다.</p>
       )}
