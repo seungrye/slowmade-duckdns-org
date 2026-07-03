@@ -49,6 +49,49 @@ export interface GenerateImageOptions {
   bucket: string;
   endpoint: string;
   pollinations?: PollinationsOptions;
+  /** Pollinations 일시 오류(5xx/429/네트워크) 재시도 횟수. 기본 2 (총 최대 3회 시도). */
+  retries?: number;
+  /** 재시도 간 지연(ms). 시도마다 (n+1)배 백오프. 기본 3000. 테스트에선 0. */
+  retryDelayMs?: number;
+}
+
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Pollinations fetch — 일시적 오류(5xx/429/네트워크·타임아웃)면 백오프 후 재시도.
+ * pollinations.ai 는 과부하 시 504(gateway timeout)를 자주 반환하므로, 한 번에 실패해
+ * "그림 그리기 실패" 로 끝나지 않도록 감싼다. 4xx(재시도 불가)는 즉시 throw. ok 응답만 반환.
+ */
+async function fetchPollinationsWithRetry(
+  url: string,
+  headers: Record<string, string>,
+  retries: number,
+  retryDelayMs: number,
+): Promise<Response> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(url, { headers });
+    } catch (e) {
+      lastErr = e; // 네트워크/타임아웃 — 재시도 대상
+      if (attempt >= retries) throw e;
+      if (retryDelayMs > 0) await sleep(retryDelayMs * (attempt + 1));
+      continue;
+    }
+    if (res.ok) return res;
+    if (RETRYABLE_STATUS.has(res.status) && attempt < retries) {
+      lastErr = new Error(`Pollinations ${res.status}`);
+      if (retryDelayMs > 0) await sleep(retryDelayMs * (attempt + 1));
+      continue;
+    }
+    throw new Error(`Pollinations ${res.status}`);
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('Pollinations unreachable');
 }
 
 /**
@@ -63,10 +106,7 @@ export async function generateImage(
   if (env.pollinations.apiKey) {
     headers['Authorization'] = `Bearer ${env.pollinations.apiKey}`;
   }
-  const res = await fetch(url, { headers });
-  if (!res.ok) {
-    throw new Error(`Pollinations ${res.status}`);
-  }
+  const res = await fetchPollinationsWithRetry(url, headers, opts.retries ?? 2, opts.retryDelayMs ?? 3000);
   const arrayBuffer = await res.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
 

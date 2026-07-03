@@ -81,7 +81,30 @@ describe('painter generateImage', () => {
     expect(result.url).toBe(`https://cdn.example.com/public/${result.key}`);
   });
 
-  it('Pollinations 실패 시 예외를 던진다', async () => {
+  it('Pollinations 504(일시 오류)는 재시도하고, 다음 시도가 성공하면 이미지를 반환한다', async () => {
+    const fakeBytes = new Uint8Array([1, 2, 3, 4]);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 504, arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) })
+      .mockResolvedValueOnce({ ok: true, status: 200, arrayBuffer: () => Promise.resolve(fakeBytes.buffer) });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const putObject = vi.fn().mockResolvedValue(undefined);
+    const minioClient = { putObject } as unknown as Parameters<typeof generateImage>[1]['minioClient'];
+
+    const result = await generateImage('a cat', {
+      minioClient,
+      bucket: 'public',
+      endpoint: 'cdn.example.com',
+      retryDelayMs: 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 504 → 재시도 → 성공
+    expect(putObject).toHaveBeenCalledTimes(1);
+    expect(result.url).toBe(`https://cdn.example.com/public/${result.key}`);
+  });
+
+  it('Pollinations 가 계속 실패하면 재시도를 소진한 뒤 예외를 던진다', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 502,
@@ -97,8 +120,35 @@ describe('painter generateImage', () => {
         minioClient,
         bucket: 'public',
         endpoint: 'cdn.example.com',
+        retries: 2,
+        retryDelayMs: 0,
       }),
     ).rejects.toThrow(/Pollinations/);
+    expect(fetchMock).toHaveBeenCalledTimes(3); // 최초 1 + 재시도 2
+    expect(putObject).not.toHaveBeenCalled();
+  });
+
+  it('4xx(재시도 불가) 오류는 즉시 예외를 던진다', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const putObject = vi.fn();
+    const minioClient = { putObject } as unknown as Parameters<typeof generateImage>[1]['minioClient'];
+
+    await expect(
+      generateImage('cat', {
+        minioClient,
+        bucket: 'public',
+        endpoint: 'cdn.example.com',
+        retries: 2,
+        retryDelayMs: 0,
+      }),
+    ).rejects.toThrow(/Pollinations 400/);
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 재시도 없음
     expect(putObject).not.toHaveBeenCalled();
   });
 
