@@ -34,9 +34,11 @@ export function middleware(request: NextRequest) {
     // 'wasm-unsafe-eval' — /games/bevy-rogue 의 Bevy(WASM) 컴파일 허용.
     // 'unsafe-eval' 보다 안전(JS eval 은 여전히 금지, WebAssembly 만 허용).
     "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com",
-    "style-src 'self' 'unsafe-inline'",
+    // cdn.jsdelivr.net — Pretendard 폰트 CSS(@font-face) 로드 허용(#247).
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "img-src 'self' blob: data: https:",
-    "font-src 'self'",
+    // cdn.jsdelivr.net — Pretendard woff2 폰트 파일 로드 허용(#247).
+    "font-src 'self' https://cdn.jsdelivr.net",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
