@@ -7,11 +7,11 @@ import { runBacktest } from "@/lib/backtest/engine";
 import { runTrendBacktest } from "@/lib/backtest/trend-engine";
 import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
-type Strategy = "infinite" | "trend";
+type Strategy = "infinite_v1" | "trend";
 type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: Strategy };
 
 export default function BacktestClient() {
-  const [strategy, setStrategy] = useState<Strategy>("infinite");
+  const [strategy, setStrategy] = useState<Strategy>("infinite_v1");
   // 공통
   const [ticker, setTicker] = useState("");
   const [principal, setPrincipal] = useState(4000);
@@ -54,7 +54,7 @@ export default function BacktestClient() {
         return;
       }
       const r =
-        strategy === "infinite"
+        strategy === "infinite_v1"
           ? runBacktest(bars, { principal, splits, takeProfitPct: takeProfitPct / 100, locPremiumPct: locPremiumPct / 100 })
           : runTrendBacktest(bars, { principal, shortMa, longMa });
       setResult({ ...r, bars, principal, strategy });
@@ -75,7 +75,7 @@ export default function BacktestClient() {
 
       {/* 전략 탭 */}
       <div className="flex gap-2 border-b mb-4">
-        {([["infinite", "무한매수법"], ["trend", "추세추종"]] as const).map(([s, label]) => (
+        {([["infinite_v1", "무한매수 v1"], ["trend", "추세추종"]] as const).map(([s, label]) => (
           <button
             key={s}
             type="button"
@@ -91,7 +91,7 @@ export default function BacktestClient() {
       </div>
 
       <p className="text-xs text-gray-400 mb-4">
-        {strategy === "infinite"
+        {strategy === "infinite_v1"
           ? "원금 분할 → 1회차 시장가, 이후 평단·프리미엄 LOC 매수, 평단+익절% 전량 매도. (시장가=종가, 매수 LOC=저가 터치, 매도=고가 터치 근사)"
           : "골든크로스(단기MA>장기MA 전환)에 원금만큼 시장가 진입, 데드크로스에 전량 청산. (시장가=종가)"}
         {" 수수료·슬리피지 미반영."}
@@ -106,7 +106,7 @@ export default function BacktestClient() {
           <input type="number" value={principal} onChange={(e) => setPrincipal(Number(e.target.value))} className="input" />
         </Field>
 
-        {strategy === "infinite" ? (
+        {strategy === "infinite_v1" ? (
           <>
             <Field label="분할 수 (T)" hint="하루예산=원금/T">
               <input type="number" value={splits} min={1} onChange={(e) => setSplits(Number(e.target.value))} className="input" />
@@ -196,7 +196,7 @@ function Result({ result }: { result: FullResult }) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Metric label="실현손익" value={fmt(result.totalPnl)} accent={result.totalPnl >= 0 ? "pos" : "neg"} />
         <Metric label="수익률 (원금 대비)" value={`${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`} accent={returnPct >= 0 ? "pos" : "neg"} />
-        {result.strategy === "infinite" ? (
+        {result.strategy === "infinite_v1" ? (
           <>
             <Metric label="사이클 (익절 횟수)" value={`${sells.length}회`} />
             <Metric label="최대 도달 회차" value={`${maxRound} / ${result.trades.length}건`} />
@@ -228,7 +228,7 @@ function Result({ result }: { result: FullResult }) {
               <th className="py-2 px-3 text-right">가격</th>
               <th className="py-2 px-3 text-right">수량</th>
               <th className="py-2 px-3 text-right">실현손익</th>
-              {result.strategy === "infinite" && <th className="py-2 px-3 text-right">회차</th>}
+              {result.strategy === "infinite_v1" && <th className="py-2 px-3 text-right">회차</th>}
             </tr>
           </thead>
           <tbody>
@@ -243,7 +243,7 @@ function Result({ result }: { result: FullResult }) {
                 <td className={`py-1.5 px-3 text-right ${t.pnl > 0 ? "text-red-600" : t.pnl < 0 ? "text-blue-600" : "text-gray-400"}`}>
                   {t.side === "sell" ? fmt(t.pnl) : "—"}
                 </td>
-                {result.strategy === "infinite" && <td className="py-1.5 px-3 text-right text-gray-500">{t.roundNo}</td>}
+                {result.strategy === "infinite_v1" && <td className="py-1.5 px-3 text-right text-gray-500">{t.roundNo}</td>}
               </tr>
             ))}
           </tbody>

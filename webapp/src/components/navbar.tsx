@@ -66,7 +66,7 @@ const stocksLinks = [
     {
         href: "/admin/backtest",
         label: "백테스트",
-        description: "무한매수법 과거 시뮬레이션",
+        description: "무한매수 v1 과거 시뮬레이션",
         icon: <FlaskConical size={20} />,
     },
 ];

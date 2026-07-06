@@ -27,7 +27,7 @@ type Trade = {
   date: string;
   time: string;
   action: "buy" | "sell";
-  strategy?: string; // "infinite" | "trend" 등. 전략 구분(마커 모양).
+  strategy?: string; // "infinite_v1" | "trend" 등. 전략 구분(마커 모양).
   price: number;
   qty: number;
   cumulativeQty?: number; // 체결 후 누적 보유 수량.
@@ -332,12 +332,12 @@ export default function MultiChartClient({ stocks }: Props) {
         emphasis: { focus: "series" },
       });
 
-      // 매매 마커 — 색=매수(빨강)/매도(파랑), 모양=전략(무한매수 ▲ / 추세 ◆ / 기타 ●).
+      // 매매 마커 — 색=매수(빨강)/매도(파랑), 모양=전략(무한매수 v1 ▲ / 추세 ◆ / 기타 ●).
       // 전략별로 scatter series 를 나눠 모양과 툴팁으로 구분한다. legend 엔 종목 line 만 노출.
       const stratSymbol = (s?: string) =>
-        s === "infinite" ? "triangle" : s === "trend" ? "diamond" : "circle";
+        s === "infinite_v1" ? "triangle" : s === "trend" ? "diamond" : "circle";
       const stratLabel = (s?: string) =>
-        s === "infinite" ? "무한매수" : s === "trend" ? "추세추종" : "기타";
+        s === "infinite_v1" ? "무한매수 v1" : s === "trend" ? "추세추종" : "기타";
       type MarkerPoint = { value: [string, number]; qty: number; cum: number };
       const pushMarkers = (action: "buy" | "sell", clr: string, krLabel: string) => {
         const group: Record<string, MarkerPoint[]> = {};
