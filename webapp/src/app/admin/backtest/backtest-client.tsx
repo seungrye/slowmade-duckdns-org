@@ -135,7 +135,9 @@ export default function BacktestClient() {
         <Field label="종료일" hint="비우면 오늘">
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
         </Field>
-        <div className="flex items-end">
+        <div className="flex flex-col gap-1">
+          {/* 다른 Field 의 label 자리를 투명으로 채워 버튼을 input 라인에 정렬 */}
+          <span className="text-xs font-medium invisible select-none" aria-hidden="true">실행</span>
           <button onClick={run} disabled={loading} className="w-full py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 transition">
             {loading ? "실행 중…" : "백테스트 실행"}
           </button>
