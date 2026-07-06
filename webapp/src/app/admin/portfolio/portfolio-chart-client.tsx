@@ -281,7 +281,7 @@ export default function PortfolioChartClient({ initialData }: { initialData?: Po
   return (
     <div>
       {/* env × currency 탭 */}
-      <div className="flex flex-wrap gap-2 border-b mb-4">
+      <div className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto">
         {(["paper", "real"] as const).map((e) =>
           (["KRW", "USD"] as const).map((c) => {
             const active = env === e && currency === c;
@@ -295,7 +295,7 @@ export default function PortfolioChartClient({ initialData }: { initialData?: Po
                   setCurrency(c);
                 }}
                 className={
-                  "px-3 py-2 text-sm border-b-2 -mb-px transition " +
+                  "px-3 py-2 text-sm border-b-2 -mb-px transition whitespace-nowrap shrink-0 " +
                   (active
                     ? "border-blue-600 text-blue-600 font-medium"
                     : "border-transparent text-gray-500 hover:text-gray-700")
