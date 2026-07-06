@@ -7,7 +7,7 @@ import { runBacktest } from "@/lib/backtest/engine";
 import { runTrendBacktest } from "@/lib/backtest/trend-engine";
 import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
-type Strategy = "infinite_v1" | "trend";
+type Strategy = "infinite_v1" | "trend_v1";
 type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: Strategy };
 
 export default function BacktestClient() {
@@ -21,7 +21,7 @@ export default function BacktestClient() {
   const [splits, setSplits] = useState(40);
   const [takeProfitPct, setTakeProfitPct] = useState(10);
   const [locPremiumPct, setLocPremiumPct] = useState(12);
-  // 추세추종
+  // 추세추종 v1
   const [shortMa, setShortMa] = useState(20);
   const [longMa, setLongMa] = useState(60);
 
@@ -34,7 +34,7 @@ export default function BacktestClient() {
       setError("종목 코드를 입력하세요.");
       return;
     }
-    if (strategy === "trend" && shortMa >= longMa) {
+    if (strategy === "trend_v1" && shortMa >= longMa) {
       setError("단기 이동평균은 장기보다 작아야 합니다.");
       return;
     }
@@ -75,7 +75,7 @@ export default function BacktestClient() {
 
       {/* 전략 탭 */}
       <div className="flex gap-2 border-b mb-4">
-        {([["infinite_v1", "무한매수 v1"], ["trend", "추세추종"]] as const).map(([s, label]) => (
+        {([["infinite_v1", "무한매수 v1"], ["trend_v1", "추세추종 v1"]] as const).map(([s, label]) => (
           <button
             key={s}
             type="button"
