@@ -7,7 +7,7 @@ import { EditorContent, EditorContext, JSONContent, useEditor } from "@tiptap/re
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
-import ImageResize from "tiptap-extension-resize-image"
+import { Image } from "@tiptap/extension-image"
 import { TaskItem } from "@tiptap/extension-task-item"
 import { TaskList } from "@tiptap/extension-task-list"
 import { TextAlign } from "@tiptap/extension-text-align"
@@ -50,6 +50,33 @@ import { lowlight } from "@/lib/lowlight"
 // --- Styles ---
 import "./editor.scss"
 
+// 뷰어(editable:false) 전용 이미지 렌더. ImageResize 의 NodeView 는 읽기전용에서 wrapper(display:flex)
+// 를 버리고 container 만 렌더해 container 의 margin:auto 정렬이 무효화된다(block width 100%). 여기선
+// renderHTML 로 wrapper+container 구조를 재현해 정렬(중앙/좌/우)·크기(width)를 그대로 반영한다.
+// 드래그 리사이즈는 에디터 전용이라 뷰어엔 NodeView 가 불필요.
+const ViewerImage = Image.extend({
+    name: "image",
+    addAttributes() {
+        return {
+            ...this.parent?.(),
+            width: { default: null },
+            height: { default: null },
+            containerStyle: { default: null },
+            wrapperStyle: { default: null },
+        }
+    },
+    renderHTML({ node }) {
+        const { src, alt, title, width, containerStyle, wrapperStyle } = node.attrs
+        const imgAttrs: Record<string, unknown> = { src, alt, title }
+        if (width) imgAttrs.width = width
+        const img: ["img", Record<string, unknown>] = ["img", imgAttrs]
+        if (containerStyle || wrapperStyle) {
+            return ["div", { style: wrapperStyle || "" }, ["div", { style: containerStyle || "" }, img]]
+        }
+        return img
+    },
+})
+
 // Tiptap 확장 기능은 컴포넌트 외부에서 정의하여 리렌더링 시 재생성되지 않도록 합니다.
 export const tiptapExtensions = [
     StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
@@ -59,7 +86,7 @@ export const tiptapExtensions = [
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: true }),
-    ImageResize.extend({ name: "image" }),
+    ViewerImage,
     Typography,
     Superscript,
     Subscript,
