@@ -3,7 +3,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state"
 import { StarterKit } from "@tiptap/starter-kit"
 import { Paragraph } from "@tiptap/extension-paragraph"
 import { Heading } from "@tiptap/extension-heading"
-import { Image } from "@tiptap/extension-image"
+import ImageResize from "tiptap-extension-resize-image"
 import { TaskItem } from "@tiptap/extension-task-item"
 import { TaskList } from "@tiptap/extension-task-list"
 import { TextAlign } from "@tiptap/extension-text-align"
@@ -157,7 +157,8 @@ export const editorExtensions = [
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: true }),
-    Image,
+    // ImageResize(드래그 크기조절) 를 기존 'image' 노드에 적용 — name 을 image 로 맞춰 호환.
+    ImageResize.extend({ name: "image" }),
     Typography,
     SuperscriptWithMarkdown,
     SubscriptWithMarkdown,

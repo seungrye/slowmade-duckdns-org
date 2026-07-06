@@ -7,7 +7,7 @@ import { EditorContent, EditorContext, JSONContent, useEditor } from "@tiptap/re
 
 // --- Tiptap Core Extensions ---
 import { StarterKit } from "@tiptap/starter-kit"
-import { Image } from "@tiptap/extension-image"
+import ImageResize from "tiptap-extension-resize-image"
 import { TaskItem } from "@tiptap/extension-task-item"
 import { TaskList } from "@tiptap/extension-task-list"
 import { TextAlign } from "@tiptap/extension-text-align"
@@ -59,7 +59,7 @@ export const tiptapExtensions = [
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: true }),
-    Image,
+    ImageResize.extend({ name: "image" }),
     Typography,
     Superscript,
     Subscript,

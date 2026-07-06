@@ -1,6 +1,6 @@
 .tiptap.ProseMirror {
   img {
-    max-width: 100%;
+    max-width: min(100%, 720px); // 큰 이미지 자동 최대폭 제한(본문 폭 또는 720px 중 작은 값)
     height: auto;
     display: block;
   }
