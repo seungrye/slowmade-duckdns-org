@@ -102,7 +102,10 @@ export default function PostWriterForm() {
 
                 showAchievementToasts(result.data);
 
-                setTimeout(() => router.push("/"), 1000); // 1초 후 홈으로 이동
+                setTimeout(() => {
+                    router.push("/");
+                    router.refresh(); // Router Cache 무효화 — 방금 작성한 글이 홈 최신 목록에 즉시 반영되도록
+                }, 1000); // 1초 후 홈으로 이동
             } else {
                 toast.error("업로드에 실패했습니다.");
                 setLoading(false);
