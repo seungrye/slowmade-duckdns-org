@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   const guard = await requireOwner();
   if (guard instanceof NextResponse) return guard;
 
-  const env: Env = req.nextUrl.searchParams.get("env") === "real" ? "real" : "paper";
+  const rawEnv = req.nextUrl.searchParams.get("env") ?? "paper";
+  const env: Env = /^[a-z0-9][a-z0-9-]{0,40}$/.test(rawEnv) ? rawEnv : "paper";
   const currency: Currency = req.nextUrl.searchParams.get("currency") === "USD" ? "USD" : "KRW";
 
   const data = await getPortfolioData(env, currency);

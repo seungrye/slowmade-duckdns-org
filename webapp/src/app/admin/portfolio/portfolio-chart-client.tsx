@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { envLabel } from "@/lib/env-label";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 
@@ -23,13 +24,13 @@ type TradeStats = {
 };
 
 type PortfolioResponse = {
-  env: "paper" | "real";
+  env: string;
   currency: "KRW" | "USD";
   history: HistoryPoint[];
   tradesByDate: Record<string, TradeStats>;
 };
 
-type Env = "paper" | "real";
+type Env = string;
 type Currency = "KRW" | "USD";
 
 function formatMoney(v: number, currency: Currency): string {
@@ -39,9 +40,10 @@ function formatMoney(v: number, currency: Currency): string {
   return `${Math.round(v).toLocaleString()}원`;
 }
 
-export default function PortfolioChartClient({ initialData }: { initialData?: PortfolioResponse }) {
+export default function PortfolioChartClient({ initialData, envs = ["paper", "real"] }:
+  { initialData?: PortfolioResponse; envs?: string[] }) {
   const router = useRouter();
-  const [env, setEnv] = useState<Env>("paper");
+  const [env, setEnv] = useState<Env>(initialData?.env ?? envs[0] ?? "paper");
   const [currency, setCurrency] = useState<Currency>("KRW");
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(false);
@@ -282,10 +284,10 @@ export default function PortfolioChartClient({ initialData }: { initialData?: Po
     <div>
       {/* env × currency 탭 */}
       <div className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
-        {(["paper", "real"] as const).map((e) =>
+        {envs.map((e) =>
           (["KRW", "USD"] as const).map((c) => {
             const active = env === e && currency === c;
-            const label = `${e === "paper" ? "모의" : "실전"} · ${c === "KRW" ? "국장" : "미장"}`;
+            const label = `${envLabel(e)} · ${c === "KRW" ? "국장" : "미장"}`;
             return (
               <button
                 key={`${e}-${c}`}

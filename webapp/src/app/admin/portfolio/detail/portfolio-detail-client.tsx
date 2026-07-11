@@ -1,11 +1,13 @@
 "use client";
 
+import { envLabel } from "@/lib/env-label";
+
 import { useMemo } from "react";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 
-type Env = "paper" | "real";
+type Env = string;
 type Currency = "KRW" | "USD";
 
 type Trade = {
@@ -191,7 +193,7 @@ export default function PortfolioDetailClient({
     });
   };
 
-  const marketLabel = `${env === "paper" ? "모의" : "실전"} · ${currency === "KRW" ? "국장" : "미장"}`;
+  const marketLabel = `${envLabel(env)} · ${currency === "KRW" ? "국장" : "미장"}`;
   const tradesDesc = [...trades].reverse(); // 최신 매매가 위로
   const historyDesc = [...history].reverse();
 

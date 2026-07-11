@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ byTicker: {} });
   }
   const envParam = req.nextUrl.searchParams.get("env");
-  const env = envParam === "paper" || envParam === "real" ? envParam : null;
+  const env = envParam && /^[a-z0-9][a-z0-9-]{0,40}$/.test(envParam) ? envParam : null;
 
   const from = req.nextUrl.searchParams.get("from");
   const to = req.nextUrl.searchParams.get("to");

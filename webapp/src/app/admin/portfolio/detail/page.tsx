@@ -23,7 +23,7 @@ export default async function PortfolioDetailPage(props: {
   if (guard instanceof NextResponse) notFound();
 
   const sp = await props.searchParams;
-  const env: Env = sp.env === "real" ? "real" : "paper";
+  const env: Env = typeof sp.env === "string" && /^[a-z0-9][a-z0-9-]{0,40}$/.test(sp.env) ? sp.env : "paper";
   const currency: Currency = sp.currency === "USD" ? "USD" : "KRW";
   const center = sp.center ?? null;
 

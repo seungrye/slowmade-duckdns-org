@@ -31,7 +31,7 @@ type Trade = {
   price: number;
   qty: number;
   cumulativeQty?: number; // 체결 후 누적 보유 수량.
-  env: "paper" | "real";
+  env: string;
 };
 
 type TradesResponse = { byTicker: Record<string, Trade[]> };

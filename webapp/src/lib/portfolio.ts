@@ -2,7 +2,19 @@ import { connectToDB } from "@/lib/db";
 import PortfolioHistory from "@/models/portfolio-history";
 import StockTrade from "@/models/stock-trade";
 
-export type Env = "paper" | "real";
+// 멀티 포트폴리오: env 는 "paper" | "real" | "{env}-{계좌명}" (예: paper-main, paper-sub)
+export type Env = string;
+
+/** DB 에 존재하는 env 목록(포트폴리오 ∪ 매매기록) — 탭을 동적으로 만든다. */
+export async function listEnvs(): Promise<string[]> {
+  await connectToDB();
+  const [a, b] = await Promise.all([
+    PortfolioHistory.distinct("env"),
+    StockTrade.distinct("env"),
+  ]);
+  const set = new Set<string>([...a, ...b].filter(Boolean));
+  return [...set].sort();
+}
 export type Currency = "KRW" | "USD";
 
 export type HistoryPoint = {
