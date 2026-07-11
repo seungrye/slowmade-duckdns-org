@@ -11,7 +11,7 @@ describe("무한매수 V4.0 (공식 원문) — 일반모드", () => {
   it("첫 매수는 새 사이클 '다음날' 전일종가+10% LOC 로 체결된다", () => {
     const r = runInfiniteV4Backtest([bar("d1", 100), bar("d2", 100)], CFG);
     expect(r.trades.filter((t) => t.date === "d1")).toHaveLength(0); // 첫날은 계획만
-    expect(r.trades[0]).toMatchObject({ date: "d2", side: "buy", qty: 10, price: 100 });
+    expect(r.trades[0]).toMatchObject({ date: "d2", side: "buy", qty: 9, price: 100 }); // 수량=지정가(110) 기준
   });
 
   it("다음날 +10% 초과 급등이면 첫 매수 미체결 → 기준 갱신 후 재시도", () => {
@@ -28,7 +28,7 @@ describe("무한매수 V4.0 (공식 원문) — 일반모드", () => {
     const r = runInfiniteV4Backtest(bars, CFG);
     const d3sell = r.trades.filter((t) => t.date === "d3" && t.side === "sell");
     expect(d3sell).toHaveLength(1);
-    expect(d3sell[0].qty).toBe(8); // 10 − floor(10/4)=2 쿼터 제외한 75%
+    expect(d3sell[0].qty).toBe(7); // 9 − floor(9/4)=2 쿼터 제외한 75%
     const d4buy = r.trades.find((t) => t.date === "d4" && t.side === "buy");
     expect(d4buy).toBeDefined();
     expect(d4buy!.roundNo).toBeLessThan(1.5); // T=0.25 에서 매수 가산(×0.25 미반영이면 ≥2)

@@ -77,7 +77,7 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
         entryLimit = bar.close * 1.10;
       } else if (bar.close <= entryLimit) {
         const one = cash / splits;
-        const q = Math.floor(one / bar.close);
+        const q = Math.floor(one / entryLimit); // 실제 LOC 는 주문 시 지정가 기준 수량(종가 미지)
         if (q >= 1) {
           buyFill(bar, q, bar.close);
           T = 1;
@@ -141,13 +141,16 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
         } else {
           tryBuy(starPoint, one); // 후반전: 전체 별지점(평단 아래)
         }
-        // 사다리 근사: 매수가 체결된 급락일에 남은 1회매수액을 종가로 추가 매수(1회분 소진 의도)
+        // 사다리 근사: 원문 사다리 레벨은 평단 아래 배치 — 종가가 평단 이하(급락 영역)일 때만
+        // 남은 1회매수액을 종가로 소진. 전반전 별지점 레그만 체결된 보통날은 +0.5회차 유지.
         if (spent > 0) {
-          const rest = one - spent;
-          const q = Math.floor(rest / bar.close);
-          if (q >= 1) {
-            spent += buyFill(bar, q, bar.close);
-            push("buy", bar, q, bar.close);
+          if (bar.close <= avg) {
+            const rest = one - spent;
+            const q = Math.floor(rest / bar.close);
+            if (q >= 1) {
+              spent += buyFill(bar, q, bar.close);
+              push("buy", bar, q, bar.close);
+            }
           }
           T += spent / one;
         }
