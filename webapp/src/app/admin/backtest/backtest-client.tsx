@@ -284,9 +284,12 @@ export default function BacktestClient() {
 
       {/* 옵션 폼 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <Field label="종목 코드" hint="예: TQQQ, 069500">
-          <input value={ticker} onChange={(e) => setTicker(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} placeholder="TICKER" className="input" />
-        </Field>
+        {/* rotation 은 후보/시그널 필드가 종목 입력을 대신한다 — 이 필드는 무시되므로 숨겨 혼동 방지 */}
+        {strategy !== "rotation_v1" && (
+          <Field label="종목 코드" hint="예: TQQQ, 069500">
+            <input value={ticker} onChange={(e) => setTicker(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} placeholder="TICKER" className="input" />
+          </Field>
+        )}
         <Field label="원금" hint="배정 자본(국장은 원화)">
           <input type="number" value={principal} onChange={(e) => setPrincipal(Number(e.target.value))} className="input" />
         </Field>
@@ -356,7 +359,7 @@ export default function BacktestClient() {
               <input value={rotCandidates} onChange={(e) => setRotCandidates(e.target.value)}
                 placeholder="비우면 자동선발" className="input" />
             </Field>
-            <Field label="시그널 종목" hint="레짐 판단 1배 지수(기본 QQQ)">
+            <Field label="시그널 종목" hint="레짐 판단 1배 지수 — 미장 QQQ(기본) · 국장 069500">
               <input value={lrsSignal} onChange={(e) => setLrsSignal(e.target.value)} placeholder="QQQ" className="input" />
             </Field>
             <Field label="시그널 SMA" hint="기본 200일">
