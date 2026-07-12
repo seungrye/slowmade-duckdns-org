@@ -10,6 +10,7 @@ import { decryptSecret } from "./crypto";
 import { KisClient, US_ORDER_EXCD, registerUsExcd, usQuoteExcd } from "./kis-client";
 import { lrsDecide, rotationDecide, trendDecide, type OrderIntent } from "./strategies";
 import { TossClient } from "./toss-client";
+import StockTrade from "@/models/stock-trade";
 import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
 import type { TradingAccountType } from "@/models/trading-account";
@@ -100,6 +101,31 @@ export function marketToday(market: "kr" | "us", now = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now).replace(/-/g, "");
 }
 
+/** 미장 live 체결을 사이트 차트 매매기록(stocktrades)에 기록.
+ *  시장가 계열(trend/lrs/rotation)만 — 즉시 체결 근사(파이썬 'ledger=체결' 설계와 동일).
+ *  국장은 파이썬 dry 데몬의 체결내역 기반 마감 sync 가 커버하므로 기록하지 않는다(중복 방지).
+ *  v4(LOC — 접수≠체결)도 제외. env enum 은 파이썬 멀티계좌 push 와 동일하게 컬렉션 레벨로 우회. */
+async function recordChartTrade(
+  envKey: string, strategy: string, it: OrderIntent, market: "kr" | "us",
+): Promise<void> {
+  if (market !== "us") return;
+  const now = new Date();
+  const time = now.toISOString();
+  try {
+    await StockTrade.collection.updateOne(
+      { env: envKey, ticker: it.symbol, time },
+      { $set: {
+          env: envKey, ticker: it.symbol, action: it.side, strategy,
+          qty: it.qty, cumulativeQty: 0, price: it.price, amount: it.qty * it.price,
+          currency: "USD", date: time.slice(0, 10), time,
+        } },
+      { upsert: true },
+    );
+  } catch (e) {
+    console.warn("[trading] 차트 매매기록 실패(매매는 계속):", e);
+  }
+}
+
 // ── 주문 실행(로그 + 이중 게이트) ────────────────────────────────
 
 async function execute(
@@ -115,6 +141,8 @@ async function execute(
       if (live) {
         orderNo = await broker.submit(it.symbol, it.qty, it.side, it.price);
         log(`주문 접수 ${orderNo} — ${it.side} ${it.symbol} x${it.qty}`);
+        await recordChartTrade(account.envKey, portfolio.strategy, it,
+                               portfolio.market as "kr" | "us");
       } else {
         log(`[DRY-RUN] ${it.side} ${it.symbol} x${it.qty} @${it.price} — ${it.reason}`);
       }
