@@ -325,8 +325,12 @@ async function runTrend(
  *  phase 는 infinite_v4 전용(미장 both / 국장 sell·buy — LOC 에뮬), 그 외 무시. */
 export async function runPortfolioCycle(
   account: AccountDoc, portfolio: PortfolioDoc, runId: Types.ObjectId, log: CycleLogger,
-  phase: "main" | "both" | "sell" | "buy" = "main",
+  phase: "main" | "both" | "sell" | "buy" | "close" = "main",
 ): Promise<string> {
+  if (phase === "close") {
+    const { runCloseSync } = await import("./close-sync");
+    return runCloseSync(account as never, portfolio as never, runId, log);
+  }
   if (portfolio.strategy === "infinite_v4") {
     const { runInfiniteV4, makeV4KisBroker, makeV4TossBroker } = await import("./infinite-v4-engine");
     const market = portfolio.market as "kr" | "us";

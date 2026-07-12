@@ -266,6 +266,21 @@ export class KisClient {
     return [...out.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, need + 30);
   }
 
+  /** 최근 일봉 OHLCV(최신순, ~30영업일) — 사이트 가격 push 용. */
+  async krOhlcvRecent(symbol: string): Promise<
+    { date: string; open: number; high: number; low: number; close: number; volume: number }[]
+  > {
+    const now = new Date();
+    const fmt = (dt: Date) => dt.toISOString().slice(0, 10).replace(/-/g, "");
+    const rows = await this.krDailyPage(symbol, fmt(new Date(now.getTime() - 60 * 86400_000)), fmt(now));
+    return rows.map((r) => ({
+      date: String(r.stck_bsop_date),
+      open: Number(r.stck_oprc ?? 0), high: Number(r.stck_hgpr ?? 0),
+      low: Number(r.stck_lwpr ?? 0), close: Number(r.stck_clpr ?? 0),
+      volume: Number(r.acml_vol ?? 0),
+    }));
+  }
+
   /** 거래대금(종가×거래량) 시계열 과거→최신 — rotation 자동선발용(최근 ~30영업일). */
   async krValueSeries(symbol: string): Promise<number[]> {
     const now = new Date();
@@ -413,6 +428,19 @@ export class KisClient {
       );
     }
     return [...out.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, need + 30);
+  }
+
+  /** 최근 일봉 OHLCV(최신순, ~최근 100일 중 상위) — 사이트 가격 push 용. */
+  async usOhlcvRecent(symbol: string, excd = "NAS"): Promise<
+    { date: string; open: number; high: number; low: number; close: number; volume: number }[]
+  > {
+    const rows = await this.usDailyPage(symbol, excd, "");
+    return rows.map((r) => ({
+      date: String(r.xymd),
+      open: Number(r.open ?? 0), high: Number(r.high ?? 0),
+      low: Number(r.low ?? 0), close: Number(r.clos ?? 0),
+      volume: Number(r.tvol ?? 0),
+    }));
   }
 
   /** 거래대금 시계열 과거→최신(미국) — rotation 자동선발용. */

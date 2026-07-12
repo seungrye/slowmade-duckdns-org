@@ -15,26 +15,29 @@ const { runPortfolioCycle } = await import("../src/lib/trading/engines");
 
 const market = process.argv[2] ?? "kr";
 const limit = Number(process.argv[3] ?? 0);
+const phase = (process.argv[4] ?? "main") as "main" | "both" | "sell" | "buy" | "close";
 
 await connectToDB();
 const account = await TradingAccount.findOne({ envKey: "paper-50194613" }).lean();
 if (!account) throw new Error("계정 없음");
 const portfolio = await TradingPortfolio.findOne({ accountId: account._id, market }).lean();
 if (!portfolio) throw new Error(`${market} 포트폴리오 없음`);
-if (limit > 0 && Array.isArray((portfolio.config as { universe?: string[] }).universe)) {
-  (portfolio.config as { universe: string[] }).universe =
-    (portfolio.config as { universe: string[] }).universe.slice(0, limit);
-  console.log(`(스모크 — 유니버스 앞 ${limit}종목만)`);
+for (const key of ["universe", "syncUniverse"] as const) {
+  const cfg = portfolio.config as Record<string, string[] | undefined>;
+  if (limit > 0 && Array.isArray(cfg[key])) {
+    cfg[key] = cfg[key]!.slice(0, limit);
+    console.log(`(스모크 — ${key} 앞 ${limit}종목만)`);
+  }
 }
 const run = await TradingRun.create({
   portfolioId: portfolio._id, accountId: account._id,
-  dateKey: `smoke-${Date.now()}`, phase: "main", status: "running", dryRun: true,
+  dateKey: `smoke-${Date.now()}`, phase, status: "running", dryRun: true,
 });
 const t0 = Date.now();
 try {
   const summary = await runPortfolioCycle(
     { ...account, liveEnabled: false } as never, portfolio as never, run._id as never,
-    (l) => console.log("  " + l),
+    (l) => console.log("  " + l), phase,
   );
   await TradingRun.updateOne({ _id: run._id },
     { $set: { status: "done", summary, finishedAt: new Date() } });

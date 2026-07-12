@@ -1,4 +1,8 @@
-import { InferSchemaType, Schema, model, models, Model } from "mongoose";
+import mongoose from "mongoose";
+import type { InferSchemaType, Model } from "mongoose";
+
+// ESM interop: named export 는 순수 node ESM 에서 안 풀려 default 로 접근(tsx 스크립트 호환).
+const { Schema, model, models } = mongoose;
 
 /**
  * 매매 기록 — stock-automator reports/{paper,real}/trades.json 동기화.

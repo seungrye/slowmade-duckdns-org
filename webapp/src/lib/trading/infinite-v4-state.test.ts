@@ -70,20 +70,21 @@ describe("infinite-v4-state.reconcileDay — 파이썬 벡터", () => {
   });
 });
 
-describe("scheduler.cyclesFor — v4 phase 사이클", () => {
-  it("국장 v4 = 매도(runAt) + 매수(15:20) 2사이클", () => {
+describe("scheduler.cyclesFor — 매매 phase + 마감 sync 사이클", () => {
+  const close = { phase: "close", at: "16:10" }; // 모든 포트폴리오 공통(체결확인·차트·메일)
+  it("국장 v4 = 매도(runAt) + 매수(15:20) + 마감", () => {
     expect(cyclesFor({ strategy: "infinite_v4", market: "kr", runAt: "09:30" })).toEqual([
-      { phase: "sell", at: "09:30" }, { phase: "buy", at: "15:20" },
+      { phase: "sell", at: "09:30" }, { phase: "buy", at: "15:20" }, close,
     ]);
   });
-  it("미장 v4 = both 1사이클(실제 LOC)", () => {
+  it("미장 v4 = both(실제 LOC) + 마감", () => {
     expect(cyclesFor({ strategy: "infinite_v4", market: "us", runAt: "09:35" })).toEqual([
-      { phase: "both", at: "09:35" },
+      { phase: "both", at: "09:35" }, close,
     ]);
   });
-  it("그 외 전략 = main 1사이클", () => {
+  it("그 외 전략 = main + 마감", () => {
     expect(cyclesFor({ strategy: "lrs_v1", market: "us", runAt: "09:35" })).toEqual([
-      { phase: "main", at: "09:35" },
+      { phase: "main", at: "09:35" }, close,
     ]);
   });
 });

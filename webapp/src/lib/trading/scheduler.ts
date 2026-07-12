@@ -38,15 +38,17 @@ export function marketClock(market: "kr" | "us", now = new Date()): MarketClock 
   };
 }
 
-export type Cycle = { phase: "main" | "both" | "sell" | "buy"; at: string };
+export type Cycle = { phase: "main" | "both" | "sell" | "buy" | "close"; at: string };
 
-/** 포트폴리오의 하루 사이클 목록 — 국장 infinite_v4 만 2사이클(매도 09:30류 + 매수 15:20). */
+/** 포트폴리오의 하루 사이클 목록 — 매매 사이클(들) + 마감 sync(16:10, 시장 tz).
+ *  국장 infinite_v4 는 매매가 2사이클(매도 09:30류 + 매수 15:20). */
 export function cyclesFor(p: { strategy: string; market: string; runAt: string }): Cycle[] {
+  const close: Cycle = { phase: "close", at: "16:10" }; // 체결확인·차트 sync·메일(파이썬 마감 대응)
   if (p.strategy === "infinite_v4" && p.market === "kr") {
-    return [{ phase: "sell", at: p.runAt }, { phase: "buy", at: "15:20" }];
+    return [{ phase: "sell", at: p.runAt }, { phase: "buy", at: "15:20" }, close];
   }
-  if (p.strategy === "infinite_v4") return [{ phase: "both", at: p.runAt }];
-  return [{ phase: "main", at: p.runAt }];
+  if (p.strategy === "infinite_v4") return [{ phase: "both", at: p.runAt }, close];
+  return [{ phase: "main", at: p.runAt }, close];
 }
 
 /** 실행해야 하는 시점인가 — 시각 경과(당일) && (주중 조건). 기록 유무는 클레임이 판단. */
@@ -132,6 +134,12 @@ export async function tradingTick(now = new Date()): Promise<void> {
         await TradingRun.updateOne(
           { _id: claim.runId },
           { $set: { status: "failed", error: msg, logs, finishedAt: new Date() } },
+        );
+        // 실패는 즉시 메일(파이썬 매매 사이클 실패 알림 대응). 실패는 삼킨다.
+        const { sendTradingMail } = await import("./mailer");
+        await sendTradingMail(
+          `⚠ 사이클 실패 ${clock.dateKey} — ${account.envKey} ${p.market}/${p.strategy}/${cycle.phase}`,
+          `${msg}\n\n로그:\n${logs.slice(-20).join("\n")}`,
         );
       }
     }
