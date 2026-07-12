@@ -168,7 +168,9 @@ export default function TradingSettingsClient() {
       <div>
         <p className="text-sm text-gray-500 mt-1">
           기본은 <b>dry-run</b>(주문 미전송, 로그만). 실주문은 계정별 wire 토글 × 서버 게이트
-          (현재 {liveAllowed ? "허용" : "차단"}) 둘 다 켜져야 나간다. 시크릿은 암호화 저장·마스킹 표시.
+          (현재 {liveAllowed ? "허용" : "차단"}) 둘 다 켜져야 나간다 — 포트폴리오의
+          <b> 실주문/dry 뱃지</b>가 스케줄 실행의 유효 모드다. &quot;테스트 실행&quot; 버튼은
+          모드와 무관하게 항상 dry. 시크릿은 암호화 저장·마스킹 표시.
         </p>
         {msg && <p className="text-sm text-amber-600 mt-2">{msg}</p>}
       </div>
@@ -240,18 +242,24 @@ export default function TradingSettingsClient() {
         <ul className="space-y-2 mb-4">
           {portfolios.map((p) => {
             const acct = accounts.find((a) => a.id === p.accountId);
+            // 유효 모드 = 계정 LIVE 토글 × 서버 게이트 — 스케줄 실행이 실제 주문을 내는지.
+            const effectiveLive = Boolean(acct?.liveEnabled) && liveAllowed;
             return (
               <li key={p.id} className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
+                    <span className={`text-xs px-1.5 py-0.5 rounded mr-2 font-semibold ${
+                      effectiveLive ? "bg-red-600 text-white" : "bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                    }`}>{effectiveLive ? "실주문" : "dry"}</span>
                     <b>{acct?.envKey ?? "?"}</b> · {p.market.toUpperCase()} · {p.strategy}
                     <span className="text-gray-500 ml-2">매일 {p.runAt} {p.market === "kr" ? "KST" : "ET"}</span>
                     {!p.enabled && <span className="text-red-500 ml-2">(비활성)</span>}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => runNow(p.id)} disabled={busy}
+                            title="설정 검증용 수동 1회 실행 — 계정 모드와 무관하게 항상 dry"
                             className="text-xs px-2 py-1 rounded border border-blue-500 text-blue-600">
-                      지금 dry-run
+                      테스트 실행(항상 dry)
                     </button>
                     <button
                       onClick={async () => {
