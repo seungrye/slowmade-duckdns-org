@@ -127,6 +127,38 @@ export const items: Record<string, Item> = {
     stackable: false,
     passiveStat: { stat: "wis", bonus: 1 },
   },
+  // ── 고전 삽화 이벤트 보상 (seed-363-classic-tales) ──────────────────
+  mutagen_serum: {
+    id: "mutagen_serum",
+    displayName: "변성 혈청",
+    desc: "이중 나선 각인이 새겨진 검붉은 병. 몸속에서 낯선 힘이 꿈틀댄다 — 밤마다 조금씩.",
+    kind: "passive",
+    stackable: false,
+    passiveStat: { stat: "str", bonus: 2 },
+  },
+  faust_pact: {
+    id: "faust_pact",
+    displayName: "잿빛 계약서",
+    desc: "서명란이 이미 네 필체로 채워져 있는 양피지. 대가는 어디에도 적혀 있지 않다.",
+    kind: "quest",
+    stackable: false,
+  },
+  old_knight_lance: {
+    id: "old_knight_lance",
+    displayName: "노기사의 랜스",
+    desc: "풍차와 싸워 온 흠집투성이 창. 우스꽝스럽지만, 날만은 진짜다.",
+    kind: "weapon",
+    stackable: false,
+    attack: 2,
+  },
+  siren_scale: {
+    id: "siren_scale",
+    displayName: "세이렌의 비늘",
+    desc: "수로의 노래를 이겨낸 증표. 귓가의 유혹을 한 꺼풀 걸러 준다.",
+    kind: "passive",
+    stackable: false,
+    passiveStat: { stat: "wis", bonus: 1 },
+  },
 };
 
 export const ITEM_IDS = Object.keys(items);
