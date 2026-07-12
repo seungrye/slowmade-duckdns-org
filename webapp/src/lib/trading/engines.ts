@@ -40,6 +40,15 @@ function creds(account: AccountDoc): Record<string, string> {
   return out;
 }
 
+export function makeTossClient(account: AccountDoc): TossClient {
+  const c = creds(account);
+  return new TossClient({
+    clientId: c.clientId,
+    clientSecret: c.clientSecret,
+    accountSeq: c.accountSeq ? Number(c.accountSeq) : null,
+  });
+}
+
 export function makeKisClient(account: AccountDoc): KisClient {
   const c = creds(account);
   return new KisClient({
@@ -52,12 +61,7 @@ export function makeKisClient(account: AccountDoc): KisClient {
 
 export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker {
   if (account.broker === "toss") {
-    const c = creds(account);
-    const client = new TossClient({
-      clientId: c.clientId,
-      clientSecret: c.clientSecret,
-      accountSeq: c.accountSeq ? Number(c.accountSeq) : null,
-    });
+    const client = makeTossClient(account);
     return {
       market,
       account: () => client.account(market),
@@ -288,12 +292,13 @@ export async function runPortfolioCycle(
   phase: "main" | "both" | "sell" | "buy" = "main",
 ): Promise<string> {
   if (portfolio.strategy === "infinite_v4") {
-    if (account.broker !== "kis") {
-      throw new Error("infinite_v4 는 현재 KIS 계정 전용(토스는 2단계 — LOC=LIMIT+CLS 이식 예정)");
-    }
-    const { runInfiniteV4 } = await import("./infinite-v4-engine");
+    const { runInfiniteV4, makeV4KisBroker, makeV4TossBroker } = await import("./infinite-v4-engine");
+    const market = portfolio.market as "kr" | "us";
+    const v4Broker = account.broker === "toss"
+      ? makeV4TossBroker(makeTossClient(account), market, account._id)
+      : makeV4KisBroker(makeKisClient(account), market);
     const v4Phase = phase === "main" ? "both" : phase;
-    return runInfiniteV4(account, portfolio, runId, makeKisClient(account), v4Phase, log);
+    return runInfiniteV4(account, portfolio, runId, v4Broker, v4Phase, log);
   }
   const broker = makeBroker(account, portfolio.market as "kr" | "us");
   switch (portfolio.strategy) {

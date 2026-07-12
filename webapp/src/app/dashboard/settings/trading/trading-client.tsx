@@ -291,7 +291,7 @@ export default function TradingSettingsClient() {
               <option value="lrs_v1">LRS</option>
               <option value="rotation_v1">모멘텀 로테이션</option>
               <option value="trend_v1">추세추종</option>
-              <option value="infinite_v4">무한매수 V4 (KIS)</option>
+              <option value="infinite_v4">무한매수 V4</option>
             </select>
             <div className="flex items-center gap-1">
               <input value={pRunAt} onChange={(e) => setPRunAt(e.target.value)}
@@ -303,9 +303,9 @@ export default function TradingSettingsClient() {
                     className={inputCls + " font-mono text-xs"} />
           <p className="text-xs text-gray-400">
             시각 기준: 국장 KST · 미장 ET(서머타임 자동). rotation 은 candidates 생략 시 시드
-            자동선발. trend 는 universe 배열 필수. 무한매수 V4 는 KIS 전용 — symbol·principal 필수,
-            미장은 아침 1회(실제 LOC), 국장은 09:30 매도 + 15:20 매수 phase 자동(LOC 에뮬).
-            무한매수 v1 은 파이썬 데몬 전용.
+            자동선발. trend 는 universe 배열 필수. 무한매수 V4 는 symbol·principal 필수 —
+            미장은 아침 1회(실제 LOC: KIS 34 / 토스 LIMIT+CLS), 국장은 09:30 매도 + 15:20 매수
+            phase 자동(LOC 에뮬). 무한매수 v1 은 파이썬 데몬 전용.
           </p>
           <button onClick={savePortfolio} disabled={busy || !pAccount} className={btnCls}>
             포트폴리오 저장(계정×시장 upsert)

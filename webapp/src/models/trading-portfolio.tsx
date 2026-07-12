@@ -5,7 +5,7 @@ import { InferSchemaType, Schema, model, models, Model } from "mongoose";
  * 파이썬 portfolio.yaml 의 overseas/domestic 블록에 해당.
  *
  * market: kr | us
- * strategy: lrs_v1 | rotation_v1 | trend_v1 | infinite_v4(KIS 전용 — 미장 LOC/국장 에뮬).
+ * strategy: lrs_v1 | rotation_v1 | trend_v1 | infinite_v4(미장 LOC/국장 에뮬 — KIS·토스).
  * runAt: "HH:MM" — kr 은 KST, us 는 ET(서머타임 자동, 파이썬과 동일 의미).
  * config: 전략별 파라미터 JSON
  *   lrs_v1:      { signal, target, sma?, band? }

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireOwner } from "@/lib/require-owner";
 import { connectToDB } from "@/lib/db";
 import TradingPortfolio from "@/models/trading-portfolio";
-import TradingAccount from "@/models/trading-account";
 
 export const dynamic = "force-dynamic";
 
@@ -48,10 +47,6 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
   if (strategy === "infinite_v4") {
-    const acct = await TradingAccount.findById(body.accountId).lean();
-    if (acct?.broker === "toss") {
-      return NextResponse.json({ error: "infinite_v4 는 KIS 계정 전용(토스는 2단계)" }, { status: 400 });
-    }
     const cfg = (body.config ?? {}) as Record<string, unknown>;
     if (!cfg.symbol || !(Number(cfg.principal) > 0)) {
       return NextResponse.json({ error: "infinite_v4 는 config.symbol·principal(양수) 필수" }, { status: 400 });

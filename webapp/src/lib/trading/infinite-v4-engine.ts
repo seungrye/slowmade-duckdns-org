@@ -1,16 +1,19 @@
-// 무한매수 V4.0 라이브 엔진 — 파이썬 trading/infinite_v4_engine.py 포팅(KIS 전용,
-// 토스는 2단계). 일일 흐름: 대사(전일 체결→T·모드·cycleCash) → 미체결 취소(멱등) →
+// 무한매수 V4.0 라이브 엔진 — 파이썬 trading/infinite_v4_engine.py 포팅(KIS·토스 겸용).
+// 일일 흐름: 대사(전일 체결→T·모드·cycleCash) → 미체결 취소(멱등) →
 // 오늘 주문(진입 LOC / normal ¼별지점 LOC+¾목표 지정가+매수 레그 / reverse) → 상태 저장.
 //
-// phase: 미장 "both"(아침 1회 — 실제 LOC, 종가 조건부 체결) /
+// phase: 미장 "both"(아침 1회 — 실제 LOC: KIS ORD_DVSN 34 / 토스 LIMIT+CLS) /
 //        국장 "sell"(09:30 — ¾ 지정가 매도만) + "buy"(15:20 — 동시호가 지정가 에뮬:
-//        현재가(≈종가)가 조건을 만족하는 레그만 전송).
+//        현재가(≈종가)가 조건을 만족하는 레그만 전송). 시장 분기는 엔진이 자동.
+// 대사 소스: KIS 는 계좌 체결내역(inquire-ccnl), 토스는 status=CLOSED 미지원이라
+// **우리가 낸 주문 로그(orderNo)의 상세 조회**로 체결을 취합한다(사이트 주문만 대사).
 // 상태는 TradingPortfolio.state.v4 에 영속(파이썬 v4-state-*.json 대체).
 
 import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
 import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
+import { TossClient } from "./toss-client";
 import {
   emptyPending, newV4State, reconcileDay,
   type V4Fill, type V4State,
@@ -19,10 +22,10 @@ import { marketToday } from "./engines";
 import type { CycleLogger } from "./engines";
 
 type Json = Record<string, unknown>;
-type Order = {
-  side: "buy" | "sell"; qty: number; price: number;
-  ordType: "loc" | "limit" | "market"; reason: string;
-};
+type OrdKind = "loc" | "limit" | "market";
+type Order = { side: "buy" | "sell"; qty: number; price: number; ordType: OrdKind; reason: string };
+type OpenRow = { orderNo: string; side: "buy" | "sell"; qty: number };
+type DatedFill = V4Fill & { date: string };
 
 export type V4Config = {
   symbol: string;
@@ -33,6 +36,142 @@ export type V4Config = {
 };
 
 const LOOKBACK_DAYS = 14;
+
+/** v4 가 브로커에 요구하는 최소 계약 — KIS/토스 어댑터가 구현. */
+export type V4Broker = {
+  snapshot(sym: string): Promise<{ holding: number; avg: number; price: number }>;
+  historyLong(sym: string, need: number): Promise<[string, number][]>;
+  /** (from, to] 구간 체결을 정규화해 반환 — 날짜 YYYYMMDD. */
+  executions(sym: string, fromDate: string, toDate: string): Promise<DatedFill[]>;
+  openOrders(sym: string): Promise<OpenRow[]>;
+  cancel(sym: string, orderNo: string, qty: number): Promise<void>;
+  place(sym: string, o: Order): Promise<string>;
+};
+
+// ── KIS 어댑터 ──────────────────────────────────────────────────
+
+export function makeV4KisBroker(client: KisClient, market: "kr" | "us"): V4Broker {
+  const usExcd = (sym: string) => US_ORDER_EXCD[usQuoteExcd(sym)] ?? "NASD";
+  return {
+    async snapshot(sym) {
+      const [holdings] = market === "kr" ? await client.krAccount() : await client.usAccount();
+      const [holding, avg] = holdings[sym] ?? [0, 0];
+      const price = market === "kr"
+        ? await client.krPrice(sym) : await client.usPrice(sym, usQuoteExcd(sym));
+      return { holding, avg, price };
+    },
+    historyLong: (sym, need) => market === "kr"
+      ? client.krHistoryLong(sym, need) : client.usHistoryLong(sym, usQuoteExcd(sym), need),
+    async executions(sym, fromDate, toDate) {
+      const rows = market === "kr"
+        ? await client.krExecutions(sym, fromDate, toDate)
+        : await client.usExecutions(sym, fromDate, toDate, usExcd(sym));
+      const fills: DatedFill[] = [];
+      for (const r of rows as Json[]) {
+        const date = String(r.ord_dt ?? "").trim();
+        const side = String(r.sll_buy_dvsn_cd ?? "").trim();
+        const qty = Number(r.ft_ccld_qty ?? r.ccld_qty ?? r.tot_ccld_qty ?? 0);
+        const price = Number(r.avg_prvs ?? r.ft_ccld_unpr3 ?? r.avg_unpr ?? r.ccld_unpr ?? 0);
+        if (date && ["01", "02"].includes(side) && qty > 0) {
+          fills.push({ date, side: side === "01" ? "sell" : "buy",
+                       qty: Math.trunc(qty), price });
+        }
+      }
+      return fills;
+    },
+    async openOrders(sym) {
+      const rows = market === "kr" ? await client.krOpenOrders() : await client.usOpenOrders();
+      const out: OpenRow[] = [];
+      for (const r of rows as Json[]) {
+        if (String(r.pdno ?? "") !== sym) continue;
+        const qty = Math.trunc(Number(r.nccs_qty ?? r.rmn_qty ?? r.ord_qty ?? 0));
+        const odno = String(r.odno ?? "");
+        if (!odno || qty < 1) continue;
+        out.push({ orderNo: odno,
+                   side: String(r.sll_buy_dvsn_cd ?? "").trim() === "02" ? "buy" : "sell", qty });
+      }
+      return out;
+    },
+    async cancel(sym, orderNo, qty) {
+      if (market === "kr") await client.krCancelOrder(orderNo, qty);
+      else await client.usCancelOrder(sym, orderNo, qty, usExcd(sym));
+    },
+    async place(sym, o) {
+      if (market === "kr") {
+        // 국장 에뮬 — LOC/지정가는 지정가로, 시장가는 시장가로
+        return client.krOrder(sym, o.qty, o.side,
+          o.ordType === "market" ? { market: true } : { market: false, price: o.price });
+      }
+      const dvsn = o.ordType === "loc" ? "34" : "00"; // 모의는 client 가 지정가 폴백
+      return client.usOrder(sym, o.qty, o.price, o.side, usExcd(sym), dvsn);
+    },
+  };
+}
+
+// ── 토스 어댑터 ─────────────────────────────────────────────────
+
+export function makeV4TossBroker(
+  client: TossClient, market: "kr" | "us", accountId: Types.ObjectId,
+): V4Broker {
+  return {
+    async snapshot(sym) {
+      const [holdings] = await client.account(market);
+      const [holding, avg] = holdings[sym] ?? [0, 0];
+      return { holding, avg, price: await client.price(sym) };
+    },
+    historyLong: (sym, need) => client.historyLong(sym, need),
+    async executions(sym, fromDate, toDate) {
+      // status=CLOSED 미지원 → 우리가 기록한 실주문(orderNo)의 상세로 체결 취합.
+      const since = new Date(
+        Date.UTC(+fromDate.slice(0, 4), +fromDate.slice(4, 6) - 1, +fromDate.slice(6, 8)) - 86400_000,
+      );
+      const logs = await TradingOrderLog.find({
+        accountId, symbol: sym, dryRun: false, orderNo: { $ne: "" },
+        createdAt: { $gte: since },
+      }).lean();
+      const fills: DatedFill[] = [];
+      for (const orderNo of [...new Set(logs.map((l) => l.orderNo))]) {
+        try {
+          const d = await client.orderDetail(orderNo);
+          const ex = (d.execution ?? {}) as Json;
+          const qty = Math.trunc(Number(ex.filledQuantity ?? 0));
+          if (qty < 1) continue;
+          const at = String(ex.filledAt ?? d.orderedAt ?? "");
+          const date = at.slice(0, 10).replace(/-/g, "");
+          if (!date || date < fromDate || date > toDate) continue;
+          fills.push({
+            date,
+            side: String(d.side ?? "").toUpperCase() === "SELL" ? "sell" : "buy",
+            qty,
+            price: Number(ex.averageFilledPrice ?? d.price ?? 0),
+          });
+        } catch {
+          continue; // 주문 단위 격리 — 하나의 조회 실패가 대사 전체를 막지 않게
+        }
+      }
+      return fills;
+    },
+    async openOrders(sym) {
+      const rows = await client.openOrders(sym);
+      return rows.map((r) => ({
+        orderNo: String(r.orderId ?? ""),
+        side: String(r.side ?? "").toUpperCase() === "BUY" ? "buy" as const : "sell" as const,
+        qty: Math.trunc(Number(r.quantity ?? 0)),
+      })).filter((r) => r.orderNo && r.qty >= 1);
+    },
+    async cancel(_sym, orderNo) {
+      await client.cancelOrder(orderNo);
+    },
+    async place(sym, o) {
+      if (o.ordType === "market") return client.orderMarket(sym, o.qty, o.side);
+      // LOC: 미국은 네이티브(LIMIT+CLS), 국장은 에뮬(일반 지정가 — phase 게이트가 판단)
+      const cls = o.ordType === "loc" && market === "us";
+      return client.orderLimit(sym, o.qty, o.side, o.price, { cls });
+    },
+  };
+}
+
+// ── 사이클 ──────────────────────────────────────────────────────
 
 function parseCfg(config: Json): V4Config {
   const symbol = String(config.symbol ?? "");
@@ -59,7 +198,7 @@ export async function runInfiniteV4(
   account: { _id: Types.ObjectId; envKey: string; liveEnabled?: boolean | null },
   portfolio: { _id: Types.ObjectId; market: string; strategy: string; config: unknown; state?: unknown },
   runId: Types.ObjectId,
-  client: KisClient,
+  broker: V4Broker,
   phase: "both" | "sell" | "buy",
   log: CycleLogger,
 ): Promise<string> {
@@ -69,30 +208,15 @@ export async function runInfiniteV4(
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
   const today = marketToday(market);
 
-  // 잔고 스냅샷(보유·평단) + 현재가
-  const [holdings] = market === "kr" ? await client.krAccount() : await client.usAccount();
-  const [holding, avg] = holdings[sym] ?? [0, 0];
-  const price = market === "kr" ? await client.krPrice(sym) : await client.usPrice(sym, usQuoteExcd(sym));
+  const { holding, avg, price } = await broker.snapshot(sym);
 
   // ── 1) 대사 — 마지막 실행일 이후(오늘 제외) 체결을 일자별 적용 ──
   let state = loadState((portfolio.state as Json | undefined)?.v4, cfg);
   const start = state.lastRunDate ||
     new Date(Date.now() - LOOKBACK_DAYS * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
   try {
-    const execs = market === "kr"
-      ? await client.krExecutions(sym, start, today)
-      : await client.usExecutions(sym, start, today);
-    const fills: (V4Fill & { date: string })[] = [];
-    for (const r of execs) {
-      const date = String(r.ord_dt ?? "").trim();
-      const side = String(r.sll_buy_dvsn_cd ?? "").trim();
-      const qty = Number(r.ft_ccld_qty ?? r.ccld_qty ?? r.tot_ccld_qty ?? 0);
-      const priceF = Number(r.avg_prvs ?? r.ft_ccld_unpr3 ?? r.avg_unpr ?? r.ccld_unpr ?? 0);
-      if (date && ["01", "02"].includes(side) && qty > 0 &&
-          state.lastRunDate < date && date < today) {
-        fills.push({ date, side: side === "01" ? "sell" : "buy", qty: Math.trunc(qty), price: priceF });
-      }
-    }
+    const fills = (await broker.executions(sym, start, today))
+      .filter((f) => state.lastRunDate < f.date && f.date < today);
     for (const date of [...new Set(fills.map((f) => f.date))].sort()) {
       const day = fills.filter((f) => f.date === date);
       state = reconcileDay(state, day, holding);
@@ -106,22 +230,14 @@ export async function runInfiniteV4(
 
   // ── 2) 미체결 취소(멱등) — buy phase 는 09:30 매도를 살리려 매수만 취소 ──
   try {
-    const rows = market === "kr" ? await client.krOpenOrders() : await client.usOpenOrders();
-    for (const r of rows) {
-      const rowSym = String(r.pdno ?? "");
-      if (rowSym !== sym) continue;
-      const sideCd = String(r.sll_buy_dvsn_cd ?? "").trim();
-      if (phase === "buy" && sideCd !== "02") continue; // 매수(02)만
-      const odno = String(r.odno ?? "");
-      const qty = Math.trunc(Number(r.nccs_qty ?? r.rmn_qty ?? r.ord_qty ?? 0));
-      if (!odno || qty < 1) continue;
+    for (const r of await broker.openOrders(sym)) {
+      if (phase === "buy" && r.side !== "buy") continue;
       if (!live) {
-        log(`[DRY-RUN] 미체결 취소 ODNO=${odno} x${qty}`);
+        log(`[DRY-RUN] 미체결 취소 ${r.orderNo} x${r.qty}`);
         continue;
       }
-      if (market === "kr") await client.krCancelOrder(odno, qty);
-      else await client.usCancelOrder(sym, odno, qty, US_ORDER_EXCD[usQuoteExcd(sym)] ?? "NASD");
-      log(`미체결 취소 ODNO=${odno} x${qty}`);
+      await broker.cancel(sym, r.orderNo, r.qty);
+      log(`미체결 취소 ${r.orderNo} x${r.qty}`);
     }
   } catch (e) {
     log(`[v4:${sym}] 미체결 조회 실패 → 취소 스킵: ${e instanceof Error ? e.message : e}`);
@@ -189,9 +305,7 @@ export async function runInfiniteV4(
     }
   } else {
     // reverse — 별지점R = 직전 5거래일 종가평균
-    const hist = market === "kr"
-      ? await client.krHistoryLong(sym, 10)
-      : await client.usHistoryLong(sym, usQuoteExcd(sym), 10);
+    const hist = await broker.historyLong(sym, 10);
     const prev5 = hist.filter(([d]) => d < today).slice(0, 5).map(([, c]) => c);
     const starR = prev5.length >= 5 ? prev5.reduce((a, b) => a + b, 0) / prev5.length : price;
     let sellQ = Math.floor(holding / (cfg.splits / 2));
@@ -226,15 +340,7 @@ export async function runInfiniteV4(
   for (const o of orders) {
     let orderNo = "";
     if (live) {
-      if (market === "kr") {
-        // 국장 에뮬: LOC/지정가 → 지정가, 시장가 → 시장가
-        orderNo = await client.krOrder(sym, o.qty, o.side,
-          o.ordType === "market" ? { market: true } : { market: false, price: o.price });
-      } else {
-        const excd = US_ORDER_EXCD[usQuoteExcd(sym)] ?? "NASD";
-        const dvsn = o.ordType === "loc" ? "34" : "00"; // 모의는 client 가 지정가 폴백
-        orderNo = await client.usOrder(sym, o.qty, o.price, o.side, excd, dvsn);
-      }
+      orderNo = await broker.place(sym, o);
       log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${o.price.toFixed(2)} (${o.ordType})`);
     } else {
       log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${o.price.toFixed(2)} (${o.ordType}) — ${o.reason}`);

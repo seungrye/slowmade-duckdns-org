@@ -235,4 +235,42 @@ export class TossClient {
     const result = ((await this.post("/api/v1/orders", body)) ?? {}) as Json;
     return String(result.orderId ?? "");
   }
+
+  /** 지정가 주문 — cls=true 면 LOC(LIMIT+timeInForce=CLS, 미국 전용). 가격 포맷:
+   *  KR 정수 원 / US $1↑ 소수2자리·$1↓ 4자리(파이썬 toss/invest._format_price 동일). */
+  async orderLimit(symbol: string, qty: number, side: "buy" | "sell", price: number,
+                   opts: { cls?: boolean; clientOrderId?: string } = {}): Promise<string> {
+    const priceStr = /^\d+$/.test(symbol)
+      ? String(Math.round(price))
+      : price < 1 ? price.toFixed(4) : price.toFixed(2);
+    const body: Json = {
+      symbol,
+      side: side.toUpperCase(),
+      orderType: "LIMIT",
+      quantity: String(Math.trunc(qty)),
+      price: priceStr,
+    };
+    if (opts.cls) body.timeInForce = "CLS";
+    if (opts.clientOrderId) body.clientOrderId = opts.clientOrderId.slice(0, 36);
+    const result = ((await this.post("/api/v1/orders", body)) ?? {}) as Json;
+    return String(result.orderId ?? "");
+  }
+
+  /** 대기중(OPEN) 주문 — 취소 안전망용. status=CLOSED 는 토스가 아직 미지원(400). */
+  async openOrders(symbol?: string): Promise<Json[]> {
+    const params: Record<string, string> = { status: "OPEN" };
+    if (symbol) params.symbol = symbol;
+    const result = ((await this.get("/api/v1/orders", params, true)) ?? {}) as Json;
+    return (result.orders as Json[]) ?? [];
+  }
+
+  async cancelOrder(orderId: string): Promise<string> {
+    const result = ((await this.post(`/api/v1/orders/${orderId}/cancel`, {})) ?? {}) as Json;
+    return String(result.orderId ?? "");
+  }
+
+  /** 주문 상세(모든 상태) — 체결 대사용(execution.filledQuantity 등). */
+  async orderDetail(orderId: string): Promise<Json> {
+    return ((await this.get(`/api/v1/orders/${orderId}`, undefined, true)) ?? {}) as Json;
+  }
 }
