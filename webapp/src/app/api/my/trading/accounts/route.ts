@@ -5,7 +5,8 @@ import TradingAccount from "@/models/trading-account";
 import TradingPortfolio from "@/models/trading-portfolio";
 import TradingRun from "@/models/trading-run";
 import TradingOrderLog from "@/models/trading-order-log";
-import { decryptSecret, encryptSecret, maskSecret } from "@/lib/trading/crypto";
+import { encryptSecret } from "@/lib/trading/crypto";
+import { maskedCreds } from "@/lib/trading/settings-data";
 
 export const dynamic = "force-dynamic";
 
@@ -18,18 +19,6 @@ const CRED_FIELDS: Record<string, string[]> = {
   kis: ["appKey", "appSecret", "accountNo"],
   toss: ["clientId", "clientSecret", "accountSeq"],
 };
-
-function maskedCreds(creds: Record<string, string>): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, blob] of Object.entries(creds ?? {})) {
-    try {
-      out[k] = maskSecret(decryptSecret(blob));
-    } catch {
-      out[k] = "(복호 불가 — 키 변경됨)";
-    }
-  }
-  return out;
-}
 
 export async function GET() {
   const owner = await requireOwner();

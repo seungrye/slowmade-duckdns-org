@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 /**
  * 자동매매 설정 — 계정(다수)·포트폴리오 블록·wire 토글·실행 이력.
@@ -45,10 +45,14 @@ const DEFAULT_RUN_AT: Record<string, { kr: string; us: string }> = {
   infinite_v4: { kr: "09:30", us: "09:35" }, // 국장 v4: 09:30 매도 + 15:20 매수(자동)
 };
 
-export default function TradingSettingsClient() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [liveAllowed, setLiveAllowed] = useState(false);
+type InitialData = { accounts: Account[]; portfolios: Portfolio[]; liveAllowed: boolean };
+
+export default function TradingSettingsClient({ initial }: { initial: InitialData }) {
+  // SSR 주입 초기값 — 마운트 후 재조회 없음(변이 시에만 reload). ISR 은 부적합:
+  // owner 전용 개인 데이터 + wire 토글 등 실시간 상태라 캐시 금지(force-dynamic SSR).
+  const [accounts, setAccounts] = useState<Account[]>(initial.accounts);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>(initial.portfolios);
+  const [liveAllowed, setLiveAllowed] = useState(initial.liveAllowed);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -74,10 +78,6 @@ export default function TradingSettingsClient() {
     setLiveAllowed(Boolean(a.liveAllowed));
     setPortfolios(p.portfolios ?? []);
   }, []);
-
-  useEffect(() => {
-    reload().catch(() => setMsg("불러오기 실패"));
-  }, [reload]);
 
   const addAccount = async () => {
     setBusy(true);
@@ -309,12 +309,60 @@ export default function TradingSettingsClient() {
           </div>
           <textarea value={pConfig} onChange={(e) => setPConfig(e.target.value)} rows={6}
                     className={inputCls + " font-mono text-xs"} />
-          <p className="text-xs text-gray-400">
-            시각 기준: 국장 KST · 미장 ET(서머타임 자동). rotation 은 candidates 생략 시 시드
-            자동선발. trend 는 universe 배열 필수. 무한매수 V4 는 symbol·principal 필수 —
-            미장은 아침 1회(실제 LOC: KIS 34 / 토스 LIMIT+CLS), 국장은 09:30 매도 + 15:20 매수
-            phase 자동(LOC 에뮬). 무한매수 v1 은 파이썬 데몬 전용.
-          </p>
+          <details className="text-xs text-gray-500 border border-gray-200 dark:border-gray-700 rounded">
+            <summary className="cursor-pointer px-3 py-2 font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 rounded">
+              📖 config 작성 가이드 (전략별 필드·예시)
+            </summary>
+            <div className="px-3 pb-3 space-y-3">
+              <p>
+                공통: 실행 시각은 <b>국장 KST · 미장 ET</b>(서머타임 자동 반영). 주말 자동 스킵.
+                아래 필드 외 값은 무시된다. 저장 후 &quot;dry-run 실행&quot;으로 신호를 미리 확인할 것.
+              </p>
+              <div>
+                <b>LRS (lrs_v1)</b> — 1배 지수 시그널로 레버리지 ETF 전량 스위칭
+                <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
+  "signal": "QQQ",   // 레짐 시그널(1배 지수). 국장 "069500"
+  "target": "TQQQ",  // 매매 대상(레버리지 ETF). 국장 "122630"
+  "sma": 200,        // 시그널 SMA 기간
+  "band": 1          // 밴드 히스테리시스 %(왕복 매매 방지)
+}`}</pre>
+              </div>
+              <div>
+                <b>모멘텀 로테이션 (rotation_v1)</b> — 후보 중 모멘텀 1위만 보유, 레짐 오프 시 현금
+                <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
+  "signal": "QQQ",              // 레짐 시그널. 국장 "069500"
+  "candidates": ["TQQQ","SOXL"], // 생략하면 시드에서 거래대금 상위 4종 자동선발
+  "sma": 200, "band": 1,
+  "mom": 126,                   // 상대 모멘텀 룩백(거래일)
+  "rebalance": 63               // 1위 재평가 주기(거래일) — 21일은 whipsaw로 불리
+}`}</pre>
+              </div>
+              <div>
+                <b>추세추종 (trend_v1)</b> — 유니버스 골든/데드크로스 스캔
+                <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
+  "universe": ["TQQQ","QQQ", ...], // 스캔 종목 배열(필수)
+  "excdMap": {"MMM":"NYS"},       // 미장 전용 — NAS 외 거래소 종목 매핑(없으면 NAS 가정)
+  "shortMa": 20, "longMa": 60,
+  "positionSize": 0.05             // 종목당 현금 비중(0.05 = 5%)
+}`}</pre>
+              </div>
+              <div>
+                <b>무한매수 V4 (infinite_v4)</b> — 미장 실제 LOC(KIS 34/토스 CLS), 국장 09:30 매도+15:20 매수 자동(LOC 에뮬)
+                <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
+  "symbol": "TQQQ",     // 종목 1개(필수) — 다른 전략과 겹치지 않게
+  "principal": 10000,   // 종목 전용 원금(필수) — 복리 장부(cycleCash)의 시작값
+  "splits": 20,         // 분할 수 — 20(공격, 리버스 감쇠 0.9) / 40(방어, 0.95)
+  "starBase": 15,       // 별% base — TQQQ 15 / SOXL 20
+  "sellTarget": 15      // 75% 지정가매도 목표 % (평단 대비)
+}`}</pre>
+                <p className="mt-1">
+                  진행 중 사이클을 이어받을 땐 상태(T·장부현금)가 state.v4 에 저장된다 —
+                  기존 보유가 있으면 v4 사이클로 편입되니 종목 중복에 주의. 무한매수 v1 은
+                  파이썬 데몬 전용.
+                </p>
+              </div>
+            </div>
+          </details>
           <button onClick={savePortfolio} disabled={busy || !pAccount} className={btnCls}>
             포트폴리오 저장(계정×시장 upsert)
           </button>
