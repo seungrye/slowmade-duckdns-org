@@ -54,3 +54,85 @@ describe("rotation_v1 — 듀얼 모멘텀 로테이션", () => {
     expect(r.equityCurve[0].date).toBe(D(5)); // 곡선도 매매 구간만
   });
 });
+
+// ── 후보 자동선발(rotation-pool) — py rotation_pool/test_rotation_pool 과 동일 벡터 ──
+
+import { liquidityMetric, selectPool, type SeedEntry } from "./rotation-pool";
+
+const SEED: SeedEntry[] = [
+  { ticker: "AAA", group: "g1" },
+  { ticker: "BBB", group: "g2" },
+  { ticker: "CCC", group: "g1" }, // AAA 와 같은 지수 그룹
+  { ticker: "DDD", group: "g3" },
+  { ticker: "EEE", group: "g4" },
+];
+
+describe("rotation-pool — 후보 자동선발", () => {
+  it("liquidityMetric: 창 미달/0 은 null, 최근 창만 반영", () => {
+    expect(liquidityMetric(Array(19).fill(100), 20)).toBeNull();
+    expect(liquidityMetric(Array(25).fill(100), 20)).toBe(100);
+    expect(liquidityMetric(Array(20).fill(0), 20)).toBeNull();
+    expect(liquidityMetric([...Array(20).fill(0), ...Array(20).fill(50)], 20)).toBe(50);
+  });
+
+  it("selectPool: 거래대금 내림차순 선발", () => {
+    const m = { AAA: 10, BBB: 40, CCC: 30, DDD: 20, EEE: 5 };
+    expect(selectPool(SEED, m, 4)).toEqual(["BBB", "CCC", "DDD", "EEE"]);
+  });
+
+  it("selectPool: 기초지수 그룹당 1종", () => {
+    const m = { AAA: 100, BBB: 90, CCC: 95, DDD: 1, EEE: 2 };
+    expect(selectPool(SEED, m, 4)).toEqual(["AAA", "BBB", "EEE", "DDD"]);
+  });
+
+  it("selectPool: 무데이터 시드는 시드 순서로 충원", () => {
+    const m = { AAA: null, BBB: 40, CCC: null, DDD: null, EEE: null };
+    expect(selectPool(SEED, m, 4)).toEqual(["BBB", "AAA", "DDD", "EEE"]);
+    expect(selectPool(SEED, {}, 4)).toEqual(["AAA", "BBB", "DDD", "EEE"]);
+  });
+});
+
+describe("rotation_v1 — 자동선발 모드(autoSeed)", () => {
+  // py tests/test_rotation_pool.py 통합 케이스와 동일 시나리오:
+  // HOT 은 모멘텀 1위지만 저유동·그룹 중복 → 풀 제외 → 매수 금지.
+  const mkv = (closeFn: (i: number) => number, volume: number, n = 60): Bar[] =>
+    Array.from({ length: n }, (_, i) => {
+      const c = closeFn(i);
+      const date = `2025-${String(Math.floor(i / 28) + 1).padStart(2, "0")}-${String((i % 28) + 1).padStart(2, "0")}`;
+      return { date, open: c, high: c, low: c, close: c, volume };
+    });
+
+  it("풀 밖 후보(저유동·그룹중복)는 모멘텀 1위여도 매수하지 않는다", () => {
+    const seed: SeedEntry[] = [
+      { ticker: "LIQ", group: "g1" }, { ticker: "HOT", group: "g1" }, { ticker: "ALT", group: "g2" }];
+    const cands = [
+      { ticker: "LIQ", bars: mkv((i) => 100 + i * 0.1, 1_000_000) },
+      { ticker: "HOT", bars: mkv((i) => 100 + i * 5.0, 1) },
+      { ticker: "ALT", bars: mkv(() => 100, 500_000) },
+    ];
+    const signal = mkv((i) => 100 + i, 0);
+    const r = runRotationBacktest(cands, signal, {
+      principal: 10000, smaPeriod: 10, bandPct: 0, momDays: 10, rebalanceDays: 5,
+      autoSeed: seed, poolSize: 2 });
+    expect(r.poolLog?.length).toBeGreaterThan(0);
+    expect(r.poolLog![0]).toContain("LIQ");
+    expect(r.poolLog![0]).not.toContain("HOT");
+    const buys = r.trades.filter((t) => t.side === "buy");
+    expect(buys.length).toBeGreaterThan(0);
+    expect(buys.every((t) => t.ticker !== "HOT")).toBe(true);
+    expect(buys[0].ticker).toBe("LIQ"); // 풀 안 모멘텀 1위
+  });
+
+  it("autoSeed 없으면(수동) 기존과 동일 — HOT 매수, poolLog 없음", () => {
+    const cands = [
+      { ticker: "LIQ", bars: mkv((i) => 100 + i * 0.1, 1_000_000) },
+      { ticker: "HOT", bars: mkv((i) => 100 + i * 5.0, 1) },
+    ];
+    const signal = mkv((i) => 100 + i, 0);
+    const r = runRotationBacktest(cands, signal, {
+      principal: 10000, smaPeriod: 10, bandPct: 0, momDays: 10, rebalanceDays: 5 });
+    const buys = r.trades.filter((t) => t.side === "buy");
+    expect(buys[0].ticker).toBe("HOT");
+    expect(r.poolLog).toBeUndefined();
+  });
+});

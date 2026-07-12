@@ -11,6 +11,7 @@ export interface Bar {
   high: number;
   low: number;
   close: number;
+  volume?: number; // 거래량 — rotation 후보 자동선발(거래대금 랭킹)에만 사용, 없으면 0 취급
 }
 
 /** 무한매수법 설정(원본 StrategyConfig 의 백테스트 조정 파라미터). */
@@ -56,6 +57,7 @@ export interface BacktestResult {
   trades: BtTrade[];
   equityCurve: EquityPoint[];
   totalPnl: number; // 매도 실현손익 합계
+  poolLog?: string[]; // rotation 후보 자동선발 풀 변경 이력 (자동선발 모드에서만)
 }
 
 /** 추세추종 설정(원본 TrendConfig 의 백테스트 조정 파라미터). */
@@ -118,6 +120,11 @@ export interface RotationV1Config {
   rebalanceDays: number; // 1위 재평가 주기 거래일 (기본 63 ≈ 분기 — 잦은 교체는 whipsaw 로 불리)
   from?: string; // 매매 구간(YYYY-MM-DD). 지표 워밍업은 구간 밖 데이터도 사용.
   to?: string;
+  // 후보 자동선발(rotation-pool.ts) — 지정 시 candidates 는 시드 전체 데이터를 담고,
+  // 풀 미확정·현금 대기·재평가 도래 시점에 거래대금 상위 poolSize 종으로 풀을 재선발한다.
+  autoSeed?: { ticker: string; group: string }[];
+  poolSize?: number; // 기본 4
+  liqDays?: number; // 거래대금 평균 기간(기본 20)
 }
 
 /** 레버리지 로테이션 v1 (LRS, Gayed 2016) — **1배 지수를 시그널**로 3배 ETF 를 스위칭.

@@ -12,6 +12,7 @@ import { runLrsBacktest } from "@/lib/backtest/lrs";
 import { runInfiniteVariantBacktest, type InfiniteVariantVersion } from "@/lib/backtest/infinite-variants";
 import { runInfiniteV4Backtest } from "@/lib/backtest/infinite-v4";
 import { runRotationBacktest } from "@/lib/backtest/rotation";
+import { KR_SEED, US_SEED, type SeedEntry } from "@/lib/backtest/rotation-pool";
 import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
 type Strategy =
@@ -58,7 +59,7 @@ const STRATEGY_DESC: Record<Strategy, string> = {
   lrs_v1:
     "레버리지 로테이션(Gayed 2016): 1배 지수(시그널, 예: QQQ)의 200SMA±밴드로 레버리지 ETF(대상, 예: TQQQ)를 스위칭 — 지수>SMA+밴드면 보유, 지수<SMA-밴드면 현금. 지수 신호가 3배 ETF 자체 신호보다 빨라 하락장 대피가 신속. 시그널 종목은 전체 이력으로 SMA 워밍업.",
   rotation_v1:
-    "듀얼 모멘텀 × 레짐(LRS): 후보 ETF 중 최근 N거래일 수익률 1위만 전액 보유(상대 모멘텀, 월 1회 재평가·자동 교체), 지수<SMA−밴드면 전량 현금(매일 검사). 종목 선택이 규칙에 내장 — 후보 풀만 정하면 강한 종목으로 자동 로테이션. 스위칭=당일 종가, 복리, 수수료 미반영.",
+    "듀얼 모멘텀 × 레짐(LRS): 후보 ETF 중 최근 N거래일 수익률 1위만 전액 보유(상대 모멘텀, 월 1회 재평가·자동 교체), 지수<SMA−밴드면 전량 현금(매일 검사). 종목 선택이 규칙에 내장 — 후보 풀만 정하면 강한 종목으로 자동 로테이션. 후보를 비우면 시드(레버리지 불 계열)에서 거래대금 상위 4종을 자동 선발(기초지수당 1종). 스위칭=당일 종가, 복리, 수수료 미반영.",
 };
 
 export default function BacktestClient() {
@@ -101,10 +102,21 @@ export default function BacktestClient() {
   const [scan, setScan] = useState<[number, number, number, number][] | null>(null);
   const [scanning, setScanning] = useState(false);
 
+  // rotation 후보 확정 — 입력이 비면 시드 자동선발 모드(시그널 6자리=국장 시드, 아니면 미장).
+  const resolveRotation = (): { list: string[]; autoSeed?: SeedEntry[]; error?: string } => {
+    const list = rotCandidates.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
+    if (list.length === 1) return { list, error: "후보를 2개 이상 입력하거나, 비워서 자동선발을 쓰세요." };
+    if (list.length >= 2) return { list };
+    const sig = (lrsSignal.trim() || "QQQ").toUpperCase();
+    const seed = /^\d{6}$/.test(sig) ? KR_SEED : US_SEED;
+    return { list: seed.map((s) => s.ticker), autoSeed: seed };
+  };
+
   // rotation 전용 — mom×재평가 그리드를 일괄 백테스트해 파라미터 민감도(강건성)를 본다.
   const runRobustnessScan = async () => {
-    const rotList = rotCandidates.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
-    if (rotList.length < 2) { setError("후보 종목을 2개 이상 입력하세요."); return; }
+    const rot = resolveRotation();
+    if (rot.error) { setError(rot.error); return; }
+    const rotList = rot.list;
     setScanning(true);
     setError(null);
     try {
@@ -125,7 +137,8 @@ export default function BacktestClient() {
         for (const rb of REBS) {
           const rr = runRotationBacktest(cands, sigBars, {
             principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: m,
-            rebalanceDays: rb, from: from || undefined, to: to || undefined });
+            rebalanceDays: rb, from: from || undefined, to: to || undefined,
+            autoSeed: rot.autoSeed });
           let maxV = -Infinity; let mdd = 0;
           for (const e of rr.equityCurve) { maxV = Math.max(maxV, e.equity); mdd = Math.min(mdd, e.equity / maxV - 1); }
           const finalV = rr.equityCurve.at(-1)?.equity ?? principal;
@@ -145,9 +158,9 @@ export default function BacktestClient() {
       setError("종목 코드를 입력하세요.");
       return;
     }
-    const rotList = rotCandidates.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
-    if (strategy === "rotation_v1" && rotList.length < 2) {
-      setError("로테이션 후보 종목을 콤마로 2개 이상 입력하세요.");
+    const rot = strategy === "rotation_v1" ? resolveRotation() : null;
+    if (rot?.error) {
+      setError(rot.error);
       return;
     }
     if (["trend_v1", "trend_v3", "trend_v4"].includes(strategy) && shortMa >= longMa) {
@@ -165,8 +178,9 @@ export default function BacktestClient() {
     setLoading(true);
     setError(null);
     try {
-      if (strategy === "rotation_v1") {
+      if (strategy === "rotation_v1" && rot) {
         // 후보 전체 + 시그널을 전체 이력으로 조회(지표 워밍업), 매매 구간은 from/to 로 제한
+        const rotList = rot.list;
         const fetchBars = async (t: string): Promise<Bar[]> => {
           const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(t)}`);
           if (!res0.ok) throw new Error(`${t} 데이터 조회 실패 (${res0.status})`);
@@ -179,7 +193,8 @@ export default function BacktestClient() {
         const rr = runRotationBacktest(
           rotList.map((t, i) => ({ ticker: t, bars: candBars[i] })), sigBars,
           { principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: rotMom,
-            rebalanceDays: rotReb, from: from || undefined, to: to || undefined });
+            rebalanceDays: rotReb, from: from || undefined, to: to || undefined,
+            autoSeed: rot.autoSeed });
         const rangeSig = sigBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...rr, bars: rangeSig, principal, strategy });
         return;
@@ -337,8 +352,9 @@ export default function BacktestClient() {
         )}
         {strategy === "rotation_v1" && (
           <>
-            <Field label="후보 종목(콤마)" hint="이 중 모멘텀 1위만 보유">
-              <input value={rotCandidates} onChange={(e) => setRotCandidates(e.target.value)} className="input" />
+            <Field label="후보 종목(콤마)" hint="이 중 모멘텀 1위만 보유. 비우면 시드에서 거래대금 상위 자동선발">
+              <input value={rotCandidates} onChange={(e) => setRotCandidates(e.target.value)}
+                placeholder="비우면 자동선발" className="input" />
             </Field>
             <Field label="시그널 종목" hint="레짐 판단 1배 지수(기본 QQQ)">
               <input value={lrsSignal} onChange={(e) => setLrsSignal(e.target.value)} placeholder="QQQ" className="input" />
@@ -540,6 +556,15 @@ function Result({ result }: { result: FullResult }) {
       <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[400px] mb-6">
         <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
       </div>
+
+      {result.poolLog && result.poolLog.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-2">후보 자동선발 이력 ({result.poolLog.length}회)</h2>
+          <ul className="max-h-40 overflow-y-auto text-xs text-gray-500 space-y-0.5 border border-gray-100 dark:border-gray-800 rounded p-2">
+            {result.poolLog.map((l) => <li key={l}>{l}</li>)}
+          </ul>
+        </div>
+      )}
 
       <h2 className="text-lg font-semibold mb-3">거래 내역 ({result.trades.length}건)</h2>
       <div className="overflow-x-auto max-h-96 overflow-y-auto border border-gray-100 dark:border-gray-800 rounded">

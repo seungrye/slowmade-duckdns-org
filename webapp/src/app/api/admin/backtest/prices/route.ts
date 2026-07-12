@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * 단일 종목 OHLC 일봉 — 브라우저 백테스트 입력용(연산은 클라이언트에서).
  * open/high/low 가 없는 소스(close 만 저장된 경우)는 close 로 대체한다.
  *
- * 반환: { ticker, bars: [{date, open, high, low, close}, ...] }
+ * 반환: { ticker, bars: [{date, open, high, low, close, volume}, ...] }
  */
 export async function GET(req: NextRequest) {
   const guard = await requireOwner();
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 
   await connectToDB();
   const docs = await StockDailyPrice.find(query)
-    .select({ date: 1, open: 1, high: 1, low: 1, close: 1, _id: 0 })
+    .select({ date: 1, open: 1, high: 1, low: 1, close: 1, volume: 1, _id: 0 })
     .sort({ date: 1 })
     .limit(10000)
     .lean();
@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       high: (d.high as number | null) ?? close,
       low: (d.low as number | null) ?? close,
       close,
+      volume: (d.volume as number | null) ?? 0, // rotation 후보 자동선발(거래대금)용
     };
   });
 

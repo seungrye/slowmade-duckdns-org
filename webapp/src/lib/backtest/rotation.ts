@@ -11,11 +11,12 @@
 // 후보 풀만 정하면 강한 종목으로 자동 로테이션된다. 지표 워밍업(SMA·모멘텀)은 from 이전
 // 데이터로 수행하고 매매는 from~to 구간에서만 한다.
 
+import { DEFAULT_LIQ_DAYS, DEFAULT_POOL_SIZE, liquidityMetric, selectPool } from "./rotation-pool";
 import type { BacktestResult, Bar, BtTrade, EquityPoint, RotationV1Config } from "./types";
 
 export interface RotationCandidate {
   ticker: string;
-  bars: Bar[]; // 전체 이력(워밍업 포함) — 날짜 오름차순
+  bars: Bar[]; // 전체 이력(워밍업 포함) — 날짜 오름차순. 자동선발 모드는 volume 포함 권장.
 }
 
 export function runRotationBacktest(
@@ -27,6 +28,14 @@ export function runRotationBacktest(
   const equityCurve: EquityPoint[] = [];
   const closeMaps = candidates.map((c) => new Map(c.bars.map((b) => [b.date, b.close])));
   const series: number[][] = candidates.map(() => []); // 후보별 시간순 종가 축적(모멘텀용)
+  // 후보 자동선발(autoSeed): 거래대금(종가×거래량) 축적 + 현재 풀 (py run_rotation_backtest 동일)
+  const autoSeed = cfg.autoSeed;
+  const volMaps = autoSeed
+    ? candidates.map((c) => new Map(c.bars.map((b) => [b.date, b.volume ?? 0])))
+    : [];
+  const valSeries: number[][] = candidates.map(() => []);
+  const poolLog: string[] = [];
+  let pool: Set<string> | null = null;
 
   let cash = cfg.principal;
   let heldIdx = -1; // 보유 중인 후보 인덱스(-1 = 현금)
@@ -50,11 +59,12 @@ export function runRotationBacktest(
     return past > 0 ? s[s.length - 1] / past - 1 : null;
   };
 
-  /** 오늘 데이터가 있는 후보 중 모멘텀 1위 인덱스(없으면 -1). */
+  /** 오늘 데이터가 있는 후보 중 모멘텀 1위 인덱스(없으면 -1). 자동선발 모드는 풀 안에서만. */
   const pickBest = (date: string): number => {
     let best = -1;
     let bestMom = -Infinity;
     for (let i = 0; i < candidates.length; i++) {
+      if (pool && !pool.has(candidates[i].ticker)) continue; // 풀 밖 후보 제외
       if (!closeMaps[i].has(date)) continue;
       const m = momentum(i);
       if (m !== null && m > bestMom) {
@@ -89,9 +99,25 @@ export function runRotationBacktest(
     sigCloses.push(bar.close);
     for (let i = 0; i < candidates.length; i++) {
       const c = closeMaps[i].get(bar.date);
-      if (c !== undefined) series[i].push(c);
+      if (c !== undefined) {
+        series[i].push(c);
+        if (autoSeed) valSeries[i].push(c * (volMaps[i].get(bar.date) ?? 0));
+      }
     }
     const inRange = (!cfg.from || bar.date >= cfg.from) && (!cfg.to || bar.date <= cfg.to);
+    // 자동선발: 실운영과 같은 시점(풀 미확정·현금 대기·재평가 도래)에 풀 재선발 — 판정 전.
+    if (inRange && autoSeed
+        && (pool === null || heldIdx < 0 || sinceRebalance >= cfg.rebalanceDays)) {
+      const metrics: Record<string, number | null> = {};
+      for (let i = 0; i < candidates.length; i++) {
+        metrics[candidates[i].ticker] = liquidityMetric(valSeries[i], cfg.liqDays ?? DEFAULT_LIQ_DAYS);
+      }
+      const newPool = selectPool(autoSeed, metrics, cfg.poolSize ?? DEFAULT_POOL_SIZE);
+      if (pool === null || newPool.join(",") !== [...pool].join(",")) {
+        poolLog.push(`${bar.date} 후보 ${pool === null ? "선발" : "갱신"}: ${newPool.join(",")}`);
+        pool = new Set(newPool);
+      }
+    }
     const ma = smaLast();
     if (inRange && ma !== null) {
       const heldClose = heldIdx >= 0 ? closeMaps[heldIdx].get(bar.date) : undefined;
@@ -129,5 +155,5 @@ export function runRotationBacktest(
   }
 
   const totalPnl = trades.filter((t) => t.side === "sell").reduce((s, t) => s + t.pnl, 0);
-  return { trades, equityCurve, totalPnl };
+  return { trades, equityCurve, totalPnl, ...(autoSeed ? { poolLog } : {}) };
 }
