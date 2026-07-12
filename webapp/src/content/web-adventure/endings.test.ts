@@ -1,19 +1,26 @@
-// 4 주차 RED — 6 엔딩 메타 검증.
-// fail / shopkeeper / wizard_apprentice 가 추가되어야 한다.
+// 엔딩 메타 검증 — 기본 6종 + 각성 시스템 신규 5종(cc57088).
+// 엔딩을 추가/삭제하면 아래 ALL_ENDINGS 목록을 함께 갱신할 것.
 
 import { describe, test, expect } from "vitest";
 import { endingsMeta, getEndingMeta, type EndingMeta } from "./endings";
 
+const ALL_ENDINGS = [
+  "ascension",
+  "fall",
+  "harmony",
+  "liberation",
+  "petrification",
+  "purge",
+  "regency",
+  "revolution",
+  "sylvan_bond",
+  "usurpation",
+  "wayfarer",
+];
+
 describe("endingsMeta", () => {
-  test("6 엔딩 모두 정의 (ascension/revolution/harmony/fall/petrification/sylvan_bond)", () => {
-    expect(Object.keys(endingsMeta).sort()).toEqual([
-      "ascension",
-      "fall",
-      "harmony",
-      "petrification",
-      "revolution",
-      "sylvan_bond",
-    ]);
+  test("11 엔딩 모두 정의 (기본 6 + 각성 5)", () => {
+    expect(Object.keys(endingsMeta).sort()).toEqual(ALL_ENDINGS);
   });
 
   test("각 엔딩이 title + epilogue + icon 을 가진다", () => {
@@ -28,15 +35,8 @@ describe("endingsMeta", () => {
     }
   });
 
-  test("getEndingMeta 가 6 엔딩 모두 lookup 가능", () => {
-    for (const id of [
-      "ascension",
-      "revolution",
-      "fall",
-      "harmony",
-      "sylvan_bond",
-      "petrification",
-    ]) {
+  test("getEndingMeta 가 11 엔딩 모두 lookup 가능", () => {
+    for (const id of ALL_ENDINGS) {
       const m = getEndingMeta(id);
       expect(m.title).toBeTruthy();
       expect(m.epilogue).toBeTruthy();
