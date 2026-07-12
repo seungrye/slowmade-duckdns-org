@@ -25,12 +25,16 @@ export const US_SEED: SeedEntry[] = [
   { ticker: "LABU", group: "biotech" },
 ];
 
-// 국장 — 국내 상장 레버리지(2배가 최대). 시드 4종은 전부 다른 그룹(py KR_SEED 동일).
+// 국장 — 국내 상장 레버리지(2배가 최대). 지수·산업형만, 단일종목 레버리지 제외(py KR_SEED 동일).
 export const KR_SEED: SeedEntry[] = [
   { ticker: "122630", group: "kospi200" }, // KODEX 레버리지
   { ticker: "233740", group: "kosdaq150" }, // KODEX 코스닥150레버리지
   { ticker: "409820", group: "nasdaq100" }, // KODEX 미국나스닥100레버리지(합성 H)
   { ticker: "423920", group: "sox" }, // TIGER 미국필라델피아반도체레버리지(합성)
+  { ticker: "418660", group: "nasdaq100" }, // TIGER 미국나스닥100레버리지(합성) — 409820 과 그룹 경쟁
+  { ticker: "494310", group: "kr_semis" }, // KODEX 반도체레버리지(2024-10 상장)
+  { ticker: "243880", group: "kospi200it" }, // TIGER 200IT레버리지
+  { ticker: "462330", group: "battery" }, // KODEX 2차전지산업레버리지
 ];
 
 /** 거래대금(종가×거래량) 시계열(과거→최신)에서 최근 days 일 평균. 부족/0 이면 null. */
