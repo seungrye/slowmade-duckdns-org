@@ -114,7 +114,8 @@ export function runRotationBacktest(
         metrics[candidates[i].ticker] = liquidityMetric(valSeries[i], cfg.liqDays ?? DEFAULT_LIQ_DAYS);
       }
       const newPool = selectPool(autoSeed, metrics, cfg.poolSize ?? DEFAULT_POOL_SIZE);
-      if (pool === null || newPool.join(",") !== [...pool].join(",")) {
+      // 구성(집합) 변경만 갱신 — 유동성 순위 스왑은 매매 영향 없음(py 백테스트·엔진과 동일 규칙).
+      if (pool === null || newPool.length !== pool.size || !newPool.every((t) => pool!.has(t))) {
         poolLog.push(`${bar.date} 후보 ${pool === null ? "선발" : "갱신"}: ${newPool.join(",")}`);
         pool = new Set(newPool);
       }
