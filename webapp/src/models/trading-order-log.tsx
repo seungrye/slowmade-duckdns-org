@@ -1,4 +1,9 @@
-import { InferSchemaType, Schema, model, models, Model } from "mongoose";
+import mongoose from "mongoose";
+import type { InferSchemaType, Model } from "mongoose";
+
+// ESM interop: named export(models 등)는 순수 node ESM 에서 안 풀려 default 로 접근한다
+// (Next/webpack·tsx 스크립트 양쪽 호환 — trading-smoke 등 서버 외 구동 지원).
+const { Schema, model, models } = mongoose;
 
 /**
  * 주문 로그 — 엔진이 내려던/내린 주문 1건마다 append(파이썬 trades/ ledger 대응).

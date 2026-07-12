@@ -7,7 +7,7 @@
 
 import { KR_SEED, US_SEED, liquidityMetric, selectPool, type SeedEntry } from "@/lib/backtest/rotation-pool";
 import { decryptSecret } from "./crypto";
-import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
+import { KisClient, US_ORDER_EXCD, registerUsExcd, usQuoteExcd } from "./kis-client";
 import { lrsDecide, rotationDecide, trendDecide, type OrderIntent } from "./strategies";
 import { TossClient } from "./toss-client";
 import TradingOrderLog from "@/models/trading-order-log";
@@ -109,20 +109,25 @@ async function execute(
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
   let executed = 0;
   for (const it of intents) {
-    let orderNo = "";
-    if (live) {
-      orderNo = await broker.submit(it.symbol, it.qty, it.side, it.price);
-      log(`주문 접수 ${orderNo} — ${it.side} ${it.symbol} x${it.qty}`);
-    } else {
-      log(`[DRY-RUN] ${it.side} ${it.symbol} x${it.qty} @${it.price} — ${it.reason}`);
+    // 주문 단위 격리 — 한 종목의 주문 거부가 나머지(특히 trend 유니버스)를 죽이지 않게.
+    try {
+      let orderNo = "";
+      if (live) {
+        orderNo = await broker.submit(it.symbol, it.qty, it.side, it.price);
+        log(`주문 접수 ${orderNo} — ${it.side} ${it.symbol} x${it.qty}`);
+      } else {
+        log(`[DRY-RUN] ${it.side} ${it.symbol} x${it.qty} @${it.price} — ${it.reason}`);
+      }
+      await TradingOrderLog.create({
+        accountId: account._id, runId, envKey: account.envKey,
+        market: portfolio.market, strategy: portfolio.strategy,
+        symbol: it.symbol, side: it.side, qty: it.qty, price: it.price,
+        ordType: "market", reason: it.reason, dryRun: !live, orderNo,
+      });
+      executed++;
+    } catch (e) {
+      log(`[${it.symbol}] 주문 실패 — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
     }
-    await TradingOrderLog.create({
-      accountId: account._id, runId, envKey: account.envKey,
-      market: portfolio.market, strategy: portfolio.strategy,
-      symbol: it.symbol, side: it.side, qty: it.qty, price: it.price,
-      ordType: "market", reason: it.reason, dryRun: !live, orderNo,
-    });
-    executed++;
   }
   return { executed, live };
 }
@@ -246,6 +251,9 @@ async function runTrend(
   const cfg = p.config as Cfg;
   const universe = Array.isArray(cfg.universe) ? (cfg.universe as string[]) : [];
   if (!universe.length) return "trend: 유니버스 비어 있음(설정의 universe 배열 필요)";
+  if (p.market === "us" && cfg.excdMap && typeof cfg.excdMap === "object") {
+    registerUsExcd(cfg.excdMap as Record<string, string>); // NYSE/AMEX 종목 시세 조회용
+  }
   const shortMa = Number(cfg.shortMa ?? 20);
   const longMa = Number(cfg.longMa ?? 60);
   const positionSize = Number(cfg.positionSize ?? 0.1);

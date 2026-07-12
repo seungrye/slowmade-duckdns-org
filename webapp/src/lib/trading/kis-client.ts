@@ -536,11 +536,20 @@ export class KisClient {
 }
 
 // 미장 시세 거래소(EXCD) — stock-automator-v2 universe.py US_ETFS 검증값 + 기본 NAS.
+// 심볼→거래소는 계정과 무관한 사실이라 전역 레지스트리로 확장한다(registerUsExcd —
+// trend 유니버스의 SYMBOL:EXCD 페어를 엔진이 등록. NYSE 종목이 NAS 로 조회돼 0건이
+// 나오는 문제 방지).
 export const US_QUOTE_EXCD: Record<string, string> = {
   QQQ: "NAS", TQQQ: "NAS", SQQQ: "NAS",
   SPY: "AMS", VOO: "AMS", UPRO: "AMS",
   SOXL: "AMS", TECL: "AMS", TNA: "AMS", FAS: "AMS", LABU: "AMS",
 };
+
+export function registerUsExcd(map: Record<string, string>): void {
+  for (const [sym, excd] of Object.entries(map)) {
+    if (excd) US_QUOTE_EXCD[sym] = excd;
+  }
+}
 
 export const usQuoteExcd = (symbol: string): string => US_QUOTE_EXCD[symbol] ?? "NAS";
 export const US_ORDER_EXCD: Record<string, string> = { NAS: "NASD", NYS: "NYSE", AMS: "AMEX" };

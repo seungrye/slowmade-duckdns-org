@@ -142,14 +142,27 @@ export async function tradingTick(now = new Date()): Promise<void> {
 
 declare global {
   var __tradingSchedulerStarted: boolean | undefined;
+  var __tradingTickRunning: boolean | undefined;
 }
 
 export function startTradingScheduler(): void {
   if (process.env.TRADING_SCHEDULER_ENABLED === "false") return;
   if (globalThis.__tradingSchedulerStarted) return; // dev HMR·중복 register 가드
   globalThis.__tradingSchedulerStarted = true;
-  const safeTick = () =>
-    tradingTick().catch((e) => console.error("[trading] tick 실패:", e));
+  // 재진입 가드 — 장시간 사이클(미장 유니버스 스캔 ~수 분)이 60초 틱과 겹쳐
+  // 동시 실행되면 KIS 유량이 폭주한다. 실행 중이면 이번 틱은 건너뛴다(클레임과 별개의
+  // 프로세스 내 직렬화 — 놓친 사이클은 다음 틱의 catch-up 이 줍는다).
+  const safeTick = async () => {
+    if (globalThis.__tradingTickRunning) return;
+    globalThis.__tradingTickRunning = true;
+    try {
+      await tradingTick();
+    } catch (e) {
+      console.error("[trading] tick 실패:", e);
+    } finally {
+      globalThis.__tradingTickRunning = false;
+    }
+  };
   // 첫 틱 = 기동 catch-up. DB/설정 미비 등 어떤 실패도 서버를 죽이지 않는다.
   setTimeout(safeTick, 10_000); // 서버 워밍업 직후
   setInterval(safeTick, TICK_MS);
