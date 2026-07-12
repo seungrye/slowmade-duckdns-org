@@ -1,0 +1,363 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+/**
+ * 자동매매 설정 — 계정(다수)·포트폴리오 블록·wire 토글·실행 이력.
+ * 시크릿은 서버에서 마스킹돼 내려오고, 수정 시 새 값을 입력한 필드만 교체된다.
+ */
+
+type Account = {
+  id: string; broker: "kis" | "toss"; env: string; name: string; envKey: string;
+  liveEnabled: boolean; memo: string; credentials: Record<string, string>;
+};
+type Portfolio = {
+  id: string; accountId: string; market: "kr" | "us"; strategy: string; runAt: string;
+  weekdaysOnly: boolean; enabled: boolean; config: Record<string, unknown>;
+  state: Record<string, unknown>;
+};
+type Run = {
+  id: string; dateKey: string; status: string; dryRun: boolean; catchUp: boolean;
+  summary: string; error: string; startedAt: string; logs: string[];
+};
+type OrderRow = {
+  id: string; envKey: string; market: string; strategy: string; symbol: string;
+  side: string; qty: number; price: number; dryRun: boolean; orderNo: string;
+  reason: string; at: string;
+};
+
+const inputCls =
+  "w-full rounded border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1.5 text-sm";
+const btnCls =
+  "rounded bg-blue-600 text-white text-sm px-3 py-1.5 hover:bg-blue-700 disabled:opacity-50";
+const CRED_FIELDS: Record<string, { key: string; label: string; required: boolean }[]> = {
+  kis: [
+    { key: "appKey", label: "KIS_APP_KEY", required: true },
+    { key: "appSecret", label: "KIS_APP_SECRET", required: true },
+    { key: "accountNo", label: "KIS_ACCOUNT_NO (12345678-01)", required: true },
+  ],
+  toss: [
+    { key: "clientId", label: "TOSS_CLIENT_ID", required: true },
+    { key: "clientSecret", label: "TOSS_CLIENT_SECRET", required: true },
+    { key: "accountSeq", label: "TOSS_ACCOUNT_SEQ (생략 시 자동)", required: false },
+  ],
+};
+const DEFAULT_CONFIG: Record<string, object> = {
+  lrs_v1: { signal: "QQQ", target: "TQQQ", sma: 200, band: 1 },
+  rotation_v1: { signal: "QQQ", sma: 200, band: 1, mom: 126, rebalance: 63 },
+  trend_v1: { universe: ["TQQQ", "QQQ"], shortMa: 20, longMa: 60, positionSize: 0.1 },
+};
+
+export default function TradingSettingsClient() {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [liveAllowed, setLiveAllowed] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // 계정 추가 폼
+  const [nBroker, setNBroker] = useState<"kis" | "toss">("kis");
+  const [nEnv, setNEnv] = useState("paper");
+  const [nName, setNName] = useState("");
+  const [nCreds, setNCreds] = useState<Record<string, string>>({});
+
+  // 포트폴리오 편집 폼
+  const [pAccount, setPAccount] = useState("");
+  const [pMarket, setPMarket] = useState<"kr" | "us">("us");
+  const [pStrategy, setPStrategy] = useState("lrs_v1");
+  const [pRunAt, setPRunAt] = useState("09:35");
+  const [pConfig, setPConfig] = useState(JSON.stringify(DEFAULT_CONFIG.lrs_v1, null, 2));
+
+  const reload = useCallback(async () => {
+    const [a, p, r] = await Promise.all([
+      fetch("/api/my/trading/accounts").then((x) => x.json()),
+      fetch("/api/my/trading/portfolios").then((x) => x.json()),
+      fetch("/api/my/trading/runs").then((x) => x.json()),
+    ]);
+    setAccounts(a.accounts ?? []);
+    setLiveAllowed(Boolean(a.liveAllowed));
+    setPortfolios(p.portfolios ?? []);
+    setRuns(r.runs ?? []);
+    setOrders(r.orders ?? []);
+  }, []);
+
+  useEffect(() => {
+    reload().catch(() => setMsg("불러오기 실패"));
+  }, [reload]);
+
+  const addAccount = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/my/trading/accounts", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ broker: nBroker, env: nEnv, name: nName, ...nCreds }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "실패");
+      setNName("");
+      setNCreds({});
+      setMsg(`계정 추가됨: ${d.envKey}`);
+      await reload();
+    } catch (e) {
+      setMsg(`계정 추가 실패: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleLive = async (a: Account) => {
+    if (!a.liveEnabled && !confirm(
+      `[${a.envKey}] 실주문(wire)을 켭니다.\n서버 게이트(TRADING_LIVE_ALLOWED=${liveAllowed}) 와 AND 로 동작합니다. 계속할까요?`,
+    )) return;
+    await fetch("/api/my/trading/accounts", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: a.id, liveEnabled: !a.liveEnabled }),
+    });
+    await reload();
+  };
+
+  const removeAccount = async (a: Account) => {
+    if (!confirm(`[${a.envKey}] 계정과 그 포트폴리오·이력을 삭제할까요?`)) return;
+    await fetch(`/api/my/trading/accounts?id=${a.id}`, { method: "DELETE" });
+    await reload();
+  };
+
+  const savePortfolio = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      let config: unknown;
+      try {
+        config = JSON.parse(pConfig);
+      } catch {
+        throw new Error("config JSON 형식 오류");
+      }
+      const res = await fetch("/api/my/trading/portfolios", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ accountId: pAccount, market: pMarket, strategy: pStrategy,
+                               runAt: pRunAt, config }),
+      });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error ?? "실패");
+      setMsg("포트폴리오 저장됨");
+      await reload();
+    } catch (e) {
+      setMsg(`저장 실패: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runNow = async (portfolioId: string) => {
+    setBusy(true);
+    setMsg("dry-run 실행 중…(시세 조회로 수십 초 걸릴 수 있음)");
+    try {
+      const res = await fetch("/api/my/trading/runs", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ portfolioId }),
+      });
+      const d = await res.json();
+      setMsg(res.ok ? `완료: ${d.summary}` : `실패: ${d.error}`);
+      await reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <main className="mx-auto px-4 py-8 max-w-4xl space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold">자동매매 설정</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          기본은 <b>dry-run</b>(주문 미전송, 로그만). 실주문은 계정별 wire 토글 × 서버 게이트
+          (현재 {liveAllowed ? "허용" : "차단"}) 둘 다 켜져야 나간다. 시크릿은 암호화 저장·마스킹 표시.
+        </p>
+        {msg && <p className="text-sm text-amber-600 mt-2">{msg}</p>}
+      </div>
+
+      {/* 계정 목록 */}
+      <section>
+        <h2 className="text-lg font-semibold mb-2">증권사 계정 ({accounts.length})</h2>
+        <ul className="space-y-2">
+          {accounts.map((a) => (
+            <li key={a.id} className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <b>{a.envKey}</b>
+                  <span className="text-gray-500 ml-2">{a.broker.toUpperCase()} · {a.env}</span>
+                  <span className="text-gray-400 ml-2 text-xs">
+                    {Object.entries(a.credentials).map(([k, v]) => `${k}=${v}`).join(" · ")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleLive(a)}
+                    className={`text-xs px-2 py-1 rounded border ${
+                      a.liveEnabled
+                        ? "bg-red-600 text-white border-red-600"
+                        : "border-gray-300 text-gray-600 dark:border-gray-600 dark:text-gray-300"
+                    }`}
+                  >
+                    {a.liveEnabled ? "LIVE ON" : "dry-run"}
+                  </button>
+                  <button onClick={() => removeAccount(a)} className="text-xs text-red-500">삭제</button>
+                </div>
+              </div>
+            </li>
+          ))}
+          {!accounts.length && <li className="text-sm text-gray-400">등록된 계정이 없습니다.</li>}
+        </ul>
+
+        {/* 계정 추가 */}
+        <div className="mt-4 border border-dashed border-gray-300 dark:border-gray-700 rounded p-3 space-y-2">
+          <div className="flex gap-2 flex-wrap">
+            <select value={nBroker} onChange={(e) => { setNBroker(e.target.value as "kis" | "toss"); setNCreds({}); }} className={inputCls + " !w-32"}>
+              <option value="kis">한국투자(KIS)</option>
+              <option value="toss">토스증권</option>
+            </select>
+            {nBroker === "kis" && (
+              <select value={nEnv} onChange={(e) => setNEnv(e.target.value)} className={inputCls + " !w-28"}>
+                <option value="paper">모의(paper)</option>
+                <option value="real">실전(real)</option>
+              </select>
+            )}
+            <input value={nName} onChange={(e) => setNName(e.target.value)}
+                   placeholder="라벨(예: 50194613)" className={inputCls + " !w-44"} />
+          </div>
+          <div className="grid md:grid-cols-3 gap-2">
+            {CRED_FIELDS[nBroker].map((f) => (
+              <input key={f.key} type="password" autoComplete="off"
+                     value={nCreds[f.key] ?? ""}
+                     onChange={(e) => setNCreds((c) => ({ ...c, [f.key]: e.target.value }))}
+                     placeholder={f.label + (f.required ? " *" : "")} className={inputCls} />
+            ))}
+          </div>
+          <button onClick={addAccount} disabled={busy} className={btnCls}>계정 추가</button>
+        </div>
+      </section>
+
+      {/* 포트폴리오 블록 */}
+      <section>
+        <h2 className="text-lg font-semibold mb-2">포트폴리오 (계정×시장, {portfolios.length})</h2>
+        <ul className="space-y-2 mb-4">
+          {portfolios.map((p) => {
+            const acct = accounts.find((a) => a.id === p.accountId);
+            return (
+              <li key={p.id} className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <b>{acct?.envKey ?? "?"}</b> · {p.market.toUpperCase()} · {p.strategy}
+                    <span className="text-gray-500 ml-2">매일 {p.runAt} {p.market === "kr" ? "KST" : "ET"}</span>
+                    {!p.enabled && <span className="text-red-500 ml-2">(비활성)</span>}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => runNow(p.id)} disabled={busy}
+                            className="text-xs px-2 py-1 rounded border border-blue-500 text-blue-600">
+                      지금 dry-run
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/my/trading/portfolios?id=${p.id}`, { method: "DELETE" });
+                        await reload();
+                      }}
+                      className="text-xs text-red-500"
+                    >삭제</button>
+                  </div>
+                </div>
+                <pre className="text-xs text-gray-500 mt-1 overflow-x-auto">{JSON.stringify(p.config)}</pre>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded p-3 space-y-2">
+          <div className="flex gap-2 flex-wrap">
+            <select value={pAccount} onChange={(e) => setPAccount(e.target.value)} className={inputCls + " !w-52"}>
+              <option value="">계정 선택…</option>
+              {accounts.map((a) => <option key={a.id} value={a.id}>{a.envKey}</option>)}
+            </select>
+            <select value={pMarket} onChange={(e) => {
+              const m = e.target.value as "kr" | "us";
+              setPMarket(m);
+              setPRunAt(m === "kr" ? "09:05" : "09:35");
+            }} className={inputCls + " !w-24"}>
+              <option value="us">미장</option>
+              <option value="kr">국장</option>
+            </select>
+            <select value={pStrategy} onChange={(e) => {
+              setPStrategy(e.target.value);
+              setPConfig(JSON.stringify(DEFAULT_CONFIG[e.target.value] ?? {}, null, 2));
+            }} className={inputCls + " !w-36"}>
+              <option value="lrs_v1">LRS</option>
+              <option value="rotation_v1">모멘텀 로테이션</option>
+              <option value="trend_v1">추세추종</option>
+            </select>
+            <input value={pRunAt} onChange={(e) => setPRunAt(e.target.value)}
+                   placeholder="HH:MM" className={inputCls + " !w-24"} />
+          </div>
+          <textarea value={pConfig} onChange={(e) => setPConfig(e.target.value)} rows={6}
+                    className={inputCls + " font-mono text-xs"} />
+          <p className="text-xs text-gray-400">
+            rotation 은 candidates 를 생략하면 시드에서 거래대금 상위 자동선발. trend 는 universe 배열 필수.
+            무한매수(v1/v4)는 2단계 — 아직 파이썬 데몬 전용.
+          </p>
+          <button onClick={savePortfolio} disabled={busy || !pAccount} className={btnCls}>
+            포트폴리오 저장(계정×시장 upsert)
+          </button>
+        </div>
+      </section>
+
+      {/* 실행 이력 */}
+      <section>
+        <h2 className="text-lg font-semibold mb-2">최근 실행</h2>
+        <ul className="space-y-1 text-sm">
+          {runs.map((r) => (
+            <li key={r.id} className="border-b border-gray-100 dark:border-gray-800 py-1">
+              <span className={r.status === "done" ? "text-green-600" : r.status === "failed" ? "text-red-500" : "text-amber-500"}>
+                [{r.status}]
+              </span>{" "}
+              {r.dateKey} · {r.dryRun ? "dry" : "LIVE"}{r.catchUp ? " · catch-up" : ""} — {r.summary || r.error}
+            </li>
+          ))}
+          {!runs.length && <li className="text-gray-400">실행 이력 없음</li>}
+        </ul>
+      </section>
+
+      {/* 주문 로그 */}
+      <section>
+        <h2 className="text-lg font-semibold mb-2">최근 주문 로그</h2>
+        <div className="overflow-x-auto">
+          <table className="text-xs w-full">
+            <thead><tr className="text-left text-gray-500">
+              <th className="py-1 pr-2">시각</th><th className="pr-2">계정</th><th className="pr-2">전략</th>
+              <th className="pr-2">종목</th><th className="pr-2">방향</th><th className="pr-2 text-right">수량</th>
+              <th className="pr-2 text-right">가격</th><th>구분</th>
+            </tr></thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id} className="border-t border-gray-100 dark:border-gray-800">
+                  <td className="py-1 pr-2 whitespace-nowrap">{new Date(o.at).toLocaleString("ko-KR")}</td>
+                  <td className="pr-2">{o.envKey}</td>
+                  <td className="pr-2">{o.strategy}</td>
+                  <td className="pr-2">{o.symbol}</td>
+                  <td className={o.side === "buy" ? "text-red-500 pr-2" : "text-blue-500 pr-2"}>{o.side}</td>
+                  <td className="pr-2 text-right">{o.qty}</td>
+                  <td className="pr-2 text-right">{o.price.toLocaleString()}</td>
+                  <td>{o.dryRun ? "dry" : `LIVE ${o.orderNo}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!orders.length && <p className="text-gray-400 text-sm">주문 로그 없음</p>}
+        </div>
+      </section>
+    </main>
+  );
+}
