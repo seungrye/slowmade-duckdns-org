@@ -16,20 +16,22 @@ export async function GET(req: NextRequest) {
   if (owner instanceof NextResponse) return owner;
   const url = new URL(req.url);
   const accountId = url.searchParams.get("accountId");
+  const limit = Math.min(Number(url.searchParams.get("limit") ?? 20) || 20, 100);
   await connectToDB();
   const q = accountId ? { accountId } : {};
-  const runs = await TradingRun.find(q).sort({ createdAt: -1 }).limit(20).lean();
-  const orders = await TradingOrderLog.find(q).sort({ createdAt: -1 }).limit(30).lean();
+  const runs = await TradingRun.find(q).sort({ createdAt: -1 }).limit(limit).lean();
+  const orders = await TradingOrderLog.find(q).sort({ createdAt: -1 }).limit(limit * 2).lean();
   return NextResponse.json({
     runs: runs.map((r) => ({
       id: String(r._id), portfolioId: String(r.portfolioId), dateKey: r.dateKey,
+      phase: (r as { phase?: string }).phase ?? "main",
       status: r.status, dryRun: r.dryRun, catchUp: r.catchUp, summary: r.summary,
       error: r.error, startedAt: r.startedAt, finishedAt: r.finishedAt,
       logs: (r.logs ?? []).slice(-30),
     })),
     orders: orders.map((o) => ({
       id: String(o._id), envKey: o.envKey, market: o.market, strategy: o.strategy,
-      symbol: o.symbol, side: o.side, qty: o.qty, price: o.price,
+      symbol: o.symbol, side: o.side, qty: o.qty, price: o.price, ordType: o.ordType,
       dryRun: o.dryRun, orderNo: o.orderNo, reason: o.reason,
       at: (o as { createdAt?: Date }).createdAt,
     })),

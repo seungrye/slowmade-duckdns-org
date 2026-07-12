@@ -28,10 +28,15 @@ const TR: Record<string, [string, string]> = {
   kr_balance: ["VTTC8434R", "TTTC8434R"],
   kr_buy: ["VTTC0012U", "TTTC0012U"],
   kr_sell: ["VTTC0011U", "TTTC0011U"],
+  kr_ccnl: ["VTTC0081R", "TTTC0081R"],
+  kr_rvsecncl: ["VTTC0013U", "TTTC0013U"],
   us_buy: ["VTTT1002U", "TTTT1002U"],
   us_sell: ["VTTT1001U", "TTTT1006U"],
   us_balance: ["VTTS3012R", "TTTS3012R"],
   us_psamount: ["VTTS3007R", "TTTS3007R"],
+  us_ccnl: ["VTTS3035R", "TTTS3035R"],
+  us_nccs: ["VTTS3018R", "TTTS3018R"],
+  us_rvsecncl: ["VTTT1004U", "TTTT1004U"],
 };
 
 const MAX_GET_RETRIES = 4;
@@ -122,14 +127,17 @@ export class KisClient {
     return body.includes("EGW00123");
   }
 
-  private async get(path: string, trId: string, params: Record<string, string>): Promise<Json> {
+  private async getRaw(
+    path: string, trId: string, params: Record<string, string>,
+    extraHeaders?: Record<string, string>,
+  ): Promise<{ data: Json; trCont: string }> {
     const url = `${this.base}${path}?${new URLSearchParams(params)}`;
     let tokenRefreshed = false;
     for (let attempt = 1; attempt <= MAX_GET_RETRIES; attempt++) {
       await throttle();
       let resp: Response;
       try {
-        resp = await fetch(url, { headers: await this.headers(trId) });
+        resp = await fetch(url, { headers: { ...(await this.headers(trId)), ...extraHeaders } });
       } catch (e) {
         if (attempt === MAX_GET_RETRIES) throw e;
         await sleep(backoffMs(attempt));
@@ -147,9 +155,34 @@ export class KisClient {
           continue;
         }
       }
-      return KisClient.handle(resp.status, text);
+      return { data: KisClient.handle(resp.status, text), trCont: resp.headers.get("tr_cont") ?? "" };
     }
     throw new KisError("retry-exhausted", `GET ${path}`);
+  }
+
+  private async get(path: string, trId: string, params: Record<string, string>): Promise<Json> {
+    return (await this.getRaw(path, trId, params)).data;
+  }
+
+  /** tr_cont 연속조회 자동 병합(파이썬 client.get_paged 대응) — 체결내역·미체결 조회용. */
+  private async getPaged(
+    path: string, trId: string, params: Record<string, string>,
+    outputKey: string, ctxFk: string, ctxNk: string, maxPages = 10,
+  ): Promise<Json[]> {
+    const rows: Json[] = [];
+    const pageParams = { ...params };
+    let trContIn = "";
+    for (let i = 0; i < maxPages; i++) {
+      const { data, trCont } = await this.getRaw(
+        path, trId, pageParams, trContIn ? { tr_cont: trContIn } : undefined,
+      );
+      rows.push(...(((data[outputKey] as Json[]) ?? [])));
+      if (!["F", "M"].includes(trCont)) break;
+      pageParams[ctxFk] = String(data[ctxFk.toLowerCase()] ?? "").trim();
+      pageParams[ctxNk] = String(data[ctxNk.toLowerCase()] ?? "").trim();
+      trContIn = "N";
+    }
+    return rows;
   }
 
   private async post(path: string, trId: string, body: Json): Promise<Json> {
@@ -270,18 +303,68 @@ export class KisClient {
     return [pos, cash];
   }
 
-  /** 국내 현금 시장가 주문(ORD_DVSN=01) → ODNO. */
-  async krOrderMarket(symbol: string, qty: number, side: "buy" | "sell"): Promise<string> {
+  /** 국내 현금 주문 — market=true 시장가(01)/false 지정가(00, price 정수원) → ODNO. */
+  async krOrder(symbol: string, qty: number, side: "buy" | "sell",
+                opts: { market?: boolean; price?: number } = {}): Promise<string> {
+    const market = opts.market ?? true;
     const d = await this.post("/uapi/domestic-stock/v1/trading/order-cash", this.tr(`kr_${side}`), {
       CANO: this.cano,
       ACNT_PRDT_CD: this.prdt,
       PDNO: symbol,
-      ORD_DVSN: "01",
+      ORD_DVSN: market ? "01" : "00",
       ORD_QTY: String(qty),
-      ORD_UNPR: "0",
+      ORD_UNPR: market ? "0" : String(Math.round(opts.price ?? 0)),
       EXCG_ID_DVSN_CD: "KRX",
       SLL_TYPE: side === "sell" ? "01" : "",
       CNDT_PRIC: "",
+    });
+    return String((d.output as Json)?.ODNO ?? "");
+  }
+
+  async krOrderMarket(symbol: string, qty: number, side: "buy" | "sell"): Promise<string> {
+    return this.krOrder(symbol, qty, side, { market: true });
+  }
+
+  /** 국내 기간 체결내역(체결분만, 매수·매도 전체) — v4 대사용. 날짜 YYYYMMDD. */
+  async krExecutions(symbol: string, startDate: string, endDate: string): Promise<Json[]> {
+    return this.getPaged(
+      "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", this.tr("kr_ccnl"),
+      {
+        CANO: this.cano, ACNT_PRDT_CD: this.prdt,
+        INQR_STRT_DT: startDate, INQR_END_DT: endDate,
+        SLL_BUY_DVSN_CD: "00", INQR_DVSN: "00", PDNO: symbol,
+        CCLD_DVSN: "01", ORD_GNO_BRNO: "", ODNO: "",
+        INQR_DVSN_3: "00", INQR_DVSN_1: "",
+        CTX_AREA_FK100: "", CTX_AREA_NK100: "",
+      },
+      "output1", "CTX_AREA_FK100", "CTX_AREA_NK100",
+    );
+  }
+
+  /** 국내 당일 미체결(취소 대상) — inquire-daily-ccld 미체결 모드(모의 지원 경로). */
+  async krOpenOrders(): Promise<Json[]> {
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    return this.getPaged(
+      "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", this.tr("kr_ccnl"),
+      {
+        CANO: this.cano, ACNT_PRDT_CD: this.prdt,
+        INQR_STRT_DT: today, INQR_END_DT: today,
+        SLL_BUY_DVSN_CD: "00", INQR_DVSN: "00", PDNO: "",
+        CCLD_DVSN: "02", ORD_GNO_BRNO: "", ODNO: "",
+        INQR_DVSN_3: "00", INQR_DVSN_1: "",
+        CTX_AREA_FK100: "", CTX_AREA_NK100: "",
+      },
+      "output1", "CTX_AREA_FK100", "CTX_AREA_NK100",
+    );
+  }
+
+  async krCancelOrder(orgOdno: string, qty: number): Promise<string> {
+    const d = await this.post("/uapi/domestic-stock/v1/trading/order-rvsecncl", this.tr("kr_rvsecncl"), {
+      CANO: this.cano, ACNT_PRDT_CD: this.prdt,
+      KRX_FWDG_ORD_ORGNO: "", ORGN_ODNO: orgOdno,
+      ORD_DVSN: "00", RVSE_CNCL_DVSN_CD: "02",
+      ORD_QTY: String(qty), ORD_UNPR: "0",
+      QTY_ALL_ORD_YN: "Y", EXCG_ID_DVSN_CD: "KRX",
     });
     return String((d.output as Json)?.ODNO ?? "");
   }
@@ -388,9 +471,10 @@ export class KisClient {
     throw new KisError("psamount-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
   }
 
-  /** 미국 지정가 주문(ORD_DVSN=00 — 시장가는 모의 미지원이라 현재가 지정가로). */
+  /** 미국 주문 — ordDvsn 00=지정가 / 34=LOC(모의는 LOC 미지원 → 지정가 폴백). */
   async usOrder(symbol: string, qty: number, price: number, side: "buy" | "sell",
-                excd = "NASD"): Promise<string> {
+                excd = "NASD", ordDvsn = "00"): Promise<string> {
+    const dvsn = this.creds.env === "paper" && ordDvsn !== "00" ? "00" : ordDvsn;
     const d = await this.post("/uapi/overseas-stock/v1/trading/order", this.tr(`us_${side}`), {
       CANO: this.cano,
       ACNT_PRDT_CD: this.prdt,
@@ -402,7 +486,50 @@ export class KisClient {
       MGCO_APTM_ODNO: "",
       SLL_TYPE: side === "buy" ? "" : "00",
       ORD_SVR_DVSN_CD: "0",
-      ORD_DVSN: "00",
+      ORD_DVSN: dvsn,
+    });
+    return String((d.output as Json)?.ODNO ?? "");
+  }
+
+  /** 미국 기간 체결내역(체결분만) — v4 대사용. */
+  async usExecutions(symbol: string, startDate: string, endDate: string,
+                     excd = "NASD"): Promise<Json[]> {
+    return this.getPaged(
+      "/uapi/overseas-stock/v1/trading/inquire-ccnl", this.tr("us_ccnl"),
+      {
+        CANO: this.cano, ACNT_PRDT_CD: this.prdt, PDNO: symbol,
+        ORD_STRT_DT: startDate, ORD_END_DT: endDate,
+        SLL_BUY_DVSN: "00", CCLD_NCCS_DVSN: "01",
+        OVRS_EXCG_CD: excd, SORT_SQN: "AS",
+        ORD_DT: "", ORD_GNO_BRNO: "", ODNO: "",
+        CTX_AREA_FK200: "", CTX_AREA_NK200: "",
+      },
+      "output", "CTX_AREA_FK200", "CTX_AREA_NK200",
+    );
+  }
+
+  /** 미국 미체결내역(취소 대상). */
+  async usOpenOrders(excd = "NASD"): Promise<Json[]> {
+    return this.getPaged(
+      "/uapi/overseas-stock/v1/trading/inquire-nccs", this.tr("us_nccs"),
+      {
+        CANO: this.cano, ACNT_PRDT_CD: this.prdt,
+        OVRS_EXCG_CD: excd, SORT_SQN: "DS",
+        CTX_AREA_FK200: "", CTX_AREA_NK200: "",
+      },
+      "output", "CTX_AREA_FK200", "CTX_AREA_NK200",
+    );
+  }
+
+  async usCancelOrder(symbol: string, orgOdno: string, qty: number,
+                      excd = "NASD"): Promise<string> {
+    const d = await this.post("/uapi/overseas-stock/v1/trading/order-rvsecncl",
+                              this.tr("us_rvsecncl"), {
+      CANO: this.cano, ACNT_PRDT_CD: this.prdt,
+      OVRS_EXCG_CD: excd, PDNO: symbol,
+      ORGN_ODNO: orgOdno, RVSE_CNCL_DVSN_CD: "02",
+      ORD_QTY: String(qty), OVRS_ORD_UNPR: "0.00",
+      MGCO_APTM_ODNO: "", ORD_SVR_DVSN_CD: "0",
     });
     return String((d.output as Json)?.ODNO ?? "");
   }

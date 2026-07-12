@@ -38,6 +38,17 @@ export function marketClock(market: "kr" | "us", now = new Date()): MarketClock 
   };
 }
 
+export type Cycle = { phase: "main" | "both" | "sell" | "buy"; at: string };
+
+/** 포트폴리오의 하루 사이클 목록 — 국장 infinite_v4 만 2사이클(매도 09:30류 + 매수 15:20). */
+export function cyclesFor(p: { strategy: string; market: string; runAt: string }): Cycle[] {
+  if (p.strategy === "infinite_v4" && p.market === "kr") {
+    return [{ phase: "sell", at: p.runAt }, { phase: "buy", at: "15:20" }];
+  }
+  if (p.strategy === "infinite_v4") return [{ phase: "both", at: p.runAt }];
+  return [{ phase: "main", at: p.runAt }];
+}
+
 /** 실행해야 하는 시점인가 — 시각 경과(당일) && (주중 조건). 기록 유무는 클레임이 판단. */
 export function isDue(
   p: { runAt: string; weekdaysOnly?: boolean | null; enabled?: boolean | null },
@@ -53,11 +64,12 @@ export function isDue(
 type ClaimResult = { runId: string } | null;
 
 async function claimRun(
-  portfolioId: string, accountId: string, dateKey: string, dryRun: boolean, catchUp: boolean,
+  portfolioId: string, accountId: string, dateKey: string, phase: string,
+  dryRun: boolean, catchUp: boolean,
 ): Promise<ClaimResult> {
   try {
     const doc = await TradingRun.create({
-      portfolioId, accountId, dateKey, status: "running", dryRun, catchUp,
+      portfolioId, accountId, dateKey, phase, status: "running", dryRun, catchUp,
       startedAt: new Date(),
     });
     return { runId: String(doc._id) };
@@ -65,7 +77,7 @@ async function claimRun(
     const code = (e as { code?: number }).code;
     if (code !== 11000) throw e; // unique 충돌 외 오류는 전파
     // 이미 누군가 클레임 — 크래시 잔재(running & stale)면 failed 처리(오늘은 재실행 안 함).
-    const existing = await TradingRun.findOne({ portfolioId, dateKey });
+    const existing = await TradingRun.findOne({ portfolioId, dateKey, phase });
     if (existing && existing.status === "running" &&
         Date.now() - existing.startedAt.getTime() > STALE_MS) {
       await TradingRun.updateOne(
@@ -90,34 +102,38 @@ export async function tradingTick(now = new Date()): Promise<void> {
     const account = accounts.get(String(p.accountId));
     if (!account) continue;
     const clock = marketClock(p.market as "kr" | "us", now);
-    if (!isDue({ runAt: p.runAt, weekdaysOnly: p.weekdaysOnly, enabled: p.enabled }, clock)) continue;
+    for (const cycle of cyclesFor({ strategy: p.strategy, market: p.market, runAt: p.runAt })) {
+      if (!isDue({ runAt: cycle.at, weekdaysOnly: p.weekdaysOnly, enabled: p.enabled }, clock)) continue;
 
-    const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
-    const catchUp = clock.hhmm > p.runAt; // 정시 틱(≤1분 지연)이 아니면 catch-up 성격
-    const claim = await claimRun(String(p._id), String(p.accountId), clock.dateKey, !live, catchUp);
-    if (!claim) continue;
+      const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
+      const catchUp = clock.hhmm > cycle.at; // 정시 틱(≤1분 지연)이 아니면 catch-up 성격
+      const claim = await claimRun(
+        String(p._id), String(p.accountId), clock.dateKey, cycle.phase, !live, catchUp,
+      );
+      if (!claim) continue;
 
-    const logs: string[] = [];
-    const log = (line: string) => {
-      logs.push(`${new Date().toISOString()} ${line}`);
-      console.log(`[trading:${account.envKey}/${p.strategy}] ${line}`);
-    };
-    try {
-      log(`사이클 시작 (${p.market} ${p.strategy} · ${live ? "LIVE" : "dry-run"}${catchUp ? " · catch-up" : ""})`);
-      const summary = await runPortfolioCycle(
-        account as never, p as never, claim.runId as never, log,
-      );
-      await TradingRun.updateOne(
-        { _id: claim.runId },
-        { $set: { status: "done", summary, logs, finishedAt: new Date() } },
-      );
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      log(`사이클 실패: ${msg}`);
-      await TradingRun.updateOne(
-        { _id: claim.runId },
-        { $set: { status: "failed", error: msg, logs, finishedAt: new Date() } },
-      );
+      const logs: string[] = [];
+      const log = (line: string) => {
+        logs.push(`${new Date().toISOString()} ${line}`);
+        console.log(`[trading:${account.envKey}/${p.strategy}:${cycle.phase}] ${line}`);
+      };
+      try {
+        log(`사이클 시작 (${p.market} ${p.strategy}/${cycle.phase} · ${live ? "LIVE" : "dry-run"}${catchUp ? " · catch-up" : ""})`);
+        const summary = await runPortfolioCycle(
+          account as never, p as never, claim.runId as never, log, cycle.phase,
+        );
+        await TradingRun.updateOne(
+          { _id: claim.runId },
+          { $set: { status: "done", summary, logs, finishedAt: new Date() } },
+        );
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        log(`사이클 실패: ${msg}`);
+        await TradingRun.updateOne(
+          { _id: claim.runId },
+          { $set: { status: "failed", error: msg, logs, finishedAt: new Date() } },
+        );
+      }
     }
   }
 }

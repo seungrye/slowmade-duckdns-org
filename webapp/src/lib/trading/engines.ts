@@ -40,6 +40,16 @@ function creds(account: AccountDoc): Record<string, string> {
   return out;
 }
 
+export function makeKisClient(account: AccountDoc): KisClient {
+  const c = creds(account);
+  return new KisClient({
+    env: account.env === "real" ? "real" : "paper",
+    appKey: c.appKey,
+    appSecret: c.appSecret,
+    accountNo: c.accountNo,
+  });
+}
+
 export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker {
   if (account.broker === "toss") {
     const c = creds(account);
@@ -57,13 +67,7 @@ export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker
       submit: (s, qty, side) => client.orderMarket(s, qty, side),
     };
   }
-  const c = creds(account);
-  const client = new KisClient({
-    env: account.env === "real" ? "real" : "paper",
-    appKey: c.appKey,
-    appSecret: c.appSecret,
-    accountNo: c.accountNo,
-  });
+  const client = makeKisClient(account);
   if (market === "kr") {
     return {
       market,
@@ -277,10 +281,20 @@ async function runTrend(
   return line;
 }
 
-/** 포트폴리오 블록 1개의 하루 사이클 실행 — 요약 문자열 반환(실패는 throw). */
+/** 포트폴리오 블록 1개의 사이클 실행 — 요약 문자열 반환(실패는 throw).
+ *  phase 는 infinite_v4 전용(미장 both / 국장 sell·buy — LOC 에뮬), 그 외 무시. */
 export async function runPortfolioCycle(
   account: AccountDoc, portfolio: PortfolioDoc, runId: Types.ObjectId, log: CycleLogger,
+  phase: "main" | "both" | "sell" | "buy" = "main",
 ): Promise<string> {
+  if (portfolio.strategy === "infinite_v4") {
+    if (account.broker !== "kis") {
+      throw new Error("infinite_v4 는 현재 KIS 계정 전용(토스는 2단계 — LOC=LIMIT+CLS 이식 예정)");
+    }
+    const { runInfiniteV4 } = await import("./infinite-v4-engine");
+    const v4Phase = phase === "main" ? "both" : phase;
+    return runInfiniteV4(account, portfolio, runId, makeKisClient(account), v4Phase, log);
+  }
   const broker = makeBroker(account, portfolio.market as "kr" | "us");
   switch (portfolio.strategy) {
     case "lrs_v1":

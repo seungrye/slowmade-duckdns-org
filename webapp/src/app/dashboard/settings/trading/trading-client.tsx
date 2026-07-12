@@ -16,16 +16,6 @@ type Portfolio = {
   weekdaysOnly: boolean; enabled: boolean; config: Record<string, unknown>;
   state: Record<string, unknown>;
 };
-type Run = {
-  id: string; dateKey: string; status: string; dryRun: boolean; catchUp: boolean;
-  summary: string; error: string; startedAt: string; logs: string[];
-};
-type OrderRow = {
-  id: string; envKey: string; market: string; strategy: string; symbol: string;
-  side: string; qty: number; price: number; dryRun: boolean; orderNo: string;
-  reason: string; at: string;
-};
-
 const inputCls =
   "w-full rounded border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1.5 text-sm";
 const btnCls =
@@ -46,13 +36,18 @@ const DEFAULT_CONFIG: Record<string, object> = {
   lrs_v1: { signal: "QQQ", target: "TQQQ", sma: 200, band: 1 },
   rotation_v1: { signal: "QQQ", sma: 200, band: 1, mom: 126, rebalance: 63 },
   trend_v1: { universe: ["TQQQ", "QQQ"], shortMa: 20, longMa: 60, positionSize: 0.1 },
+  infinite_v4: { symbol: "TQQQ", principal: 10000, splits: 20, starBase: 15, sellTarget: 15 },
+};
+const DEFAULT_RUN_AT: Record<string, { kr: string; us: string }> = {
+  lrs_v1: { kr: "09:05", us: "09:35" },
+  rotation_v1: { kr: "09:05", us: "09:35" },
+  trend_v1: { kr: "15:40", us: "09:35" },
+  infinite_v4: { kr: "09:30", us: "09:35" }, // 국장 v4: 09:30 매도 + 15:20 매수(자동)
 };
 
 export default function TradingSettingsClient() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
-  const [runs, setRuns] = useState<Run[]>([]);
-  const [orders, setOrders] = useState<OrderRow[]>([]);
   const [liveAllowed, setLiveAllowed] = useState(false);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,16 +66,13 @@ export default function TradingSettingsClient() {
   const [pConfig, setPConfig] = useState(JSON.stringify(DEFAULT_CONFIG.lrs_v1, null, 2));
 
   const reload = useCallback(async () => {
-    const [a, p, r] = await Promise.all([
+    const [a, p] = await Promise.all([
       fetch("/api/my/trading/accounts").then((x) => x.json()),
       fetch("/api/my/trading/portfolios").then((x) => x.json()),
-      fetch("/api/my/trading/runs").then((x) => x.json()),
     ]);
     setAccounts(a.accounts ?? []);
     setLiveAllowed(Boolean(a.liveAllowed));
     setPortfolios(p.portfolios ?? []);
-    setRuns(r.runs ?? []);
-    setOrders(r.orders ?? []);
   }, []);
 
   useEffect(() => {
@@ -172,9 +164,8 @@ export default function TradingSettingsClient() {
   };
 
   return (
-    <main className="mx-auto px-4 py-8 max-w-4xl space-y-8">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">자동매매 설정</h1>
         <p className="text-sm text-gray-500 mt-1">
           기본은 <b>dry-run</b>(주문 미전송, 로그만). 실주문은 계정별 wire 토글 × 서버 게이트
           (현재 {liveAllowed ? "허용" : "차단"}) 둘 다 켜져야 나간다. 시크릿은 암호화 저장·마스킹 표시.
@@ -286,27 +277,35 @@ export default function TradingSettingsClient() {
             <select value={pMarket} onChange={(e) => {
               const m = e.target.value as "kr" | "us";
               setPMarket(m);
-              setPRunAt(m === "kr" ? "09:05" : "09:35");
+              setPRunAt(DEFAULT_RUN_AT[pStrategy]?.[m] ?? (m === "kr" ? "09:05" : "09:35"));
             }} className={inputCls + " !w-24"}>
               <option value="us">미장</option>
               <option value="kr">국장</option>
             </select>
             <select value={pStrategy} onChange={(e) => {
-              setPStrategy(e.target.value);
-              setPConfig(JSON.stringify(DEFAULT_CONFIG[e.target.value] ?? {}, null, 2));
-            }} className={inputCls + " !w-36"}>
+              const st = e.target.value;
+              setPStrategy(st);
+              setPConfig(JSON.stringify(DEFAULT_CONFIG[st] ?? {}, null, 2));
+              setPRunAt(DEFAULT_RUN_AT[st]?.[pMarket] ?? "09:35");
+            }} className={inputCls + " !w-40"}>
               <option value="lrs_v1">LRS</option>
               <option value="rotation_v1">모멘텀 로테이션</option>
               <option value="trend_v1">추세추종</option>
+              <option value="infinite_v4">무한매수 V4 (KIS)</option>
             </select>
-            <input value={pRunAt} onChange={(e) => setPRunAt(e.target.value)}
-                   placeholder="HH:MM" className={inputCls + " !w-24"} />
+            <div className="flex items-center gap-1">
+              <input value={pRunAt} onChange={(e) => setPRunAt(e.target.value)}
+                     placeholder="HH:MM" className={inputCls + " !w-24"} />
+              <span className="text-xs text-gray-500">{pMarket === "kr" ? "KST" : "ET(미 동부)"}</span>
+            </div>
           </div>
           <textarea value={pConfig} onChange={(e) => setPConfig(e.target.value)} rows={6}
                     className={inputCls + " font-mono text-xs"} />
           <p className="text-xs text-gray-400">
-            rotation 은 candidates 를 생략하면 시드에서 거래대금 상위 자동선발. trend 는 universe 배열 필수.
-            무한매수(v1/v4)는 2단계 — 아직 파이썬 데몬 전용.
+            시각 기준: 국장 KST · 미장 ET(서머타임 자동). rotation 은 candidates 생략 시 시드
+            자동선발. trend 는 universe 배열 필수. 무한매수 V4 는 KIS 전용 — symbol·principal 필수,
+            미장은 아침 1회(실제 LOC), 국장은 09:30 매도 + 15:20 매수 phase 자동(LOC 에뮬).
+            무한매수 v1 은 파이썬 데몬 전용.
           </p>
           <button onClick={savePortfolio} disabled={busy || !pAccount} className={btnCls}>
             포트폴리오 저장(계정×시장 upsert)
@@ -314,50 +313,11 @@ export default function TradingSettingsClient() {
         </div>
       </section>
 
-      {/* 실행 이력 */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2">최근 실행</h2>
-        <ul className="space-y-1 text-sm">
-          {runs.map((r) => (
-            <li key={r.id} className="border-b border-gray-100 dark:border-gray-800 py-1">
-              <span className={r.status === "done" ? "text-green-600" : r.status === "failed" ? "text-red-500" : "text-amber-500"}>
-                [{r.status}]
-              </span>{" "}
-              {r.dateKey} · {r.dryRun ? "dry" : "LIVE"}{r.catchUp ? " · catch-up" : ""} — {r.summary || r.error}
-            </li>
-          ))}
-          {!runs.length && <li className="text-gray-400">실행 이력 없음</li>}
-        </ul>
-      </section>
-
-      {/* 주문 로그 */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2">최근 주문 로그</h2>
-        <div className="overflow-x-auto">
-          <table className="text-xs w-full">
-            <thead><tr className="text-left text-gray-500">
-              <th className="py-1 pr-2">시각</th><th className="pr-2">계정</th><th className="pr-2">전략</th>
-              <th className="pr-2">종목</th><th className="pr-2">방향</th><th className="pr-2 text-right">수량</th>
-              <th className="pr-2 text-right">가격</th><th>구분</th>
-            </tr></thead>
-            <tbody>
-              {orders.map((o) => (
-                <tr key={o.id} className="border-t border-gray-100 dark:border-gray-800">
-                  <td className="py-1 pr-2 whitespace-nowrap">{new Date(o.at).toLocaleString("ko-KR")}</td>
-                  <td className="pr-2">{o.envKey}</td>
-                  <td className="pr-2">{o.strategy}</td>
-                  <td className="pr-2">{o.symbol}</td>
-                  <td className={o.side === "buy" ? "text-red-500 pr-2" : "text-blue-500 pr-2"}>{o.side}</td>
-                  <td className="pr-2 text-right">{o.qty}</td>
-                  <td className="pr-2 text-right">{o.price.toLocaleString()}</td>
-                  <td>{o.dryRun ? "dry" : `LIVE ${o.orderNo}`}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!orders.length && <p className="text-gray-400 text-sm">주문 로그 없음</p>}
-        </div>
-      </section>
-    </main>
+      <p className="text-sm">
+        <a href="/dashboard/trading" className="text-blue-600 hover:underline">
+          실행 이력·주문 로그 보기 → /dashboard/trading
+        </a>
+      </p>
+    </div>
   );
 }

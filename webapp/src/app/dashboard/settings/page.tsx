@@ -3,23 +3,38 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useSession } from 'next-auth/react';
 import { Theme, storeTheme, applyTheme } from '@/lib/theme';
-import Link from 'next/link';
+import dynamic from 'next/dynamic';
 
-/** 자동매매 설정 진입 카드 — owner 에게만 노출(API 200 여부로 판정, 존재 미노출 원칙). */
-function TradingSettingsCard() {
+const TradingSettingsClient = dynamic(() => import('./trading/trading-client'), {
+    ssr: false,
+    loading: () => <p className="text-sm text-gray-400 p-6">자동매매 설정 불러오는 중…</p>,
+});
+
+/** 자동매매 설정 — 같은 페이지의 접이식 섹션(owner 에게만, API 200 여부로 판정).
+ *  펼칠 때만 lazy 로드해 일반 사용자·접힌 상태의 번들/요청 부담이 없다. */
+function TradingSettingsSection() {
     const [visible, setVisible] = useState(false);
+    const [open, setOpen] = useState(false);
     useEffect(() => {
-        fetch('/api/my/trading/accounts').then((r) => setVisible(r.ok)).catch(() => setVisible(false));
+        fetch('/api/my/trading/accounts', { method: 'HEAD' })
+            .then((r) => setVisible(r.ok))
+            .catch(() => setVisible(false));
     }, []);
     if (!visible) return null;
     return (
-        <Link href="/dashboard/settings/trading"
-              className="block mt-6 bg-white dark:bg-gray-900 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:border-blue-400 transition-colors">
-            <h2 className="text-xl font-semibold mb-1 text-gray-800 dark:text-gray-200">자동매매 설정 →</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-                증권사 계정(KIS·토스, 다수)·포트폴리오·실주문(wire) 토글·실행 이력. 기본 dry-run.
-            </p>
-        </Link>
+        <div className="mt-6 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+            <button type="button" onClick={() => setOpen(!open)}
+                    className="w-full text-left p-6 flex items-center justify-between">
+                <div>
+                    <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">자동매매 설정</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                        증권사 계정(KIS·토스, 다수)·포트폴리오·실주문(wire) 토글·실행 이력. 기본 dry-run.
+                    </p>
+                </div>
+                <span className="text-gray-400 ml-4 shrink-0">{open ? '▲ 접기' : '▼ 펼치기'}</span>
+            </button>
+            {open && <div className="px-6 pb-6"><TradingSettingsClient /></div>}
+        </div>
     );
 }
 
@@ -161,7 +176,7 @@ export default function SettingsPage() {
         <main className="mx-auto px-4 py-6">
             <h1 className="text-3xl font-bold mb-6 text-gray-900">설정</h1>
             <SettingsForm />
-            <TradingSettingsCard />
+            <TradingSettingsSection />
         </main>
     );
 }

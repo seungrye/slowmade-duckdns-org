@@ -3,7 +3,7 @@ import { InferSchemaType, Schema, model, models, Model } from "mongoose";
 /**
  * 매매 사이클 실행 기록 = **멱등성의 원장**.
  *
- * (portfolioId, dateKey) unique — 스케줄러가 원자적 upsert 로 클레임해 하루 1회를
+ * (portfolioId, dateKey, phase) unique — 스케줄러가 원자 클레임해 phase당 하루 1회를
  * 보장한다. 블루그린 배포로 구/신 인스턴스가 잠깐 공존해도, 재시작·catch-up 이
  * 겹쳐도 두 번 실행되지 않는다(파이썬 데몬의 "하루 1회 + cancel 안전망" 대응).
  *
@@ -17,6 +17,7 @@ const TradingRunSchema = new Schema(
     portfolioId: { type: Schema.Types.ObjectId, ref: "TradingPortfolio", required: true },
     accountId: { type: Schema.Types.ObjectId, ref: "TradingAccount", required: true, index: true },
     dateKey: { type: String, required: true }, // 시장 tz 기준 YYYY-MM-DD
+    phase: { type: String, default: "main" }, // main|both|sell|buy — 국장 v4 는 sell/buy 2사이클
     status: { type: String, required: true, enum: ["running", "done", "failed"], default: "running" },
     dryRun: { type: Boolean, default: true },
     catchUp: { type: Boolean, default: false },
@@ -29,7 +30,7 @@ const TradingRunSchema = new Schema(
   { timestamps: true },
 );
 
-TradingRunSchema.index({ portfolioId: 1, dateKey: 1 }, { unique: true });
+TradingRunSchema.index({ portfolioId: 1, dateKey: 1, phase: 1 }, { unique: true });
 
 export type TradingRunType = InferSchemaType<typeof TradingRunSchema>;
 

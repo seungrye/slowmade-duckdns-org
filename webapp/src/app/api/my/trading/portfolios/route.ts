@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireOwner } from "@/lib/require-owner";
 import { connectToDB } from "@/lib/db";
 import TradingPortfolio from "@/models/trading-portfolio";
+import TradingAccount from "@/models/trading-account";
 
 export const dynamic = "force-dynamic";
 
@@ -38,14 +39,24 @@ export async function POST(req: NextRequest) {
   if (!["kr", "us"].includes(market)) {
     return NextResponse.json({ error: "market 은 kr|us" }, { status: 400 });
   }
-  if (!["lrs_v1", "rotation_v1", "trend_v1"].includes(strategy)) {
-    return NextResponse.json({ error: "strategy 는 lrs_v1|rotation_v1|trend_v1 (무한매수는 2단계)" }, { status: 400 });
+  if (!["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4"].includes(strategy)) {
+    return NextResponse.json({ error: "strategy 는 lrs_v1|rotation_v1|trend_v1|infinite_v4" }, { status: 400 });
   }
   const runAt = String(body.runAt ?? (market === "kr" ? "09:05" : "09:35"));
   if (!/^\d{2}:\d{2}$/.test(runAt)) {
     return NextResponse.json({ error: "runAt 은 HH:MM" }, { status: 400 });
   }
   await connectToDB();
+  if (strategy === "infinite_v4") {
+    const acct = await TradingAccount.findById(body.accountId).lean();
+    if (acct?.broker === "toss") {
+      return NextResponse.json({ error: "infinite_v4 는 KIS 계정 전용(토스는 2단계)" }, { status: 400 });
+    }
+    const cfg = (body.config ?? {}) as Record<string, unknown>;
+    if (!cfg.symbol || !(Number(cfg.principal) > 0)) {
+      return NextResponse.json({ error: "infinite_v4 는 config.symbol·principal(양수) 필수" }, { status: 400 });
+    }
+  }
   // 계정당 시장 1블록 — upsert (기존 블록 갱신 시 state 는 보존)
   const doc = await TradingPortfolio.findOneAndUpdate(
     { accountId: body.accountId, market },
