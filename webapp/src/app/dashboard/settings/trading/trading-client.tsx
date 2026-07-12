@@ -200,7 +200,7 @@ export default function TradingSettingsClient() {
                   >
                     {a.liveEnabled ? "LIVE ON" : "dry-run"}
                   </button>
-                  <button onClick={() => removeAccount(a)} className="text-xs text-red-500">삭제</button>
+                  <button onClick={() => removeAccount(a)} className="text-xs text-red-500 cursor-pointer hover:underline hover:text-red-600">삭제</button>
                 </div>
               </div>
             </li>
@@ -258,15 +258,15 @@ export default function TradingSettingsClient() {
                   <div className="flex gap-2">
                     <button onClick={() => runNow(p.id)} disabled={busy}
                             title="설정 검증용 수동 1회 실행 — 계정 모드와 무관하게 항상 dry"
-                            className="text-xs px-2 py-1 rounded border border-blue-500 text-blue-600">
-                      테스트 실행(항상 dry)
+                            className="text-xs px-2.5 py-1 rounded border border-blue-500 text-blue-600 cursor-pointer hover:bg-blue-600 hover:text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-wait">
+                      dry-run 실행
                     </button>
                     <button
                       onClick={async () => {
                         await fetch(`/api/my/trading/portfolios?id=${p.id}`, { method: "DELETE" });
                         await reload();
                       }}
-                      className="text-xs text-red-500"
+                      className="text-xs text-red-500 cursor-pointer hover:underline hover:text-red-600"
                     >삭제</button>
                   </div>
                 </div>
