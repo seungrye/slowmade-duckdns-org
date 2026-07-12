@@ -2,6 +2,7 @@
 
 import type { Character, Choice } from "@/types/web-adventure";
 import { estimateSuccessPercent } from "@/lib/web-adventure/engine/rollDice";
+import { renderInline } from "@/lib/web-adventure/play/render-inline";
 import { effectiveStat } from "@/lib/web-adventure/engine/stats";
 import { items } from "@/content/web-adventure/items";
 import {
@@ -52,7 +53,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
                 onClick={() => onChoose(c.id)}
                 className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 transition-colors"
               >
-                {c.label}
+                {renderInline(c.label)}
               </button>
             </li>
           );
@@ -73,7 +74,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
                 title={`${STAT_LABELS_SHORT[c.stat] ?? c.stat} ${effectiveStat(character, c.stat)} + d20 ≥ ${c.difficulty}`}
                 className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 transition-colors flex justify-between items-center"
               >
-                <span>{c.label}</span>
+                <span>{renderInline(c.label)}</span>
                 <span className="text-sm text-amber-800 ml-3 shrink-0">
                   [확률 {percent}%]
                 </span>
@@ -118,7 +119,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
                   : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
-              <span>{c.label}</span>
+              <span>{renderInline(c.label)}</span>
               {!allowed && <span className="text-xs ml-2">({reason})</span>}
             </button>
           </li>
