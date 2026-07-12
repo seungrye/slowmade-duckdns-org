@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import ReactECharts from "echarts-for-react";
+import { useDragScrollX } from "@/hooks/use-drag-scroll";
 import type { EChartsOption } from "echarts";
 import { runBacktest } from "@/lib/backtest/engine";
 import { runTrendBacktest, runTrendVariantBacktest } from "@/lib/backtest/trend-engine";
@@ -62,6 +63,7 @@ const STRATEGY_DESC: Record<Strategy, string> = {
 
 export default function BacktestClient() {
   const [strategy, setStrategy] = useState<Strategy>("infinite_v1");
+  const tabScroll = useDragScrollX<HTMLDivElement>();
   // 공통
   const [ticker, setTicker] = useState("");
   const [principal, setPrincipal] = useState(4000);
@@ -244,7 +246,7 @@ export default function BacktestClient() {
       </p>
 
       {/* 전략 탭 */}
-      <div className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
+      <div {...tabScroll} className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
         {STRATEGY_TABS.map(([s, label]) => (
           <button
             key={s}

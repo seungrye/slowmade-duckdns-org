@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { envLabel } from "@/lib/env-label";
+import { useDragScrollX } from "@/hooks/use-drag-scroll";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 
@@ -44,6 +45,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
   { initialData?: PortfolioResponse; envs?: string[] }) {
   const router = useRouter();
   const [env, setEnv] = useState<Env>(initialData?.env ?? envs[0] ?? "paper");
+  const tabScroll = useDragScrollX<HTMLDivElement>();
   const [currency, setCurrency] = useState<Currency>("KRW");
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(false);
@@ -283,7 +285,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
   return (
     <div>
       {/* env × currency 탭 */}
-      <div className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
+      <div {...tabScroll} className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
         {envs.map((e) =>
           (["KRW", "USD"] as const).map((c) => {
             const active = env === e && currency === c;
