@@ -58,6 +58,20 @@ PATCHES=(
   scripts/seed-345-branch-divergence.mjs # #345 6 씬 probability 분기별 다른 흐름 분리
   scripts/seed-349-narrative-strengthening.mjs # #349 시나리오 개연성 보강 (사제단 의식 정체 + 침투 씬)
   scripts/seed-350-narrative-fix.mjs # #350 P0 derail 라벨 + P1 omphalos_caught_at_gate
+  scripts/seed-351-callback-partial.mjs # #351 콜백 부분 반영
+  scripts/seed-352-body-min-3lines.mjs # #352 비엔딩 body 최소 3문단 보강
+  scripts/seed-353-kael-deduction.mjs # #353 카엘 추리 분기
+  scripts/seed-354-reroll-boost.mjs # #354 리롤 보상 조정
+  # seed-355-enrich-bodies.mjs 제외 — Gemini LLM 보강 "도구"(GEMINI_API_KEY·비결정적).
+  # 변환 결과는 mongo 원본에만 존재. 재구축 시 보강 전 본문으로 남는 한계(백업이 원본).
+  scripts/seed-356-omphalos-hub.mjs # #356 옴팔로스 허브 확장
+  scripts/seed-357-omphalos-flag-propagation.mjs # #357 옴팔로스 flag 전파
+  # seed-358-playscript.mjs 제외 — Gemini LLM 희곡체 변환 "도구"(--all/--only 인자 필수).
+  # 위와 동일 사유. 재구축 후 필요 시 수동 실행: node scripts/seed-358-playscript.mjs --all
+  scripts/seed-360-kael-awakening.mjs # #360 카엘 각성 루트 + 신규 엔딩
+  scripts/seed-361-rin-awakening.mjs # #361 린 각성 루트 + 신규 엔딩
+  scripts/seed-362-dialogue-format.mjs # #362 서식 일원화 정정 (FORMAT.md)
+  scripts/seed-363-classic-tales.mjs # #363 고전 삽화 이벤트 4편 12씬
 )
 
 run_one() {
