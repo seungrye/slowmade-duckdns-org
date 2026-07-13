@@ -26,6 +26,29 @@ type Fill = {
 
 const RECENT_TRADES = 100;
 const LOOKBACK_DAYS = 90;
+// 현재가 조회 실패 비중이 이 값을 넘으면 스냅샷을 기록하지 않는다(휴장일·대규모 장애 시
+// 부분 평가가 총자산으로 영속되는 것을 방지). 그 이하의 소수 실패는 평단가 대체로 흡수.
+const MAX_FAIL_RATIO = 0.3;
+
+/** 보유 평가(순수) — 현재가 실패 종목은 평단가(취득원가)로 대체해 평가에서 누락되지
+ *  않게 한다. priceOf(sym)===null 은 조회 실패를 뜻한다. rows 는 메일 표시용. */
+export function valueHoldings(
+  holdings: Record<string, [number, number]>,
+  priceOf: (sym: string) => number | null,
+): { hv: number; failed: string[]; failRatio: number; rows: [string, number, number, number][] } {
+  let hv = 0;
+  const failed: string[] = [];
+  const rows: [string, number, number, number][] = [];
+  const entries = Object.entries(holdings);
+  for (const [sym, [qty, avg]] of entries) {
+    const live = priceOf(sym);
+    const price = live ?? avg; // 폴백 = 취득원가
+    if (live == null) failed.push(sym);
+    hv += qty * price;
+    rows.push([sym, qty, avg, price]);
+  }
+  return { hv, failed, failRatio: entries.length ? failed.length / entries.length : 0, rows };
+}
 
 // ── 파이썬 site_sync._parse_fill / fills_to_trades_and_pnl 포팅 ──
 
@@ -237,33 +260,43 @@ export async function runCloseSync(
   log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${run.toFixed(0)} · 누적 ${cum.toFixed(0)}`);
 
   // ③ 포트폴리오 스냅샷
-  const evalRows: [string, number, number, number][] = []; // sym, qty, avg, price
+  let evalRows: [string, number, number, number][] = []; // sym, qty, avg, price (메일 표시용)
   if (balOk) {
-    let hv = 0;
-    for (const [sym, [qty, avg]] of Object.entries(holdings)) {
+    // 현재가 실패 종목은 평가에서 빼지 않고 평단가(취득원가)로 대체 — 휴장일·일시
+    // 오류에 총자산이 무너지지 않게(가치 소실 대신 원가로 완만히 degrade). 단, 실패
+    // 비중이 크면(휴장일 수동 실행 등) 스냅샷을 아예 기록하지 않아 오염값 영속을 막는다.
+    const prices = new Map<string, number | null>();
+    for (const [sym] of Object.entries(holdings)) {
       try {
-        const price = isToss
+        prices.set(sym, isToss
           ? await toss!.price(sym)
-          : market === "kr" ? await kis!.krPrice(sym) : await kis!.usPrice(sym, usQuoteExcd(sym));
-        hv += qty * price;
-        evalRows.push([sym, qty, avg, price]);
+          : market === "kr" ? await kis!.krPrice(sym) : await kis!.usPrice(sym, usQuoteExcd(sym)));
       } catch (e) {
-        log(`[${sym}] 현재가 실패(평가 제외): ${e instanceof Error ? e.message : e}`);
+        prices.set(sym, null);
+        log(`[${sym}] 현재가 실패 → 평단가 대체 평가: ${e instanceof Error ? e.message : e}`);
       }
     }
-    await PortfolioHistory.collection.updateOne(
-      { env: account.envKey, currency, date: now.toISOString() },
-      { $set: {
-          env: account.envKey, currency, date: now.toISOString(), dateStr: today,
-          totalValue: Math.round((cash + hv) * 10000) / 10000,
-          cash: Math.round(cash * 10000) / 10000,
-          holdingsValue: Math.round(hv * 10000) / 10000,
-          runPnl: Math.round(run * 10000) / 10000,
-          cumulativePnl: Math.round(cum * 10000) / 10000,
-        } },
-      { upsert: true },
-    );
-    log(`포트폴리오 스냅샷: 현금 ${cash.toFixed(0)} + 보유 ${hv.toFixed(0)}`);
+    const { hv, failed, failRatio, rows } = valueHoldings(holdings, (sym) => prices.get(sym) ?? null);
+    evalRows = rows;
+    if (failRatio > MAX_FAIL_RATIO) {
+      log(`포트폴리오 스냅샷 스킵 — 현재가 실패 ${failed.length}/${Object.keys(holdings).length}종목`
+        + `(${Math.round(failRatio * 100)}%): 휴장/장애 가능성, 오염값 기록 방지`);
+    } else {
+      if (failed.length) log(`포트폴리오 스냅샷: ${failed.length}종목 평단가 대체(${failed.join(",")})`);
+      await PortfolioHistory.collection.updateOne(
+        { env: account.envKey, currency, date: now.toISOString() },
+        { $set: {
+            env: account.envKey, currency, date: now.toISOString(), dateStr: today,
+            totalValue: Math.round((cash + hv) * 10000) / 10000,
+            cash: Math.round(cash * 10000) / 10000,
+            holdingsValue: Math.round(hv * 10000) / 10000,
+            runPnl: Math.round(run * 10000) / 10000,
+            cumulativePnl: Math.round(cum * 10000) / 10000,
+          } },
+        { upsert: true },
+      );
+      log(`포트폴리오 스냅샷: 현금 ${cash.toFixed(0)} + 보유 ${hv.toFixed(0)}`);
+    }
   }
 
   // ④ 마감 메일(하루 1통) — 파이썬 마감 사이클 메일 대응

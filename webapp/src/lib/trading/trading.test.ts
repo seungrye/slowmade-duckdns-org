@@ -3,6 +3,7 @@ import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
 import { isDue, marketClock } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
+import { valueHoldings } from "./close-sync";
 
 beforeAll(() => {
   process.env.TRADING_SECRET_KEY = "a".repeat(64);
@@ -145,5 +146,29 @@ describe("kr-tick — KRX 호가단위 라운딩", () => {
   it("ETF 는 저가에도 5원 단위(462330 류)", () => {
     expect(krTickRound(962, "buy")).toBe(960);
     expect(krTickRound(962, "sell")).toBe(965);
+  });
+});
+
+describe("close-sync valueHoldings — 현재가 실패 원가 폴백", () => {
+  const H = { TQQQ: [10, 80] as [number, number], SOXL: [5, 20] as [number, number] };
+  it("전부 조회 성공: 현재가로 평가", () => {
+    const r = valueHoldings(H, (s) => ({ TQQQ: 100, SOXL: 30 }[s] ?? null));
+    expect(r.hv).toBe(10 * 100 + 5 * 30);
+    expect(r.failed).toEqual([]);
+    expect(r.failRatio).toBe(0);
+  });
+  it("일부 실패: 평단가로 대체(누락 아님)·failed 집계", () => {
+    const r = valueHoldings(H, (s) => (s === "TQQQ" ? 100 : null));
+    expect(r.hv).toBe(10 * 100 + 5 * 20); // SOXL 은 평단 20
+    expect(r.failed).toEqual(["SOXL"]);
+    expect(r.failRatio).toBe(0.5);
+  });
+  it("07-12 재현: 전부 실패해도 평가가 0으로 무너지지 않고 원가", () => {
+    const r = valueHoldings(H, () => null);
+    expect(r.hv).toBe(10 * 80 + 5 * 20); // 전부 평단
+    expect(r.failRatio).toBe(1);         // 호출측이 MAX_FAIL_RATIO 로 스킵
+  });
+  it("보유 없음: 0·failRatio 0(0나눗셈 안전)", () => {
+    expect(valueHoldings({}, () => 1)).toMatchObject({ hv: 0, failRatio: 0 });
   });
 });
