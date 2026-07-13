@@ -9,6 +9,7 @@
 
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
+import { krTickRound, type KrTickKind } from "./kr-tick";
 import { throttle } from "./rate-limit";
 
 export type KisCreds = {
@@ -318,17 +319,20 @@ export class KisClient {
     return [pos, cash];
   }
 
-  /** 국내 현금 주문 — market=true 시장가(01)/false 지정가(00, price 정수원) → ODNO. */
+  /** 국내 현금 주문 — market=true 시장가(01)/false 지정가(00) → ODNO.
+   *  지정가는 KRX 호가단위 라운딩(기본 ETF 5원 — 매도 올림·매수 내림). 위반 시
+   *  40030000 "호가단위 오류"로 거부되므로 여기서 단일 처리한다. */
   async krOrder(symbol: string, qty: number, side: "buy" | "sell",
-                opts: { market?: boolean; price?: number } = {}): Promise<string> {
+                opts: { market?: boolean; price?: number; tick?: KrTickKind } = {}): Promise<string> {
     const market = opts.market ?? true;
+    const limitPrice = market ? 0 : krTickRound(opts.price ?? 0, side, opts.tick ?? "etf");
     const d = await this.post("/uapi/domestic-stock/v1/trading/order-cash", this.tr(`kr_${side}`), {
       CANO: this.cano,
       ACNT_PRDT_CD: this.prdt,
       PDNO: symbol,
       ORD_DVSN: market ? "01" : "00",
       ORD_QTY: String(qty),
-      ORD_UNPR: market ? "0" : String(Math.round(opts.price ?? 0)),
+      ORD_UNPR: market ? "0" : String(limitPrice),
       EXCG_ID_DVSN_CD: "KRX",
       SLL_TYPE: side === "sell" ? "01" : "",
       CNDT_PRIC: "",

@@ -339,11 +339,17 @@ export async function runInfiniteV4(
   // ── 4) 주문 전송(dry-run 게이트) + 상태 저장 ──
   for (const o of orders) {
     let orderNo = "";
-    if (live) {
-      orderNo = await broker.place(sym, o);
-      log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${o.price.toFixed(2)} (${o.ordType})`);
-    } else {
-      log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${o.price.toFixed(2)} (${o.ordType}) — ${o.reason}`);
+    try {
+      if (live) {
+        orderNo = await broker.place(sym, o);
+        log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${o.price.toFixed(2)} (${o.ordType})`);
+      } else {
+        log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${o.price.toFixed(2)} (${o.ordType}) — ${o.reason}`);
+      }
+    } catch (e) {
+      // 주문 단위 격리 — 한 건 거부(호가단위 등)가 나머지 주문·상태 저장을 막지 않게.
+      log(`주문 실패(${o.side} x${o.qty} @${o.price.toFixed(2)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
+      continue;
     }
     await TradingOrderLog.create({
       accountId: account._id, runId, envKey: account.envKey,

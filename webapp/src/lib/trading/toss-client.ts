@@ -4,6 +4,7 @@
 
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
+import { krTickRound } from "./kr-tick";
 import { throttle } from "./rate-limit";
 
 export type TossCreds = {
@@ -241,7 +242,7 @@ export class TossClient {
   async orderLimit(symbol: string, qty: number, side: "buy" | "sell", price: number,
                    opts: { cls?: boolean; clientOrderId?: string } = {}): Promise<string> {
     const priceStr = /^\d+$/.test(symbol)
-      ? String(Math.round(price))
+      ? String(krTickRound(price, side)) // KR: 호가단위(ETF 5원) — 매도 올림·매수 내림
       : price < 1 ? price.toFixed(4) : price.toFixed(2);
     const body: Json = {
       symbol,

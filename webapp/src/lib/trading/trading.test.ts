@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
 import { isDue, marketClock } from "./scheduler";
+import { krTickRound, krTickSize } from "./kr-tick";
 
 beforeAll(() => {
   process.env.TRADING_SECRET_KEY = "a".repeat(64);
@@ -123,5 +124,26 @@ describe("trading/scheduler — 순수 헬퍼", () => {
     expect(isDue({ runAt: "09:00", enabled: false }, clock)).toBe(false);
     expect(isDue({ runAt: "09:00" }, { ...clock, isWeekday: false })).toBe(false);
     expect(isDue({ runAt: "09:00", weekdaysOnly: false }, { ...clock, isWeekday: false })).toBe(true);
+  });
+});
+
+describe("kr-tick — KRX 호가단위 라운딩", () => {
+  it("오늘 실패 재현: ETF 별지점 매도 138,861.92 → 138,865(5원 올림)", () => {
+    expect(krTickRound(138_861.92, "sell")).toBe(138_865);
+  });
+  it("ETF 평단 매수 126,486 → 126,485(5원 내림)", () => {
+    expect(krTickRound(126_486, "buy")).toBe(126_485);
+  });
+  it("익절 139,134.6 매도 → 139,135(우연히 통과했던 값과 일치)", () => {
+    expect(krTickRound(139_134.6, "sell")).toBe(139_135);
+  });
+  it("주식 테이블: 150,000원대 100원 단위, 962원 1원 단위", () => {
+    expect(krTickSize(150_000, "stock")).toBe(100);
+    expect(krTickRound(150_795, "buy", "stock")).toBe(150_700);
+    expect(krTickRound(962.4, "sell", "stock")).toBe(963);
+  });
+  it("ETF 는 저가에도 5원 단위(462330 류)", () => {
+    expect(krTickRound(962, "buy")).toBe(960);
+    expect(krTickRound(962, "sell")).toBe(965);
   });
 });
