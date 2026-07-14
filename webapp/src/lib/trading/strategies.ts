@@ -30,6 +30,8 @@ export function lrsDecide(args: {
   cash: number;
   smaPeriod?: number;
   bandPct?: number;
+  trailPct?: number; // 선택: 트레일링 스톱(진입 후 고점 대비 -trailPct 이탈 시 청산)
+  peak?: number;     // trailPct 사용 시 진입 후 고점(호출측이 추적해 전달)
 }): OrderIntent[] {
   const sma = args.smaPeriod ?? 200;
   const band = args.bandPct ?? 0.01;
@@ -42,9 +44,15 @@ export function lrsDecide(args: {
       return [{ side: "buy", symbol: args.target, qty, price: args.price,
                 reason: `레짐 진입(시그널>${sma}SMA+${Math.round(band * 100)}%)` }];
     }
-  } else if (args.holdingQty > 0 && today < ma * (1 - band)) {
-    return [{ side: "sell", symbol: args.target, qty: args.holdingQty, price: args.price,
-              reason: `레짐 이탈 현금화(시그널<${sma}SMA-${Math.round(band * 100)}%)` }];
+  } else if (args.holdingQty > 0) {
+    const regimeOff = today < ma * (1 - band);
+    const trailHit = !!args.trailPct && args.trailPct > 0 && args.trailPct < 1
+      && args.peak !== undefined && args.price <= args.peak * (1 - args.trailPct);
+    if (regimeOff || trailHit) {
+      return [{ side: "sell", symbol: args.target, qty: args.holdingQty, price: args.price,
+                reason: regimeOff ? `레짐 이탈 현금화(시그널<${sma}SMA-${Math.round(band * 100)}%)`
+                                  : `트레일링 스톱(-${Math.round((args.trailPct ?? 0) * 100)}%)` }];
+    }
   }
   return [];
 }

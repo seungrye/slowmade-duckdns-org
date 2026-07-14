@@ -12,8 +12,12 @@
 // 후보 풀만 정하면 강한 종목으로 자동 로테이션된다. 지표 워밍업(SMA·모멘텀)은 from 이전
 // 데이터로 수행하고 매매는 from~to 구간에서만 한다.
 
+import { rotationDecide } from "@/lib/trading/strategies";
 import { DEFAULT_LIQ_DAYS, DEFAULT_POOL_SIZE, liquidityMetric, selectPool } from "./rotation-pool";
 import type { BacktestResult, Bar, BtTrade, EquityPoint, RotationV1Config } from "./types";
+
+// 백테스트는 실거래와 **동일한 결정 함수**(rotationDecide, 라이브가 쓰는 그 함수)를 호출한다.
+// 백테스트는 풀 자동선발·체결모델(종가)·자산곡선만 담당 — 백테스트=실거래 단일코드.
 
 export interface RotationCandidate {
   ticker: string;
@@ -50,30 +54,6 @@ export function runRotationBacktest(
     let s = 0;
     for (let i = sigCloses.length - cfg.smaPeriod; i < sigCloses.length; i++) s += sigCloses[i];
     return s / cfg.smaPeriod;
-  };
-
-  /** 후보 i 의 momDays 수익률(데이터 부족 시 null). */
-  const momentum = (i: number): number | null => {
-    const s = series[i];
-    if (s.length < cfg.momDays + 1) return null;
-    const past = s[s.length - 1 - cfg.momDays];
-    return past > 0 ? s[s.length - 1] / past - 1 : null;
-  };
-
-  /** 오늘 데이터가 있는 후보 중 모멘텀 1위 인덱스(없으면 -1). 자동선발 모드는 풀 안에서만. */
-  const pickBest = (date: string): number => {
-    let best = -1;
-    let bestMom = -Infinity;
-    for (let i = 0; i < candidates.length; i++) {
-      if (pool && !pool.has(candidates[i].ticker)) continue; // 풀 밖 후보 제외
-      if (!closeMaps[i].has(date)) continue;
-      const m = momentum(i);
-      if (m !== null && m > bestMom) {
-        bestMom = m;
-        best = i;
-      }
-    }
-    return best;
   };
 
   const sell = (date: string, price: number) => {
@@ -123,31 +103,39 @@ export function runRotationBacktest(
     const ma = smaLast();
     if (inRange && ma !== null) {
       const heldClose = heldIdx >= 0 ? closeMaps[heldIdx].get(bar.date) : undefined;
-      if (bar.close < ma * (1 - cfg.bandPct)) {
-        // 레짐 오프 — 전량 현금(매일 검사)
-        if (heldIdx >= 0 && heldClose !== undefined) sell(bar.date, heldClose);
-      } else if (bar.close > ma * (1 + cfg.bandPct)) {
-        // 레짐 온 — 무보유면 1위 진입, 보유 중이면 주기마다 1위 재평가(교체)
-        if (heldIdx < 0) {
-          const best = pickBest(bar.date);
-          if (best >= 0) {
-            const price = closeMaps[best].get(bar.date)!;
-            buy(bar.date, best, price);
-            sinceRebalance = 0;
-          }
-        } else {
-          sinceRebalance++;
-          if (sinceRebalance >= cfg.rebalanceDays) {
-            sinceRebalance = 0;
-            const best = pickBest(bar.date);
-            if (best >= 0 && best !== heldIdx && heldClose !== undefined) {
-              sell(bar.date, heldClose); // 같은 날 종가로 스위칭
-              buy(bar.date, best, closeMaps[best].get(bar.date)!);
-            }
-          }
-        }
+      // 재평가 카운터는 "보유 & 레짐 온" 인 날에만 진행(원본과 동일 타이밍) — decide 전에 증가.
+      const regimeOn = bar.close > ma * (1 + cfg.bandPct);
+      if (regimeOn && heldIdx >= 0) sinceRebalance++;
+
+      // 풀 안에서 오늘 데이터 있는 후보만 candidates 로, 각 후보 종가는 최신순으로 전달.
+      const poolCands: string[] = [];
+      const candCloses: Record<string, number[]> = {};
+      for (let i = 0; i < candidates.length; i++) {
+        if (pool && !pool.has(candidates[i].ticker)) continue;
+        if (!closeMaps[i].has(bar.date)) continue;
+        poolCands.push(candidates[i].ticker);
+        candCloses[candidates[i].ticker] = series[i].slice(-(cfg.momDays + 1)).reverse();
       }
-      // 밴드 사이(히스테리시스): 보유 상태 유지, 교체·청산 없음
+      const dec = rotationDecide({
+        candidates: poolCands, signalCloses: sigCloses.slice(-cfg.smaPeriod).reverse(),
+        candCloses, holding: heldIdx >= 0 ? candidates[heldIdx].ticker : null,
+        daysSinceRebalance: sinceRebalance,
+        smaPeriod: cfg.smaPeriod, bandPct: cfg.bandPct, momDays: cfg.momDays, rebalanceDays: cfg.rebalanceDays,
+      });
+
+      if (dec.action === "cash") {
+        if (heldIdx >= 0 && heldClose !== undefined) sell(bar.date, heldClose); // 레짐 오프 청산
+      } else if (dec.action === "switch" && dec.target) {
+        const ti = candidates.findIndex((c) => c.ticker === dec.target);
+        const tp = ti >= 0 ? closeMaps[ti].get(bar.date) : undefined;
+        if (tp !== undefined && (heldIdx < 0 || heldClose !== undefined)) {
+          if (heldIdx >= 0 && heldClose !== undefined) sell(bar.date, heldClose); // 같은 날 종가 스위칭
+          buy(bar.date, ti, tp);
+          sinceRebalance = 0;
+        }
+      } else if (dec.rebalanced) {
+        sinceRebalance = 0; // 재평가일 "1위 유지"(교체 없음)도 카운터 리셋
+      }
     }
     if (inRange) {
       const heldClose = heldIdx >= 0 ? closeMaps[heldIdx].get(bar.date) : undefined;

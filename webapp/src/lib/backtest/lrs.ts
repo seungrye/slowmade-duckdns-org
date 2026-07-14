@@ -11,8 +11,11 @@
 // 시그널 종목과 매매 종목의 일봉을 날짜로 정렬하며, 시그널 SMA 워밍업을 위해 시그널
 // 일봉은 매매 구간보다 과거까지 포함해 넘기는 것을 권장한다(사이트는 전체 이력 사용).
 
+import { lrsDecide } from "@/lib/trading/strategies";
 import type { BacktestResult, Bar, BtTrade, EquityPoint, LrsV1Config } from "./types";
 
+// 백테스트는 일봉을 하루씩 흘리며 **실거래와 동일한 결정 함수**(lrsDecide, 라이브가 쓰는
+// 그 함수)를 호출한다 — 백테스트=실거래 단일코드. 여기선 체결모델(종가 체결)·자산곡선만 담당.
 export function runLrsBacktest(tradeBars: Bar[], signalBars: Bar[], cfg: LrsV1Config): BacktestResult {
   const sigByDate = new Map(signalBars.map((b) => [b.date, b.close]));
   // 매매 시작일 이전의 시그널 종가로 SMA 를 워밍업한다(시그널 이력이 더 길 때).
@@ -26,38 +29,33 @@ export function runLrsBacktest(tradeBars: Bar[], signalBars: Bar[], cfg: LrsV1Co
   let peak = 0;
   let cash = cfg.principal; // 복리 — 매도 대금 전액을 다음 진입에 재투자(전량 스위칭 전략의 자연스러운 형태)
 
-  const smaLast = (): number | null => {
-    if (sigCloses.length < cfg.smaPeriod) return null;
-    let s = 0;
-    for (let i = sigCloses.length - cfg.smaPeriod; i < sigCloses.length; i++) s += sigCloses[i];
-    return s / cfg.smaPeriod;
-  };
-
   for (const bar of tradeBars) {
     const sc = sigByDate.get(bar.date);
     if (sc !== undefined) sigCloses.push(sc);
-    const ma = smaLast();
-    if (ma !== null && sc !== undefined) {
-      if (holdingQty > 0) {
-        peak = Math.max(peak, bar.close);
-        const trailHit = cfg.trailPct > 0 && cfg.trailPct < 1 && bar.close <= peak * (1 - cfg.trailPct);
-        if (sc < ma * (1 - cfg.bandPct) || trailHit) {
+    if (sc !== undefined && sigCloses.length >= cfg.smaPeriod) {
+      if (holdingQty > 0) peak = Math.max(peak, bar.close);
+      const intents = lrsDecide({
+        signalCloses: sigCloses.slice(-cfg.smaPeriod).reverse(), // 최신순 요구
+        target: "", price: bar.close,
+        holdingQty, avgPrice: holdingQty ? costBasis / holdingQty : 0, cash,
+        smaPeriod: cfg.smaPeriod, bandPct: cfg.bandPct,
+        trailPct: cfg.trailPct, peak: holdingQty > 0 ? peak : undefined,
+      });
+      for (const it of intents) {
+        if (it.side === "buy") {
+          costBasis = it.qty * bar.close;
+          cash -= costBasis;
+          holdingQty = it.qty;
+          peak = bar.close;
+          trades.push({ date: bar.date, side: "buy", price: bar.close, qty: it.qty, pnl: 0, roundNo: 0 });
+        } else {
           const avg = costBasis / holdingQty;
-          const pnl = (bar.close - avg) * holdingQty;
-          trades.push({ date: bar.date, side: "sell", price: bar.close, qty: holdingQty, pnl, roundNo: 0 });
+          trades.push({ date: bar.date, side: "sell", price: bar.close, qty: holdingQty,
+                        pnl: (bar.close - avg) * holdingQty, roundNo: 0 });
           cash += bar.close * holdingQty;
           holdingQty = 0;
           costBasis = 0;
           peak = 0;
-        }
-      } else if (sc > ma * (1 + cfg.bandPct)) {
-        const qty = Math.floor(cash / bar.close);
-        if (qty >= 1) {
-          costBasis = qty * bar.close;
-          cash -= costBasis;
-          holdingQty = qty;
-          peak = bar.close;
-          trades.push({ date: bar.date, side: "buy", price: bar.close, qty, pnl: 0, roundNo: 0 });
         }
       }
     }
