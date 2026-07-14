@@ -304,7 +304,7 @@ export class KisClient {
   }
 
   /** 보유맵 {symbol: [qty, avg]} + 가용현금(익일정산 nxdy_excc_amt — T+2 미결제 반영). */
-  async krAccount(): Promise<[Record<string, [number, number]>, number]> {
+  async krAccount(): Promise<[Record<string, [number, number]>, number, number]> {
     const d = await this.get("/uapi/domestic-stock/v1/trading/inquire-balance", this.tr("kr_balance"), {
       CANO: this.cano,
       ACNT_PRDT_CD: this.prdt,
@@ -319,14 +319,17 @@ export class KisClient {
       CTX_AREA_NK100: "",
     });
     const pos: Record<string, [number, number]> = {};
+    let hvSum = 0;
     for (const r of (d.output1 as Json[]) ?? []) {
       const q = Math.trunc(Number(r.hldg_qty ?? 0));
       if (q > 0) pos[String(r.pdno)] = [q, Number(r.pchs_avg_pric ?? 0)];
+      hvSum += Number(r.evlu_amt ?? 0); // 종목별 평가금액
     }
     const out2raw = d.output2;
     const out2 = (Array.isArray(out2raw) ? out2raw[0] : out2raw) as Json | undefined;
     const cash = Number(out2?.nxdy_excc_amt ?? out2?.dnca_tot_amt ?? 0);
-    return [pos, cash];
+    const hvBroker = Number(out2?.scts_evlu_amt ?? 0) || hvSum; // 증권사 유가증권평가금액
+    return [pos, cash, hvBroker];
   }
 
   /** 국내 현금 주문 — market=true 시장가(01)/false 지정가(00) → ODNO.
@@ -467,7 +470,7 @@ export class KisClient {
   }
 
   /** 미국 보유맵 + 매수가능 USD(psamount — 미체결 반영. 실패 시 현금 0 폴백은 호출측). */
-  async usAccount(): Promise<[Record<string, [number, number]>, number]> {
+  async usAccount(): Promise<[Record<string, [number, number]>, number, number]> {
     const d = await this.get("/uapi/overseas-stock/v1/trading/inquire-balance", this.tr("us_balance"), {
       CANO: this.cano,
       ACNT_PRDT_CD: this.prdt,
@@ -477,9 +480,11 @@ export class KisClient {
       CTX_AREA_NK200: "",
     });
     const pos: Record<string, [number, number]> = {};
+    let hvBroker = 0; // 증권사 평가금액 합(우리가 현재가를 재조회하지 않는다)
     for (const r of (d.output1 as Json[]) ?? []) {
       const q = Math.trunc(Number(r.ovrs_cblc_qty ?? 0));
       if (q > 0) pos[String(r.ovrs_pdno)] = [q, Number(r.pchs_avg_pric ?? 0)];
+      hvBroker += Number(r.ovrs_stck_evlu_amt ?? 0);
     }
     let cash = 0;
     try {
@@ -487,7 +492,7 @@ export class KisClient {
     } catch {
       cash = 0; // 파이썬과 동일: psamount 실패 시 현금 0(매수 스킵) — 보유는 유지
     }
-    return [pos, cash];
+    return [pos, cash, hvBroker];
   }
 
   async usBuyable(symbol: string, price: number, excd = "NASD"): Promise<number> {

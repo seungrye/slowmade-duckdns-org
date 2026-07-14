@@ -206,21 +206,23 @@ export class TossClient {
   }
 
   /** 보유맵(시장 필터) + 현금(매수가능, KRW|USD). */
-  async account(market: "kr" | "us"): Promise<[Record<string, [number, number]>, number]> {
+  async account(market: "kr" | "us"): Promise<[Record<string, [number, number]>, number, number]> {
     const data = ((await this.get("/api/v1/holdings", undefined, true)) ?? {}) as Json;
     const country = market === "kr" ? "KR" : "US";
     const pos: Record<string, [number, number]> = {};
+    let hvBroker = 0; // 토스 평가금액(필드 있으면 사용, 없으면 0 → close-sync 폴백)
     for (const it of (data.items as Json[]) ?? []) {
       if (it.marketCountry !== country) continue;
       const q = Math.trunc(Number(it.quantity ?? 0));
       if (q > 0) pos[String(it.symbol)] = [q, Number(it.averagePurchasePrice ?? 0)];
+      hvBroker += Number(it.evaluationAmount ?? it.evalAmount ?? 0);
     }
     const bp = ((await this.get(
       "/api/v1/buying-power",
       { currency: market === "kr" ? "KRW" : "USD" },
       true,
     )) ?? {}) as Json;
-    return [pos, Number(bp.cashBuyingPower ?? 0)];
+    return [pos, Number(bp.cashBuyingPower ?? 0), hvBroker];
   }
 
   /** 시장가 주문 → orderId. clientOrderId 는 멱등키(10분). */

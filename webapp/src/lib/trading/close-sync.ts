@@ -182,12 +182,13 @@ export async function runCloseSync(
   const kis: KisClient | null = isToss ? null : makeKisClient(account as never);
   const toss: TossClient | null = isToss ? makeTossClient(account as never) : null;
 
-  // 잔고(보유·현금)
+  // 잔고(보유·현금·증권사 평가금액)
   let holdings: Record<string, [number, number]> = {};
   let cash = 0;
+  let hvBroker = 0; // 증권사 API 가 준 보유 평가금액(우리가 현재가를 재계산하지 않는다)
   let balOk = true;
   try {
-    [holdings, cash] = isToss
+    [holdings, cash, hvBroker] = isToss
       ? await toss!.account(market)
       : market === "kr" ? await kis!.krAccount() : await kis!.usAccount();
   } catch (e) {
@@ -261,30 +262,40 @@ export async function runCloseSync(
   }
   log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${run.toFixed(0)} · 누적 ${cum.toFixed(0)}`);
 
-  // ③ 포트폴리오 스냅샷
+  // ③ 포트폴리오 스냅샷 — 보유 평가는 **증권사 API 가 준 평가금액**(hvBroker)을 그대로
+  // 사용한다(우리가 종목별 현재가를 재조회해 곱하지 않는다 → 유량제한에 총자산이
+  // 무너지지 않음). hvBroker 가 없을 때만(토스 등) 폴백으로 자체 계산(원가 대체 포함).
   let evalRows: [string, number, number, number][] = []; // sym, qty, avg, price (메일 표시용)
   if (balOk) {
-    // 현재가 실패 종목은 평가에서 빼지 않고 평단가(취득원가)로 대체 — 휴장일·일시
-    // 오류에 총자산이 무너지지 않게(가치 소실 대신 원가로 완만히 degrade). 단, 실패
-    // 비중이 크면(휴장일 수동 실행 등) 스냅샷을 아예 기록하지 않아 오염값 영속을 막는다.
-    const prices = new Map<string, number | null>();
-    for (const [sym] of Object.entries(holdings)) {
-      try {
-        prices.set(sym, isToss
-          ? await toss!.price(sym)
-          : market === "kr" ? await kis!.krPrice(sym) : await kis!.usPrice(sym, usQuoteExcd(sym)));
-      } catch (e) {
-        prices.set(sym, null);
-        log(`[${sym}] 현재가 실패 → 평단가 대체 평가: ${e instanceof Error ? e.message : e}`);
+    let hv = hvBroker;
+    let skip = false;
+    if (!(hv > 0)) {
+      const prices = new Map<string, number | null>();
+      for (const [sym] of Object.entries(holdings)) {
+        try {
+          prices.set(sym, isToss
+            ? await toss!.price(sym)
+            : market === "kr" ? await kis!.krPrice(sym) : await kis!.usPrice(sym, usQuoteExcd(sym)));
+        } catch (e) {
+          prices.set(sym, null);
+          log(`[${sym}] 현재가 실패 → 평단가 대체 평가: ${e instanceof Error ? e.message : e}`);
+        }
       }
-    }
-    const { hv, failed, failRatio, rows } = valueHoldings(holdings, (sym) => prices.get(sym) ?? null);
-    evalRows = rows;
-    if (failRatio > MAX_FAIL_RATIO) {
-      log(`포트폴리오 스냅샷 스킵 — 현재가 실패 ${failed.length}/${Object.keys(holdings).length}종목`
-        + `(${Math.round(failRatio * 100)}%): 휴장/장애 가능성, 오염값 기록 방지`);
+      const vh = valueHoldings(holdings, (sym) => prices.get(sym) ?? null);
+      hv = vh.hv;
+      evalRows = vh.rows;
+      if (vh.failRatio > MAX_FAIL_RATIO) {
+        log(`포트폴리오 스냅샷 스킵 — 현재가 실패 ${vh.failed.length}/${Object.keys(holdings).length}종목`
+          + `(${Math.round(vh.failRatio * 100)}%): 휴장/장애 가능성, 오염값 기록 방지`);
+        skip = true;
+      } else if (vh.failed.length) {
+        log(`포트폴리오 스냅샷(폴백): ${vh.failed.length}종목 평단가 대체(${vh.failed.join(",")})`);
+      }
     } else {
-      if (failed.length) log(`포트폴리오 스냅샷: ${failed.length}종목 평단가 대체(${failed.join(",")})`);
+      // 증권사 평가금액 사용 — 메일 표시는 원가 기준(별도 가격조회 없음)
+      evalRows = Object.entries(holdings).map(([s, [q, a]]) => [s, q, a, a]);
+    }
+    if (!skip) {
       await PortfolioHistory.collection.updateOne(
         { env: account.envKey, currency, date: now.toISOString() },
         { $set: {
