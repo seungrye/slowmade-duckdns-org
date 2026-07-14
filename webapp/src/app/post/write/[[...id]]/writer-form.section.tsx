@@ -16,9 +16,26 @@ export default function PostWriterForm() {
     const _id = Array.isArray(id) ? id[0] : id;
 
     const editorRef = useRef<RichWebEditorHandle>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [title, setTitle] = useState('');
     const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
     const [loading, setLoading] = useState(false);
+    const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
+
+    // 에디터(제목·본문·태그·제출 버튼 전체)가 뷰포트를 벗어나지 않도록 컨테이너 높이를
+    // 가용 영역(화면 높이 − 컨테이너 상단 오프셋)으로 고정한다. 본문은 내부 스크롤(editor.scss).
+    useEffect(() => {
+        const update = () => {
+            const el = containerRef.current;
+            if (!el) return;
+            const top = el.getBoundingClientRect().top;
+            // top 은 부모 py-6 상단여백 포함. 하단 py-6(24px) 여백도 빼 페이지 스크롤 방지.
+            setMaxHeight(Math.max(320, window.innerHeight - top - 24));
+        };
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, []);
 
     useEffect(() => {
         console.log("PostWriterForm mounted with _id:", _id);
@@ -117,42 +134,47 @@ export default function PostWriterForm() {
         }
     };
 
-    return (<>
-        <div className="border border-gray-300 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
-            <input
-                type="text"
-                placeholder="제목을 입력하세요"
-                defaultValue={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className='w-full p-3'
-            />
-        </div>
+    return (
         <div
-            className="border border-gray-300 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper cursor-text"
-            onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
-            onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
-            tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
-            aria-label="Post content editor, click or press enter to start writing"
+            ref={containerRef}
+            style={maxHeight ? { height: `${maxHeight}px` } : undefined}
+            className="flex flex-col"
         >
-            <RichWebEditor ref={editorRef} />
-        </div>
-        <div className="mt-4">
-            <TagInput
-                tags={tags}
-                onTagsChange={setTags}
-                placeholder="태그를 입력하고 Enter 또는 쉼표를 누르세요"
-            />
-        </div>
-        <div className="flex justify-end mt-4">
-            <button
-                onClick={handleSubmit}
-                className={`bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition duration-200 ${loading && "opacity-50 cursor-not-allowed"}`}
-                disabled={loading}
-                aria-label="Submit"
+            <div className="border border-gray-300 rounded-b-none rounded-lg has-focus:shadow-sm shrink-0">
+                <input
+                    type="text"
+                    placeholder="제목을 입력하세요"
+                    defaultValue={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className='w-full p-3'
+                />
+            </div>
+            <div
+                className="border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg flex-1 min-h-0 rich-web-editor-wrapper cursor-text"
+                onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
+                onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
+                tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
+                aria-label="Post content editor, click or press enter to start writing"
             >
-                {loading ? "업로드 중..." : "Submit"}
-            </button>
+                <RichWebEditor ref={editorRef} />
+            </div>
+            <div className="mt-4 shrink-0">
+                <TagInput
+                    tags={tags}
+                    onTagsChange={setTags}
+                    placeholder="태그를 입력하고 Enter 또는 쉼표를 누르세요"
+                />
+            </div>
+            <div className="flex justify-end mt-4 shrink-0">
+                <button
+                    onClick={handleSubmit}
+                    className={`bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition duration-200 ${loading && "opacity-50 cursor-not-allowed"}`}
+                    disabled={loading}
+                    aria-label="Submit"
+                >
+                    {loading ? "업로드 중..." : "Submit"}
+                </button>
+            </div>
         </div>
-    </>
     );
 }

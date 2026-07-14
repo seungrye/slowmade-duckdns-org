@@ -333,18 +333,6 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         }
     }, [isMobile, mobileView])
 
-    const autoResizeTextarea = React.useCallback((el: HTMLTextAreaElement) => {
-        el.style.height = 'auto';
-        el.style.height = `${el.scrollHeight}px`;
-    }, []);
-
-    // Code 모드 진입 시 textarea 초기 높이 조절
-    React.useEffect(() => {
-        if (isMarkdownMode && textareaRef.current) {
-            autoResizeTextarea(textareaRef.current);
-        }
-    }, [isMarkdownMode, autoResizeTextarea])
-
     const handleToggleMarkdown = React.useCallback(() => {
         if (!editor) return;
         if (!isMarkdownModeRef.current) {
@@ -373,8 +361,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     const handleMarkdownChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         markdownContentRef.current = e.target.value;
         setMarkdownContent(e.target.value);
-        autoResizeTextarea(e.target);
-    }, [autoResizeTextarea]);
+    }, []);
 
     React.useImperativeHandle(ref, () => ({
         getContent: () => {
