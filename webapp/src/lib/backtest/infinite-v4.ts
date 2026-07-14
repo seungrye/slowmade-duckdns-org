@@ -128,30 +128,23 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
       // ── 매수(T 가 1회분 이상 남았을 때): LOC 종가 체결 ──
       if (T <= splits - 1) {
         let spent = 0;
-        const tryBuy = (limit: number, amt: number) => {
-          if (bar.close > limit) return;
-          const q = Math.floor(amt / limit); // 주문 수량은 지정가 기준
+        // LOC 분할 매수 사다리(원문 §4): 종가가 트리거(별지점/평단) 이하이면 사다리가
+        // 부족분을 채워 그 레그 금액을 종가에 전액 소진 — 몇 칸이 체결되든 총액이 amt 로
+        // 수렴. 종가 단일가 체결이라 수량=⌊amt/종가⌋(종가가 낮을수록 수량↑로 1회액 채움).
+        const ladderBuy = (trigger: number, amt: number) => {
+          if (bar.close > trigger || amt <= 0) return;
+          const q = Math.floor(amt / bar.close);
           if (q < 1) return;
           spent += buyFill(bar, q, bar.close);
           push("buy", bar, q, bar.close);
         };
         if (T < splits / 2) {
-          tryBuy(starPoint, one / 2); // 절반 별지점
-          tryBuy(avg, one / 2); // 절반 평단
+          ladderBuy(starPoint, one / 2); // 전반: 절반 별지점
+          ladderBuy(avg, one - spent); // 나머지(남은 돈 전부) 평단
         } else {
-          tryBuy(starPoint, one); // 후반전: 전체 별지점(평단 아래)
+          ladderBuy(starPoint, one); // 후반전: 전액 별지점(평단 아래)
         }
-        // 사다리 근사: 원문 사다리 레벨은 평단 아래 배치 — 종가가 평단 이하(급락 영역)일 때만
-        // 남은 1회매수액을 종가로 소진. 전반전 별지점 레그만 체결된 보통날은 +0.5회차 유지.
         if (spent > 0) {
-          if (bar.close <= avg) {
-            const rest = one - spent;
-            const q = Math.floor(rest / bar.close);
-            if (q >= 1) {
-              spent += buyFill(bar, q, bar.close);
-              push("buy", bar, q, bar.close);
-            }
-          }
           T += spent / one;
         }
         if (T > splits - 1) {

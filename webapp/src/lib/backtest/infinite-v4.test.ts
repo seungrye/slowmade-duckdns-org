@@ -45,14 +45,26 @@ describe("무한매수 V4.0 (공식 원문) — 일반모드", () => {
     expect(d4buy!.roundNo).toBeLessThan(2); // T=0.75 기반(감축 없으면 1+매수분으로 2 근접)
   });
 
-  it("급락일엔 사다리 근사로 1회매수액을 종가에 소진한다", () => {
-    // d3 종가 50: 별지점·평단 체결 + 남은 예산 종가 추가 매수 → 그날 매수 합계 ≈ 1회액(1000$)
+  it("급락일엔 LOC 사다리로 1회매수액을 종가에 전액 소진한다(원문 §4)", () => {
+    // d3 종가 50(평단 100 아래): 별지점 레그(절반) + 평단 레그(남은 전부) 모두 종가에
+    // 사다리로 채워짐 → 그날 매수 합계 = 1회액(1000$) 거의 전액. 종가가 낮을수록 수량↑.
     const bars = [bar("d1", 100), bar("d2", 100), bar("d3", 50)];
     const r = runInfiniteV4Backtest(bars, CFG);
-    const spent = r.trades.filter((t) => t.date === "d3" && t.side === "buy")
-      .reduce((s, t) => s + t.price * t.qty, 0);
-    expect(spent).toBeGreaterThan(900); // one=3000/(4−1)=1000 의 90%+ 소진
+    const d3buys = r.trades.filter((t) => t.date === "d3" && t.side === "buy");
+    const spent = d3buys.reduce((s, t) => s + t.price * t.qty, 0);
+    expect(d3buys.length).toBe(2); // 별지점 레그 + 평단 레그 둘 다 체결
+    expect(spent).toBeGreaterThan(990); // one=3000/(4−1)=1000 전액 소진(사다리)
     expect(spent).toBeLessThanOrEqual(1000);
+  });
+
+  it("보통일(평단<종가≤별지점)엔 별지점 레그만 체결 → 절반만 소진", () => {
+    // d3 종가 105(평단 100 위, 별지점 107.5 아래): 별지점 레그만 걸리고 평단 레그는 미체결.
+    const bars = [bar("d1", 100), bar("d2", 100), bar("d3", 105)];
+    const r = runInfiniteV4Backtest(bars, CFG);
+    const d3buys = r.trades.filter((t) => t.date === "d3" && t.side === "buy");
+    const spent = d3buys.reduce((s, t) => s + t.price * t.qty, 0);
+    expect(d3buys.length).toBe(1); // 별지점 레그만
+    expect(spent).toBeLessThanOrEqual(500); // 1회액의 절반(one/2=500) 이하
   });
 });
 
