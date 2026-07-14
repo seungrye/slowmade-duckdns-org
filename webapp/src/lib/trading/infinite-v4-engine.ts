@@ -18,6 +18,7 @@ import {
   emptyPending, newV4State, reconcileDay,
   type V4Fill, type V4State,
 } from "./infinite-v4-state";
+import { v4PlanDay, type V4PlannedOrder } from "./v4-plan";
 import { marketToday } from "./engines";
 import type { CycleLogger } from "./engines";
 
@@ -243,8 +244,9 @@ export async function runInfiniteV4(
     log(`[v4:${sym}] 미체결 조회 실패 → 취소 스킵: ${e instanceof Error ? e.message : e}`);
   }
 
-  // ── 3) 오늘 주문 생성 ──
-  const starPct = (t: number) => (cfg.starBase - (2 * cfg.starBase * t) / cfg.splits) / 100;
+  // ── 3) 오늘 주문 생성 — v4PlanDay() 단일 소스(백테스트와 같은 함수) ──
+  // 엔진은 phase 게이트(국장 LOC 에뮬: buy phase 는 현재가≈종가가 조건 충족 레그만 전송)와
+  // 전송·pending 영속만 담당한다.
   const locBuyOk = (limit: number) => (phase === "both" ? true : price <= limit);
   const locSellOk = (limit: number) => (phase === "both" ? true : price >= limit);
   const orders: Order[] = [];
@@ -255,81 +257,55 @@ export async function runInfiniteV4(
     state.recoverConfirmed = false;
   }
 
-  if (holding === 0 && state.mode === "normal") {
-    if (phase !== "sell") {
-      const limit = state.entryLimit || price * 1.10;
-      const one = state.cycleCash / cfg.splits;
-      const q = Math.floor(one / limit);
-      if (q >= 1 && locBuyOk(limit)) {
-        orders.push({ side: "buy", qty: q, price: limit, ordType: "loc",
-                      reason: "V4 첫 매수(전일종가+10% LOC)" });
-      }
-      state.entryLimit = price * 1.10;
-    }
-  } else if (state.mode === "normal") {
-    const starPoint = avg * (1 + starPct(state.t));
-    const one = state.cycleCash / Math.max(0.5, cfg.splits - state.t);
-    pend.one = one;
-    const q25 = Math.floor(holding / 4);
-    const q75 = holding - q25;
-    if (phase !== "buy" && q75 >= 1) {
-      orders.push({ side: "sell", qty: q75, price: avg * (1 + cfg.sellTarget), ordType: "limit",
-                    reason: `V4 75% 익절(평단+${Math.round(cfg.sellTarget * 100)}%)` });
-      pend.q75 = q75;
-    }
-    if (phase !== "sell" && q25 >= 1 && locSellOk(starPoint)) {
-      orders.push({ side: "sell", qty: q25, price: starPoint, ordType: "loc",
-                    reason: `V4 쿼터매도(별지점 T=${state.t.toFixed(2)})` });
-      pend.q25 = q25;
-    }
-    if (phase !== "sell" && state.t <= cfg.splits - 1) {
-      if (state.t < cfg.splits / 2) {
-        const qStar = starPoint > 0 ? Math.floor(one / 2 / starPoint) : 0;
-        if (qStar >= 1 && locBuyOk(starPoint)) {
-          orders.push({ side: "buy", qty: qStar, price: starPoint, ordType: "loc",
-                        reason: "V4 전반 별지점 매수" });
-        }
-        const rest = one - qStar * starPoint;
-        const qAvg = avg > 0 ? Math.floor(rest / avg) : 0;
-        if (qAvg >= 1 && locBuyOk(avg)) {
-          orders.push({ side: "buy", qty: qAvg, price: avg, ordType: "loc",
-                        reason: "V4 전반 평단 매수(사다리 포함)" });
-        }
-      } else {
-        const q = starPoint > 0 ? Math.floor(one / starPoint) : 0;
-        if (q >= 1 && locBuyOk(starPoint)) {
-          orders.push({ side: "buy", qty: q, price: starPoint, ordType: "loc",
-                        reason: "V4 후반 별지점 매수" });
-        }
-      }
-    }
-  } else {
-    // reverse — 별지점R = 직전 5거래일 종가평균
+  let prev5: number[] = [];
+  if (state.mode === "reverse") {
     const hist = await broker.historyLong(sym, 10);
-    const prev5 = hist.filter(([d]) => d < today).slice(0, 5).map(([, c]) => c);
-    const starR = prev5.length >= 5 ? prev5.reduce((a, b) => a + b, 0) / prev5.length : price;
-    let sellQ = Math.floor(holding / (cfg.splits / 2));
-    if (sellQ < 1 && holding > 0) sellQ = 1;
-    if (state.reverseFirstDay) {
-      if (phase !== "buy" && sellQ >= 1) {
-        orders.push({ side: "sell", qty: sellQ, price, ordType: "market",
-                      reason: "V4 리버스 첫날 무조건 매도(MOC 근사)" });
-        pend.reverseFirst = true;
+    prev5 = hist.filter(([d]) => d < today).slice(0, 5).map(([, c]) => c);
+  }
+
+  const plan = v4PlanDay({
+    mode: state.mode, t: state.t, avg, holding, cash: state.cycleCash,
+    refPrice: price, entryLimit: state.entryLimit || null, prev5,
+    reverseFirstDay: state.reverseFirstDay,
+    cfg: { splits: cfg.splits, starBase: cfg.starBase, sellTarget: cfg.sellTarget },
+  });
+  if (state.mode === "normal" && holding > 0) {
+    pend.one = state.cycleCash / Math.max(0.5, cfg.splits - state.t);
+  }
+
+  const REASON: Record<V4PlannedOrder["tag"], string> = {
+    entry: "V4 첫 매수(전일종가+10% LOC)", star: "V4 별지점 매수", avg: "V4 평단 매수",
+    rung: "V4 사다리 매수(X/k)", big: "V4 큰수 매수(접어내림)",
+    q25: `V4 쿼터매도(별지점 T=${state.t.toFixed(2)})`,
+    q75: `V4 75% 익절(평단+${Math.round(cfg.sellTarget * 100)}%)`,
+    rev_first: "V4 리버스 첫날 무조건 매도(MOC 근사)",
+    rev_sell: "V4 리버스 등분 매도(별지점R 위)", rev_qbuy: "V4 리버스 쿼터매수(별지점R 아래)",
+  };
+  for (const o of plan) {
+    if (o.side === "sell") {
+      // q75(장중 지정가)·rev_first(MOC)는 sell phase, LOC 매도(q25/rev_sell)는 buy phase(에뮬)
+      if (o.tag === "q75" || o.tag === "rev_first") {
+        if (phase === "buy") continue;
+        orders.push({ side: "sell", qty: o.qty, price: o.price,
+                      ordType: o.kind === "market" ? "market" : "limit", reason: REASON[o.tag] });
+        if (o.tag === "rev_first") pend.reverseFirst = true;
+        else pend.q75 = o.qty;
+      } else {
+        if (phase === "sell" || !locSellOk(o.price)) continue;
+        orders.push({ side: "sell", qty: o.qty, price: o.price, ordType: "loc", reason: REASON[o.tag] });
+        if (o.tag === "q25") pend.q25 = o.qty;
+        else pend.reverseSell = o.qty;
       }
-    } else {
-      if (phase !== "sell" && sellQ >= 1 && locSellOk(starR)) {
-        orders.push({ side: "sell", qty: sellQ, price: starR, ordType: "loc",
-                      reason: "V4 리버스 등분 매도(별지점R 위)" });
-        pend.reverseSell = sellQ;
-      }
-      if (phase !== "sell") {
-        const q = starR > 0 ? Math.floor(state.cycleCash / 4 / starR) : 0;
-        if (q >= 1 && locBuyOk(starR)) {
-          orders.push({ side: "buy", qty: q, price: starR, ordType: "loc",
-                        reason: "V4 리버스 쿼터매수(별지점R 아래)" });
-        }
-      }
+    } else { // buy — 전부 LOC(진입·사다리 포함)
+      if (phase === "sell" || !locBuyOk(o.price)) continue;
+      orders.push({ side: "buy", qty: o.qty, price: o.price, ordType: "loc", reason: REASON[o.tag] });
     }
+  }
+
+  if (holding === 0 && state.mode === "normal" && phase !== "sell") {
+    state.entryLimit = price * 1.10; // 다음 기준 갱신(미체결 대비)
+  }
+  if (state.mode === "reverse") {
     const prevClose = prev5[0] ?? price;
     if (holding > 0 && avg > 0 && prevClose > avg * (1 - cfg.sellTarget)) {
       state.recoverConfirmed = true;
