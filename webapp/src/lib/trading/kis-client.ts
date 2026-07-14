@@ -128,6 +128,12 @@ export class KisClient {
     return body.includes("EGW00123");
   }
 
+  /** 유량제한(초당 거래건수 초과) — HTTP 200·rt_cd=1 로 와서 handle 이 throw 하기 전에
+   *  재시도로 흡수한다(마감 sync 의 현재가·체결내역 대량 조회가 여기 자주 걸림). */
+  private static isRateLimited(body: string): boolean {
+    return body.includes("초당 거래건수") || body.includes("EGW00201");
+  }
+
   private async getRaw(
     path: string, trId: string, params: Record<string, string>,
     extraHeaders?: Record<string, string>,
@@ -155,6 +161,10 @@ export class KisClient {
           await sleep(backoffMs(attempt));
           continue;
         }
+      }
+      if (KisClient.isRateLimited(text) && attempt < MAX_GET_RETRIES) {
+        await sleep(backoffMs(attempt) + 700); // 초당 거래건수 초과 — throttle(1s) 위에 추가 백오프
+        continue;
       }
       return { data: KisClient.handle(resp.status, text), trCont: resp.headers.get("tr_cont") ?? "" };
     }

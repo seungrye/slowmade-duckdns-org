@@ -168,6 +168,12 @@ describe("close-sync valueHoldings — 현재가 실패 원가 폴백", () => {
     expect(r.hv).toBe(10 * 80 + 5 * 20); // 전부 평단
     expect(r.failRatio).toBe(1);         // 호출측이 MAX_FAIL_RATIO 로 스킵
   });
+  it("07-14 재현: 현재가 0/NaN(유량제한 빈값)도 실패로 처리 → 원가 폴백", () => {
+    // usPrice 가 0(rt_cd=0·last 빈값) 이나 NaN 을 반환해도 0원 평가로 무너지지 않아야 한다.
+    expect(valueHoldings(H, (s) => (s === "TQQQ" ? 100 : 0)).hv).toBe(10 * 100 + 5 * 20);
+    expect(valueHoldings(H, () => NaN).hv).toBe(10 * 80 + 5 * 20);
+    expect(valueHoldings(H, (s) => (s === "TQQQ" ? 0 : NaN)).failed.sort()).toEqual(["SOXL", "TQQQ"]);
+  });
   it("보유 없음: 0·failRatio 0(0나눗셈 안전)", () => {
     expect(valueHoldings({}, () => 1)).toMatchObject({ hv: 0, failRatio: 0 });
   });

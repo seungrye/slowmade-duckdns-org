@@ -31,7 +31,8 @@ const LOOKBACK_DAYS = 90;
 const MAX_FAIL_RATIO = 0.3;
 
 /** 보유 평가(순수) — 현재가 실패 종목은 평단가(취득원가)로 대체해 평가에서 누락되지
- *  않게 한다. priceOf(sym)===null 은 조회 실패를 뜻한다. rows 는 메일 표시용. */
+ *  않게 한다. 유효 현재가 = null 아님 · 유한 · 양수. **0/NaN 도 실패로 처리**(유량제한 시
+ *  usPrice 가 0/빈값을 반환해도 0원 평가로 총자산이 무너지지 않게 — 07-14 붕괴 원인). */
 export function valueHoldings(
   holdings: Record<string, [number, number]>,
   priceOf: (sym: string) => number | null,
@@ -42,8 +43,9 @@ export function valueHoldings(
   const entries = Object.entries(holdings);
   for (const [sym, [qty, avg]] of entries) {
     const live = priceOf(sym);
-    const price = live ?? avg; // 폴백 = 취득원가
-    if (live == null) failed.push(sym);
+    const ok = live != null && Number.isFinite(live) && live > 0;
+    const price = ok ? live : avg; // 폴백 = 취득원가
+    if (!ok) failed.push(sym);
     hv += qty * price;
     rows.push([sym, qty, avg, price]);
   }
