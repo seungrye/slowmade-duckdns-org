@@ -8,6 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
 import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
 import { showAchievementToasts } from '@/lib/show-achievement-toast';
+import { useMobile } from '@/hooks/use-mobile';
 
 export default function PostWriterForm() {
     const { data: session } = useSession();
@@ -21,10 +22,16 @@ export default function PostWriterForm() {
     const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
     const [loading, setLoading] = useState(false);
     const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
+    const isMobile = useMobile();
 
-    // 에디터(제목·본문·태그·제출 버튼 전체)가 뷰포트를 벗어나지 않도록 컨테이너 높이를
-    // 가용 영역(화면 높이 − 컨테이너 상단 오프셋)으로 고정한다. 본문은 내부 스크롤(editor.scss).
+    // 데스크톱에서만: 에디터(제목·본문·태그·제출 전체)를 뷰포트에 고정하고 본문을 내부
+    // 스크롤(editor.scss). 모바일은 플로팅 툴바가 페이지 스크롤을 전제하므로 고정하지 않고
+    // 원래대로 페이지가 늘어나게 둔다(내부 스크롤 미적용).
     useEffect(() => {
+        if (isMobile) {
+            setMaxHeight(undefined);
+            return;
+        }
         const update = () => {
             const el = containerRef.current;
             if (!el) return;
@@ -35,7 +42,7 @@ export default function PostWriterForm() {
         update();
         window.addEventListener('resize', update);
         return () => window.removeEventListener('resize', update);
-    }, []);
+    }, [isMobile]);
 
     useEffect(() => {
         console.log("PostWriterForm mounted with _id:", _id);
@@ -137,8 +144,8 @@ export default function PostWriterForm() {
     return (
         <div
             ref={containerRef}
-            style={maxHeight ? { height: `${maxHeight}px` } : undefined}
-            className="flex flex-col"
+            style={!isMobile && maxHeight ? { height: `${maxHeight}px` } : undefined}
+            className={!isMobile ? "flex flex-col" : undefined}
         >
             <div className="border border-gray-300 rounded-b-none rounded-lg has-focus:shadow-sm shrink-0">
                 <input
@@ -150,7 +157,7 @@ export default function PostWriterForm() {
                 />
             </div>
             <div
-                className="border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg flex-1 min-h-0 rich-web-editor-wrapper cursor-text"
+                className={`border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"}`}
                 onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                 onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                 tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정

@@ -333,6 +333,20 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         }
     }, [isMobile, mobileView])
 
+    // textarea 를 내용 높이에 맞춰 늘린다. 데스크톱은 고정높이 content-wrapper 안에서
+    // 넘치면 그 컨테이너가 내부 스크롤, 모바일은 페이지가 늘어나 페이지 스크롤(플로팅 툴바).
+    const autoResizeTextarea = React.useCallback((el: HTMLTextAreaElement) => {
+        el.style.height = 'auto';
+        el.style.height = `${el.scrollHeight}px`;
+    }, []);
+
+    // Markdown 모드 진입 시 textarea 초기 높이 조절
+    React.useEffect(() => {
+        if (isMarkdownMode && textareaRef.current) {
+            autoResizeTextarea(textareaRef.current);
+        }
+    }, [isMarkdownMode, autoResizeTextarea])
+
     const handleToggleMarkdown = React.useCallback(() => {
         if (!editor) return;
         if (!isMarkdownModeRef.current) {
@@ -361,7 +375,8 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     const handleMarkdownChange = React.useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         markdownContentRef.current = e.target.value;
         setMarkdownContent(e.target.value);
-    }, []);
+        autoResizeTextarea(e.target);
+    }, [autoResizeTextarea]);
 
     React.useImperativeHandle(ref, () => ({
         getContent: () => {

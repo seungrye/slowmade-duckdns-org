@@ -40,7 +40,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
   return (
     <article className="mx-auto px-4 py-6">
       <PostScrollDepth postId={post._id} postTitle={post.title} />
-      <header className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg mb-4 has-focus:shadow-sm">
+      <header className="border border-gray-300 dark:border-gray-700 rounded-b-none rounded-lg has-focus:shadow-sm">
         {/*
           모바일(기본): 3행
             1행) 제목 (좌정렬, wrap 가능)
@@ -70,7 +70,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         </div>
       </header>
 
-      <div className="border border-gray-300 dark:border-gray-700 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
+      <div className="border border-gray-300 dark:border-gray-700 border-t-0 has-focus:shadow-sm rounded-b-lg min-h-[480px] rich-web-editor-wrapper flex flex-col">
         <div className="p-4 transition-all duration-300 ease-in-out flex-1" ref={bodyRef}>
           <RichContentViewer content={post.jsonContent as JSONContent} waitRenderComplete={true} />
         </div>

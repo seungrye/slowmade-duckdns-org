@@ -131,7 +131,7 @@
 .rich-web-editor-markdown {
   display: block;
   width: 100%;
-  height: 100%;               /* content-wrapper 를 채우고 내부 스크롤(페이지 안 늘어남) */
+  min-height: 300px;          /* auto-resize 로 내용 높이만큼 늘어남(넘치면 컨테이너가 스크롤) */
   padding: 1.5rem;
   font-family: "DM Mono", "Fira Code", "Cascadia Code", monospace;
   font-size: 0.875rem;
@@ -141,10 +141,18 @@
   border: none;
   outline: none;
   resize: none;
-  overflow-y: auto;
+  overflow: hidden;
   box-sizing: border-box;
 
   .dark & {
     color: var(--tt-gray-dark-900);
+  }
+}
+
+/* 모바일: 비주얼 모드(.tiptap.ProseMirror)와 동일한 축소 padding 을 마크다운 모드에도
+   적용 — 미적용 시 마크다운일 때만 본문 padding 이 더 커 보이는 문제(모드 전환 불일치). */
+@media screen and (max-width: 480px) {
+  .rich-web-editor-markdown {
+    padding: .5rem .75rem;
   }
 }
