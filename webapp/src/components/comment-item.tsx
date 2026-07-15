@@ -80,7 +80,7 @@ export default function CommentItem({
           ref={onRef}
           className={`${indentClass}flex items-start gap-4 border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-950/30 rounded-lg rounded-br-none p-4 transition-all duration-300`}
         >
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="text-lg" aria-label="enji">✨</span>
               <h3 className={`font-medium text-purple-700 dark:text-purple-300 tracking-tighter ${manrope.className}`}>
@@ -144,7 +144,7 @@ export default function CommentItem({
           ref={onRef}
           className={`${indentClass}flex items-start gap-4 border border-gray-200 dark:border-gray-700 rounded-lg rounded-br-none p-4 transition-all duration-300`}
         >
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h3 className={`font-medium text-gray-900 dark:text-white tracking-tighter ${manrope.className}`}>
                 {c.author}
