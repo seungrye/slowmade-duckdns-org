@@ -555,6 +555,21 @@ export class KisClient {
     );
   }
 
+  /** 미국 기간 체결내역 — 전 종목(PDNO="")을 거래소별(NASD/NYSE/AMEX)로 일괄 조회·병합.
+   *  종목별 조회(수백 종목)보다 훨씬 적은 호출로 전 거래소 체결을 잡는다.
+   *  (거래소를 지정하지 않으면 KIS 가 NASD 만 반환 → NYSE 상장 보유의 체결을 놓친다.) */
+  async usExecutionsAll(startDate: string, endDate: string): Promise<Json[]> {
+    const out: Json[] = [];
+    for (const excd of ["NASD", "NYSE", "AMEX"]) {
+      try {
+        out.push(...await this.usExecutions("", startDate, endDate, excd));
+      } catch {
+        // 거래소별 실패는 스킵(부분 결과라도 반영) — 유량제한은 하위 getRaw 가 이미 재시도.
+      }
+    }
+    return out;
+  }
+
   /** 미국 미체결내역(취소 대상). */
   async usOpenOrders(excd = "NASD"): Promise<Json[]> {
     return this.getPaged(

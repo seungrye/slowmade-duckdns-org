@@ -238,17 +238,27 @@ export async function runCloseSync(
     .toISOString().slice(0, 10).replace(/-/g, "");
   if (!isToss) {
     const fills: Fill[] = [];
-    for (const sym of tradeSyms) {
+    if (market === "us") {
+      // 미장: 거래소별 일괄조회(전 종목). 종목별 NASD 조회는 NYSE 상장 보유의 체결을
+      // 놓쳐 실현손익이 0 이 되던 원인 → 전 거래소 일괄로 교체.
       try {
-        const rows = market === "kr"
-          ? await kis!.krExecutions(sym, start, todayKey)
-          : await kis!.usExecutions(sym, start, todayKey);
-        for (const r of rows) {
+        for (const r of await kis!.usExecutionsAll(start, todayKey)) {
           const p = parseFill(r as Json);
           if (p) fills.push(p);
         }
       } catch (e) {
-        log(`[${sym}] 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
+        log(`미장 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
+      }
+    } else {
+      for (const sym of tradeSyms) {
+        try {
+          for (const r of await kis!.krExecutions(sym, start, todayKey)) {
+            const p = parseFill(r as Json);
+            if (p) fills.push(p);
+          }
+        } catch (e) {
+          log(`[${sym}] 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
+        }
       }
     }
     const out = fillsToTradesAndPnl(fills, {
