@@ -17,6 +17,7 @@ import { makeKisClient, makeTossClient, marketToday } from "./engines";
 import type { CycleLogger } from "./engines";
 import { TossClient } from "./toss-client";
 import { sendTradingMail } from "./mailer";
+import { UNIVERSES } from "./universes";
 
 type Json = Record<string, unknown>;
 type Fill = {
@@ -196,8 +197,11 @@ export async function runCloseSync(
     log(`잔고 조회 실패 → 포트폴리오 스냅샷 생략: ${e instanceof Error ? e.message : e}`);
   }
 
-  // ① 가격 push — syncUniverse ∪ config.universe ∪ 보유
+  // ① 가격 push — syncUniverseRef(명명 유니버스) ∪ syncUniverse(인라인, 하위호환) ∪
+  //   config.universe ∪ 보유. 대형 종목 목록은 포트폴리오 문서 대신 universes.ts 로 분리.
+  const ref = typeof cfg.syncUniverseRef === "string" ? (UNIVERSES[cfg.syncUniverseRef] ?? []) : [];
   const uni = new Set<string>([
+    ...ref,
     ...(Array.isArray(cfg.syncUniverse) ? (cfg.syncUniverse as string[]) : []),
     ...(Array.isArray(cfg.universe) ? (cfg.universe as string[]) : []),
     ...(cfg.symbol ? [String(cfg.symbol)] : []),
