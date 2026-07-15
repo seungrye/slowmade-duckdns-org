@@ -43,6 +43,26 @@ export default function CommentContent({ content }: { content: string }) {
               {children}
             </code>
           ),
+          // remark-gfm 이 표를 <table> 로 파싱하지만 Tailwind Preflight 가 기본 테두리를
+          // 지우므로 여기서 명시 스타일. 넓은 표는 가로 스크롤 컨테이너로 감싸 모바일 대응.
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-2">
+              <table className="border-collapse w-full text-sm">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => (
+            <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>
+          ),
+          th: ({ children }) => (
+            <th className="border border-gray-300 dark:border-gray-600 px-2 py-1 text-left font-semibold whitespace-nowrap">
+              {children}
+            </th>
+          ),
+          td: ({ children }) => (
+            <td className="border border-gray-300 dark:border-gray-600 px-2 py-1 align-top">
+              {children}
+            </td>
+          ),
           blockquote: ({ children }) => (
             <blockquote className="border-l-4 border-gray-300 dark:border-gray-600 pl-3 my-1 text-gray-600 dark:text-gray-400">
               {children}
