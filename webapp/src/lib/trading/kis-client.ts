@@ -38,6 +38,8 @@ const TR: Record<string, [string, string]> = {
   us_ccnl: ["VTTS3035R", "TTTS3035R"],
   us_nccs: ["VTTS3018R", "TTTS3018R"],
   us_rvsecncl: ["VTTT1004U", "TTTT1004U"],
+  us_period_profit: ["VTTS3039R", "TTTS3039R"], // 해외 기간손익(모의 미지원 — 실계좌만)
+  kr_period_profit: ["VTTC8708R", "TTTC8708R"], // 국내 기간별매매손익(모의 미지원 — 실계좌만)
 };
 
 const MAX_GET_RETRIES = 4;
@@ -568,6 +570,35 @@ export class KisClient {
       }
     }
     return out;
+  }
+
+  /** 미국 기간 실현손익 총액(inquire-period-profit output2). 증권사가 계산한 값.
+   *  모의투자는 미지원 → KisError throw(호출측이 자체계산으로 폴백). */
+  async usRealizedPnl(startDate: string, endDate: string): Promise<number> {
+    const d = await this.get(
+      "/uapi/overseas-stock/v1/trading/inquire-period-profit", this.tr("us_period_profit"),
+      {
+        CANO: this.cano, ACNT_PRDT_CD: this.prdt, OVRS_EXCG_CD: "%", NATN_CD: "000",
+        CRCY_CD: "USD", PDNO: "", INQR_STRT_DT: startDate, INQR_END_DT: endDate,
+        WCRC_FRCR_DVSN_CD: "02", CTX_AREA_FK200: "", CTX_AREA_NK200: "",
+      },
+    );
+    const o2 = (Array.isArray(d.output2) ? d.output2[0] : d.output2) as Json | undefined;
+    return Number(o2?.ovrs_rlzt_pfls_amt ?? o2?.rlzt_pfls_amt ?? 0);
+  }
+
+  /** 국내 기간 실현손익 총액(inquire-period-trade-profit output2). 모의 미지원 → throw. */
+  async krRealizedPnl(startDate: string, endDate: string): Promise<number> {
+    const d = await this.get(
+      "/uapi/domestic-stock/v1/trading/inquire-period-trade-profit", this.tr("kr_period_profit"),
+      {
+        CANO: this.cano, ACNT_PRDT_CD: this.prdt, SORT_DVSN: "00", PDNO: "",
+        INQR_STRT_DT: startDate, INQR_END_DT: endDate, CBLC_DVSN: "00",
+        CTX_AREA_FK100: "", CTX_AREA_NK100: "",
+      },
+    );
+    const o2 = (Array.isArray(d.output2) ? d.output2[0] : d.output2) as Json | undefined;
+    return Number(o2?.tot_rlzt_pfls ?? o2?.rlzt_pfls ?? 0);
   }
 
   /** 미국 미체결내역(취소 대상). */

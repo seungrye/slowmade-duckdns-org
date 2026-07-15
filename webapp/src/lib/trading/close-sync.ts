@@ -264,9 +264,20 @@ export async function runCloseSync(
     const out = fillsToTradesAndPnl(fills, {
       env: account.envKey, strategy: portfolio.strategy, market, today,
     });
-    run = out.run;
+    run = out.run;   // 폴백값(체결내역 avg-cost 자체계산)
     cum = out.cum;
     tradeCount = await upsertTrades(out.records);
+    // 실현손익은 **증권사 기간손익 API 우선**(실계좌) — 실패(모의 미지원)면 위 자체계산 유지.
+    // (매매기록/차트 마커는 체결내역이 단일 소스, pnl 총액만 증권사 값으로 대체.)
+    try {
+      const base = new Date(now.getTime() - 1825 * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
+      cum = market === "kr" ? await kis!.krRealizedPnl(base, todayKey) : await kis!.usRealizedPnl(base, todayKey);
+      run = market === "kr" ? await kis!.krRealizedPnl(todayKey, todayKey) : await kis!.usRealizedPnl(todayKey, todayKey);
+      log(`실현손익: 증권사 기간손익 API 사용 (오늘 ${run.toFixed(0)} · 누적 ${cum.toFixed(0)})`);
+    } catch (e) {
+      log(`실현손익: 기간손익 API 미지원(모의 등) → 체결내역 자체계산 유지 (누적 ${cum.toFixed(0)}): `
+        + `${e instanceof Error ? e.message : e}`);
+    }
   } else {
     log("토스: 종료 주문 목록 미지원 — 매매기록은 주문 로그 기반(v4 대사 경로) 유지");
   }
