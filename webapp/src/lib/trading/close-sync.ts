@@ -199,9 +199,12 @@ export async function runCloseSync(
 
   // ① 가격 push — syncUniverseRef(명명 유니버스) ∪ syncUniverse(인라인, 하위호환) ∪
   //   config.universe ∪ 보유. 대형 종목 목록은 포트폴리오 문서 대신 universes.ts 로 분리.
-  const ref = typeof cfg.syncUniverseRef === "string" ? (UNIVERSES[cfg.syncUniverseRef] ?? []) : [];
+  const refSyms = [
+    ...(typeof cfg.syncUniverseRef === "string" ? (UNIVERSES[cfg.syncUniverseRef] ?? []) : []),
+    ...(typeof cfg.universeRef === "string" ? (UNIVERSES[cfg.universeRef] ?? []) : []),
+  ];
   const uni = new Set<string>([
-    ...ref,
+    ...refSyms,
     ...(Array.isArray(cfg.syncUniverse) ? (cfg.syncUniverse as string[]) : []),
     ...(Array.isArray(cfg.universe) ? (cfg.universe as string[]) : []),
     ...(cfg.symbol ? [String(cfg.symbol)] : []),

@@ -10,6 +10,7 @@ import { decryptSecret } from "./crypto";
 import { KisClient, US_ORDER_EXCD, registerUsExcd, usQuoteExcd } from "./kis-client";
 import { lrsDecide, rotationDecide, trendDecide, type OrderIntent } from "./strategies";
 import { TossClient } from "./toss-client";
+import { UNIVERSES, EXCD_MAPS } from "./universes";
 import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
 import type { TradingAccountType } from "@/models/trading-account";
@@ -251,10 +252,13 @@ async function runTrend(
   account: AccountDoc, p: PortfolioDoc, runId: Types.ObjectId, broker: LiveBroker, log: CycleLogger,
 ): Promise<string> {
   const cfg = p.config as Cfg;
-  const universe = Array.isArray(cfg.universe) ? (cfg.universe as string[]) : [];
-  if (!universe.length) return "trend: 유니버스 비어 있음(설정의 universe 배열 필요)";
-  if (p.market === "us" && cfg.excdMap && typeof cfg.excdMap === "object") {
-    registerUsExcd(cfg.excdMap as Record<string, string>); // NYSE/AMEX 종목 시세 조회용
+  // universeRef(명명 유니버스) 우선, 없으면 인라인 universe(하위호환).
+  const ref = typeof cfg.universeRef === "string" ? cfg.universeRef : null;
+  const universe = ref ? (UNIVERSES[ref] ?? []) : (Array.isArray(cfg.universe) ? (cfg.universe as string[]) : []);
+  if (!universe.length) return "trend: 유니버스 비어 있음(설정의 universeRef 또는 universe 필요)";
+  const excdMap = ref ? EXCD_MAPS[ref] : (cfg.excdMap as Record<string, string> | undefined);
+  if (p.market === "us" && excdMap && typeof excdMap === "object") {
+    registerUsExcd(excdMap); // NYSE/AMEX 종목 시세 조회용
   }
   const shortMa = Number(cfg.shortMa ?? 20);
   const longMa = Number(cfg.longMa ?? 60);
