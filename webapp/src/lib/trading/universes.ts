@@ -194,3 +194,27 @@ export const EXCD_MAPS: Record<string, Record<string, string>> = {
     TECL: "AMS", TNA: "AMS", FAS: "AMS", LABU: "AMS",
   },
 };
+
+// 지수/레버리지 ETF 티커 → 표시명. stocks 컬렉션은 지수 '구성종목'만 이름을 가져
+// ETF(069500=KODEX 200, TQQQ 등)는 이름이 없다. 차트/매매 상세에서 티커만 보이지 않도록
+// 폴백 이름을 제공한다(출처: universe.py US_ETFS/KR_ETFS). DB 이름이 있으면 그쪽이 우선.
+export const ETF_NAMES: Record<string, string> = {
+  // 국장
+  "069500": "KODEX 200",
+  "122630": "KODEX 레버리지",
+  "252670": "KODEX 200선물인버스2X",
+  "233740": "KODEX 코스닥150레버리지",
+  "251340": "KODEX 코스닥150선물인버스",
+  "409820": "KODEX 미국나스닥100레버리지(합성 H)",
+  "423920": "TIGER 미국필라델피아반도체레버리지(합성)",
+  "418660": "TIGER 미국나스닥100레버리지(합성)",
+  "494310": "KODEX 반도체레버리지",
+  "243880": "TIGER 200IT레버리지",
+  "462330": "KODEX 2차전지산업레버리지",
+  // 미장
+  QQQ: "Invesco QQQ", TQQQ: "ProShares UltraPro QQQ", SQQQ: "ProShares UltraPro Short QQQ",
+  SPY: "SPDR S&P 500", VOO: "Vanguard S&P 500", UPRO: "ProShares UltraPro S&P500",
+  SOXL: "Direxion Semiconductor Bull 3X", TECL: "Direxion Technology Bull 3X",
+  TNA: "Direxion Small Cap Bull 3X", FAS: "Direxion Financial Bull 3X",
+  LABU: "Direxion Biotech Bull 3X",
+};

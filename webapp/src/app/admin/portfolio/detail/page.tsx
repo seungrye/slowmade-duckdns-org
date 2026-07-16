@@ -5,6 +5,7 @@ import { connectToDB } from "@/lib/db";
 import StockTrade from "@/models/stock-trade";
 import StockDailyPrice from "@/models/stock-daily-price";
 import Stock from "@/models/stock";
+import { ETF_NAMES } from "@/lib/trading/universes";
 import { getPortfolioData, type Env, type Currency } from "@/lib/portfolio";
 import PortfolioDetailClient from "./portfolio-detail-client";
 
@@ -68,6 +69,8 @@ export default async function PortfolioDetailPage(props: {
     : [];
   const names: Record<string, string> = {};
   for (const n of nameDocs) names[n.ticker as string] = n.name as string;
+  // stocks 에 없는 지수/레버리지 ETF(예: 069500=KODEX 200)는 ETF_NAMES 로 보완 — DB 이름 우선.
+  for (const tk of tickers) if (!names[tk] && ETF_NAMES[tk]) names[tk] = ETF_NAMES[tk];
 
   const { history } = await getPortfolioData(env, currency);
 
