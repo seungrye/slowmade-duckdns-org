@@ -190,7 +190,11 @@ function parseCfg(config: Json): V4Config {
 function loadState(raw: unknown, cfg: V4Config): V4State {
   const v = (raw ?? {}) as Partial<V4State>;
   if (typeof v.cycleCash === "number" && typeof v.t === "number" && v.pending) {
-    return { ...newV4State(cfg.symbol, cfg.splits, cfg.principal), ...v } as V4State;
+    // 진행 상태(t·cycleCash·mode·pending 등)는 이어받되 splits 는 config 를 원본으로 삼는다.
+    // reconcileDay 의 reverse 트리거(t > splits−1)·감쇠(0.9/0.95)는 s.splits 를 읽으므로,
+    // 사이클 도중 config.splits 를 바꿔도 이렇게 해야 즉시 반영된다. (예전엔 ...v 의 stale
+    // state.splits 가 config 를 덮어 주문사이즈=20 / reverse=40 로 혼재됐다.)
+    return { ...newV4State(cfg.symbol, cfg.splits, cfg.principal), ...v, splits: cfg.splits } as V4State;
   }
   return newV4State(cfg.symbol, cfg.splits, cfg.principal);
 }
