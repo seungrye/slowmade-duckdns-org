@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireIngestKey } from "@/lib/require-ingest-key";
 import { connectToDB } from "@/lib/db";
 import StockTrade from "@/models/stock-trade";
+import { normalizeTradeTime } from "@/lib/trade-time";
 
 export const dynamic = "force-dynamic";
 
@@ -46,9 +47,11 @@ export async function POST(req: NextRequest) {
         typeof t.time === "string" &&
         typeof t.date === "string",
     )
-    .map((t) => ({
+    .map((t) => {
+      const time = normalizeTradeTime(t.time);
+      return {
       updateOne: {
-        filter: { env: t.env, ticker: t.ticker, time: t.time },
+        filter: { env: t.env, ticker: t.ticker, time },
         update: {
           $set: {
             env: t.env,
@@ -61,13 +64,14 @@ export async function POST(req: NextRequest) {
             amount: t.amount ?? t.price * t.qty,
             currency: t.currency ?? "KRW",
             date: t.date,
-            time: t.time,
+            time,
           },
           $currentDate: { updatedAt: true },
         },
         upsert: true,
       },
-    }));
+    };
+    });
   if (ops.length === 0) return NextResponse.json({ upserted: 0 });
   try {
     const r = await StockTrade.collection.bulkWrite(ops as never, { ordered: false });

@@ -18,6 +18,7 @@ import type { CycleLogger } from "./engines";
 import { TossClient } from "./toss-client";
 import { sendTradingMail } from "./mailer";
 import { UNIVERSES } from "./universes";
+import { normalizeTradeTime } from "@/lib/trade-time";
 
 type Json = Record<string, unknown>;
 type Fill = {
@@ -148,13 +149,16 @@ async function upsertPrices(records: Json[]): Promise<number> {
 
 async function upsertTrades(records: Json[]): Promise<number> {
   if (!records.length) return 0;
-  const ops = records.map((r) => ({
-    updateOne: {
-      filter: { env: r.env, ticker: r.ticker, time: r.time },
-      update: { $set: r },
-      upsert: true,
-    },
-  }));
+  const ops = records.map((r) => {
+    const time = normalizeTradeTime(String(r.time));
+    return {
+      updateOne: {
+        filter: { env: r.env, ticker: r.ticker, time },
+        update: { $set: { ...r, time } },
+        upsert: true,
+      },
+    };
+  });
   const res = await StockTrade.collection.bulkWrite(ops as never[], { ordered: false });
   return (res.upsertedCount ?? 0) + (res.modifiedCount ?? 0);
 }
