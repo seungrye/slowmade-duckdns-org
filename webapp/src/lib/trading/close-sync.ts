@@ -12,12 +12,12 @@ import StockDailyPrice from "@/models/stock-daily-price";
 import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
 import type { Types } from "mongoose";
-import { KisClient, usQuoteExcd } from "./kis-client";
+import { KisClient, usQuoteExcd, registerUsExcd } from "./kis-client";
 import { makeKisClient, makeTossClient, marketToday } from "./engines";
 import type { CycleLogger } from "./engines";
 import { TossClient } from "./toss-client";
 import { sendTradingMail } from "./mailer";
-import { UNIVERSES } from "./universes";
+import { UNIVERSES, EXCD_MAPS } from "./universes";
 import { normalizeTradeTime } from "@/lib/trade-time";
 
 type Json = Record<string, unknown>;
@@ -214,6 +214,19 @@ export async function runCloseSync(
     ...(cfg.symbol ? [String(cfg.symbol)] : []),
     ...Object.keys(holdings),
   ]);
+  // NYSE/AMEX 종목 일봉은 정확한 EXCD 로 조회해야 한다. registerUsExcd 는 trend 엔진
+  // 매매 사이클에서만 호출되는데, close-sync(마감 사이클)는 별도 실행이라 모듈 레지스트리가
+  // 비어 있다 → 미등록 NYSE 종목이 전부 기본 NAS 로 조회돼 0건(07-14 NYSE 가격 유실 원인).
+  // 여기서도 포트폴리오 excd 매핑(universeRef 또는 인라인)을 등록한다.
+  if (market === "us" && !isToss) {
+    const em =
+      (typeof cfg.universeRef === "string" ? EXCD_MAPS[cfg.universeRef] : undefined) ??
+      (typeof cfg.syncUniverseRef === "string" ? EXCD_MAPS[cfg.syncUniverseRef] : undefined) ??
+      (cfg.excdMap && typeof cfg.excdMap === "object"
+        ? (cfg.excdMap as Record<string, string>)
+        : undefined);
+    if (em) registerUsExcd(em);
+  }
   let priceRecords = 0, priceSyms = 0;
   for (const sym of uni) {
     try {
