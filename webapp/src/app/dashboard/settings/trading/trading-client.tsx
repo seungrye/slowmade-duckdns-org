@@ -340,25 +340,34 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
               <div>
                 <b>추세추종 (trend_v1)</b> — 유니버스 골든/데드크로스 스캔
                 <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
-  "universe": ["TQQQ","QQQ", ...], // 스캔 종목 배열(필수)
-  "excdMap": {"MMM":"NYS"},       // 미장 전용 — NAS 외 거래소 종목 매핑(없으면 NAS 가정)
+  // 스캔 종목 — universeRef(권장) 또는 universe 둘 중 하나(필수)
+  "universeRef": "sp500-us",       // 명명 유니버스 참조(아래 목록). 미장 거래소맵도 자동 적용
+  // "universe": ["TQQQ","QQQ"],    // 또는 인라인 배열로 직접 나열
+  // "excdMap": {"MMM":"NYS"},      // 인라인 universe 일 때만 — NAS 외 거래소 매핑(universeRef 는 자동)
   "shortMa": 20, "longMa": 60,
   "positionSize": 0.05             // 종목당 현금 비중(0.05 = 5%)
 }`}</pre>
+                <p className="mt-1">
+                  명명 유니버스: <code>sp500-us</code>(미장 514) · <code>kospi200-kr</code>(국장 211).
+                  거래소 매핑을 포함해 코드(universes.ts)에서 관리 — 큰 목록은 참조가 권장된다.
+                </p>
               </div>
               <div>
                 <b>무한매수 V4 (infinite_v4)</b> — 미장 실제 LOC(KIS 34/토스 CLS), 국장 09:30 매도+15:20 매수 자동(LOC 에뮬)
                 <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
-  "symbol": "TQQQ",     // 종목 1개(필수) — 다른 전략과 겹치지 않게
+  "symbol": "069500",   // 종목 1개(필수) — 다른 전략과 겹치지 않게
   "principal": 10000,   // 종목 전용 원금(필수) — 복리 장부(cycleCash)의 시작값
   "splits": 20,         // 분할 수 — 20(공격, 리버스 감쇠 0.9) / 40(방어, 0.95)
   "starBase": 15,       // 별% base — TQQQ 15 / SOXL 20
-  "sellTarget": 15      // 75% 지정가매도 목표 % (평단 대비)
+  "sellTarget": 10,     // 지정가매도 목표 % (평단 대비)
+  "syncUniverseRef": "kospi200-kr" // (선택) 차트 가격선 유니버스 — 매매는 symbol 1개지만
+                                   //  차트엔 지수 구성종목 가격을 함께 그린다. 인라인은 "syncUniverse": [...]
 }`}</pre>
                 <p className="mt-1">
                   진행 중 사이클을 이어받을 땐 상태(T·장부현금)가 state.v4 에 저장된다 —
                   기존 보유가 있으면 v4 사이클로 편입되니 종목 중복에 주의. 무한매수 v1 은
-                  파이썬 데몬 전용.
+                  파이썬 데몬 전용. <code>syncUniverseRef</code> 는 매매엔 영향 없고 차트 가격
+                  수집 범위만 넓힌다(생략 시 보유 종목만 수집).
                 </p>
               </div>
             </div>
