@@ -9,8 +9,8 @@ export type Env = string;
 export async function listEnvs(): Promise<string[]> {
   await connectToDB();
   const [a, b] = await Promise.all([
-    PortfolioHistory.distinct("env"),
-    StockTrade.distinct("env"),
+    PortfolioHistory.distinct("env", { hidden: { $ne: true } }),
+    StockTrade.distinct("env", { hidden: { $ne: true } }),
   ]);
   const set = new Set<string>([...a, ...b].filter(Boolean));
   return [...set].sort();
@@ -98,11 +98,11 @@ export function aggregateTradesByDate(trades: TradeDoc[]): Record<string, TradeS
  */
 export async function getPortfolioData(env: Env, currency: Currency): Promise<PortfolioData> {
   await connectToDB();
-  const histDocs = await PortfolioHistory.find({ env, currency })
+  const histDocs = await PortfolioHistory.find({ env, currency, hidden: { $ne: true } })
     .select({ date: 1, dateStr: 1, totalValue: 1, cash: 1, holdingsValue: 1, cumulativePnl: 1, _id: 0 })
     .sort({ date: 1 })
     .lean();
-  const trades = await StockTrade.find({ env, currency })
+  const trades = await StockTrade.find({ env, currency, hidden: { $ne: true } })
     .select({ ticker: 1, action: 1, amount: 1, price: 1, qty: 1, date: 1, _id: 0 })
     .lean();
 

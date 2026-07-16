@@ -25,6 +25,8 @@ const PortfolioHistorySchema = new Schema(
     holdingsValue: { type: Number, default: 0 },
     runPnl: { type: Number, default: 0 },
     cumulativePnl: { type: Number, default: 0 },
+    // 소프트 삭제 — 포트폴리오 삭제 시 (env,currency) 스냅샷을 숨긴다(복구 가능). 조회는 { hidden: { $ne: true } }.
+    hidden: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

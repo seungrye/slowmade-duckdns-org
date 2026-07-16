@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const from = req.nextUrl.searchParams.get("from");
   const to = req.nextUrl.searchParams.get("to");
 
-  const query: Record<string, unknown> = { ticker: { $in: requested } };
+  const query: Record<string, unknown> = { ticker: { $in: requested }, hidden: { $ne: true } };
   if (env) query.env = env;
   if (from || to) {
     const range: Record<string, string> = {};

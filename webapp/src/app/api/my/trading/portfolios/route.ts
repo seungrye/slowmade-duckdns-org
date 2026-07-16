@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireOwner } from "@/lib/require-owner";
 import { connectToDB } from "@/lib/db";
 import TradingPortfolio from "@/models/trading-portfolio";
+import TradingAccount from "@/models/trading-account";
+import StockTrade from "@/models/stock-trade";
+import PortfolioHistory from "@/models/portfolio-history";
+
+/** 포트폴리오의 (env, currency) 로 매매기록·이력 숨김/복구 토글 — 소프트 삭제.
+ *  (accountId, market) 이 unique 라 (env,currency)당 포트폴리오는 유일 → 다른 블록 안 건드림. */
+async function setHidden(accountId: unknown, market: string, hidden: boolean): Promise<void> {
+  const acct = await TradingAccount.findById(accountId).select({ envKey: 1 }).lean();
+  const env = (acct as { envKey?: string } | null)?.envKey;
+  if (!env) return;
+  const currency = market === "kr" ? "KRW" : "USD";
+  // 복구(hidden=false)는 숨겨진 것만 대상, 숨김(true)은 전체 대상.
+  const filter = hidden ? { env, currency } : { env, currency, hidden: true };
+  await Promise.all([
+    StockTrade.updateMany(filter, { $set: { hidden } }),
+    PortfolioHistory.updateMany(filter, { $set: { hidden } }),
+  ]);
+}
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +83,8 @@ export async function POST(req: NextRequest) {
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+  // 삭제(숨김)했던 같은 (env,currency) 기록을 재생성 시 자동 복구.
+  await setHidden(body.accountId, market, false);
   return NextResponse.json({ id: String(doc._id) });
 }
 
@@ -73,6 +93,13 @@ export async function DELETE(req: NextRequest) {
   if (owner instanceof NextResponse) return owner;
   const id = String(new URL(req.url).searchParams.get("id") ?? "");
   await connectToDB();
+  const pf = await TradingPortfolio.findById(id).select({ accountId: 1, market: 1 }).lean();
   await TradingPortfolio.deleteOne({ _id: id });
+  // 매매기록·이력은 하드 삭제하지 않고 숨김(복구 가능) — 포트폴리오를 같은 계정·시장으로
+  // 다시 만들면 POST 에서 자동 복구된다.
+  if (pf) {
+    const p = pf as { accountId: unknown; market: string };
+    await setHidden(p.accountId, p.market, true);
+  }
   return NextResponse.json({ ok: true });
 }

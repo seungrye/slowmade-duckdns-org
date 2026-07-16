@@ -29,7 +29,7 @@ export default async function PortfolioDetailPage(props: {
 
   await connectToDB();
 
-  const tradeDocs = await StockTrade.find({ env, currency })
+  const tradeDocs = await StockTrade.find({ env, currency, hidden: { $ne: true } })
     .select({ ticker: 1, action: 1, qty: 1, cumulativeQty: 1, price: 1, amount: 1, date: 1, time: 1, strategy: 1, _id: 0 })
     .sort({ date: 1, time: 1 })
     .lean();

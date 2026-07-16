@@ -28,6 +28,9 @@ const StockTradeSchema = new Schema(
     currency: { type: String, default: "KRW" },
     date: { type: String, required: true }, // YYYY-MM-DD
     time: { type: String, required: true }, // ISO
+    // 소프트 삭제 — 포트폴리오 삭제 시 (env,currency) 기록을 숨긴다(하드 삭제 아님, 복구 가능).
+    // 미설정(undefined)=표시. 조회는 { hidden: { $ne: true } } 로 제외.
+    hidden: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
