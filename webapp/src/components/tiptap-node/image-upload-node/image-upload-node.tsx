@@ -106,10 +106,12 @@ function useFileUpload(options: UploadOptions) {
     }
   }
 
-  const uploadFiles = async (files: File[]): Promise<string | null> => {
+  const uploadFiles = async (
+    files: File[]
+  ): Promise<{ url: string; name: string }[]> => {
     if (!files || files.length === 0) {
       options.onError?.(new Error("No files to upload"))
-      return null
+      return []
     }
 
     if (options.limit && files.length > options.limit) {
@@ -118,16 +120,16 @@ function useFileUpload(options: UploadOptions) {
           `Maximum ${options.limit} file${options.limit === 1 ? "" : "s"} allowed`
         )
       )
-      return null
+      return []
     }
 
-    const file = files[0]
-    if (!file) {
-      options.onError?.(new Error("File is undefined"))
-      return null
+    // 여러 장을 한 번에 — 순차 업로드(fileItem 프리뷰가 현재 파일 진행률 표시).
+    const results: { url: string; name: string }[] = []
+    for (const file of files) {
+      const url = await uploadFile(file)
+      if (url) results.push({ url, name: file.name.replace(/\.[^/.]+$/, "") || "image" })
     }
-
-    return uploadFile(file)
+    return results
   }
 
   const clearFileItem = () => {
@@ -357,23 +359,24 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
   }
 
   const handleUpload = async (files: File[]) => {
-    const url = await uploadFiles(files)
+    const uploaded = await uploadFiles(files)
 
-    if (url) {
+    if (uploaded.length > 0) {
       const pos = props.getPos()
       if (pos === undefined) return
-      const filename = files[0]?.name.replace(/\.[^/.]+$/, "") || "unknown"
 
+      // 업로드 노드 1개를 제거하고 업로드된 이미지들을 순서대로 삽입.
       props.editor
         .chain()
         .focus()
         .deleteRange({ from: pos, to: pos + 1 })
-        .insertContentAt(pos, [
-          {
+        .insertContentAt(
+          pos,
+          uploaded.map(({ url, name }) => ({
             type: "image",
-            attrs: { src: url, alt: filename, title: filename },
-          },
-        ])
+            attrs: { src: url, alt: name, title: name },
+          }))
+        )
         .run()
     }
   }
@@ -411,6 +414,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
         name="file"
         accept={accept}
         type="file"
+        multiple={limit !== 1}
         onChange={handleChange}
         onClick={(e: React.MouseEvent<HTMLInputElement>) => e.stopPropagation()}
       />
