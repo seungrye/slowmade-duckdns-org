@@ -65,16 +65,28 @@ describe("lintSceneContent — DEAD_END", () => {
 });
 
 describe("lintSceneContent — TOO_MANY_CHOICES", () => {
-  it("choices > 3 → TOO_MANY_CHOICES", () => {
+  it("choices > 6 → TOO_MANY_CHOICES", () => {
     const reg: SceneRegistry = {
       s: makeScene({
         id: "s",
-        choices: Array.from({ length: 4 }, (_, i) => ({ kind: "plain", id: `c${i}`, label: "x", to: "e" })),
+        choices: Array.from({ length: 7 }, (_, i) => ({ kind: "plain", id: `c${i}`, label: "x", to: "e" })),
       }),
       e: makeScene({ id: "e", isEnding: true, endingId: "fall" }),
     };
     const r = lintSceneContent(reg, { startSceneIds: ["s"] });
     expect(r.issues.some((i) => i.code === "TOO_MANY_CHOICES" && i.sceneId === "s")).toBe(true);
+  });
+
+  it("choices 6개(=pool 상한) → TOO_MANY_CHOICES 아님", () => {
+    const reg: SceneRegistry = {
+      s: makeScene({
+        id: "s",
+        choices: Array.from({ length: 6 }, (_, i) => ({ kind: "plain", id: `c${i}`, label: "x", to: "e" })),
+      }),
+      e: makeScene({ id: "e", isEnding: true, endingId: "fall" }),
+    };
+    const r = lintSceneContent(reg, { startSceneIds: ["s"] });
+    expect(r.issues.some((i) => i.code === "TOO_MANY_CHOICES")).toBe(false);
   });
 
   it("maxChoices 옵션으로 임계 조정 가능 (예: 2)", () => {

@@ -57,10 +57,16 @@ export type Character = {
 };
 
 /** 선택지 — 3 종 (plain / probability / conditional). */
+// `pinned` (공통, 옵션): 씬 선택지가 표시 상한(3)을 넘을 때 랜덤 3-of-N 으로 추린다.
+// pinned=true 면 항상 노출(추첨 제외) — 핵심 진행/스토리 분기가 랜덤으로 가려져 소프트락
+// 되지 않게 한다. plain 이 아닌 분기(conditional/probability)는 pinned 여부와 무관하게
+// 항상 노출된다(해금·도전 분기라 랜덤 대상 아님). 추첨은 non-pinned plain 만 대상.
 export type Choice =
   | { kind: "plain"; id: string; label: string; to: string;
       /** #253 — 〈에테르니아〉 침식도 변동 (예: 마법 사용 시 +N, 정제수 사용 시 -N). */
       stigmaDelta?: number;
+      /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출. */
+      pinned?: boolean;
     }
   | {
       kind: "probability";
@@ -81,6 +87,8 @@ export type Choice =
       stigmaDeltaOnSuccess?: number;
       /** #253 — *실패 시에만* 추가로 적용되는 침식도 변동. */
       stigmaDeltaOnFailure?: number;
+      /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출(probability 는 기본적으로 항상 노출). */
+      pinned?: boolean;
     }
   | {
       kind: "conditional";
@@ -93,6 +101,8 @@ export type Choice =
        */
       hidden?: boolean;
       stigmaDelta?: number;
+      /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출(conditional 은 기본적으로 항상 노출). */
+      pinned?: boolean;
     };
 
 export type ChoiceCondition =

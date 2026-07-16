@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
+import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
 import {
   getSkipVisitedEnabled,
@@ -75,6 +76,14 @@ export default function SceneRenderer({
     if (arr.length === 1) return arr[0];
     return arr[hashString(`${runIndex}:${scene.id}`) % arr.length];
   }, [scene.id, scene.illustration, scene.illustrations, runIndex]);
+
+  // 선택지 추림 — 씬 pool 이 3개를 넘으면 (회차 + 씬 id) 결정적 추첨으로 3개만.
+  // 같은 회차·씬은 항상 같은 조합(안정), 회차가 바뀌면 다른 조합(반복 플레이). pinned·
+  // conditional·probability 는 항상 노출. character 상태 변화 시 재평가하되 추첨은 seed 안정.
+  const displayedChoices = useMemo(
+    () => pickDisplayedChoices(scene.choices, character, { seed: `${runIndex}:${scene.id}` }),
+    [scene.choices, scene.id, character, runIndex],
+  );
   const [opacity, setOpacity] = useState<0 | 100>(0);
   const [revealCount, setRevealCount] = useState(0);
   const [choicesReady, setChoicesReady] = useState(false);
@@ -208,7 +217,7 @@ export default function SceneRenderer({
           </div>
         ) : (
           <div className="web-adventure-fade-in" data-choices-visible="true">
-            <ChoiceList choices={scene.choices} character={character} onChoose={onChoose} />
+            <ChoiceList choices={displayedChoices} character={character} onChoose={onChoose} />
           </div>
         ))}
     </article>

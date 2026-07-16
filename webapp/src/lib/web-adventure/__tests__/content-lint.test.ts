@@ -48,11 +48,11 @@ describe("콘텐츠 구조 lint (#271)", () => {
     expect(r.issues.find((i) => i.code === "DEAD_END" && i.sceneId === "dead")).toBeTruthy();
   });
 
-  it("choices 가 3 개 초과 = TOO_MANY_CHOICES", () => {
+  it("choices 가 6 개 초과 = TOO_MANY_CHOICES (pool 상한 6, 화면은 랜덤 3-of-N)", () => {
     const reg: SceneRegistry = {
       s: makeScene({
         id: "s",
-        choices: Array.from({ length: 4 }, (_, i) => ({ kind: "plain", id: `c${i}`, label: "x", to: "e" })),
+        choices: Array.from({ length: 7 }, (_, i) => ({ kind: "plain", id: `c${i}`, label: "x", to: "e" })),
       }),
       e: makeScene({ id: "e", isEnding: true, endingId: "fall" }),
     };

@@ -3,7 +3,8 @@
 // 규칙:
 //   ORPHAN              — 시작 씬도 아니고 어떤 분기의 target 도 아닌 씬.
 //   DEAD_END            — choices 가 비었는데 isEnding=false (또는 endingId 없음).
-//   TOO_MANY_CHOICES    — choices.length > 3 (#262 UX 정책).
+//   TOO_MANY_CHOICES    — choices.length > 6 (저작 pool 상한). 화면엔 회차별 3개만
+//                         랜덤 노출(choiceSample.pickDisplayedChoices) 하므로 pool 은 6까지 허용.
 //   DANGLING_REF        — choice 의 to/onSuccess/onFailure 가 sceneRegistry 에 없는 id.
 //   UNREACHABLE_ENDING  — requiredEndings 의 어떤 endingId 도 시작 씬에서 도달 불가
 //                         (분기 hidden/조건 무시한 *그래프 도달성*. 자격은 e2e 가 별도 검증).
@@ -32,7 +33,7 @@ export interface LintOptions {
   startSceneIds: string[];
   /** 도달해야 하는 EndingId 목록. 빠뜨리면 UNREACHABLE_ENDING. */
   requiredEndings?: EndingId[];
-  /** 최대 분기 수 (기본 3, #262). */
+  /** 저작 pool 최대 분기 수 (기본 6; 화면은 랜덤 3-of-N). */
   maxChoices?: number;
   /**
    * reducer 자동 전환으로 진입하는 ending 씬 id 들 (예: ending_petrification 은
@@ -109,7 +110,7 @@ export function lintSceneContent(
   registry: SceneRegistry,
   options: LintOptions,
 ): LintResult {
-  const maxChoices = options.maxChoices ?? 3;
+  const maxChoices = options.maxChoices ?? 6;
   const autoEndings = new Set(options.autoEndingSceneIds ?? []);
   const issues: LintIssue[] = [];
 
