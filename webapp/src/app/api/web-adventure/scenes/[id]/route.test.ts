@@ -194,6 +194,48 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     expect(arg.version).toBe(4);
     expect(arg.snapshot).toEqual(updated);
   });
+
+  // 그래프 카드 이동 — position 만 바뀐 커밋은 버저닝하지 않는다(드래그마다 리비전 방지).
+  it('position 만 변경 시 revision 미생성 + revisionCount 미증가', async () => {
+    const existing = { id: 'town_square_dawn', title: '광장', revisionCount: 2 };
+    const updated = { id: 'town_square_dawn', title: '광장', revisionCount: 2, position: { x: 10, y: 20 } };
+    (WebAdventureScene.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue(existing),
+    });
+    (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue(updated),
+    });
+
+    const res = await PUT(makeRequest('PUT', { position: { x: 10, y: 20 } }), { params });
+    expect(res.status).toBe(200);
+    // revision 생성 안 함
+    expect(WebAdventureSceneRevision.create as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
+    // revisionCount $inc 안 함
+    const updateQuery = (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![1] as {
+      $set?: Record<string, unknown>; $inc?: Record<string, unknown>;
+    };
+    expect(updateQuery.$inc).toBeUndefined();
+    expect(updateQuery.$set).toMatchObject({ position: { x: 10, y: 20 } });
+  });
+
+  // position 과 content 를 함께 바꾸면 종전대로 버저닝한다.
+  it('position + content(title) 동시 변경은 버저닝한다', async () => {
+    const existing = { id: 'town_square_dawn', title: '옛', revisionCount: 1 };
+    const updated = { id: 'town_square_dawn', title: '새', revisionCount: 2, position: { x: 5, y: 5 } };
+    (WebAdventureScene.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue(existing),
+    });
+    (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue(updated),
+    });
+
+    await PUT(makeRequest('PUT', { title: '새', position: { x: 5, y: 5 } }), { params });
+    expect(WebAdventureSceneRevision.create as ReturnType<typeof vi.fn>).toHaveBeenCalledOnce();
+    const updateQuery = (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![1] as {
+      $inc?: Record<string, unknown>;
+    };
+    expect(updateQuery.$inc!.revisionCount).toBe(1);
+  });
 });
 
 describe('DELETE /api/web-adventure/scenes/[id]', () => {

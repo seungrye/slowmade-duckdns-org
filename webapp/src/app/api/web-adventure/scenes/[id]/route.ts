@@ -42,10 +42,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
   // revisionCount 는 서버가 $inc 로 관리 — 클라이언트 입력 무시.
   delete update.revisionCount;
 
+  // 그래프 카드 위치(position x,y) *만* 바뀐 커밋은 버저닝하지 않는다 — 노드를
+  // 드래그할 때마다 리비전이 쌓이는 것을 막는다(내용 변경이 아니라 레이아웃일 뿐).
+  // content 필드가 하나라도 함께 바뀌면 종전대로 revision + revisionCount++.
+  const changedKeys = Object.keys(update);
+  const positionOnly =
+    changedKeys.length > 0 && changedKeys.every((k) => k === "position");
+
   // 옛 quest CMS 패턴 — 기존 씬이 있을 때만 revisionCount 를 $inc 1.
   // 첫 생성 (existing=null) 분기에서는 $set 만 (revisionCount default 0 유지).
   const updateQuery: Record<string, unknown> = { $set: update };
-  if (existing) {
+  if (existing && !positionOnly) {
     updateQuery.$inc = { revisionCount: 1 };
   }
 
@@ -57,17 +64,19 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (!updated) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
 
-  // 3. 모든 commit (insert/update) 시 revision 생성. 첫 생성도 v0 백업.
+  // 3. content 변경 커밋만 revision 생성(위치만 바뀐 커밋은 스킵). 첫 생성도 v0 백업.
   //    snapshot = updated (= 그 commit 후 상태). version = updated.revisionCount.
-  const commitVersion =
-    (updated as { revisionCount?: number }).revisionCount ?? 0;
-  await WebAdventureSceneRevision.create({
-    sceneId: id,
-    snapshot: updated,
-    version: commitVersion,
-    author: "system",
-    createdAt: new Date(),
-  });
+  if (!positionOnly) {
+    const commitVersion =
+      (updated as { revisionCount?: number }).revisionCount ?? 0;
+    await WebAdventureSceneRevision.create({
+      sceneId: id,
+      snapshot: updated,
+      version: commitVersion,
+      author: "system",
+      createdAt: new Date(),
+    });
+  }
 
   return apiSuccess(updated);
 }
