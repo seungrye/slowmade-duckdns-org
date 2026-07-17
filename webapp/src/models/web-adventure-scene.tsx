@@ -136,6 +136,10 @@ const WebAdventureSceneSchema = new Schema(
     // 옛 quest CMS 패턴 — Scene 의 *현재 리비전 번호*. PUT 마다 +1.
     // 기존 씬은 정의되지 않은 상태로 잔존 — 첫 PUT 시 default 0 + $inc 1 = 1.
     revisionCount: { type: Number, default: 0 },
+    // 소프트 삭제 — 삭제해도 문서를 지우지 않는다(리비전 이력 보존). id 가 unique 라 같은
+    // id 로 재생성 시엔 소프트 삭제된 문서를 재사용(undelete). 게임·목록 조회는 { $ne: true }.
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
@@ -160,6 +164,9 @@ export interface WebAdventureSceneDoc {
   position?: { x: number; y: number };
   /** 옛 quest CMS 패턴 — 현재 리비전 번호. PUT 마다 +1. */
   revisionCount?: number;
+  /** 소프트 삭제 — true 면 게임·목록에서 제외(문서는 보존). */
+  isDeleted?: boolean;
+  deletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

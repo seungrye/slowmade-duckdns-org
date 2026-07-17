@@ -9,7 +9,7 @@ import WebAdventureScene from "@/models/web-adventure-scene";
 
 export async function GET() {
   await connectToDB();
-  const scenes = await WebAdventureScene.find({}).lean();
+  const scenes = await WebAdventureScene.find({ isDeleted: { $ne: true } }).lean();
   return NextResponse.json(
     { success: true, data: { scenes } },
     {

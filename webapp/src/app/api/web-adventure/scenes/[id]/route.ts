@@ -84,7 +84,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   await connectToDB();
   const { id } = await params;
-  const deleted = await WebAdventureScene.findOneAndDelete({ id });
+  // 하드 삭제하지 않고 소프트 삭제 — 문서·리비전 이력을 보존하고 isDeleted 로 숨긴다.
+  // 같은 id 로 다시 만들면(POST) 이 문서를 재사용(undelete)한다.
+  const deleted = await WebAdventureScene.findOneAndUpdate(
+    { id, isDeleted: { $ne: true } },
+    { $set: { isDeleted: true, deletedAt: new Date() } },
+    { new: true },
+  );
   if (!deleted) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
   return apiSuccess({ id });
 }

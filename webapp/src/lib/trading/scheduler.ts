@@ -95,10 +95,10 @@ async function claimRun(
 
 export async function tradingTick(now = new Date()): Promise<void> {
   await connectToDB();
-  const portfolios = await TradingPortfolio.find({ enabled: true }).lean();
+  const portfolios = await TradingPortfolio.find({ enabled: true, isDeleted: { $ne: true } }).lean();
   if (!portfolios.length) return;
   const accounts = new Map(
-    (await TradingAccount.find({}).lean()).map((a) => [String(a._id), a]),
+    (await TradingAccount.find({ isDeleted: { $ne: true } }).lean()).map((a) => [String(a._id), a]),
   );
   for (const p of portfolios) {
     const account = accounts.get(String(p.accountId));

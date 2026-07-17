@@ -57,9 +57,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const portfolioId = String(body.portfolioId ?? "");
   await connectToDB();
-  const portfolio = await TradingPortfolio.findById(portfolioId).lean();
+  const portfolio = await TradingPortfolio.findOne({ _id: portfolioId, isDeleted: { $ne: true } }).lean();
   if (!portfolio) return NextResponse.json({ error: "포트폴리오 없음" }, { status: 404 });
-  const account = await TradingAccount.findById(portfolio.accountId).lean();
+  const account = await TradingAccount.findOne({ _id: portfolio.accountId, isDeleted: { $ne: true } }).lean();
   if (!account) return NextResponse.json({ error: "계정 없음" }, { status: 404 });
 
   const run = await TradingRun.create({

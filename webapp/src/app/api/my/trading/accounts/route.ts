@@ -3,8 +3,8 @@ import { requireOwner } from "@/lib/require-owner";
 import { connectToDB } from "@/lib/db";
 import TradingAccount from "@/models/trading-account";
 import TradingPortfolio from "@/models/trading-portfolio";
-import TradingRun from "@/models/trading-run";
-import TradingOrderLog from "@/models/trading-order-log";
+import StockTrade from "@/models/stock-trade";
+import PortfolioHistory from "@/models/portfolio-history";
 import { encryptSecret } from "@/lib/trading/crypto";
 import { maskedCreds } from "@/lib/trading/settings-data";
 
@@ -24,7 +24,7 @@ export async function GET() {
   const owner = await requireOwner();
   if (owner instanceof NextResponse) return owner;
   await connectToDB();
-  const accounts = await TradingAccount.find({}).sort({ createdAt: 1 }).lean();
+  const accounts = await TradingAccount.find({ isDeleted: { $ne: true } }).sort({ createdAt: 1 }).lean();
   return NextResponse.json({
     accounts: accounts.map((a) => ({
       id: String(a._id),
@@ -65,8 +65,20 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
   const envKey = `${env}-${name}`;
-  const dup = await TradingAccount.findOne({ envKey }).lean();
-  if (dup) return NextResponse.json({ error: `envKey 중복: ${envKey}` }, { status: 409 });
+  // envKey 는 unique — 소프트 삭제된 같은 envKey 문서가 있으면 재사용(undelete), 살아있으면 409.
+  const dup = await TradingAccount.findOne({ envKey });
+  if (dup && !dup.isDeleted) {
+    return NextResponse.json({ error: `envKey 중복: ${envKey}` }, { status: 409 });
+  }
+  if (dup) {
+    dup.set({
+      ownerEmail: owner.email, broker, env, name, credentials,
+      liveEnabled: false, memo: String(body.memo ?? ""), isDeleted: false, deletedAt: null,
+    });
+    dup.markModified("credentials");
+    await dup.save();
+    return NextResponse.json({ id: String(dup._id), envKey });
+  }
   const doc = await TradingAccount.create({
     ownerEmail: owner.email, broker, env, name, envKey, credentials,
     liveEnabled: false, memo: String(body.memo ?? ""),
@@ -103,9 +115,14 @@ export async function DELETE(req: NextRequest) {
   await connectToDB();
   const acct = await TradingAccount.findById(id);
   if (!acct) return NextResponse.json({ error: "계정 없음" }, { status: 404 });
-  await TradingPortfolio.deleteMany({ accountId: acct._id });
-  await TradingRun.deleteMany({ accountId: acct._id });
-  await TradingOrderLog.deleteMany({ accountId: acct._id });
-  await acct.deleteOne();
+  const now = new Date();
+  // 소프트 삭제 — 하드 삭제 없이 숨긴다. 실행/주문 로그(runs/orderlogs)는 그대로 보존한다.
+  await Promise.all([
+    TradingPortfolio.updateMany({ accountId: acct._id }, { $set: { isDeleted: true, deletedAt: now } }),
+    // 이 계정(envKey)의 매매 차트도 함께 숨김(양 통화).
+    StockTrade.updateMany({ env: acct.envKey }, { $set: { hidden: true } }),
+    PortfolioHistory.updateMany({ env: acct.envKey }, { $set: { hidden: true } }),
+  ]);
+  await TradingAccount.updateOne({ _id: acct._id }, { $set: { isDeleted: true, deletedAt: now } });
   return NextResponse.json({ ok: true });
 }

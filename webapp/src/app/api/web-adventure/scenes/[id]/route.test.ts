@@ -241,15 +241,19 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
 describe('DELETE /api/web-adventure/scenes/[id]', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('씬을 찾지 못하면 404', async () => {
-    (WebAdventureScene.findOneAndDelete as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+  it('씬을 찾지 못하면 404 (소프트 삭제 — findOneAndUpdate null)', async () => {
+    (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     const res = await DELETE(makeRequest('DELETE'), { params });
     expect(res.status).toBe(404);
   });
 
-  it('정상 삭제 시 200', async () => {
-    (WebAdventureScene.findOneAndDelete as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'town_square_dawn' });
+  it('정상 삭제 시 200 (소프트 삭제 — isDeleted=true 로 update)', async () => {
+    const upd = WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>;
+    upd.mockResolvedValue({ id: 'town_square_dawn', isDeleted: true });
     const res = await DELETE(makeRequest('DELETE'), { params });
     expect(res.status).toBe(200);
+    // 하드 삭제가 아니라 isDeleted 를 세팅해야 한다.
+    const setArg = upd.mock.calls[0]![1] as { $set?: Record<string, unknown> };
+    expect(setArg.$set?.isDeleted).toBe(true);
   });
 });

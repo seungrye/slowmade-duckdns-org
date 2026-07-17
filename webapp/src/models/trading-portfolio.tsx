@@ -30,6 +30,10 @@ const TradingPortfolioSchema = new Schema(
     enabled: { type: Boolean, default: true },
     config: { type: Schema.Types.Mixed, default: {} },
     state: { type: Schema.Types.Mixed, default: {} },
+    // 소프트 삭제 — 삭제해도 문서를 지우지 않고 숨긴다(재생성 시 같은 (accountId,market)
+    // 문서를 재사용해 undelete). 조회는 { isDeleted: { $ne: true } } 로 제외.
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

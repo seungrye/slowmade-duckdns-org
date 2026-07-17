@@ -50,8 +50,8 @@ export function maskedCreds(creds: Record<string, string>): Record<string, strin
 export async function loadTradingSettings(): Promise<TradingSettingsData> {
   await connectToDB();
   const [accounts, portfolios] = await Promise.all([
-    TradingAccount.find({}).sort({ createdAt: 1 }).lean(),
-    TradingPortfolio.find({}).sort({ createdAt: 1 }).lean(),
+    TradingAccount.find({ isDeleted: { $ne: true } }).sort({ createdAt: 1 }).lean(),
+    TradingPortfolio.find({ isDeleted: { $ne: true } }).sort({ createdAt: 1 }).lean(),
   ]);
   return {
     accounts: accounts.map((a) => ({

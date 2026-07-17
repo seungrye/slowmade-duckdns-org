@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ScenesPage() {
   await connectToDB();
-  const docs = await WebAdventureScene.find({}).sort({ id: 1 }).lean();
+  const docs = await WebAdventureScene.find({ isDeleted: { $ne: true } }).sort({ id: 1 }).lean();
   // lean 결과(ObjectId/Date 포함)를 client prop 으로 넘기기 위해 JSON 직렬화로 평문화.
   const initialScenes = JSON.parse(JSON.stringify(docs)) as Scene[];
   return <ScenesClient initialScenes={initialScenes} />;

@@ -29,6 +29,10 @@ const TradingAccountSchema = new Schema(
     credentials: { type: Schema.Types.Mixed, required: true }, // {필드: 암호화블롭}
     liveEnabled: { type: Boolean, default: false },
     memo: { type: String, default: "" },
+    // 소프트 삭제 — 삭제해도 문서를 지우지 않고 숨긴다. envKey 가 unique 라 같은 envKey 로
+    // 재생성 시엔 소프트 삭제된 문서를 재사용(undelete)한다. 조회는 { isDeleted: { $ne: true } }.
+    isDeleted: { type: Boolean, default: false, index: true },
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );

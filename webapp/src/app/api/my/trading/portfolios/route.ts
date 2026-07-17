@@ -30,7 +30,8 @@ export async function GET(req: NextRequest) {
   if (owner instanceof NextResponse) return owner;
   const accountId = new URL(req.url).searchParams.get("accountId");
   await connectToDB();
-  const q = accountId ? { accountId } : {};
+  const q: Record<string, unknown> = { isDeleted: { $ne: true } };
+  if (accountId) q.accountId = accountId;
   const rows = await TradingPortfolio.find(q).sort({ createdAt: 1 }).lean();
   return NextResponse.json({
     portfolios: rows.map((p) => ({
@@ -79,6 +80,8 @@ export async function POST(req: NextRequest) {
         weekdaysOnly: body.weekdaysOnly !== false,
         enabled: body.enabled !== false,
         config: body.config ?? {},
+        // 소프트 삭제됐던 (accountId,market) 문서를 재생성 시 재사용(undelete).
+        isDeleted: false, deletedAt: null,
       },
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
@@ -95,9 +98,10 @@ export async function DELETE(req: NextRequest) {
   const id = String(new URL(req.url).searchParams.get("id") ?? "");
   await connectToDB();
   const pf = await TradingPortfolio.findById(id).select({ accountId: 1, market: 1 }).lean();
-  await TradingPortfolio.deleteOne({ _id: id });
-  // 매매기록·이력은 하드 삭제하지 않고 숨김(복구 가능). 재생성해도 자동 복구되지 않으며
-  // (POST 참조), 복구가 필요하면 수동으로 hidden 을 되돌린다.
+  // 하드 삭제하지 않고 소프트 삭제 — 문서는 남기고 isDeleted 로 숨긴다(스케줄러·목록에서 제외).
+  await TradingPortfolio.updateOne({ _id: id }, { $set: { isDeleted: true, deletedAt: new Date() } });
+  // 매매기록·이력도 하드 삭제하지 않고 숨김. 재생성해도 자동 복구되지 않으며(POST 참조),
+  // 복구가 필요하면 수동으로 hidden 을 되돌린다.
   if (pf) {
     const p = pf as { accountId: unknown; market: string };
     await setHidden(p.accountId, p.market, true);

@@ -10,7 +10,7 @@ import WebAdventureScene from "@/models/web-adventure-scene";
 
 export async function GET() {
   await connectToDB();
-  const scenes = await WebAdventureScene.find({})
+  const scenes = await WebAdventureScene.find({ isDeleted: { $ne: true } })
     .sort({ id: 1 })
     .lean();
   return apiSuccess(scenes);
@@ -25,10 +25,22 @@ export async function POST(req: NextRequest) {
     return apiError("id, title, illustration, body 는 필수입니다.", 400);
   }
 
+  // id 는 unique — 살아있으면 409, 소프트 삭제된 문서면 재사용(undelete + 새 내용으로 덮어씀).
   const existing = await WebAdventureScene.findOne({ id: body.id });
-  if (existing) return apiError(`이미 존재하는 씬 ID 입니다: ${body.id}`, 409);
+  if (existing && !existing.isDeleted) {
+    return apiError(`이미 존재하는 씬 ID 입니다: ${body.id}`, 409);
+  }
 
   try {
+    if (existing) {
+      existing.set({
+        title: body.title, illustration: body.illustration, body: body.body,
+        choices: body.choices ?? [], onEnter: body.onEnter,
+        isEnding: body.isEnding, endingId: body.endingId, isDeleted: false, deletedAt: null,
+      });
+      await existing.save();
+      return apiSuccess(existing, 201);
+    }
     const scene = await WebAdventureScene.create({
       id: body.id,
       title: body.title,
