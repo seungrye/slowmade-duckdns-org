@@ -33,10 +33,14 @@ export async function POST(req: NextRequest) {
 
   try {
     if (existing) {
+      // 소프트 삭제된 씬 재사용 — 새 내용으로 덮어쓰고 undelete. 배리에이션 이미지는
+      // 옛 것이 남지 않도록 초기화(재생성=깨끗). position 은 그래프 좌표라 유지.
       existing.set({
         title: body.title, illustration: body.illustration, body: body.body,
         choices: body.choices ?? [], onEnter: body.onEnter,
-        isEnding: body.isEnding, endingId: body.endingId, isDeleted: false, deletedAt: null,
+        isEnding: body.isEnding, endingId: body.endingId,
+        illustrations: Array.isArray(body.illustrations) ? body.illustrations : [],
+        isDeleted: false, deletedAt: null,
       });
       await existing.save();
       return apiSuccess(existing, 201);
