@@ -83,8 +83,9 @@ export async function POST(req: NextRequest) {
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
-  // 삭제(숨김)했던 같은 (env,currency) 기록을 재생성 시 자동 복구.
-  await setHidden(body.accountId, market, false);
+  // 재생성 시 옛 기록을 자동 복구하지 않는다 — 지운 포트폴리오를 같은 계정·시장으로 다시
+  // 만들면 '깨끗한 새 차트'를 기대하므로(#피드백). 숨김은 삭제 시점에 고정되고, 복구가
+  // 필요하면 수동으로 hidden 을 되돌린다.
   return NextResponse.json({ id: String(doc._id) });
 }
 
@@ -95,8 +96,8 @@ export async function DELETE(req: NextRequest) {
   await connectToDB();
   const pf = await TradingPortfolio.findById(id).select({ accountId: 1, market: 1 }).lean();
   await TradingPortfolio.deleteOne({ _id: id });
-  // 매매기록·이력은 하드 삭제하지 않고 숨김(복구 가능) — 포트폴리오를 같은 계정·시장으로
-  // 다시 만들면 POST 에서 자동 복구된다.
+  // 매매기록·이력은 하드 삭제하지 않고 숨김(복구 가능). 재생성해도 자동 복구되지 않으며
+  // (POST 참조), 복구가 필요하면 수동으로 hidden 을 되돌린다.
   if (pf) {
     const p = pf as { accountId: unknown; market: string };
     await setHidden(p.accountId, p.market, true);
