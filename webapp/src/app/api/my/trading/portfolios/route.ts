@@ -71,19 +71,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "infinite_v4 는 config.symbol·principal(양수) 필수" }, { status: 400 });
     }
   }
-  // 계정당 시장 1블록 — upsert (기존 블록 갱신 시 state 는 보존)
+  // 계정당 시장 1블록 — upsert. 라이브 블록 *편집* 시엔 state(진행 중 사이클)를 보존하고,
+  // *재생성*(신규 or 소프트 삭제됐던 걸 되살림)일 때만 state 를 초기화한다 — 그래야 지웠다
+  // 다시 만든 포트폴리오가 옛 V4 사이클(T·장부현금)을 이어가지 않고 깨끗하게 시작한다.
+  const prev = await TradingPortfolio.findOne({ accountId: body.accountId, market })
+    .select({ isDeleted: 1 }).lean();
+  const isRecreate = !prev || (prev as { isDeleted?: boolean }).isDeleted === true;
+  const setFields: Record<string, unknown> = {
+    strategy, runAt,
+    weekdaysOnly: body.weekdaysOnly !== false,
+    enabled: body.enabled !== false,
+    config: body.config ?? {},
+    // 소프트 삭제됐던 (accountId,market) 문서를 재생성 시 재사용(undelete).
+    isDeleted: false, deletedAt: null,
+  };
+  if (isRecreate) setFields.state = {}; // 재생성/신규 — 사이클 상태 초기화
   const doc = await TradingPortfolio.findOneAndUpdate(
     { accountId: body.accountId, market },
-    {
-      $set: {
-        strategy, runAt,
-        weekdaysOnly: body.weekdaysOnly !== false,
-        enabled: body.enabled !== false,
-        config: body.config ?? {},
-        // 소프트 삭제됐던 (accountId,market) 문서를 재생성 시 재사용(undelete).
-        isDeleted: false, deletedAt: null,
-      },
-    },
+    { $set: setFields },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
   // 재생성 시 옛 기록을 자동 복구하지 않는다 — 지운 포트폴리오를 같은 계정·시장으로 다시

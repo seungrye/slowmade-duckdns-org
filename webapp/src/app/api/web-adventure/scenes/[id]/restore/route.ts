@@ -33,10 +33,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   }).lean();
   if (!target) return apiError(`리비전을 찾을 수 없습니다: ${id} v${version}`, 404);
 
-  // 2. 현재 씬 — 덮어쓰기 직전 백업 대상.
-  const current = await WebAdventureScene.findOne({ id }).lean();
-
-  // 3. snapshot 으로 현재 씬 덮어쓰기.
+  // 2. snapshot 으로 현재 씬 덮어쓰기.
   //    snapshot 의 mongo metadata 키는 제거 (id 는 URL 경로 기준 보존).
   const snapshot = (target as { snapshot: Record<string, unknown> }).snapshot ?? {};
   const update: Record<string, unknown> = { ...snapshot };
@@ -47,9 +44,10 @@ export async function POST(req: NextRequest, { params }: Params) {
   delete update.__v;
 
   // 3. snapshot 으로 update + revisionCount $inc 1 (복원도 새 commit).
+  //    소프트 삭제된 씬을 복원하면 되살린다(isDeleted 해제 — 옛 스냅샷에 필드가 없어도 보장).
   const restored = await WebAdventureScene.findOneAndUpdate(
     { id },
-    { $set: update, $inc: { revisionCount: 1 } },
+    { $set: { ...update, isDeleted: false, deletedAt: null }, $inc: { revisionCount: 1 } },
     { new: true, runValidators: true },
   ).lean();
   if (!restored) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
