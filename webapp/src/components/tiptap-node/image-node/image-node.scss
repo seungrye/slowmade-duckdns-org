@@ -5,6 +5,17 @@
     display: block;
   }
 
+  // 리사이즈 이미지 컨테이너(핸들 기준 div)를 이미지 폭에 맞춰 축소.
+  // tiptap-extension-resize-image 는 flex 래퍼 안에 컨테이너 div 를 두는데, 컨테이너에
+  // 명시 width 가 없으면 img(max-width: min(100%,720px))보다 넓게 늘어나, 리사이즈 핸들이
+  // 이미지 테두리가 아닌 빈 여백에 붙는다. 컨테이너를 fit-content 로 이미지에 맞춘다.
+  // (리사이즈된 이미지는 컨테이너에 인라인 width:Npx 가 붙어 이 규칙보다 우선 → 그대로 유지.)
+  // 정렬(좌/중/우)은 flex 래퍼가 전폭을 유지하고 컨테이너에 margin:auto 를 주므로 영향 없음.
+  div:has(> img) {
+    width: fit-content;
+    max-width: 100%;
+  }
+
   > img:not([data-type="emoji"] img) {
     margin: 2rem 0;
     outline: 0.125rem solid transparent;
