@@ -16,12 +16,23 @@ export async function GET(req: NextRequest) {
   if (owner instanceof NextResponse) return owner;
   const url = new URL(req.url);
   const accountId = url.searchParams.get("accountId");
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? 20) || 20, 100);
+  const numParam = (k: string, def: number, max: number) =>
+    Math.min(Math.max(0, Number(url.searchParams.get(k) ?? def) || 0), max);
+  // 실행 이력·주문 로그를 각각 독립 페이징(page 0-based).
+  const runsPage = numParam("runsPage", 0, 100000);
+  const ordersPage = numParam("ordersPage", 0, 100000);
+  const runsSize = Math.max(1, numParam("runsSize", 15, 50));
+  const ordersSize = Math.max(1, numParam("ordersSize", 25, 100));
   await connectToDB();
   const q = accountId ? { accountId } : {};
-  const runs = await TradingRun.find(q).sort({ createdAt: -1 }).limit(limit).lean();
-  const orders = await TradingOrderLog.find(q).sort({ createdAt: -1 }).limit(limit * 2).lean();
+  const [runs, orders, runsTotal, ordersTotal] = await Promise.all([
+    TradingRun.find(q).sort({ createdAt: -1 }).skip(runsPage * runsSize).limit(runsSize).lean(),
+    TradingOrderLog.find(q).sort({ createdAt: -1 }).skip(ordersPage * ordersSize).limit(ordersSize).lean(),
+    TradingRun.countDocuments(q),
+    TradingOrderLog.countDocuments(q),
+  ]);
   return NextResponse.json({
+    runsTotal, ordersTotal, runsPage, ordersPage, runsSize, ordersSize,
     runs: runs.map((r) => ({
       id: String(r._id), portfolioId: String(r.portfolioId), dateKey: r.dateKey,
       phase: (r as { phase?: string }).phase ?? "main",

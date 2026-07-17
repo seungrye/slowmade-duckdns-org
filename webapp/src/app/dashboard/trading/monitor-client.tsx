@@ -16,31 +16,61 @@ type OrderRow = {
 };
 type Account = { id: string; envKey: string };
 
+const RUNS_SIZE = 15;
+const ORDERS_SIZE = 25;
+
+/** 섹션 페이지 네비게이터 — 이전/다음 + "n / m". 범위 밖이면 비활성. */
+function Pager({ page, total, size, onPage }: {
+  page: number; total: number; size: number; onPage: (p: number) => void;
+}) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const cur = Math.min(page, pages - 1);
+  if (total <= size) return null;
+  const btn = "px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 text-xs disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800";
+  return (
+    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+      <button type="button" className={btn} disabled={cur <= 0} onClick={() => onPage(cur - 1)}>← 이전</button>
+      <span>{cur + 1} / {pages}<span className="text-gray-400"> · 총 {total.toLocaleString()}건</span></span>
+      <button type="button" className={btn} disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)}>다음 →</button>
+    </div>
+  );
+}
+
 export default function TradingMonitorClient() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [runsTotal, setRunsTotal] = useState(0);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+  const [runsPage, setRunsPage] = useState(0);
+  const [ordersPage, setOrdersPage] = useState(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState("");
   const [openLog, setOpenLog] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-  const reload = useCallback(async (acct: string) => {
-    const q = acct ? `?accountId=${acct}&limit=50` : "?limit=50";
+  const reload = useCallback(async (acct: string, rp: number, op: number) => {
+    const p = new URLSearchParams({
+      runsPage: String(rp), ordersPage: String(op),
+      runsSize: String(RUNS_SIZE), ordersSize: String(ORDERS_SIZE),
+    });
+    if (acct) p.set("accountId", acct);
     const [a, r] = await Promise.all([
       fetch("/api/my/trading/accounts").then((x) => x.json()),
-      fetch(`/api/my/trading/runs${q}`).then((x) => x.json()),
+      fetch(`/api/my/trading/runs?${p.toString()}`).then((x) => x.json()),
     ]);
     setAccounts((a.accounts ?? []).map((x: Account & { envKey: string }) => ({ id: x.id, envKey: x.envKey })));
     setRuns(r.runs ?? []);
     setOrders(r.orders ?? []);
+    setRunsTotal(r.runsTotal ?? 0);
+    setOrdersTotal(r.ordersTotal ?? 0);
     setUpdatedAt(new Date());
   }, []);
 
   useEffect(() => {
-    reload(accountId).catch(() => undefined);
-    const iv = setInterval(() => reload(accountId).catch(() => undefined), 30_000);
+    reload(accountId, runsPage, ordersPage).catch(() => undefined);
+    const iv = setInterval(() => reload(accountId, runsPage, ordersPage).catch(() => undefined), 30_000);
     return () => clearInterval(iv);
-  }, [reload, accountId]);
+  }, [reload, accountId, runsPage, ordersPage]);
 
   return (
     <main className="mx-auto px-4 py-8 max-w-5xl space-y-8">
@@ -52,7 +82,8 @@ export default function TradingMonitorClient() {
             {" · "}설정은 <a href="/dashboard/settings" className="text-blue-600 hover:underline">마이페이지 설정</a>의 자동매매 섹션
           </p>
         </div>
-        <select value={accountId} onChange={(e) => setAccountId(e.target.value)}
+        <select value={accountId}
+                onChange={(e) => { setAccountId(e.target.value); setRunsPage(0); setOrdersPage(0); }}
                 className="rounded border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1.5 text-sm">
           <option value="">전체 계정</option>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.envKey}</option>)}
@@ -84,6 +115,8 @@ export default function TradingMonitorClient() {
           ))}
           {!runs.length && <li className="text-gray-400">실행 이력 없음</li>}
         </ul>
+        <Pager page={runsPage} total={runsTotal} size={RUNS_SIZE}
+               onPage={(p) => { setRunsPage(p); setOpenLog(null); }} />
       </section>
 
       <section>
@@ -113,6 +146,7 @@ export default function TradingMonitorClient() {
           </table>
           {!orders.length && <p className="text-gray-400 text-sm">주문 로그 없음</p>}
         </div>
+        <Pager page={ordersPage} total={ordersTotal} size={ORDERS_SIZE} onPage={setOrdersPage} />
       </section>
     </main>
   );
