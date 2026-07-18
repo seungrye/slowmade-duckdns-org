@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { NextResponse } from "next/server";
 import { requireOwner } from "@/lib/require-owner";
-import { getPortfolioData, listEnvs } from "@/lib/portfolio";
+import { getPortfolioData, listEnvCurrencies } from "@/lib/portfolio";
 import PortfolioChartClient from "./portfolio-chart-client";
 
 export const dynamic = "force-dynamic";
@@ -16,10 +16,10 @@ export default async function PortfolioPage() {
   const guard = await requireOwner();
   if (guard instanceof NextResponse) notFound();
 
-  // env 탭 목록은 DB 에 실존하는 값으로 동적 구성(멀티 포트폴리오: paper-main, paper-sub …).
-  const envs = await listEnvs();
-  const defaultEnv = envs[0] ?? "paper";
-  const initialData = await getPortfolioData(defaultEnv, "KRW");
+  // 탭은 숨김 아닌 기록이 실제로 있는 (env, currency) 조합만 — 삭제(숨김)한 조합은 탭에서 사라짐.
+  const tabs = await listEnvCurrencies();
+  const first = tabs[0] ?? { env: "paper", currency: "KRW" as const };
+  const initialData = await getPortfolioData(first.env, first.currency);
 
   return (
     <main className="mx-auto px-4 py-8">
@@ -27,7 +27,7 @@ export default async function PortfolioPage() {
       <p className="text-sm text-gray-500 mb-6">
         owner 전용 · 사이클별 portfolio 시계열 + 매매 마커 (▲ 매수만 / ▼ 매도만 / ■ 둘 다)
       </p>
-      <PortfolioChartClient initialData={initialData} envs={envs.length ? envs : ["paper"]} />
+      <PortfolioChartClient initialData={initialData} tabs={tabs.length ? tabs : [{ env: "paper", currency: "KRW" }]} />
     </main>
   );
 }

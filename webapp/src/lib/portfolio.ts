@@ -15,6 +15,28 @@ export async function listEnvs(): Promise<string[]> {
   const set = new Set<string>([...a, ...b].filter(Boolean));
   return [...set].sort();
 }
+
+/** 탭용 (env, currency) 조합 — 숨김 아닌 기록이 실제로 있는 것만. 포트폴리오·통화를 삭제(숨김)
+ *  하면 그 조합 탭이 사라진다(빈 통화 탭이 남지 않게). PortfolioHistory ∪ StockTrade. */
+export async function listEnvCurrencies(): Promise<{ env: string; currency: Currency }[]> {
+  await connectToDB();
+  const grp = (m: typeof PortfolioHistory | typeof StockTrade) =>
+    m.aggregate<{ _id: { env: string; currency: string } }>([
+      { $match: { hidden: { $ne: true } } },
+      { $group: { _id: { env: "$env", currency: "$currency" } } },
+    ]);
+  const [a, b] = await Promise.all([grp(PortfolioHistory), grp(StockTrade)]);
+  const map = new Map<string, { env: string; currency: Currency }>();
+  for (const r of [...a, ...b]) {
+    const env = r._id?.env;
+    const currency = r._id?.currency;
+    if (env && (currency === "KRW" || currency === "USD")) {
+      map.set(`${env}|${currency}`, { env, currency });
+    }
+  }
+  return [...map.values()].sort((x, y) =>
+    x.env === y.env ? (x.currency < y.currency ? -1 : 1) : x.env < y.env ? -1 : 1);
+}
 export type Currency = "KRW" | "USD";
 
 export type HistoryPoint = {

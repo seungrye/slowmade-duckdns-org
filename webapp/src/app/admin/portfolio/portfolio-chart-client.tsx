@@ -41,12 +41,16 @@ function formatMoney(v: number, currency: Currency): string {
   return `${Math.round(v).toLocaleString()}원`;
 }
 
-export default function PortfolioChartClient({ initialData, envs = ["paper", "real"] }:
-  { initialData?: PortfolioResponse; envs?: string[] }) {
+export default function PortfolioChartClient({ initialData, envs = ["paper", "real"], tabs }:
+  { initialData?: PortfolioResponse; envs?: string[]; tabs?: { env: string; currency: Currency }[] }) {
+  // 탭 조합 — tabs(숨김 아닌 기록이 실존하는 (env,currency)) 우선. 없으면 envs × [KRW,USD] 폴백(하위호환).
+  const combos = tabs && tabs.length
+    ? tabs
+    : envs.flatMap((e) => (["KRW", "USD"] as const).map((c) => ({ env: e, currency: c })));
   const router = useRouter();
-  const [env, setEnv] = useState<Env>(initialData?.env ?? envs[0] ?? "paper");
+  const [env, setEnv] = useState<Env>(initialData?.env ?? combos[0]?.env ?? "paper");
   const tabScroll = useDragScrollX<HTMLDivElement>();
-  const [currency, setCurrency] = useState<Currency>("KRW");
+  const [currency, setCurrency] = useState<Currency>(initialData?.currency ?? combos[0]?.currency ?? "KRW");
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(false);
   // SSR(page.tsx)로 기본(paper,KRW) 데이터가 주입되면 첫 fetch 를 건너뛴다. 이후 탭 변경은 fetch.
@@ -286,8 +290,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     <div>
       {/* env × currency 탭 */}
       <div {...tabScroll} className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
-        {envs.map((e) =>
-          (["KRW", "USD"] as const).map((c) => {
+        {combos.map(({ env: e, currency: c }) => {
             const active = env === e && currency === c;
             const label = `${envLabel(e)} · ${c === "KRW" ? "국장" : "미장"}`;
             return (
@@ -308,8 +311,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
                 {label}
               </button>
             );
-          }),
-        )}
+          })}
       </div>
 
       <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[520px] mb-4">
