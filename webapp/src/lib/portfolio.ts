@@ -18,42 +18,23 @@ export async function listEnvs(): Promise<string[]> {
   return [...set].sort();
 }
 
-/** 탭용 (env, currency) 조합 — ① 살아있는 포트폴리오(매매 전이라 기록이 없어도 탭은 나오게)
- *  ∪ ② 숨김 아닌 기록이 실제 있는 조합. 삭제한 포트폴리오(+숨긴 기록)만 탭에서 사라진다. */
+/** 탭용 (env, currency) 조합 — 살아있는(삭제 안 된) 포트폴리오 기준. 계정 envKey × market→통화.
+ *  포트폴리오를 만들면(매매 전이어도) 탭이 생기고, 삭제하면 탭이 사라진다. */
 export async function listEnvCurrencies(): Promise<{ env: string; currency: Currency }[]> {
   await connectToDB();
-  const map = new Map<string, { env: string; currency: Currency }>();
-
-  // ① 살아있는 포트폴리오 → (계정 envKey, market→통화). 매매 전이어도 탭 표시.
   const ports = await TradingPortfolio.find({ isDeleted: { $ne: true } })
     .select({ accountId: 1, market: 1 }).lean();
-  if (ports.length) {
-    const accts = await TradingAccount.find({
-      _id: { $in: ports.map((p) => p.accountId) }, isDeleted: { $ne: true },
-    }).select({ envKey: 1 }).lean();
-    const envKeyOf = new Map(accts.map((a) => [String(a._id), a.envKey as string]));
-    for (const p of ports) {
-      const env = envKeyOf.get(String(p.accountId));
-      const currency: Currency = p.market === "kr" ? "KRW" : "USD";
-      if (env) map.set(`${env}|${currency}`, { env, currency });
-    }
+  if (!ports.length) return [];
+  const accts = await TradingAccount.find({
+    _id: { $in: ports.map((p) => p.accountId) }, isDeleted: { $ne: true },
+  }).select({ envKey: 1 }).lean();
+  const envKeyOf = new Map(accts.map((a) => [String(a._id), a.envKey as string]));
+  const map = new Map<string, { env: string; currency: Currency }>();
+  for (const p of ports) {
+    const env = envKeyOf.get(String(p.accountId));
+    const currency: Currency = p.market === "kr" ? "KRW" : "USD";
+    if (env) map.set(`${env}|${currency}`, { env, currency });
   }
-
-  // ② 숨김 아닌 기록 기반(포트폴리오가 없어도 과거 기록이 있으면 탭 유지).
-  const grp = (m: typeof PortfolioHistory | typeof StockTrade) =>
-    m.aggregate<{ _id: { env: string; currency: string } }>([
-      { $match: { hidden: { $ne: true } } },
-      { $group: { _id: { env: "$env", currency: "$currency" } } },
-    ]);
-  const [a, b] = await Promise.all([grp(PortfolioHistory), grp(StockTrade)]);
-  for (const r of [...a, ...b]) {
-    const env = r._id?.env;
-    const currency = r._id?.currency;
-    if (env && (currency === "KRW" || currency === "USD")) {
-      map.set(`${env}|${currency}`, { env, currency });
-    }
-  }
-
   return [...map.values()].sort((x, y) =>
     x.env === y.env ? (x.currency < y.currency ? -1 : 1) : x.env < y.env ? -1 : 1);
 }
