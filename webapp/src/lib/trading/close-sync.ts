@@ -11,6 +11,7 @@
 import StockDailyPrice from "@/models/stock-daily-price";
 import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
+import TradingOrderLog from "@/models/trading-order-log";
 import type { Types } from "mongoose";
 import { KisClient, usQuoteExcd, registerUsExcd } from "./kis-client";
 import { makeKisClient, makeTossClient, marketToday } from "./engines";
@@ -260,39 +261,68 @@ export async function runCloseSync(
   let run = 0, cum = 0, tradeCount = 0;
   const start = new Date(now.getTime() - LOOKBACK_DAYS * 86400_000)
     .toISOString().slice(0, 10).replace(/-/g, "");
-  if (!isToss) {
-    const fills: Fill[] = [];
-    if (market === "us") {
-      // 미장: 거래소별 일괄조회(전 종목). 종목별 NASD 조회는 NYSE 상장 보유의 체결을
-      // 놓쳐 실현손익이 0 이 되던 원인 → 전 거래소 일괄로 교체.
+  const fills: Fill[] = [];
+  if (isToss) {
+    // 토스: 종료 상태 체결조회 API 가 없어, 우리가 기록한 실주문(orderNo)의 상세(orderDetail)
+    // 로 체결을 취합한다(V4TossBroker 와 같은 방식). ticker 는 주문 로그의 symbol 로 매핑.
+    const since = new Date(now.getTime() - LOOKBACK_DAYS * 86400_000);
+    const logs = await TradingOrderLog.find({
+      accountId: account._id, dryRun: false, orderNo: { $ne: "" }, createdAt: { $gte: since },
+    }).lean();
+    const symOf = new Map<string, string>();
+    for (const l of logs) if (l.orderNo) symOf.set(String(l.orderNo), String(l.symbol));
+    for (const [orderNo, sym] of symOf) {
       try {
-        for (const r of await kis!.usExecutionsAll(start, todayKey)) {
+        const d = (await toss!.orderDetail(orderNo)) as Json;
+        const ex = (d.execution ?? {}) as Json;
+        const qty = Math.trunc(Number(ex.filledQuantity ?? 0));
+        if (qty < 1) continue; // 체결분만
+        const at = String(ex.filledAt ?? d.orderedAt ?? "");
+        const date = at.slice(0, 10); // YYYY-MM-DD
+        const dateKey = date.replace(/-/g, "");
+        if (!dateKey || dateKey < start || dateKey > todayKey) continue;
+        fills.push({
+          ticker: sym, date,
+          time: at.length >= 19 ? at.slice(0, 19) : `${date}T00:00:00`,
+          side: String(d.side ?? "").toUpperCase() === "SELL" ? "sell" : "buy",
+          qty, price: Number(ex.averageFilledPrice ?? d.price ?? 0), currency,
+        });
+      } catch {
+        continue; // 주문 단위 격리 — 하나의 조회 실패가 대사 전체를 막지 않게
+      }
+    }
+  } else if (market === "us") {
+    // 미장: 거래소별 일괄조회(전 종목). 종목별 NASD 조회는 NYSE 상장 보유의 체결을
+    // 놓쳐 실현손익이 0 이 되던 원인 → 전 거래소 일괄로 교체.
+    try {
+      for (const r of await kis!.usExecutionsAll(start, todayKey)) {
+        const p = parseFill(r as Json);
+        if (p) fills.push(p);
+      }
+    } catch (e) {
+      log(`미장 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
+    }
+  } else {
+    for (const sym of tradeSyms) {
+      try {
+        for (const r of await kis!.krExecutions(sym, start, todayKey)) {
           const p = parseFill(r as Json);
           if (p) fills.push(p);
         }
       } catch (e) {
-        log(`미장 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
-      }
-    } else {
-      for (const sym of tradeSyms) {
-        try {
-          for (const r of await kis!.krExecutions(sym, start, todayKey)) {
-            const p = parseFill(r as Json);
-            if (p) fills.push(p);
-          }
-        } catch (e) {
-          log(`[${sym}] 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
-        }
+        log(`[${sym}] 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
       }
     }
-    const out = fillsToTradesAndPnl(fills, {
-      env: account.envKey, strategy: portfolio.strategy, market, today,
-    });
-    run = out.run;   // 폴백값(체결내역 avg-cost 자체계산)
-    cum = out.cum;
-    tradeCount = await upsertTrades(out.records);
-    // 실현손익은 **증권사 기간손익 API 우선**(실계좌) — 실패(모의 미지원)면 위 자체계산 유지.
-    // (매매기록/차트 마커는 체결내역이 단일 소스, pnl 총액만 증권사 값으로 대체.)
+  }
+  const out = fillsToTradesAndPnl(fills, {
+    env: account.envKey, strategy: portfolio.strategy, market, today,
+  });
+  run = out.run;   // 폴백값(체결내역 avg-cost 자체계산)
+  cum = out.cum;
+  tradeCount = await upsertTrades(out.records);
+  // 실현손익은 **증권사 기간손익 API 우선**(KIS 실계좌) — 실패(모의 미지원)면 위 자체계산 유지.
+  // 토스는 기간손익 API 가 없어 체결내역 자체계산(run/cum)을 그대로 쓴다.
+  if (!isToss) {
     try {
       const base = new Date(now.getTime() - 1825 * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
       cum = market === "kr" ? await kis!.krRealizedPnl(base, todayKey) : await kis!.usRealizedPnl(base, todayKey);
@@ -302,8 +332,6 @@ export async function runCloseSync(
       log(`실현손익: 기간손익 API 미지원(모의 등) → 체결내역 자체계산 유지 (누적 ${cum.toFixed(0)}): `
         + `${e instanceof Error ? e.message : e}`);
     }
-  } else {
-    log("토스: 종료 주문 목록 미지원 — 매매기록은 주문 로그 기반(v4 대사 경로) 유지");
   }
   log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${run.toFixed(0)} · 누적 ${cum.toFixed(0)}`);
 
