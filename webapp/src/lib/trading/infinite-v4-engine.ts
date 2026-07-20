@@ -38,6 +38,14 @@ export type V4Config = {
 
 const LOOKBACK_DAYS = 14;
 
+/** YYYYMMDD 의 하루 전(캘린더일). 대사 윈도우의 lastRunDate 갱신용 순수 헬퍼. */
+export function prevMarketDay(ymd: string): string {
+  const y = Number(ymd.slice(0, 4)), m = Number(ymd.slice(4, 6)), d = Number(ymd.slice(6, 8));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() - 1);
+  return dt.toISOString().slice(0, 10).replace(/-/g, "");
+}
+
 /** v4 가 브로커에 요구하는 최소 계약 — KIS/토스 어댑터가 구현. */
 export type V4Broker = {
   snapshot(sym: string): Promise<{ holding: number; avg: number; price: number }>;
@@ -340,7 +348,12 @@ export async function runInfiniteV4(
   }
 
   state.pending = pend;
-  state.lastRunDate = today;
+  // 왜 '어제'인가: LOC 주문은 그날 종가에 체결돼 체결일 == 실행일(today)이 된다. 대사 필터는
+  // `lastRunDate < date < today`(양쪽 strict)라, lastRunDate=today 로 남기면 다음 실행의
+  // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를
+  // '어제'(= 마지막으로 완전 반영된 날)로 남기면 다음 실행 창이 전일 체결을 포함해 대사가 이어진다.
+  // 2단계(sell 09:30 / buy 15:20 동일일)는 sell 이 어제로 올려도 buy 창은 비어 중복반영이 없다.
+  state.lastRunDate = prevMarketDay(today);
   await TradingPortfolio.updateOne({ _id: portfolio._id }, { $set: { "state.v4": state } });
 
   const line = `V4 ${sym}[${phase}]: 주문 ${orders.length}건 (T=${state.t.toFixed(2)} ` +
