@@ -6,6 +6,7 @@
 // rotation 재평가일·자동선발 풀은 TradingPortfolio.state 에 영속(파이썬 rotation-state 대응).
 
 import { KR_SEED, US_SEED, liquidityMetric, selectPool, type SeedEntry } from "@/lib/backtest/rotation-pool";
+import { clampBuyQty } from "./buyable";
 import { decryptSecret } from "./crypto";
 import { KisClient, US_ORDER_EXCD, registerUsExcd, usQuoteExcd } from "./kis-client";
 import { lrsDecide, rotationDecide, trendDecide, type OrderIntent } from "./strategies";
@@ -31,6 +32,10 @@ export type LiveBroker = {
   historyLong(symbol: string, need?: number): Promise<[string, number][]>;
   valueSeries(symbol: string): Promise<number[]>;
   submit(symbol: string, qty: number, side: "buy" | "sell", price: number): Promise<string>;
+  // 종목·가격의 매수가능수량(수수료·환율 반영). KIS=psamount 권위값(max_ord_psbl_qty/
+  // nrcvb_buy_qty), 토스=매수여력/수수료율 계산. 전량매수(rotation/LRS)가 주문가능금액을
+  // 넘겨 거부되는 것을 막는다("현금 관리" — 총액이 아닌 실제 주문가능수량으로 사이징).
+  buyableQty(symbol: string, price: number): Promise<number>;
 };
 
 function creds(account: AccountDoc): Record<string, string> {
@@ -70,6 +75,7 @@ export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker
       historyLong: (s, need = 210) => client.historyLong(s, need),
       valueSeries: (s) => client.valueSeries(s),
       submit: (s, qty, side) => client.orderMarket(s, qty, side),
+      buyableQty: (s, price) => client.buyableQty(s, price, market),
     };
   }
   const client = makeKisClient(account);
@@ -81,6 +87,7 @@ export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker
       historyLong: (s, need = 210) => client.krHistoryLong(s, need),
       valueSeries: (s) => client.krValueSeries(s),
       submit: (s, qty, side) => client.krOrderMarket(s, qty, side),
+      buyableQty: (s, price) => client.krBuyableQty(s, price),
     };
   }
   return {
@@ -92,6 +99,7 @@ export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker
     // KIS 미국 시장가는 모의 미지원 → 현재가 지정가(파이썬 OverseasTrendBroker.submit 동일)
     submit: (s, qty, side, price) =>
       client.usOrder(s, qty, price, side, US_ORDER_EXCD[usQuoteExcd(s)] ?? "NASD"),
+    buyableQty: (s, price) => client.usBuyableQty(s, price, US_ORDER_EXCD[usQuoteExcd(s)] ?? "NASD"),
   };
 }
 
@@ -155,7 +163,18 @@ async function runLrs(
     smaPeriod: sma, bandPct: Number(cfg.band ?? 1) / 100,
   });
   if (!intents.length) log(`[LRS ${target}] 신호 없음(레짐 유지) — 보유 ${qty}주`);
-  const { executed } = await execute(account, p, runId, intents, broker, log);
+  // 전량매수(LRS)도 매수가능수량으로 클램프 — lrsDecide 는 floor(현금/가격) 총액 기준이라
+  // KIS 한도 초과로 거부될 수 있다(rotation 과 동일 원인). 매도는 그대로.
+  const sized: OrderIntent[] = [];
+  for (const it of intents) {
+    if (it.side !== "buy") { sized.push(it); continue; }
+    const maxQ = it.price > 0 ? await broker.buyableQty(it.symbol, it.price) : 0;
+    const q = clampBuyQty(it.qty, maxQ);
+    if (q < 1) { log(`[LRS ${it.symbol}] 매수가능수량 0 — 매수 보류(가격 ${it.price.toFixed(2)})`); continue; }
+    if (q !== it.qty) log(`[LRS ${it.symbol}] 매수수량 ${it.qty}→${q} 클램프(매수가능수량)`);
+    sized.push({ ...it, qty: q });
+  }
+  const { executed } = await execute(account, p, runId, sized, broker, log);
   return `LRS ${target}: 신호 ${executed}건`;
 }
 
@@ -236,9 +255,12 @@ async function runRotation(
     }
     if (holding !== d.target) {
       const price = await broker.priceOf(d.target);
-      const q = price > 0 ? Math.floor(cash / price) : 0;
+      // 수량은 매수가능수량(수수료·환율 반영)으로 — floor(현금/가격)은 총액이라 KIS 한도를
+      // 넘겨 40250000(주문가능금액 부족)로 거부된다(레버리지 ETF 등 특히). 스위치 당일 미정산
+      // 매도대금은 아직 반영 안 되므로 그날 덜 담고 다음 사이클에 마저 진입(안전).
+      const q = price > 0 ? await broker.buyableQty(d.target, price) : 0;
       if (q >= 1) intents.push({ side: "buy", symbol: d.target, qty: q, price, reason: d.reason });
-      else log(`[rotation] 현금 부족으로 ${d.target} 진입 보류(현금 ${cash.toFixed(0)})`);
+      else log(`[rotation] 매수가능수량 0 — ${d.target} 진입 보류(현금 ${cash.toFixed(0)}, 가격 ${price.toFixed(2)})`);
     }
   }
   const { executed } = await execute(account, p, runId, intents, broker, log);

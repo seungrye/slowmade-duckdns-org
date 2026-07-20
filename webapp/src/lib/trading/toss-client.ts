@@ -6,6 +6,7 @@ import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
 import { krTickRound } from "./kr-tick";
 import { throttle } from "./rate-limit";
+import { feeInclusiveQty } from "./buyable";
 
 export type TossCreds = {
   clientId: string;
@@ -28,6 +29,7 @@ type Json = Record<string, unknown>;
 export class TossClient {
   private token: string | null = null;
   private accountSeq: number | null;
+  private commissionCache: Record<string, number> | null = null;
 
   constructor(private creds: TossCreds) {
     this.accountSeq = creds.accountSeq ?? null;
@@ -223,6 +225,34 @@ export class TossClient {
       true,
     )) ?? {}) as Json;
     return [pos, Number(bp.cashBuyingPower ?? 0), hvBroker];
+  }
+
+  /** 시장별 수수료율(%) — /api/v1/commissions. 1회 조회 후 캐시(같은 사이클 내). */
+  private async commissionRate(market: "kr" | "us"): Promise<number> {
+    if (!this.commissionCache) {
+      const rows = ((await this.get("/api/v1/commissions", undefined, true)) ?? []) as Json[];
+      const map: Record<string, number> = {};
+      for (const r of Array.isArray(rows) ? rows : []) {
+        const c = String(r.marketCountry ?? "").toUpperCase();
+        if (c) map[c] = Number(r.commissionRate ?? 0);
+      }
+      this.commissionCache = map;
+    }
+    return this.commissionCache[market === "kr" ? "KR" : "US"] ?? 0;
+  }
+
+  /** 종목·가격의 매수가능수량 — KIS max_ord_psbl_qty 대응. 토스는 종목별 최대수량 API 가
+   *  없어 매수여력(cashBuyingPower) ÷ (가격 × (1+수수료율))로 계산한다(수수료 포함). */
+  async buyableQty(symbol: string, price: number, market: "kr" | "us"): Promise<number> {
+    if (price <= 0) return 0;
+    const bp = ((await this.get(
+      "/api/v1/buying-power",
+      { currency: market === "kr" ? "KRW" : "USD" },
+      true,
+    )) ?? {}) as Json;
+    const cash = Number(bp.cashBuyingPower ?? 0);
+    const rate = await this.commissionRate(market); // % 단위(예: US 0.25)
+    return feeInclusiveQty(cash, price, rate);
   }
 
   /** 시장가 주문 → orderId. clientOrderId 는 멱등키(10분). */

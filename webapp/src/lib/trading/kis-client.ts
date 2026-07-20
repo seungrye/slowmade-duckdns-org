@@ -10,6 +10,7 @@
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
 import { krTickRound, type KrTickKind } from "./kr-tick";
+import { pickField } from "./buyable";
 import { throttle } from "./rate-limit";
 
 export type KisCreds = {
@@ -31,6 +32,7 @@ const TR: Record<string, [string, string]> = {
   kr_sell: ["VTTC0011U", "TTTC0011U"],
   kr_ccnl: ["VTTC0081R", "TTTC0081R"],
   kr_rvsecncl: ["VTTC0013U", "TTTC0013U"],
+  kr_psbl: ["VTTC8908R", "TTTC8908R"], // 국내 매수가능조회(수수료·세금 반영 수량)
   us_buy: ["VTTT1002U", "TTTT1002U"],
   us_sell: ["VTTT1001U", "TTTT1006U"],
   us_balance: ["VTTS3012R", "TTTS3012R"],
@@ -518,6 +520,39 @@ export class KisClient {
     const qty = out?.max_ord_psbl_qty;
     if (qty !== undefined && qty !== "") return Number(qty) * price;
     throw new KisError("psamount-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
+  }
+
+  /** 미국 종목·가격의 KIS 최대매수수량(max_ord_psbl_qty — 수수료·환율 반영 권위값).
+   *  주문가능'금액'(usBuyable)은 수수료 前 총액이라 floor(금액/가격)이 KIS 한도를 넘길 수
+   *  있다(레버리지 ETF 등). 종목·가격을 넣으면 KIS 가 직접 계산한 수량을 그대로 쓴다. */
+  async usBuyableQty(symbol: string, price: number, excd = "NASD"): Promise<number> {
+    const d = await this.get(
+      "/uapi/overseas-stock/v1/trading/inquire-psamount",
+      this.tr("us_psamount"),
+      { CANO: this.cano, ACNT_PRDT_CD: this.prdt, OVRS_EXCG_CD: excd,
+        OVRS_ORD_UNPR: price.toFixed(2), ITEM_CD: symbol },
+    );
+    const outRaw = d.output;
+    const out = (Array.isArray(outRaw) ? outRaw[0] : outRaw) as Json | undefined;
+    const q = pickField(out, ["max_ord_psbl_qty", "ovrs_max_ord_psbl_qty", "ord_psbl_qty"]);
+    if (q !== null) return Math.trunc(q);
+    throw new KisError("psamount-qty-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
+  }
+
+  /** 국내 종목·가격의 최대 매수가능수량(nrcvb_buy_qty — 미수 없는 순수 현금 기준, 수수료·세금 반영). */
+  async krBuyableQty(symbol: string, price: number): Promise<number> {
+    const d = await this.get(
+      "/uapi/domestic-stock/v1/trading/inquire-psbl-order",
+      this.tr("kr_psbl"),
+      { CANO: this.cano, ACNT_PRDT_CD: this.prdt, PDNO: symbol,
+        ORD_UNPR: String(Math.round(price)), ORD_DVSN: "00",
+        CMA_EVLU_AMT_ICLD_YN: "N", OVRS_ICLD_YN: "N" },
+    );
+    const outRaw = d.output;
+    const out = (Array.isArray(outRaw) ? outRaw[0] : outRaw) as Json | undefined;
+    const q = pickField(out, ["nrcvb_buy_qty", "max_buy_qty"]);
+    if (q !== null) return Math.trunc(q);
+    throw new KisError("psbl-qty-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
   }
 
   /** 미국 주문 — ordDvsn 00=지정가 / 34=LOC(모의는 LOC 미지원 → 지정가 폴백). */
