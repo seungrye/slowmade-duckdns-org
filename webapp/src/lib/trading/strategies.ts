@@ -73,6 +73,17 @@ export function momentum(closesNewestFirst: number[], days: number): number | nu
   return past > 0 ? closesNewestFirst[0] / past - 1 : null;
 }
 
+/** 복합 모멘텀 — 여러 룩백의 momentum 평균(데이터부족 룩백은 스킵). 전부 부족이면 null.
+ *  단일 룩백 lookbacks=[d] 는 momentum(closes, d) 과 동일. 타이밍 운을 줄여 강건성↑. */
+export function compositeMomentum(closesNewestFirst: number[], lookbacks: number[]): number | null {
+  const ms: number[] = [];
+  for (const d of lookbacks) {
+    const m = momentum(closesNewestFirst, d);
+    if (m !== null) ms.push(m);
+  }
+  return ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : null;
+}
+
 export function rotationDecide(args: {
   candidates: string[]; // 순회 순서 = 동률 tie-break(파이썬과 동일)
   signalCloses: number[];
@@ -83,22 +94,26 @@ export function rotationDecide(args: {
   bandPct?: number;
   momDays?: number;
   rebalanceDays?: number;
+  momLookbacks?: number[]; // 지정 시 복합 모멘텀(여러 룩백 평균). 미지정이면 단일 momDays(기존).
 }): RotationDecision {
   const sma = args.smaPeriod ?? 200;
   const band = args.bandPct ?? 0.01;
   const mom = args.momDays ?? 126;
   const reb = args.rebalanceDays ?? 63;
+  const lookbacks = args.momLookbacks;
   const none: RotationDecision = { action: "hold", target: null, reason: "", rebalanced: false, regimeOn: false };
 
   const ma = smaNewest(args.signalCloses, sma);
   if (ma === null) return { ...none, reason: "시그널 SMA 워밍업 부족" };
   const today = args.signalCloses[0];
 
+  const momOf = (closes: number[]): number | null =>
+    lookbacks && lookbacks.length ? compositeMomentum(closes, lookbacks) : momentum(closes, mom);
   const pickBest = (): string | null => {
     let best: string | null = null;
     let bestMom = -Infinity;
     for (const sym of args.candidates) {
-      const m = momentum(args.candCloses[sym] ?? [], mom);
+      const m = momOf(args.candCloses[sym] ?? []);
       if (m !== null && m > bestMom) {
         best = sym;
         bestMom = m;

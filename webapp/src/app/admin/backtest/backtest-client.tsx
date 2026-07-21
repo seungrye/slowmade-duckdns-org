@@ -12,12 +12,15 @@ import { runLrsBacktest } from "@/lib/backtest/lrs";
 import { runInfiniteVariantBacktest, type InfiniteVariantVersion } from "@/lib/backtest/infinite-variants";
 import { runInfiniteV4Backtest } from "@/lib/backtest/infinite-v4";
 import { runRotationBacktest } from "@/lib/backtest/rotation";
+import { runDualMomentumBacktest } from "@/lib/backtest/dual-momentum";
+import { runVolTargetBacktest } from "@/lib/backtest/vol-target";
 import { KR_SEED, US_SEED, type SeedEntry } from "@/lib/backtest/rotation-pool";
 import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
 type Strategy =
   | "infinite_v1" | "infinite_v2_1" | "infinite_v2_2" | "infinite_v3_0" | "infinite_v4_0"
-  | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1" | "rotation_v2";
+  | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1" | "rotation_v2"
+  | "dual_momentum_v1" | "vol_target_v1";
 
 const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = {
   infinite_v2_1: "v2_1", infinite_v2_2: "v2_2", infinite_v3_0: "v3_0",
@@ -30,6 +33,8 @@ type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: S
 const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
   ["rotation_v2", "모멘텀 로테이션 v2 (분할매수)"],
   ["rotation_v1", "모멘텀 로테이션 v1"],
+  ["dual_momentum_v1", "듀얼 모멘텀 GEM (채권 대피)"],
+  ["vol_target_v1", "변동성 타깃 레버리지"],
   ["lrs_v1", "레버리지 로테이션 v1"],
   ["regime_v1", "레짐 모멘텀 v1"],
   ["trend_v4", "추세추종 v4 (트레일링)"],
@@ -66,6 +71,10 @@ const STRATEGY_DESC: Record<Strategy, string> = {
     "듀얼 모멘텀 × 레짐(LRS): 후보 ETF 중 최근 N거래일 수익률 1위만 전액 보유(상대 모멘텀, 월 1회 재평가·자동 교체), 지수<SMA−밴드면 전량 현금(매일 검사). 종목 선택이 규칙에 내장 — 후보 풀만 정하면 강한 종목으로 자동 로테이션. 후보를 비우면 시드(레버리지 불 계열)에서 거래대금 상위 4종을 자동 선발(기초지수당 1종). 스위칭=당일 종가, 복리, 수수료 미반영.",
   rotation_v2:
     "모멘텀 로테이션 v1 규칙과 동일하되, 진입/교체 시 현금 전액을 한 번에 사지 않고 **K거래일에 나눠 분할매수(DCA)**한다. 진입가를 평균화해 레버리지 ETF 의 단일일 타이밍 리스크·급락 직후 낙폭을 완화(백테스트상 낙폭↓·위험조정수익↑, 특히 K≈15). K는 재평가주기 이하 권장(너무 크면 현금드래그로 수익↓). 레짐 오프 청산·재교체 시 남은 분할계획은 취소.",
+  dual_momentum_v1:
+    "듀얼 모멘텀(GEM, Gary Antonacci): 후보 ETF 중 최근 N거래일 수익률 1위 보유(상대 모멘텀). 단, 그 1위마저 방어자산(예: IEF 미국채)보다 약하면 **방어자산으로 대피**(절대 모멘텀) — 하락장엔 현금 대신 채권을 들어 방어하면서 이자수익까지 노린다. 로테이션과 달리 SMA 레짐선 없이 '상대+절대' 모멘텀만으로 방어/공격을 전환. 복합 모멘텀(여러 룩백 평균) 옵션으로 타이밍 운을 줄일 수 있다.",
+  vol_target_v1:
+    "변동성 타깃 레버리지: 레버리지 ETF 를 항상 풀로 들지 않고 **목표 변동성에 맞춰 부분 포지션**으로 노출을 조절한다. 노출 f = min(최대노출, 목표변동성 ÷ 실현변동성) — 시장이 조용하면 많이, 변동성이 치솟으면 자동으로 줄여(현금 확대) 급락 낙폭을 완화한다. 드리프트가 밴드를 넘을 때만 재조정해 매매를 아낀다. 레짐 시그널(1배 지수) 지정 시 SMA 이탈이면 전량 현금.",
 };
 
 export default function BacktestClient() {
@@ -96,6 +105,20 @@ export default function BacktestClient() {
   const [rotMom, setRotMom] = useState(126);
   const [rotReb, setRotReb] = useState(63);
   const [rotDca, setRotDca] = useState(15); // v2 분할매수 K(슬라이스)
+  const [rotComposite, setRotComposite] = useState(false); // 복합 모멘텀(멀티 룩백 평균)
+  // 듀얼 모멘텀 GEM
+  const [dmCandidates, setDmCandidates] = useState("TQQQ,SOXL,UPRO,TECL");
+  const [dmDefensive, setDmDefensive] = useState("IEF");
+  const [dmMom, setDmMom] = useState(252);
+  const [dmReb, setDmReb] = useState(21);
+  const [dmComposite, setDmComposite] = useState(false); // 복합 모멘텀
+  // 변동성 타깃 레버리지
+  const [vtTargetVol, setVtTargetVol] = useState(25);
+  const [vtLookback, setVtLookback] = useState(20);
+  const [vtMaxLev, setVtMaxLev] = useState(1.0);
+  const [vtBand, setVtBand] = useState(5); // 드리프트 %p
+  const [vtSignal, setVtSignal] = useState("QQQ"); // 레짐 시그널(선택)
+  const [vtSma, setVtSma] = useState(200);
   // 레버리지 로테이션 v1
   const [lrsSignal, setLrsSignal] = useState("QQQ");
   const [lrsSma, setLrsSma] = useState(200);
@@ -161,7 +184,9 @@ export default function BacktestClient() {
   };
 
   const run = async () => {
-    if (!strategy.startsWith("rotation") && !ticker.trim()) {
+    // rotation·듀얼모멘텀은 후보 필드가 종목 입력을 대신 → 단일 종목 코드 불필요
+    const noSingleTicker = strategy.startsWith("rotation") || strategy === "dual_momentum_v1";
+    if (!noSingleTicker && !ticker.trim()) {
       setError("종목 코드를 입력하세요.");
       return;
     }
@@ -200,10 +225,59 @@ export default function BacktestClient() {
         const rr = runRotationBacktest(
           rotList.map((t, i) => ({ ticker: t, bars: candBars[i] })), sigBars,
           { principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: rotMom,
+            momLookbacks: rotComposite ? [21, 63, 126, 252] : undefined,
             rebalanceDays: rotReb, from: from || undefined, to: to || undefined,
             autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined });
         const rangeSig = sigBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...rr, bars: rangeSig, principal, strategy });
+        return;
+      }
+      // 듀얼 모멘텀 GEM — 후보(위험) + 방어자산을 전체 이력으로 조회, 매매 구간은 from/to
+      if (strategy === "dual_momentum_v1") {
+        const candList = dmCandidates.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
+        const defTicker = dmDefensive.trim().toUpperCase();
+        if (candList.length < 1 || !defTicker) {
+          setError("후보 종목과 방어자산(예: IEF)을 입력하세요."); setLoading(false); return;
+        }
+        const fetchBars = async (t: string): Promise<Bar[]> => {
+          const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(t)}`);
+          if (!res0.ok) throw new Error(`${t} 데이터 조회 실패 (${res0.status})`);
+          const b: Bar[] = (await res0.json()).bars ?? [];
+          if (b.length === 0) throw new Error(`${t} 일봉 데이터가 없습니다.`);
+          return b;
+        };
+        const [defBars, ...candBars] = await Promise.all([fetchBars(defTicker), ...candList.map(fetchBars)]);
+        const dr = runDualMomentumBacktest(
+          candList.map((t, i) => ({ ticker: t, bars: candBars[i] })),
+          { ticker: defTicker, bars: defBars },
+          { principal, momDays: dmMom, momLookbacks: dmComposite ? [21, 63, 126, 252] : undefined,
+            rebalanceDays: dmReb, from: from || undefined, to: to || undefined });
+        const rangeBars = defBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
+        setResult({ ...dr, bars: rangeBars, principal, strategy });
+        return;
+      }
+      // 변동성 타깃 — 대상 ETF 전체 이력 + 레짐 시그널(선택). from/to 는 러너 내부에서 제한.
+      if (strategy === "vol_target_v1") {
+        const fetchBars = async (t: string): Promise<Bar[]> => {
+          const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(t)}`);
+          if (!res0.ok) throw new Error(`${t} 데이터 조회 실패 (${res0.status})`);
+          const b: Bar[] = (await res0.json()).bars ?? [];
+          if (b.length === 0) throw new Error(`${t} 일봉 데이터가 없습니다.`);
+          return b;
+        };
+        const tgt = ticker.trim().toUpperCase();
+        const useSignal = !!vtSignal.trim();
+        const [tgtBars, sigBars] = await Promise.all([
+          fetchBars(tgt),
+          useSignal ? fetchBars(vtSignal.trim().toUpperCase()) : Promise.resolve<Bar[]>([]),
+        ]);
+        const vr = runVolTargetBacktest({ ticker: tgt, bars: tgtBars }, {
+          principal, targetVolPct: vtTargetVol, volLookback: vtLookback, maxLeverage: vtMaxLev,
+          rebalanceBand: vtBand / 100, from: from || undefined, to: to || undefined,
+          smaPeriod: useSignal ? vtSma : undefined,
+        }, useSignal ? sigBars : undefined);
+        const rangeBars = tgtBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
+        setResult({ ...vr, bars: rangeBars, principal, strategy });
         return;
       }
       const params = new URLSearchParams({ ticker: ticker.trim().toUpperCase() });
@@ -291,9 +365,9 @@ export default function BacktestClient() {
 
       {/* 옵션 폼 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        {/* rotation 은 후보/시그널 필드가 종목 입력을 대신한다 — 이 필드는 무시되므로 숨겨 혼동 방지 */}
-        {!strategy.startsWith("rotation") && (
-          <Field label="종목 코드" hint="예: TQQQ, 069500">
+        {/* rotation·듀얼모멘텀은 후보 필드가 종목 입력을 대신한다 — 이 필드는 무시되므로 숨겨 혼동 방지 */}
+        {!strategy.startsWith("rotation") && strategy !== "dual_momentum_v1" && (
+          <Field label="종목 코드" hint={strategy === "vol_target_v1" ? "대상 레버리지 ETF(예: TQQQ)" : "예: TQQQ, 069500"}>
             <input value={ticker} onChange={(e) => setTicker(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} placeholder="TICKER" className="input" />
           </Field>
         )}
@@ -386,6 +460,56 @@ export default function BacktestClient() {
                 <input type="number" value={rotDca} min={1} onChange={(e) => setRotDca(Number(e.target.value))} className="input" />
               </Field>
             )}
+            <Field label="복합 모멘텀" hint="여러 룩백(21·63·126·252) 평균 — 강건성↑. 켜면 위 모멘텀 일수 무시">
+              <label className="flex items-center gap-2 h-[38px]">
+                <input type="checkbox" checked={rotComposite} onChange={(e) => setRotComposite(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">{rotComposite ? "켜짐(멀티 룩백)" : "꺼짐(단일)"}</span>
+              </label>
+            </Field>
+          </>
+        )}
+        {strategy === "dual_momentum_v1" && (
+          <>
+            <Field label="후보 종목(콤마)" hint="이 중 모멘텀 1위 보유(상대 모멘텀)">
+              <input value={dmCandidates} onChange={(e) => setDmCandidates(e.target.value)} placeholder="TQQQ,SOXL,UPRO,TECL" className="input" />
+            </Field>
+            <Field label="방어자산" hint="1위가 약하면 대피(예: IEF 미국채)">
+              <input value={dmDefensive} onChange={(e) => setDmDefensive(e.target.value)} placeholder="IEF" className="input" />
+            </Field>
+            <Field label="모멘텀 일수" hint="수익률 룩백(기본 252≈12개월)">
+              <input type="number" value={dmMom} min={5} onChange={(e) => setDmMom(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="재평가 주기(일)" hint="1위 재선정(기본 21≈월 1회)">
+              <input type="number" value={dmReb} min={1} onChange={(e) => setDmReb(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="복합 모멘텀" hint="여러 룩백(21·63·126·252) 평균. 켜면 위 모멘텀 일수 무시">
+              <label className="flex items-center gap-2 h-[38px]">
+                <input type="checkbox" checked={dmComposite} onChange={(e) => setDmComposite(e.target.checked)} className="w-4 h-4" />
+                <span className="text-sm text-gray-600 dark:text-gray-300">{dmComposite ? "켜짐" : "꺼짐"}</span>
+              </label>
+            </Field>
+          </>
+        )}
+        {strategy === "vol_target_v1" && (
+          <>
+            <Field label="목표 변동성 %" hint="연 환산(예: 25). 낮을수록 노출↓">
+              <input type="number" value={vtTargetVol} min={1} step={1} onChange={(e) => setVtTargetVol(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="변동성 창(일)" hint="실현변동성 계산 기간(기본 20)">
+              <input type="number" value={vtLookback} min={2} onChange={(e) => setVtLookback(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="최대 노출(배)" hint="1.0=현금 이내, >1=레버리지 허용">
+              <input type="number" value={vtMaxLev} min={0.1} step={0.1} onChange={(e) => setVtMaxLev(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="리밸런스 밴드 %p" hint="노출 드리프트 이 이상일 때만 재조정(기본 5)">
+              <input type="number" value={vtBand} min={0} step={1} onChange={(e) => setVtBand(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="레짐 시그널(선택)" hint="1배 지수(예: QQQ). 비우면 레짐 필터 없음">
+              <input value={vtSignal} onChange={(e) => setVtSignal(e.target.value)} placeholder="QQQ(선택)" className="input" />
+            </Field>
+            <Field label="시그널 SMA" hint="레짐 기준(기본 200, 시그널 있을 때만)">
+              <input type="number" value={vtSma} min={20} onChange={(e) => setVtSma(Number(e.target.value))} className="input" />
+            </Field>
           </>
         )}
         {strategy === "lrs_v1" && (
@@ -516,7 +640,9 @@ function Result({ result }: { result: FullResult }) {
   const maxRound = result.trades.reduce((m, t) => Math.max(m, t.roundNo), 0);
 
   const isRotation = result.strategy.startsWith("rotation");
-  const option: EChartsOption = isRotation
+  // 총자산(현금+보유) 곡선으로 표시할 전략 — 로테이션 계열 + 듀얼모멘텀(다종목) + 변동성타깃(부분 포지션)
+  const isPortfolio = isRotation || result.strategy === "dual_momentum_v1" || result.strategy === "vol_target_v1";
+  const option: EChartsOption = isPortfolio
     ? {
         // 다중 종목 로테이션 — 단일 가격축 대신 총자산(현금+보유) 곡선으로 표시
         tooltip: { trigger: "axis" },
@@ -592,7 +718,7 @@ function Result({ result }: { result: FullResult }) {
               <th className="py-2 px-3 text-right">수량</th>
               <th className="py-2 px-3 text-right">실현손익</th>
               {result.strategy.startsWith("infinite") && <th className="py-2 px-3 text-right">회차</th>}
-              {isRotation && <th className="py-2 px-3 text-left">종목</th>}
+              {isPortfolio && <th className="py-2 px-3 text-left">종목</th>}
             </tr>
           </thead>
           <tbody>
@@ -608,7 +734,7 @@ function Result({ result }: { result: FullResult }) {
                   {t.side === "sell" ? fmt(t.pnl) : "—"}
                 </td>
                 {result.strategy.startsWith("infinite") && <td className="py-1.5 px-3 text-right text-gray-500">{t.roundNo}</td>}
-                {isRotation && <td className="py-1.5 px-3 text-left text-gray-500">{t.ticker}</td>}
+                {isPortfolio && <td className="py-1.5 px-3 text-left text-gray-500">{t.ticker}</td>}
               </tr>
             ))}
           </tbody>

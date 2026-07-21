@@ -117,6 +117,7 @@ export interface RotationV1Config {
   smaPeriod: number; // 시그널(1배 지수) SMA (기본 200)
   bandPct: number; // 레짐 밴드 히스테리시스 (기본 0.01)
   momDays: number; // 상대 모멘텀 룩백 거래일 (기본 126 ≈ 6개월)
+  momLookbacks?: number[]; // 복합 모멘텀: 여러 룩백(예 [21,63,126,252]) 평균. 미지정이면 단일 momDays.
   rebalanceDays: number; // 1위 재평가 주기 거래일 (기본 63 ≈ 분기 — 잦은 교체는 whipsaw 로 불리)
   from?: string; // 매매 구간(YYYY-MM-DD). 지표 워밍업은 구간 밖 데이터도 사용.
   to?: string;
@@ -130,6 +131,33 @@ export interface RotationV1Config {
   dcaSlices?: number;
   // 거래비용(편도 수수료+슬리피지 비율, 예: 0.0025=0.25%). 매수는 q=floor(cash/(price·(1+fee)))
   // 로 축소(라이브 buyableQty 와 동일 원리), 매도대금은 (1−fee) 반영. 미지정/0 이면 무비용(기존).
+  feeRate?: number;
+}
+
+/** 듀얼 모멘텀(GEM, Antonacci) — 후보 중 상대모멘텀 1위 보유 + 절대모멘텀(1위 ≤ 방어자산)이면
+ *  방어자산(예 IEF 채권) 대피. 재평가주기마다 판정, 전량 in/out(1종목), 복리. SMA 레짐 없음. */
+export interface DualMomentumV1Config {
+  principal: number;
+  momDays: number; // 모멘텀 룩백 거래일 (기본 252 ≈ 12개월)
+  momLookbacks?: number[]; // 복합 모멘텀(여러 룩백 평균). 미지정이면 단일 momDays.
+  rebalanceDays: number; // 재평가 주기 거래일 (기본 21 ≈ 월 1회)
+  from?: string;
+  to?: string;
+  feeRate?: number; // 편도 거래비용
+}
+
+/** 변동성 타깃 레버리지 — 레버리지 ETF 를 목표 변동성에 맞춰 부분 포지션으로 노출 조절.
+ *  노출 f = min(maxLeverage, targetVol / 실현변동성). 시그널 지정 시 SMA 이탈이면 f=0(현금). */
+export interface VolTargetV1Config {
+  principal: number;
+  targetVolPct: number; // 목표 연변동성 % (예 25)
+  volLookback: number; // 실현변동성 계산 창(거래일, 기본 20)
+  maxLeverage: number; // 최대 노출 배수(기본 1.0 = 현금 이내)
+  rebalanceBand: number; // 노출 드리프트 이 이상일 때만 재조정(기본 0.05 = 5%p). 거래 절감.
+  smaPeriod?: number; // 시그널 SMA (지정 시 레짐 필터)
+  bandPct?: number;
+  from?: string;
+  to?: string;
   feeRate?: number;
 }
 

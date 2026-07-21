@@ -133,12 +133,14 @@ export function runRotationBacktest(
         if (pool && !pool.has(candidates[i].ticker)) continue;
         if (!closeMaps[i].has(bar.date)) continue;
         poolCands.push(candidates[i].ticker);
-        candCloses[candidates[i].ticker] = series[i].slice(-(cfg.momDays + 1)).reverse();
+        // 복합 모멘텀이면 최대 룩백만큼, 아니면 momDays 만큼 최신 종가 전달.
+        const need = cfg.momLookbacks && cfg.momLookbacks.length ? Math.max(...cfg.momLookbacks) : cfg.momDays;
+        candCloses[candidates[i].ticker] = series[i].slice(-(need + 1)).reverse();
       }
       const dec = rotationDecide({
         candidates: poolCands, signalCloses: sigCloses.slice(-cfg.smaPeriod).reverse(),
         candCloses, holding: heldIdx >= 0 ? candidates[heldIdx].ticker : null,
-        daysSinceRebalance: sinceRebalance,
+        daysSinceRebalance: sinceRebalance, momLookbacks: cfg.momLookbacks,
         smaPeriod: cfg.smaPeriod, bandPct: cfg.bandPct, momDays: cfg.momDays, rebalanceDays: cfg.rebalanceDays,
       });
 
