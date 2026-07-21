@@ -32,6 +32,15 @@
   font-family: "DM Sans", sans-serif;
 }
 
+/* 이미지 노드 선택 박스가 우측 빈 영역까지 잡히는 문제 수정.
+   resize-image 확장의 노드 DOM(wrapper)은 display:flex 전체폭이라, ProseMirror 기본
+   selectednode 아웃라인이 이미지 폭이 아니라 전체폭에 그려진다(특히 좌측정렬 시 우측 여백 큼).
+   확장이 이미지 폭에 맞는 dashed border 를 container 에 이미 그리므로, 전체폭 wrapper 아웃라인만
+   제거해 선택 영역이 이미지에 딱 맞게 한다. (hr 등 다른 노드 선택 표시는 :has(img) 로 제외해 유지) */
+.tiptap.ProseMirror .ProseMirror-selectednode:has(img) {
+  outline: none;
+}
+
 .rich-web-content-wrapper {
   height: calc(100% - var(--tt-toolbar-height));
   overflow-y: auto;
