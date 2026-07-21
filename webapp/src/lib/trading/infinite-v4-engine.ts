@@ -15,7 +15,7 @@ import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
 import { TossClient } from "./toss-client";
 import {
-  emptyPending, newV4State, reconcileDay,
+  absorbIdleCash, emptyPending, newV4State, reconcileDay,
   type V4Fill, type V4State,
 } from "./infinite-v4-state";
 import { v4PlanDay, type V4PlannedOrder } from "./v4-plan";
@@ -48,7 +48,7 @@ export function prevMarketDay(ymd: string): string {
 
 /** v4 가 브로커에 요구하는 최소 계약 — KIS/토스 어댑터가 구현. */
 export type V4Broker = {
-  snapshot(sym: string): Promise<{ holding: number; avg: number; price: number }>;
+  snapshot(sym: string): Promise<{ holding: number; avg: number; price: number; cash: number }>;
   historyLong(sym: string, need: number): Promise<[string, number][]>;
   /** (from, to] 구간 체결을 정규화해 반환 — 날짜 YYYYMMDD. */
   executions(sym: string, fromDate: string, toDate: string): Promise<DatedFill[]>;
@@ -63,11 +63,11 @@ export function makeV4KisBroker(client: KisClient, market: "kr" | "us"): V4Broke
   const usExcd = (sym: string) => US_ORDER_EXCD[usQuoteExcd(sym)] ?? "NASD";
   return {
     async snapshot(sym) {
-      const [holdings] = market === "kr" ? await client.krAccount() : await client.usAccount();
+      const [holdings, cash] = market === "kr" ? await client.krAccount() : await client.usAccount();
       const [holding, avg] = holdings[sym] ?? [0, 0];
       const price = market === "kr"
         ? await client.krPrice(sym) : await client.usPrice(sym, usQuoteExcd(sym));
-      return { holding, avg, price };
+      return { holding, avg, price, cash: Number(cash ?? 0) };
     },
     historyLong: (sym, need) => market === "kr"
       ? client.krHistoryLong(sym, need) : client.usHistoryLong(sym, usQuoteExcd(sym), need),
@@ -124,9 +124,9 @@ export function makeV4TossBroker(
 ): V4Broker {
   return {
     async snapshot(sym) {
-      const [holdings] = await client.account(market);
+      const [holdings, cash] = await client.account(market);
       const [holding, avg] = holdings[sym] ?? [0, 0];
-      return { holding, avg, price: await client.price(sym) };
+      return { holding, avg, price: await client.price(sym), cash: Number(cash ?? 0) };
     },
     historyLong: (sym, need) => client.historyLong(sym, need),
     async executions(sym, fromDate, toDate) {
@@ -221,7 +221,7 @@ export async function runInfiniteV4(
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
   const today = marketToday(market);
 
-  const { holding, avg, price } = await broker.snapshot(sym);
+  const { holding, avg, price, cash } = await broker.snapshot(sym);
 
   // ── 1) 대사 — 마지막 실행일 이후(오늘 제외) 체결을 일자별 적용 ──
   let state = loadState((portfolio.state as Json | undefined)?.v4, cfg);
@@ -239,6 +239,16 @@ export async function runInfiniteV4(
     }
   } catch (e) {
     log(`[v4:${sym}] 체결 대사 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
+  }
+
+  // ── 1.5) 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션 플랫일 때만 cycleCash 를 계좌현금으로 재시드.
+  const reinvest = ((portfolio.config ?? {}) as Json).reinvestIdleCash !== false; // 기본 활성
+  {
+    const before = state.cycleCash;
+    state = absorbIdleCash(state, cash, holding, reinvest);
+    if (state.cycleCash !== before) {
+      log(`[v4:${sym}] 유휴현금 반영 cycleCash ${before.toFixed(0)}→${state.cycleCash.toFixed(0)}(플랫 — 입금/미투입 흡수)`);
+    }
   }
 
   // ── 2) 미체결 취소(멱등) — buy phase 는 09:30 매도를 살리려 매수만 취소 ──

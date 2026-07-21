@@ -35,6 +35,17 @@ export function newV4State(symbol: string, splits: number, principal: number): V
   };
 }
 
+/** 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션이 **플랫(holding===0)** 일 때만, 계좌 가용현금이
+ *  사이클 장부(cycleCash)보다 크면 cycleCash 를 계좌현금으로 재시드한다(사이클 경계/최초 진입 전).
+ *  플랫 시점엔 포지션이 없어 계좌현금=이 종목의 가용 드라이파우더이므로 이중반영·상한위반 없이 안전.
+ *  보유 중(holding>0)엔 손대지 않음(진행 사이클의 분할 스케줄 보호). enabled=false 면 무변경. 순수(불변). */
+export function absorbIdleCash(state: V4State, accountCash: number, holding: number, enabled: boolean): V4State {
+  if (enabled && holding === 0 && Number.isFinite(accountCash) && accountCash > state.cycleCash) {
+    return { ...state, cycleCash: accountCash };
+  }
+  return state;
+}
+
 export type V4Fill = { side: "buy" | "sell"; qty: number; price: number };
 
 /** 하루치 체결을 상태에 적용(순수 — 원본 불변). holdingAfter: 그 날 이후 보유수량 근사. */

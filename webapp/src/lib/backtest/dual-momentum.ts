@@ -52,6 +52,10 @@ export function runDualMomentumBacktest(
   let qty = 0;
   let avg = 0;
   let sinceReb = 0;
+  // 적립식(매월 입금) — 항상 투자 상태라 보유 자산에 즉시 증액(현금 드래그 없음).
+  const contribution = cfg.contribution && cfg.contribution > 0 ? cfg.contribution : 0;
+  const contributions: { date: string; amount: number }[] = [];
+  let prevMonth: string | null = null;
 
   const sell = (date: string, price: number) => {
     trades.push({ date, side: "sell", price, qty, pnl: (price - avg) * qty, roundNo: 0, ticker: held! });
@@ -65,12 +69,28 @@ export function runDualMomentumBacktest(
     cash -= price * q * (1 + fee);
     held = ticker; qty = q; avg = price;
   };
+  // 누적 증액 매수 — 평단 누적 평균(buy 는 덮어쓰기라 적립 top-up 엔 이걸 쓴다).
+  const addBuy = (date: string, ticker: string, price: number, budget: number) => {
+    const q = Math.floor(budget / (price * (1 + fee)));
+    if (q < 1) return;
+    trades.push({ date, side: "buy", price, qty: q, pnl: 0, roundNo: 0, ticker });
+    avg = qty > 0 ? (avg * qty + price * q) / (qty + q) : price;
+    cash -= price * q * (1 + fee);
+    qty += q; held = ticker;
+  };
 
   for (const bar of defensive.bars) {
     const date = bar.date;
     for (let i = 0; i < all.length; i++) { const c = closeMaps[i].get(date); if (c !== undefined) series[i].push(c); }
     const inRange = (!cfg.from || date >= cfg.from) && (!cfg.to || date <= cfg.to);
     if (!inRange) continue;
+
+    // 적립식: 월경계에 현금 유입(리밸런스가 매수하면 그 매수가 흡수, 아니면 아래에서 보유 자산에 증액).
+    if (contribution > 0) {
+      const ym = date.slice(0, 7);
+      if (prevMonth !== null && ym !== prevMonth) { cash += contribution; contributions.push({ date, amount: contribution }); }
+      prevMonth = ym;
+    }
 
     if (held !== null) sinceReb++;
     if (held === null || sinceReb >= cfg.rebalanceDays) {
@@ -88,9 +108,19 @@ export function runDualMomentumBacktest(
         sinceReb = 0;
       }
     }
+    // 적립식: 리밸런스가 매수하지 않은(hold) 날엔 유휴현금을 보유 자산에 즉시 증액. cash 0 이면 no-op.
+    if (contribution > 0 && held !== null) {
+      const hc = closeMaps[idxOf.get(held)!].get(date);
+      if (hc !== undefined) addBuy(date, held, hc, cash);
+    }
     const cur = held !== null ? closeMaps[idxOf.get(held)!].get(date) : undefined;
     equityCurve.push({ date, equity: cash + (cur !== undefined ? qty * cur : qty * avg) });
   }
   const totalPnl = trades.filter((t) => t.side === "sell").reduce((s, t) => s + t.pnl, 0);
-  return { trades, equityCurve, totalPnl };
+  return {
+    trades, equityCurve, totalPnl,
+    ...(contribution > 0
+      ? { contributions, totalContributed: cfg.principal + contributions.reduce((s, c) => s + c.amount, 0) }
+      : {}),
+  };
 }

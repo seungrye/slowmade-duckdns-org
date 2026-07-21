@@ -15,6 +15,7 @@ import { runRotationBacktest } from "@/lib/backtest/rotation";
 import { runDualMomentumBacktest } from "@/lib/backtest/dual-momentum";
 import { runVolTargetBacktest } from "@/lib/backtest/vol-target";
 import { KR_SEED, US_SEED, type SeedEntry } from "@/lib/backtest/rotation-pool";
+import { computeMetrics } from "@/lib/backtest/metrics";
 import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
 type Strategy =
@@ -83,6 +84,7 @@ export default function BacktestClient() {
   // 공통
   const [ticker, setTicker] = useState("");
   const [principal, setPrincipal] = useState(4000);
+  const [monthlyContribution, setMonthlyContribution] = useState(0); // 적립식: 매월 입금액(0=목돈). rotation/dual/vol 만 지원.
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   // 무한매수
@@ -227,7 +229,8 @@ export default function BacktestClient() {
           { principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: rotMom,
             momLookbacks: rotComposite ? [21, 63, 126, 252] : undefined,
             rebalanceDays: rotReb, from: from || undefined, to: to || undefined,
-            autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined });
+            autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined,
+            contribution: monthlyContribution || undefined });
         const rangeSig = sigBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...rr, bars: rangeSig, principal, strategy });
         return;
@@ -251,7 +254,8 @@ export default function BacktestClient() {
           candList.map((t, i) => ({ ticker: t, bars: candBars[i] })),
           { ticker: defTicker, bars: defBars },
           { principal, momDays: dmMom, momLookbacks: dmComposite ? [21, 63, 126, 252] : undefined,
-            rebalanceDays: dmReb, from: from || undefined, to: to || undefined });
+            rebalanceDays: dmReb, from: from || undefined, to: to || undefined,
+            contribution: monthlyContribution || undefined });
         const rangeBars = defBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...dr, bars: rangeBars, principal, strategy });
         return;
@@ -274,7 +278,7 @@ export default function BacktestClient() {
         const vr = runVolTargetBacktest({ ticker: tgt, bars: tgtBars }, {
           principal, targetVolPct: vtTargetVol, volLookback: vtLookback, maxLeverage: vtMaxLev,
           rebalanceBand: vtBand / 100, from: from || undefined, to: to || undefined,
-          smaPeriod: useSignal ? vtSma : undefined,
+          smaPeriod: useSignal ? vtSma : undefined, contribution: monthlyContribution || undefined,
         }, useSignal ? sigBars : undefined);
         const rangeBars = tgtBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...vr, bars: rangeBars, principal, strategy });
@@ -374,6 +378,11 @@ export default function BacktestClient() {
         <Field label="원금" hint="배정 자본(국장은 원화)">
           <input type="number" value={principal} onChange={(e) => setPrincipal(Number(e.target.value))} className="input" />
         </Field>
+        {(strategy.startsWith("rotation") || strategy === "dual_momentum_v1" || strategy === "vol_target_v1") && (
+          <Field label="월 적립금" hint="매월 입금액(0=목돈 일시투입). 입금분은 보유에 즉시 투입돼 현금 드래그 없음. 수익률은 TWR 로 표기">
+            <input type="number" value={monthlyContribution} min={0} onChange={(e) => setMonthlyContribution(Number(e.target.value))} className="input" />
+          </Field>
+        )}
 
         {strategy === "infinite_v1" && (
           <>
@@ -635,6 +644,8 @@ function Result({ result }: { result: FullResult }) {
   const invested = buys.reduce((s, t) => s + t.price * t.qty, 0);
   const returnPct = result.principal > 0 ? (result.totalPnl / result.principal) * 100 : 0;
   const finalEquity = result.equityCurve.at(-1)?.equity ?? 0;
+  // 적립식이면 유입 자본을 제거한 시간가중수익(TWR)로 수익률 표기(원금 대비 %는 왜곡되므로).
+  const twr = result.totalContributed ? computeMetrics(result.equityCurve, result.principal, result.contributions) : null;
   const wins = sells.filter((t) => t.pnl > 0).length;
   const winRate = sells.length > 0 ? (wins / sells.length) * 100 : 0;
   const maxRound = result.trades.reduce((m, t) => Math.max(m, t.roundNo), 0);
@@ -675,7 +686,11 @@ function Result({ result }: { result: FullResult }) {
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <Metric label="실현손익" value={fmt(result.totalPnl)} accent={result.totalPnl >= 0 ? "pos" : "neg"} />
-        <Metric label="수익률 (원금 대비)" value={`${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`} accent={returnPct >= 0 ? "pos" : "neg"} />
+        {twr ? (
+          <Metric label="수익률 (TWR)" value={`${twr.totalReturnPct >= 0 ? "+" : ""}${twr.totalReturnPct.toFixed(2)}%`} accent={twr.totalReturnPct >= 0 ? "pos" : "neg"} />
+        ) : (
+          <Metric label="수익률 (원금 대비)" value={`${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`} accent={returnPct >= 0 ? "pos" : "neg"} />
+        )}
         {result.strategy.startsWith("infinite") ? (
           <>
             <Metric label="사이클 (익절 횟수)" value={`${sells.length}회`} />
@@ -689,6 +704,7 @@ function Result({ result }: { result: FullResult }) {
             <Metric label="진입/청산" value={`${buys.length}/${sells.length}건`} />
           </>
         )}
+        {result.totalContributed ? <Metric label="총 납입원금" value={fmt(result.totalContributed)} /> : null}
         <Metric label="현재 보유 평가액" value={fmt(finalEquity)} />
         <Metric label="일봉 기간" value={`${result.bars[0]?.date} ~ ${result.bars.at(-1)?.date}`} />
         <Metric label="바 수" value={`${result.bars.length}일`} />

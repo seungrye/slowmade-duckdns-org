@@ -68,6 +68,40 @@ describe("rotation DCA — 분할매수 동작", () => {
   });
 });
 
+describe("rotation 적립식(contribution) — 현금 드래그 제거", () => {
+  // 월을 넘기며 날짜 생성(5거래일마다 다음 달) — 월경계 입금 트리거 확인용.
+  const DM = (i: number) => {
+    const m = Math.floor(i / 5) + 1;
+    const d = (i % 5) + 1;
+    return `2020-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  };
+  const mkM = (closes: number[]): Bar[] => closes.map((c, i) => ({ date: DM(i), open: c, high: c, low: c, close: c }));
+  const CFG = { principal: 10000, smaPeriod: 3, bandPct: 0, momDays: 2, rebalanceDays: 100 };
+  const signal = mkM(Array.from({ length: 15 }, (_, i) => 10 + i)); // 계속 상승 → 레짐 온
+  const A = mkM(Array(15).fill(100));
+
+  it("월경계마다 입금분을 보유 종목에 즉시 추가매수(레짐 온)", () => {
+    const r = runRotationBacktest([{ ticker: "A", bars: A }], signal, { ...CFG, contribution: 500 });
+    const buys = r.trades.filter((t) => t.side === "buy");
+    const topups = buys.filter((b) => b.qty === 5); // floor(500/100)=5
+    expect(topups).toHaveLength(2); // 2월·3월 경계 2회
+    expect(r.contributions).toHaveLength(2);
+    expect(r.totalContributed).toBe(10000 + 500 * 2);
+    // 최종 보유수량 = 초기 100 + 적립 5×2 = 110
+    const totalQty = buys.reduce((s, b) => s + b.qty, 0);
+    expect(totalQty).toBe(110);
+  });
+
+  it("contribution 미지정/0 이면 기존과 동일(회귀)", () => {
+    const a = runRotationBacktest([{ ticker: "A", bars: A }], signal, CFG);
+    const b = runRotationBacktest([{ ticker: "A", bars: A }], signal, { ...CFG, contribution: 0 });
+    expect(b.trades).toEqual(a.trades);
+    expect(b.equityCurve).toEqual(a.equityCurve);
+    expect(a.contributions).toBeUndefined();
+    expect(a.totalContributed).toBeUndefined();
+  });
+});
+
 describe("rotation 거래비용(feeRate)", () => {
   const signal = mk([10, 10, 10, 12, 13, 14, 15, 16]);
   const A = mk([100, 100, 100, 100, 100, 100, 100, 100]);

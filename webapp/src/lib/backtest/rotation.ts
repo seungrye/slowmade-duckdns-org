@@ -53,6 +53,10 @@ export function runRotationBacktest(
   let dcaTarget = -1; // 분할매수 중인 후보 인덱스
   let dcaLeft = 0; // 남은 슬라이스 수
   let sliceCash = 0; // 슬라이스당 투입 현금(cash/dcaSlices, 진입 시점 고정)
+  // 적립식(매월 입금) — 월경계마다 현금 유입, 보유·레짐온이면 당일 종가로 즉시 추가매수.
+  const contribution = cfg.contribution && cfg.contribution > 0 ? cfg.contribution : 0;
+  const contributions: { date: string; amount: number }[] = [];
+  let prevMonth: string | null = null;
 
   const smaLast = (): number | null => {
     if (sigCloses.length < cfg.smaPeriod) return null;
@@ -105,6 +109,15 @@ export function runRotationBacktest(
       }
     }
     const inRange = (!cfg.from || bar.date >= cfg.from) && (!cfg.to || bar.date <= cfg.to);
+    // 적립식: 매매 구간 안에서 월이 바뀌면 입금(첫 in-range 달은 초기원금이라 제외).
+    if (inRange && contribution > 0) {
+      const ym = bar.date.slice(0, 7);
+      if (prevMonth !== null && ym !== prevMonth) {
+        cash += contribution;
+        contributions.push({ date: bar.date, amount: contribution });
+      }
+      prevMonth = ym;
+    }
     // 자동선발: 실운영과 같은 시점(풀 미확정·현금 대기·재평가 도래)에 풀 재선발 — 판정 전.
     if (inRange && autoSeed
         && (pool === null || heldIdx < 0 || sinceRebalance >= cfg.rebalanceDays)) {
@@ -167,6 +180,9 @@ export function runRotationBacktest(
         // hold(재평가 유지 포함) — 분할매수 진행 중이면 오늘 슬라이스 소진.
         if (dcaLeft > 0 && heldIdx === dcaTarget && regimeOn && heldClose !== undefined) {
           if (addBuy(bar.date, dcaTarget, heldClose, sliceCash)) dcaLeft--;
+        } else if (contribution > 0 && heldIdx >= 0 && regimeOn && heldClose !== undefined) {
+          // 적립금·유휴현금 즉시 투입(현금 드래그 제거) — 보유·레짐온일 때만. 현금 0 이면 no-op.
+          addBuy(bar.date, heldIdx, heldClose, cash);
         }
         if (dec.rebalanced) sinceRebalance = 0; // 재평가일 "1위 유지"(교체 없음)도 카운터 리셋
       }
@@ -179,5 +195,11 @@ export function runRotationBacktest(
   }
 
   const totalPnl = trades.filter((t) => t.side === "sell").reduce((s, t) => s + t.pnl, 0);
-  return { trades, equityCurve, totalPnl, ...(autoSeed ? { poolLog } : {}) };
+  return {
+    trades, equityCurve, totalPnl,
+    ...(autoSeed ? { poolLog } : {}),
+    ...(contribution > 0
+      ? { contributions, totalContributed: cfg.principal + contributions.reduce((s, c) => s + c.amount, 0) }
+      : {}),
+  };
 }

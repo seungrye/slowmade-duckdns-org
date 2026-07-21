@@ -7,6 +7,7 @@
 
 import { KR_SEED, US_SEED, liquidityMetric, selectPool, type SeedEntry } from "@/lib/backtest/rotation-pool";
 import { clampBuyQty } from "./buyable";
+import { topUpQty } from "./topup";
 import { decryptSecret } from "./crypto";
 import { KisClient, US_ORDER_EXCD, registerUsExcd, usQuoteExcd } from "./kis-client";
 import { lrsDecide, rotationDecide, trendDecide, type OrderIntent } from "./strategies";
@@ -174,6 +175,15 @@ async function runLrs(
     if (q !== it.qty) log(`[LRS ${it.symbol}] 매수수량 ${it.qty}→${q} 클램프(매수가능수량)`);
     sized.push({ ...it, qty: q });
   }
+  // 유휴현금 top-up(현금 드래그 제거) — 보유 & 레짐 유지(매도 신호 없음)이면 남는 현금을 target 에 추가 투입.
+  if (cfg.reinvestIdleCash !== false && qty > 0 && !sized.some((i) => i.side === "sell")) {
+    const bq = price > 0 ? await broker.buyableQty(target, price) : 0;
+    const q = topUpQty({ targetNotional: cash + qty * price, currentNotional: qty * price, price, buyableQty: bq });
+    if (q >= 1) {
+      sized.push({ side: "buy", symbol: target, qty: q, price, reason: `유휴현금 추가 투입(${q}주)` });
+      log(`[LRS ${target}] 유휴현금 추가 투입 — ${q}주(레짐 유지)`);
+    }
+  }
   const { executed } = await execute(account, p, runId, sized, broker, log);
   return `LRS ${target}: 신호 ${executed}건`;
 }
@@ -262,6 +272,16 @@ async function runRotation(
       if (q >= 1) intents.push({ side: "buy", symbol: d.target, qty: q, price, reason: d.reason });
       else log(`[rotation] 매수가능수량 0 — ${d.target} 진입 보류(현금 ${cash.toFixed(0)}, 가격 ${price.toFixed(2)})`);
     }
+  } else if (d.action === "hold" && holding && d.regimeOn && cfg.reinvestIdleCash !== false) {
+    // 유휴현금 top-up(현금 드래그 제거) — 보유 & 레짐 유지일 때 남는 현금(입금·미정산 정산분)을 보유 종목에 투입.
+    const price = await broker.priceOf(holding);
+    const [hq] = holdings[holding];
+    const bq = price > 0 ? await broker.buyableQty(holding, price) : 0;
+    const q = topUpQty({ targetNotional: cash + hq * price, currentNotional: hq * price, price, buyableQty: bq });
+    if (q >= 1) {
+      intents.push({ side: "buy", symbol: holding, qty: q, price, reason: `유휴현금 추가 투입(${q}주)` });
+      log(`[rotation] 유휴현금 추가 투입 — ${holding} ${q}주(레짐 유지)`);
+    }
   }
   const { executed } = await execute(account, p, runId, intents, broker, log);
   if (d.rebalanced) {
@@ -290,6 +310,8 @@ async function runTrend(
   let remaining = cash;
   let buys = 0, sells = 0, scanned = 0;
   const intents: OrderIntent[] = [];
+  let holdingsValue = 0; // 스캔한 보유 종목 평가액 합(top-up 목표비중용 총자산 산정)
+  const topUpCands: { sym: string; price: number; hq: number }[] = []; // 보유 & 상승세 유지 종목
   for (const sym of universe) {
     let closes: number[];
     try {
@@ -302,6 +324,8 @@ async function runTrend(
     scanned++;
     const price = closes[0];
     const [hq] = holdings[sym] ?? [0, 0];
+    holdingsValue += hq * price;
+    let hadSell = false;
     for (const sig of trendDecide({
       symbol: sym, closes, price, holdingQty: hq,
       principal: Math.min(budgetPer, remaining), shortMa, longMa,
@@ -311,8 +335,26 @@ async function runTrend(
         if (notional > remaining) continue;
         remaining -= notional;
         buys++;
-      } else sells++;
+      } else { sells++; hadSell = true; }
       intents.push(sig);
+    }
+    if (hq > 0 && !hadSell) topUpCands.push({ sym, price, hq }); // 보유 유지(청산 신호 없음) → top-up 후보
+  }
+  // 유휴현금 top-up(현금 드래그 제거) — 보유·상승세 종목을 목표비중(positionSize×총자산)까지 추가 투입.
+  if (cfg.reinvestIdleCash !== false) {
+    const equity = cash + holdingsValue;
+    const targetPer = positionSize * equity;
+    for (const h of topUpCands) {
+      if (remaining < h.price) continue;
+      const bq = await broker.buyableQty(h.sym, h.price);
+      const q = topUpQty({ targetNotional: targetPer, currentNotional: h.hq * h.price, price: h.price,
+                           buyableQty: Math.min(bq, Math.floor(remaining / h.price)) });
+      if (q >= 1) {
+        intents.push({ side: "buy", symbol: h.sym, qty: q, price: h.price, reason: `유휴현금 추가 투입(목표비중 ${Math.round(positionSize * 100)}%)` });
+        remaining -= q * h.price;
+        buys++;
+        log(`[trend ${h.sym}] 유휴현금 추가 투입 — ${q}주(목표비중까지)`);
+      }
     }
   }
   await execute(account, p, runId, intents, broker, log);

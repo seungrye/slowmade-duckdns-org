@@ -58,6 +58,9 @@ export interface BacktestResult {
   equityCurve: EquityPoint[];
   totalPnl: number; // 매도 실현손익 합계
   poolLog?: string[]; // rotation 후보 자동선발 풀 변경 이력 (자동선발 모드에서만)
+  // 적립식(주기 입금) — contribution 지정 시에만 채워진다. 지표(TWR)·총납입 표시용.
+  contributions?: { date: string; amount: number }[]; // 실제 입금이 일어난 날짜·금액
+  totalContributed?: number; // 초기 원금 + Σ 입금 (수익률 분모 왜곡 방지용 참고값)
 }
 
 /** 추세추종 설정(원본 TrendConfig 의 백테스트 조정 파라미터). */
@@ -132,6 +135,9 @@ export interface RotationV1Config {
   // 거래비용(편도 수수료+슬리피지 비율, 예: 0.0025=0.25%). 매수는 q=floor(cash/(price·(1+fee)))
   // 로 축소(라이브 buyableQty 와 동일 원리), 매도대금은 (1−fee) 반영. 미지정/0 이면 무비용(기존).
   feeRate?: number;
+  // 적립식(적립 투자) — 매월(거래월 경계) contribution 만큼 현금 유입. 보유·레짐온이면 당일 종가로
+  // 즉시 추가매수(현금 드래그 제거), 레짐오프/미보유면 현금 대기 후 다음 진입에 투입. 미지정/0 이면 목돈 단일 투입(기존).
+  contribution?: number;
 }
 
 /** 듀얼 모멘텀(GEM, Antonacci) — 후보 중 상대모멘텀 1위 보유 + 절대모멘텀(1위 ≤ 방어자산)이면
@@ -144,6 +150,7 @@ export interface DualMomentumV1Config {
   from?: string;
   to?: string;
   feeRate?: number; // 편도 거래비용
+  contribution?: number; // 적립식: 매월 유입액. 항상 투자 상태이므로 보유 자산에 즉시 증액. 미지정/0=목돈(기존).
 }
 
 /** 변동성 타깃 레버리지 — 레버리지 ETF 를 목표 변동성에 맞춰 부분 포지션으로 노출 조절.
@@ -159,6 +166,7 @@ export interface VolTargetV1Config {
   from?: string;
   to?: string;
   feeRate?: number;
+  contribution?: number; // 적립식: 매월 유입액. equity 증가→목표노출(f×equity) 확대로 f 비율만 투입, (1−f)는 완충 유지. 미지정/0=목돈(기존).
 }
 
 /** 레버리지 로테이션 v1 (LRS, Gayed 2016) — **1배 지수를 시그널**로 3배 ETF 를 스위칭.

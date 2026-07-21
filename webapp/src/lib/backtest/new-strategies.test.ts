@@ -91,3 +91,51 @@ describe("runVolTargetBacktest — 러너 스모크", () => {
     expect(r.equityCurve.at(-1)!.equity).toBeGreaterThan(10000);
   });
 });
+
+// 적립식(월 입금) — 현금 드래그 제거. 월을 넘기는 날짜(5거래일마다 다음 달)로 월경계 입금 확인.
+const DM = (i: number) => `2020-${String(Math.floor(i / 5) + 1).padStart(2, "0")}-${String((i % 5) + 1).padStart(2, "0")}`;
+const mkM = (closes: number[]): Bar[] => closes.map((c, i) => ({ date: DM(i), open: c, high: c, low: c, close: c }));
+
+describe("runDualMomentumBacktest — 적립식", () => {
+  const A = mkM(Array.from({ length: 15 }, (_, i) => 100 + i * 2)); // 상승 → 항상 1위
+  const IEF = mkM(Array(15).fill(100));
+  const base = { principal: 10000, momDays: 2, rebalanceDays: 3 };
+
+  it("월경계 입금을 보유 자산에 즉시 증액(항상 투자 상태)", () => {
+    const r = runDualMomentumBacktest([{ ticker: "A", bars: A }], { ticker: "IEF", bars: IEF }, { ...base, contribution: 1000 });
+    expect(r.contributions).toHaveLength(2); // 2·3월 경계
+    expect(r.totalContributed).toBe(10000 + 1000 * 2);
+    const noC = runDualMomentumBacktest([{ ticker: "A", bars: A }], { ticker: "IEF", bars: IEF }, base);
+    const q = (x: typeof r) => x.trades.filter((t) => t.side === "buy").reduce((s, t) => s + t.qty, 0);
+    expect(q(r)).toBeGreaterThan(q(noC)); // 입금분만큼 보유수량↑
+  });
+
+  it("contribution 미지정이면 기존과 동일(회귀)", () => {
+    const a = runDualMomentumBacktest([{ ticker: "A", bars: A }], { ticker: "IEF", bars: IEF }, base);
+    const b = runDualMomentumBacktest([{ ticker: "A", bars: A }], { ticker: "IEF", bars: IEF }, { ...base, contribution: 0 });
+    expect(b.trades).toEqual(a.trades);
+    expect(b.equityCurve).toEqual(a.equityCurve);
+    expect(a.contributions).toBeUndefined();
+  });
+});
+
+describe("runVolTargetBacktest — 적립식", () => {
+  const closes = Array.from({ length: 15 }, (_, i) => 100 * (1 + i * 0.003)); // 저변동 상승 → f≈1
+  const base = { principal: 10000, targetVolPct: 25, volLookback: 5, maxLeverage: 1.0, rebalanceBand: 0.05 };
+
+  it("월경계 입금을 강제 리밸런스로 배분 — 최종 자산이 무적립보다 크다", () => {
+    const r = runVolTargetBacktest({ ticker: "TQQQ", bars: mkM(closes) }, { ...base, contribution: 1000 });
+    expect(r.contributions).toHaveLength(2);
+    expect(r.totalContributed).toBe(10000 + 1000 * 2);
+    const noC = runVolTargetBacktest({ ticker: "TQQQ", bars: mkM(closes) }, base);
+    expect(r.equityCurve.at(-1)!.equity).toBeGreaterThan(noC.equityCurve.at(-1)!.equity + 1500);
+  });
+
+  it("contribution 미지정이면 기존과 동일(회귀)", () => {
+    const a = runVolTargetBacktest({ ticker: "TQQQ", bars: mkM(closes) }, base);
+    const b = runVolTargetBacktest({ ticker: "TQQQ", bars: mkM(closes) }, { ...base, contribution: 0 });
+    expect(b.trades).toEqual(a.trades);
+    expect(b.equityCurve).toEqual(a.equityCurve);
+    expect(a.contributions).toBeUndefined();
+  });
+});

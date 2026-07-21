@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { emptyPending, newV4State, reconcileDay, type V4State } from "./infinite-v4-state";
+import { absorbIdleCash, emptyPending, newV4State, reconcileDay, type V4State } from "./infinite-v4-state";
 import { cyclesFor } from "./scheduler";
 
 // 파이썬 tests/test_infinite_v4_state.py 와 동일 벡터 — 포팅 일치 확인.
@@ -7,6 +7,27 @@ import { cyclesFor } from "./scheduler";
 function st(over: Partial<V4State> = {}): V4State {
   return { ...newV4State("TQQQ", 20, 10_000), t: 5, ...over };
 }
+
+describe("infinite-v4-state.absorbIdleCash — 유휴현금(입금) 흡수", () => {
+  it("플랫(holding 0) + 계좌현금 > cycleCash → cycleCash 재시드(입금 흡수)", () => {
+    const s = st({ cycleCash: 3900 });
+    const out = absorbIdleCash(s, 4900, 0, true); // $1000 입금
+    expect(out.cycleCash).toBe(4900);
+    expect(s.cycleCash).toBe(3900); // 원본 불변
+  });
+  it("보유 중(holding>0)이면 흡수 안 함(진행 사이클 보호)", () => {
+    const out = absorbIdleCash(st({ cycleCash: 3900 }), 4900, 10, true);
+    expect(out.cycleCash).toBe(3900);
+  });
+  it("계좌현금이 cycleCash 이하면 무변경(미정산 감소 무시)", () => {
+    const out = absorbIdleCash(st({ cycleCash: 3900 }), 3000, 0, true);
+    expect(out.cycleCash).toBe(3900);
+  });
+  it("enabled=false 면 무변경", () => {
+    const out = absorbIdleCash(st({ cycleCash: 3900 }), 9999, 0, false);
+    expect(out.cycleCash).toBe(3900);
+  });
+});
 
 describe("infinite-v4-state.reconcileDay — 파이썬 벡터", () => {
   it("¾ 지정가(q75) 체결 → T×0.25, 잔여 보유 → 사이클 유지", () => {

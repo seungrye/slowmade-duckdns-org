@@ -50,3 +50,36 @@ describe("backtest metrics — computeMetrics", () => {
     expect(up.sharpe).toBeGreaterThan(0);
   });
 });
+
+describe("computeMetrics — 적립식(TWR) 보정", () => {
+  it("기여금 유입을 제거한 시간가중수익(TWR)으로 총수익·MDD 계산", () => {
+    // day0 100 → day1 110(+10%, 무입금) → day2 입금100 후 +10% = (110+100)*1.1 = 231
+    const c: EquityPoint[] = [
+      { date: "2020-01-02", equity: 100 },
+      { date: "2020-01-03", equity: 110 },
+      { date: "2020-02-03", equity: 231 },
+    ];
+    const m = computeMetrics(c, 100, [{ date: "2020-02-03", amount: 100 }]);
+    expect(m.final).toBe(231);
+    expect(m.totalContributed).toBe(200);
+    expect(m.totalReturnPct).toBeCloseTo(21, 6); // 1.1*1.1-1 (입금 자본은 수익에서 제외)
+    expect(m.mdd).toBeCloseTo(0, 6);
+  });
+
+  it("입금으로 인한 상승은 수익 아님 — 입금 후 하락은 TWR 지수 기준 낙폭", () => {
+    // day1 입금100 후 하락: base 200 → equity 180 (-10%) → TWR index 0.9
+    const c: EquityPoint[] = [
+      { date: "2020-01-02", equity: 100 },
+      { date: "2020-02-02", equity: 180 },
+    ];
+    const m = computeMetrics(c, 100, [{ date: "2020-02-02", amount: 100 }]);
+    expect(m.totalReturnPct).toBeCloseTo(-10, 6);
+    expect(m.mdd).toBeCloseTo(-10, 6);
+  });
+
+  it("contributions 미지정/빈배열이면 기존 동작과 동일(회귀)", () => {
+    const c = curve([100, 150, 130]);
+    expect(computeMetrics(c, 100, undefined)).toEqual(computeMetrics(c, 100));
+    expect(computeMetrics(c, 100, [])).toEqual(computeMetrics(c, 100));
+  });
+});

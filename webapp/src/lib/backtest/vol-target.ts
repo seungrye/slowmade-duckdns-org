@@ -39,6 +39,10 @@ export function runVolTargetBacktest(
   let prevClose: number | null = null;
   const sigCloses: number[] = [];
   let regimeOn = true; // 시그널 있을 때만 갱신(히스테리시스)
+  // 적립식(매월 입금) — 입금월엔 드리프트 밴드 무시하고 강제 리밸런스해 f 비율만 투입((1−f)는 완충 유지).
+  const contribution = cfg.contribution && cfg.contribution > 0 ? cfg.contribution : 0;
+  const contributions: { date: string; amount: number }[] = [];
+  let prevMonth: string | null = null;
 
   for (const bar of target.bars) {
     const date = bar.date;
@@ -49,6 +53,13 @@ export function runVolTargetBacktest(
 
     const inRange = (!cfg.from || date >= cfg.from) && (!cfg.to || date <= cfg.to);
     if (!inRange) continue;
+
+    let contributedThisBar = false;
+    if (contribution > 0) {
+      const ym = date.slice(0, 7);
+      if (prevMonth !== null && ym !== prevMonth) { cash += contribution; contributions.push({ date, amount: contribution }); contributedThisBar = true; }
+      prevMonth = ym;
+    }
 
     // 레짐(선택): 시그널 SMA 히스테리시스
     if (sigMap && cfg.smaPeriod) {
@@ -66,8 +77,8 @@ export function runVolTargetBacktest(
     const equity = cash + qty * price;
     const curVal = qty * price;
     const targetVal = f * equity;
-    // 드리프트가 밴드 초과일 때만 리밸런스(거래 절감)
-    if (equity > 0 && Math.abs(targetVal - curVal) / equity > cfg.rebalanceBand) {
+    // 드리프트가 밴드 초과일 때만 리밸런스(거래 절감). 단 입금월엔 강제 리밸런스(입금분 즉시 배분).
+    if (equity > 0 && (contributedThisBar || Math.abs(targetVal - curVal) / equity > cfg.rebalanceBand)) {
       const targetQty = price > 0 ? Math.floor(targetVal / price) : 0;
       const delta = targetQty - qty;
       if (delta > 0) { const cost = delta * price * (1 + fee); if (cost <= cash) { cash -= cost; qty += delta; trades.push({ date, side: "buy", price, qty: delta, pnl: 0, roundNo: 0, ticker: target.ticker }); } }
@@ -75,6 +86,10 @@ export function runVolTargetBacktest(
     }
     equityCurve.push({ date, equity: cash + qty * price });
   }
-  const totalPnl = equityCurve.length ? equityCurve[equityCurve.length - 1].equity - cfg.principal : 0;
-  return { trades, equityCurve, totalPnl };
+  const invested = contribution > 0 ? cfg.principal + contributions.reduce((s, c) => s + c.amount, 0) : cfg.principal;
+  const totalPnl = equityCurve.length ? equityCurve[equityCurve.length - 1].equity - invested : 0;
+  return {
+    trades, equityCurve, totalPnl,
+    ...(contribution > 0 ? { contributions, totalContributed: invested } : {}),
+  };
 }

@@ -318,6 +318,13 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                 공통: 실행 시각은 <b>국장 KST · 미장 ET</b>(서머타임 자동 반영). 주말 자동 스킵.
                 아래 필드 외 값은 무시된다. 저장 후 &quot;dry-run 실행&quot;으로 신호를 미리 확인할 것.
               </p>
+              <p>
+                <b>공통 옵션 — <code>reinvestIdleCash</code></b>(모든 전략, 기본 <b>true</b>): 계좌에 놀고
+                있는 현금(입금·정산분)을 매 실행 시 보유 종목에 자동 추가 매수해 <b>현금 드래그를 제거</b>한다.
+                로테이션·LRS 는 전량, 추세는 목표비중까지, 무한매수 V4 는 포지션이 비었을 때(사이클 경계)
+                cycleCash 로 흡수한다. 한 계좌를 여러 종목이 공유하면 과투입될 수 있으니 그럴 땐
+                <code>&quot;reinvestIdleCash&quot;: false</code> 로 끈다.
+              </p>
               <div>
                 <b>LRS (lrs_v1)</b> — 1배 지수 시그널로 레버리지 ETF 전량 스위칭
                 <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
