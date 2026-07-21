@@ -182,11 +182,11 @@ export default function BacktestClient() {
           const rr = runRotationBacktest(cands, sigBars, {
             principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: m,
             rebalanceDays: rb, from: from || undefined, to: to || undefined,
-            autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined });
-          let maxV = -Infinity; let mdd = 0;
-          for (const e of rr.equityCurve) { maxV = Math.max(maxV, e.equity); mdd = Math.min(mdd, e.equity / maxV - 1); }
-          const finalV = rr.equityCurve.at(-1)?.equity ?? principal;
-          out.push([m, rb, (finalV / principal - 1) * 100, mdd * 100]);
+            autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined,
+            contribution: monthlyContribution || undefined });
+          // 적립식·원금0 대응 — finalV/principal(0 나눗셈) 대신 computeMetrics(TWR) 사용.
+          const rm = computeMetrics(rr.equityCurve, principal, rr.contributions);
+          out.push([m, rb, rm.totalReturnPct, rm.mdd]);
         }
       }
       setScan(out);
