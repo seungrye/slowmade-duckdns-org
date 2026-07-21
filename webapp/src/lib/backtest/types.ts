@@ -125,6 +125,12 @@ export interface RotationV1Config {
   autoSeed?: { ticker: string; group: string }[];
   poolSize?: number; // 기본 4
   liqDays?: number; // 거래대금 평균 기간(기본 20)
+  // 분할매수(DCA): 진입/교체 시 현금 전액을 한 번에 사는 대신 dcaSlices 거래일에 걸쳐
+  // sliceCash=cash/dcaSlices 씩 나눠 매수(평단 누적). 미지정/≤1 이면 기존 일시금 매수.
+  dcaSlices?: number;
+  // 거래비용(편도 수수료+슬리피지 비율, 예: 0.0025=0.25%). 매수는 q=floor(cash/(price·(1+fee)))
+  // 로 축소(라이브 buyableQty 와 동일 원리), 매도대금은 (1−fee) 반영. 미지정/0 이면 무비용(기존).
+  feeRate?: number;
 }
 
 /** 레버리지 로테이션 v1 (LRS, Gayed 2016) — **1배 지수를 시그널**로 3배 ETF 를 스위칭.

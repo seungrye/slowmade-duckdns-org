@@ -48,6 +48,11 @@ export function runRotationBacktest(
   let avg = 0;
   let sinceRebalance = 0;
   const sigCloses: number[] = [];
+  // 분할매수(DCA) 상태 — dcaSlices>1 일 때만 사용. 진입/교체 후 남은 슬라이스를 매일 소진.
+  const dcaSlices = cfg.dcaSlices && cfg.dcaSlices > 1 ? Math.floor(cfg.dcaSlices) : 0;
+  let dcaTarget = -1; // 분할매수 중인 후보 인덱스
+  let dcaLeft = 0; // 남은 슬라이스 수
+  let sliceCash = 0; // 슬라이스당 투입 현금(cash/dcaSlices, 진입 시점 고정)
 
   const smaLast = (): number | null => {
     if (sigCloses.length < cfg.smaPeriod) return null;
@@ -56,23 +61,37 @@ export function runRotationBacktest(
     return s / cfg.smaPeriod;
   };
 
+  const fee = cfg.feeRate && cfg.feeRate > 0 ? cfg.feeRate : 0; // 편도 거래비용(수수료+슬리피지)
+
   const sell = (date: string, price: number) => {
     trades.push({ date, side: "sell", price, qty, pnl: (price - avg) * qty, roundNo: 0,
                   ticker: candidates[heldIdx].ticker });
-    cash += price * qty;
+    cash += price * qty * (1 - fee);
     heldIdx = -1;
     qty = 0;
     avg = 0;
   };
 
   const buy = (date: string, i: number, price: number) => {
-    const q = Math.floor(cash / price);
+    const q = Math.floor(cash / (price * (1 + fee)));
     if (q < 1) return;
     trades.push({ date, side: "buy", price, qty: q, pnl: 0, roundNo: 0, ticker: candidates[i].ticker });
-    cash -= price * q;
+    cash -= price * q * (1 + fee);
     heldIdx = i;
     qty = q;
     avg = price;
+  };
+
+  // 분할매수용 누적 매수 — budget(슬라이스 현금) 안에서 사고 평단을 누적 평균으로 갱신.
+  const addBuy = (date: string, i: number, price: number, budget: number): boolean => {
+    const q = Math.floor(budget / (price * (1 + fee)));
+    if (q < 1) return false;
+    trades.push({ date, side: "buy", price, qty: q, pnl: 0, roundNo: 0, ticker: candidates[i].ticker });
+    avg = qty > 0 ? (avg * qty + price * q) / (qty + q) : price;
+    cash -= price * q * (1 + fee);
+    qty += q;
+    heldIdx = i;
+    return true;
   };
 
   for (const bar of signalBars) {
@@ -125,16 +144,29 @@ export function runRotationBacktest(
 
       if (dec.action === "cash") {
         if (heldIdx >= 0 && heldClose !== undefined) sell(bar.date, heldClose); // 레짐 오프 청산
+        dcaLeft = 0; // 청산 시 남은 분할매수 계획 취소
       } else if (dec.action === "switch" && dec.target) {
         const ti = candidates.findIndex((c) => c.ticker === dec.target);
         const tp = ti >= 0 ? closeMaps[ti].get(bar.date) : undefined;
         if (tp !== undefined && (heldIdx < 0 || heldClose !== undefined)) {
           if (heldIdx >= 0 && heldClose !== undefined) sell(bar.date, heldClose); // 같은 날 종가 스위칭
-          buy(bar.date, ti, tp);
+          if (dcaSlices) {
+            // 분할매수 예약 — 매도 후 가용현금을 dcaSlices 로 나눠 첫 슬라이스만 오늘 매수.
+            dcaTarget = ti;
+            sliceCash = cash / dcaSlices;
+            dcaLeft = dcaSlices;
+            if (addBuy(bar.date, ti, tp, sliceCash)) dcaLeft--;
+          } else {
+            buy(bar.date, ti, tp); // 일시금(기존)
+          }
           sinceRebalance = 0;
         }
-      } else if (dec.rebalanced) {
-        sinceRebalance = 0; // 재평가일 "1위 유지"(교체 없음)도 카운터 리셋
+      } else {
+        // hold(재평가 유지 포함) — 분할매수 진행 중이면 오늘 슬라이스 소진.
+        if (dcaLeft > 0 && heldIdx === dcaTarget && regimeOn && heldClose !== undefined) {
+          if (addBuy(bar.date, dcaTarget, heldClose, sliceCash)) dcaLeft--;
+        }
+        if (dec.rebalanced) sinceRebalance = 0; // 재평가일 "1위 유지"(교체 없음)도 카운터 리셋
       }
     }
     if (inRange) {

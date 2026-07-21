@@ -17,7 +17,7 @@ import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
 type Strategy =
   | "infinite_v1" | "infinite_v2_1" | "infinite_v2_2" | "infinite_v3_0" | "infinite_v4_0"
-  | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1";
+  | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1" | "rotation_v2";
 
 const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = {
   infinite_v2_1: "v2_1", infinite_v2_2: "v2_2", infinite_v3_0: "v3_0",
@@ -37,6 +37,7 @@ const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
   ["regime_v1", "레짐 모멘텀 v1"],
   ["lrs_v1", "레버리지 로테이션 v1"],
   ["rotation_v1", "모멘텀 로테이션 v1"],
+  ["rotation_v2", "모멘텀 로테이션 v2 (분할매수)"],
 ];
 
 const STRATEGY_DESC: Record<Strategy, string> = {
@@ -60,6 +61,8 @@ const STRATEGY_DESC: Record<Strategy, string> = {
     "레버리지 로테이션(Gayed 2016): 1배 지수(시그널, 예: QQQ)의 200SMA±밴드로 레버리지 ETF(대상, 예: TQQQ)를 스위칭 — 지수>SMA+밴드면 보유, 지수<SMA-밴드면 현금. 지수 신호가 3배 ETF 자체 신호보다 빨라 하락장 대피가 신속. 시그널 종목은 전체 이력으로 SMA 워밍업.",
   rotation_v1:
     "듀얼 모멘텀 × 레짐(LRS): 후보 ETF 중 최근 N거래일 수익률 1위만 전액 보유(상대 모멘텀, 월 1회 재평가·자동 교체), 지수<SMA−밴드면 전량 현금(매일 검사). 종목 선택이 규칙에 내장 — 후보 풀만 정하면 강한 종목으로 자동 로테이션. 후보를 비우면 시드(레버리지 불 계열)에서 거래대금 상위 4종을 자동 선발(기초지수당 1종). 스위칭=당일 종가, 복리, 수수료 미반영.",
+  rotation_v2:
+    "모멘텀 로테이션 v1 규칙과 동일하되, 진입/교체 시 현금 전액을 한 번에 사지 않고 **K거래일에 나눠 분할매수(DCA)**한다. 진입가를 평균화해 레버리지 ETF 의 단일일 타이밍 리스크·급락 직후 낙폭을 완화(백테스트상 낙폭↓·위험조정수익↑, 특히 K≈15). K는 재평가주기 이하 권장(너무 크면 현금드래그로 수익↓). 레짐 오프 청산·재교체 시 남은 분할계획은 취소.",
 };
 
 export default function BacktestClient() {
@@ -85,10 +88,11 @@ export default function BacktestClient() {
   const [regBand, setRegBand] = useState(2); // %
   const [regMom, setRegMom] = useState(60);
   const [regTrail, setRegTrail] = useState(25); // %
-  // 모멘텀 로테이션 v1
+  // 모멘텀 로테이션 v1 / v2(분할매수)
   const [rotCandidates, setRotCandidates] = useState("TQQQ,SOXL,UPRO,TECL");
   const [rotMom, setRotMom] = useState(126);
   const [rotReb, setRotReb] = useState(63);
+  const [rotDca, setRotDca] = useState(15); // v2 분할매수 K(슬라이스)
   // 레버리지 로테이션 v1
   const [lrsSignal, setLrsSignal] = useState("QQQ");
   const [lrsSma, setLrsSma] = useState(200);
@@ -138,7 +142,7 @@ export default function BacktestClient() {
           const rr = runRotationBacktest(cands, sigBars, {
             principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: m,
             rebalanceDays: rb, from: from || undefined, to: to || undefined,
-            autoSeed: rot.autoSeed });
+            autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined });
           let maxV = -Infinity; let mdd = 0;
           for (const e of rr.equityCurve) { maxV = Math.max(maxV, e.equity); mdd = Math.min(mdd, e.equity / maxV - 1); }
           const finalV = rr.equityCurve.at(-1)?.equity ?? principal;
@@ -154,11 +158,11 @@ export default function BacktestClient() {
   };
 
   const run = async () => {
-    if (strategy !== "rotation_v1" && !ticker.trim()) {
+    if (!strategy.startsWith("rotation") && !ticker.trim()) {
       setError("종목 코드를 입력하세요.");
       return;
     }
-    const rot = strategy === "rotation_v1" ? resolveRotation() : null;
+    const rot = strategy.startsWith("rotation") ? resolveRotation() : null;
     if (rot?.error) {
       setError(rot.error);
       return;
@@ -178,7 +182,7 @@ export default function BacktestClient() {
     setLoading(true);
     setError(null);
     try {
-      if (strategy === "rotation_v1" && rot) {
+      if (strategy.startsWith("rotation") && rot) {
         // 후보 전체 + 시그널을 전체 이력으로 조회(지표 워밍업), 매매 구간은 from/to 로 제한
         const rotList = rot.list;
         const fetchBars = async (t: string): Promise<Bar[]> => {
@@ -194,7 +198,7 @@ export default function BacktestClient() {
           rotList.map((t, i) => ({ ticker: t, bars: candBars[i] })), sigBars,
           { principal, smaPeriod: lrsSma, bandPct: lrsBand / 100, momDays: rotMom,
             rebalanceDays: rotReb, from: from || undefined, to: to || undefined,
-            autoSeed: rot.autoSeed });
+            autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined });
         const rangeSig = sigBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...rr, bars: rangeSig, principal, strategy });
         return;
@@ -285,7 +289,7 @@ export default function BacktestClient() {
       {/* 옵션 폼 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {/* rotation 은 후보/시그널 필드가 종목 입력을 대신한다 — 이 필드는 무시되므로 숨겨 혼동 방지 */}
-        {strategy !== "rotation_v1" && (
+        {!strategy.startsWith("rotation") && (
           <Field label="종목 코드" hint="예: TQQQ, 069500">
             <input value={ticker} onChange={(e) => setTicker(e.target.value)} onKeyDown={(e) => e.key === "Enter" && run()} placeholder="TICKER" className="input" />
           </Field>
@@ -353,7 +357,7 @@ export default function BacktestClient() {
             </Field>
           </>
         )}
-        {strategy === "rotation_v1" && (
+        {strategy.startsWith("rotation") && (
           <>
             <Field label="후보 종목(콤마)" hint="이 중 모멘텀 1위만 보유. 비우면 시드에서 거래대금 상위 자동선발">
               <input value={rotCandidates} onChange={(e) => setRotCandidates(e.target.value)}
@@ -374,6 +378,11 @@ export default function BacktestClient() {
             <Field label="재평가 주기(일)" hint="1위 재선정 주기(기본 63≈분기, 잦으면 whipsaw)">
               <input type="number" value={rotReb} min={1} onChange={(e) => setRotReb(Number(e.target.value))} className="input" />
             </Field>
+            {strategy === "rotation_v2" && (
+              <Field label="분할매수 K(슬라이스)" hint="진입/교체 시 K거래일에 나눠 매수(1=일시금). 재평가주기 이하 권장(예 10~21)">
+                <input type="number" value={rotDca} min={1} onChange={(e) => setRotDca(Number(e.target.value))} className="input" />
+              </Field>
+            )}
           </>
         )}
         {strategy === "lrs_v1" && (
@@ -406,7 +415,7 @@ export default function BacktestClient() {
             {loading ? "실행 중…" : "백테스트 실행"}
           </button>
         </div>
-        {strategy === "rotation_v1" && (
+        {strategy.startsWith("rotation") && (
           <div className="flex flex-col gap-1">
             <span className="text-xs font-medium invisible select-none" aria-hidden="true">스캔</span>
             <button onClick={runRobustnessScan} disabled={scanning}
@@ -418,7 +427,7 @@ export default function BacktestClient() {
       </div>
 
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
-      {scan && strategy === "rotation_v1" && <RobustnessHeatmap scan={scan} curMom={rotMom} curReb={rotReb} />}
+      {scan && strategy.startsWith("rotation") && <RobustnessHeatmap scan={scan} curMom={rotMom} curReb={rotReb} />}
       {result && <Result result={result} />}
 
       <style jsx>{`
@@ -503,7 +512,7 @@ function Result({ result }: { result: FullResult }) {
   const winRate = sells.length > 0 ? (wins / sells.length) * 100 : 0;
   const maxRound = result.trades.reduce((m, t) => Math.max(m, t.roundNo), 0);
 
-  const isRotation = result.strategy === "rotation_v1";
+  const isRotation = result.strategy.startsWith("rotation");
   const option: EChartsOption = isRotation
     ? {
         // 다중 종목 로테이션 — 단일 가격축 대신 총자산(현금+보유) 곡선으로 표시
@@ -580,7 +589,7 @@ function Result({ result }: { result: FullResult }) {
               <th className="py-2 px-3 text-right">수량</th>
               <th className="py-2 px-3 text-right">실현손익</th>
               {result.strategy.startsWith("infinite") && <th className="py-2 px-3 text-right">회차</th>}
-              {result.strategy === "rotation_v1" && <th className="py-2 px-3 text-left">종목</th>}
+              {isRotation && <th className="py-2 px-3 text-left">종목</th>}
             </tr>
           </thead>
           <tbody>
@@ -596,7 +605,7 @@ function Result({ result }: { result: FullResult }) {
                   {t.side === "sell" ? fmt(t.pnl) : "—"}
                 </td>
                 {result.strategy.startsWith("infinite") && <td className="py-1.5 px-3 text-right text-gray-500">{t.roundNo}</td>}
-                {result.strategy === "rotation_v1" && <td className="py-1.5 px-3 text-left text-gray-500">{t.ticker}</td>}
+                {isRotation && <td className="py-1.5 px-3 text-left text-gray-500">{t.ticker}</td>}
               </tr>
             ))}
           </tbody>
