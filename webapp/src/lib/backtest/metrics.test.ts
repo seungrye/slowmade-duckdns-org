@@ -82,4 +82,17 @@ describe("computeMetrics — 적립식(TWR) 보정", () => {
     expect(computeMetrics(c, 100, undefined)).toEqual(computeMetrics(c, 100));
     expect(computeMetrics(c, 100, [])).toEqual(computeMetrics(c, 100));
   });
+
+  it("원금 0 + 적립식(순수 적립) 도 TWR 계산됨 (원금 0 이라고 0% 반환하면 버그)", () => {
+    // day0 자산 0(미투자) → day1 입금 100 → day2 +10% = 110
+    const c: EquityPoint[] = [
+      { date: "2020-01-02", equity: 0 },
+      { date: "2020-02-03", equity: 100 },
+      { date: "2020-03-03", equity: 110 },
+    ];
+    const m = computeMetrics(c, 0, [{ date: "2020-02-03", amount: 100 }]);
+    expect(m.final).toBe(110);
+    expect(m.totalContributed).toBe(100);
+    expect(m.totalReturnPct).toBeCloseTo(10, 6); // 입금 자본 제거한 TWR = +10%
+  });
 });

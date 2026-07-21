@@ -28,11 +28,13 @@ export function computeMetrics(
   contributions?: { date: string; amount: number }[],
 ): BacktestMetrics {
   const n = equityCurve.length;
-  if (n === 0 || principal <= 0) {
-    return { final: principal, totalReturnPct: 0, cagr: 0, mdd: 0, calmar: 0, sharpe: 0 };
+  const hasContrib = !!contributions && contributions.length > 0;
+  // 곡선이 비었거나, 목돈 원금 ≤0 이고 적립도 없으면(자본 없음) 0 지표. 적립식(순수 적립, 원금 0)은
+  // TWR 지수(1 시작, 원금 불필요)로 계산 가능하므로 여기서 걸러 0 을 반환하면 안 된다.
+  if (n === 0 || (principal <= 0 && !hasContrib)) {
+    return { final: n ? equityCurve[n - 1].equity : principal, totalReturnPct: 0, cagr: 0, mdd: 0, calmar: 0, sharpe: 0 };
   }
   const final = equityCurve[n - 1].equity;
-  const hasContrib = !!contributions && contributions.length > 0;
   const flowByDate = new Map<string, number>();
   if (hasContrib) for (const c of contributions!) flowByDate.set(c.date, (flowByDate.get(c.date) ?? 0) + c.amount);
   const totalContributed = hasContrib
