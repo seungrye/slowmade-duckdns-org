@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
+vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
     find: vi.fn(),
@@ -13,7 +14,10 @@ vi.mock('@/models/web-adventure-scene', () => ({
 }));
 
 import { GET, POST } from './route';
+import { auth } from '@/auth';
 import WebAdventureScene from '@/models/web-adventure-scene';
+
+const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
 function makeRequest(body?: object): NextRequest {
   return new Request('http://localhost/api/web-adventure/scenes', {
@@ -42,7 +46,16 @@ describe('GET /api/web-adventure/scenes', () => {
 });
 
 describe('POST /api/web-adventure/scenes', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } }); // 기본 로그인 상태
+  });
+
+  it('로그인하지 않으면 401 (무인증 씬 생성 차단)', async () => {
+    asMock(auth).mockResolvedValue(null);
+    const res = await POST(makeRequest({ id: 'x', title: 't', illustration: '/x.jpg', body: ['b'] }));
+    expect(res.status).toBe(401);
+  });
 
   it('id / title / illustration / body 필수 누락 시 400', async () => {
     const res = await POST(makeRequest({ id: 'x' }));

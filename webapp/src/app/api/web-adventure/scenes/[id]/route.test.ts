@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
+vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
     findOne: vi.fn(),
@@ -19,8 +20,11 @@ vi.mock('@/models/web-adventure-scene-revision', () => ({
 }));
 
 import { GET, PUT, DELETE } from './route';
+import { auth } from '@/auth';
 import WebAdventureScene from '@/models/web-adventure-scene';
 import WebAdventureSceneRevision from '@/models/web-adventure-scene-revision';
+
+const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
 const params = Promise.resolve({ id: 'town_square_dawn' });
 
@@ -56,7 +60,16 @@ describe('GET /api/web-adventure/scenes/[id]', () => {
 });
 
 describe('PUT /api/web-adventure/scenes/[id]', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
+  });
+
+  it('로그인하지 않으면 401 (무인증 씬 수정 차단)', async () => {
+    asMock(auth).mockResolvedValue(null);
+    const res = await PUT(makeRequest('PUT', { title: 'x' }), { params });
+    expect(res.status).toBe(401);
+  });
 
   it('씬을 찾지 못하면 404 (findOne / findOneAndUpdate 모두 null)', async () => {
     (WebAdventureScene.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -239,7 +252,16 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
 });
 
 describe('DELETE /api/web-adventure/scenes/[id]', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
+  });
+
+  it('로그인하지 않으면 401 (무인증 씬 삭제 차단)', async () => {
+    asMock(auth).mockResolvedValue(null);
+    const res = await DELETE(makeRequest('DELETE'), { params });
+    expect(res.status).toBe(401);
+  });
 
   it('씬을 찾지 못하면 404 (소프트 삭제 — findOneAndUpdate null)', async () => {
     (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue(null);

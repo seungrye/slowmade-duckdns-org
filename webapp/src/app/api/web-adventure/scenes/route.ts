@@ -3,8 +3,9 @@
 // Phase B 기준 (사용자 결정): admin 권한 없이 전체 공개.
 // Phase F (사이트 노출 + 정식 admin UI) 시점에 권한 강제 예정.
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
+import { requireAuth } from "@/lib/require-auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import WebAdventureScene from "@/models/web-adventure-scene";
 
@@ -17,6 +18,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authed = await requireAuth(); // 씬 생성은 로그인 필요(무인증 변조/DoS 차단)
+  if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const body = await req.json();
 

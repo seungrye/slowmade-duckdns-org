@@ -12,8 +12,9 @@
 //   - UI: v0 = "최초 작성" (diff 없음). v_N (N>=1) = v_{N-1} → v_N diff.
 //   - 'v_N 으로 복원' = mongo = v_N snapshot + 새 commit (v_{last+1}).
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
+import { requireAuth } from "@/lib/require-auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import WebAdventureScene from "@/models/web-adventure-scene";
 import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
@@ -29,6 +30,8 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
+  const authed = await requireAuth(); // 씬 수정은 로그인 필요
+  if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const { id } = await params;
   const body = await req.json();
@@ -82,6 +85,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
+  const authed = await requireAuth(); // 씬 삭제는 로그인 필요
+  if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const { id } = await params;
   // 하드 삭제하지 않고 소프트 삭제 — 문서·리비전 이력을 보존하고 isDeleted 로 숨긴다.

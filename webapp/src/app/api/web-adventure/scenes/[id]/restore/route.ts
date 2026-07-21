@@ -7,8 +7,9 @@
 // PUT 의 로직을 직접 호출하지 않고 동일 흐름을 반복 — body 가 snapshot 자체이므로
 // id 등 metadata 가 섞이지 않도록 명시적으로 처리.
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
+import { requireAuth } from "@/lib/require-auth";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import WebAdventureScene from "@/models/web-adventure-scene";
 import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
@@ -16,6 +17,8 @@ import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
+  const authed = await requireAuth(); // 리비전 복원은 로그인 필요
+  if (authed instanceof NextResponse) return authed;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { version?: number };
   const version = Number(body.version);

@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
+vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
     findOne: vi.fn(),
@@ -22,8 +23,11 @@ vi.mock('@/models/web-adventure-scene-revision', () => ({
 }));
 
 import { POST } from './route';
+import { auth } from '@/auth';
 import WebAdventureScene from '@/models/web-adventure-scene';
 import WebAdventureSceneRevision from '@/models/web-adventure-scene-revision';
+
+const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
 const params = Promise.resolve({ id: 'kael_infirmary' });
 
@@ -39,7 +43,16 @@ function makeRequest(body: object): NextRequest {
 }
 
 describe('POST /api/web-adventure/scenes/[id]/restore', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
+  });
+
+  it('로그인하지 않으면 401 (무인증 복원 차단)', async () => {
+    asMock(auth).mockResolvedValue(null);
+    const res = await POST(makeRequest({ version: 0 }), { params });
+    expect(res.status).toBe(401);
+  });
 
   it('version 미지정 시 400', async () => {
     const res = await POST(makeRequest({}), { params });
