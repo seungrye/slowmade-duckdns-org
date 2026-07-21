@@ -16,12 +16,13 @@ import { runDualMomentumBacktest } from "@/lib/backtest/dual-momentum";
 import { runVolTargetBacktest } from "@/lib/backtest/vol-target";
 import { KR_SEED, US_SEED, type SeedEntry } from "@/lib/backtest/rotation-pool";
 import { computeMetrics } from "@/lib/backtest/metrics";
+import { runValueRebalancingBacktest } from "@/lib/backtest/value-rebalancing";
 import type { Bar, BacktestResult } from "@/lib/backtest/types";
 
 type Strategy =
   | "infinite_v1" | "infinite_v2_1" | "infinite_v2_2" | "infinite_v3_0" | "infinite_v4_0"
   | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1" | "rotation_v2"
-  | "dual_momentum_v1" | "vol_target_v1";
+  | "dual_momentum_v1" | "vol_target_v1" | "value_rebalancing";
 
 const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = {
   infinite_v2_1: "v2_1", infinite_v2_2: "v2_2", infinite_v3_0: "v3_0",
@@ -36,6 +37,7 @@ const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
   ["rotation_v1", "모멘텀 로테이션 v1"],
   ["dual_momentum_v1", "듀얼 모멘텀 GEM (채권 대피)"],
   ["vol_target_v1", "변동성 타깃 레버리지"],
+  ["value_rebalancing", "밸류리밸런싱 VR (라오어)"],
   ["lrs_v1", "레버리지 로테이션 v1"],
   ["regime_v1", "레짐 모멘텀 v1"],
   ["trend_v4", "추세추종 v4 (트레일링)"],
@@ -76,6 +78,8 @@ const STRATEGY_DESC: Record<Strategy, string> = {
     "듀얼 모멘텀(GEM, Gary Antonacci): 후보 ETF 중 최근 N거래일 수익률 1위 보유(상대 모멘텀). 단, 그 1위마저 방어자산(예: IEF 미국채)보다 약하면 **방어자산으로 대피**(절대 모멘텀) — 하락장엔 현금 대신 채권을 들어 방어하면서 이자수익까지 노린다. 로테이션과 달리 SMA 레짐선 없이 '상대+절대' 모멘텀만으로 방어/공격을 전환. 복합 모멘텀(여러 룩백 평균) 옵션으로 타이밍 운을 줄일 수 있다.",
   vol_target_v1:
     "변동성 타깃 레버리지: 레버리지 ETF 를 항상 풀로 들지 않고 **목표 변동성에 맞춰 부분 포지션**으로 노출을 조절한다. 노출 f = min(최대노출, 목표변동성 ÷ 실현변동성) — 시장이 조용하면 많이, 변동성이 치솟으면 자동으로 줄여(현금 확대) 급락 낙폭을 완화한다. 드리프트가 밴드를 넘을 때만 재조정해 매매를 아낀다. 레짐 시그널(1배 지수) 지정 시 SMA 이탈이면 전량 현금.",
+  value_rebalancing:
+    "라오어 밸류리밸런싱(VR): 레버리지 ETF(예: TQQQ)를 장기 보유하되 목표경로 V의 **밴드(±b) 안**으로 유지하는 밸류애버리징. 계좌 = 주식(평가금) + Pool(현금). 사이클(2주)마다 V₂ = V₁ + Pool/G + 현금흐름으로 목표를 갱신 — **현금비중(P/V)이 목표 기울기를 자동 조절**(Pool↑ 공격적 매수, Pool↓ 공격적 매도). 평가금이 하단 아래면 Pool로 매수(사이클 한도 u 내), 상단 위면 매도해 대금을 Pool로. **G가 위험 다이얼**(클수록 보수적: 수익·위험 함께↓, 위험이 더 빨리↓). 적립(+)/거치(0)/인출(−) 지원. 평단 무관. (실력공식은 원문 미공개 — 기본공식 + 존버감지)",
 };
 
 export default function BacktestClient() {
@@ -121,6 +125,14 @@ export default function BacktestClient() {
   const [vtBand, setVtBand] = useState(5); // 드리프트 %p
   const [vtSignal, setVtSignal] = useState("QQQ"); // 레짐 시그널(선택)
   const [vtSma, setVtSma] = useState(200);
+  // 밸류리밸런싱 VR
+  const [vrG, setVrG] = useState(10); // 위험 다이얼(적립·거치 10 / 인출 20)
+  const [vrBand, setVrBand] = useState(15); // 밴드폭 % (±15)
+  const [vrPoolLimit, setVrPoolLimit] = useState(50); // 사이클당 Pool 매수 한도 % (거치 50 / 적립 75 / 인출 25)
+  const [vrCycleDays, setVrCycleDays] = useState(10); // 사이클 거래일(2주)
+  const [vrInitStock, setVrInitStock] = useState(85); // 초기 주식 비중 %
+  const [vrCashflow, setVrCashflow] = useState(0); // 사이클당 현금흐름(+적립/−인출/0거치)
+  const [vrFee, setVrFee] = useState(0); // 편도 수수료 %
   // 레버리지 로테이션 v1
   const [lrsSignal, setLrsSignal] = useState("QQQ");
   const [lrsSma, setLrsSma] = useState(200);
@@ -282,6 +294,23 @@ export default function BacktestClient() {
         }, useSignal ? sigBars : undefined);
         const rangeBars = tgtBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
         setResult({ ...vr, bars: rangeBars, principal, strategy });
+        return;
+      }
+      // 밸류리밸런싱 VR — 대상 ETF 전체 이력. from/to 는 러너 내부에서 제한.
+      if (strategy === "value_rebalancing") {
+        const tgt = ticker.trim().toUpperCase();
+        const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(tgt)}`);
+        if (!res0.ok) throw new Error(`${tgt} 데이터 조회 실패 (${res0.status})`);
+        const tgtBars: Bar[] = (await res0.json()).bars ?? [];
+        if (tgtBars.length === 0) throw new Error(`${tgt} 일봉 데이터가 없습니다.`);
+        const vrr = runValueRebalancingBacktest({ ticker: tgt, bars: tgtBars }, {
+          principal, gradient: vrG, bandPct: vrBand / 100, poolLimitPct: vrPoolLimit / 100,
+          cycleDays: vrCycleDays, initStockRatio: vrInitStock / 100,
+          cashflow: vrCashflow || undefined, feeRate: vrFee ? vrFee / 100 : undefined,
+          from: from || undefined, to: to || undefined,
+        });
+        const rangeBars = tgtBars.filter((b) => (!from || b.date >= from) && (!to || b.date <= to));
+        setResult({ ...vrr, bars: rangeBars, principal, strategy });
         return;
       }
       const params = new URLSearchParams({ ticker: ticker.trim().toUpperCase() });
@@ -521,6 +550,31 @@ export default function BacktestClient() {
             </Field>
           </>
         )}
+        {strategy === "value_rebalancing" && (
+          <>
+            <Field label="G (위험 다이얼)" hint="클수록 보수적. 적립·거치 10 / 인출 20">
+              <input type="number" value={vrG} min={1} step={1} onChange={(e) => setVrG(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="밴드 %" hint="±b (기본 15). 매매 빈도 조절(저민감)">
+              <input type="number" value={vrBand} min={1} step={1} onChange={(e) => setVrBand(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="Pool 사용한도 %" hint="사이클당 매수 상한. 거치 50 / 적립 75 / 인출 25">
+              <input type="number" value={vrPoolLimit} min={1} max={100} step={5} onChange={(e) => setVrPoolLimit(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="사이클(거래일)" hint="V 갱신 주기. 2주=10">
+              <input type="number" value={vrCycleDays} min={1} onChange={(e) => setVrCycleDays(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="초기 주식 %" hint="주식:Pool 초기 분할(기본 85 = 85:15)">
+              <input type="number" value={vrInitStock} min={1} max={100} step={5} onChange={(e) => setVrInitStock(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="사이클당 현금흐름" hint="+적립 / −인출 / 0 거치. TWR 로 수익률 표기">
+              <input type="number" value={vrCashflow} step={50} onChange={(e) => setVrCashflow(Number(e.target.value))} className="input" />
+            </Field>
+            <Field label="수수료 %" hint="편도 수수료+슬리피지(0=무비용)">
+              <input type="number" value={vrFee} min={0} step={0.05} onChange={(e) => setVrFee(Number(e.target.value))} className="input" />
+            </Field>
+          </>
+        )}
         {strategy === "lrs_v1" && (
           <>
             <Field label="시그널 종목" hint="1배 지수(예: QQQ). 비우면 대상 종목">
@@ -652,7 +706,7 @@ function Result({ result }: { result: FullResult }) {
 
   const isRotation = result.strategy.startsWith("rotation");
   // 총자산(현금+보유) 곡선으로 표시할 전략 — 로테이션 계열 + 듀얼모멘텀(다종목) + 변동성타깃(부분 포지션)
-  const isPortfolio = isRotation || result.strategy === "dual_momentum_v1" || result.strategy === "vol_target_v1";
+  const isPortfolio = isRotation || result.strategy === "dual_momentum_v1" || result.strategy === "vol_target_v1" || result.strategy === "value_rebalancing";
   const option: EChartsOption = isPortfolio
     ? {
         // 다중 종목 로테이션 — 단일 가격축 대신 총자산(현금+보유) 곡선으로 표시

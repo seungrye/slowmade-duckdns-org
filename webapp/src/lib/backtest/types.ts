@@ -169,6 +169,22 @@ export interface VolTargetV1Config {
   contribution?: number; // 적립식: 매월 유입액. equity 증가→목표노출(f×equity) 확대로 f 비율만 투입, (1−f)는 완충 유지. 미지정/0=목돈(기존).
 }
 
+/** 라오어 밸류리밸런싱(VR) — 단일 레버리지 ETF를 목표 경로 V의 밴드(±b) 안으로 유지하는 밸류애버리징 발전형.
+ *  계좌 = 주식(평가금) + Pool(현금). 사이클(2주)마다 V₂=V₁+Pool/G+CF, 밴드 재계산. 매일 밴드 이탈 시
+ *  밴드 경계까지 리밸런스(하단 아래→매수, 상단 위→매도). 평단 무관(가격만 사용). 적립/거치/인출 지원. */
+export interface ValueRebalancingConfig {
+  principal: number; // 초기 총자금(주식 + Pool)
+  gradient: number; // G — 위험 다이얼(적립·거치 10 / 인출 20). 클수록 보수적(현금 두껍게)
+  bandPct: number; // 밴드폭 b (기본 0.15 = ±15%) — 매매 빈도 조절(저민감)
+  poolLimitPct: number; // 사이클당 Pool 매수 사용 한도 u (적립 0.75 / 거치 0.50 / 인출 0.25)
+  cycleDays: number; // 사이클 길이(거래일, 기본 10 = 2주)
+  initStockRatio?: number; // 초기 주식:Pool 비율(기본 0.85 = 85:15). 원문 미규정 — 평형 현금비중 근사
+  cashflow?: number; // 사이클당 현금흐름 CF: 양수=적립, 음수=인출, 0/미지정=거치
+  feeRate?: number; // 편도 수수료+슬리피지
+  from?: string;
+  to?: string;
+}
+
 /** 레버리지 로테이션 v1 (LRS, Gayed 2016) — **1배 지수를 시그널**로 3배 ETF 를 스위칭.
  *  시그널 종가 > 시그널 SMA(1+밴드)면 대상(레버리지 ETF) 보유, SMA(1-밴드) 이탈이면 현금.
  *  레버리지 ETF 자체 SMA 는 신호가 늦으므로(3배 변동) 지수 SMA 를 쓰는 것이 핵심. */
