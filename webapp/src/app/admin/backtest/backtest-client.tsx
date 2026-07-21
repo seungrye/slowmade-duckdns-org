@@ -95,6 +95,7 @@ export default function BacktestClient() {
   const [splits, setSplits] = useState(40);
   const [takeProfitPct, setTakeProfitPct] = useState(10);
   const [locPremiumPct, setLocPremiumPct] = useState(12);
+  const [iv4V, setIv4V] = useState(0); // v4 변동성 계수 V(%). 0=비움 → §5.3.2 자동 유도
   // 추세추종 v1·v3·v4 공통(MA 크로스) / v2 는 단일 MA
   const [shortMa, setShortMa] = useState(20);
   const [longMa, setLongMa] = useState(60);
@@ -337,7 +338,7 @@ export default function BacktestClient() {
       const variantVer = INFINITE_VARIANT_VER[strategy];
       const r = (() => {
         if (variantVer) return runInfiniteVariantBacktest(bars, { principal, splits, version: variantVer });
-        if (strategy === "infinite_v4_0") return runInfiniteV4Backtest(bars, { principal, splits });
+        if (strategy === "infinite_v4_0") return runInfiniteV4Backtest(bars, { principal, splits, v: iv4V || undefined });
         switch (strategy) {
           case "infinite_v1":
             return runBacktest(bars, { principal, splits, takeProfitPct: takeProfitPct / 100, locPremiumPct: locPremiumPct / 100 });
@@ -429,6 +430,11 @@ export default function BacktestClient() {
         {(strategy in INFINITE_VARIANT_VER || strategy === "infinite_v4_0") && (
           <Field label="분할 수" hint="v2.x 권장 40 · v3/v4 권장 20 (매수·매도%는 버전 규칙 내장)">
             <input type="number" value={splits} min={2} onChange={(e) => setSplits(Number(e.target.value))} className="input" />
+          </Field>
+        )}
+        {strategy === "infinite_v4_0" && (
+          <Field label="V (변동성 계수, %)" hint="비우면 자동(V≈4×일간σ%, §5.3.2). 종목별: TQQQ 15 · SOXL 20 · KODEX레버리지 8. ⚠σ→V는 미검증 추론(§5.5)">
+            <input type="number" value={iv4V || ""} min={0} placeholder="자동" onChange={(e) => setIv4V(Number(e.target.value))} className="input" />
           </Field>
         )}
         {strategy === "trend_v2" && (
@@ -750,6 +756,7 @@ function Result({ result }: { result: FullResult }) {
             <Metric label="사이클 (익절 횟수)" value={`${sells.length}회`} />
             <Metric label="최대 도달 회차" value={`${maxRound} / ${result.trades.length}건`} />
             <Metric label="총 매수 금액" value={fmt(invested)} />
+            {result.resolvedV != null && <Metric label="사용된 V (변동성 계수)" value={`${result.resolvedV}%`} />}
           </>
         ) : (
           <>

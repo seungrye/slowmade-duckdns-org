@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runInfiniteV4Backtest } from "./infinite-v4";
+import { runInfiniteV4Backtest, deriveVFromBars, revSellDecay } from "./infinite-v4";
 import type { Bar } from "./types";
 
 // 파이썬 tests/test_new_strategies.py v4 벡터와 동일 — 백테스트=실거래 단일코드(v4PlanDay)
@@ -7,8 +7,9 @@ import type { Bar } from "./types";
 
 const bar = (date: string, close: number, high = close, low = close): Bar => ({ date, open: close, high, low, close });
 
-// splits=4, principal=4000 → 첫 매수 1000$. 별% = 15 − 7.5T.
-const CFG = { principal: 4000, splits: 4 };
+// splits=4, principal=4000 → 첫 매수 1000$. V=15 명시 → 별% = 15 − 7.5T.
+// (V 미지정이면 §5.3.2 로 봉에서 자동 유도되므로, 별% 값을 고정하려면 v 를 명시한다.)
+const CFG = { principal: 4000, splits: 4, v: 15 };
 
 describe("무한매수 V4.0 (공식 원문) — 일반모드", () => {
   it("첫 매수: 큰수(전일종가+10%)에 X/P주 + 사다리 X/k 1주 → 종가에 X 전액", () => {
@@ -116,5 +117,56 @@ describe("무한매수 V4.0 — 소진후 리버스모드", () => {
     const baseBuys = base.trades.filter((t) => t.side === "buy").length;
     const moreBuys = more.trades.filter((t) => t.side === "buy").length;
     expect(moreBuys).toBeGreaterThan(baseBuys);
+  });
+});
+
+describe("무한매수 V4.0 — V(변동성 계수) 팩터", () => {
+  // 알려진 σ 시나리오: 로그수익률 ±0.05 교대 → 표본σ=0.05774 → V=round(4×5.774)=23.
+  const knownSigmaBars = (): Bar[] => {
+    const closes = [100, 100 * Math.exp(0.05), 100, 100 * Math.exp(0.05), 100];
+    return closes.map((c, i) => bar(`s${i}`, c));
+  };
+
+  it("deriveVFromBars: V ≈ 4 × 일간 σ% (§5.3.2)", () => {
+    expect(deriveVFromBars(knownSigmaBars())).toBe(23); // 4 × 5.774% ≈ 23.09 → 23
+  });
+
+  it("deriveVFromBars: σ=0(평탄) 또는 표본 부족이면 15(TQQQ) 폴백", () => {
+    expect(deriveVFromBars([bar("a", 100), bar("b", 100), bar("c", 100)])).toBe(15); // σ=0
+    expect(deriveVFromBars([bar("a", 100)])).toBe(15); // 수익률 표본 <2
+    expect(deriveVFromBars([])).toBe(15);
+  });
+
+  it("revSellDecay: 1 − 1/(splits/2) — 40→0.95·20→0.90·30→0.9333 (30분할 교정)", () => {
+    expect(revSellDecay(40)).toBeCloseTo(0.95, 10);
+    expect(revSellDecay(20)).toBeCloseTo(0.9, 10);
+    expect(revSellDecay(30)).toBeCloseTo(0.9333, 4); // 기존 삼항은 0.95 로 오채점했다
+  });
+
+  it("V 오버라이드: 최종매도 목표가 = 평단×(1+V/100) — V=15→115, V=20→120", () => {
+    // d2 진입 10주@100(평단100,T=1). d3 high125·종가105: 75% 지정가매도가 target 에 체결.
+    const bars = [bar("d1", 100), bar("d2", 100), bar("d3", 105, 125)];
+    const r15 = runInfiniteV4Backtest(bars, { principal: 4000, splits: 4, v: 15 });
+    const r20 = runInfiniteV4Backtest(bars, { principal: 4000, splits: 4, v: 20 });
+    const sell15 = r15.trades.find((t) => t.date === "d3" && t.side === "sell");
+    const sell20 = r20.trades.find((t) => t.date === "d3" && t.side === "sell");
+    expect(sell15!.price).toBe(114.99); // 100 × 1.15 = 114.999… → 버림(r2=Math.trunc) 114.99
+    expect(sell20!.price).toBe(120); // 100 × 1.20 → 120
+    expect(sell20!.price).toBeGreaterThan(sell15!.price); // V↑ → 최종매도 목표가↑
+    expect(r15.resolvedV).toBe(15);
+    expect(r20.resolvedV).toBe(20);
+  });
+
+  it("V 미지정이면 §5.3.2 자동 유도 — resolvedV = deriveVFromBars(bars)", () => {
+    const bars = knownSigmaBars();
+    const r = runInfiniteV4Backtest(bars, { principal: 4000, splits: 4 });
+    expect(r.resolvedV).toBe(deriveVFromBars(bars)); // 23
+    expect(r.resolvedV).toBe(23);
+  });
+
+  it("V=0 도 미지정과 동일하게 자동 유도(falsy 처리)", () => {
+    const bars = knownSigmaBars();
+    const r = runInfiniteV4Backtest(bars, { principal: 4000, splits: 4, v: 0 });
+    expect(r.resolvedV).toBe(23);
   });
 });

@@ -57,6 +57,7 @@ export interface BacktestResult {
   trades: BtTrade[];
   equityCurve: EquityPoint[];
   totalPnl: number; // 매도 실현손익 합계
+  resolvedV?: number; // 무한매수 v4: 실제 채점에 쓰인 V(변동성 계수). 사용자 입력값 또는 자동 유도값.
   poolLog?: string[]; // rotation 후보 자동선발 풀 변경 이력 (자동선발 모드에서만)
   // 적립식(주기 입금) — contribution 지정 시에만 채워진다. 지표(TWR)·총납입 표시용.
   contributions?: { date: string; amount: number }[]; // 실제 입금이 일어난 날짜·금액

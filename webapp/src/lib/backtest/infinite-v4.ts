@@ -11,13 +11,43 @@ import type { BacktestResult, Bar, BtTrade, EquityPoint } from "./types";
 export interface InfiniteV4Config {
   principal: number;
   splits: number; // 20/30/40 (원문 추천). 별%·T 감쇠율이 분할수에 연동된다.
+  // V(변동성 계수, %) — 포스트 Tier-0 원자 팩터. 종목별 고유값(TQQQ 15 / SOXL 20 / KODEX레버리지 8).
+  // 별% base·최종매도 목표(+V%)·리버스 탈출선(−V%)을 전부 구동한다. 미지정/0 이면 §5.3.2 로 자동 유도.
+  v?: number;
+}
+
+/** 포스트 §5.3.2 — 일간 로그수익률 표준편차 σ 로 변동성 계수 V 를 유도한다.
+ *  V ≈ 4 × σ(%)  (TQQQ σ≈3.7%→15, SOXL σ≈5.0%→20). 표본 부족·σ=0 시 15(TQQQ) 폴백.
+ *  주의: 포스트는 σ 를 "최근 1년·분기 재계산" 하지만, 백테스트는 로드된 전체 구간 σ 로 V 를 1회
+ *  산출한다(V±1 엔 둔감한 코스 팩터 — 롤링 재계산은 범위 밖, 소폭 lookahead). ⚠ σ→V 유도 자체는
+ *  포스트가 밝힌 미검증 추론(§5.5). */
+export function deriveVFromBars(bars: Bar[]): number {
+  const rets: number[] = [];
+  for (let i = 1; i < bars.length; i++) {
+    const p0 = bars[i - 1].close;
+    const p1 = bars[i].close;
+    if (p0 > 0 && p1 > 0) rets.push(Math.log(p1 / p0));
+  }
+  if (rets.length < 2) return 15;
+  const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
+  const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length - 1);
+  const sigmaPct = Math.sqrt(variance) * 100;
+  const v = Math.round(4 * sigmaPct);
+  return v > 0 ? v : 15;
+}
+
+/** 리버스모드 매도 시 T 감쇠 배수 = 1 − 1/(등분수), 등분수 = splits/2 (포스트 §6.1.1 유도).
+ *  40분할→0.95, 20분할→0.90, 30분할→0.9333. (기존 삼항 splits===20?0.9:0.95 는 30분할 오채점.) */
+export function revSellDecay(splits: number): number {
+  return 1 - 1 / (splits / 2);
 }
 
 export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): BacktestResult {
   const { principal, splits } = cfg;
-  const planCfg = { splits, starBase: 15, sellTarget: 0.15 }; // TQQQ 기준(SOXL 20/0.20)
-  const REV_SELL_DECAY = splits === 20 ? 0.9 : 0.95;
-  const RECOVER_PCT = 0.15;
+  const V = cfg.v && cfg.v > 0 ? cfg.v : deriveVFromBars(bars); // 미지정/0 → §5.3.2 자동 유도
+  const planCfg = { splits, starBase: V, sellTarget: V / 100 }; // V 하나가 별%·최종매도를 구동
+  const REV_SELL_DECAY = revSellDecay(splits);
+  const RECOVER_PCT = V / 100; // 리버스 탈출선 −V%
 
   const trades: BtTrade[] = [];
   const equityCurve: EquityPoint[] = [];
@@ -144,5 +174,5 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
   }
 
   const totalPnl = trades.filter((t) => t.side === "sell").reduce((s, t) => s + t.pnl, 0);
-  return { trades, equityCurve, totalPnl };
+  return { trades, equityCurve, totalPnl, resolvedV: V };
 }
