@@ -24,20 +24,23 @@ const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = 
 };
 type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: Strategy };
 
+// 표시 순서 = 추천 순(위험조정수익·강건성 기준). 로테이션 계열 상위(v2 분할매수가 백테스트
+// 검증상 최고 — Calmar↑·MDD↓·수수료/시그널/파라미터에 강건), 방어형 모멘텀(LRS·레짐·트레일링
+// 추세) 중위, 무한매수(주기적 물타기 — v4 가 가장 완성형) 하위.
 const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
-  ["infinite_v1", "무한매수 v1"],
-  ["infinite_v2_1", "무한매수 v2.1"],
-  ["infinite_v2_2", "무한매수 v2.2"],
-  ["infinite_v3_0", "무한매수 v3.0"],
-  ["infinite_v4_0", "무한매수 v4.0"],
+  ["rotation_v2", "모멘텀 로테이션 v2 (분할매수)"],
+  ["rotation_v1", "모멘텀 로테이션 v1"],
+  ["lrs_v1", "레버리지 로테이션 v1"],
+  ["regime_v1", "레짐 모멘텀 v1"],
+  ["trend_v4", "추세추종 v4 (트레일링)"],
+  ["trend_v3", "추세추종 v3 (추세필터)"],
   ["trend_v1", "추세추종 v1"],
   ["trend_v2", "추세추종 v2 (MA돌파)"],
-  ["trend_v3", "추세추종 v3 (추세필터)"],
-  ["trend_v4", "추세추종 v4 (트레일링)"],
-  ["regime_v1", "레짐 모멘텀 v1"],
-  ["lrs_v1", "레버리지 로테이션 v1"],
-  ["rotation_v1", "모멘텀 로테이션 v1"],
-  ["rotation_v2", "모멘텀 로테이션 v2 (분할매수)"],
+  ["infinite_v4_0", "무한매수 v4.0"],
+  ["infinite_v2_2", "무한매수 v2.2"],
+  ["infinite_v3_0", "무한매수 v3.0"],
+  ["infinite_v2_1", "무한매수 v2.1"],
+  ["infinite_v1", "무한매수 v1"],
 ];
 
 const STRATEGY_DESC: Record<Strategy, string> = {
@@ -66,7 +69,7 @@ const STRATEGY_DESC: Record<Strategy, string> = {
 };
 
 export default function BacktestClient() {
-  const [strategy, setStrategy] = useState<Strategy>("infinite_v1");
+  const [strategy, setStrategy] = useState<Strategy>("rotation_v2"); // 기본=추천 1순위
   const tabScroll = useDragScrollX<HTMLDivElement>();
   // 공통
   const [ticker, setTicker] = useState("");
