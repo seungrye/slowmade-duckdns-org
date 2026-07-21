@@ -60,6 +60,29 @@ server {
 		proxy_cache_bypass $http_upgrade;
 	}
 
+	# MinIO(S3) apex 경로 프록시 — minio-api 서브도메인 DNS 간헐 실패 우회.
+	# /s3/<bucket>/<key> → minio_s3 의 /<bucket>/<key> (path-style 이라 Host 무관).
+	location /s3/ {
+		rewrite ^/s3/(.*)$ /$1 break;
+		proxy_pass http://minio_s3;
+		proxy_set_header Host $http_host;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_connect_timeout 300s;
+		proxy_send_timeout 300s;
+		proxy_read_timeout 300s;
+		proxy_buffering off;
+		proxy_request_buffering off;
+		proxy_redirect off;
+		proxy_http_version 1.1;
+		proxy_set_header Connection "";
+		chunked_transfer_encoding off;
+		# 이미지 캐시 — 브라우저/CDN 재요청 감소
+		add_header Cache-Control "public, max-age=86400" always;
+		add_header X-Content-Type-Options "nosniff" always;
+	}
+
 	location /api/ {
 		proxy_pass http://webapp;
 		proxy_http_version 1.1;
@@ -206,6 +229,10 @@ server {
 
 	location / {
 		# minio-console.slowmade.duckdns.org 접속 시 호스트의 9090번 포트로 프록시
+		# 내부망(192.168.0.0/24)·로컬만 — 콘솔 인터넷 노출 차단(보안 감사 HIGH)
+		allow 192.168.0.0/24;
+		allow 127.0.0.1;
+		deny all;
 		proxy_pass http://minio_console;
 		proxy_set_header Host $http_host;
 		proxy_set_header X-Real-IP $remote_addr;
