@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { updateVBasic, bandOf, rebalanceShares, runValueRebalancingBacktest } from "./value-rebalancing";
-import type { Bar } from "./types";
+import {
+  updateVBasic, bandOf, rebalanceShares, runValueRebalancingBacktest,
+  seedVR, cycleCoverSellQty, advanceCycleVR, applyVRFill,
+} from "./value-rebalancing";
+import type { Bar, ValueRebalancingConfig } from "./types";
 import type { RotationCandidate } from "./rotation";
 
 // ── 순수 헬퍼 ──
@@ -86,5 +89,67 @@ describe("runValueRebalancingBacktest — 러너", () => {
     const b = runValueRebalancingBacktest(bars, { ...CFG, feeRate: 0 });
     expect(b.trades).toEqual(a.trades);
     expect(b.equityCurve).toEqual(a.equityCurve);
+  });
+});
+
+// ── 라이브 공용 순수 함수(백테스트=라이브 단일 소스) ──
+const VCFG: ValueRebalancingConfig = { principal: 10000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5, cycleDays: 5, initStockRatio: 0.85 };
+
+describe("VR seedVR — 초기 85:15 분할", () => {
+  it("qty=floor(85%/price), pool=원금−매수액, V=매수후평가, buyBudget=u×pool", () => {
+    const s = seedVR(VCFG, 100);
+    expect(s).toEqual({ qty: 85, pool: 1500, V: 8500, buyBudget: 750, sinceCycle: 0, cumBuy: 8500, cumSell: 0 });
+  });
+  it("수수료 반영: 매수여력이 (1+fee)로 줄어 주수↓", () => {
+    const s = seedVR({ ...VCFG, feeRate: 0.01 }, 100);
+    expect(s.qty).toBe(Math.floor(8500 / (100 * 1.01))); // 84
+  });
+});
+
+describe("VR applyVRFill — 체결 장부 반영", () => {
+  const base = seedVR(VCFG, 100); // qty85 pool1500 buyBudget750
+  it("매수: pool·buyBudget↓, qty·cumBuy↑", () => {
+    const s = applyVRFill(base, { side: "buy", qty: 5, price: 80 }, 0);
+    expect(s.qty).toBe(90);
+    expect(s.pool).toBe(1500 - 400);
+    expect(s.buyBudget).toBe(750 - 400);
+    expect(s.cumBuy).toBe(8500 + 400);
+  });
+  it("매도: pool·cumSell↑, qty↓ (buyBudget 무관)", () => {
+    const s = applyVRFill(base, { side: "sell", qty: 9, price: 130 }, 0);
+    expect(s.qty).toBe(76);
+    expect(s.pool).toBe(1500 + 1170);
+    expect(s.cumSell).toBe(1170);
+    expect(s.buyBudget).toBe(750);
+  });
+});
+
+describe("VR advanceCycleVR — 사이클 경계 V 갱신", () => {
+  it("원문 예시: V9000·Pool1000·G10·CF250 → V9350·Pool1250·budget=u×1250·sinceCycle0", () => {
+    const st = { qty: 50, pool: 1000, V: 9000, buyBudget: 111, sinceCycle: 5, cumBuy: 0, cumSell: 0 };
+    const s = advanceCycleVR(st, { ...VCFG, cashflow: 250 });
+    expect(s.V).toBe(9350);
+    expect(s.pool).toBe(1250);
+    expect(s.buyBudget).toBe(0.5 * 1250);
+    expect(s.sinceCycle).toBe(0);
+  });
+  it("거치(CF=0): V += Pool/G, pool 불변", () => {
+    const st = { qty: 50, pool: 1000, V: 9000, buyBudget: 0, sinceCycle: 5, cumBuy: 0, cumSell: 0 };
+    const s = advanceCycleVR(st, VCFG);
+    expect(s.V).toBe(9100);
+    expect(s.pool).toBe(1000);
+  });
+});
+
+describe("VR cycleCoverSellQty — 인출 충당 매도", () => {
+  const st = { qty: 85, pool: 100, V: 8500, buyBudget: 50, sinceCycle: 5, cumBuy: 0, cumSell: 0 };
+  it("CF<0 이고 Pool+CF<0 → 부족분을 주식 매도로 충당(올림)", () => {
+    expect(cycleCoverSellQty(st, { ...VCFG, cashflow: -300 }, 100)).toBe(2); // ceil(200/100)
+  });
+  it("Pool 충분하면 0", () => {
+    expect(cycleCoverSellQty({ ...st, pool: 500 }, { ...VCFG, cashflow: -300 }, 100)).toBe(0);
+  });
+  it("거치(CF≥0)면 0", () => {
+    expect(cycleCoverSellQty(st, VCFG, 100)).toBe(0);
   });
 });

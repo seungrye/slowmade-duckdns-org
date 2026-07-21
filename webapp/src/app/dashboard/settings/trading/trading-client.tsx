@@ -37,12 +37,14 @@ const DEFAULT_CONFIG: Record<string, object> = {
   rotation_v1: { signal: "QQQ", sma: 200, band: 1, mom: 126, rebalance: 63 },
   trend_v1: { universe: ["TQQQ", "QQQ"], shortMa: 20, longMa: 60, positionSize: 0.1 },
   infinite_v4: { symbol: "TQQQ", principal: 10000, splits: 20, starBase: 15, sellTarget: 15 },
+  value_rebalancing: { symbol: "TQQQ", principal: 10000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5, cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0 },
 };
 const DEFAULT_RUN_AT: Record<string, { kr: string; us: string }> = {
   lrs_v1: { kr: "09:05", us: "09:35" },
   rotation_v1: { kr: "09:05", us: "09:35" },
   trend_v1: { kr: "15:40", us: "09:35" },
   infinite_v4: { kr: "09:30", us: "09:35" }, // 국장 v4: 09:30 매도 + 15:20 매수(자동)
+  value_rebalancing: { kr: "15:20", us: "15:50" }, // VR 은 종가 근처(LOC 종가 체결) 실행 권장
 };
 
 type InitialData = { accounts: Account[]; portfolios: Portfolio[]; liveAllowed: boolean };
@@ -300,6 +302,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
               <option value="rotation_v1">모멘텀 로테이션</option>
               <option value="trend_v1">추세추종</option>
               <option value="infinite_v4">무한매수 V4</option>
+              <option value="value_rebalancing">밸류리밸런싱 VR</option>
             </select>
             <div className="flex items-center gap-1">
               <input value={pRunAt} onChange={(e) => setPRunAt(e.target.value)}
@@ -375,6 +378,28 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                   기존 보유가 있으면 v4 사이클로 편입되니 종목 중복에 주의. 무한매수 v1 은
                   파이썬 데몬 전용. <code>syncUniverseRef</code> 는 매매엔 영향 없고 차트 가격
                   수집 범위만 넓힌다(생략 시 보유 종목만 수집).
+                </p>
+              </div>
+              <div>
+                <b>밸류리밸런싱 VR (value_rebalancing)</b> — 단일 레버리지 ETF를 목표경로 V의 밴드(±b) 안으로 유지(하루 1회)
+                <pre className="bg-gray-50 dark:bg-gray-800 rounded p-2 mt-1 overflow-x-auto">{`{
+  "symbol": "TQQQ",       // 종목 1개(필수) — 다른 전략과 겹치지 않게
+  "principal": 10000,     // 원금(필수) — 주식+Pool(현금) 합. 종목 전용
+  "gradient": 10,         // G 위험 다이얼(필수) — 클수록 보수적. 적립·거치 10 / 인출 20
+  "bandPct": 0.15,        // 밴드폭 b(±15%) — 매매 빈도 조절(저민감)
+  "poolLimitPct": 0.5,    // 사이클당 Pool 매수 한도 u — 거치 0.5 / 적립 0.75 / 인출 0.25
+  "cycleDays": 10,        // V 갱신 주기(실행일 수, 2주=10)
+  "initStockRatio": 0.85, // 첫 실행 시드 주식 비중(85:15) — 원금의 이만큼 즉시 매수
+  "cashflow": 0,          // 사이클당 현금흐름 CF: +적립 / 0 거치 / −인출
+  "feeRate": 0            // 편도 수수료+슬리피지(0.0025=0.25%)
+}`}</pre>
+                <p className="mt-1">
+                  계좌 = 주식(보유×가격) + Pool(현금 장부, state.vr 영속). 사이클마다 V₂=V₁+Pool/G+CF,
+                  밴드 재계산. 매일 평가금이 밴드 하단↓이면 매수·상단↑이면 매도(경계까지) 1건.
+                  <b>첫 실행에 원금의 {"initStockRatio"}(기본 85%)를 실제 매수해 진입</b>(이미 그 종목을 보유
+                  중이면 재매수 없이 채택). <b>실행 시각은 종가 근처 권장</b>(LOC 종가 체결). <code>cashflow≠0</code>
+                  (적립/인출)은 <b>실제 입출금을 전제</b>로 한다 — 인출이 Pool 로 부족하면 강제 청산하지 않고
+                  Pool 을 0 으로 클램프하고 경고만 남긴다(자금 보충 필요).
                 </p>
               </div>
             </div>

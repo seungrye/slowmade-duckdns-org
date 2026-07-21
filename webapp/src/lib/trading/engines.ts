@@ -382,6 +382,16 @@ export async function runPortfolioCycle(
     const v4Phase = phase === "main" ? "both" : phase;
     return runInfiniteV4(account, portfolio, runId, v4Broker, v4Phase, log);
   }
+  if (portfolio.strategy === "value_rebalancing") {
+    // VR 도 v4 의 V4Broker 어댑터를 재사용(snapshot·executions·place — KIS·토스 자동)
+    const { makeV4KisBroker, makeV4TossBroker } = await import("./infinite-v4-engine");
+    const { runValueRebalancing } = await import("./value-rebalancing-engine");
+    const market = portfolio.market as "kr" | "us";
+    const vrBroker = account.broker === "toss"
+      ? makeV4TossBroker(makeTossClient(account), market, account._id)
+      : makeV4KisBroker(makeKisClient(account), market);
+    return runValueRebalancing(account, portfolio, runId, vrBroker, log);
+  }
   const broker = makeBroker(account, portfolio.market as "kr" | "us");
   switch (portfolio.strategy) {
     case "lrs_v1":

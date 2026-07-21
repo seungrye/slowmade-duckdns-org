@@ -10,7 +10,7 @@ const { Schema, model, models } = mongoose;
  * 파이썬 portfolio.yaml 의 overseas/domestic 블록에 해당.
  *
  * market: kr | us
- * strategy: lrs_v1 | rotation_v1 | trend_v1 | infinite_v4(미장 LOC/국장 에뮬 — KIS·토스).
+ * strategy: lrs_v1 | rotation_v1 | trend_v1 | infinite_v4 | value_rebalancing(모두 KIS·토스).
  * runAt: "HH:MM" — kr 은 KST, us 는 ET(서머타임 자동, 파이썬과 동일 의미).
  * config: 전략별 파라미터 JSON
  *   lrs_v1:      { signal, target, sma?, band? }
@@ -18,13 +18,16 @@ const { Schema, model, models } = mongoose;
  *   trend_v1:    { universe: string[](심볼 배열), shortMa?, longMa?, positionSize? }
  *   infinite_v4: { symbol, principal(필수 — 종목 전용 원금), splits?, starBase?, sellTarget? }
  *                국장은 runAt(09:30 매도)+15:20 매수 phase 가 자동으로 돈다(LOC 에뮬).
+ *   value_rebalancing: { symbol, principal(필수), gradient(G,필수), bandPct?, poolLimitPct?,
+ *                cycleDays?, initStockRatio?, cashflow?, feeRate? } — 밴드 밖이면 하루 1회
+ *                밴드 경계까지 리밸런스. 첫 실행에 initStockRatio(기본 85%)만큼 시드 매수. runAt 종가 근처 권장.
  * state: 엔진 영속 상태(rotation last_rebalance·auto_pool 등) — 파이썬 rotation-state 파일 대체.
  */
 const TradingPortfolioSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: "TradingAccount", required: true, index: true },
     market: { type: String, required: true, enum: ["kr", "us"] },
-    strategy: { type: String, required: true, enum: ["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4"] },
+    strategy: { type: String, required: true, enum: ["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4", "value_rebalancing"] },
     runAt: { type: String, required: true, default: "09:05" }, // kr=KST, us=ET
     weekdaysOnly: { type: Boolean, default: true },
     enabled: { type: Boolean, default: true },

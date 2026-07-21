@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
   if (!["kr", "us"].includes(market)) {
     return NextResponse.json({ error: "market 은 kr|us" }, { status: 400 });
   }
-  if (!["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4"].includes(strategy)) {
-    return NextResponse.json({ error: "strategy 는 lrs_v1|rotation_v1|trend_v1|infinite_v4" }, { status: 400 });
+  if (!["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4", "value_rebalancing"].includes(strategy)) {
+    return NextResponse.json({ error: "strategy 는 lrs_v1|rotation_v1|trend_v1|infinite_v4|value_rebalancing" }, { status: 400 });
   }
   const runAt = String(body.runAt ?? (market === "kr" ? "09:05" : "09:35"));
   if (!/^\d{2}:\d{2}$/.test(runAt)) {
@@ -69,6 +69,12 @@ export async function POST(req: NextRequest) {
     const cfg = (body.config ?? {}) as Record<string, unknown>;
     if (!cfg.symbol || !(Number(cfg.principal) > 0)) {
       return NextResponse.json({ error: "infinite_v4 는 config.symbol·principal(양수) 필수" }, { status: 400 });
+    }
+  }
+  if (strategy === "value_rebalancing") {
+    const cfg = (body.config ?? {}) as Record<string, unknown>;
+    if (!cfg.symbol || !(Number(cfg.principal) > 0) || !(Number(cfg.gradient) > 0)) {
+      return NextResponse.json({ error: "value_rebalancing 은 config.symbol·principal(양수)·gradient(양수) 필수" }, { status: 400 });
     }
   }
   // 계정당 시장 1블록 — upsert. 라이브 블록 *편집* 시엔 state(진행 중 사이클)를 보존하고,

@@ -40,7 +40,62 @@ export function rebalanceShares(args: {
   return 0;
 }
 
-/** VR 백테스트. target=대상 ETF(단일). 매매 구간은 from/to. */
+/** VR 장부 상태 — 백테스트·라이브 공용. qty/pool 은 장부(라이브는 대사로 broker 와 동기화),
+ *  V=목표경로값, buyBudget=사이클 매수한도 잔량, sinceCycle=사이클-일 카운터, cum*=실효평단 리포팅. */
+export interface VRState {
+  qty: number;
+  pool: number;
+  V: number;
+  buyBudget: number;
+  sinceCycle: number;
+  cumBuy: number;
+  cumSell: number;
+}
+
+/** 초기 진입: principal 을 주식:Pool(기본 85:15)로 분할. 첫 V = 매수 직후 평가금(qty×price). */
+export function seedVR(cfg: ValueRebalancingConfig, price0: number): VRState {
+  const fee = cfg.feeRate && cfg.feeRate > 0 ? cfg.feeRate : 0;
+  const initStock = cfg.initStockRatio ?? 0.85;
+  const qty = Math.floor((cfg.principal * initStock) / (price0 * (1 + fee)));
+  const cumBuy = qty * price0 * (1 + fee);
+  const pool = cfg.principal - cumBuy;
+  return { qty, pool, V: qty * price0, buyBudget: cfg.poolLimitPct * pool, sinceCycle: 0, cumBuy, cumSell: 0 };
+}
+
+/** 인출(CF<0)이 Pool 로 부족하면 주식 매도로 충당할 주수(Pool≥0 불변식). 충당 불필요/불가면 0.
+ *  사이클 경계에서 advanceCycleVR 이전에 호출 — 반환 주수를 applyVRFill(매도)로 반영해야 한다. */
+export function cycleCoverSellQty(state: VRState, cfg: ValueRebalancingConfig, price: number): number {
+  const cf = cfg.cashflow ?? 0;
+  const fee = cfg.feeRate && cfg.feeRate > 0 ? cfg.feeRate : 0;
+  if (cf < 0 && state.pool + cf < 0 && price > 0) {
+    return Math.min(state.qty, Math.ceil(-(state.pool + cf) / (price * (1 - fee))));
+  }
+  return 0;
+}
+
+/** 사이클 경계: V 갱신(V₂=V₁+Pool/G+CF, Pool 은 CF 반영 전) + CF 적용 + 매수예산 리셋 + sinceCycle=0.
+ *  cover-sell(인출충당)은 이 호출 전에 applyVRFill 로 pool/qty 에 이미 반영돼 있어야 한다. */
+export function advanceCycleVR(state: VRState, cfg: ValueRebalancingConfig): VRState {
+  const cf = cfg.cashflow ?? 0;
+  const V = updateVBasic(state.V, state.pool, cfg.gradient, cf); // Pool 은 CF 반영 전 값(원문 예시)
+  const pool = cf !== 0 ? Math.max(0, state.pool + cf) : state.pool;
+  return { ...state, V, pool, buyBudget: cfg.poolLimitPct * pool, sinceCycle: 0 };
+}
+
+/** 체결 1건을 Pool 장부에 반영(매수→pool·buyBudget↓·qty↑ / 매도→pool↑·qty↓). fee 는 대금에 반영. */
+export function applyVRFill(
+  state: VRState, fill: { side: "buy" | "sell"; qty: number; price: number }, fee: number,
+): VRState {
+  if (fill.side === "buy") {
+    const cost = fill.qty * fill.price * (1 + fee);
+    return { ...state, pool: state.pool - cost, cumBuy: state.cumBuy + cost, buyBudget: state.buyBudget - cost, qty: state.qty + fill.qty };
+  }
+  const proceeds = fill.qty * fill.price * (1 - fee);
+  return { ...state, pool: state.pool + proceeds, cumSell: state.cumSell + proceeds, qty: state.qty - fill.qty };
+}
+
+/** VR 백테스트. target=대상 ETF(단일). 매매 구간은 from/to. 순수 함수(seedVR/advanceCycleVR/
+ *  applyVRFill/rebalanceShares)를 라이브 엔진과 공유한다 — 로직 단일 소스. */
 export function runValueRebalancingBacktest(target: RotationCandidate, cfg: ValueRebalancingConfig): BacktestResult {
   const trades: BtTrade[] = [];
   const equityCurve: EquityPoint[] = [];
@@ -48,72 +103,48 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
   const contributions: { date: string; amount: number }[] = [];
   const fee = cfg.feeRate && cfg.feeRate > 0 ? cfg.feeRate : 0;
   const b = cfg.bandPct;
-  const G = cfg.gradient;
-  const u = cfg.poolLimitPct;
   const cycleDays = Math.max(1, Math.floor(cfg.cycleDays));
   const cf = cfg.cashflow ?? 0;
-  const initStock = cfg.initStockRatio ?? 0.85;
   const tk = target.ticker;
 
   const bars = target.bars.filter((bar) => (!cfg.from || bar.date >= cfg.from) && (!cfg.to || bar.date <= cfg.to) && bar.close > 0);
   if (bars.length === 0) return { trades, equityCurve, totalPnl: 0 };
 
-  // ── 초기 진입: principal 을 주식:Pool 로 분할, 첫 V = 매수 직후 평가금 ──
   const p0 = bars[0].close;
-  let qty = Math.floor((cfg.principal * initStock) / (p0 * (1 + fee)));
-  let cumBuy = qty * p0 * (1 + fee);
-  let cumSell = 0;
-  let pool = cfg.principal - cumBuy;
-  let V = qty * p0;
-  if (qty >= 1) trades.push({ date: bars[0].date, side: "buy", price: p0, qty, pnl: 0, roundNo: 0, ticker: tk });
+  let state = seedVR(cfg, p0);
+  if (state.qty >= 1) trades.push({ date: bars[0].date, side: "buy", price: p0, qty: state.qty, pnl: 0, roundNo: 0, ticker: tk });
+  let band = bandOf(state.V, b);
 
-  let band = bandOf(V, b);
-  let buyBudget = u * pool; // 사이클 매수 한도 잔량
-  let sinceCycle = 0;
-
-  const buy = (date: string, price: number, n: number) => {
-    const cost = n * price * (1 + fee);
-    pool -= cost; cumBuy += cost; buyBudget -= cost; qty += n;
-    trades.push({ date, side: "buy", price, qty: n, pnl: 0, roundNo: 0, ticker: tk });
-  };
-  const sell = (date: string, price: number, n: number) => {
-    const proceeds = n * price * (1 - fee);
-    pool += proceeds; cumSell += proceeds; qty -= n;
-    trades.push({ date, side: "sell", price, qty: n, pnl: 0, roundNo: 0, ticker: tk });
+  // 체결 기록 + 장부 반영(백테스트는 종가 즉시 체결)
+  const fill = (date: string, side: "buy" | "sell", price: number, n: number) => {
+    trades.push({ date, side, price, qty: n, pnl: 0, roundNo: 0, ticker: tk });
+    state = applyVRFill(state, { side, qty: n, price }, fee);
   };
 
   for (let i = 0; i < bars.length; i++) {
     const date = bars[i].date;
     const price = bars[i].close;
 
-    // 사이클 경계(첫 바 제외): CF 적용 + V 갱신 + 밴드/예산 리셋
-    if (i > 0 && sinceCycle >= cycleDays) {
-      // 인출(CF<0)이 Pool 로 부족하면 주식 매도로 충당(Pool ≥ 0 불변식)
-      if (cf < 0 && pool + cf < 0 && price > 0) {
-        const need = -(pool + cf);
-        const sellQ = Math.min(qty, Math.ceil(need / (price * (1 - fee))));
-        if (sellQ > 0) sell(date, price, sellQ);
-      }
-      const poolBeforeCf = pool; // V 공식은 CF 반영 전 Pool 사용(원문 예시)
-      V = updateVBasic(V, poolBeforeCf, G, cf);
-      if (cf !== 0) { pool = Math.max(0, pool + cf); contributions.push({ date, amount: cf }); }
+    // 사이클 경계(첫 바 제외): 인출충당 매도 → V 갱신 + CF + 밴드/예산 리셋
+    if (i > 0 && state.sinceCycle >= cycleDays) {
+      const coverQ = cycleCoverSellQty(state, cfg, price);
+      if (coverQ > 0) fill(date, "sell", price, coverQ);
+      state = advanceCycleVR(state, cfg);
+      if (cf !== 0) contributions.push({ date, amount: cf });
       // 존버모드 감지: Pool 이 1주도 못 살 만큼 소진 → V 정체(기본공식 한계)
-      if (pool < price) poolLog.push(`${date} 존버모드 경보: Pool 소진(${pool.toFixed(0)}) — 기본공식 V 정체`);
-      band = bandOf(V, b);
-      buyBudget = u * pool;
-      sinceCycle = 0;
+      if (state.pool < price) poolLog.push(`${date} 존버모드 경보: Pool 소진(${state.pool.toFixed(0)}) — 기본공식 V 정체`);
+      band = bandOf(state.V, b);
     }
 
     // 매일 밴드 판정 매매
-    const delta = rebalanceShares({ qty, price, low: band.low, high: band.high, buyBudget, pool, fee });
-    if (delta > 0) buy(date, price, delta);
-    else if (delta < 0) sell(date, price, -delta);
+    const delta = rebalanceShares({ qty: state.qty, price, low: band.low, high: band.high, buyBudget: state.buyBudget, pool: state.pool, fee });
+    if (delta > 0) fill(date, "buy", price, delta);
+    else if (delta < 0) fill(date, "sell", price, -delta);
 
-    equityCurve.push({ date, equity: qty * price + pool });
-    sinceCycle++;
+    equityCurve.push({ date, equity: state.qty * price + state.pool });
+    state = { ...state, sinceCycle: state.sinceCycle + 1 };
   }
 
-  void cumBuy; void cumSell; // 실효평단 리포팅용 축적(현재 결과 스키마엔 미노출)
   const invested = cf !== 0 ? cfg.principal + contributions.reduce((s, c) => s + c.amount, 0) : cfg.principal;
   const totalPnl = equityCurve.length ? equityCurve[equityCurve.length - 1].equity - invested : 0;
   return {
