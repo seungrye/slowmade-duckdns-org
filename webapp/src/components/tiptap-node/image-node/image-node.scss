@@ -13,7 +13,10 @@
   // 정렬(좌/중/우)은 flex 래퍼가 전폭을 유지하고 컨테이너에 margin:auto 를 주므로 영향 없음.
   div:has(> img) {
     width: fit-content;
-    max-width: 100%;
+    // 이미지와 동일 캡(720px). max-width:100% 였을 땐 img 의 max-width:min(100%,720px) 순환참조로
+    // fit-content 가 본문 전폭으로 풀려 컨테이너(핸들 기준)가 이미지보다 넓게 남았다(빈 여백 선택).
+    // img 와 같은 min(100%,720px) 로 캡하면 컨테이너가 이미지에 딱 맞는다(헤드리스 크롬 검증).
+    max-width: min(100%, 720px);
   }
 
   > img:not([data-type="emoji"] img) {
