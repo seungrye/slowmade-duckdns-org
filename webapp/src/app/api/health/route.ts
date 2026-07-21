@@ -26,6 +26,8 @@ export async function GET(req: Request) {
     await admin.ping();
     return apiSuccess({ ok: true, mongo: 'ok' });
   } catch (e) {
-    return apiError(e instanceof Error ? e.message : 'mongo ping failed', 503);
+    // 내부 에러 원문(DB 연결정보 등)은 로그로만 — 무인증 공개 엔드포인트라 응답엔 제네릭 메시지.
+    console.error('[health] deep check failed:', e);
+    return apiError('deep health check failed', 503);
   }
 }

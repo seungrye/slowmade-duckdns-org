@@ -4,16 +4,21 @@ vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/lib/env', () => ({ env: { points: { newPost: 5 } } }));
 vi.mock('@/models/post', () => ({ default: { create: vi.fn(), findById: vi.fn() } }));
-vi.mock('@/models/user', () => ({ default: { findOneAndUpdate: vi.fn() } }));
+vi.mock('@/models/user', () => ({ default: { findOneAndUpdate: vi.fn(), findOne: vi.fn() } }));
 vi.mock('@/models/post-revision', () => ({ default: { create: vi.fn() } }));
 vi.mock('@/lib/achievements', () => ({ checkAndGrantPostCountAchievements: vi.fn().mockResolvedValue([]) }));
 
 import { POST } from './route';
 import { auth } from '@/auth';
 import Post from '@/models/post';
+import User from '@/models/user';
 import PostRevision from '@/models/post-revision';
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
+const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
+// 새 글 작성 경로가 참조하는 User.findOne(...).lean() 기본 목(작성자명 조회).
+const stubAuthorUser = (username = '진짜닉') =>
+  asMock(User.findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue({ username }) });
 
 function makeRequest(body: object) {
   return new Request('http://localhost/api/submit', {
@@ -52,12 +57,30 @@ describe('POST /api/submit', () => {
 
   it('새 게시글 작성 시 201을 반환한다', async () => {
     mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
+    stubAuthorUser();
     (Post.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
-    const res = await POST(makeRequest({ userEmail: 'a@test.com', title: 'T', jsonContent: '{}' }));
+    const res = await POST(makeRequest({ userEmail: 'a@test.com', title: 'T', htmlContent: '<p>x</p>', jsonContent: '{}' }));
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.success).toBe(true);
     expect(body.data.pointsGained).toBe(5);
+  });
+
+  it('새 글 작성 시 author/userEmail 은 서버가 강제하고 likes/views/isDeleted 는 무시한다 (Mass Assignment 방지)', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
+    stubAuthorUser('진짜닉');
+    asMock(Post.create).mockResolvedValue({});
+    await POST(makeRequest({
+      userEmail: 'a@test.com', title: 'T', htmlContent: '<p>x</p>', jsonContent: '{}',
+      author: '관리자', likes: 999, views: 999, isDeleted: true, version: 42,
+    }));
+    const arg = asMock(Post.create).mock.calls[0][0];
+    expect(arg.author).toBe('진짜닉');        // 클라 '관리자' 위조 무시 → 서버 username
+    expect(arg.userEmail).toBe('a@test.com'); // 세션 강제
+    expect(arg.likes).toBeUndefined();         // 클라 값 미전달(스키마 기본 0)
+    expect(arg.views).toBeUndefined();
+    expect(arg.isDeleted).toBeUndefined();
+    expect(arg.version).toBeUndefined();
   });
 
   it('_id가 있으면 게시글 수정 분기로 진입한다', async () => {

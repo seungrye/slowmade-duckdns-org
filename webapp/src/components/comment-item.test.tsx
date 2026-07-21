@@ -54,13 +54,14 @@ describe('CommentItem', () => {
     expect(defaultProps.onReplyToggle).toHaveBeenCalledWith('c1');
   });
 
-  it('로그인 사용자가 작성자일 때 Delete 버튼을 표시한다', () => {
+  it('내 댓글(isOwn)이면 Delete 버튼을 표시한다', () => {
+    // 소유판정은 서버가 isOwn 으로 내려준다(이메일 노출 대체).
     const session = { user: { email: 'tester@test.com' }, expires: '' } as never;
-    render(<CommentItem {...defaultProps} session={session} />);
+    render(<CommentItem {...defaultProps} comment={{ ...baseComment, isOwn: true }} session={session} />);
     expect(screen.getByText('Delete')).toBeInTheDocument();
   });
 
-  it('로그인 사용자가 작성자가 아닐 때 Delete 버튼을 숨긴다', () => {
+  it('내 댓글이 아니면(isOwn 없음) Delete 버튼을 숨긴다', () => {
     const session = { user: { email: 'other@test.com' }, expires: '' } as never;
     render(<CommentItem {...defaultProps} session={session} />);
     expect(screen.queryByText('Delete')).not.toBeInTheDocument();
@@ -68,7 +69,7 @@ describe('CommentItem', () => {
 
   it('Delete 클릭 시 onDelete를 호출한다', () => {
     const session = { user: { email: 'tester@test.com' }, expires: '' } as never;
-    render(<CommentItem {...defaultProps} session={session} />);
+    render(<CommentItem {...defaultProps} comment={{ ...baseComment, isOwn: true }} session={session} />);
     fireEvent.click(screen.getByText('Delete'));
     expect(defaultProps.onDelete).toHaveBeenCalledWith('c1');
   });

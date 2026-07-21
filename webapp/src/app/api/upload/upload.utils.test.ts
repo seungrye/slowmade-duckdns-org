@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildFileName, buildPublicUrl, validateUploadFormData } from './upload.utils';
+import { buildFileName, buildPublicUrl, validateUploadFormData, MAX_FILE_BYTES, MAX_THUMB_BYTES } from './upload.utils';
 
 describe('buildFileName', () => {
   // 타임스탬프와 원본 파일명을 하이픈으로 연결한다
@@ -93,5 +93,25 @@ describe('validateUploadFormData', () => {
 
     const result = validateUploadFormData(formData);
     expect(result.ok).toBe(true);
+  });
+
+  it('file 크기가 상한을 초과하면 ok: false (스토리지/대역폭 DoS 방지)', () => {
+    const formData = new FormData();
+    formData.append('file', new File([new Uint8Array(MAX_FILE_BYTES + 1)], 'big.jpg', { type: 'image/jpeg' }));
+    formData.append('thumbnail', new File(['thumb'], 'thumb.jpg', { type: 'image/jpeg' }));
+
+    const result = validateUploadFormData(formData);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/File too large/);
+  });
+
+  it('thumbnail 크기가 상한을 초과하면 ok: false', () => {
+    const formData = new FormData();
+    formData.append('file', new File(['ok'], 'ok.jpg', { type: 'image/jpeg' }));
+    formData.append('thumbnail', new File([new Uint8Array(MAX_THUMB_BYTES + 1)], 'thumb.jpg', { type: 'image/jpeg' }));
+
+    const result = validateUploadFormData(formData);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Thumbnail too large/);
   });
 });

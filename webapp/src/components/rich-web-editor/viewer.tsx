@@ -67,15 +67,34 @@ const ViewerImage = Image.extend({
     },
     renderHTML({ node }) {
         const { src, alt, title, width, containerStyle, wrapperStyle } = node.attrs
-        const imgAttrs: Record<string, unknown> = { src, alt, title }
+        const imgAttrs: Record<string, unknown> = { src: sanitizeSrc(src), alt, title }
         if (width) imgAttrs.width = width
         const img: ["img", Record<string, unknown>] = ["img", imgAttrs]
-        if (containerStyle || wrapperStyle) {
-            return ["div", { style: wrapperStyle || "" }, ["div", { style: containerStyle || "" }, img]]
+        const ws = sanitizeStyle(wrapperStyle), cs = sanitizeStyle(containerStyle)
+        if (cs || ws) {
+            return ["div", { style: ws }, ["div", { style: cs }, img]]
         }
         return img
     },
 })
+
+// CSS 인젝션 방어 — jsonContent 는 서버가 임의 Object 로 저장하므로(에디터 우회 가능), 렌더 시점에
+// style 속성의 위험 토큰(외부 리소스 로드 url()·@import·expression·javascript:)을 제거한다.
+// display/flex/margin 등 레이아웃 스타일은 그대로 유지.
+export function sanitizeStyle(style: unknown): string {
+    if (typeof style !== "string") return ""
+    return style
+        .replace(/url\s*\(/gi, "")
+        .replace(/@import/gi, "")
+        .replace(/expression\s*\(/gi, "")
+        .replace(/javascript:/gi, "")
+}
+
+// 이미지 src 는 http(s) 또는 data:image 만 허용(그 외 스킴 차단).
+export function sanitizeSrc(src: unknown): string {
+    if (typeof src !== "string") return ""
+    return /^(https?:|data:image\/)/i.test(src.trim()) ? src : ""
+}
 
 // Tiptap 확장 기능은 컴포넌트 외부에서 정의하여 리렌더링 시 재생성되지 않도록 합니다.
 export const tiptapExtensions = [

@@ -9,6 +9,7 @@ import { checkAndGrantCommentCountAchievements } from '@/lib/achievements';
 import { AchievementType } from '@/models/achievement';
 import { env } from '@/lib/env';
 import { requireAuth } from '@/lib/require-auth';
+import { rateLimit, clientIp } from '@/lib/rate-limit';
 
 const POINTS_FOR_NEW_COMMENT = env.points.newComment;
 
@@ -39,11 +40,19 @@ function __anonidObfuscated(anonid: string): string {
 }
 
 export async function POST(req: NextRequest) {
+    // 스팸/DoS 완화 — IP당 분당 10건(무인증 익명 댓글이 주 위험).
+    if (!rateLimit(`comment:${clientIp(req)}`, 10, 60_000)) {
+        return apiError("요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.", 429);
+    }
+
     const session = await auth();
     const { postId, parentId = null, content, anonid } = await req.json();
 
-    if (!content) {
+    if (typeof content !== "string" || content.trim().length === 0) {
         return apiError("댓글 내용이 없습니다.", 400);
+    }
+    if (content.length > 5000) {
+        return apiError("댓글이 너무 깁니다. (최대 5000자)", 413);
     }
 
     await connectToDB();
@@ -58,7 +67,15 @@ export async function POST(req: NextRequest) {
         const user = await User.findOne({ email: userEmail });
         if (user) authorId = user._id;
     } else {
-        author = __anonidObfuscated(anonid);
+        // 익명 — anonid 필수·유효성 검증(미전달 시 500 대신 400).
+        if (typeof anonid !== "string" || anonid.length === 0) {
+            return apiError("익명 식별자가 필요합니다.", 400);
+        }
+        try {
+            author = __anonidObfuscated(anonid);
+        } catch {
+            return apiError("익명 식별자가 올바르지 않습니다.", 400);
+        }
     }
 
     try {
@@ -99,12 +116,16 @@ export async function GET(req: NextRequest) {
 
     await connectToDB();
 
+    // 무인증 조회 허용(공개). 세션은 "내 댓글" 소유판정(isOwn)에만 쓰고, 이메일(PII)은 응답에서 제거.
+    const session = await auth();
+    const myEmail = session?.user?.email ?? null;
+
     const commentsFromDB = await Comment.find ({
         post: new mongoose.Types.ObjectId(postId),
     }) // isDeleted 필터를 제거하여 삭제된 댓글도 함께 조회합니다.
         .populate({
             path: 'authorId',
-            select: 'email name' // 필요한 필드만 선택적으로 가져옴
+            select: 'email name' // email 은 서버 소유판정용 — 응답엔 name 만 남김
         })
         .populate({
             path: 'parent',
@@ -113,16 +134,16 @@ export async function GET(req: NextRequest) {
         .sort({ createdAt: 1 })
         .lean();
 
-    // 삭제된 댓글의 내용을 서버에서 변경하여 반환합니다.
+    // 이메일(PII) 제거 + 소유판정(isOwn) 부여. 삭제된 댓글은 내용/작성자 마스킹.
     const comments = commentsFromDB.map(comment => {
+        const a = comment.authorId as { email?: string; name?: string } | null | undefined;
+        const isOwn = !!myEmail && !!a && typeof a === 'object' && a.email === myEmail;
+        const authorId = a && typeof a === 'object' ? { name: a.name } : a; // email 노출 차단
+        const base = { ...comment, authorId, isOwn };
         if (comment.isDeleted) {
-            return {
-                ...comment,
-                content: '삭제된 댓글입니다.',
-                author: '알 수 없음',
-            };
+            return { ...base, content: '삭제된 댓글입니다.', author: '알 수 없음' };
         }
-        return comment;
+        return base;
     });
 
     return apiSuccess(comments);

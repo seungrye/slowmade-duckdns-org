@@ -176,7 +176,7 @@ export default function CommentItem({
                 Reply
               </button>
 
-              {session?.user?.email === c.authorId?.email && (
+              {c.isOwn && (
                 <button
                   className="text-sm text-red-600 hover:underline mt-2"
                   onClick={() => onDelete(c._id)}
