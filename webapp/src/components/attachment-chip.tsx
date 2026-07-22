@@ -76,9 +76,17 @@ export function AttachmentChip({
             onRemove();
           }}
           aria-label={`${att.name} 삭제`}
-          className="absolute -bottom-1 -right-1 w-4 h-4 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white text-[10px] leading-none shadow"
+          className="absolute -bottom-1.5 -right-1.5 text-red-500 hover:text-red-600 transition-colors"
         >
-          ×
+          {/* close-circle(솔리드) — 빨간 원에 X 컷아웃. 흰 배경 원으로 X 가 흰색으로 보이게. */}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="block h-4 w-4 rounded-full bg-white drop-shadow-sm">
+            <path
+              fillRule="evenodd"
+              clipRule="evenodd"
+              d="M22 12c0 5.5228 -4.4772 10 -10 10 -5.52285 0 -10 -4.4772 -10 -10C2 6.47715 6.47715 2 12 2c5.5228 0 10 4.47715 10 10ZM8.96963 8.96965c0.29289 -0.29289 0.76776 -0.29289 1.06067 0L12 10.9393l1.9696 -1.96963c0.2929 -0.29289 0.7678 -0.29289 1.0607 0 0.2929 0.29289 0.2929 0.76777 0 1.06063L13.0606 12l1.9697 1.9696c0.2929 0.2929 0.2929 0.7678 0 1.0607 -0.2929 0.2929 -0.7678 0.2929 -1.0607 0L12 13.0607l-1.9697 1.9696c-0.29288 0.2929 -0.76776 0.2929 -1.06065 0 -0.29289 -0.2929 -0.29289 -0.7678 0 -1.0606L10.9393 12l-1.96967 -1.9697c-0.2929 -0.29288 -0.2929 -0.76776 0 -1.06065Z"
+              fill="currentColor"
+            />
+          </svg>
         </button>
       )}
     </>

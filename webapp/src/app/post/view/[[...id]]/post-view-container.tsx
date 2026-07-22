@@ -87,7 +87,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
 
         {post.attachments && post.attachments.length > 0 && (
           <div className="p-3 border-t border-t-gray-200 dark:border-t-gray-700">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-nowrap items-center gap-2 overflow-x-auto">
               {post.attachments.map((att) => (
                 <AttachmentChip
                   key={att.id}

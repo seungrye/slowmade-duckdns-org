@@ -192,7 +192,7 @@ export default function PostWriterForm() {
                 </div>
                 {/* 첨부행: 박스 안 하단, border-t 구분선(뷰와 일관). 첨부 없으면 숨김. */}
                 {attachments.length > 0 && (
-                    <div className="shrink-0 border-t border-t-gray-200 dark:border-t-gray-700 p-3 flex flex-wrap items-center gap-2">
+                    <div className="shrink-0 border-t border-t-gray-200 dark:border-t-gray-700 p-3 flex flex-nowrap items-center gap-2 overflow-x-auto">
                         {attachments.map((att) => (
                             <AttachmentChip
                                 key={att.id}
