@@ -175,29 +175,34 @@ export default function PostWriterForm() {
                     dangerouslySetInnerHTML={{ __html: lockIconSvg(isPrivate) }}
                 />
             </div>
-            <div
-                className={`border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"}`}
-                onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
-                onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
-                tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
-                aria-label="Post content editor, click or press enter to start writing"
-            >
-                <RichWebEditor
-                    ref={editorRef}
-                    onAttach={(m) => setAttachments((prev) => [...prev, m])}
-                />
-            </div>
-            {attachments.length > 0 && (
-                <div className="mt-4 shrink-0 flex flex-wrap items-center gap-2">
-                    {attachments.map((att) => (
-                        <AttachmentChip
-                            key={att.id}
-                            att={att}
-                            onRemove={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
-                        />
-                    ))}
+            {/* 바깥 박스: 테두리·라운드를 여기로. 에디터와 첨부행을 한 박스 안에 담아 보기 화면과 일관되게. */}
+            <div className={`border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg flex flex-col ${isMobile ? "" : "flex-1 min-h-0"}`}>
+                {/* 에디터 래퍼: 테두리 없이 .rich-web-editor-wrapper(내부 스크롤·overflow)만 유지 */}
+                <div
+                    className={`rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"}`}
+                    onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
+                    onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
+                    tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
+                    aria-label="Post content editor, click or press enter to start writing"
+                >
+                    <RichWebEditor
+                        ref={editorRef}
+                        onAttach={(m) => setAttachments((prev) => [...prev, m])}
+                    />
                 </div>
-            )}
+                {/* 첨부행: 박스 안 하단, border-t 구분선(뷰와 일관). 첨부 없으면 숨김. */}
+                {attachments.length > 0 && (
+                    <div className="shrink-0 border-t border-t-gray-200 dark:border-t-gray-700 p-3 flex flex-wrap items-center gap-2">
+                        {attachments.map((att) => (
+                            <AttachmentChip
+                                key={att.id}
+                                att={att}
+                                onRemove={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                            />
+                        ))}
+                    </div>
+                )}
+            </div>
             <div className="mt-4 shrink-0">
                 <TagInput
                     tags={tags}

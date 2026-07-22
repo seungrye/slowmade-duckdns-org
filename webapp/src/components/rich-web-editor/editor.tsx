@@ -82,7 +82,7 @@ const MainToolbarContent = ({
     onHighlighterClick: () => void
     onLinkClick: () => void
     onMathClick: () => void
-    onPickAttachment: (file: File) => void
+    onPickAttachment: (files: File[]) => void
     isMobile: boolean
     isMarkdownMode: boolean
     onToggleMarkdown: () => void
@@ -302,7 +302,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, { onAttach?: 
 
     // 파일 첨부 — /api/attachment/upload 로 올린 뒤 상위(작성 폼)로 메타 콜백. 본문에 삽입하지 않고,
     // 폼 하단 전용 첨부 영역에 칩으로 쌓인다(제출 시 서버 프록시가 key·권한 해석).
-    const insertAttachment = React.useCallback(async (file: File) => {
+    const uploadOne = React.useCallback(async (file: File) => {
         try {
             const fd = new FormData();
             fd.append("file", file);
@@ -317,6 +317,11 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, { onAttach?: 
             console.error("첨부 업로드 오류:", e);
         }
     }, [props]);
+
+    // 다중 선택 지원 — 파일마다 병렬 업로드(각 uploadOne 이 자체 try/catch 라 1건 실패가 나머지를 막지 않음).
+    const insertAttachments = React.useCallback(async (files: File[]) => {
+        await Promise.all(files.map(uploadOne));
+    }, [uploadOne]);
 
     React.useEffect(() => {
         const checkCursorVisibility = () => {
@@ -454,7 +459,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, { onAttach?: 
                         onHighlighterClick={() => setMobileView("highlighter")}
                         onLinkClick={() => setMobileView("link")}
                         onMathClick={() => setMobileView("math")}
-                        onPickAttachment={insertAttachment}
+                        onPickAttachment={insertAttachments}
                         isMobile={isMobile}
                         isMarkdownMode={isMarkdownMode}
                         onToggleMarkdown={handleToggleMarkdown}

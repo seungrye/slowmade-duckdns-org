@@ -11,11 +11,11 @@ const PaperclipIcon = ({ className }: { className?: string }) => (
 )
 
 export interface AttachmentUploadButtonProps extends Omit<ButtonProps, "onClick"> {
-  onPick: (file: File) => void | Promise<void>
+  onPick: (files: File[]) => void | Promise<void>
   text?: string
 }
 
-/** 본문 툴바의 '파일 첨부' 버튼 — 파일 선택 시 onPick(file) 호출(업로드+본문 칩 삽입은 상위가 처리). */
+/** 본문 툴바의 '파일 첨부' 버튼 — 파일 선택 시 onPick(files) 호출(다중 선택 지원, 업로드는 상위가 처리). */
 export const AttachmentUploadButton = React.forwardRef<HTMLButtonElement, AttachmentUploadButtonProps>(
   ({ onPick, text, className = "", ...buttonProps }, ref) => {
     const inputRef = React.useRef<HTMLInputElement>(null)
@@ -39,11 +39,12 @@ export const AttachmentUploadButton = React.forwardRef<HTMLButtonElement, Attach
         <input
           ref={inputRef}
           type="file"
+          multiple
           style={{ display: "none" }}
           onChange={(e) => {
-            const f = e.target.files?.[0]
+            const files = Array.from(e.target.files ?? [])
             e.target.value = "" // 같은 파일 재선택 허용
-            if (f) onPick(f)
+            if (files.length) onPick(files)
           }}
         />
       </>
