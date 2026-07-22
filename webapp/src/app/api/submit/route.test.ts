@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/lib/env', () => ({ env: { points: { newPost: 5 } } }));
 vi.mock('@/models/post', () => ({ default: { create: vi.fn(), findById: vi.fn() } }));

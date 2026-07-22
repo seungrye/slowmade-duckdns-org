@@ -27,12 +27,14 @@ async function loadViewablePost(_id: string) {
   return priv?.post ?? null;
 }
 
-// 조회수 write 를 client(PostViewTracker)로 분리했으므로 렌더가 순수해져 ISR 캐싱이 가능.
-// 글 수정/삭제는 최대 이 주기(초) 후 반영되고, 좋아요·댓글은 client 가 최신값을 로드한다.
-export const revalidate = 60;
+// generateStaticParams(공개 글)로 빌드 시 정적 생성 → 공개 글은 캐시된 정적 렌더로 빠르다.
+// revalidate(시간 ISR)는 제거: 비공개 글은 정적 대상에서 빠져 on-demand 로 렌더되는데, 그때
+// 작성자 판정을 위해 auth()(쿠키)를 읽으므로 revalidate 와 공존하면 DYNAMIC_SERVER_USAGE 로
+// 터진다. revalidate 를 빼면 공개 글은 정적 유지·비공개 글은 동적(인증) 렌더가 가능하다.
+// 공개 글 '수정' 반영은 submit 라우트의 revalidatePath('/post/view/{id}') 로 처리한다.
 
-// dynamic route([[...id]])는 generateStaticParams 가 있어야 ISR 로 캐싱된다.
-// 기존 글은 빌드 시 정적 생성, 빌드 후 작성된 글은 dynamicParams(기본 true)로 첫 요청 시 생성.
+// dynamic route([[...id]])는 generateStaticParams 가 있어야 정적 생성된다.
+// 기존 공개 글은 빌드 시 정적 생성, 그 외(신규·비공개)는 dynamicParams(기본 true)로 on-demand.
 export async function generateStaticParams() {
     const ids = await getAllPostIds();
     return ids.map((id) => ({ id: [id] }));

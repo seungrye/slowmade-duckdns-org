@@ -10,6 +10,7 @@ import { HttpStatusCode } from "axios";
 import PostRevision from "@/models/post-revision";
 import { env } from "@/lib/env";
 import { requireAuth } from "@/lib/require-auth";
+import { revalidatePath } from "next/cache";
 
 const POINTS_FOR_NEW_POST = env.points.newPost;
 
@@ -85,6 +86,8 @@ export async function POST(req: Request) {
       existingPost.version += 1;
 
       await existingPost.save();
+      // 공개 글은 정적 생성돼 있으므로 수정 반영을 위해 해당 뷰 경로를 무효화(revalidate 제거 대체).
+      revalidatePath(`/post/view/${payload._id}`);
     } else {
       // Mass Assignment 방지 — 허용 필드만. author/userEmail 은 서버가 강제(클라 위조 차단),
       // likes/views/version/isDeleted 는 스키마 기본값 사용(클라가 못 정함).
