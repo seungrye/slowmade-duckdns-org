@@ -56,7 +56,7 @@ export const AttachmentChip = Node.create({
         rel: "noopener noreferrer",
         contenteditable: "false",
       }),
-      ["img", { src: attachmentIconDataUri(mime), class: "att-ico", alt: name || "첨부파일", width: 20, height: 24 }],
+      ["img", { src: attachmentIconDataUri(mime), class: "att-ico", alt: name || "첨부파일" }],
     ];
   },
 });

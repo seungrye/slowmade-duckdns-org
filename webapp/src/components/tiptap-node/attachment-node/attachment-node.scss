@@ -16,6 +16,8 @@
   .att-ico {
     display: block;
     flex: none;
+    height: 1.15em; /* 주변 텍스트에 맞춘 아이콘 크기(비율 유지) */
+    width: auto;
   }
 
   &:hover {
