@@ -43,4 +43,20 @@ describe("AttachmentChip", () => {
     render(<AttachmentChip att={att} downloadHref="/x" />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("뷰: 다운로드 배지는 기본 숨김·hover 시 표시(group-hover)", () => {
+    const { container } = render(<AttachmentChip att={att} downloadHref="/x" />);
+    const badge = container.querySelector('[data-role="download-badge"]');
+    expect(badge).toBeTruthy();
+    const cls = badge!.getAttribute("class") ?? "";
+    expect(cls).toContain("opacity-0");
+    expect(cls).toContain("group-hover:opacity-100");
+  });
+
+  it("작성: X 는 기본 숨김·hover 시 표시(group-hover)", () => {
+    render(<AttachmentChip att={att} onRemove={() => {}} />);
+    const cls = screen.getByRole("button", { name: /삭제/ }).getAttribute("class") ?? "";
+    expect(cls).toContain("opacity-0");
+    expect(cls).toContain("group-hover:opacity-100");
+  });
 });
