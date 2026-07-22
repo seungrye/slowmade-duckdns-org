@@ -65,7 +65,7 @@ export function AttachmentChip({
       <img
         src={attachmentIconDataUri(att.mimeType)}
         alt=""
-        className="h-9 w-auto block transition group-hover:drop-shadow-md"
+        className="h-8 w-auto block transition group-hover:drop-shadow-md"
       />
       {onRemove && (
         <button
@@ -76,7 +76,7 @@ export function AttachmentChip({
             onRemove();
           }}
           aria-label={`${att.name} 삭제`}
-          className="absolute -bottom-1.5 -right-1.5 text-red-500 hover:text-red-600 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
+          className="absolute bottom-1 right-1 text-red-500 hover:text-red-600 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
         >
           {/* close-circle(솔리드) — 빨간 원에 X 컷아웃. 흰 배경 원으로 X 가 흰색으로 보이게. */}
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="block h-4 w-4 rounded-full bg-white drop-shadow-sm">
@@ -94,7 +94,7 @@ export function AttachmentChip({
         <span
           data-role="download-badge"
           aria-hidden="true"
-          className="absolute -bottom-1.5 -right-1.5 w-4 h-4 flex items-center justify-center rounded-full bg-blue-500 text-white shadow opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
+          className="absolute bottom-1 right-1 w-4 h-4 flex items-center justify-center rounded-full bg-blue-500 text-white shadow opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
         >
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="w-2.5 h-2.5">
             <path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />

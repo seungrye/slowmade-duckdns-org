@@ -179,7 +179,7 @@ export default function PostWriterForm() {
             <div className={`border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg flex flex-col ${isMobile ? "" : "flex-1 min-h-0"}`}>
                 {/* 에디터 래퍼: 테두리 없이 .rich-web-editor-wrapper(내부 스크롤·overflow)만 유지 */}
                 <div
-                    className={`rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"}`}
+                    className={`rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"} ${attachments.length === 0 ? "rounded-b-lg" : ""}`}
                     onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                     onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                     tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
