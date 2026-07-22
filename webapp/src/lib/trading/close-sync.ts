@@ -20,6 +20,7 @@ import { TossClient } from "./toss-client";
 import { sendTradingMail } from "./mailer";
 import { UNIVERSES, EXCD_MAPS } from "./universes";
 import { normalizeTradeTime } from "@/lib/trade-time";
+import { formatMoney } from "@/lib/format";
 
 type Json = Record<string, unknown>;
 type Fill = {
@@ -327,13 +328,13 @@ export async function runCloseSync(
       const base = new Date(now.getTime() - 1825 * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
       cum = market === "kr" ? await kis!.krRealizedPnl(base, todayKey) : await kis!.usRealizedPnl(base, todayKey);
       run = market === "kr" ? await kis!.krRealizedPnl(todayKey, todayKey) : await kis!.usRealizedPnl(todayKey, todayKey);
-      log(`실현손익: 증권사 기간손익 API 사용 (오늘 ${run.toFixed(0)} · 누적 ${cum.toFixed(0)})`);
+      log(`실현손익: 증권사 기간손익 API 사용 (오늘 ${formatMoney(run, market)} · 누적 ${formatMoney(cum, market)})`);
     } catch (e) {
-      log(`실현손익: 기간손익 API 미지원(모의 등) → 체결내역 자체계산 유지 (누적 ${cum.toFixed(0)}): `
+      log(`실현손익: 기간손익 API 미지원(모의 등) → 체결내역 자체계산 유지 (누적 ${formatMoney(cum, market)}): `
         + `${e instanceof Error ? e.message : e}`);
     }
   }
-  log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${run.toFixed(0)} · 누적 ${cum.toFixed(0)}`);
+  log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${formatMoney(run, market)} · 누적 ${formatMoney(cum, market)}`);
 
   // ③ 포트폴리오 스냅샷 — 보유 평가는 **증권사 API 가 준 평가금액**(hvBroker)을 그대로
   // 사용한다(우리가 종목별 현재가를 재조회해 곱하지 않는다 → 유량제한에 총자산이
@@ -381,7 +382,7 @@ export async function runCloseSync(
           } },
         { upsert: true },
       );
-      log(`포트폴리오 스냅샷: 현금 ${cash.toFixed(0)} + 보유 ${hv.toFixed(0)}`);
+      log(`포트폴리오 스냅샷: 현금 ${formatMoney(cash, market)} + 보유 ${formatMoney(hv, market)}`);
     }
   }
 
@@ -389,18 +390,18 @@ export async function runCloseSync(
   const body = [
     `실행: ${now.toISOString()} · ${account.envKey} · ${market.toUpperCase()}/${portfolio.strategy}`,
     "",
-    `오늘 실현손익: ${run.toFixed(2)} ${currency} · 누적: ${cum.toFixed(2)} ${currency}`,
-    balOk ? `현금: ${cash.toFixed(2)} ${currency}` : "잔고 조회 실패(스냅샷 생략)",
+    `오늘 실현손익: ${formatMoney(run, market)} · 누적: ${formatMoney(cum, market)}`,
+    balOk ? `현금: ${formatMoney(cash, market)}` : "잔고 조회 실패(스냅샷 생략)",
     "",
     "보유:",
     ...(evalRows.length
       ? evalRows.map(([s, q, a, p]) =>
-          `  ${s}: ${q}주 · 평단 ${a.toFixed(2)} · 현재 ${p.toFixed(2)} (${(((p - a) / a) * 100 || 0).toFixed(1)}%)`)
+          `  ${s}: ${q}주 · 평단 ${formatMoney(a, market)} · 현재 ${formatMoney(p, market)} (${(((p - a) / a) * 100 || 0).toFixed(1)}%)`)
       : ["  (없음)"]),
   ].join("\n");
   const mailed = await sendTradingMail(
     `체결 결과 ${today} — ${market.toUpperCase()}/${portfolio.strategy}`, body);
   log(mailed ? "마감 메일 발송 완료" : "메일 미설정/실패 — 스킵");
 
-  return `close-sync: 가격 ${priceSyms}종목 · 매매 ${tradeCount}건 · 실현 ${run.toFixed(0)}/${cum.toFixed(0)}`;
+  return `close-sync: 가격 ${priceSyms}종목 · 매매 ${tradeCount}건 · 실현 ${formatMoney(run, market)}/${formatMoney(cum, market)}`;
 }

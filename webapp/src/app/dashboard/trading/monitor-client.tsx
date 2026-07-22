@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { formatMoney } from "@/lib/format";
 
 /** 자동매매 모니터링 — 실행 이력·주문 로그(30초 자동 갱신, 계정 필터). */
 
@@ -137,7 +138,7 @@ export default function TradingMonitorClient() {
                   <td className="pr-2">{o.symbol}</td>
                   <td className={o.side === "buy" ? "text-red-500 pr-2" : "text-blue-500 pr-2"}>{o.side}</td>
                   <td className="pr-2 text-right">{o.qty}</td>
-                  <td className="pr-2 text-right">{o.price.toLocaleString()}</td>
+                  <td className="pr-2 text-right">{formatMoney(o.price, o.market === "kr" ? "kr" : "us")}</td>
                   <td className="pr-2">{o.ordType ?? "market"}</td>
                   <td>{o.dryRun ? "dry" : `LIVE ${o.orderNo}`}</td>
                 </tr>

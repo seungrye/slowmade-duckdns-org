@@ -15,6 +15,7 @@ import { TossClient } from "./toss-client";
 import { UNIVERSES, EXCD_MAPS } from "./universes";
 import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
+import { formatMoney } from "@/lib/format";
 import type { TradingAccountType } from "@/models/trading-account";
 import type { TradingPortfolioType } from "@/models/trading-portfolio";
 import type { Types } from "mongoose";
@@ -128,7 +129,7 @@ async function execute(
         // 매매기록(stocktrades)은 주문 시점이 아니라 **장 마감 sync 의 실제 체결내역**으로
         // 기록한다(정확한 체결가·수량). 여기서 즉시 기록하지 않는다.
       } else {
-        log(`[DRY-RUN] ${it.side} ${it.symbol} x${it.qty} @${it.price} — ${it.reason}`);
+        log(`[DRY-RUN] ${it.side} ${it.symbol} x${it.qty} @${formatMoney(it.price, broker.market)} — ${it.reason}`);
       }
       await TradingOrderLog.create({
         accountId: account._id, runId, envKey: account.envKey,
@@ -171,7 +172,7 @@ async function runLrs(
     if (it.side !== "buy") { sized.push(it); continue; }
     const maxQ = it.price > 0 ? await broker.buyableQty(it.symbol, it.price) : 0;
     const q = clampBuyQty(it.qty, maxQ);
-    if (q < 1) { log(`[LRS ${it.symbol}] 매수가능수량 0 — 매수 보류(가격 ${it.price.toFixed(2)})`); continue; }
+    if (q < 1) { log(`[LRS ${it.symbol}] 매수가능수량 0 — 매수 보류(가격 ${formatMoney(it.price, broker.market)})`); continue; }
     if (q !== it.qty) log(`[LRS ${it.symbol}] 매수수량 ${it.qty}→${q} 클램프(매수가능수량)`);
     sized.push({ ...it, qty: q });
   }
@@ -270,7 +271,7 @@ async function runRotation(
       // 매도대금은 아직 반영 안 되므로 그날 덜 담고 다음 사이클에 마저 진입(안전).
       const q = price > 0 ? await broker.buyableQty(d.target, price) : 0;
       if (q >= 1) intents.push({ side: "buy", symbol: d.target, qty: q, price, reason: d.reason });
-      else log(`[rotation] 매수가능수량 0 — ${d.target} 진입 보류(현금 ${cash.toFixed(0)}, 가격 ${price.toFixed(2)})`);
+      else log(`[rotation] 매수가능수량 0 — ${d.target} 진입 보류(현금 ${formatMoney(cash, broker.market)}, 가격 ${formatMoney(price, broker.market)})`);
     }
   } else if (d.action === "hold" && holding && d.regimeOn && cfg.reinvestIdleCash !== false) {
     // 유휴현금 top-up(현금 드래그 제거) — 보유 & 레짐 유지일 때 남는 현금(입금·미정산 정산분)을 보유 종목에 투입.

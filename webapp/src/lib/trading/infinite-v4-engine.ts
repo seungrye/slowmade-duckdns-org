@@ -21,6 +21,7 @@ import {
 import { v4PlanDay, type V4PlannedOrder } from "./v4-plan";
 import { marketToday } from "./engines";
 import type { CycleLogger } from "./engines";
+import { formatMoney } from "@/lib/format";
 
 type Json = Record<string, unknown>;
 type OrdKind = "loc" | "limit" | "market";
@@ -233,12 +234,12 @@ export async function runInfiniteV4(
     for (const date of [...new Set(fills.map((f) => f.date))].sort()) {
       const day = fills.filter((f) => f.date === date);
       state = reconcileDay(state, day, holding);
-      log(`[v4:${sym}] ${date} 대사: 매수 ${day.filter((f) => f.side === "buy").length}건·` +
+      log(`[v4:${sym}] ${date} 체결 반영: 매수 ${day.filter((f) => f.side === "buy").length}건·` +
           `매도 ${day.filter((f) => f.side === "sell").length}건 → T=${state.t.toFixed(2)} ` +
-          `mode=${state.mode} cash=${state.cycleCash.toFixed(0)}`);
+          `mode=${state.mode} cash=${formatMoney(state.cycleCash, market)}`);
     }
   } catch (e) {
-    log(`[v4:${sym}] 체결 대사 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
+    log(`[v4:${sym}] 체결 반영 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
   }
 
   // ── 1.5) 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션 플랫일 때만 cycleCash 를 계좌현금으로 재시드.
@@ -247,7 +248,7 @@ export async function runInfiniteV4(
     const before = state.cycleCash;
     state = absorbIdleCash(state, cash, holding, reinvest);
     if (state.cycleCash !== before) {
-      log(`[v4:${sym}] 유휴현금 반영 cycleCash ${before.toFixed(0)}→${state.cycleCash.toFixed(0)}(플랫 — 입금/미투입 흡수)`);
+      log(`[v4:${sym}] 유휴현금 반영 cycleCash ${formatMoney(before, market)}→${formatMoney(state.cycleCash, market)}(플랫 — 입금/미투입 흡수)`);
     }
   }
 
@@ -340,13 +341,13 @@ export async function runInfiniteV4(
     try {
       if (live) {
         orderNo = await broker.place(sym, o);
-        log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${o.price.toFixed(2)} (${o.ordType})`);
+        log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, market)} (${o.ordType})`);
       } else {
-        log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${o.price.toFixed(2)} (${o.ordType}) — ${o.reason}`);
+        log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${formatMoney(o.price, market)} (${o.ordType}) — ${o.reason}`);
       }
     } catch (e) {
       // 주문 단위 격리 — 한 건 거부(호가단위 등)가 나머지 주문·상태 저장을 막지 않게.
-      log(`주문 실패(${o.side} x${o.qty} @${o.price.toFixed(2)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
+      log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
       continue;
     }
     await TradingOrderLog.create({

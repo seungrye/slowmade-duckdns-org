@@ -20,6 +20,7 @@ import {
 } from "@/lib/backtest/value-rebalancing";
 import { prevMarketDay, type V4Broker } from "./infinite-v4-engine";
 import { marketToday, type CycleLogger } from "./engines";
+import { formatMoney } from "@/lib/format";
 
 type Json = Record<string, unknown>;
 
@@ -87,7 +88,7 @@ export async function runValueRebalancing(
         sinceCycle: 0, cumBuy: stockVal, cumSell: 0,
       };
       persisted = { ...st, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };
-      log(`[vr:${sym}] 기존 보유 ${holding} 채택 → V=${stockVal.toFixed(0)} Pool=${pool.toFixed(0)}`);
+      log(`[vr:${sym}] 기존 보유 ${holding} 채택 → V=${formatMoney(stockVal, market)} Pool=${formatMoney(pool, market)}`);
       // 채택 즉시 아래 리밸런스 진행
     } else {
       const seeded = seedVR(cfg, price);
@@ -116,10 +117,10 @@ export async function runValueRebalancing(
       .filter((f) => persisted!.lastRunDate < f.date && f.date < today);
     for (const f of fills) {
       state = applyVRFill(state, { side: f.side, qty: f.qty, price: f.price }, fee);
-      log(`[vr:${sym}] ${f.date} 대사: ${f.side} ${f.qty}@${f.price} → Pool=${state.pool.toFixed(0)}`);
+      log(`[vr:${sym}] ${f.date} 체결 반영: ${f.side} ${f.qty}@${formatMoney(f.price, market)} → Pool=${formatMoney(state.pool, market)}`);
     }
   } catch (e) {
-    log(`[vr:${sym}] 체결 대사 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
+    log(`[vr:${sym}] 체결 반영 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
   }
   state.qty = holding; // 보유수량은 브로커가 진실원 — 대사 누락 대비 동기화
 
@@ -128,10 +129,10 @@ export async function runValueRebalancing(
   if (state.sinceCycle >= cycleDays) {
     const cf = cfg.cashflow ?? 0;
     if (cf < 0 && state.pool + cf < 0) {
-      log(`[vr:${sym}] ⚠ 인출 ${cf} 이 Pool(${state.pool.toFixed(0)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
+      log(`[vr:${sym}] ⚠ 인출 ${formatMoney(cf, market)} 이 Pool(${formatMoney(state.pool, market)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
     }
     state = advanceCycleVR(state, cfg);
-    log(`[vr:${sym}] 사이클 경계: V→${state.V.toFixed(0)} Pool→${state.pool.toFixed(0)} 매수예산→${state.buyBudget.toFixed(0)}`);
+    log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)}`);
   }
 
   // ── 오늘 밴드 판정 → 델타 1건 ──
@@ -140,9 +141,9 @@ export async function runValueRebalancing(
   if (delta > 0) {
     const byCash = Math.floor(cash / (price * (1 + fee))); // 실계좌 현금 캡(공유 계좌 안전)
     delta = Math.min(delta, byCash);
-    if (delta > 0) orders.push({ side: "buy", qty: delta, price: price * 1.1, reason: `VR 밴드하단 매수(V=${state.V.toFixed(0)})` });
+    if (delta > 0) orders.push({ side: "buy", qty: delta, price: price * 1.1, reason: `VR 밴드하단 매수(V=${formatMoney(state.V, market)})` });
   } else if (delta < 0) {
-    orders.push({ side: "sell", qty: -delta, price: price * 0.9, reason: `VR 밴드상단 매도(V=${state.V.toFixed(0)})` });
+    orders.push({ side: "sell", qty: -delta, price: price * 0.9, reason: `VR 밴드상단 매도(V=${formatMoney(state.V, market)})` });
   }
 
   await sendOrders(orders, broker, { account, runId, market, sym, live, log });
@@ -151,7 +152,7 @@ export async function runValueRebalancing(
   const persist: VRPersist = { ...state, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };
   await TradingPortfolio.updateOne({ _id: portfolio._id }, { $set: { "state.vr": persist } });
 
-  const line = `VR ${sym}: 주문 ${orders.length}건 (V=${state.V.toFixed(0)} 밴드[${band.low.toFixed(0)},${band.high.toFixed(0)}] 보유 ${holding} Pool ${state.pool.toFixed(0)})`;
+  const line = `VR ${sym}: 주문 ${orders.length}건 (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`;
   log(line);
   return line;
 }
@@ -170,12 +171,12 @@ async function sendOrders(
     try {
       if (ctx.live) {
         orderNo = await broker.place(ctx.sym, { side: o.side, qty: o.qty, price: o.price, ordType: "loc", reason: o.reason });
-        ctx.log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${o.price.toFixed(2)} (loc)`);
+        ctx.log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)} (loc)`);
       } else {
-        ctx.log(`[DRY-RUN] ${o.side} ${ctx.sym} x${o.qty} @${o.price.toFixed(2)} (loc) — ${o.reason}`);
+        ctx.log(`[DRY-RUN] ${o.side} ${ctx.sym} x${o.qty} @${formatMoney(o.price, ctx.market)} (loc) — ${o.reason}`);
       }
     } catch (e) {
-      ctx.log(`주문 실패(${o.side} x${o.qty} @${o.price.toFixed(2)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
+      ctx.log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
       continue;
     }
     await TradingOrderLog.create({
