@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
     const escapedQuery = escapeRegex(query);
     const pipeline: PipelineStage[] = [
-      { $match: { isDeleted: { $ne: true }, tags: { $regex: escapedQuery, $options: 'i' } } },
+      { $match: { isDeleted: { $ne: true }, isPrivate: { $ne: true }, tags: { $regex: escapedQuery, $options: 'i' } } },
       { $unwind: '$tags' },
       { $match: { tags: { $regex: escapedQuery, $options: 'i' } } },
       { $group: { _id: { $toLower: '$tags' } } },

@@ -13,6 +13,21 @@ import { requireAuth } from "@/lib/require-auth";
 
 const POINTS_FOR_NEW_POST = env.points.newPost;
 
+// 첨부 메타 정리 — 클라가 보낸 임의 객체 대신 허용 필드만(mass-assignment 방지). 최대 20개.
+function sanitizeAttachments(raw: unknown): { id: string; name: string; key: string; size: number; mimeType: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .slice(0, 20)
+    .map((a) => ({
+      id: String(a?.id ?? ""),
+      name: String(a?.name ?? ""),
+      key: String(a?.key ?? ""),
+      size: Number(a?.size ?? 0),
+      mimeType: String(a?.mimeType ?? ""),
+    }))
+    .filter((a) => a.key && a.name);
+}
+
 export async function POST(req: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
@@ -62,7 +77,11 @@ export async function POST(req: Request) {
 
       // 2. 원본 게시글 업데이트 및 버전 증가
       const { title, htmlContent, jsonContent, tags } = payload;
-      existingPost.set({ title, htmlContent, jsonContent, tags });
+      existingPost.set({
+        title, htmlContent, jsonContent, tags,
+        isPrivate: !!payload.isPrivate,
+        attachments: sanitizeAttachments(payload.attachments),
+      });
       existingPost.version += 1;
 
       await existingPost.save();
@@ -76,6 +95,8 @@ export async function POST(req: Request) {
         jsonContent: payload.jsonContent,
         urls: Array.isArray(payload.urls) ? payload.urls : [],
         tags: Array.isArray(payload.tags) ? payload.tags : [],
+        isPrivate: !!payload.isPrivate,
+        attachments: sanitizeAttachments(payload.attachments),
         userEmail: auth.email,
         author: authorUser?.username ?? auth.email,
       });

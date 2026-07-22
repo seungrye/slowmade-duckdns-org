@@ -13,6 +13,7 @@ vi.mock('@/models/comment', () => ({
 vi.mock('@/models/user', () => ({
   default: { findOne: vi.fn(), findOneAndUpdate: vi.fn() },
 }));
+vi.mock('@/models/post', () => ({ default: { findById: vi.fn() } }));
 vi.mock('@/lib/achievements', () => ({
   checkAndGrantCommentCountAchievements: vi.fn().mockResolvedValue([]),
 }));
@@ -21,8 +22,13 @@ import { POST, GET, DELETE } from './route';
 import { auth } from '@/auth';
 import Comment from '@/models/comment';
 import User from '@/models/user';
+import Post from '@/models/post';
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
+const mockPostFindById = Post.findById as ReturnType<typeof vi.fn>;
+// GET 의 비공개 가드용 findById(...).select(...).lean() 체인.
+const stubPost = (post: unknown) =>
+  mockPostFindById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(post) }) });
 
 function makePostRequest(body: object) {
   return new Request('http://localhost/api/comments', {
@@ -89,11 +95,24 @@ describe('POST /api/comments', () => {
 });
 
 describe('GET /api/comments', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stubPost({ isPrivate: false, userEmail: 'author@test.com' }); // 기본: 공개글(댓글 노출)
+  });
 
   it('postId가 없으면 400을 반환한다', async () => {
     const res = await GET(makeGetRequest());
     expect(res.status).toBe(400);
+  });
+
+  it('비공개 글의 댓글은 작성자가 아니면 빈 배열', async () => {
+    mockAuth.mockResolvedValue({ user: { email: 'someone@test.com' }, expires: '' });
+    stubPost({ isPrivate: true, userEmail: 'author@test.com' }); // 뷰어는 작성자 아님
+    const res = await GET(makeGetRequest('507f1f77bcf86cd799439011'));
+    expect(res.status).toBe(200);
+    const { data } = await res.json();
+    expect(data).toEqual([]);
+    expect(Comment.find).not.toHaveBeenCalled();
   });
 
   it('댓글 목록을 반환하면 200을 반환한다', async () => {

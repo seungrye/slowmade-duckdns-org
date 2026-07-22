@@ -144,7 +144,8 @@ describe('POST /api/submit', () => {
     (Post.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost);
     (PostRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
     await POST(makeRequest({ _id: 'post1', userEmail: 'a@test.com', title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'], version: 999 }));
-    expect(mockPost.set).toHaveBeenCalledWith({ title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'] });
+    // isPrivate(기본 false)·attachments(기본 [])는 허용 필드. version 등 그 외는 무시.
+    expect(mockPost.set).toHaveBeenCalledWith({ title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'], isPrivate: false, attachments: [] });
     expect(mockPost.set).not.toHaveBeenCalledWith(expect.objectContaining({ version: 999 }));
   });
 });

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getPostsByTag } from '@/lib/posts';
 import TagPostList from './tag-post-list';
+import { auth } from '@/auth';
 
 type Props = Promise<{ tag: string }>;
 
@@ -22,7 +23,8 @@ export default async function TagPage(props: {
 }) {
     const params = await props.params;
   const decodedTag = decodeURIComponent(params.tag);
-  const {posts} = await getPostsByTag(decodedTag);
+  const session = await auth(); // 로그인 작성자는 자기 비공개 글도 태그 목록에 포함
+  const {posts} = await getPostsByTag(decodedTag, session?.user?.email ?? null);
 
   return (
         <main className="mx-auto px-4 py-6">

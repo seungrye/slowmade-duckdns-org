@@ -20,6 +20,15 @@ interface PostData {
   userEmail: string;
   author: string;
   createdAt: string;
+  isPrivate?: boolean;
+  attachments?: { name: string; size: number; mimeType: string }[];
+}
+
+/** 바이트를 사람이 읽기 좋은 크기로. */
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function PostViewContainer({ post }: { post: PostData }) {
@@ -49,7 +58,12 @@ export default function PostViewContainer({ post }: { post: PostData }) {
           데스크탑(md+): 1행 — 좌 제목 + 우 메타(날짜·이름·액션).
         */}
         <div className="w-full p-3 grid gap-2 md:gap-4 grid-cols-1 md:grid-cols-[1fr_auto] md:items-center">
-          <h1 className="font-bold md:text-lg md:truncate">{post.title}</h1>
+          <h1 className="font-bold md:text-lg md:truncate">
+            {post.isPrivate && (
+              <Badge className="mr-2 align-middle bg-amber-500 hover:bg-amber-500 text-white">🔒 비공개</Badge>
+            )}
+            {post.title}
+          </h1>
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
             <div className="flex items-center justify-end gap-3 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
               <time dateTime={post.createdAt}>
@@ -74,6 +88,25 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         <div className="p-4 transition-all duration-300 ease-in-out flex-1" ref={bodyRef}>
           <RichContentViewer content={post.jsonContent as JSONContent} waitRenderComplete={true} />
         </div>
+
+        {post.attachments && post.attachments.length > 0 && (
+          <div className="p-3 text-sm border-t border-t-gray-200 dark:border-t-gray-700">
+            <div className="mb-2 font-medium text-gray-600 dark:text-gray-300">📎 첨부파일</div>
+            <ul className="flex flex-col gap-1.5">
+              {post.attachments.map((att, idx) => (
+                <li key={`${att.name}-${idx}`}>
+                  <a
+                    href={`/api/attachment/${post._id}?i=${idx}`}
+                    className="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    <span className="truncate max-w-[70vw]">{att.name}</span>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">({fmtBytes(att.size)})</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {post.tags && post.tags.length > 0 && (
           <div className="p-3 text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700">

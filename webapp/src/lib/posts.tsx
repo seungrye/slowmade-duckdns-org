@@ -9,6 +9,16 @@ import { escapeRegex } from "@/lib/utils";
 import { env } from "@/lib/env";
 
 /**
+ * 비공개(isPrivate) 글 필터 조각. 비로그인/타인은 공개 글만, 로그인한 작성자는 공개 ∪ 본인 비공개.
+ * Mongo match 에 spread 로 병합해 쓴다. 순수 함수(테스트 가능).
+ */
+export function privacyMatch(viewerEmail?: string | null): Record<string, unknown> {
+  return viewerEmail
+    ? { $or: [{ isPrivate: { $ne: true } }, { userEmail: viewerEmail }] }
+    : { isPrivate: { $ne: true } };
+}
+
+/**
  * A centralized function to fetch posts based on various criteria.
  * It dynamically builds a MongoDB aggregation pipeline to filter out soft-deleted posts.
  * @param params - Query parameters including sorting, pagination, and filtering.
@@ -18,11 +28,12 @@ async function __fetchPosts(params: SetPostQuery): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
-  const { userEmail, query, withComments, page = 1, limit = 12, sort = 'latest' } = params;
+  const { userEmail, viewerEmail, query, withComments, page = 1, limit = 12, sort = 'latest' } = params;
 
   const matchStage: PipelineStage.Match = {
     $match: {
-      isDeleted: { $ne: true } // Soft-deleted posts are excluded by default
+      isDeleted: { $ne: true }, // Soft-deleted posts are excluded by default
+      ...privacyMatch(viewerEmail), // 비공개 글은 작성자 본인에게만
     },
   };
 
@@ -112,7 +123,7 @@ async function __fetchPosts(params: SetPostQuery): Promise<{
   };
 }
 
-export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false): Promise<{
+export async function getPosts(sort: SortOption = 'latest', withComments: boolean = false, viewerEmail: string | null | undefined = null): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
@@ -122,6 +133,7 @@ export async function getPosts(sort: SortOption = 'latest', withComments: boolea
     limit: 12,
     sort: sort || 'latest',
     withComments: withComments || false,
+    viewerEmail: viewerEmail || undefined,
   });
 }
 
@@ -146,6 +158,7 @@ export async function __getAllTags(): Promise<{ tag: string; count: number }[]> 
     {
       $match: {
         isDeleted: { $ne: true },
+        isPrivate: { $ne: true }, // 비공개 글의 태그는 클라우드/집계에 노출하지 않음
         tags: { $exists: true, $ne: [] },
       },
     },
@@ -175,7 +188,7 @@ export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
   return __getAllTags();
 }
 
-export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false): Promise<{
+export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false, viewerEmail: string | null | undefined = null): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
@@ -186,6 +199,7 @@ export async function getPaginatedPosts(page: number, limit: number, sort: SortO
     sort: sort || 'latest',
     withComments: withComments || false,
     userEmail: userEmail || undefined,
+    viewerEmail: viewerEmail || undefined,
   });
 }
 
@@ -211,7 +225,8 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
     throw new Error("User email is required to fetch posts.");
   }
 
-  return await getPaginatedPosts(page, limit, sort, userEmail, withComments);
+  // 작성자 본인 대시보드 — 자기 비공개 글도 보여야 하므로 viewerEmail 도 본인.
+  return await getPaginatedPosts(page, limit, sort, userEmail, withComments, userEmail);
 }
 
 export async function deletePost(postId: string, userEmail: string): Promise<{ success: boolean; message: string; }> {
@@ -256,11 +271,11 @@ export async function deletePost(postId: string, userEmail: string): Promise<{ s
   }
 }
 
-export async function getPost(_id: string): Promise<{ post: GetPostType; } | null> {
+export async function getPost(_id: string, viewerEmail?: string | null): Promise<{ post: GetPostType; } | null> {
   try {
     await connectToDB();
-    // Fetch only if not soft-deleted
-    const post = await Post.findOne({ _id, isDeleted: { $ne: true } }).lean<GetPostType>();
+    // Fetch only if not soft-deleted, and (public OR viewer is the author for private).
+    const post = await Post.findOne({ _id, isDeleted: { $ne: true }, ...privacyMatch(viewerEmail) }).lean<GetPostType>();
 
     if (!post) {
       console.warn(`Post with ID ${_id} not found or has been deleted.`);
@@ -277,8 +292,8 @@ export async function getPost(_id: string): Promise<{ post: GetPostType; } | nul
 export async function updatePostViews(_id: string): Promise<void> {
   try {
     await connectToDB();
-    // Do not increment views for a deleted post
-    await Post.findOneAndUpdate({ _id, isDeleted: { $ne: true } }, { $inc: { views: 1 } });
+    // Do not increment views for a deleted or private post
+    await Post.findOneAndUpdate({ _id, isDeleted: { $ne: true }, isPrivate: { $ne: true } }, { $inc: { views: 1 } });
   } catch (error) {
     console.error("Error on <updatePostViews>", error);
   }
@@ -290,7 +305,8 @@ export async function updatePostViews(_id: string): Promise<void> {
  */
 export async function getAllPostIds(): Promise<string[]> {
   await connectToDB();
-  const posts = await Post.find({ isDeleted: { $ne: true } }, '_id').lean();
+  // 비공개 글은 정적 생성 대상에서 제외(공개 캐시 유출 방지) — 뷰 페이지가 동적으로 인증 렌더.
+  const posts = await Post.find({ isDeleted: { $ne: true }, isPrivate: { $ne: true } }, '_id').lean();
   return posts.map((p) => String(p._id));
 }
 
@@ -300,7 +316,7 @@ export async function getAllPostIds(): Promise<string[]> {
  * @param tag 검색할 태그 문자열
  * @returns 해당 태그를 가진 게시글의 배열
  */
-export async function getPostsByTag(tag: string): Promise<{
+export async function getPostsByTag(tag: string, viewerEmail?: string | null): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
@@ -308,7 +324,8 @@ export async function getPostsByTag(tag: string): Promise<{
 
   const matchStage: PipelineStage.Match = {
     $match: {
-      isDeleted: { $ne: true } // Exclude soft-deleted posts
+      isDeleted: { $ne: true }, // Exclude soft-deleted posts
+      ...privacyMatch(viewerEmail), // 비공개 글은 작성자 본인에게만
     },
   };
 

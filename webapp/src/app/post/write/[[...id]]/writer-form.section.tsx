@@ -10,6 +10,14 @@ import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
 import { showAchievementToasts } from '@/lib/show-achievement-toast';
 import { useMobile } from '@/hooks/use-mobile';
 
+type Attachment = { id: string; name: string; key: string; size: number; mimeType: string };
+
+function fmtBytes(n: number): string {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function PostWriterForm() {
     const { data: session } = useSession();
     const router = useRouter();
@@ -18,11 +26,40 @@ export default function PostWriterForm() {
 
     const editorRef = useRef<RichWebEditorHandle>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const attachInputRef = useRef<HTMLInputElement>(null);
     const [title, setTitle] = useState('');
     const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
+    const [isPrivate, setIsPrivate] = useState(false); // 비공개(작성자만 열람). 기본 공개.
+    const [attachments, setAttachments] = useState<Attachment[]>([]); // 다운로드 첨부(본문 미삽입)
+    const [attaching, setAttaching] = useState(false);
     const [loading, setLoading] = useState(false);
     const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
     const isMobile = useMobile();
+
+    const handleAttach = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        e.target.value = ''; // 같은 파일 재선택 허용
+        if (!files.length) return;
+        setAttaching(true);
+        for (const file of files) {
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/api/attachment/upload', { method: 'POST', body: fd });
+                const json = await res.json();
+                if (res.ok && json?.data?.key) {
+                    setAttachments((prev) => [...prev, json.data as Attachment]);
+                } else {
+                    toast.error(`첨부 실패: ${file.name}${json?.message ? ` — ${json.message}` : ''}`);
+                }
+            } catch {
+                toast.error(`첨부 실패: ${file.name}`);
+            }
+        }
+        setAttaching(false);
+    };
+
+    const removeAttachment = (id: string) => setAttachments((prev) => prev.filter((a) => a.id !== id));
 
     // 데스크톱에서만: 에디터(제목·본문·태그·제출 전체)를 뷰포트에 고정하고 본문을 내부
     // 스크롤(editor.scss). 모바일은 플로팅 툴바가 페이지 스크롤을 전제하므로 고정하지 않고
@@ -59,7 +96,7 @@ export default function PostWriterForm() {
                 }
 
                 const { data: post } = await res.json();
-                const { jsonContent, title, urls, tags: fetchedTags } = post; // API로부터 태그를 받아옵니다.
+                const { jsonContent, title, urls, tags: fetchedTags, isPrivate: fetchedPrivate, attachments: fetchedAttachments } = post; // API로부터 태그를 받아옵니다.
                 if (jsonContent) {
                     // 에디터에 내용 설정
                     console.assert(typeof jsonContent !== 'undefined', "jsonContent should not be undefined");
@@ -73,6 +110,8 @@ export default function PostWriterForm() {
                     editorRef.current?.setContent(jsonContent, urls);
                     setTitle(title);
                     setTags(fetchedTags || []);
+                    setIsPrivate(!!fetchedPrivate);
+                    setAttachments(Array.isArray(fetchedAttachments) ? fetchedAttachments : []);
                 } else {
                     toast.error("게시글을 불러오는 데 실패했습니다.");
                 }
@@ -106,6 +145,8 @@ export default function PostWriterForm() {
             userEmail: session?.user.email,
             urls: urls || [], // 에디터에서 가져온 이미지 URL 배열
             tags: tags, // 태그 상태는 이미 문자열 배열입니다.
+            isPrivate,
+            attachments,
         };
 
         if (_id) {
@@ -172,6 +213,61 @@ export default function PostWriterForm() {
                     placeholder="태그를 입력하고 Enter 또는 쉼표를 누르세요"
                 />
             </div>
+
+            <div className="mt-4 shrink-0 flex flex-col gap-3">
+                {/* 비공개 토글 — 기본 공개 */}
+                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                    <input
+                        type="checkbox"
+                        checked={isPrivate}
+                        onChange={(e) => setIsPrivate(e.target.checked)}
+                        className="w-4 h-4"
+                    />
+                    <span>🔒 비공개 (나만 보기)</span>
+                    <span className="text-xs text-gray-400">— 체크하면 로그인한 작성자 본인에게만 보입니다</span>
+                </label>
+
+                {/* 파일 첨부(본문 삽입 아님 — 다운로드 첨부) */}
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <input
+                            ref={attachInputRef}
+                            type="file"
+                            multiple
+                            className="hidden"
+                            onChange={handleAttach}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => attachInputRef.current?.click()}
+                            disabled={attaching}
+                            className="text-sm px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                        >
+                            {attaching ? "첨부 중..." : "📎 파일 첨부"}
+                        </button>
+                        <span className="text-xs text-gray-400">이미지 외 파일(PDF·문서·zip 등) — 최대 15MB, 본문엔 안 들어가고 첨부로 표시</span>
+                    </div>
+                    {attachments.length > 0 && (
+                        <ul className="flex flex-col gap-1">
+                            {attachments.map((a) => (
+                                <li key={a.id} className="flex items-center gap-2 text-sm">
+                                    <span className="truncate max-w-[60vw]">{a.name}</span>
+                                    <span className="text-xs text-gray-400">({fmtBytes(a.size)})</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => removeAttachment(a.id)}
+                                        className="text-xs text-red-500 hover:underline"
+                                        aria-label={`${a.name} 첨부 제거`}
+                                    >
+                                        제거
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            </div>
+
             <div className="flex justify-end mt-4 shrink-0">
                 <button
                     onClick={handleSubmit}

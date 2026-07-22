@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import ContentSection from "./content.section";
 import { getPaginatedPosts } from "@/lib/posts";
 import { env } from "@/lib/env";
+import { auth } from "@/auth";
 
 export const metadata: Metadata = {
   // 키워드(유머·이야기·Slowmade)를 제목에 담아 검색엔진 주제 인식을 돕는다.
@@ -24,7 +25,9 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   // 초기 9건을 서버에서 미리 로드해 InfinitPostList 초기값으로 주입(첫 페이지 CSR fetch 제거).
   // 파라미터는 /api/posts route 와 동일하게 맞춘다(sort=latest, withComments=true).
-  const { posts } = await getPaginatedPosts(1, 9, 'latest', null, true);
+  // 로그인한 작성자는 자기 비공개 글도 피드에 보인다(viewer=본인 email).
+  const session = await auth();
+  const { posts } = await getPaginatedPosts(1, 9, 'latest', null, true, session?.user?.email ?? null);
 
   // 홈 구조화 데이터(WebSite) — 검색엔진의 주제·사이트 이해를 돕는다.
   const jsonLd = {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from "@/auth";
 import { apiSuccess, apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
+import Post from '@/models/post';
 import { connectToDB } from '@/lib/db';
 import mongoose, { HydratedDocument } from 'mongoose';
 import User from '@/models/user';
@@ -119,6 +120,12 @@ export async function GET(req: NextRequest) {
     // 무인증 조회 허용(공개). 세션은 "내 댓글" 소유판정(isOwn)에만 쓰고, 이메일(PII)은 응답에서 제거.
     const session = await auth();
     const myEmail = session?.user?.email ?? null;
+
+    // 비공개 글의 댓글은 작성자 본인에게만 노출(글 본문은 숨겨도 댓글로 새는 것 차단).
+    const owner = await Post.findById(postId).select('isPrivate userEmail').lean<{ isPrivate?: boolean; userEmail?: string } | null>();
+    if (owner?.isPrivate && owner.userEmail !== myEmail) {
+      return apiSuccess([]);
+    }
 
     const commentsFromDB = await Comment.find ({
         post: new mongoose.Types.ObjectId(postId),
