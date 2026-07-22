@@ -24,7 +24,7 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <Link href={`/post/view/${post._id}`} className='truncate ' aria-label={`게시물 제목: ${post.title}`}>
           <h3 className="text-lg font-semibold truncate">
-            {post.isPrivate && <PrivateLockIcon className="mr-1.5 h-[0.85em] w-[0.85em] align-[-0.12em] text-gray-400" />}
+            {post.isPrivate && <PrivateLockIcon className="mr-1.5 h-[1.15em] w-[1.15em] align-[-0.2em] text-gray-400" />}
             {post.title}
           </h3>
         </Link>
