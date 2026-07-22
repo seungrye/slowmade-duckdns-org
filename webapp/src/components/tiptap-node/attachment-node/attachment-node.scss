@@ -1,0 +1,49 @@
+/* 본문 인라인 첨부 칩 — 아이콘 배지 + 파일명. 호버 하이라이트로 "다운로드 링크"임을 알린다. */
+.attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px 2px 5px;
+  margin: 0 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #1e293b;
+  text-decoration: none;
+  font-size: 0.9em;
+  line-height: 1.5;
+  vertical-align: baseline;
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+  cursor: pointer;
+
+  .att-ico {
+    flex: none;
+    border-radius: 3px;
+    vertical-align: middle;
+  }
+  .att-name {
+    white-space: nowrap;
+    max-width: 22em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.18);
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .attachment-chip {
+    border-color: #334155;
+    background: #1e293b;
+    color: #e2e8f0;
+
+    &:hover {
+      background: #1e3a8a;
+      border-color: #3b82f6;
+    }
+  }
+}

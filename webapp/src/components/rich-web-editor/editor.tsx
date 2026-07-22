@@ -23,10 +23,13 @@ import "@/components/tiptap-node/code-block-node/code-block-node.scss"
 import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/image-node/image-node.scss"
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
+import "@/components/tiptap-node/attachment-node/attachment-node.scss"
 
 // --- Tiptap UI ---
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
 import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
+import { AttachmentUploadButton } from "@/components/tiptap-ui/attachment-upload-button/attachment-upload-button"
+import { type AttachmentMeta } from "./attachment-icon"
 import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { NodeButton } from "@/components/tiptap-ui/node-button"
 import {
@@ -72,6 +75,7 @@ const MainToolbarContent = ({
     onHighlighterClick,
     onLinkClick,
     onMathClick,
+    onPickAttachment,
     isMobile,
     isMarkdownMode,
     onToggleMarkdown,
@@ -79,6 +83,7 @@ const MainToolbarContent = ({
     onHighlighterClick: () => void
     onLinkClick: () => void
     onMathClick: () => void
+    onPickAttachment: (file: File) => void
     isMobile: boolean
     isMarkdownMode: boolean
     onToggleMarkdown: () => void
@@ -146,6 +151,7 @@ const MainToolbarContent = ({
 
                 <ToolbarGroup>
                     <ImageUploadButton text="Add" aria-label="Add Image" />
+                    <AttachmentUploadButton onPick={onPickAttachment} aria-label="파일 첨부" />
                     {!isMobile ? (
                         <MathPopover />
                     ) : (
@@ -215,9 +221,10 @@ export interface RichWebEditorHandle {
     getContent: () => {
         jsonContent: JSONContent | undefined,
         htmlContent: HTMLContent | undefined,
-        uploadImageUrls: ImageUrlType[]
+        uploadImageUrls: ImageUrlType[],
+        uploadAttachments: AttachmentMeta[]
     };
-    setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => void;
+    setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[], uploadAttachments?: AttachmentMeta[]) => void;
     focus: () => void;
 }
 
@@ -237,6 +244,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     })
     const toolbarRef = React.useRef<HTMLDivElement>(null)
     const uploadedImageUrlsRef = React.useRef<ImageUrlType[]>([]);
+    const uploadedAttachmentsRef = React.useRef<AttachmentMeta[]>([]);
 
     // Markdown mode state
     const [isMarkdownMode, setIsMarkdownMode] = React.useState(false);
@@ -294,6 +302,29 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         ],
         content: "",
     })
+
+    // 파일 첨부 — /api/attachment/upload 로 올린 뒤 본문에 인라인 첨부 칩을 삽입. 메타(key 포함)는
+    // uploadedAttachmentsRef 에 모아 getContent 로 반환(폼이 제출 → 서버 프록시가 key·권한 해석).
+    const insertAttachment = React.useCallback(async (file: File) => {
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await fetch("/api/attachment/upload", { method: "POST", body: fd });
+            const json = await res.json();
+            if (!res.ok || !json?.data?.id) {
+                console.error("첨부 업로드 실패:", json?.message);
+                return;
+            }
+            const meta = json.data as AttachmentMeta;
+            uploadedAttachmentsRef.current.push(meta);
+            editor?.chain().focus().insertContent({
+                type: "attachmentChip",
+                attrs: { href: `/api/attachment/id/${meta.id}`, name: meta.name, mime: meta.mimeType, size: meta.size },
+            }).run();
+        } catch (e) {
+            console.error("첨부 업로드 오류:", e);
+        }
+    }, [editor]);
 
     React.useEffect(() => {
         const checkCursorVisibility = () => {
@@ -393,11 +424,13 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                 jsonContent: editor?.getJSON(),
                 htmlContent: editor?.getHTML(),
                 uploadImageUrls: uploadedImageUrlsRef.current,
+                uploadAttachments: uploadedAttachmentsRef.current,
             };
         },
-        setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => {
+        setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[], uploadAttachments?: AttachmentMeta[]) => {
             if (!editor) return console.warn("Editor is not initialized");
             uploadedImageUrlsRef.current = uploadImageUrls || [];
+            uploadedAttachmentsRef.current = uploadAttachments || []; // 수정 로딩 시 기존 첨부 메타 보존
             editor.commands.setContent(content);
             if (isMarkdownModeRef.current) {
                 const md = editor.getMarkdown();
@@ -431,6 +464,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                         onHighlighterClick={() => setMobileView("highlighter")}
                         onLinkClick={() => setMobileView("link")}
                         onMathClick={() => setMobileView("math")}
+                        onPickAttachment={insertAttachment}
                         isMobile={isMobile}
                         isMarkdownMode={isMarkdownMode}
                         onToggleMarkdown={handleToggleMarkdown}

@@ -50,7 +50,6 @@ export default function PrivatePostGate({ id }: { id: string }) {
         author: post.author,
         createdAt: new Date(post.createdAt).toISOString(),
         isPrivate: !!post.isPrivate,
-        attachments: (post.attachments ?? []).map((a) => ({ name: a.name, size: a.size, mimeType: a.mimeType })),
       }}
     />
   );

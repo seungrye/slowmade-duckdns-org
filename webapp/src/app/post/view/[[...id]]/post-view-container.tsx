@@ -21,14 +21,7 @@ interface PostData {
   author: string;
   createdAt: string;
   isPrivate?: boolean;
-  attachments?: { name: string; size: number; mimeType: string }[];
-}
-
-/** 바이트를 사람이 읽기 좋은 크기로. */
-function fmtBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  // 첨부는 본문 인라인 칩(attachmentChip 노드)으로 렌더 — 별도 하단 목록 없음.
 }
 
 export default function PostViewContainer({ post }: { post: PostData }) {
@@ -88,25 +81,6 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         <div className="p-4 transition-all duration-300 ease-in-out flex-1" ref={bodyRef}>
           <RichContentViewer content={post.jsonContent as JSONContent} waitRenderComplete={true} />
         </div>
-
-        {post.attachments && post.attachments.length > 0 && (
-          <div className="p-3 text-sm border-t border-t-gray-200 dark:border-t-gray-700">
-            <div className="mb-2 font-medium text-gray-600 dark:text-gray-300">📎 첨부파일</div>
-            <ul className="flex flex-col gap-1.5">
-              {post.attachments.map((att, idx) => (
-                <li key={`${att.name}-${idx}`}>
-                  <a
-                    href={`/api/attachment/${post._id}?i=${idx}`}
-                    className="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    <span className="truncate max-w-[70vw]">{att.name}</span>
-                    <span className="text-xs text-gray-400 whitespace-nowrap">({fmtBytes(att.size)})</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
 
         {post.tags && post.tags.length > 0 && (
           <div className="p-3 text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700">
