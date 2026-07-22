@@ -6,25 +6,21 @@ import PostViewTracker from './post-view-tracker';
 import { buildArticleJsonLd } from './article-json-ld';
 import { buildPostMetadata } from './build-post-metadata';
 import { env } from '@/lib/env';
-import { auth } from '@/auth';
+import PrivatePostGate from './private-post-gate';
 
 type Params = Promise<{ id: string[] }>
 
 const siteUrl = env.siteUrl;
 
 /**
- * 뷰어가 볼 수 있는 글을 로드한다. **공개 글은 auth() 를 타지 않아 ISR 정적 캐시가 유지**되고,
- * 공개 필터로 못 찾으면(비공개 가능성) auth() 로 작성자 본인인지 확인해 동적으로 렌더한다.
- * (비공개 글은 generateStaticParams 에서 제외되므로 정적 캐시에 담기지 않는다.)
+ * 공개 글만 서버에서 로드한다(공개 필터). **auth()(쿠키)를 절대 호출하지 않아** 정적 생성/캐시가
+ * 유지된다(generateStaticParams + revalidate 와 충돌 없음 → DYNAMIC_SERVER_USAGE 회피).
+ * 공개로 못 찾으면(비공개 or 없음) 서버는 판단하지 않고, 클라이언트 게이트(PrivatePostGate)가
+ * 인증 API(/api/post)로 작성자 본인인지 확인해 렌더한다.
  */
-async function loadViewablePost(_id: string) {
-  const pub = await getPost(_id); // 공개 필터 — auth 미호출
-  if (pub?.post) return pub.post;
-  const session = await auth(); // 여기서부터 동적 렌더(쿠키)
-  const viewer = session?.user?.email ?? null;
-  if (!viewer) return null;
-  const priv = await getPost(_id, viewer);
-  return priv?.post ?? null;
+async function loadPublicPost(_id: string) {
+  const pub = await getPost(_id);
+  return pub?.post ?? null;
 }
 
 // generateStaticParams(공개 글)로 빌드 시 정적 생성 → 공개 글은 캐시된 정적 렌더로 빠르다.
@@ -46,7 +42,7 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
 
     if (!_id) return { title: 'Post Not Found' };
 
-    const post = await loadViewablePost(_id);
+    const post = await loadPublicPost(_id); // 공개 글만 메타 노출(비공개는 클라 게이트가 렌더)
     if (!post) return { title: 'Post Not Found' };
 
     return buildPostMetadata({
@@ -67,8 +63,9 @@ export default async function PostViewer(props: { params: Params }) {
 
     if (!_id) notFound();
 
-    const post = await loadViewablePost(_id);
-    if (!post) notFound();
+    const post = await loadPublicPost(_id);
+    // 공개로 못 찾으면 비공개일 수 있으니 클라 게이트로(작성자 본인만 인증 렌더). 없는 글도 게이트가 '찾을 수 없음'.
+    if (!post) return <PrivatePostGate id={_id} />;
 
     const url = `${siteUrl}/post/view/${_id}`;
     const description = post.htmlContent
