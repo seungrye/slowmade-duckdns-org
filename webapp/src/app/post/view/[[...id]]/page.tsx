@@ -101,6 +101,9 @@ export default async function PostViewer(props: { params: Params }) {
                     author: post.author,
                     createdAt: (post.createdAt as Date).toISOString(),
                     isPrivate: !!post.isPrivate,
+                    attachments: (post.attachments ?? []).map((a) => ({
+                        id: a.id ?? "", name: a.name ?? "", size: a.size ?? 0, mimeType: a.mimeType ?? "",
+                    })),
                 }}
             />
         </>

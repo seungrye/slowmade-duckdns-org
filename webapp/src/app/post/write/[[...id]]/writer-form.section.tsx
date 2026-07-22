@@ -9,7 +9,8 @@ import { SetPostType } from '@/types/api/submit.d';
 import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
 import { showAchievementToasts } from '@/lib/show-achievement-toast';
 import { useMobile } from '@/hooks/use-mobile';
-import { lockIconSvg } from '@/components/rich-web-editor/attachment-icon';
+import { lockIconSvg, type AttachmentMeta } from '@/components/rich-web-editor/attachment-icon';
+import { AttachmentChip } from '@/components/attachment-chip';
 
 export default function PostWriterForm() {
     const { data: session } = useSession();
@@ -22,6 +23,7 @@ export default function PostWriterForm() {
     const [title, setTitle] = useState('');
     const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
     const [isPrivate, setIsPrivate] = useState(false); // 비공개(작성자만 열람). 기본 공개. 제목 옆 자물쇠로 토글.
+    const [attachments, setAttachments] = useState<AttachmentMeta[]>([]); // 본문 하단 전용 첨부 영역(태그처럼). 툴바 클립 → 칩 추가.
     const [loading, setLoading] = useState(false);
     const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
     const isMobile = useMobile();
@@ -72,11 +74,12 @@ export default function PostWriterForm() {
                         console.assert(Array.isArray(fetchedTags), "tags should be an array");
                     }
                     console.assert(editorRef.current, "editorRef.current should not be null");
-                    // 기존 첨부 메타(key 포함)를 에디터 ref 에 시드 → 수정 저장 시 보존(본문 칩은 jsonContent 로 이미 복원).
-                    editorRef.current?.setContent(jsonContent, urls, Array.isArray(fetchedAttachments) ? fetchedAttachments : []);
+                    editorRef.current?.setContent(jsonContent, urls);
                     setTitle(title);
                     setTags(fetchedTags || []);
                     setIsPrivate(!!fetchedPrivate);
+                    // 기존 첨부는 전용 영역 칩으로 복원(본문 삽입 아님).
+                    setAttachments(Array.isArray(fetchedAttachments) ? fetchedAttachments : []);
                 } else {
                     toast.error("게시글을 불러오는 데 실패했습니다.");
                 }
@@ -92,8 +95,8 @@ export default function PostWriterForm() {
     const handleSubmit = async (e: React.FormEvent<HTMLButtonElement>) => {
         e.preventDefault();
 
-        // 에디터에서 값 가져오기(본문·이미지·첨부 메타 일괄)
-        const { htmlContent, jsonContent, uploadImageUrls: urls, uploadAttachments } = editorRef.current?.getContent() || { jsonContent: null, htmlContent: null, uploadImageUrls: [], uploadAttachments: [] };
+        // 에디터에서 값 가져오기(본문·이미지). 첨부는 별도 state(전용 영역).
+        const { htmlContent, jsonContent, uploadImageUrls: urls } = editorRef.current?.getContent() || { jsonContent: null, htmlContent: null, uploadImageUrls: [] };
         if (!title.trim() || !jsonContent) {
             return toast.error("제목과 내용을 입력해주세요.");
         } else {
@@ -111,7 +114,7 @@ export default function PostWriterForm() {
             urls: urls || [], // 에디터에서 가져온 이미지 URL 배열
             tags: tags, // 태그 상태는 이미 문자열 배열입니다.
             isPrivate,
-            attachments: uploadAttachments || [], // 본문 인라인 첨부 칩들의 메타(key 포함)
+            attachments, // 전용 첨부 영역 칩들의 메타(key 포함)
         };
 
         if (_id) {
@@ -179,8 +182,23 @@ export default function PostWriterForm() {
                 tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
                 aria-label="Post content editor, click or press enter to start writing"
             >
-                <RichWebEditor ref={editorRef} />
+                <RichWebEditor
+                    ref={editorRef}
+                    onAttach={(m) => setAttachments((prev) => [...prev, m])}
+                />
             </div>
+            {attachments.length > 0 && (
+                <div className="mt-4 shrink-0 flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">📎 첨부파일</span>
+                    {attachments.map((att) => (
+                        <AttachmentChip
+                            key={att.id}
+                            att={att}
+                            onRemove={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                        />
+                    ))}
+                </div>
+            )}
             <div className="mt-4 shrink-0">
                 <TagInput
                     tags={tags}

@@ -23,7 +23,6 @@ import "@/components/tiptap-node/code-block-node/code-block-node.scss"
 import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/image-node/image-node.scss"
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
-import "@/components/tiptap-node/attachment-node/attachment-node.scss"
 
 // --- Tiptap UI ---
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
@@ -222,13 +221,12 @@ export interface RichWebEditorHandle {
         jsonContent: JSONContent | undefined,
         htmlContent: HTMLContent | undefined,
         uploadImageUrls: ImageUrlType[],
-        uploadAttachments: AttachmentMeta[]
     };
-    setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[], uploadAttachments?: AttachmentMeta[]) => void;
+    setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => void;
     focus: () => void;
 }
 
-export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((props, ref) => {
+export const RichWebEditor = React.forwardRef<RichWebEditorHandle, { onAttach?: (meta: AttachmentMeta) => void }>((props, ref) => {
     const isMobile = useMobile()
     const windowSize = useWindowSize()
     const [mobileView, setMobileView] = React.useState<
@@ -244,7 +242,6 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
     })
     const toolbarRef = React.useRef<HTMLDivElement>(null)
     const uploadedImageUrlsRef = React.useRef<ImageUrlType[]>([]);
-    const uploadedAttachmentsRef = React.useRef<AttachmentMeta[]>([]);
 
     // Markdown mode state
     const [isMarkdownMode, setIsMarkdownMode] = React.useState(false);
@@ -303,8 +300,8 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
         content: "",
     })
 
-    // 파일 첨부 — /api/attachment/upload 로 올린 뒤 본문에 인라인 첨부 칩을 삽입. 메타(key 포함)는
-    // uploadedAttachmentsRef 에 모아 getContent 로 반환(폼이 제출 → 서버 프록시가 key·권한 해석).
+    // 파일 첨부 — /api/attachment/upload 로 올린 뒤 상위(작성 폼)로 메타 콜백. 본문에 삽입하지 않고,
+    // 폼 하단 전용 첨부 영역에 칩으로 쌓인다(제출 시 서버 프록시가 key·권한 해석).
     const insertAttachment = React.useCallback(async (file: File) => {
         try {
             const fd = new FormData();
@@ -315,16 +312,11 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                 console.error("첨부 업로드 실패:", json?.message);
                 return;
             }
-            const meta = json.data as AttachmentMeta;
-            uploadedAttachmentsRef.current.push(meta);
-            editor?.chain().focus().insertContent({
-                type: "attachmentChip",
-                attrs: { href: `/api/attachment/id/${meta.id}`, name: meta.name, mime: meta.mimeType, size: meta.size },
-            }).run();
+            props.onAttach?.(json.data as AttachmentMeta);
         } catch (e) {
             console.error("첨부 업로드 오류:", e);
         }
-    }, [editor]);
+    }, [props]);
 
     React.useEffect(() => {
         const checkCursorVisibility = () => {
@@ -424,13 +416,11 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, object>((prop
                 jsonContent: editor?.getJSON(),
                 htmlContent: editor?.getHTML(),
                 uploadImageUrls: uploadedImageUrlsRef.current,
-                uploadAttachments: uploadedAttachmentsRef.current,
             };
         },
-        setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[], uploadAttachments?: AttachmentMeta[]) => {
+        setContent: (content: HTMLContent, uploadImageUrls?: ImageUrlType[]) => {
             if (!editor) return console.warn("Editor is not initialized");
             uploadedImageUrlsRef.current = uploadImageUrls || [];
-            uploadedAttachmentsRef.current = uploadAttachments || []; // 수정 로딩 시 기존 첨부 메타 보존
             editor.commands.setContent(content);
             if (isMarkdownModeRef.current) {
                 const md = editor.getMarkdown();

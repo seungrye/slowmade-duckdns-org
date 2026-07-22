@@ -10,6 +10,7 @@ import RevisionHistorySection from './revision-history.section';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import PostScrollDepth from '@/components/post-scroll-depth';
+import { AttachmentChip } from '@/components/attachment-chip';
 
 interface PostData {
   _id: string;
@@ -21,7 +22,8 @@ interface PostData {
   author: string;
   createdAt: string;
   isPrivate?: boolean;
-  // 첨부는 본문 인라인 칩(attachmentChip 노드)으로 렌더 — 별도 하단 목록 없음.
+  // 첨부는 본문↔태그 사이 전용 섹션에 칩으로 렌더. 비어 있으면 섹션 미표시.
+  attachments?: { id: string; name: string; size: number; mimeType: string }[];
 }
 
 export default function PostViewContainer({ post }: { post: PostData }) {
@@ -81,6 +83,21 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         <div className="p-4 transition-all duration-300 ease-in-out flex-1" ref={bodyRef}>
           <RichContentViewer content={post.jsonContent as JSONContent} waitRenderComplete={true} />
         </div>
+
+        {post.attachments && post.attachments.length > 0 && (
+          <div className="p-3 border-t border-t-gray-200 dark:border-t-gray-700">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">📎 첨부파일</span>
+              {post.attachments.map((att) => (
+                <AttachmentChip
+                  key={att.id}
+                  att={att}
+                  downloadHref={`/api/attachment/id/${att.id}`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {post.tags && post.tags.length > 0 && (
           <div className="p-3 text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700">

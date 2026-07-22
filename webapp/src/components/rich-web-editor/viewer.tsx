@@ -28,7 +28,6 @@ import "katex/dist/katex.min.css"
 import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
 import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
-import { AttachmentChip } from "@/components/tiptap-node/attachment-node/attachment-node"
 
 // --- UI Primitives ---
 
@@ -37,7 +36,6 @@ import "@/components/tiptap-node/code-block-node/code-block-node.scss"
 import "@/components/tiptap-node/list-node/list-node.scss"
 import "@/components/tiptap-node/image-node/image-node.scss"
 import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
-import "@/components/tiptap-node/attachment-node/attachment-node.scss"
 
 // --- Tiptap UI ---
 
@@ -120,7 +118,6 @@ export const tiptapExtensions = [
     TableRow,
     TableHeader,
     TableCell,
-    AttachmentChip,
 ];
 
 export interface RichContentViewerProps {

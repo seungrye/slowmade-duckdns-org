@@ -22,7 +22,6 @@ import { Markdown } from "@tiptap/markdown"
 import { Link } from "@/components/tiptap-extension/link-extension"
 import { Selection } from "@/components/tiptap-extension/selection-extension"
 import { TrailingNode } from "@/components/tiptap-extension/trailing-node-extension"
-import { AttachmentChip } from "@/components/tiptap-node/attachment-node/attachment-node"
 import { lowlight } from "@/lib/lowlight"
 
 type JSONContent = { type?: string; attrs?: Record<string, unknown>; content?: JSONContent[]; text?: string }
@@ -172,7 +171,6 @@ export const editorExtensions = [
     TableRow,
     TableHeader,
     TableCell,
-    AttachmentChip,
     Markdown,
     MarkdownPaste,
 ];

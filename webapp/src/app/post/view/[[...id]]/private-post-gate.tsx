@@ -11,7 +11,7 @@ import PostViewContainer from './post-view-container';
 type Loaded = {
   _id: string; title: string; jsonContent: unknown; likes?: number; tags?: string[];
   userEmail: string; author: string; createdAt: string; isPrivate?: boolean;
-  attachments?: { name: string; size: number; mimeType: string }[];
+  attachments?: { id: string; name: string; size: number; mimeType: string }[];
 };
 
 export default function PrivatePostGate({ id }: { id: string }) {
@@ -50,6 +50,9 @@ export default function PrivatePostGate({ id }: { id: string }) {
         author: post.author,
         createdAt: new Date(post.createdAt).toISOString(),
         isPrivate: !!post.isPrivate,
+        attachments: (post.attachments ?? []).map((a) => ({
+          id: a.id, name: a.name, size: a.size, mimeType: a.mimeType,
+        })),
       }}
     />
   );
