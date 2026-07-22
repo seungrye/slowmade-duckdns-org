@@ -41,11 +41,14 @@ export const AttachmentChip = Node.create({
 
   renderHTML({ node, HTMLAttributes }) {
     const { href, name, mime, size } = node.attrs as { href: string; name: string; mime: string; size: number };
+    // 아이콘만 표시 — 파일명은 호버 툴팁(title)·접근성(aria-label)으로.
     return [
       "a",
       mergeAttributes(HTMLAttributes, {
         href,
         class: "attachment-chip",
+        title: name,
+        "aria-label": name ? `첨부파일 ${name}` : "첨부파일",
         "data-mime": mime,
         "data-name": name,
         "data-size": String(size ?? 0),
@@ -53,8 +56,7 @@ export const AttachmentChip = Node.create({
         rel: "noopener noreferrer",
         contenteditable: "false",
       }),
-      ["img", { src: attachmentIconDataUri(mime), class: "att-ico", alt: "", width: 30, height: 16 }],
-      ["span", { class: "att-name" }, name || "첨부파일"],
+      ["img", { src: attachmentIconDataUri(mime), class: "att-ico", alt: name || "첨부파일", width: 20, height: 24 }],
     ];
   },
 });

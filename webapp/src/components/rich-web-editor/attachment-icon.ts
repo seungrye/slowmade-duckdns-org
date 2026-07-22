@@ -1,32 +1,40 @@
-// 첨부 파일 MIME → 작은 SVG 배지(색 + 확장자 라벨). 인라인 첨부 칩·툴바 등에서 공용.
-// 순수 함수 — 테스트 가능. 아이콘 폰트 비의존(어디서나 동일 렌더).
+// 첨부 파일 MIME → 파일타입 문서 아이콘(작은 인라인 SVG 글리프). 인라인 첨부 칩 등에서 공용.
+// 순수 함수 — 테스트 가능. 아이콘 폰트 비의존(어디서나 동일 렌더). MIME→타입 분류는
+// colemanw/9c9a12aae16a4bfe2678de86b661d922 gist(MIME→FontAwesome 파일아이콘)의 분류를 참고하되,
+// 폰트 대신 원본 문서 글리프 SVG 로 그린다.
 
 export type AttachmentIconSpec = { label: string; color: string };
 
 /** 업로드된 첨부 메타 — 폼 제출·프록시 해석용. key 는 MinIO 오브젝트 키(공개 URL 아님). */
 export type AttachmentMeta = { id: string; name: string; key: string; size: number; mimeType: string };
 
-/** MIME 문자열 → 배지 라벨·색. 미지 타입은 FILE. */
+/** MIME 문자열 → 파일타입 라벨·색. 구체 타입 우선, 그다음 prefix(image/audio/video/text), 미지=FILE. */
 export function attachmentIconSpec(mime: string | undefined | null): AttachmentIconSpec {
   const m = (mime ?? "").toLowerCase();
   if (m === "application/pdf") return { label: "PDF", color: "#e11d48" };
   if (m.includes("hwp")) return { label: "HWP", color: "#0891b2" };
-  if (m.includes("wordprocessingml") || m === "application/msword") return { label: "DOC", color: "#2563eb" };
-  if (m.includes("spreadsheetml") || m.includes("ms-excel")) return { label: "XLS", color: "#16a34a" };
-  if (m.includes("presentationml") || m.includes("ms-powerpoint")) return { label: "PPT", color: "#ea580c" };
-  if (m.includes("zip") || m.includes("7z") || m.includes("compressed") || m.includes("x-rar")) return { label: "ZIP", color: "#a16207" };
-  if (m.startsWith("image/")) return { label: "IMG", color: "#7c3aed" };
+  if (m.includes("wordprocessingml") || m === "application/msword" || m.includes("ms-word") || m.includes("opendocument.text")) return { label: "DOC", color: "#2563eb" };
+  if (m.includes("spreadsheetml") || m.includes("ms-excel") || m.includes("opendocument.spreadsheet")) return { label: "XLS", color: "#16a34a" };
+  if (m.includes("presentationml") || m.includes("ms-powerpoint") || m.includes("opendocument.presentation")) return { label: "PPT", color: "#ea580c" };
+  if (m.includes("zip") || m.includes("gzip") || m.includes("7z") || m.includes("x-rar") || m.includes("compressed") || m.includes("tar")) return { label: "ZIP", color: "#a16207" };
   if (m === "text/csv") return { label: "CSV", color: "#0d9488" };
-  if (m.startsWith("text/") || m === "application/json") return { label: "TXT", color: "#475569" };
+  if (m === "text/html" || m === "application/json" || m.includes("xml") || m.includes("javascript") || m === "text/css") return { label: "<>", color: "#7c3aed" };
+  if (m.startsWith("image/")) return { label: "IMG", color: "#db2777" };
+  if (m.startsWith("audio/")) return { label: "AUD", color: "#c026d3" };
+  if (m.startsWith("video/")) return { label: "VID", color: "#4f46e5" };
+  if (m.startsWith("text/")) return { label: "TXT", color: "#475569" };
   return { label: "FILE", color: "#64748b" };
 }
 
-/** MIME → 작은 라운드 배지 SVG 마크업(30×16). */
+/** MIME → 문서형 파일 아이콘 SVG(세로 페이지 + 접힌 모서리 + 타입 색 라벨 밴드). 28×34 viewBox. */
 export function attachmentIconSvg(mime: string | undefined | null): string {
   const { label, color } = attachmentIconSpec(mime);
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="16" viewBox="0 0 30 16">`
-    + `<rect width="30" height="16" rx="3" fill="${color}"/>`
-    + `<text x="15" y="12" text-anchor="middle" font-size="9" font-weight="700" font-family="sans-serif" fill="#ffffff">${label}</text>`
+  const fontSize = label.length >= 4 ? 6.5 : 8; // FILE 등 긴 라벨은 작게
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="34" viewBox="0 0 28 34">`
+    + `<path d="M6 2 H17 L23 8 V30 A2 2 0 0 1 21 32 H6 A2 2 0 0 1 4 30 V4 A2 2 0 0 1 6 2 Z" fill="#ffffff" stroke="${color}" stroke-width="1.6"/>`
+    + `<path d="M17 2 V8 H23" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round"/>`
+    + `<rect x="4" y="20.5" width="19" height="9" rx="1.6" fill="${color}"/>`
+    + `<text x="13.5" y="27.3" text-anchor="middle" font-size="${fontSize}" font-weight="700" font-family="sans-serif" fill="#ffffff">${label}</text>`
     + `</svg>`;
 }
 

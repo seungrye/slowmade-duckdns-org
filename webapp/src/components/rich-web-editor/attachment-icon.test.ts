@@ -14,6 +14,14 @@ describe("attachmentIconSpec — MIME → 배지 라벨/색", () => {
     expect(attachmentIconSpec("text/csv").label).toBe("CSV");
     expect(attachmentIconSpec("application/x-hwp").label).toBe("HWP");
   });
+  it("gist 확장 카테고리 — audio/video/code(prefix·구체)", () => {
+    expect(attachmentIconSpec("audio/mpeg").label).toBe("AUD");
+    expect(attachmentIconSpec("video/mp4").label).toBe("VID");
+    expect(attachmentIconSpec("text/html").label).toBe("<>");   // code (text/* 보다 우선)
+    expect(attachmentIconSpec("application/json").label).toBe("<>");
+    expect(attachmentIconSpec("application/gzip").label).toBe("ZIP");
+    expect(attachmentIconSpec("application/vnd.oasis.opendocument.text").label).toBe("DOC");
+  });
   it("미지/빈 타입 → FILE", () => {
     expect(attachmentIconSpec("application/octet-stream").label).toBe("FILE");
     expect(attachmentIconSpec("").label).toBe("FILE");
@@ -26,9 +34,11 @@ describe("attachmentIconSpec — MIME → 배지 라벨/색", () => {
 });
 
 describe("attachmentIconSvg / dataUri", () => {
-  it("SVG 에 라벨 텍스트 포함", () => {
-    expect(attachmentIconSvg("application/pdf")).toContain(">PDF<");
-    expect(attachmentIconSvg("application/pdf")).toContain("<svg");
+  it("문서형 글리프 SVG — 페이지 path + 라벨 텍스트", () => {
+    const svg = attachmentIconSvg("application/pdf");
+    expect(svg).toContain("<svg");
+    expect(svg).toContain("<path"); // 문서(페이지) 모양
+    expect(svg).toContain(">PDF<"); // 타입 라벨
   });
   it("dataUri 는 svg+xml", () => {
     expect(attachmentIconDataUri("image/png")).toMatch(/^data:image\/svg\+xml;utf8,/);
