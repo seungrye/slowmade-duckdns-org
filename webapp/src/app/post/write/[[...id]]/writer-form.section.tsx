@@ -189,7 +189,6 @@ export default function PostWriterForm() {
             </div>
             {attachments.length > 0 && (
                 <div className="mt-4 shrink-0 flex flex-wrap items-center gap-2">
-                    <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">📎 첨부파일</span>
                     {attachments.map((att) => (
                         <AttachmentChip
                             key={att.id}

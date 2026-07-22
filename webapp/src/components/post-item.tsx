@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { GetPostType } from '@/types/posts.d';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown, faChevronUp, faComment, faEye, faHeart } from '@fortawesome/free-solid-svg-icons';
+import { PrivateLockIcon } from '@/components/private-lock-icon';
 import dynamic from "next/dynamic";
 
 const RichContentViewer = dynamic(
@@ -22,7 +23,10 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
     <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm hover:shadow-md inset-shadow-xs">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <Link href={`/post/view/${post._id}`} className='truncate ' aria-label={`게시물 제목: ${post.title}`}>
-          <h3 className="text-lg font-semibold truncate">{post.title}</h3>
+          <h3 className="text-lg font-semibold truncate">
+            {post.isPrivate && <PrivateLockIcon className="mr-1.5 h-[0.85em] w-[0.85em] text-gray-400" />}
+            {post.title}
+          </h3>
         </Link>
         <button
           onClick={() => togglePost?.(post._id)}

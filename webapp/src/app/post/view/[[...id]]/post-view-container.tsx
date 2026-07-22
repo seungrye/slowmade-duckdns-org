@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import PostScrollDepth from '@/components/post-scroll-depth';
 import { AttachmentChip } from '@/components/attachment-chip';
+import { PrivateLockIcon } from '@/components/private-lock-icon';
 
 interface PostData {
   _id: string;
@@ -55,7 +56,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         <div className="w-full p-3 grid gap-2 md:gap-4 grid-cols-1 md:grid-cols-[1fr_auto] md:items-center">
           <h1 className="font-bold md:text-lg md:truncate">
             {post.isPrivate && (
-              <Badge className="mr-2 align-middle bg-amber-500 hover:bg-amber-500 text-white">🔒 비공개</Badge>
+              <PrivateLockIcon className="mr-1.5 h-[0.9em] w-[0.9em] text-gray-400" />
             )}
             {post.title}
           </h1>
@@ -87,7 +88,6 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         {post.attachments && post.attachments.length > 0 && (
           <div className="p-3 border-t border-t-gray-200 dark:border-t-gray-700">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">📎 첨부파일</span>
               {post.attachments.map((att) => (
                 <AttachmentChip
                   key={att.id}
