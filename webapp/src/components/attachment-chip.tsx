@@ -78,8 +78,9 @@ export function AttachmentChip({
           aria-label={`${att.name} 삭제`}
           className="absolute bottom-1 right-1 text-red-500 hover:text-red-600 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100"
         >
-          {/* close-circle(솔리드) — 빨간 원에 X 컷아웃. 흰 배경 원으로 X 가 흰색으로 보이게. */}
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="block h-4 w-4 rounded-full bg-white drop-shadow-sm">
+          {/* close-circle(솔리드) — 빨간 원에 X 컷아웃. 같은 크기(r=10) 흰 원을 뒤에 깔아 X 는 흰색·외곽선 없음. */}
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="block h-4 w-4 drop-shadow-sm">
+            <circle cx="12" cy="12" r="10" fill="#fff" />
             <path
               fillRule="evenodd"
               clipRule="evenodd"

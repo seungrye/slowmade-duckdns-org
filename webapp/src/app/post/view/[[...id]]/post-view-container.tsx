@@ -56,7 +56,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         <div className="w-full p-3 grid gap-2 md:gap-4 grid-cols-1 md:grid-cols-[1fr_auto] md:items-center">
           <h1 className="font-bold md:text-lg md:truncate">
             {post.isPrivate && (
-              <PrivateLockIcon className="mr-1.5 h-[0.9em] w-[0.9em] text-gray-400" />
+              <PrivateLockIcon className="mr-1.5 h-[1.5em] w-[1.5em] align-[-0.4em] text-gray-400" />
             )}
             {post.title}
           </h1>

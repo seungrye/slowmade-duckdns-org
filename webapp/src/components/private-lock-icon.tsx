@@ -9,7 +9,7 @@ export function PrivateLockIcon({ className }: { className?: string }) {
       viewBox="0 0 20 22"
       role="img"
       aria-label="비공개"
-      className={`inline-block shrink-0 align-[-0.15em] ${className ?? "h-[1em] w-[1em] text-gray-400"}`}
+      className={`inline-block shrink-0 ${className ?? "h-[1em] w-[1em] align-[-0.15em] text-gray-400"}`}
     >
       <rect x="4" y="10" width="12" height="9" rx="2" fill="currentColor" />
       <path d="M6.5 10V7.5a3.5 3.5 0 017 0V10" fill="none" stroke="currentColor" strokeWidth="1.8" />
