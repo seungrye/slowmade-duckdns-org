@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import FactorPanel, { type FactorKind } from "./factor-panel";
 import ReactECharts from "echarts-for-react";
 import { useDragScrollX } from "@/hooks/use-drag-scroll";
 import type { EChartsOption } from "echarts";
@@ -22,7 +23,8 @@ import type { Bar, BacktestResult } from "@/lib/backtest/types";
 type Strategy =
   | "infinite_v1" | "infinite_v2_1" | "infinite_v2_2" | "infinite_v3_0" | "infinite_v4_0"
   | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1" | "rotation_v2"
-  | "dual_momentum_v1" | "vol_target_v1" | "value_rebalancing";
+  | "dual_momentum_v1" | "vol_target_v1" | "value_rebalancing"
+  | "factor_compare" | "factor_momentum" | "factor_low_vol" | "factor_reversal";
 
 const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = {
   infinite_v2_1: "v2_1", infinite_v2_2: "v2_2", infinite_v3_0: "v3_0",
@@ -33,6 +35,10 @@ type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: S
 // 검증상 최고 — Calmar↑·MDD↓·수수료/시그널/파라미터에 강건), 방어형 모멘텀(LRS·레짐·트레일링
 // 추세) 중위, 무한매수(주기적 물타기 — v4 가 가장 완성형) 하위.
 const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
+  ["factor_compare", "팩터 비교"],
+  ["factor_momentum", "팩터: 모멘텀(12-1)"],
+  ["factor_low_vol", "팩터: 저변동성"],
+  ["factor_reversal", "팩터: 단기 평균회귀"],
   ["rotation_v2", "모멘텀 로테이션 v2 (분할매수)"],
   ["rotation_v1", "모멘텀 로테이션 v1"],
   ["dual_momentum_v1", "듀얼 모멘텀 GEM (채권 대피)"],
@@ -51,7 +57,22 @@ const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
   ["infinite_v1", "무한매수 v1"],
 ];
 
+// 팩터 개별 탭 → factor.ts 팩터 종류. factor_compare 는 여기 없음(비교 모드 = focus undefined).
+const FACTOR_FOCUS: Partial<Record<Strategy, FactorKind>> = {
+  factor_momentum: "momentum",
+  factor_low_vol: "low_vol",
+  factor_reversal: "reversal",
+};
+
 const STRATEGY_DESC: Record<Strategy, string> = {
+  factor_compare:
+    "크로스섹셔널 팩터 3종 + 벤치마크(동일가중·시장ETF)를 같은 기간으로 비교. 유니버스를 서버가 Mongo 에서 로드·연산. 체크박스로 표시 전략 선택. ⚠ 유니버스가 현재 구성종목이라 생존편향(낙관 편향).",
+  factor_momentum:
+    "크로스섹셔널 모멘텀(12-1): 최근 12개월 수익률(최근 1개월 제외) 상위 분위를 동일가중, 월 리밸런스. 유니버스 대상.",
+  factor_low_vol:
+    "저변동성: 최근 1년 일수익률 표준편차 하위 분위(저변동)를 동일가중, 월 리밸런스. 유니버스 대상.",
+  factor_reversal:
+    "단기 평균회귀: 최근 1개월 수익률 하위 분위(최근 하락주)를 동일가중, 월 리밸런스. 유니버스 대상.",
   infinite_v1:
     "원금 분할 → 1회차 시장가, 이후 평단·프리미엄 LOC 매수, 평단+익절% 전량 매도. (시장가=종가, 매수 LOC=저가 터치, 매도=고가 터치 근사)",
   infinite_v2_1:
@@ -368,6 +389,8 @@ export default function BacktestClient() {
     }
   };
 
+  const isFactor = strategy.startsWith("factor_");
+
   return (
     <main className="mx-auto px-4 py-8 max-w-5xl">
       <h1 className="text-2xl font-bold mb-1">백테스트</h1>
@@ -397,6 +420,10 @@ export default function BacktestClient() {
         {" 수수료·슬리피지 미반영."}
       </p>
 
+      {isFactor ? (
+        <FactorPanel focus={FACTOR_FOCUS[strategy]} defaultFrom={from} defaultTo={to} />
+      ) : (
+      <>
       {/* 옵션 폼 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         {/* rotation·듀얼모멘텀은 후보 필드가 종목 입력을 대신한다 — 이 필드는 무시되므로 숨겨 혼동 방지 */}
@@ -625,6 +652,8 @@ export default function BacktestClient() {
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
       {scan && strategy.startsWith("rotation") && <RobustnessHeatmap scan={scan} curMom={rotMom} curReb={rotReb} />}
       {result && <Result result={result} />}
+      </>
+      )}
 
       <style jsx>{`
         :global(.input) { width: 100%; padding: 0.5rem; border: 1px solid rgb(209 213 219); border-radius: 0.375rem; background: transparent; font-size: 0.875rem; }
