@@ -68,6 +68,12 @@ write_upstream() {
     sed "s/127\\.0\\.0\\.1:[0-9]\\+/127.0.0.1:${port}/" "$UPSTREAM_SRC" > "$tmp"
     sudo install -m 0644 "$tmp" "$UPSTREAM_DST"
     rm -f "$tmp"
+    # 검증: DST 가 실제로 새 포트로 반영됐는지 되읽어 확인(간헐적 미갱신 방어).
+    # 이게 어긋난 채 구 인스턴스를 멈추면 nginx 가 죽은 포트로 붙어 전체 502 가 난다.
+    # 반영 실패 시 non-zero 리턴 → 호출측이 구 인스턴스 정지 전에 중단한다.
+    local now
+    now=$(grep -oE '127\.0\.0\.1:[0-9]+' "$UPSTREAM_DST" | head -1 | cut -d: -f2 || true)
+    [[ "$now" == "$port" ]]
 }
 
 health_check() {
@@ -153,7 +159,11 @@ main() {
     log "new instance healthy"
 
     log "swap upstream → ${inactive} and reload nginx"
-    write_upstream "$inactive"
+    if ! write_upstream "$inactive"; then
+        warn "새 인스턴스(${inactive})는 정상이나 upstream 파일이 ${inactive} 로 갱신되지 않음(간헐 버그)."
+        warn "구 인스턴스(${active})·nginx 라우팅을 그대로 두어 서비스는 지속(새 코드는 미반영)."
+        die "deploy aborted: upstream 갱신 실패 — ${UPSTREAM_DST} 수동 확인/수정 후 재시도. (새 인스턴스 webapp@${inactive} 는 계속 실행 중)"
+    fi
     sudo nginx -t
     sudo nginx -s reload
 
