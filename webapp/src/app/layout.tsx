@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { env } from "@/lib/env";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import Providers from "@/components/providers";
@@ -28,6 +28,12 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary",
   },
+};
+
+// 사이트가 light/dark 를 모두 지원한다고 브라우저에 명시(<meta name="color-scheme">).
+// CSS 보다 먼저 파싱되어 모바일 크롬 자동 다크(force-dark)를 확실히 비활성화한다.
+export const viewport: Viewport = {
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
