@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import FactorPanel, { type FactorKind, type CompareEntry } from "./factor-panel";
+import { Field } from "./field";
 import ReactECharts from "echarts-for-react";
 import { useDragScrollX } from "@/hooks/use-drag-scroll";
 import type { EChartsOption } from "echarts";
@@ -718,16 +719,6 @@ export default function BacktestClient() {
         :global(.dark .input) { border-color: rgb(75 85 99); }
       `}</style>
     </main>
-  );
-}
-
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-gray-600 dark:text-gray-300">{label}</span>
-      {children}
-      {hint && <span className="text-[10px] text-gray-400">{hint}</span>}
-    </label>
   );
 }
 

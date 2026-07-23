@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 import type { BacktestMetrics } from "@/lib/backtest/metrics";
+import { Field } from "./field";
 
 // 크로스섹셔널 팩터 백테스트 개별 탭 패널. 서버 라우트가 유니버스를 로드·연산.
 // 선택 팩터(focus) + 벤치마크(동일가중·시장ETF)를 표·차트로. "비교에 추가" 체크 시 focus 팩터를
@@ -152,48 +153,45 @@ export default function FactorPanel({
 
   return (
     <div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
-        팩터는 <b>유니버스 전체</b>를 팩터로 랭킹해 상위 분위를 담는 포트폴리오라 단일 종목이 아니라 <b>시장(유니버스) 선택</b>입니다.
-        시작/종료를 비우면 다른 탭처럼 <b>전체 이력~오늘</b>. 원금·월적립금은 다른 전략 탭과 공유됩니다.
-      </p>
-      <div className="flex flex-wrap items-end gap-3 mb-4">
-        <label className="text-sm">
-          시장
-          <select value={market} onChange={(e) => setMarket(e.target.value)} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-800">
+      {/* 옵션 폼 — 모멘텀 로테이션 탭과 동일 디자인(Field + grid + .input). 팩터는 유니버스 포트폴리오라
+          단일 종목 대신 '시장(유니버스)' 선택. 순서: 원금 → 월적립금 → 유니버스 → 분위 → 시작/종료 → 실행. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <Field label="원금" hint="배정 자본(국장은 원화)">
+          <input type="number" value={principal} onChange={(e) => onPrincipal(Number(e.target.value))} className="input" />
+        </Field>
+        <Field label="월 적립금" hint="매월 입금액(0=목돈 일시투입). 입금분은 보유에 즉시 투입돼 현금 드래그 없음. 수익률은 TWR 로 표기">
+          <input type="number" value={monthlyContribution} min={0} onChange={(e) => onMonthly(Number(e.target.value))} className="input" />
+        </Field>
+        <Field label="시장(유니버스)" hint="팩터로 랭킹할 유니버스 — 단일 종목 아님">
+          <select value={market} onChange={(e) => setMarket(e.target.value)} className="input">
             <option value="us">{"미국 S&P500"}</option>
             <option value="kr">국내 KOSPI200</option>
           </select>
-        </label>
-        <label className="text-sm">
-          시작
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-800" />
-        </label>
-        <label className="text-sm">
-          종료
-          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-800" />
-        </label>
-        <label className="text-sm">
-          원금
-          <input type="number" min={0} step={1000} value={principal} onChange={(e) => onPrincipal(Number(e.target.value))} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-28 dark:bg-gray-800" />
-        </label>
-        <label className="text-sm">
-          월적립금
-          <input type="number" min={0} step={100} value={monthlyContribution} onChange={(e) => onMonthly(Number(e.target.value))} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-28 dark:bg-gray-800" />
-        </label>
-        <label className="text-sm">
-          분위
-          <input type="number" min={0.05} max={0.5} step={0.05} value={quantile} onChange={(e) => setQuantile(Number(e.target.value))} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-20 dark:bg-gray-800" />
-        </label>
-        <button onClick={run} disabled={loading} className="py-2 px-4 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50">
-          {loading ? "실행 중…" : "백테스트 실행"}
-        </button>
-        {entry && (
-          <label className="flex items-center gap-1 text-sm cursor-pointer">
-            <input type="checkbox" checked={inCompare} onChange={() => onSetCompare(inCompare ? null : entry)} />
-            비교에 추가
-          </label>
-        )}
+        </Field>
+        <Field label="분위" hint="상·하위 분위 비율(0.2=상/하위 20%)">
+          <input type="number" min={0.05} max={0.5} step={0.05} value={quantile} onChange={(e) => setQuantile(Number(e.target.value))} className="input" />
+        </Field>
+        <Field label="시작일" hint="비우면 전체">
+          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="input" />
+        </Field>
+        <Field label="종료일" hint="비우면 오늘">
+          <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="input" />
+        </Field>
+        <div className="flex flex-col gap-1">
+          {/* 다른 Field 의 label 자리를 투명으로 채워 버튼을 input 라인에 정렬 */}
+          <span className="text-xs font-medium invisible select-none" aria-hidden="true">실행</span>
+          <button onClick={run} disabled={loading} className="w-full py-2 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50 transition">
+            {loading ? "실행 중…" : "백테스트 실행"}
+          </button>
+        </div>
       </div>
+
+      {entry && (
+        <label className="inline-flex items-center gap-1.5 text-sm mb-4 cursor-pointer select-none">
+          <input type="checkbox" checked={inCompare} onChange={() => onSetCompare(inCompare ? null : entry)} />
+          이 결과를 &quot;비교&quot; 탭에 추가
+        </label>
+      )}
 
       {err && <p className="text-red-600 text-sm mb-3">{err}</p>}
       {loading && <p className="text-gray-500 text-sm">유니버스 로드·연산 중 (수십 초 걸릴 수 있음)…</p>}
