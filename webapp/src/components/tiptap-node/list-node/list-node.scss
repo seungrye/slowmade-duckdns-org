@@ -46,6 +46,12 @@
     p {
       margin-top: 0;
     }
+
+    // 마커(disc/decimal 등) 색을 본문 텍스트색(다크=밝은색)으로 명시 —
+    // color-scheme 미상속 브라우저(모바일)에서 dark-on-dark 로 안 보이는 것 방지.
+    &::marker {
+      color: var(--tt-theme-text, currentColor);
+    }
   }
 
   // Ordered lists
