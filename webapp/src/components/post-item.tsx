@@ -20,7 +20,7 @@ interface PostItemProps {
 
 export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm hover:shadow-md inset-shadow-xs">
+    <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-700 shadow-sm hover:shadow-md inset-shadow-xs">
       <div className="flex items-center justify-between px-4 pt-4 pb-3">
         <Link href={`/post/view/${post._id}`} className='truncate ' aria-label={`게시물 제목: ${post.title}`}>
           <h3 className="text-lg font-semibold truncate">
@@ -79,7 +79,7 @@ export default function PostItem({ post, isOpen, togglePost }: PostItemProps) {
 
 export function PostItemSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm hover:shadow-md inset-shadow-xs">
+    <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden border border-gray-300 dark:border-gray-700 shadow-sm hover:shadow-md inset-shadow-xs">
       <div className="animate-pulse">
         <div className="flex bg-gray-100 dark:bg-gray-800 items-center justify-between px-4 pt-4 pb-3">
           &nbsp;
