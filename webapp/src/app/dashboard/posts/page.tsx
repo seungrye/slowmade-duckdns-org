@@ -47,7 +47,7 @@ export default async function MyUploadsPage({ searchParams }: Props) {
       <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mt-6">
         {posts.length > 0 ? (
           posts.map((post: GetPostType) => (
-            <div key={post._id} className="bg-white dark:bg-gray-900 rounded-lg shadow-md inset-shadow-xs p-4">
+            <div key={post._id} className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-700 shadow-md inset-shadow-xs p-4">
               <Suspense fallback={<Loading />}>
                 <Link href={`/post/view/${post._id}`} className="" aria-label={`유머 보기: ${post.title}`}>
                   <div className="h-[200px] overflow-hidden">

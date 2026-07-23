@@ -11,8 +11,6 @@ export default async function ProfilePage() {
       <MyProfile session={session} />
       {/* 달성한 업적 */}
       <MyAchievements session={session} />
-      {/* 내가 올린 유머 */}
-      {/* <MyHumorList/> */}
     </main>
   );
 }
