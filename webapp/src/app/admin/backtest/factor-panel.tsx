@@ -7,7 +7,7 @@ import type { BacktestMetrics } from "@/lib/backtest/metrics";
 
 // 크로스섹셔널 팩터 백테스트 개별 탭 패널. 서버 라우트가 유니버스를 로드·연산.
 // 선택 팩터(focus) + 벤치마크(동일가중·시장ETF)를 표·차트로. "비교에 추가" 체크 시 focus 팩터를
-// 상위(backtest-client)의 범용 비교 맵에 담는다.
+// 상위(backtest-client)의 범용 비교 맵에 담는다. 원금/월적립금은 다른 탭과 공유(부모 state).
 
 interface Metrics {
   final: number;
@@ -16,6 +16,7 @@ interface Metrics {
   mdd: number;
   calmar: number;
   sharpe: number;
+  totalContributed?: number; // 적립식일 때 원금 + Σ적립
 }
 interface Strat {
   key: string;
@@ -30,6 +31,8 @@ interface Resp {
   from: string;
   to: string;
   quantile: number;
+  principal: number;
+  contribution: number;
   note: string;
   strategies: Strat[];
 }
@@ -58,16 +61,24 @@ export default function FactorPanel({
   defaultTo,
   inCompare,
   onSetCompare,
+  principal,
+  monthlyContribution,
+  onPrincipal,
+  onMonthly,
 }: {
   focus: FactorKind;
   defaultFrom?: string;
   defaultTo?: string;
   inCompare: boolean;
   onSetCompare: (e: CompareEntry | null) => void;
+  principal: number;
+  monthlyContribution: number;
+  onPrincipal: (n: number) => void;
+  onMonthly: (n: number) => void;
 }) {
   const [market, setMarket] = useState("us");
-  const [from, setFrom] = useState(defaultFrom || "2015-01-01");
-  const [to, setTo] = useState(defaultTo || "2024-12-31");
+  const [from, setFrom] = useState(defaultFrom || ""); // 빈값 = 전체 이력(라우트가 처리)
+  const [to, setTo] = useState(defaultTo || ""); // 빈값 = 오늘
   const [quantile, setQuantile] = useState(0.2);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Resp | null>(null);
@@ -77,7 +88,15 @@ export default function FactorPanel({
     setLoading(true);
     setErr("");
     try {
-      const r = await fetch(`/api/admin/backtest/factor?market=${market}&from=${from}&to=${to}&quantile=${quantile}`);
+      const qs = new URLSearchParams({
+        market,
+        from,
+        to,
+        quantile: String(quantile),
+        principal: String(principal),
+        contribution: String(monthlyContribution),
+      });
+      const r = await fetch(`/api/admin/backtest/factor?${qs}`);
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || "요청 실패");
       setData(j);
@@ -91,28 +110,24 @@ export default function FactorPanel({
 
   // focus 팩터 + 벤치마크(동일가중·시장ETF)만 표시.
   const shown = data ? data.strategies.filter((s) => s.key === focus || s.key === "equal_weight" || s.key === "market") : [];
-
-  // focus 팩터의 비교 항목.
   const focusStrat = data?.strategies.find((s) => s.key === focus);
-  const entry: CompareEntry | null = focusStrat
-    ? {
-        label: `팩터: ${focusStrat.name}`,
-        sub: `${data!.universe} · ${data!.from}~${data!.to} · 분위${Math.round(data!.quantile * 100)}%`,
-        curve: focusStrat.equityCurve.map((p) => ({ date: p.date, v: p.equity })),
-        metrics: focusStrat.metrics as BacktestMetrics,
-      }
-    : null;
+
+  // focus 팩터의 비교 항목(곡선은 시작=1 재기준 — 브라우저 entryFromResult 와 동일).
+  const buildEntry = (d: Resp, fs: Strat): CompareEntry => {
+    const base = fs.equityCurve[0]?.equity || 1;
+    const extra = d.contribution > 0 ? ` · 월적립 ${d.contribution.toLocaleString()}` : "";
+    return {
+      label: `팩터: ${fs.name}`,
+      sub: `${d.universe} · ${d.from}~${d.to} · 분위${Math.round(d.quantile * 100)}%${extra}`,
+      curve: fs.equityCurve.map((p) => ({ date: p.date, v: base > 0 ? p.equity / base : 0 })),
+      metrics: fs.metrics as BacktestMetrics,
+    };
+  };
+  const entry: CompareEntry | null = focusStrat && data ? buildEntry(data, focusStrat) : null;
 
   // 재실행(데이터 갱신) 시 담겨 있으면 새 결과로 갱신.
   useEffect(() => {
-    if (inCompare && focusStrat && data) {
-      onSetCompare({
-        label: `팩터: ${focusStrat.name}`,
-        sub: `${data.universe} · ${data.from}~${data.to} · 분위${Math.round(data.quantile * 100)}%`,
-        curve: focusStrat.equityCurve.map((p) => ({ date: p.date, v: p.equity })),
-        metrics: focusStrat.metrics as BacktestMetrics,
-      });
-    }
+    if (inCompare && focusStrat && data) onSetCompare(buildEntry(data, focusStrat));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
@@ -137,6 +152,10 @@ export default function FactorPanel({
 
   return (
     <div>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+        팩터는 <b>유니버스 전체</b>를 팩터로 랭킹해 상위 분위를 담는 포트폴리오라 단일 종목이 아니라 <b>시장(유니버스) 선택</b>입니다.
+        시작/종료를 비우면 다른 탭처럼 <b>전체 이력~오늘</b>. 원금·월적립금은 다른 전략 탭과 공유됩니다.
+      </p>
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <label className="text-sm">
           시장
@@ -152,6 +171,14 @@ export default function FactorPanel({
         <label className="text-sm">
           종료
           <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-800" />
+        </label>
+        <label className="text-sm">
+          원금
+          <input type="number" min={0} step={1000} value={principal} onChange={(e) => onPrincipal(Number(e.target.value))} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-28 dark:bg-gray-800" />
+        </label>
+        <label className="text-sm">
+          월적립금
+          <input type="number" min={0} step={100} value={monthlyContribution} onChange={(e) => onMonthly(Number(e.target.value))} className="block border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-28 dark:bg-gray-800" />
         </label>
         <label className="text-sm">
           분위
@@ -175,6 +202,9 @@ export default function FactorPanel({
         <>
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
             {data.universe} · 로드종목 {data.universeSize} · 분위 {Math.round(data.quantile * 100)}% · {data.from}~{data.to}
+            {data.contribution > 0
+              ? ` · 원금 ${data.principal.toLocaleString()} + 월적립 ${data.contribution.toLocaleString()}`
+              : ` · 원금 ${data.principal.toLocaleString()}`}
           </div>
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm border-collapse">
@@ -205,6 +235,11 @@ export default function FactorPanel({
               </tbody>
             </table>
           </div>
+          {data.contribution > 0 && focusStrat?.metrics.totalContributed !== undefined && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              적립식(TWR 지표) · 총 투입 {Math.round(focusStrat.metrics.totalContributed).toLocaleString()} → 최종 {Math.round(focusStrat.metrics.final).toLocaleString()}
+            </p>
+          )}
           {chart && (
             <div style={{ height: 380 }}>
               <ReactECharts option={chart} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />

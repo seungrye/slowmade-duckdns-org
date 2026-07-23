@@ -129,14 +129,37 @@ function select(scores: Map<string, number>, pickLowest: boolean, q: number, min
   return arr.slice(0, k).map((e) => e[0]);
 }
 
-/** 포지션 가치 추적으로 일별 equity 곡선 산출(선택 종목 동일가중, 월 리밸런스, 사이 드리프트 허용). */
-function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt: (ti: number) => string[]): EquityPoint[] {
-  const n = dates.length;
-  const rebal = new Set(monthStarts(dates));
-  let equity = 1;
+/** 시뮬레이션 옵션 — 원금·월적립금·투자 창(인덱스). 기본은 시작=1·목돈·전체 범위(기존 호환). */
+export interface SimOpts {
+  principal: number; // 초기 원금(현금). 기본 1(= 시작=1 정규화).
+  contribution: number; // 매월 리밸런스일 적립액. 0=목돈.
+  startIdx: number; // 투자 시작 인덱스(이전은 곡선 미출력, 스코어 룩백엔 계속 사용).
+  endIdx: number; // 투자 종료 인덱스(포함).
+}
+
+/** dates.length 로 기본 옵션(시작=1·목돈·전체 범위). */
+function defaultOpts(n: number): SimOpts {
+  return { principal: 1, contribution: 0, startIdx: 0, endIdx: n - 1 };
+}
+
+/** 창 [startIdx,endIdx] 내 '월초' 리밸런스 인덱스 중 startIdx 이후(적립 유입 시점 = 첫 배치 제외). */
+function monthlyRebalances(dates: string[], startIdx: number, endIdx: number): number[] {
+  return monthStarts(dates).filter((i) => i > startIdx && i <= endIdx);
+}
+
+/**
+ * 포지션 가치 추적으로 일별 equity(금액) 곡선 산출. 선택 종목 동일가중, 월 리밸런스, 사이 드리프트 허용.
+ * startIdx 에서 원금을 즉시 배치(초기 리밸런스)하고, 이후 월초에 contribution 을 유입(적립식). 곡선은
+ * [startIdx,endIdx] 만. 스코어(selectAt)는 startIdx 이전 데이터를 룩백으로 계속 참조한다(호출측 ff 전체).
+ */
+function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt: (ti: number) => string[], opts: SimOpts): EquityPoint[] {
+  const { principal, contribution, startIdx, endIdx } = opts;
+  const contribAt = new Set(monthlyRebalances(dates, startIdx, endIdx)); // 적립 유입일
+  const rebalAt = new Set<number>([startIdx, ...contribAt]); // 초기 배치 + 월초
+  let equity = principal;
   let positions: { t: string; shares: number }[] = [];
   const curve: EquityPoint[] = [];
-  for (let ti = 0; ti < n; ti++) {
+  for (let ti = startIdx; ti <= endIdx; ti++) {
     if (positions.length) {
       let val = 0;
       for (const p of positions) {
@@ -145,7 +168,8 @@ function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt:
       }
       if (val > 0) equity = val;
     }
-    if (rebal.has(ti)) {
+    if (contribution > 0 && contribAt.has(ti)) equity += contribution; // 월 적립 유입(재배치 전)
+    if (rebalAt.has(ti)) {
       const sel = selectAt(ti);
       if (sel.length) {
         const per = equity / sel.length;
@@ -163,12 +187,13 @@ function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt:
 
 // --- 공개 API ---
 
-/** 팩터 전략 1종의 전체기간 equity 곡선(1 시작). */
-export function runFactor(matrix: FactorMatrix, kind: FactorKind, params: FactorParams = DEFAULT_FACTOR_PARAMS): EquityPoint[] {
+/** 팩터 전략 1종의 equity 곡선. opts 미지정 시 시작=1·목돈·전체 범위(기존 호환). */
+export function runFactor(matrix: FactorMatrix, kind: FactorKind, params: FactorParams = DEFAULT_FACTOR_PARAMS, opts?: Partial<SimOpts>): EquityPoint[] {
+  const o = { ...defaultOpts(matrix.dates.length), ...opts };
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
   const pickLowest = kind !== "momentum";
   const selectAt = (ti: number) => select(scoresAt(kind, ff, first, ti, params), pickLowest, params.quantile, params.minNames);
-  return simulate(matrix.dates, ff, selectAt);
+  return simulate(matrix.dates, ff, selectAt, o);
 }
 
 /** 리밸런스 시점 ti 에서 선택되는 종목명(테스트/디버그용). */
@@ -177,26 +202,21 @@ export function selectNames(matrix: FactorMatrix, kind: FactorKind, ti: number, 
   return select(scoresAt(kind, ff, first, ti, params), kind !== "momentum", params.quantile, params.minNames);
 }
 
-/** 벤치마크: 상장된 모든 종목 동일가중(월 리밸런스). */
-export function runEqualWeight(matrix: FactorMatrix): EquityPoint[] {
+/** 벤치마크: 상장된 모든 종목 동일가중(월 리밸런스). opts 미지정 시 시작=1·목돈·전체 범위. */
+export function runEqualWeight(matrix: FactorMatrix, opts?: Partial<SimOpts>): EquityPoint[] {
+  const o = { ...defaultOpts(matrix.dates.length), ...opts };
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
   const selectAt = (ti: number) => [...first.entries()].filter(([, f]) => f <= ti).map(([t]) => t);
-  return simulate(matrix.dates, ff, selectAt);
+  return simulate(matrix.dates, ff, selectAt, o);
 }
 
-/** 벤치마크: 단일 종목(시장 ETF) 매수후보유. */
-export function runBuyHold(matrix: FactorMatrix, ticker: string): EquityPoint[] {
+/** 벤치마크: 단일 종목(시장 ETF) 매수후보유(적립식이면 월 매수). opts 미지정 시 시작=1·목돈. */
+export function runBuyHold(matrix: FactorMatrix, ticker: string, opts?: Partial<SimOpts>): EquityPoint[] {
+  const o = { ...defaultOpts(matrix.dates.length), ...opts };
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
-  const arr = ff.get(ticker);
   const f = first.get(ticker) ?? Infinity;
-  const curve: EquityPoint[] = [];
-  let base: number | null = null;
-  for (let ti = 0; ti < matrix.dates.length; ti++) {
-    const px = arr ? arr[ti] : null;
-    if (base == null && px != null && f <= ti) base = px;
-    curve.push({ date: matrix.dates[ti], equity: base != null && px != null ? px / base : 1 });
-  }
-  return curve;
+  const selectAt = (ti: number) => (f <= ti ? [ticker] : []);
+  return simulate(matrix.dates, ff, selectAt, o);
 }
 
 /** [from,to] 로 잘라 시작=1 로 재기준(룩백 버퍼 제거·비교 정렬). */
@@ -215,25 +235,42 @@ export interface FactorComparisonRow {
 }
 
 /**
- * 3팩터 + 벤치마크(동일가중·시장ETF)를 같은 기간으로 실행·비교.
- * matrix 는 [from 이전 룩백 버퍼 ~ to] 를 담고, 결과 곡선은 [from,to] 로 잘라 1 시작 재기준한다.
+ * 3팩터 + 벤치마크(동일가중·시장ETF)를 같은 기간·같은 원금/적립으로 실행·비교.
+ * matrix 는 [from 이전 룩백 버퍼 ~ to] 를 담고, 곡선은 [from,to] 창만 출력(스코어는 버퍼를 룩백으로 참조).
+ * principal(기본 1)·contribution(기본 0, 월 적립) 을 주면 실제 금액·적립식 곡선 + TWR 지표를 낸다.
  */
 export function runFactorComparison(
   matrix: FactorMatrix,
-  opts: { from: string; to: string; marketTicker?: string; params?: FactorParams },
+  opts: { from: string; to: string; marketTicker?: string; params?: FactorParams; principal?: number; contribution?: number },
 ): FactorComparisonRow[] {
   const params = opts.params ?? DEFAULT_FACTOR_PARAMS;
+  const principal = opts.principal ?? 1;
+  const contribution = opts.contribution && opts.contribution > 0 ? opts.contribution : 0;
+  const dates = matrix.dates;
+
+  // 투자 창: from 이상 첫 인덱스 ~ to 이하 마지막 인덱스.
+  let startIdx = dates.findIndex((d) => d >= opts.from);
+  if (startIdx < 0) startIdx = 0;
+  let endIdx = dates.length - 1;
+  for (let i = dates.length - 1; i >= 0; i--) {
+    if (dates[i] <= opts.to) { endIdx = i; break; }
+  }
+  if (endIdx < startIdx) endIdx = startIdx;
+  const sim: SimOpts = { principal, contribution, startIdx, endIdx };
+
+  // 적립 유입 내역(모든 전략 공통 = 창 내 월초, 첫 배치 제외) → TWR 지표에 사용.
+  const contribList = contribution > 0 ? monthlyRebalances(dates, startIdx, endIdx).map((i) => ({ date: dates[i], amount: contribution })) : undefined;
+
   const rows: FactorComparisonRow[] = [];
-  const add = (key: string, name: string, full: EquityPoint[]) => {
-    const eq = trimAndRebase(full, opts.from, opts.to);
-    rows.push({ key, name, equityCurve: eq, metrics: computeMetrics(eq, 1) });
+  const add = (key: string, name: string, curve: EquityPoint[]) => {
+    rows.push({ key, name, equityCurve: curve, metrics: computeMetrics(curve, principal, contribList) });
   };
-  add("low_vol", "저변동성", runFactor(matrix, "low_vol", params));
-  add("momentum", "모멘텀(12-1)", runFactor(matrix, "momentum", params));
-  add("reversal", "단기 평균회귀", runFactor(matrix, "reversal", params));
-  add("equal_weight", "동일가중(벤치)", runEqualWeight(matrix));
+  add("low_vol", "저변동성", runFactor(matrix, "low_vol", params, sim));
+  add("momentum", "모멘텀(12-1)", runFactor(matrix, "momentum", params, sim));
+  add("reversal", "단기 평균회귀", runFactor(matrix, "reversal", params, sim));
+  add("equal_weight", "동일가중(벤치)", runEqualWeight(matrix, sim));
   if (opts.marketTicker && matrix.closes.has(opts.marketTicker)) {
-    add("market", `시장ETF(${opts.marketTicker})`, runBuyHold(matrix, opts.marketTicker));
+    add("market", `시장ETF(${opts.marketTicker})`, runBuyHold(matrix, opts.marketTicker, sim));
   }
   return rows;
 }

@@ -464,6 +464,10 @@ export default function BacktestClient() {
           defaultTo={to}
           inCompare={!!compare[strategy]}
           onSetCompare={(e) => setCompareEntry(strategy, e)}
+          principal={principal}
+          monthlyContribution={monthlyContribution}
+          onPrincipal={setPrincipal}
+          onMonthly={setMonthlyContribution}
         />
       ) : (
       <>

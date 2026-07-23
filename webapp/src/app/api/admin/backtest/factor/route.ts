@@ -22,10 +22,13 @@ function minusDays(dateStr: string, days: number): string {
 }
 
 /**
- * GET /api/admin/backtest/factor?market=us|kr&from=YYYY-MM-DD&to=YYYY-MM-DD&quantile=0.2
+ * GET /api/admin/backtest/factor?market=us|kr&from=YYYY-MM-DD&to=YYYY-MM-DD&quantile=0.2&principal=10000&contribution=0
  *
  * 크로스섹셔널 팩터 백테스트(서버측) — 저변동성·모멘텀·평균회귀 3종 + 벤치마크(동일가중·시장ETF)를
- * 같은 기간으로 실행·비교. 유니버스 종가는 Mongo(stockdailyprices)에서 서버가 직접 로드(브라우저 병목 회피).
+ * 같은 기간·같은 원금/적립으로 실행·비교. 유니버스 종가는 Mongo(stockdailyprices)에서 서버가 직접 로드.
+ *
+ * 날짜는 다른 전략 탭과 일관: **from 비우면 전체 이력, to 비우면 오늘**. 원금(principal)·월적립금
+ * (contribution)을 주면 실제 금액·적립식 곡선 + TWR 지표(computeMetrics)를 낸다.
  */
 export async function GET(req: NextRequest) {
   const guard = await requireOwner();
@@ -36,17 +39,22 @@ export async function GET(req: NextRequest) {
   const cfg = MARKET_MAP[market];
   if (!cfg) return NextResponse.json({ error: "market 은 us|kr" }, { status: 400 });
 
-  const from = (sp.get("from") ?? "2015-01-01").trim();
-  const to = (sp.get("to") ?? "2024-12-31").trim();
+  const fromRaw = (sp.get("from") ?? "").trim(); // 빈값 = 전체 이력
+  const to = (sp.get("to") ?? "").trim() || new Date().toISOString().slice(0, 10); // 빈값 = 오늘
   const quantile = Math.min(0.5, Math.max(0.05, Number(sp.get("quantile") ?? 0.2) || 0.2));
+  const principal = Math.max(0, Number(sp.get("principal") ?? 10000) || 0);
+  const contribution = Math.max(0, Number(sp.get("contribution") ?? 0) || 0);
+  const params = { ...DEFAULT_FACTOR_PARAMS, quantile };
 
   const syms = UNIVERSES[cfg.universe] ?? [];
   const loadSyms = Array.from(new Set([...syms, cfg.etf]));
-  const bufferFrom = minusDays(from, 500); // 252 거래일 룩백 여유(달력일 ~500)
+  // from 지정 시 룩백 버퍼(달력일 ~500)만큼 앞을 더 로드. from 비우면 전체 이력 로드(하한 없음).
+  const dateFilter: Record<string, string> = { $lte: to };
+  if (fromRaw) dateFilter.$gte = minusDays(fromRaw, 500);
 
   await connectToDB();
   const rows = await StockDailyPrice.find(
-    { ticker: { $in: loadSyms }, date: { $gte: bufferFrom, $lte: to } },
+    { ticker: { $in: loadSyms }, date: dateFilter },
     { ticker: 1, date: 1, close: 1, _id: 0 },
   ).lean<{ ticker: string; date: string; close: number }[]>();
 
@@ -70,11 +78,16 @@ export async function GET(req: NextRequest) {
   }
   const matrix: FactorMatrix = { dates, closes };
 
+  // from 비우면 유효 시작 = 팩터 룩백 워밍업 후 첫 투자일(momLong 거래일 뒤). 지정 시 그대로.
+  const from = fromRaw || (dates.length ? dates[Math.min(params.momLong, dates.length - 1)] : to);
+
   const strategies = runFactorComparison(matrix, {
     from,
     to,
     marketTicker: cfg.etf,
-    params: { ...DEFAULT_FACTOR_PARAMS, quantile },
+    params,
+    principal,
+    contribution,
   });
 
   return NextResponse.json({
@@ -84,6 +97,8 @@ export async function GET(req: NextRequest) {
     from,
     to,
     quantile,
+    principal,
+    contribution,
     note: SURVIVORSHIP_NOTE,
     strategies,
   });
