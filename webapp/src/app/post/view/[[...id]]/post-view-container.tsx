@@ -19,6 +19,7 @@ interface PostData {
   jsonContent: unknown;
   likes: number;
   tags: string[];
+  aiTags?: string[]; // tags 중 AI(Gemini)가 붙인 것 — 표시색 구분용(사용자=파랑, AI=회색)
   userEmail: string;
   author: string;
   createdAt: string;
@@ -102,11 +103,17 @@ export default function PostViewContainer({ post }: { post: PostData }) {
         {post.tags && post.tags.length > 0 && (
           <div className="p-3 text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700">
             <div className="flex flex-wrap items-center gap-3">
-              {post.tags.map((tag: string) => (
-                <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag}>
-                  <Badge className="text-sm px-3 py-1 cursor-pointer"># {tag}</Badge>
-                </Link>
-              ))}
+              {post.tags.map((tag: string) => {
+                // AI(Gemini)가 붙인 태그는 회색 ✨, 사용자 태그는 파랑 #.
+                const isAi = (post.aiTags ?? []).some((a) => a.toLowerCase() === tag.toLowerCase());
+                return (
+                  <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag}>
+                    <Badge variant={isAi ? 'default' : 'primary'} className="text-sm px-3 py-1 cursor-pointer">
+                      {isAi ? '✨' : '#'} {tag}
+                    </Badge>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

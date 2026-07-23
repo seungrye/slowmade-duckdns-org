@@ -8,6 +8,7 @@ import User from "@/models/user";
 import { AchievementType } from "@/models/achievement";
 import { HttpStatusCode } from "axios";
 import PostRevision from "@/models/post-revision";
+import { generateAndUpdateTags } from "@/lib/tags/suggest-tags";
 import { env } from "@/lib/env";
 import { requireAuth } from "@/lib/require-auth";
 import { revalidatePath } from "next/cache";
@@ -92,17 +93,25 @@ export async function POST(req: Request) {
       // Mass Assignment 방지 — 허용 필드만. author/userEmail 은 서버가 강제(클라 위조 차단),
       // likes/views/version/isDeleted 는 스키마 기본값 사용(클라가 못 정함).
       const authorUser = await User.findOne({ email: auth.email }).lean<{ username?: string } | null>();
-      await Post.create({
+      const userTags = Array.isArray(payload.tags) ? payload.tags : [];
+      const created = await Post.create({
         title: payload.title,
         htmlContent: payload.htmlContent,
         jsonContent: payload.jsonContent,
         urls: Array.isArray(payload.urls) ? payload.urls : [],
-        tags: Array.isArray(payload.tags) ? payload.tags : [],
+        tags: userTags,
         isPrivate: !!payload.isPrivate,
         attachments: sanitizeAttachments(payload.attachments),
         userEmail: auth.email,
         author: authorUser?.username ?? auth.email,
       });
+
+      // 신규 글: 본문 기반 AI 태그를 백그라운드로 추천·추가(리비전 없이). 응답을 막지 않는다(fire-and-forget).
+      void generateAndUpdateTags(created._id.toString(), {
+        title: payload.title,
+        htmlContent: payload.htmlContent,
+        userTags,
+      }).catch((e) => console.warn('[submit] AI 태그 트리거 실패:', e));
 
       // Grant points for new post
       await User.findOneAndUpdate({ email: auth.email }, { $inc: { points: POINTS_FOR_NEW_POST } });

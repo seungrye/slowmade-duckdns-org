@@ -38,6 +38,12 @@ const PostSchema = new Schema(
         default: [],
         index: true // 나중에 태그로 검색할 때 성능 향상을 위해 인덱스를 추가합니다.
     },
+    // AI(Gemini)가 본문 기반으로 자동 추가한 태그(사용자 태그와 구분·표시색 결정용).
+    // aiTags 는 tags 의 부분집합 — tags 에 병합돼 검색·집계는 정상 동작하고, 출처만 여기서 표시.
+    aiTags: {
+        type: [String],
+        default: [],
+    },
     isDeleted: {
       type: Boolean,
       default: false,

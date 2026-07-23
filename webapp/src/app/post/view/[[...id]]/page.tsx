@@ -97,6 +97,7 @@ export default async function PostViewer(props: { params: Params }) {
                     jsonContent: post.jsonContent,
                     likes: post.likes,
                     tags: post.tags ?? [],
+                    aiTags: post.aiTags ?? [],
                     userEmail: post.userEmail,
                     author: post.author,
                     createdAt: (post.createdAt as Date).toISOString(),

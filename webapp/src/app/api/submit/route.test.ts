@@ -8,6 +8,8 @@ vi.mock('@/models/post', () => ({ default: { create: vi.fn(), findById: vi.fn() 
 vi.mock('@/models/user', () => ({ default: { findOneAndUpdate: vi.fn(), findOne: vi.fn() } }));
 vi.mock('@/models/post-revision', () => ({ default: { create: vi.fn() } }));
 vi.mock('@/lib/achievements', () => ({ checkAndGrantPostCountAchievements: vi.fn().mockResolvedValue([]) }));
+// 신규 글 후 백그라운드 AI 태그 호출(fire-and-forget) — 라우트 단위 테스트에선 목킹.
+vi.mock('@/lib/tags/suggest-tags', () => ({ generateAndUpdateTags: vi.fn().mockResolvedValue(undefined) }));
 
 import { POST } from './route';
 import { auth } from '@/auth';
@@ -59,7 +61,7 @@ describe('POST /api/submit', () => {
   it('새 게시글 작성 시 201을 반환한다', async () => {
     mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
     stubAuthorUser();
-    (Post.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
+    (Post.create as ReturnType<typeof vi.fn>).mockResolvedValue({ _id: 'newid' });
     const res = await POST(makeRequest({ userEmail: 'a@test.com', title: 'T', htmlContent: '<p>x</p>', jsonContent: '{}' }));
     expect(res.status).toBe(201);
     const body = await res.json();
@@ -70,7 +72,7 @@ describe('POST /api/submit', () => {
   it('새 글 작성 시 author/userEmail 은 서버가 강제하고 likes/views/isDeleted 는 무시한다 (Mass Assignment 방지)', async () => {
     mockAuth.mockResolvedValue({ user: { email: 'a@test.com' } });
     stubAuthorUser('진짜닉');
-    asMock(Post.create).mockResolvedValue({});
+    asMock(Post.create).mockResolvedValue({ _id: 'newid' });
     await POST(makeRequest({
       userEmail: 'a@test.com', title: 'T', htmlContent: '<p>x</p>', jsonContent: '{}',
       author: '관리자', likes: 999, views: 999, isDeleted: true, version: 42,

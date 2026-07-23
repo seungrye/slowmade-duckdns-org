@@ -9,7 +9,7 @@ import PostViewContainer from './post-view-container';
  * **작성자 본인에게만** 렌더한다. 못 받으면(타인·비로그인·없는 글) '찾을 수 없음'.
  */
 type Loaded = {
-  _id: string; title: string; jsonContent: unknown; likes?: number; tags?: string[];
+  _id: string; title: string; jsonContent: unknown; likes?: number; tags?: string[]; aiTags?: string[];
   userEmail: string; author: string; createdAt: string; isPrivate?: boolean;
   attachments?: { id: string; name: string; size: number; mimeType: string }[];
 };
@@ -53,6 +53,7 @@ export default function PrivatePostGate({ id }: { id: string }) {
         jsonContent: post.jsonContent,
         likes: post.likes ?? 0,
         tags: post.tags ?? [],
+        aiTags: post.aiTags ?? [],
         userEmail: post.userEmail,
         author: post.author,
         createdAt: new Date(post.createdAt).toISOString(),
