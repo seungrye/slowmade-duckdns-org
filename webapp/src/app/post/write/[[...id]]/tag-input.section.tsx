@@ -74,8 +74,32 @@ export default function TagInput({ tags, onTagsChange, placeholder }: TagInputPr
     setActiveIndex(-1);
   };
 
+  // 콤마는 태그 구분자 — 입력값에 ','가 들어오면(직접 입력이든 IME 확정이든) 콤마 앞 완성 조각들을
+  // 태그로 추가하고 마지막 조각만 입력값으로 남긴다. keydown 타이밍에 의존하지 않아 한글 IME 에서
+  // 끝 글자가 남는 문제가 없다. 콤마 다중("a,b,c") 붙여넣기도 자연히 처리된다.
+  const handleInputChange = (raw: string) => {
+    if (!raw.includes(',')) {
+      setInputValue(raw);
+      return;
+    }
+    const parts = raw.split(',');
+    const rest = parts.pop() ?? '';
+    const additions = parts.map(normalizeTag).filter(Boolean);
+    if (additions.length > 0) {
+      const merged = [...tags];
+      for (const t of additions) {
+        if (!merged.some((x) => x.toLowerCase() === t.toLowerCase())) merged.push(t);
+      }
+      onTagsChange(merged);
+    }
+    setInputValue(rest);
+  };
+
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
+    if (e.key === 'Enter') {
+      // 한글 IME 조합 중 Enter 는 조합 확정용 — 태그 추가로 처리하지 않는다(끝 글자 중복/누락 방지).
+      // 콤마(',')는 keydown 이 아니라 onChange(handleInputChange)에서 분리 처리한다.
+      if (e.nativeEvent.isComposing) return;
       e.preventDefault();
       if (activeIndex >= 0 && suggestions[activeIndex]) {
         addTag(suggestions[activeIndex]);
@@ -124,7 +148,7 @@ export default function TagInput({ tags, onTagsChange, placeholder }: TagInputPr
         <input
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder || '태그를 입력하세요...'}
           className="flex-grow p-1 bg-transparent focus:outline-none min-w-[120px] text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
