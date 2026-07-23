@@ -119,9 +119,8 @@ export default function FactorPanel({
   const chart: EChartsOption | null = shown.length
     ? {
         tooltip: { trigger: "axis" },
-        // 범례 상단 고정(하단 x축과 분리 — 모바일 겹침 방지), 좁은 화면은 스크롤.
-        legend: { data: shown.map((s) => s.name), textStyle: { color: "#888", fontSize: 11 }, type: "scroll", top: 0, left: "center" },
-        grid: { left: 8, right: 14, top: 46, bottom: 8, containLabel: true },
+        // 범례는 위 표(전략명=선 색상)가 대신하므로 차트엔 두지 않는다(중복·겹침 제거).
+        grid: { left: 8, right: 14, top: 12, bottom: 8, containLabel: true },
         xAxis: { type: "category", data: shown[0].equityCurve.map((p) => p.date), boundaryGap: false, axisLabel: { color: "#888", hideOverlap: true } },
         yAxis: { type: "value", scale: true, axisLabel: { color: "#888" } },
         series: shown.map((s) => ({
