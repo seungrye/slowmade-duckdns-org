@@ -799,10 +799,12 @@ function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, 
   const dates = [...dateSet].sort();
   const option: EChartsOption = {
     tooltip: { trigger: "axis" },
-    legend: { data: entries.map(([, e]) => e.label), textStyle: { color: "#888" }, type: "scroll" },
-    grid: { left: 55, right: 20, top: 40, bottom: 40 },
-    xAxis: { type: "category", data: dates, axisLabel: { color: "#888" } },
-    yAxis: { type: "value", name: "성장(1=시작)", scale: true, axisLabel: { color: "#888" } },
+    // 범례를 상단 고정(하단 x축과 분리 — 모바일 겹침 방지), 좁은 화면은 스크롤.
+    legend: { data: entries.map(([, e]) => e.label), textStyle: { color: "#888", fontSize: 11 }, type: "scroll", top: 0, left: "center" },
+    // containLabel: 축 라벨 공간을 자동 확보해 라벨이 다른 요소와 겹치지 않게.
+    grid: { left: 8, right: 14, top: 46, bottom: 8, containLabel: true },
+    xAxis: { type: "category", data: dates, boundaryGap: false, axisLabel: { color: "#888", hideOverlap: true } },
+    yAxis: { type: "value", scale: true, axisLabel: { color: "#888" } },
     series: entries.map(([, e], i) => {
       const m = new Map(e.curve.map((p) => [p.date, p.v]));
       return {

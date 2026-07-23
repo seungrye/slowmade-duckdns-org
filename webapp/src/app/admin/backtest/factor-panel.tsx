@@ -119,10 +119,11 @@ export default function FactorPanel({
   const chart: EChartsOption | null = shown.length
     ? {
         tooltip: { trigger: "axis" },
-        legend: { data: shown.map((s) => s.name), textStyle: { color: "#888" } },
-        grid: { left: 55, right: 20, top: 34, bottom: 40 },
-        xAxis: { type: "category", data: shown[0].equityCurve.map((p) => p.date), axisLabel: { color: "#888" } },
-        yAxis: { type: "value", name: "성장(1=시작)", scale: true, axisLabel: { color: "#888" } },
+        // 범례 상단 고정(하단 x축과 분리 — 모바일 겹침 방지), 좁은 화면은 스크롤.
+        legend: { data: shown.map((s) => s.name), textStyle: { color: "#888", fontSize: 11 }, type: "scroll", top: 0, left: "center" },
+        grid: { left: 8, right: 14, top: 46, bottom: 8, containLabel: true },
+        xAxis: { type: "category", data: shown[0].equityCurve.map((p) => p.date), boundaryGap: false, axisLabel: { color: "#888", hideOverlap: true } },
+        yAxis: { type: "value", scale: true, axisLabel: { color: "#888" } },
         series: shown.map((s) => ({
           name: s.name,
           type: "line",
