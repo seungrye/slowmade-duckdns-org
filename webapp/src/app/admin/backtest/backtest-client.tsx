@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import FactorPanel, { type FactorKind } from "./factor-panel";
+import { useState, useEffect } from "react";
+import FactorPanel, { type FactorKind, type CompareEntry } from "./factor-panel";
 import ReactECharts from "echarts-for-react";
 import { useDragScrollX } from "@/hooks/use-drag-scroll";
 import type { EChartsOption } from "echarts";
@@ -24,7 +24,7 @@ type Strategy =
   | "infinite_v1" | "infinite_v2_1" | "infinite_v2_2" | "infinite_v3_0" | "infinite_v4_0"
   | "trend_v1" | "trend_v2" | "trend_v3" | "trend_v4" | "regime_v1" | "lrs_v1" | "rotation_v1" | "rotation_v2"
   | "dual_momentum_v1" | "vol_target_v1" | "value_rebalancing"
-  | "factor_compare" | "factor_momentum" | "factor_low_vol" | "factor_reversal";
+  | "compare" | "factor_momentum" | "factor_low_vol" | "factor_reversal";
 
 const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = {
   infinite_v2_1: "v2_1", infinite_v2_2: "v2_2", infinite_v3_0: "v3_0",
@@ -35,7 +35,7 @@ type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: S
 // 검증상 최고 — Calmar↑·MDD↓·수수료/시그널/파라미터에 강건), 방어형 모멘텀(LRS·레짐·트레일링
 // 추세) 중위, 무한매수(주기적 물타기 — v4 가 가장 완성형) 하위.
 const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
-  ["factor_compare", "팩터 비교"],
+  ["compare", "비교"],
   ["factor_momentum", "팩터: 모멘텀(12-1)"],
   ["factor_low_vol", "팩터: 저변동성"],
   ["factor_reversal", "팩터: 단기 평균회귀"],
@@ -65,8 +65,8 @@ const FACTOR_FOCUS: Partial<Record<Strategy, FactorKind>> = {
 };
 
 const STRATEGY_DESC: Record<Strategy, string> = {
-  factor_compare:
-    "크로스섹셔널 팩터 3종 + 벤치마크(동일가중·시장ETF)를 같은 기간으로 비교. 유니버스를 서버가 Mongo 에서 로드·연산. 체크박스로 표시 전략 선택. ⚠ 유니버스가 현재 구성종목이라 생존편향(낙관 편향).",
+  compare:
+    "각 전략 탭에서 '비교에 추가' 로 담은 전략들을 자산곡선·지표로 함께 비교(2개 이상 담아야 활성). 각 전략은 자기 탭 옵션대로 실행된 결과를 재기준(시작=1)해 오버레이. 기간·티커가 다르면 아래 표에 표기.",
   factor_momentum:
     "크로스섹셔널 모멘텀(12-1): 최근 12개월 수익률(최근 1개월 제외) 상위 분위를 동일가중, 월 리밸런스. 유니버스 대상.",
   factor_low_vol:
@@ -105,6 +105,7 @@ const STRATEGY_DESC: Record<Strategy, string> = {
 
 export default function BacktestClient() {
   const [strategy, setStrategy] = useState<Strategy>("rotation_v2"); // 기본=추천 1순위
+  const [compare, setCompare] = useState<Partial<Record<Strategy, CompareEntry>>>({}); // 범용 비교에 담긴 전략들
   const tabScroll = useDragScrollX<HTMLDivElement>();
   // 공통
   const [ticker, setTicker] = useState("");
@@ -389,7 +390,35 @@ export default function BacktestClient() {
     }
   };
 
+  const strategyLabel = (s: Strategy): string => STRATEGY_TABS.find(([k]) => k === s)?.[1] ?? s;
+  const setCompareEntry = (s: Strategy, e: CompareEntry | null) =>
+    setCompare((prev) => {
+      const n = { ...prev };
+      if (e) n[s] = e;
+      else delete n[s];
+      return n;
+    });
+  // 브라우저 전략 결과 → 비교 항목(재기준 시작=1). 지표는 computeMetrics 재사용.
+  const entryFromResult = (fr: FullResult): CompareEntry => {
+    const base = fr.equityCurve[0]?.equity || 1;
+    const isPortfolio =
+      fr.strategy.startsWith("rotation") || fr.strategy === "dual_momentum_v1" || fr.strategy === "vol_target_v1";
+    const under = isPortfolio ? "" : ticker || "";
+    return {
+      label: strategyLabel(fr.strategy),
+      sub: `${under ? under + " · " : ""}${from || "?"}~${to || "?"}`,
+      curve: fr.equityCurve.map((p) => ({ date: p.date, v: base > 0 ? p.equity / base : 0 })),
+      metrics: computeMetrics(fr.equityCurve, fr.principal, fr.contributions),
+    };
+  };
+  // 담긴 전략을 재실행하면 새 결과로 비교 항목 갱신.
+  useEffect(() => {
+    if (result && compare[result.strategy]) setCompareEntry(result.strategy, entryFromResult(result));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result]);
+
   const isFactor = strategy.startsWith("factor_");
+  const compareCount = Object.keys(compare).length;
 
   return (
     <main className="mx-auto px-4 py-8 max-w-5xl">
@@ -400,19 +429,25 @@ export default function BacktestClient() {
 
       {/* 전략 탭 */}
       <div {...tabScroll} className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
-        {STRATEGY_TABS.map(([s, label]) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => { setStrategy(s); setResult(null); setError(null); }}
-            className={
-              "px-4 py-2 text-sm border-b-2 -mb-px transition whitespace-nowrap shrink-0 " +
-              (strategy === s ? "border-blue-600 text-blue-600 font-medium" : "border-transparent text-gray-500 hover:text-gray-700")
-            }
-          >
-            {label}
-          </button>
-        ))}
+        {STRATEGY_TABS.map(([s, label]) => {
+          const disabled = s === "compare" && compareCount < 2; // 담긴 전략 2개 미만이면 비교 탭 비활성
+          return (
+            <button
+              key={s}
+              type="button"
+              disabled={disabled}
+              onClick={() => { if (disabled) return; setStrategy(s); setResult(null); setError(null); }}
+              className={
+                "px-4 py-2 text-sm border-b-2 -mb-px transition whitespace-nowrap shrink-0 " +
+                (disabled ? "border-transparent text-gray-300 dark:text-gray-600 cursor-not-allowed " : "") +
+                (strategy === s ? "border-blue-600 text-blue-600 font-medium" : "border-transparent text-gray-500 hover:text-gray-700")
+              }
+            >
+              {label}
+              {s === "compare" && compareCount > 0 ? ` (${compareCount})` : ""}
+            </button>
+          );
+        })}
       </div>
 
       <p className="text-xs text-gray-400 mb-4">
@@ -420,8 +455,16 @@ export default function BacktestClient() {
         {" 수수료·슬리피지 미반영."}
       </p>
 
-      {isFactor ? (
-        <FactorPanel focus={FACTOR_FOCUS[strategy]} defaultFrom={from} defaultTo={to} />
+      {strategy === "compare" ? (
+        <CompareView compare={compare} onRemove={(s) => setCompareEntry(s, null)} />
+      ) : isFactor ? (
+        <FactorPanel
+          focus={FACTOR_FOCUS[strategy]!}
+          defaultFrom={from}
+          defaultTo={to}
+          inCompare={!!compare[strategy]}
+          onSetCompare={(e) => setCompareEntry(strategy, e)}
+        />
       ) : (
       <>
       {/* 옵션 폼 */}
@@ -649,6 +692,17 @@ export default function BacktestClient() {
         )}
       </div>
 
+      {result && (
+        <label className="inline-flex items-center gap-1.5 text-sm mb-4 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={!!compare[strategy]}
+            onChange={() => setCompareEntry(strategy, compare[strategy] ? null : entryFromResult(result))}
+          />
+          이 결과를 &quot;비교&quot; 탭에 추가
+        </label>
+      )}
+
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
       {scan && strategy.startsWith("rotation") && <RobustnessHeatmap scan={scan} curMom={rotMom} curReb={rotReb} />}
       {result && <Result result={result} />}
@@ -725,6 +779,86 @@ function RobustnessHeatmap({ scan, curMom, curReb }: { scan: [number, number, nu
 
 function fmt(v: number): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+// "비교" 탭 — 담긴 전략들의 재기준 자산곡선 오버레이 + 지표표. 2개 미만이면 안내.
+function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, CompareEntry>>; onRemove: (s: Strategy) => void }) {
+  const entries = (Object.entries(compare) as [Strategy, CompareEntry | undefined][]).filter(
+    (e): e is [Strategy, CompareEntry] => !!e[1],
+  );
+  if (entries.length < 2) {
+    return (
+      <p className="text-gray-500 text-sm">
+        각 전략 탭에서 백테스트를 실행한 뒤 &quot;비교에 추가&quot; 로 2개 이상 담으면 여기서 함께 비교합니다. (현재 {entries.length}개)
+      </p>
+    );
+  }
+  const palette = ["#2563eb", "#db2777", "#16a34a", "#f59e0b", "#7c3aed", "#0891b2", "#dc2626", "#65a30d"];
+  const dateSet = new Set<string>();
+  for (const [, e] of entries) for (const p of e.curve) dateSet.add(p.date);
+  const dates = [...dateSet].sort();
+  const option: EChartsOption = {
+    tooltip: { trigger: "axis" },
+    legend: { data: entries.map(([, e]) => e.label), textStyle: { color: "#888" }, type: "scroll" },
+    grid: { left: 55, right: 20, top: 40, bottom: 40 },
+    xAxis: { type: "category", data: dates, axisLabel: { color: "#888" } },
+    yAxis: { type: "value", name: "성장(1=시작)", scale: true, axisLabel: { color: "#888" } },
+    series: entries.map(([, e], i) => {
+      const m = new Map(e.curve.map((p) => [p.date, p.v]));
+      return {
+        name: e.label,
+        type: "line",
+        showSymbol: false,
+        sampling: "lttb",
+        connectNulls: false,
+        lineStyle: { width: 1.6, color: palette[i % palette.length] },
+        itemStyle: { color: palette[i % palette.length] },
+        data: dates.map((d) => (m.has(d) ? Number(m.get(d)!.toFixed(4)) : null)),
+      };
+    }),
+  };
+  return (
+    <div>
+      <div className="overflow-x-auto mb-4">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
+              <th className="py-2 pr-3">전략</th>
+              <th className="py-2 pr-3">기간/종목</th>
+              <th className="py-2 pr-3 text-right">총수익%</th>
+              <th className="py-2 pr-3 text-right">CAGR%</th>
+              <th className="py-2 pr-3 text-right">MDD%</th>
+              <th className="py-2 pr-3 text-right">Sharpe</th>
+              <th className="py-2 pr-3 text-right">Calmar</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(([s, e], i) => (
+              <tr key={s} className="border-b border-gray-100 dark:border-gray-800">
+                <td className="py-2 pr-3 font-medium" style={{ color: palette[i % palette.length] }}>{e.label}</td>
+                <td className="py-2 pr-3 text-gray-500 text-xs">{e.sub}</td>
+                <td className="py-2 pr-3 text-right">{e.metrics.totalReturnPct.toFixed(1)}</td>
+                <td className="py-2 pr-3 text-right">{e.metrics.cagr.toFixed(1)}</td>
+                <td className="py-2 pr-3 text-right">{e.metrics.mdd.toFixed(1)}</td>
+                <td className="py-2 pr-3 text-right">{e.metrics.sharpe.toFixed(2)}</td>
+                <td className="py-2 pr-3 text-right">{e.metrics.calmar.toFixed(2)}</td>
+                <td className="py-2 text-right">
+                  <button onClick={() => onRemove(s)} className="text-gray-400 hover:text-red-500" aria-label="비교에서 제거">✕</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ height: 420 }}>
+        <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
+      </div>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
+        각 전략의 결과를 시작=1 로 재기준해 겹쳐 그림. 기간·종목이 다르면 위 표의 &quot;기간/종목&quot; 참고. 수수료·슬리피지 미반영.
+      </p>
+    </div>
+  );
 }
 
 function Result({ result }: { result: FullResult }) {

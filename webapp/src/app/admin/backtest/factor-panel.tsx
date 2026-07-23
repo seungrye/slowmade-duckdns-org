@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
+import type { BacktestMetrics } from "@/lib/backtest/metrics";
 
-// 크로스섹셔널 팩터 백테스트 패널(백테스트 탭 안에서 렌더). 서버 라우트가 유니버스를 로드·연산.
-// focus 지정(개별 팩터 탭): 해당 팩터 + 벤치마크만. focus 없음(비교 탭): 전 전략 + 체크박스 선택.
-// 팩터는 월 리밸런스 포트폴리오라 개별 매매시점 마커는 의미가 약해 자산곡선(수익률)으로 비교한다.
+// 크로스섹셔널 팩터 백테스트 개별 탭 패널. 서버 라우트가 유니버스를 로드·연산.
+// 선택 팩터(focus) + 벤치마크(동일가중·시장ETF)를 표·차트로. "비교에 추가" 체크 시 focus 팩터를
+// 상위(backtest-client)의 범용 비교 맵에 담는다.
 
 interface Metrics {
   final: number;
@@ -35,6 +36,14 @@ interface Resp {
 
 export type FactorKind = "low_vol" | "momentum" | "reversal";
 
+// 범용 비교 항목(브라우저/팩터 공통). curve.v 는 시작=1 재기준값.
+export interface CompareEntry {
+  label: string;
+  sub: string;
+  curve: { date: string; v: number }[];
+  metrics: BacktestMetrics;
+}
+
 const COLORS: Record<string, string> = {
   momentum: "#2563eb",
   reversal: "#db2777",
@@ -43,7 +52,19 @@ const COLORS: Record<string, string> = {
   market: "#f59e0b",
 };
 
-export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?: FactorKind; defaultFrom?: string; defaultTo?: string }) {
+export default function FactorPanel({
+  focus,
+  defaultFrom,
+  defaultTo,
+  inCompare,
+  onSetCompare,
+}: {
+  focus: FactorKind;
+  defaultFrom?: string;
+  defaultTo?: string;
+  inCompare: boolean;
+  onSetCompare: (e: CompareEntry | null) => void;
+}) {
   const [market, setMarket] = useState("us");
   const [from, setFrom] = useState(defaultFrom || "2015-01-01");
   const [to, setTo] = useState(defaultTo || "2024-12-31");
@@ -51,7 +72,6 @@ export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?:
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Resp | null>(null);
   const [err, setErr] = useState("");
-  const [hidden, setHidden] = useState<Set<string>>(new Set()); // 비교 모드: 숨긴 시리즈
 
   const run = async () => {
     setLoading(true);
@@ -69,11 +89,32 @@ export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?:
     }
   };
 
-  const all = data ? data.strategies : [];
-  // 개별(focus): 해당 팩터 + 벤치마크. 비교: 전 전략 중 체크된 것.
-  const shown = focus
-    ? all.filter((s) => s.key === focus || s.key === "equal_weight" || s.key === "market")
-    : all.filter((s) => !hidden.has(s.key));
+  // focus 팩터 + 벤치마크(동일가중·시장ETF)만 표시.
+  const shown = data ? data.strategies.filter((s) => s.key === focus || s.key === "equal_weight" || s.key === "market") : [];
+
+  // focus 팩터의 비교 항목.
+  const focusStrat = data?.strategies.find((s) => s.key === focus);
+  const entry: CompareEntry | null = focusStrat
+    ? {
+        label: `팩터: ${focusStrat.name}`,
+        sub: `${data!.universe} · ${data!.from}~${data!.to} · 분위${Math.round(data!.quantile * 100)}%`,
+        curve: focusStrat.equityCurve.map((p) => ({ date: p.date, v: p.equity })),
+        metrics: focusStrat.metrics as BacktestMetrics,
+      }
+    : null;
+
+  // 재실행(데이터 갱신) 시 담겨 있으면 새 결과로 갱신.
+  useEffect(() => {
+    if (inCompare && focusStrat && data) {
+      onSetCompare({
+        label: `팩터: ${focusStrat.name}`,
+        sub: `${data.universe} · ${data.from}~${data.to} · 분위${Math.round(data.quantile * 100)}%`,
+        curve: focusStrat.equityCurve.map((p) => ({ date: p.date, v: p.equity })),
+        metrics: focusStrat.metrics as BacktestMetrics,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   const chart: EChartsOption | null = shown.length
     ? {
@@ -87,20 +128,12 @@ export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?:
           type: "line",
           showSymbol: false,
           sampling: "lttb",
-          lineStyle: { width: focus && s.key === focus ? 2.5 : 1.4, color: COLORS[s.key] },
+          lineStyle: { width: s.key === focus ? 2.5 : 1.4, color: COLORS[s.key] },
           itemStyle: { color: COLORS[s.key] },
           data: s.equityCurve.map((p) => Number(p.equity.toFixed(4))),
         })),
       }
     : null;
-
-  const toggle = (k: string) =>
-    setHidden((prev) => {
-      const n = new Set(prev);
-      if (n.has(k)) n.delete(k);
-      else n.add(k);
-      return n;
-    });
 
   return (
     <div>
@@ -127,6 +160,12 @@ export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?:
         <button onClick={run} disabled={loading} className="py-2 px-4 rounded bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50">
           {loading ? "실행 중…" : "백테스트 실행"}
         </button>
+        {entry && (
+          <label className="flex items-center gap-1 text-sm cursor-pointer">
+            <input type="checkbox" checked={inCompare} onChange={() => onSetCompare(inCompare ? null : entry)} />
+            비교에 추가
+          </label>
+        )}
       </div>
 
       {err && <p className="text-red-600 text-sm mb-3">{err}</p>}
@@ -137,19 +176,6 @@ export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?:
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
             {data.universe} · 로드종목 {data.universeSize} · 분위 {Math.round(data.quantile * 100)}% · {data.from}~{data.to}
           </div>
-
-          {!focus && (
-            // 비교 모드: 표시할 전략 선택 체크박스
-            <div className="flex flex-wrap gap-3 mb-3 text-sm">
-              {all.map((s) => (
-                <label key={s.key} className="flex items-center gap-1 cursor-pointer" style={{ color: COLORS[s.key] }}>
-                  <input type="checkbox" checked={!hidden.has(s.key)} onChange={() => toggle(s.key)} />
-                  {s.name}
-                </label>
-              ))}
-            </div>
-          )}
-
           <div className="overflow-x-auto mb-4">
             <table className="w-full text-sm border-collapse">
               <thead>
@@ -164,10 +190,10 @@ export default function FactorPanel({ focus, defaultFrom, defaultTo }: { focus?:
               </thead>
               <tbody>
                 {shown.map((s) => (
-                  <tr key={s.key} className={"border-b border-gray-100 dark:border-gray-800 " + (focus && s.key === focus ? "font-semibold" : "")}>
+                  <tr key={s.key} className={"border-b border-gray-100 dark:border-gray-800 " + (s.key === focus ? "font-semibold" : "")}>
                     <td className="py-2 pr-4" style={{ color: COLORS[s.key] }}>
                       {s.name}
-                      {focus && s.key === focus ? " ★" : ""}
+                      {s.key === focus ? " ★" : ""}
                     </td>
                     <td className="py-2 pr-4 text-right">{s.metrics.totalReturnPct.toFixed(1)}</td>
                     <td className="py-2 pr-4 text-right">{s.metrics.cagr.toFixed(1)}</td>
