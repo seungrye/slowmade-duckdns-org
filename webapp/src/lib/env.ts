@@ -73,6 +73,12 @@ export const env = {
   // stock-automator 데몬이 /api/ingest/* 호출 시 X-Ingest-Key 헤더로 검증.
   // 빈 문자열이면 ingest 전부 차단 (Default secure).
   stockIngestKey: process.env.STOCK_INGEST_KEY ?? '',
+
+  // 서버 내부 self-call(/api/revalidate) 검증 토큰. 백그라운드 작업(AI 태그)이 request scope
+  // 밖에서 revalidatePath 를 못 하므로, 라우트 핸들러를 self-fetch 해 캐시를 무효화할 때 쓴다.
+  // 새 env 없이 STOCK_INGEST_KEY 를 재사용(프로덕션에 이미 존재 → 즉시 동작, 인스턴스 간 일관).
+  // 빈 문자열이면 엔드포인트·트리거 모두 비활성(Default secure).
+  revalidateToken: process.env.REVALIDATE_TOKEN || process.env.STOCK_INGEST_KEY || '',
 } as const;
 
 export function validateEnv(): void {

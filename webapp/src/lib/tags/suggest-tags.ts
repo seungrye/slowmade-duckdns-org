@@ -1,5 +1,4 @@
 import { GoogleGenAI } from '@google/genai';
-import { revalidatePath } from 'next/cache';
 import Post from '@/models/post';
 import { connectToDB } from '@/lib/db';
 import { getAllTags } from '@/lib/posts';
@@ -127,8 +126,31 @@ export async function suggestTags(input: {
 }
 
 /**
+ * 캐시 무효화 트리거 — 내부 revalidate 엔드포인트를 self-fetch 한다.
+ *
+ * 왜 직접 revalidatePath 를 안 쓰나: 이 코드는 fire-and-forget 백그라운드(응답 종료 후)라 request
+ * scope 밖 → 거기서 부른 revalidatePath 는 무효(삼켜짐). 라우트 핸들러(/api/revalidate)를 self-fetch
+ * 하면 그 핸들러는 정상 scope 라 revalidatePath 가 실제로 먹는다. 토큰 없으면 skip, 실패는 삼킨다
+ * (best-effort — 다음 자연 갱신에 반영). 절대 throw 안 함.
+ */
+export async function triggerRevalidate(paths: string[]): Promise<void> {
+  const token = env.revalidateToken.trim();
+  if (!token || paths.length === 0) return;
+  try {
+    await fetch(`${env.siteUrl}/api/revalidate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-internal-token': token },
+      body: JSON.stringify({ paths }),
+    });
+  } catch (e) {
+    console.warn('[ai-tags] triggerRevalidate failed:', e instanceof Error ? e.message : String(e));
+  }
+}
+
+/**
  * 신규 글 제출 후 백그라운드 실행: AI 태그를 받아 리비전 없이 문서 tags/aiTags 를 갱신.
  * PostRevision·version 을 만들지 않고(updatePostViews 패턴), timestamps 도 건드리지 않는다.
+ * DB 갱신 후 내부 엔드포인트로 캐시를 무효화한다(백그라운드 revalidatePath 무효 회피).
  */
 export async function generateAndUpdateTags(
   postId: string,
@@ -152,13 +174,7 @@ export async function generateAndUpdateTags(
       { timestamps: false },
     );
 
-    // 캐시 갱신(백그라운드라 요청 스코프 밖일 수 있어 실패는 삼킨다).
-    try {
-      revalidatePath(`/post/view/${postId}`);
-      revalidatePath('/tags');
-    } catch {
-      /* outside request scope — DB 갱신은 이미 됨, 다음 렌더에 반영 */
-    }
+    await triggerRevalidate([`/post/view/${postId}`, '/tags']);
   } catch (e) {
     console.warn('[ai-tags] generateAndUpdateTags failed:', e instanceof Error ? e.message : String(e));
   }
