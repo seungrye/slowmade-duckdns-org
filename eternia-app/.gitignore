@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build-setup.log
+.env.build
+
+# Capacitor / Android 빌드 산출물 (플랫폼 소스는 커밋, 빌드물은 무시)
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/capacitor-cordova-android-plugins/
+*.apk
+*.aab
+!debug.keystore
