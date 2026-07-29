@@ -72,4 +72,19 @@ describe("SceneRenderer", () => {
     const img = screen.getByAltText("삽화 /a/harbor.png");
     expect(img).toHaveAttribute("src", "/a/harbor.png");
   });
+
+  it("<<fx flash>> → 화면효과 오버레이 발동", () => {
+    const scene: Scene = { ...SCENE, body: ["번쩍 <<fx flash>>"] };
+    render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
+    const overlay = screen.getByTestId("fx-overlay");
+    expect(overlay).toHaveAttribute("data-fx", "flash");
+    expect(overlay).toHaveClass("wa-fx-flash");
+  });
+
+  it("<<fx shake>> → 씬 카드에 wa-fx-shake 적용, 오버레이 없음", () => {
+    const scene: Scene = { ...SCENE, body: ["흔들 <<fx shake>>"] };
+    render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
+    expect(screen.getByTestId("scene-renderer")).toHaveClass("wa-fx-shake");
+    expect(screen.queryByTestId("fx-overlay")).toBeNull();
+  });
 });

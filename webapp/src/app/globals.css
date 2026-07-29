@@ -124,3 +124,39 @@ body {
     animation: none;
   }
 }
+
+/* 화면효과 <<fx …>> — 암전/플래시(전체화면 오버레이)·셰이크(씬 카드). --wa-fx-ms 로 지속시간 주입. */
+@keyframes wa-fx-fadeout {
+  0% { opacity: 0; }
+  30%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes wa-fx-fadein {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes wa-fx-flash {
+  0% { opacity: 0; }
+  15% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+@keyframes wa-fx-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+.wa-fx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+}
+.wa-fx-fadeout { background: #000; animation: wa-fx-fadeout var(--wa-fx-ms, 800ms) ease both; }
+.wa-fx-fadein { background: #000; animation: wa-fx-fadein var(--wa-fx-ms, 800ms) ease both; }
+.wa-fx-flash { background: #fff; animation: wa-fx-flash var(--wa-fx-ms, 400ms) ease both; }
+.wa-fx-shake { animation: wa-fx-shake var(--wa-fx-ms, 500ms) ease; }
+@media (prefers-reduced-motion: reduce) {
+  .wa-fx-overlay, .wa-fx-shake { animation: none; }
+}

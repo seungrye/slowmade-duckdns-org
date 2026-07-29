@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
 import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
@@ -90,6 +90,14 @@ export default function SceneRenderer({
   const [choicesReady, setChoicesReady] = useState(false);
   const [skipAll, setSkipAll] = useState(false);
 
+  // 화면효과 <<fx …>> — 문단 리빌 시 1회 발동. 발동 지점까지 처리한 문단 인덱스(firedRef)를
+  // 넘어선 문단의 fx 만 실행 → 재렌더에도 중복 발동 안 함. 씬 바뀌면 리셋.
+  type Fx = { effect: string; ms: number; nonce: number };
+  const [fx, setFx] = useState<Fx | null>(null);
+  const firedRef = useRef(0);
+  const fxSceneRef = useRef(scene.id);
+  const fxNonce = useRef(0);
+
   const skipSequential = useMemo(() => {
     if (process.env.NODE_ENV === "test") return true;
     if (process.env.NEXT_PUBLIC_TYPEWRITER === "off") return true;
@@ -136,13 +144,56 @@ export default function SceneRenderer({
     setChoicesReady(false);
   }, [scene.id, revealCount, skipAll, skipSequential, total]);
 
+  // <<fx …>> 발동 — 새로 노출된 문단(firedRef..revealCount)의 fx 디렉티브 실행.
+  useEffect(() => {
+    if (fxSceneRef.current !== scene.id) {
+      fxSceneRef.current = scene.id;
+      firedRef.current = 0;
+    }
+    for (let idx = firedRef.current; idx < revealCount; idx++) {
+      const segs = parseScript(scene.body[idx] ?? "", character.variables);
+      for (const s of segs) {
+        if (s.kind === "directive" && s.cmd === "fx" && s.args[0]) {
+          const ms = Number.parseInt(s.args[1] ?? "", 10) || (s.args[0] === "flash" ? 400 : 800);
+          setFx({ effect: s.args[0], ms, nonce: (fxNonce.current += 1) });
+        }
+        // (오디오 sfx/bgm 디렉티브 재생은 T30 — 여기선 fx 만.)
+      }
+    }
+    firedRef.current = revealCount;
+  }, [scene.id, revealCount, scene.body, character.variables]);
+
+  // 효과 지속시간 뒤 오버레이/셰이크 정리 (재발동은 nonce 로 키가 바뀌어 애니메이션 재시작).
+  useEffect(() => {
+    if (!fx) return;
+    const id = window.setTimeout(() => setFx(null), fx.ms);
+    return () => window.clearTimeout(id);
+  }, [fx]);
+
+  const shaking = fx?.effect === "shake";
+
   return (
     <article
       key={scene.id}
-      className="rounded-lg bg-amber-100/70 border border-amber-300 p-4 shadow-sm transition-opacity duration-100"
-      style={{ opacity: opacity / 100 }}
+      className={`rounded-lg bg-amber-100/70 border border-amber-300 p-4 shadow-sm transition-opacity duration-100 ${shaking ? "wa-fx-shake" : ""}`}
+      style={
+        {
+          opacity: opacity / 100,
+          ...(shaking ? { "--wa-fx-ms": `${fx?.ms}ms` } : {}),
+        } as CSSProperties
+      }
       data-testid="scene-renderer"
     >
+      {/* 화면효과 오버레이(암전/플래시). nonce 로 remount 되어 재발동마다 애니메이션 재시작. */}
+      {fx && fx.effect !== "shake" && (
+        <div
+          key={fx.nonce}
+          data-testid="fx-overlay"
+          data-fx={fx.effect}
+          className={`wa-fx-overlay wa-fx-${fx.effect}`}
+          style={{ "--wa-fx-ms": `${fx.ms}ms` } as CSSProperties}
+        />
+      )}
       <div className="relative w-full aspect-[16/9] rounded-md overflow-hidden bg-amber-200 mb-4">
         <Image
           src={chosenIllustration}
