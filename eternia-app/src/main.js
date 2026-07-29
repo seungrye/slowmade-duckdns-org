@@ -1,5 +1,5 @@
 import { fetchScenes, START_SCENE_ID } from "./content-client.js";
-import { stripDirectives } from "./script.js";
+import { parseScript } from "./script.js";
 import {
   rollProbability, estimateSuccessPercent, stigmaDebuff, rollStat,
   clampStigma, isFullyPetrified, isDead, evalCondition, STIGMA_MAX, INVENTORY_CAP,
@@ -98,15 +98,45 @@ import {
     if (!sc.isEnding && isFullyPetrified(S)) { showEndingCard("petrification", sc); return; }
     if (!sc.isEnding && isDead(S)) { showEndingCard("fall", sc); return; }
     if (sc.title) emitHead(sc);
+    if (sc.illustration) emitIllustration(sc.illustration); // 씬 삽화(painter 생성 URL)
     var body = sc.body || [];
     if (body.length) emitPara(); else afterBody();
   }
   function emitHead(sc) { var b = addBlk(); b.innerHTML = '<div class="flourish">❧ ⟡ ❧</div>' + (sc.title ? '<div class="stitle">⟨ ' + esc(sc.title) + " ⟩</div>" : ""); toBottom(); }
+  function emitFig(url, opts) {
+    opts = opts || {};
+    var wrap = document.createElement("div"); wrap.className = "fig" + (opts.impact ? " impact" : "");
+    var img = document.createElement("img"); img.className = "illust"; img.src = url; img.alt = opts.alt || "삽화"; img.loading = "lazy";
+    wrap.appendChild(img); return wrap;
+  }
+  function emitIllustration(url) { var b = addBlk(); b.appendChild(emitFig(url, { alt: "씬 삽화" })); toBottom(); }
   function emitPara() {
     var b = addBlk("p-blk"); var p = document.createElement("div"); p.className = "p"; b.appendChild(p); toBottom();
-    // {{변수}} 선치환 + << 디렉티브 >> 제거(실행은 슬라이스3). 표시 마크업은 tokenize.
-    var raw = stripDirectives(scene.body[cur.pi], S.variables);
-    typeInto(p, raw, function () { cont.classList.remove("hidden"); });
+    // {{변수}} 선치환 + << 디렉티브 >> 실행(img/fx). 표시 텍스트는 tokenize.
+    var segs = parseScript(scene.body[cur.pi], S.variables);
+    var textRaw = segs.filter(function (s) { return s.kind === "text"; }).map(function (s) { return s.text; }).join("");
+    segs.forEach(function (s) { if (s.kind === "directive") execDirective(s); });
+    typeInto(p, textRaw, function () { cont.classList.remove("hidden"); });
+  }
+  // << 디렉티브 >> 실행 — img(삽화)·fx(화면효과). sfx/bgm 은 슬라이스3-audio.
+  function execDirective(s) {
+    if (s.cmd === "img" && s.args[0]) { var fb = addBlk(); fb.appendChild(emitFig(s.args[0], { impact: s.args.indexOf("impact") >= 0, alt: "삽화 " + s.args[0] })); toBottom(); return; }
+    if (s.cmd === "fx" && s.args[0]) { var ms = parseInt(s.args[1], 10); execFx(s.args[0], Number.isFinite(ms) ? ms : 0); return; }
+  }
+  function execFx(effect, ms) {
+    if (!ms) ms = effect === "flash" ? 400 : 800;
+    var stage = $("stage"); if (!stage) return;
+    if (effect === "shake") {
+      stage.classList.remove("fx-shake"); void stage.offsetWidth;
+      stage.style.setProperty("--fx-ms", ms + "ms"); stage.classList.add("fx-shake");
+      setTimeout(function () { stage.classList.remove("fx-shake"); }, ms);
+      return;
+    }
+    if (effect === "fadeout" || effect === "fadein" || effect === "flash") {
+      var ov = document.createElement("div"); ov.className = "fx-ov fx-" + effect; ov.setAttribute("data-fx", effect);
+      ov.style.setProperty("--fx-ms", ms + "ms"); stage.appendChild(ov);
+      setTimeout(function () { ov.remove(); }, ms);
+    }
   }
   function afterBody() {
     if (scene.isEnding) { showEndingCard(scene.endingId || "fall", scene); return; }

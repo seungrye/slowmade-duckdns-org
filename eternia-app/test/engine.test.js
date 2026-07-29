@@ -194,4 +194,23 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(document.querySelectorAll(".ending").length).toBe(1);
     expect(document.getElementById("log").textContent).toContain("ascension");
   });
+
+  it("Scene.illustration 을 삽화 이미지로 렌더", async () => {
+    await boot([{ id: "kael_infirmary", title: "의무동", illustration: "https://cdn.test/inf.png", body: ["b"], choices: [] }]);
+    const img = document.querySelector("#log .fig img.illust");
+    expect(img).toBeTruthy();
+    expect(img.getAttribute("src")).toBe("https://cdn.test/inf.png");
+  });
+
+  it("<<img url impact>> 를 임팩트 삽화로 렌더", async () => {
+    await boot([{ id: "kael_infirmary", title: "컷", body: ["번쩍 <<img https://cdn.test/hall.png impact>>"], choices: [] }]);
+    const fig = document.querySelector("#log .fig.impact img.illust");
+    expect(fig).toBeTruthy();
+    expect(fig.getAttribute("src")).toBe("https://cdn.test/hall.png");
+  });
+
+  it("<<fx flash>> 가 스테이지 화면효과 오버레이를 발동", async () => {
+    await boot([{ id: "kael_infirmary", title: "섬광", body: ["번쩍 <<fx flash>>"], choices: [] }]);
+    expect(document.querySelector("#stage .fx-ov[data-fx='flash']")).toBeTruthy();
+  });
 });
