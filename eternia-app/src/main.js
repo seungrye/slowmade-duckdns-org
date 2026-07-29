@@ -272,47 +272,52 @@ import {
     var ab = $("againBtn"); if (ab) ab.addEventListener("click", restart);
   }
 
-  // ── 캐릭터 생성 (웹 CharacterCreator 이식) ──
+  // ── 캐릭터 생성 (2단계: 주인공 → 화면전환 → 성흔) ──
   var sel = { protagonist: "kael", ability: "lunar" };
   var startSceneId = START_SCENE_ID;
   function setNameplate(m, ability) { var np = document.querySelector(".nameplate"); if (np) np.textContent = m.nameShort + " · " + abilities[ability].name; }
-  function syncCreator() {
-    var m = protagonists[sel.protagonist];
-    [].forEach.call(document.querySelectorAll(".cr-prota"), function (b) { b.classList.toggle("sel", b.getAttribute("data-p") === sel.protagonist); b.setAttribute("aria-pressed", b.getAttribute("data-p") === sel.protagonist); });
-    [].forEach.call(document.querySelectorAll(".cr-abil"), function (b) { b.classList.toggle("sel", b.getAttribute("data-a") === sel.ability); b.setAttribute("aria-pressed", b.getAttribute("data-a") === sel.ability); });
-    var maxHp = 100 + m.baseStats.con * 5; var rr = sel.ability === "none" ? 3 : 0;
-    $("cr-desc").textContent = m.oneLine;
-    $("cr-info").innerHTML = "최대 HP <b>" + maxHp + "</b> · 재굴림 <b>" + rr + "</b> · 시작 침식 <b>" + m.startStigma + "</b>";
-    $("cr-start").textContent = m.nameShort + " 의 운명으로 발을 내딛는다";
-  }
   function showCreator() {
     var t = $("title"); if (t) t.classList.add("hidden");
     var old = $("creator"); if (old) old.remove();
-    sel = { protagonist: "kael", ability: "lunar" };
+    sel = { protagonist: null, ability: "lunar" };
     var box = document.createElement("section"); box.className = "creator"; box.id = "creator";
-    box.innerHTML =
-      '<h2 class="cr-h">너의 운명을 선택하라</h2>' +
-      '<div class="cr-cards" id="cr-protas"></div>' +
-      '<p class="cr-desc" id="cr-desc"></p>' +
-      '<h3 class="cr-h2">너의 핏줄에 흐르는 성흔</h3>' +
-      '<div class="cr-cards" id="cr-abils"></div>' +
-      '<div class="cr-info" id="cr-info"></div>' +
-      '<button type="button" class="creator-start" id="cr-start"></button>';
     $("screen").appendChild(box);
+    renderProtaStep();
+  }
+  // Step 1 — 주인공 선택(탭 시 성흔 화면으로 전환)
+  function renderProtaStep() {
+    var box = $("creator"); if (!box) return;
+    box.innerHTML = '<p class="cr-step mono">STEP 1 / 2 · 주인공</p><h2 class="cr-h">너의 운명을 선택하라</h2><div class="cr-cards" id="cr-protas"></div>';
     PROTAGONIST_ORDER.forEach(function (p) {
       var m = protagonists[p]; var b = document.createElement("button"); b.type = "button"; b.className = "cr-card cr-prota"; b.setAttribute("data-p", p);
-      b.innerHTML = '<div class="cr-name">' + esc(m.name) + '</div><div class="cr-one">' + esc(m.oneLine) + '</div><div class="cr-stig">시작 침식 <b>' + m.startStigma + "</b></div>";
-      b.addEventListener("click", function () { sel.protagonist = p; syncCreator(); });
-      $("cr-protas").appendChild(b);
+      b.innerHTML = '<div class="cr-name">' + esc(m.name) + '</div><div class="cr-one">' + esc(m.oneLine) + '</div><div class="cr-stig">시작 침식 <b>' + m.startStigma + "</b> · 최대 HP <b>" + (100 + m.baseStats.con * 5) + "</b></div>";
+      b.addEventListener("click", function () { sel.protagonist = p; renderAbilityStep(); });
+      box.querySelector("#cr-protas").appendChild(b);
     });
+  }
+  // Step 2 — 성흔 선택 + 시작(주인공 다시 뒤로)
+  function renderAbilityStep() {
+    var box = $("creator"); if (!box) return;
+    var m = protagonists[sel.protagonist];
+    box.innerHTML = '<p class="cr-step mono">STEP 2 / 2 · 성흔</p><h2 class="cr-h">' + esc(m.nameShort) + ' · 핏줄에 흐르는 성흔</h2>' +
+      '<p class="cr-desc">' + esc(m.oneLine) + '</p><div class="cr-cards" id="cr-abils"></div><div class="cr-info" id="cr-info"></div>' +
+      '<div class="cr-actions"><button type="button" class="cr-back" id="cr-back">← 주인공 다시</button><button type="button" class="creator-start" id="cr-start"></button></div>';
     ABILITY_KEYS.forEach(function (k) {
       var a = abilities[k]; var b = document.createElement("button"); b.type = "button"; b.className = "cr-card cr-abil"; b.setAttribute("data-a", k);
       b.innerHTML = '<div class="cr-name">' + esc(a.name) + '</div><div class="cr-one">' + esc(a.desc) + "</div>";
-      b.addEventListener("click", function () { sel.ability = k; syncCreator(); });
-      $("cr-abils").appendChild(b);
+      b.addEventListener("click", function () { sel.ability = k; syncAbility(); });
+      box.querySelector("#cr-abils").appendChild(b);
     });
+    $("cr-back").addEventListener("click", renderProtaStep);
     $("cr-start").addEventListener("click", onStart);
-    syncCreator();
+    syncAbility();
+  }
+  function syncAbility() {
+    var m = protagonists[sel.protagonist];
+    [].forEach.call(document.querySelectorAll(".cr-abil"), function (b) { var on = b.getAttribute("data-a") === sel.ability; b.classList.toggle("sel", on); b.setAttribute("aria-pressed", on); });
+    var maxHp = 100 + m.baseStats.con * 5; var rr = sel.ability === "none" ? 3 : 0;
+    $("cr-info").innerHTML = "최대 HP <b>" + maxHp + "</b> · 재굴림 <b>" + rr + "</b> · 시작 침식 <b>" + m.startStigma + "</b>";
+    $("cr-start").textContent = m.nameShort + " 의 운명으로 발을 내딛는다";
   }
   function onStart() {
     S = buildCharacter(sel.protagonist, sel.ability);

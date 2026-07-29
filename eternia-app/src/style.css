@@ -140,7 +140,10 @@
   .creator .cr-card .cr-stig{font-size:11px; margin-top:4px;}
   .creator .cr-desc{font-size:12px; font-style:italic; opacity:.85; margin:8px 2px;}
   .creator .cr-info{font-size:12px; margin:10px 2px; padding:8px 10px; border:1px solid var(--frame,#c9b78e); border-radius:4px; background:#e7dcc0;}
-  .creator .creator-start{display:block; width:100%; margin-top:14px; border:2px solid #5a3d18; background:var(--gold,#9a6b2f); color:#f6efe0; font-weight:800; font-size:14px; padding:11px; border-radius:4px; cursor:pointer;}
+  .creator .cr-step{font-size:10px; letter-spacing:.18em; color:var(--inkm,#8a7a58); text-align:center; margin:2px 0 4px;}
+  .creator .cr-actions{display:flex; gap:8px; margin-top:14px;}
+  .creator .cr-back{flex:0 0 auto; border:2px solid var(--frame,#c9b78e); background:#e7dcc0; color:var(--ink1,#3a2c18); font-weight:700; font-size:13px; padding:11px 12px; border-radius:4px; cursor:pointer;}
+  .creator .creator-start{flex:1; border:2px solid #5a3d18; background:var(--gold,#9a6b2f); color:#f6efe0; font-weight:800; font-size:14px; padding:11px; border-radius:4px; cursor:pointer;}
   @media (min-width:420px){ .creator .cr-cards{grid-template-columns:1fr 1fr;} }
 
   /* 선택지 — ✤ 아이콘 불릿 텍스트 라인 */

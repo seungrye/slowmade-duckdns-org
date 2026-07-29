@@ -39,10 +39,11 @@ function mountApp() {
   document.body.innerHTML = bodyInner;
 }
 function startGame(opts) {
-  document.getElementById("title").click(); // 타이틀 탭 → 캐릭터 생성
-  if (opts && opts.protagonist) document.querySelector('.cr-prota[data-p="' + opts.protagonist + '"]').click();
+  document.getElementById("title").click(); // 타이틀 탭 → STEP1(주인공)
+  const p = (opts && opts.protagonist) || "kael";
+  document.querySelector('.cr-prota[data-p="' + p + '"]').click(); // 주인공 선택 → STEP2(성흔)
   if (opts && opts.ability) document.querySelector('.cr-abil[data-a="' + opts.ability + '"]').click();
-  document.getElementById("cr-start").click(); // 기본 Kael+lunar → boot(fetch)
+  document.getElementById("cr-start").click(); // 시작 → boot(fetch)
 }
 async function waitFor(pred, { timeout = 1000, interval = 5 } = {}) {
   const start = Date.now();
@@ -81,25 +82,41 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     document.body.innerHTML = "";
   });
 
-  it("타이틀 → 탭하면 캐릭터 생성, 시작하면 fetch한 씬 렌더 ({{변수}} 치환)", async () => {
+  it("타이틀 → 주인공 선택 → (전환) 성흔 선택 2단계 → fetch한 씬 렌더 ({{변수}} 치환)", async () => {
     mountApp();
     await import("../src/main.js");
     const title = document.getElementById("title");
     expect(title.classList.contains("hidden")).toBe(false);
-    // 탭 → 캐릭터 생성 화면(주인공 3 + 성흔 4)
+    // 탭 → STEP1: 주인공 3 (성흔은 아직 없음)
     title.click();
     expect(document.querySelector("#creator")).toBeTruthy();
     expect(document.querySelectorAll(".cr-prota").length).toBe(3);
+    expect(document.querySelectorAll(".cr-abil").length).toBe(0);
+    expect(document.getElementById("cr-start")).toBeNull();
+    // 주인공 선택 → STEP2 전환: 성흔 4 + 시작 버튼 등장, 주인공 카드는 사라짐
+    document.querySelector('.cr-prota[data-p="kael"]').click();
+    expect(document.querySelectorAll(".cr-prota").length).toBe(0);
     expect(document.querySelectorAll(".cr-abil").length).toBe(4);
-    // 기본(Kael+lunar)으로 시작 → boot(fetch)
+    expect(document.getElementById("cr-start")).toBeTruthy();
+    // 시작 → boot(fetch)
     document.getElementById("cr-start").click();
     await waitFor(() => document.querySelector("#log")?.textContent.includes("카엘"));
     const text = document.getElementById("log").textContent;
     expect(text).toContain("의무동");
     expect(text).toContain("카엘");
     expect(text).not.toContain("{{who}}");
-    // 상태바 네임플레이트 = 선택 주인공 · 성흔
     expect(document.querySelector(".nameplate").textContent).toContain("카엘");
+  });
+
+  it("성흔 단계에서 '주인공 다시'로 STEP1 복귀", async () => {
+    mountApp();
+    await import("../src/main.js");
+    document.getElementById("title").click();
+    document.querySelector('.cr-prota[data-p="rin"]').click(); // → STEP2
+    expect(document.querySelectorAll(".cr-abil").length).toBe(4);
+    document.getElementById("cr-back").click(); // ← 주인공 다시
+    expect(document.querySelectorAll(".cr-prota").length).toBe(3);
+    expect(document.querySelectorAll(".cr-abil").length).toBe(0);
   });
 
   it("주인공 선택(린)이 해당 시작씬으로 진입 + 네임플레이트 갱신", async () => {
