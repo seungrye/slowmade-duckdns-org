@@ -169,3 +169,31 @@
   .bottombar .bbtn:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
 
   @media (prefers-reduced-motion:reduce){ *{animation-duration:.001ms!important; animation-iteration-count:1!important; transition-duration:.05ms!important;} .log{scroll-behavior:auto;} }
+
+/* ─────────── 앱 모드(풀스크린 게임) ─────────── */
+html, body.app { height: 100%; margin: 0; }
+body.app { background: var(--pg); overflow: hidden; }
+body.app .screen {
+  position: fixed; inset: 0; width: 100vw; height: 100dvh;
+  border-radius: 0; box-shadow: none;
+}
+body.app .status { padding-top: calc(9px + env(safe-area-inset-top)); }
+body.app .bottombar { padding-bottom: calc(7px + env(safe-area-inset-bottom)); }
+
+/* ⚙ 설정 시트(디렉터 컨트롤을 앱 안으로) */
+.sheet-scrim { position: absolute; inset: 0; z-index: 9; background: rgba(20,15,5,.45); opacity: 0; pointer-events: none; transition: opacity .25s; }
+.sheet-scrim.show { opacity: 1; pointer-events: auto; }
+.settings {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 10;
+  transform: translateY(110%); transition: transform .28s cubic-bezier(.2,.7,.3,1);
+  background: var(--pg2); border-top: 2px solid var(--pgedge);
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom)); display: grid; gap: 8px;
+}
+.settings.open { transform: translateY(0); }
+.settings .grip { width: 40px; height: 4px; border-radius: 3px; background: var(--pgedge); margin: 2px auto 8px; }
+.settings .setrow {
+  appearance: none; cursor: pointer; text-align: left; font: inherit; font-weight: 600; font-size: 15px;
+  color: var(--ink1); background: #e7dcc0; border: 2px solid var(--pgedge); border-radius: 3px; padding: 11px 14px;
+}
+.settings .setrow:active { transform: translateY(1px); }
+.settings .setrow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

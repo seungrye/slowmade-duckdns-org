@@ -3,78 +3,54 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>에테르니아의 추락 — 픽셀 저널 플레이어 목업</title>
+<title>에테르니아의 추락</title>
 <link rel="stylesheet" href="/src/style.css">
 </head>
-<body>
-  <main class="wrap">
-    <section class="pitch">
-      <p class="eyebrow mono">에테르니아의 추락 · 픽셀 저널 플레이어 목업</p>
-      <h1>우리 어드벤처를, <span class="g">「모험가 이야기」 감성으로.</span></h1>
-      <p class="lede">양피지 저널 UI(초상화·체력 핍·침식도·6능력치·장식 구분선·페이지 번호·✤ 선택지)에, 스크립트 출력을 넘어선 상호작용을 얹었습니다. 주인공 <b>린</b> · <b>검은 연기의 항만</b> 한 장면.</p>
-      <div class="legend">
-        <div class="li"><span class="n">1</span><span><b>호흡</b> — 서사가 리듬 있게 흐름. 본문 탭=다음(리빌 중이면 즉시 완성).</span></div>
-        <div class="li"><span class="n">2</span><span><b>씬 내부 선택</b> — 상자 개봉은 장면을 안 바꾸고 이후 서술만 바꿈.</span></div>
-        <div class="li"><span class="n">3</span><span><b>동적 치환</b> — 경로·밀수품·정보원이 뒤 문장에 <span class="mono">{{변수}}</span>로 삽입.</span></div>
-        <div class="li"><span class="n">4</span><span><b>상태 전파</b> — 초반 획득/침식이 뒤의 조건부·판정·엔딩을 바꿈.</span></div>
-        <div class="li"><span class="n">＋</span><span><b>삽화 인라인/임팩트</b> + <b>스크롤 백로그</b> — 위로 올려 이전 페이지 재확인.</span></div>
-      </div>
-      <div class="controls">
-        <p class="ctl-title mono">디렉터 컨트롤</p>
-        <div class="row">
-          <button class="btn" id="restart">↺ 처음부터</button>
-          <button class="btn" id="autoBtn">▷ 자동</button>
-          <button class="btn" id="fastBtn">» 빠르게</button>
-          <button class="btn" id="theme" title="테마" aria-label="테마 전환">◐</button>
-        </div>
-        <p class="hint">폰 <b>본문을 탭</b>하면 다음으로. 위로 <b>스크롤</b>하면 이전 서사·삽화·선택을 다시 볼 수 있습니다. (턴제 전투는 뺐습니다.)</p>
-      </div>
-    </section>
-
-    <section class="stagecol">
-      <div class="phone">
-        <div class="screen" id="screen">
-          <div class="status">
-            <button class="gear" id="gear" aria-label="설정">⚙</button>
-            <div class="strow">
-              <div class="portrait"></div>
-              <div class="idcol">
-                <span class="nameplate">린 · 수사관</span>
-                <div class="meters">
-                  <div class="piprow" id="hpPips"></div>
-                  <div class="stigrow"><span class="stiglab mono">침식</span><span class="stigbar"><i id="stigBar"></i></span><span class="stigval mono" id="stigVal">0</span></div>
-                </div>
-              </div>
-              <div class="statgrid" id="statgrid"></div>
-            </div>
-            <div class="goldrule"></div>
-          </div>
-
-          <div class="stage" id="stage">
-            <div class="log" id="log" tabindex="0"></div>
-            <div class="impact-ov" id="impactOv"></div>
-          </div>
-
-          <div class="cont hidden" id="cont">▾ 탭하여 계속</div>
-          <button class="newpill" id="newpill">새 내용 ▾</button>
-          <div class="toast" id="toast"></div>
-
-          <div class="bottombar" id="bottombar">
-            <button class="bbtn" type="button" data-bb="codex" title="도감(코덱스)">📖</button>
-            <button class="bbtn wip" type="button" data-bb="wip" title="증거 (작업중)">🔎</button>
-            <button class="bbtn" type="button" data-bb="rank" title="업적·랭크">🏅</button>
-            <span class="sp"></span>
-            <button class="bbtn" type="button" data-bb="inv" title="소지품">🎒</button>
+<body class="app">
+  <!-- 앱: 게임 화면만 풀스크린(데모용 설명·기기 프레임·푸터는 제거) -->
+  <div class="screen" id="screen">
+    <div class="status">
+      <button class="gear" id="gear" aria-label="설정">⚙</button>
+      <div class="strow">
+        <div class="portrait"></div>
+        <div class="idcol">
+          <span class="nameplate">린 · 수사관</span>
+          <div class="meters">
+            <div class="piprow" id="hpPips"></div>
+            <div class="stigrow"><span class="stiglab mono">침식</span><span class="stigbar"><i id="stigBar"></i></span><span class="stigval mono" id="stigVal">0</span></div>
           </div>
         </div>
+        <div class="statgrid" id="statgrid"></div>
       </div>
-      <p class="hint mono" style="text-align:center;opacity:.72">시뮬레이션 — 픽셀 삽화는 자리표시(도트 키아트 대체)</p>
-    </section>
+      <div class="goldrule"></div>
+    </div>
 
-    <footer class="note" style="grid-column:1/-1;border-top:1px solid var(--line);padding-top:18px;color:var(--muted);font-size:12.5px;line-height:1.65;">
-      <b>개념 목업.</b> 블록 스트림 미니 엔진(<span class="mono">para·figure·choice·roll</span> + <span class="mono">{{변수}}</span>)으로 동작합니다. 픽셀 삽화는 실제 도트 아트 대신 CSS 자리표시입니다. <b>정직한 리스크</b>: 톤은 맞췄지만 이건 여전히 껍데기 — 성패는 ① 이런 씬을 빠르게 <b>저작</b>하나 ② <b>도트 아트 생산량</b>을 감당하나에 달렸습니다.
-    </footer>
-  </main>
+    <div class="stage" id="stage">
+      <div class="log" id="log" tabindex="0"></div>
+      <div class="impact-ov" id="impactOv"></div>
+    </div>
+
+    <div class="cont hidden" id="cont">▾ 탭하여 계속</div>
+    <button class="newpill" id="newpill">새 내용 ▾</button>
+    <div class="toast" id="toast"></div>
+
+    <div class="bottombar" id="bottombar">
+      <button class="bbtn" type="button" data-bb="codex" title="도감(코덱스)">📖</button>
+      <button class="bbtn wip" type="button" data-bb="wip" title="증거 (작업중)">🔎</button>
+      <button class="bbtn" type="button" data-bb="rank" title="업적·랭크">🏅</button>
+      <span class="sp"></span>
+      <button class="bbtn" type="button" data-bb="inv" title="소지품">🎒</button>
+    </div>
+
+    <!-- ⚙ 설정 시트 -->
+    <div class="sheet-scrim" id="scrim"></div>
+    <div class="settings" id="settings">
+      <div class="grip"></div>
+      <button class="setrow" type="button" id="restart">↺ 처음부터</button>
+      <button class="setrow" type="button" id="autoBtn">▷ 자동</button>
+      <button class="setrow" type="button" id="fastBtn">» 빠르게</button>
+    </div>
+  </div>
 
 <script type="module" src="/src/main.js"></script>
 </body>

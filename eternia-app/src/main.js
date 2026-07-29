@@ -248,20 +248,23 @@
     $('againBtn').addEventListener('click', restart);
   }
 
-  // ── 컨트롤 ──
-  $('gear').addEventListener('click', function(){ toast('설정 (목업)'); });
-  $('bottombar').addEventListener('click', function(e){
+  // ── 컨트롤 ── (요소 없으면 스킵하는 null-safe 배선)
+  function on(id, ev, fn){ var el=$(id); if(el) el.addEventListener(ev, fn); }
+  function closeSettings(){ var st=$('settings'), sc=$('scrim'); if(st) st.classList.remove('open'); if(sc) sc.classList.remove('show'); }
+  on('gear','click', function(){ var st=$('settings'), sc=$('scrim'); if(!st) return toast('설정'); var open=st.classList.toggle('open'); if(sc) sc.classList.toggle('show', open); });
+  on('scrim','click', closeSettings);
+  on('bottombar','click', function(e){
     var b=e.target.closest('[data-bb]'); if(!b) return; var k=b.getAttribute('data-bb');
     if(k==='inv') toast(S.inv.length? '소지품 · '+S.inv.join(', ') : '소지품 · 비어 있음');
     else if(k==='codex') toast('도감(코덱스) — 준비 중');
     else if(k==='rank') toast('업적·랭크 — 준비 중');
     else if(k==='wip') toast('증거 — 작업중…');
   });
-  $('autoBtn').addEventListener('click', function(){ pace=!pace; this.textContent=pace?'▶ 자동 켜짐':'▷ 자동'; if(pace&&!typing&&node&&node.type==='text'){ clearTimeout(autoTimer); autoTimer=setTimeout(advance,500);} });
-  $('fastBtn').addEventListener('click', function(){ fast=!fast; this.textContent=fast?'»» 빠르게 켜짐':'» 빠르게'; });
-  $('theme').addEventListener('click', function(){ var c=document.documentElement.getAttribute('data-theme'); var n=c==='dark'?'light':(c==='light'?'dark':(window.matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark')); document.documentElement.setAttribute('data-theme',n); });
-  function restart(){ clearT(); S=initState(); log.innerHTML=''; impactOv.classList.remove('show'); impactOv.innerHTML=''; impactActive=null; newpill.classList.remove('show'); toastEl.classList.remove('show'); stick=true; renderHP(false); renderStig(false); renderStats(false); goTo('start'); }
-  $('restart').addEventListener('click', restart);
+  on('autoBtn','click', function(){ pace=!pace; this.textContent=pace?'▶ 자동 켜짐':'▷ 자동'; if(pace&&!typing&&node&&node.type==='text'){ clearTimeout(autoTimer); autoTimer=setTimeout(advance,500);} });
+  on('fastBtn','click', function(){ fast=!fast; this.textContent=fast?'»» 빠르게 켜짐':'» 빠르게'; });
+  on('theme','click', function(){ var c=document.documentElement.getAttribute('data-theme'); var n=c==='dark'?'light':(c==='light'?'dark':(window.matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark')); document.documentElement.setAttribute('data-theme',n); });
+  function restart(){ clearT(); S=initState(); log.innerHTML=''; impactOv.classList.remove('show'); impactOv.innerHTML=''; impactActive=null; newpill.classList.remove('show'); toastEl.classList.remove('show'); stick=true; renderHP(false); renderStig(false); renderStats(false); closeSettings(); goTo('start'); }
+  on('restart','click', restart);
 
   renderHP(false); renderStig(false); renderStats(false); goTo('start');
 })();
