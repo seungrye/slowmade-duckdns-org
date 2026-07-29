@@ -1,0 +1,73 @@
+name: eternia-app Android build
+
+# eternia-app/ 변경이 main 에 push 될 때 자동 빌드 + 언제든 수동 실행(workflow_dispatch).
+# public 레포 → GitHub 호스티드 러너 무료. 산출: 디버그 APK 아티팩트.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "eternia-app/**"
+      - ".github/workflows/eternia-app.yml"
+  workflow_dispatch: {} # 수동 빌드: Actions 탭 > 이 워크플로 > Run workflow
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eternia-app-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: eternia-app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: eternia-app/package-lock.json
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages (android-34)
+        run: |
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build web (Vite)
+        run: npm run build
+
+      - name: Sync Capacitor → android
+        run: npx cap sync android
+
+      - name: Assemble debug APK
+        run: |
+          chmod +x android/gradlew
+          cd android && ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eternia-debug-apk
+          path: eternia-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
