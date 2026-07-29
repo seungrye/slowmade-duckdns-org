@@ -65,4 +65,11 @@ describe("SceneRenderer", () => {
     expect(container.textContent).not.toContain("<<");
     expect(container.textContent).not.toContain("바스락");
   });
+
+  it("<<img … impact>> 를 삽화 이미지로 렌더", () => {
+    const scene: Scene = { ...SCENE, body: ["<<img /a/harbor.png impact>>"] };
+    render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
+    const img = screen.getByAltText("삽화 /a/harbor.png");
+    expect(img).toHaveAttribute("src", "/a/harbor.png");
+  });
 });

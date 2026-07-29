@@ -163,13 +163,36 @@ export default function SceneRenderer({
         style={{ cursor: revealCount < total ? "pointer" : undefined }}
       >
         {scene.body.slice(0, revealCount).map((p, i) => {
-          // {{변수}} 치환 + << 디렉티브 >> 분리. 디렉티브(sfx/bgm/fx/img/wait)의 재생·삽화 렌더는
-          // 후속 태스크 — 지금은 표시 텍스트만 렌더(디렉티브가 본문에 문자로 새지 않게).
+          // {{변수}} 치환 + << 디렉티브 >> 분리. 표시 텍스트는 <p>, <<img>> 는 블록 삽화로.
+          // (오디오/화면효과 디렉티브 재생은 후속 태스크 — 여기선 표시에 영향 없음.)
           const segs = parseScript(p, character.variables);
+          const texts = segs.filter((s) => s.kind === "text");
+          const imgs = segs.filter((s) => s.kind === "directive" && s.cmd === "img");
           return (
-            <p key={`${scene.id}-${i}`} className="leading-relaxed web-adventure-fade-in">
-              {segs.map((s, j) => (s.kind === "text" ? <Fragment key={j}>{renderInline(s.text)}</Fragment> : null))}
-            </p>
+            <Fragment key={`${scene.id}-${i}`}>
+              {texts.length > 0 && (
+                <p className="leading-relaxed web-adventure-fade-in">
+                  {texts.map((s, j) => (
+                    <Fragment key={j}>{renderInline(s.kind === "text" ? s.text : "")}</Fragment>
+                  ))}
+                </p>
+              )}
+              {imgs.map((s, j) => {
+                if (s.kind !== "directive") return null;
+                const impact = s.args.includes("impact");
+                // 인라인=본문폭 삽화, 임팩트=full-bleed(패딩 밖) 컷. 에셋 이름/URL 은 그대로 src(추후 키→URL 해석).
+                return (
+                  <div
+                    key={`img-${j}`}
+                    className={`relative w-full aspect-[16/9] overflow-hidden bg-amber-200 web-adventure-fade-in ${
+                      impact ? "-mx-4 my-3" : "my-3 rounded-md"
+                    }`}
+                  >
+                    <Image src={s.args[0]} alt={`삽화 ${s.args[0]}`} fill sizes="(max-width: 768px) 100vw, 640px" className="object-cover" unoptimized />
+                  </div>
+                );
+              })}
+            </Fragment>
           );
         })}
       </div>
