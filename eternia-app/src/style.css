@@ -197,3 +197,7 @@ body.app .bottombar { padding-bottom: calc(7px + env(safe-area-inset-bottom)); }
 }
 .settings .setrow:active { transform: translateY(1px); }
 .settings .setrow:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+/* 상단 능력치 칩 — 탭하면 툴팁(어떤 스탯인지) */
+.sstat { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.sstat:active { transform: translateY(1px); filter: brightness(1.15); }

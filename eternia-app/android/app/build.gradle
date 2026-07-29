@@ -7,8 +7,9 @@ android {
         applicationId "org.slowmade.eternia"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // 빌드번호: CI 가 -PappVersionCode=<github.run_number> 로 주입(빌드마다 증가). 로컬은 기본 1.
+        versionCode project.hasProperty('appVersionCode') ? project.property('appVersionCode').toString().toInteger() : 1
+        versionName project.hasProperty('appVersionName') ? project.property('appVersionName').toString() : "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

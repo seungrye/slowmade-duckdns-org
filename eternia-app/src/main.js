@@ -220,7 +220,7 @@
   }
   function renderHP(flash){ var hp=$('hpPips'); hp.innerHTML=''; for(var i=0;i<S.hpMax;i++){ var d=document.createElement('span'); d.className='pip hp'+(i<S.hp?' on':''); hp.appendChild(d); } if(flash&&hp.animate) hp.animate([{filter:'brightness(2)'},{filter:'brightness(1)'}],{duration:600}); }
   function renderStig(flash){ $('stigBar').style.width=(S.stigma/S.stigMax*100)+'%'; $('stigVal').textContent=S.stigma; if(flash){ var e=$('stigVal'); if(e.animate) e.animate([{filter:'brightness(2)'},{filter:'brightness(1)'}],{duration:700}); } }
-  function renderStats(flash){ var g=$('statgrid'); g.innerHTML=''; STAT_ORDER.forEach(function(k){ var d=document.createElement('div'); d.className='sstat'; d.innerHTML='<span class="ic">'+STAT_IC[k]+'</span>'+S.stats[k]; g.appendChild(d); }); if(flash && g.animate) g.animate([{filter:'brightness(1.8)'},{filter:'brightness(1)'}],{duration:600}); }
+  function renderStats(flash){ var g=$('statgrid'); g.innerHTML=''; STAT_ORDER.forEach(function(k){ var d=document.createElement('div'); d.className='sstat'; d.setAttribute('data-stat',k); d.setAttribute('title',STAT_KO[k]); d.innerHTML='<span class="ic">'+STAT_IC[k]+'</span>'+S.stats[k]; g.appendChild(d); }); if(flash && g.animate) g.animate([{filter:'brightness(1.8)'},{filter:'brightness(1)'}],{duration:600}); }
 
   // ── 엔딩 ──
   function ending(kind){
@@ -250,9 +250,7 @@
 
   // ── 컨트롤 ── (요소 없으면 스킵하는 null-safe 배선)
   function on(id, ev, fn){ var el=$(id); if(el) el.addEventListener(ev, fn); }
-  function closeSettings(){ var st=$('settings'), sc=$('scrim'); if(st) st.classList.remove('open'); if(sc) sc.classList.remove('show'); }
-  on('gear','click', function(){ var st=$('settings'), sc=$('scrim'); if(!st) return toast('설정'); var open=st.classList.toggle('open'); if(sc) sc.classList.toggle('show', open); });
-  on('scrim','click', closeSettings);
+  // 하단 바 아이콘 탭 → 툴팁
   on('bottombar','click', function(e){
     var b=e.target.closest('[data-bb]'); if(!b) return; var k=b.getAttribute('data-bb');
     if(k==='inv') toast(S.inv.length? '소지품 · '+S.inv.join(', ') : '소지품 · 비어 있음');
@@ -260,11 +258,10 @@
     else if(k==='rank') toast('업적·랭크 — 준비 중');
     else if(k==='wip') toast('증거 — 작업중…');
   });
-  on('autoBtn','click', function(){ pace=!pace; this.textContent=pace?'▶ 자동 켜짐':'▷ 자동'; if(pace&&!typing&&node&&node.type==='text'){ clearTimeout(autoTimer); autoTimer=setTimeout(advance,500);} });
-  on('fastBtn','click', function(){ fast=!fast; this.textContent=fast?'»» 빠르게 켜짐':'» 빠르게'; });
-  on('theme','click', function(){ var c=document.documentElement.getAttribute('data-theme'); var n=c==='dark'?'light':(c==='light'?'dark':(window.matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark')); document.documentElement.setAttribute('data-theme',n); });
-  function restart(){ clearT(); S=initState(); log.innerHTML=''; impactOv.classList.remove('show'); impactOv.innerHTML=''; impactActive=null; newpill.classList.remove('show'); toastEl.classList.remove('show'); stick=true; renderHP(false); renderStig(false); renderStats(false); closeSettings(); goTo('start'); }
-  on('restart','click', restart);
+  // 상단 능력치 아이콘 탭 → 어떤 스탯인지 툴팁(하단 아이콘과 동일 방식)
+  on('statgrid','click', function(e){ var s=e.target.closest('[data-stat]'); if(!s) return; var k=s.getAttribute('data-stat'); toast(STAT_KO[k]+' · '+S.stats[k]); });
+  // restart() 는 엔딩 '다시 플레이'(#againBtn)에서 사용
+  function restart(){ clearT(); S=initState(); log.innerHTML=''; impactOv.classList.remove('show'); impactOv.innerHTML=''; impactActive=null; newpill.classList.remove('show'); toastEl.classList.remove('show'); stick=true; renderHP(false); renderStig(false); renderStats(false); goTo('start'); }
 
   renderHP(false); renderStig(false); renderStats(false); goTo('start');
 })();
