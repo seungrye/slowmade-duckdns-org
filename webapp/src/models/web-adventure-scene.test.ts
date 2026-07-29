@@ -127,6 +127,15 @@ describe('onEnter / endingId', () => {
     expect(err).toBeUndefined();
   });
 
+  it('onEnter.setVars({{키}} 치환 소스)를 받아 보존한다', () => {
+    const doc = makeDoc({ onEnter: { setVars: { route: '정문 초소', n: 3 } } });
+    const err = doc.validateSync();
+    expect(err).toBeUndefined();
+    const vars = (doc as unknown as { onEnter: { setVars: Map<string, unknown> } }).onEnter.setVars;
+    expect(vars.get('route')).toBe('정문 초소');
+    expect(vars.get('n')).toBe(3);
+  });
+
   it('endingId 가 enum 밖이면 실패', () => {
     const doc = makeDoc({ isEnding: true, endingId: 'invalid_ending', choices: [] });
     const err = doc.validateSync();
@@ -137,5 +146,28 @@ describe('onEnter / endingId', () => {
     const doc = makeDoc({ isEnding: true, endingId: 'ascension', choices: [] });
     const err = doc.validateSync();
     expect(err).toBeUndefined();
+  });
+});
+
+describe('bgm (씬 기본 배경음)', () => {
+  it('bgm.src 있으면 통과 + loop/volume 보존', () => {
+    const doc = makeDoc({ bgm: { src: '/a/theme.mp3', loop: true, volume: 0.5 } });
+    const err = doc.validateSync();
+    expect(err).toBeUndefined();
+    const bgm = (doc as unknown as { bgm: { src: string; loop: boolean; volume: number } }).bgm;
+    expect(bgm.src).toBe('/a/theme.mp3');
+    expect(bgm.loop).toBe(true);
+    expect(bgm.volume).toBe(0.5);
+  });
+
+  it('bgm 을 지정하지 않으면 통과(선택 필드)', () => {
+    const doc = makeDoc();
+    expect(doc.validateSync()).toBeUndefined();
+  });
+
+  it('bgm 이 있으나 src 가 없으면 실패', () => {
+    const doc = makeDoc({ bgm: { loop: true } });
+    const err = doc.validateSync();
+    expect(err).toBeDefined();
   });
 });

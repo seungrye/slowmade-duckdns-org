@@ -102,6 +102,19 @@ const OnEnterSchema = new Schema(
     addItems: { type: [String], default: undefined },
     // 4 주차 — 누적 카운터 (예: caughtCount) +1 씩 누적.
     incrementCounters: { type: [String], default: undefined },
+    // 동적 텍스트 변수({{키}} 치환 소스) — character.variables 에 병합. 값은 string|number.
+    setVars: { type: Map, of: Schema.Types.Mixed },
+  },
+  { _id: false },
+);
+
+// ── bgm (씬 기본 배경음) ─────────────────────────────────────────────────────
+// types/web-adventure.ts 의 SceneBgm 1:1 미러. 중간 제어는 body 의 <<bgm …>> 디렉티브.
+const SceneBgmSchema = new Schema(
+  {
+    src: { type: String, required: true },
+    loop: { type: Boolean },
+    volume: { type: Number },
   },
   { _id: false },
 );
@@ -126,6 +139,8 @@ const WebAdventureSceneSchema = new Schema(
     },
     choices: { type: [ChoiceSchema], required: true, default: [] },
     onEnter: { type: OnEnterSchema },
+    // 씬 진입 기본 BGM(선택). 중간 제어는 body 의 <<bgm …>> 디렉티브.
+    bgm: { type: SceneBgmSchema },
     isEnding: { type: Boolean },
     endingId: {
       type: String,
@@ -157,7 +172,10 @@ export interface WebAdventureSceneDoc {
     setFlags?: Map<string, boolean>;
     addItems?: string[];
     incrementCounters?: string[];
+    setVars?: Map<string, string | number>;
   };
+  /** 씬 진입 기본 BGM(선택). types/web-adventure.ts SceneBgm 미러. */
+  bgm?: { src: string; loop?: boolean; volume?: number };
   isEnding?: boolean;
   endingId?: string;
   /** #222 — /scenes/graph 노드 좌표. optional. */
