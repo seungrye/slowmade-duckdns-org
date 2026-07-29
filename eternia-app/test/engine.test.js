@@ -38,8 +38,11 @@ function mountApp() {
   document.body.className = "app";
   document.body.innerHTML = bodyInner;
 }
-function startGame() {
-  document.getElementById("title").click(); // 타이틀 탭 → boot(fetch)
+function startGame(opts) {
+  document.getElementById("title").click(); // 타이틀 탭 → 캐릭터 생성
+  if (opts && opts.protagonist) document.querySelector('.cr-prota[data-p="' + opts.protagonist + '"]').click();
+  if (opts && opts.ability) document.querySelector('.cr-abil[data-a="' + opts.ability + '"]').click();
+  document.getElementById("cr-start").click(); // 기본 Kael+lunar → boot(fetch)
 }
 async function waitFor(pred, { timeout = 1000, interval = 5 } = {}) {
   const start = Date.now();
@@ -78,22 +81,37 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     document.body.innerHTML = "";
   });
 
-  it("타이틀 → 탭하면 fetch한 씬이 렌더된다 ({{변수}} 치환 포함)", async () => {
+  it("타이틀 → 탭하면 캐릭터 생성, 시작하면 fetch한 씬 렌더 ({{변수}} 치환)", async () => {
     mountApp();
     await import("../src/main.js");
     const title = document.getElementById("title");
-    // 시작 전: 타이틀 보임, 본문 비어 있음
     expect(title.classList.contains("hidden")).toBe(false);
-    expect(document.querySelectorAll("#log .blk").length).toBe(0);
-    // 탭 → 타이틀 숨김 + boot(fetch)
-    startGame();
-    expect(title.classList.contains("hidden")).toBe(true);
-    // 씬 제목(의무동)과 본문 {{who}}→카엘 치환이 렌더될 때까지 대기
+    // 탭 → 캐릭터 생성 화면(주인공 3 + 성흔 4)
+    title.click();
+    expect(document.querySelector("#creator")).toBeTruthy();
+    expect(document.querySelectorAll(".cr-prota").length).toBe(3);
+    expect(document.querySelectorAll(".cr-abil").length).toBe(4);
+    // 기본(Kael+lunar)으로 시작 → boot(fetch)
+    document.getElementById("cr-start").click();
     await waitFor(() => document.querySelector("#log")?.textContent.includes("카엘"));
     const text = document.getElementById("log").textContent;
     expect(text).toContain("의무동");
     expect(text).toContain("카엘");
     expect(text).not.toContain("{{who}}");
+    // 상태바 네임플레이트 = 선택 주인공 · 성흔
+    expect(document.querySelector(".nameplate").textContent).toContain("카엘");
+  });
+
+  it("주인공 선택(린)이 해당 시작씬으로 진입 + 네임플레이트 갱신", async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { scenes: [{ id: "rin_harbor", title: "검은 연기의 항만", body: ["린의 수사가 시작된다."], choices: [] }] } }),
+    });
+    mountApp();
+    await import("../src/main.js");
+    startGame({ protagonist: "rin" });
+    await waitFor(() => document.querySelector(".stitle"));
+    expect(document.getElementById("log").textContent).toContain("항만");
+    expect(document.querySelector(".nameplate").textContent).toContain("린");
   });
 
   it("plain 선택지로 진행해 엔딩 카드에 도달하고, 재탭해도 중복되지 않는다", async () => {
@@ -147,12 +165,12 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(t).toContain("석화");
   });
 
-  it("onEnter.hpDelta 가 상태바 HP 를 깎는다", async () => {
+  it("onEnter.hpDelta 가 HP 를 깎는다(카엘 maxHp 120)", async () => {
     await boot([
-      { id: "kael_infirmary", title: "시작", onEnter: { hpDelta: -3 }, body: ["아프다"], choices: [] },
+      { id: "kael_infirmary", title: "시작", onEnter: { hpDelta: -20 }, body: ["아프다"], choices: [] },
     ]);
-    // maxHp 4, hpDelta -3 → hp 1 → on 상태 pip 1개
-    expect(document.querySelectorAll("#hpPips .pip.on").length).toBe(1);
+    // Kael maxHp = 100 + con(4)*5 = 120, hpDelta -20 → 100
+    expect(document.querySelector(".piprow").getAttribute("title")).toBe("HP 100/120");
   });
 
   it("conditional 조건 미충족 선택지는 잠긴다(disabled)", async () => {

@@ -128,6 +128,20 @@
   @keyframes fx-flash{0%{opacity:0}15%{opacity:.9}100%{opacity:0}}
   .stage.fx-shake{animation:fx-shake var(--fx-ms,500ms) ease;}
   @keyframes fx-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+  /* 캐릭터 생성 (창작기) — 주인공 3 + 성흔 4 선택. */
+  .creator{position:absolute; inset:0; z-index:20; overflow:auto; background:#efe6cf; padding:16px 14px 26px; color:var(--ink1,#3a2c18);}
+  .creator .cr-h{font-size:17px; font-weight:800; text-align:center; margin:6px 0 12px; color:var(--gold,#9a6b2f);}
+  .creator .cr-h2{font-size:14px; font-weight:700; margin:14px 0 8px;}
+  .creator .cr-cards{display:grid; grid-template-columns:1fr; gap:8px;}
+  .creator .cr-card{text-align:left; border:2px solid var(--frame,#c9b78e); background:#f2ead4; padding:9px 11px; border-radius:4px; cursor:pointer; color:inherit; transition:background .12s, border-color .12s;}
+  .creator .cr-card.sel{background:var(--gold,#9a6b2f); border-color:#5a3d18; color:#f6efe0;}
+  .creator .cr-card .cr-name{font-weight:800; font-size:14px;}
+  .creator .cr-card .cr-one{font-size:11.5px; opacity:.85; margin-top:2px; line-height:1.4;}
+  .creator .cr-card .cr-stig{font-size:11px; margin-top:4px;}
+  .creator .cr-desc{font-size:12px; font-style:italic; opacity:.85; margin:8px 2px;}
+  .creator .cr-info{font-size:12px; margin:10px 2px; padding:8px 10px; border:1px solid var(--frame,#c9b78e); border-radius:4px; background:#e7dcc0;}
+  .creator .creator-start{display:block; width:100%; margin-top:14px; border:2px solid #5a3d18; background:var(--gold,#9a6b2f); color:#f6efe0; font-weight:800; font-size:14px; padding:11px; border-radius:4px; cursor:pointer;}
+  @media (min-width:420px){ .creator .cr-cards{grid-template-columns:1fr 1fr;} }
 
   /* 선택지 — ✤ 아이콘 불릿 텍스트 라인 */
   .choices{display:grid; gap:2px; margin:6px 0 4px;}

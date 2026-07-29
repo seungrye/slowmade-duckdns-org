@@ -1,6 +1,8 @@
 import { fetchScenes, START_SCENE_ID } from "./content-client.js";
 import { parseScript } from "./script.js";
 import { AudioBus } from "./audio-bus.js";
+import { protagonists, PROTAGONIST_ORDER, buildCharacter } from "./protagonists.js";
+import { abilities, ABILITY_KEYS } from "./abilities.js";
 import {
   rollProbability, estimateSuccessPercent, stigmaDebuff, rollStat,
   clampStigma, isFullyPetrified, isDead, evalCondition, STIGMA_MAX, INVENTORY_CAP,
@@ -241,7 +243,18 @@ import {
   }
 
   // ── 상태바 렌더 ──
-  function renderHP(flash) { var hp = $("hpPips"); hp.innerHTML = ""; for (var i = 0; i < S.maxHp; i++) { var d = document.createElement("span"); d.className = "pip hp" + (i < S.hp ? " on" : ""); hp.appendChild(d); } if (flash && hp.animate) hp.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 600 }); }
+  // maxHp 가 100+ 라 하트 고정 칸(HP_HEARTS)에 비율로 스케일 표시(살아있으면 최소 1칸).
+  var HP_HEARTS = 5;
+  function renderHP(flash) {
+    var hp = $("hpPips"); hp.innerHTML = "";
+    var mx = S.maxHp || 1;
+    var filled = Math.round((S.hp / mx) * HP_HEARTS);
+    if (S.hp > 0 && filled < 1) filled = 1;
+    if (filled > HP_HEARTS) filled = HP_HEARTS; if (filled < 0) filled = 0;
+    for (var i = 0; i < HP_HEARTS; i++) { var d = document.createElement("span"); d.className = "pip hp" + (i < filled ? " on" : ""); hp.appendChild(d); }
+    var pr = document.querySelector(".piprow"); if (pr) pr.setAttribute("title", "HP " + S.hp + "/" + S.maxHp);
+    if (flash && hp.animate) hp.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 600 });
+  }
   function renderStig(flash) { $("stigBar").style.width = (S.stigmaErosion / STIGMA_MAX * 100) + "%"; $("stigVal").textContent = S.stigmaErosion; if (flash) { var e = $("stigVal"); if (e.animate) e.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 700 }); } }
   function renderStats(flash) { var g = $("statgrid"); g.innerHTML = ""; STAT_ORDER.forEach(function (k) { var d = document.createElement("div"); d.className = "sstat"; d.setAttribute("data-stat", k); d.setAttribute("title", STAT_KO[k]); d.innerHTML = '<span class="ic">' + STAT_IC[k] + "</span>" + S.stats[k]; g.appendChild(d); }); if (flash && g.animate) g.animate([{ filter: "brightness(1.8)" }, { filter: "brightness(1)" }], { duration: 600 }); }
 
@@ -259,6 +272,58 @@ import {
     var ab = $("againBtn"); if (ab) ab.addEventListener("click", restart);
   }
 
+  // ── 캐릭터 생성 (웹 CharacterCreator 이식) ──
+  var sel = { protagonist: "kael", ability: "lunar" };
+  var startSceneId = START_SCENE_ID;
+  function setNameplate(m, ability) { var np = document.querySelector(".nameplate"); if (np) np.textContent = m.nameShort + " · " + abilities[ability].name; }
+  function syncCreator() {
+    var m = protagonists[sel.protagonist];
+    [].forEach.call(document.querySelectorAll(".cr-prota"), function (b) { b.classList.toggle("sel", b.getAttribute("data-p") === sel.protagonist); b.setAttribute("aria-pressed", b.getAttribute("data-p") === sel.protagonist); });
+    [].forEach.call(document.querySelectorAll(".cr-abil"), function (b) { b.classList.toggle("sel", b.getAttribute("data-a") === sel.ability); b.setAttribute("aria-pressed", b.getAttribute("data-a") === sel.ability); });
+    var maxHp = 100 + m.baseStats.con * 5; var rr = sel.ability === "none" ? 3 : 0;
+    $("cr-desc").textContent = m.oneLine;
+    $("cr-info").innerHTML = "최대 HP <b>" + maxHp + "</b> · 재굴림 <b>" + rr + "</b> · 시작 침식 <b>" + m.startStigma + "</b>";
+    $("cr-start").textContent = m.nameShort + " 의 운명으로 발을 내딛는다";
+  }
+  function showCreator() {
+    var t = $("title"); if (t) t.classList.add("hidden");
+    var old = $("creator"); if (old) old.remove();
+    sel = { protagonist: "kael", ability: "lunar" };
+    var box = document.createElement("section"); box.className = "creator"; box.id = "creator";
+    box.innerHTML =
+      '<h2 class="cr-h">너의 운명을 선택하라</h2>' +
+      '<div class="cr-cards" id="cr-protas"></div>' +
+      '<p class="cr-desc" id="cr-desc"></p>' +
+      '<h3 class="cr-h2">너의 핏줄에 흐르는 성흔</h3>' +
+      '<div class="cr-cards" id="cr-abils"></div>' +
+      '<div class="cr-info" id="cr-info"></div>' +
+      '<button type="button" class="creator-start" id="cr-start"></button>';
+    $("screen").appendChild(box);
+    PROTAGONIST_ORDER.forEach(function (p) {
+      var m = protagonists[p]; var b = document.createElement("button"); b.type = "button"; b.className = "cr-card cr-prota"; b.setAttribute("data-p", p);
+      b.innerHTML = '<div class="cr-name">' + esc(m.name) + '</div><div class="cr-one">' + esc(m.oneLine) + '</div><div class="cr-stig">시작 침식 <b>' + m.startStigma + "</b></div>";
+      b.addEventListener("click", function () { sel.protagonist = p; syncCreator(); });
+      $("cr-protas").appendChild(b);
+    });
+    ABILITY_KEYS.forEach(function (k) {
+      var a = abilities[k]; var b = document.createElement("button"); b.type = "button"; b.className = "cr-card cr-abil"; b.setAttribute("data-a", k);
+      b.innerHTML = '<div class="cr-name">' + esc(a.name) + '</div><div class="cr-one">' + esc(a.desc) + "</div>";
+      b.addEventListener("click", function () { sel.ability = k; syncCreator(); });
+      $("cr-abils").appendChild(b);
+    });
+    $("cr-start").addEventListener("click", onStart);
+    syncCreator();
+  }
+  function onStart() {
+    S = buildCharacter(sel.protagonist, sel.ability);
+    var m = protagonists[sel.protagonist];
+    setNameplate(m, sel.ability);
+    renderHP(false); renderStig(false); renderStats(false);
+    var cr = $("creator"); if (cr) cr.remove();
+    startSceneId = m.startScene;
+    boot();
+  }
+
   // ── 부팅/컨트롤 ──
   function showMsg(txt) { var b = addBlk("p-blk"); var p = document.createElement("div"); p.className = "p"; p.style.opacity = ".7"; p.textContent = txt; b.appendChild(p); toBottom(true); return b; }
   var loadingBlk = null;
@@ -274,11 +339,10 @@ import {
       return;
     }
     if (loadingBlk) { loadingBlk.remove(); loadingBlk = null; }
-    goTo(START_SCENE_ID);
+    goTo(startSceneId);
   }
   function on(id, ev, fn) { var el = $(id); if (el) el.addEventListener(ev, fn); }
-  function startGame() { var t = $("title"); if (t) t.classList.add("hidden"); boot(); }
-  on("title", "click", startGame);
+  on("title", "click", showCreator); // 타이틀 탭 → 캐릭터 생성
   on("bottombar", "click", function (e) {
     var b = e.target.closest("[data-bb]"); if (!b) return; var k = b.getAttribute("data-bb");
     if (k === "inv") toast(S.inventory.length ? "소지품 · " + S.inventory.join(", ") : "소지품 · 비어 있음");
@@ -287,7 +351,7 @@ import {
     else if (k === "wip") toast("증거 — 작업중…");
   });
   on("statgrid", "click", function (e) { var s = e.target.closest("[data-stat]"); if (!s) return; var k = s.getAttribute("data-stat"); toast(STAT_KO[k] + " · " + S.stats[k]); });
-  function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; renderHP(false); renderStig(false); renderStats(false); goTo(START_SCENE_ID); }
+  function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; renderHP(false); renderStig(false); renderStats(false); showCreator(); }
 
-  renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 startGame()→boot()
+  renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 showCreator()
 })();
