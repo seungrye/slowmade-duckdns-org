@@ -7,6 +7,12 @@ import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import WebAdventureScene from "@/models/web-adventure-scene";
 
+// 공개 read-only 컨텐츠 — 앱(Capacitor WebView, cross-origin)도 소비하므로 CORS 허용.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+};
+
 export async function GET() {
   await connectToDB();
   const scenes = await WebAdventureScene.find({ isDeleted: { $ne: true } }).lean();
@@ -16,7 +22,13 @@ export async function GET() {
       status: 200,
       headers: {
         "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300",
+        ...CORS_HEADERS,
       },
     },
   );
+}
+
+// CORS preflight — 앱 WebView 의 cross-origin fetch 대비.
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }

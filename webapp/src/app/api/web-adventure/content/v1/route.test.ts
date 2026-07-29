@@ -7,7 +7,7 @@ vi.mock('@/models/web-adventure-scene', () => ({
   default: { find: vi.fn() },
 }));
 
-import { GET } from './route';
+import { GET, OPTIONS } from './route';
 import WebAdventureScene from '@/models/web-adventure-scene';
 
 describe('GET /api/web-adventure/content/v1', () => {
@@ -36,5 +36,20 @@ describe('GET /api/web-adventure/content/v1', () => {
     const res = await GET();
     const cacheControl = res.headers.get('Cache-Control') ?? '';
     expect(cacheControl).toContain('max-age=60');
+  });
+
+  it('CORS 허용 헤더(앱 WebView cross-origin fetch용)를 갖는다', async () => {
+    (WebAdventureScene.find as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue([]),
+    });
+    const res = await GET();
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+  });
+
+  it('OPTIONS preflight 는 204 + CORS 헤더', () => {
+    const res = OPTIONS();
+    expect(res.status).toBe(204);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('Access-Control-Allow-Methods') ?? '').toContain('GET');
   });
 });
