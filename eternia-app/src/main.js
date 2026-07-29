@@ -225,6 +225,8 @@
   // ── 엔딩 ──
   function ending(kind){
     clearT(); cont.classList.add('hidden');
+    // 종료 상태로 고정 — 이후 본문 탭/오버레이 탭이 advance→goTo(END)로 엔딩을 재출력하지 않게.
+    node=null; awaiting=false; cur={ id:null, pi:0 };
     var b=addBlk(); var win=kind==='win'; var e=document.createElement('div'); e.className='ending'+(win?'':' lose');
     var cb=S.vars.contraband||'증거', comp=S.vars.informant||'정보원';
     var desc = win

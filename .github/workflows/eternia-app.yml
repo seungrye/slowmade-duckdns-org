@@ -53,6 +53,9 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Run tests
+        run: npm test
+
       - name: Build web (Vite)
         run: npm run build
 
