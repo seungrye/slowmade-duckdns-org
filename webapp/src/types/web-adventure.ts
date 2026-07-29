@@ -54,6 +54,8 @@ export type Character = {
   inventory: string[];
   flags: Record<string, boolean | number>;
   rerollsLeft: number;
+  /** 동적 텍스트 변수({{키}} 치환 소스). Scene.onEnter.setVars / `<<set …>>` 로 채워짐. */
+  variables?: Record<string, string | number>;
 };
 
 /** 선택지 — 3 종 (plain / probability / conditional). */
@@ -123,6 +125,15 @@ export type ChoiceCondition =
   /** #359 각성 — 복합 AND. 모든 하위 조건을 만족할 때 충족(각성 다중 조건 게이트용). */
   | { kind: "all"; conditions: ChoiceCondition[] };
 
+/** 씬 진입 시 재생할 기본 BGM. 없으면 이전 BGM 유지(또는 무음). 중간 제어는 body 의 `<<bgm …>>` 디렉티브. */
+export type SceneBgm = {
+  /** 오디오 에셋 키 또는 URL(→ 호스팅에서 해석). */
+  src: string;
+  loop?: boolean;
+  /** 0..1 */
+  volume?: number;
+};
+
 export type Scene = {
   id: string;
   illustration: string;
@@ -131,6 +142,11 @@ export type Scene = {
   title: string;
   body: string[];
   choices: Choice[];
+  /**
+   * 씬 진입 BGM(선택). body 문단은 인라인 스크립트 확장 지원 — `{{변수}}` 치환 +
+   * `<< sfx|bgm|fx|img|wait|set … >>` 디렉티브(lib/web-adventure/script.ts). 토큰 없으면 종전과 동일.
+   */
+  bgm?: SceneBgm;
   isEnding?: boolean;
   endingId?: EndingId;
   /**
@@ -150,6 +166,8 @@ export type Scene = {
     hpDelta?: number;
     /** 재굴림 횟수 변동 (양수 = 보충). 주인공 무관 재굴림 보충 이벤트용. */
     rerollDelta?: number;
+    /** 씬 진입 시 설정할 동적 텍스트 변수({{키}} 치환 소스). character.variables 에 병합. */
+    setVars?: Record<string, string | number>;
   };
 };
 
