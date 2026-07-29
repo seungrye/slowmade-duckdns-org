@@ -7,6 +7,7 @@ import ChoiceList from "./ChoiceList";
 import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
 import { parseScript } from "@/lib/web-adventure/script";
+import { AudioBus } from "./audio-bus";
 import {
   getSkipVisitedEnabled,
   getTypewriterEnabled,
@@ -25,6 +26,8 @@ type Props = {
   rerollsLeft?: number;
   onReroll?: () => void;
   onConfirm?: () => void;
+  /** 오디오 재생 버스 주입(테스트 seam). 미지정 시 내부 인스턴스 사용. */
+  audioBus?: AudioBus;
 };
 
 /** 문단 사이 간격 (ms). */
@@ -64,8 +67,15 @@ export default function SceneRenderer({
   rerollsLeft = 0,
   onReroll,
   onConfirm,
+  audioBus,
 }: Props) {
   const total = scene.body.length;
+
+  // 오디오 버스 — SceneRenderer 는 씬 전환에 remount 되지 않으므로(부모가 key 미지정) ref 가
+  // 유지돼 BGM 이 씬 전환에도 이어진다. 언마운트(플레이 종료) 시 dispose 로 정지.
+  const internalBusRef = useRef<AudioBus | null>(null);
+  if (!audioBus && !internalBusRef.current) internalBusRef.current = new AudioBus();
+  const bus = audioBus ?? (internalBusRef.current as AudioBus);
 
   // 배리에이션 선택 — (회차 + 씬 id) 결정적 해시. 같은 회차 같은 씬은 항상 같은 그림,
   // 회차가 바뀌면 변화. 랜덤이 아니라 hydration 안전. illustrations 없으면 단일 fallback.
@@ -115,6 +125,16 @@ export default function SceneRenderer({
     return () => window.clearTimeout(id);
   }, [scene.id]);
 
+  // 씬 기본 BGM — 진입 시 재생. 같은 트랙이면 이어 재생(재시작 X), 미지정 씬은 이전 BGM 유지.
+  useEffect(() => {
+    if (scene.bgm?.src) {
+      bus.playBgm(scene.bgm.src, { loop: scene.bgm.loop, volume: scene.bgm.volume });
+    }
+  }, [scene.id, scene.bgm?.src, scene.bgm?.loop, scene.bgm?.volume, bus]);
+
+  // 언마운트(플레이 종료) 시 BGM 정지.
+  useEffect(() => () => bus.dispose(), [bus]);
+
   // 문단 순차 reveal — 타이머 기반.
   useEffect(() => {
     if (skipAll || skipSequential || total === 0) {
@@ -153,15 +173,27 @@ export default function SceneRenderer({
     for (let idx = firedRef.current; idx < revealCount; idx++) {
       const segs = parseScript(scene.body[idx] ?? "", character.variables);
       for (const s of segs) {
-        if (s.kind === "directive" && s.cmd === "fx" && s.args[0]) {
+        if (s.kind !== "directive" || !s.args[0]) continue;
+        if (s.cmd === "fx") {
           const ms = Number.parseInt(s.args[1] ?? "", 10) || (s.args[0] === "flash" ? 400 : 800);
           setFx({ effect: s.args[0], ms, nonce: (fxNonce.current += 1) });
+        } else if (s.cmd === "sfx") {
+          const vol = s.args[1] !== undefined ? Number.parseFloat(s.args[1]) : NaN;
+          bus.playSfx(s.args[0], Number.isFinite(vol) ? vol : undefined);
+        } else if (s.cmd === "bgm") {
+          const ctrl = s.args[0];
+          if (ctrl === "play") {
+            const src = s.args[1];
+            if (src) bus.playBgm(src, {});
+            else bus.resumeBgm();
+          } else if (ctrl === "stop") bus.stopBgm();
+          else if (ctrl === "pause") bus.pauseBgm();
+          else if (ctrl === "resume") bus.resumeBgm();
         }
-        // (오디오 sfx/bgm 디렉티브 재생은 T30 — 여기선 fx 만.)
       }
     }
     firedRef.current = revealCount;
-  }, [scene.id, revealCount, scene.body, character.variables]);
+  }, [scene.id, revealCount, scene.body, character.variables, bus]);
 
   // 효과 지속시간 뒤 오버레이/셰이크 정리 (재발동은 nonce 로 키가 바뀌어 애니메이션 재시작).
   useEffect(() => {

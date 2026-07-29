@@ -49,8 +49,8 @@
 |---|---|---|---|
 | `<<img 이름\|URL [inline\|impact]>>` | 에셋 이름/URL, 모드(기본 `inline`) | 본문 사이 삽화. `inline`=본문폭, `impact`=full-bleed 컷 | ✅ 렌더 구현 |
 | `<<fx fadeout\|fadein\|flash\|shake [ms]>>` | 효과, 지속 ms(기본 flash 400·나머지 800) | 화면효과 — fadeout/fadein/flash=전체화면 오버레이, shake=씬 카드 흔들림 | ✅ 렌더 구현 |
-| `<<sfx 이름 [vol]>>` | 효과음 에셋, 볼륨 | 효과음 1회 재생 | ⏳ 재생 예정 — 현재는 표시에서 제거만 |
-| `<<bgm play\|stop\|pause\|resume [이름] [fade]>>` | 제어, 트랙, 페이드 | BGM 중간 제어 | ⏳ 재생 예정 — 현재는 제거만 |
+| `<<sfx 이름\|URL [vol]>>` | 효과음 에셋/URL, 볼륨(0..1) | 문단 리빌 시 효과음 1회 재생 | ✅ 재생 구현 |
+| `<<bgm play\|stop\|pause\|resume [이름\|URL]>>` | 제어, 트랙 | BGM 중간 제어(play 에 트랙 주면 교체, 없으면 재개) | ✅ 재생 구현(fade 미지원) |
 | `<<wait ms>>` | ms | 리빌 사이 호흡 비트 | ⏳ 미구현(현재 무시) |
 | `<<set k=v>>` | `키=값` | 인라인 변수 설정 | ⏳ 미구현 — 대신 `onEnter.setVars` 사용 권장 |
 
@@ -59,7 +59,9 @@
 - **씬 기본 BGM**: `Scene.bgm?: { src; loop?; volume? }` 로 씬 단위 배경음을 지정(있/없 선택). 씬
   저작 UI(`/scenes/[id]`)의 **배경음 필드**에서 URL 직접 입력 또는 오디오 파일 업로드
   (`/api/web-adventure/audio/upload` → MinIO public URL)로 저작한다. 중간 제어는 `<<bgm …>>`.
-  (필드 저작·업로드는 구현 완료 — **실제 재생 연결은 별도 태스크**.)
+  진입 시 재생되며 **같은 트랙이면 씬 전환에도 이어 재생**(재시작 X), BGM 미지정 씬은 이전 BGM
+  유지. 재생 버스는 `play/audio-bus.ts`(HTMLAudio, 재생 실패는 삼킴). ⚠ **브라우저 autoplay 정책**
+  상 사용자 상호작용 전 첫 자동재생은 차단될 수 있다(첫 탭 이후부터 확실히 재생).
 - **화면효과는 `prefers-reduced-motion` 시 애니메이션 off**(접근성). 오버레이는 pointer-events 없음.
 
 ### 하위호환

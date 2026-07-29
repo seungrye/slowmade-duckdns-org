@@ -4,7 +4,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import SceneRenderer from "./SceneRenderer";
+import type { AudioBus } from "./audio-bus";
 import type { Character, Scene } from "@/types/web-adventure";
+
+// 목 버스 — vi.fn 핸들을 그대로 노출(assert 용). 전달 시점에만 AudioBus 로 캐스팅.
+function makeMockBus() {
+  return {
+    playBgm: vi.fn(), stopBgm: vi.fn(), pauseBgm: vi.fn(), resumeBgm: vi.fn(),
+    playSfx: vi.fn(), dispose: vi.fn(),
+  };
+}
+const asBus = (b: ReturnType<typeof makeMockBus>) => b as unknown as AudioBus;
 
 vi.mock("next/image", () => ({
   default: ({ alt, src }: { alt: string; src: string }) => (
@@ -60,7 +70,7 @@ describe("SceneRenderer", () => {
 
   it("<< 디렉티브 >> 는 본문에 문자로 노출되지 않는다", () => {
     const scene: Scene = { ...SCENE, body: ["덤불이 <<sfx 바스락>> 흔들린다"] };
-    const { container } = render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
+    const { container } = render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} audioBus={asBus(makeMockBus())} />);
     expect(container.textContent).toContain("흔들린다");
     expect(container.textContent).not.toContain("<<");
     expect(container.textContent).not.toContain("바스락");
@@ -86,5 +96,19 @@ describe("SceneRenderer", () => {
     render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
     expect(screen.getByTestId("scene-renderer")).toHaveClass("wa-fx-shake");
     expect(screen.queryByTestId("fx-overlay")).toBeNull();
+  });
+
+  it("Scene.bgm 진입 시 playBgm(src, loop/volume) 호출", () => {
+    const bus = makeMockBus();
+    const scene: Scene = { ...SCENE, bgm: { src: "/a/theme.mp3", loop: true, volume: 0.6 } };
+    render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} audioBus={asBus(bus)} />);
+    expect(bus.playBgm).toHaveBeenCalledWith("/a/theme.mp3", { loop: true, volume: 0.6 });
+  });
+
+  it("<<sfx 이름>> 리빌 시 playSfx 호출", () => {
+    const bus = makeMockBus();
+    const scene: Scene = { ...SCENE, body: ["칼이 부딪친다 <<sfx /a/clash.mp3 0.5>>"] };
+    render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} audioBus={asBus(bus)} />);
+    expect(bus.playSfx).toHaveBeenCalledWith("/a/clash.mp3", 0.5);
   });
 });
