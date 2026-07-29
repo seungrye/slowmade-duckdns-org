@@ -122,4 +122,76 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     await waitFor(() => document.getElementById("log").textContent.includes("불러오지 못"), { timeout: 3500 });
     expect(document.getElementById("log").textContent).toContain("불러오지 못");
   });
+
+  // 임의의 씬 셋으로 부팅하는 헬퍼
+  async function boot(scenes) {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: { scenes } }),
+    });
+    mountApp();
+    await import("../src/main.js");
+    startGame();
+    await waitFor(() => document.querySelector(".stitle") || document.querySelector(".ending"));
+  }
+
+  it("onEnter.stigmaDelta 로 침식100 도달 시 자동 석화(petrification) 엔딩", async () => {
+    await boot([
+      { id: "kael_infirmary", title: "시작", body: ["b"], choices: [{ kind: "plain", id: "g", label: "간다", to: "doom" }] },
+      { id: "doom", title: "심연", onEnter: { stigmaDelta: 100 }, body: ["돌이 된다"], choices: [] },
+    ]);
+    // 첫 씬 진행 → doom 진입 시 침식 100 → 즉시 석화 엔딩(본문 미표시)
+    driveToEnding();
+    const t = document.getElementById("log").textContent;
+    expect(document.querySelectorAll(".ending").length).toBe(1);
+    expect(t).toContain("petrification");
+    expect(t).toContain("석화");
+  });
+
+  it("onEnter.hpDelta 가 상태바 HP 를 깎는다", async () => {
+    await boot([
+      { id: "kael_infirmary", title: "시작", onEnter: { hpDelta: -3 }, body: ["아프다"], choices: [] },
+    ]);
+    // maxHp 4, hpDelta -3 → hp 1 → on 상태 pip 1개
+    expect(document.querySelectorAll("#hpPips .pip.on").length).toBe(1);
+  });
+
+  it("conditional 조건 미충족 선택지는 잠긴다(disabled)", async () => {
+    await boot([
+      {
+        id: "kael_infirmary", title: "문", body: ["b"],
+        choices: [
+          { kind: "conditional", id: "c", label: "금서를 읽는다", condition: { kind: "flag", key: "hasBook" }, to: "x" },
+          { kind: "plain", id: "p", label: "지나간다", to: "x" },
+        ],
+      },
+      { id: "x", title: "끝", body: ["끝"], isEnding: true, endingId: "fall", choices: [] },
+    ]);
+    // 첫 문단 넘겨 선택지 노출
+    document.getElementById("log").click();
+    await waitFor(() => document.querySelector(".choices"));
+    const locked = document.querySelector(".choice.locked");
+    expect(locked).toBeTruthy();
+    expect(locked.disabled).toBe(true);
+  });
+
+  it("probability 선택 → 굴림 카드가 뜬다(성공/실패 결정적)", async () => {
+    // reduce-motion 에서 roll=11. stat int7 + 11 = 18. 난이도 12 → 성공.
+    await boot([
+      {
+        id: "kael_infirmary", title: "도전", body: ["b"],
+        choices: [{ kind: "probability", id: "r", label: "뛴다", stat: "int", difficulty: 12, onSuccess: "win", onFailure: "lose" }],
+      },
+      { id: "win", title: "성공씬", body: ["해냈다"], isEnding: true, endingId: "ascension", choices: [] },
+      { id: "lose", title: "실패씬", body: ["놓쳤다"], isEnding: true, endingId: "fall", choices: [] },
+    ]);
+    document.getElementById("log").click();
+    await waitFor(() => document.querySelector(".choices .choice"));
+    document.querySelector(".choices .choice").click();
+    await waitFor(() => document.querySelector(".rollcard"));
+    expect(document.querySelector(".rollcard.ok")).toBeTruthy(); // 성공
+    await waitFor(() => document.getElementById("log").textContent.includes("해냈다")); // win 씬 진입(150ms 후)
+    driveToEnding(); // win 본문 넘겨 엔딩 카드까지
+    expect(document.querySelectorAll(".ending").length).toBe(1);
+    expect(document.getElementById("log").textContent).toContain("ascension");
+  });
 });

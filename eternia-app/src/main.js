@@ -1,26 +1,34 @@
 import { fetchScenes, START_SCENE_ID } from "./content-client.js";
 import { stripDirectives } from "./script.js";
+import {
+  rollProbability, estimateSuccessPercent, stigmaDebuff, rollStat,
+  clampStigma, isFullyPetrified, isDead, evalCondition, STIGMA_MAX, INVENTORY_CAP,
+} from "./rules.js";
 
 // 에테르니아의 추락 — 플레이어. 사이트 계약(/api/web-adventure/content/v1)의 Scene 을 소비해
-// 렌더한다. (슬라이스1: 실시간 fetch → 본문[body]+선택지[choices] 어댑트. 굴림/onEnter 전체 효과·
-// 디렉티브 실행·캐릭터 생성은 이후 슬라이스.)
+// 렌더한다. (슬라이스2: 사이트 굴림/침식/조건/onEnter 규칙 패리티. 디렉티브 실행·캐릭터 생성은 이후.)
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var log = $("log"), cont = $("cont"), newpill = $("newpill"), toastEl = $("toast");
 
-  // ── 캐릭터 상태 (슬라이스4에서 캐릭터 생성으로 대체) ──
+  // ── 캐릭터 상태 (사이트 Character 필드 정합. 캐릭터 생성은 슬라이스4.) ──
   function initState() {
     return {
       stats: { str: 4, dex: 6, int: 7, cha: 6, con: 5, wis: 6 },
-      hp: 4, hpMax: 4, stigma: 10, stigMax: 100,
-      inv: [], flags: {}, vars: {},
+      hp: 4, maxHp: 4, stigmaErosion: 10,
+      ability: "none", rerollsLeft: 1,
+      inventory: [], flags: {}, variables: {},
     };
   }
   var S = initState();
   var STAT_KO = { str: "힘", dex: "민첩", int: "지능", cha: "카리스마", con: "건강", wis: "지혜" };
   var STAT_IC = { str: "⚔️", dex: "🪶", int: "🔮", cha: "🎭", con: "❤️", wis: "📘" };
   var STAT_ORDER = ["str", "dex", "int", "cha", "con", "wis"];
+  var ENDING_KO = {
+    ascension: "승천", revolution: "혁명", harmony: "조화", fall: "추락", petrification: "석화",
+    sylvan_bond: "정령의 결속", liberation: "해방", usurpation: "찬탈", regency: "섭정", purge: "숙청", wayfarer: "방랑자",
+  };
 
   // ── 씬 데이터 (사이트 content/v1 에서 fetch) ──
   var sceneMap = {};
@@ -31,7 +39,7 @@ import { stripDirectives } from "./script.js";
     function flush() { if (plain) { runs.push({ text: plain, cls: "" }); plain = ""; } }
     while (i < t.length) {
       var rest = t.slice(i), m;
-      if ((m = /^\{\{(\w+)\}\}/.exec(rest))) { flush(); runs.push({ text: (S.vars[m[1]] != null ? String(S.vars[m[1]]) : "…"), cls: "dyn" }); i += m[0].length; continue; }
+      if ((m = /^\{\{(\w+)\}\}/.exec(rest))) { flush(); runs.push({ text: (S.variables[m[1]] != null ? String(S.variables[m[1]]) : "…"), cls: "dyn" }); i += m[0].length; continue; }
       if ((m = /^\*\*([^*]+)\*\*/.exec(rest))) { flush(); runs.push({ text: m[1], cls: "bold" }); i += m[0].length; continue; }
       if ((m = /^\[\[([^\]]+)\]\]/.exec(rest))) { flush(); runs.push({ text: m[1], cls: "teal" }); i += m[0].length; continue; }
       if ((m = /^\*([^*]+)\*/.exec(rest))) { flush(); runs.push({ text: m[1], cls: "dir" }); i += m[0].length; continue; }
@@ -86,6 +94,9 @@ import { stripDirectives } from "./script.js";
     if (!sc) { var b = addBlk("p-blk"); b.innerHTML = '<div class="p" style="opacity:.6">…(씬 없음: ' + esc(String(sceneId)) + ")</div>"; cont.classList.add("hidden"); return; }
     scene = sc; cur = { id: sceneId, pi: 0 }; ended = false; awaitingChoice = false;
     applyOnEnter(sc.onEnter);
+    // 자동 엔딩(사이트 moveToScene): 명시 isEnding 은 body 렌더 후(afterBody), 침식100/HP0 은 즉시.
+    if (!sc.isEnding && isFullyPetrified(S)) { showEndingCard("petrification", sc); return; }
+    if (!sc.isEnding && isDead(S)) { showEndingCard("fall", sc); return; }
     if (sc.title) emitHead(sc);
     var body = sc.body || [];
     if (body.length) emitPara(); else afterBody();
@@ -93,13 +104,12 @@ import { stripDirectives } from "./script.js";
   function emitHead(sc) { var b = addBlk(); b.innerHTML = '<div class="flourish">❧ ⟡ ❧</div>' + (sc.title ? '<div class="stitle">⟨ ' + esc(sc.title) + " ⟩</div>" : ""); toBottom(); }
   function emitPara() {
     var b = addBlk("p-blk"); var p = document.createElement("div"); p.className = "p"; b.appendChild(p); toBottom();
-    // 사이트 render-inline 처럼 {{변수}} 를 *먼저* 치환하고 << 디렉티브 >> 는 제거(실행은 슬라이스3).
-    // (앱 tokenize 는 "대사" 를 통째로 잡아 안쪽 {{}} 를 못 바꾸므로 파서 interpolate 를 선행.)
-    var raw = stripDirectives(scene.body[cur.pi], S.vars);
+    // {{변수}} 선치환 + << 디렉티브 >> 제거(실행은 슬라이스3). 표시 마크업은 tokenize.
+    var raw = stripDirectives(scene.body[cur.pi], S.variables);
     typeInto(p, raw, function () { cont.classList.remove("hidden"); });
   }
   function afterBody() {
-    if (scene.isEnding) { showEndingCard(scene); return; }
+    if (scene.isEnding) { showEndingCard(scene.endingId || "fall", scene); return; }
     awaitingChoice = true; emitChoices(scene);
   }
   function advance() {
@@ -112,92 +122,97 @@ import { stripDirectives } from "./script.js";
   }
   log.addEventListener("click", function () { if (typing) advance(); else if (scene && !ended && !awaitingChoice) advance(); });
 
-  // ── onEnter (슬라이스1: setVars/setFlags. hp/stigma/addItems/재굴림 = 슬라이스2) ──
+  // ── onEnter (사이트 applyOnEnter 이식) ──
   function applyOnEnter(oe) {
     if (!oe) return;
-    if (oe.setVars) { for (var k in oe.setVars) S.vars[k] = oe.setVars[k]; }
-    if (oe.setFlags) { for (var f in oe.setFlags) S.flags[f] = oe.setFlags[f]; }
+    if (oe.setVars) for (var k in oe.setVars) S.variables[k] = oe.setVars[k];
+    if (oe.setFlags) for (var f in oe.setFlags) S.flags[f] = oe.setFlags[f];
+    if (oe.incrementCounters) oe.incrementCounters.forEach(function (key) { S.flags[key] = (typeof S.flags[key] === "number" ? S.flags[key] : 0) + 1; });
+    if (oe.addItems) oe.addItems.forEach(function (it) { if (S.inventory.indexOf(it) < 0 && S.inventory.length < INVENTORY_CAP) S.inventory.push(it); });
+    if (typeof oe.stigmaDelta === "number" && Number.isFinite(oe.stigmaDelta) && oe.stigmaDelta !== 0) applyStig(oe.stigmaDelta);
+    if (typeof oe.hpDelta === "number" && Number.isFinite(oe.hpDelta) && oe.hpDelta !== 0) { S.hp = Math.max(0, Math.min(S.maxHp, S.hp + oe.hpDelta)); renderHP(true); }
+    if (typeof oe.rerollDelta === "number" && Number.isFinite(oe.rerollDelta) && oe.rerollDelta !== 0) S.rerollsLeft = Math.max(0, S.rerollsLeft + oe.rerollDelta);
+  }
+  function applyStig(delta) {
+    if (typeof delta !== "number" || !Number.isFinite(delta) || delta === 0) return;
+    S.stigmaErosion = clampStigma(S.stigmaErosion, delta); renderStig(true); if (delta > 0) toast("침식도 +" + delta);
   }
 
-  // ── 선택지 (사이트 Choice discriminated union → 앱 옵션 어댑트) ──
-  function chance(stat, diff) { var succ = (20 - (diff - (S.stats[stat] || 0)) + 1) / 20 * 100; return Math.max(5, Math.min(95, Math.round(succ))); }
-  function adaptChoice(c) {
-    if (c.kind === "probability") return { label: c.label, kind: "prob", prob: { stat: c.stat, diff: c.difficulty }, onSuccess: c.onSuccess, onFail: c.onFailure };
-    if (c.kind === "conditional") return { label: c.label, kind: "cond", condition: c.condition, goto: c.to, reqDesc: condDesc(c.condition) };
-    return { label: c.label, kind: "plain", goto: c.to };
-  }
-  function isConditionMet(cond) {
-    if (!cond) return true;
-    switch (cond.kind) {
-      case "flag": { var v = !!S.flags[cond.key]; return cond.expect === false ? !v : v; }
-      case "minStat": return (S.stats[cond.stat] || 0) >= cond.min;
-      case "minFlag": return (Number(S.flags[cond.key]) || 0) >= cond.min;
-      case "stigmaAtLeast": return S.stigma >= cond.min;
-      case "hasItem": return S.inv.indexOf(cond.itemId) >= 0;
-      default: return true; // 미구현 조건은 열어둔다(슬라이스2에서 정합).
-    }
+  // ── 선택지 (사이트 Choice discriminated union → 렌더/판정) ──
+  function choiceVisible(c) {
+    // conditional hidden=true + 미충족 → 숨김. probability hideWhenFlag truthy → 숨김.
+    if (c.kind === "conditional" && c.hidden && !evalCondition(c.condition, S)) return false;
+    if (c.kind === "probability" && c.hideWhenFlag && S.flags[c.hideWhenFlag]) return false;
+    return true;
   }
   function condDesc(cond) {
     if (!cond) return "";
     if (cond.kind === "minStat") return (STAT_KO[cond.stat] || cond.stat) + " " + cond.min + "+";
     if (cond.kind === "flag") return String(cond.key);
+    if (cond.kind === "hasItem") return "아이템: " + cond.itemId;
+    if (cond.kind === "ability") return "성흔: " + cond.required;
     if (cond.kind === "stigmaAtLeast") return "침식 " + cond.min + "+";
     return "조건";
   }
   function emitChoices(sc) {
-    var choices = sc.choices || [];
+    var choices = (sc.choices || []).filter(choiceVisible);
     var b = addBlk(); var wrap = document.createElement("div"); wrap.className = "choices";
     if (!choices.length) { var pr0 = document.createElement("div"); pr0.className = "cprompt"; pr0.style.opacity = ".6"; pr0.textContent = "(계속되는 길이 없다)"; wrap.appendChild(pr0); b.appendChild(wrap); toBottom(true); return; }
     choices.forEach(function (c) {
-      var opt = adaptChoice(c);
-      var btn = document.createElement("button"); btn.type = "button"; btn.className = "choice " + (opt.kind || "plain");
-      var locked = false, tag = opt.tag || "";
-      if (opt.kind === "cond") locked = !isConditionMet(opt.condition);
-      if (opt.kind === "prob") tag = "[" + (STAT_KO[opt.prob.stat] || opt.prob.stat) + " " + chance(opt.prob.stat, opt.prob.diff) + "%]";
-      var right = locked ? '<span class="ctag">🔒 ' + esc(opt.reqDesc || "조건 미충족") + "</span>" : (tag ? '<span class="ctag">' + esc(tag) + "</span>" : "");
-      btn.innerHTML = '<span class="bul">✤</span><span class="lbl">' + esc(stripMarks(opt.label || "")) + "</span>" + right;
+      var btn = document.createElement("button"); btn.type = "button"; btn.className = "choice " + (c.kind === "probability" ? "prob" : c.kind === "conditional" ? "cond" : "plain");
+      var locked = false, tag = "";
+      if (c.kind === "conditional") locked = !evalCondition(c.condition, S);
+      if (c.kind === "probability") { var pct = estimateSuccessPercent({ stat: rollStat(S, c.stat), ability: S.ability, statKey: c.stat, difficulty: c.difficulty }); tag = "[" + (STAT_KO[c.stat] || c.stat) + " " + pct + "%]"; }
+      var right = locked ? '<span class="ctag">🔒 ' + esc(condDesc(c.condition)) + "</span>" : (tag ? '<span class="ctag">' + esc(tag) + "</span>" : "");
+      btn.innerHTML = '<span class="bul">✤</span><span class="lbl">' + esc(stripMarks(c.label || "")) + "</span>" + right;
       if (locked) { btn.classList.add("locked"); btn.disabled = true; }
-      else btn.addEventListener("click", function () { chooseOpt(b, opt); });
+      else btn.addEventListener("click", function () { chooseOpt(b, c); });
       wrap.appendChild(btn);
     });
     b.appendChild(wrap); cont.classList.add("hidden"); toBottom(true);
   }
-  function chooseOpt(blk, opt) {
+  function chooseOpt(blk, c) {
     awaitingChoice = false;
-    blk.innerHTML = ""; var rec = document.createElement("div"); rec.className = "picked"; rec.innerHTML = '<span class="bul">✤</span> <b>' + esc(stripMarks(opt.label || "")) + "</b>"; blk.appendChild(rec);
-    if (opt.kind === "prob") {
-      var ch = chance(opt.prob.stat, opt.prob.diff); var roll = reduce ? 11 : Math.floor(Math.random() * 20) + 1;
-      var ok = reduce ? (ch >= 50) : (roll + (S.stats[opt.prob.stat] || 0) >= opt.prob.diff);
-      emitRoll(ok, opt.prob, roll);
-      var target = ok ? opt.onSuccess : opt.onFail;
+    blk.innerHTML = ""; var rec = document.createElement("div"); rec.className = "picked"; rec.innerHTML = '<span class="bul">✤</span> <b>' + esc(stripMarks(c.label || "")) + "</b>"; blk.appendChild(rec);
+    if (c.kind === "probability") {
+      var rng = reduce ? function () { return 0.5; } : Math.random; // 테스트 결정성(roll=11)
+      var statV = rollStat(S, c.stat);
+      var res = rollProbability({ stat: statV, ability: S.ability, statKey: c.stat, difficulty: c.difficulty, rng: rng });
+      emitRoll(res, c, statV);
+      applyStig(c.stigmaDelta);
+      applyStig(res.success ? c.stigmaDeltaOnSuccess : c.stigmaDeltaOnFailure);
+      var target = res.success ? c.onSuccess : c.onFailure;
       setTimeout(function () { goTo(target); }, reduce ? 150 : 800);
       return;
     }
-    goTo(opt.goto);
+    applyStig(c.stigmaDelta);
+    goTo(c.to);
   }
-  function emitRoll(ok, prob, roll) {
-    var b = addBlk(); var c = document.createElement("div"); c.className = "rollcard " + (ok ? "ok" : "fail");
-    c.innerHTML = '<div class="lab mono">' + (STAT_KO[prob.stat] || prob.stat) + " 판정</div>" +
-      '<div class="dice mono">d20(' + roll + ") + " + (STAT_KO[prob.stat] || prob.stat) + "(" + (S.stats[prob.stat] || 0) + ") vs 난이도 " + prob.diff + "</div>" +
-      '<div class="res">' + (ok ? "성공!" : "실패…") + "</div>";
-    b.appendChild(c); toBottom(true);
+  function emitRoll(res, c, statV) {
+    var b = addBlk(); var el = document.createElement("div"); el.className = "rollcard " + (res.success ? "ok" : "fail");
+    var bonusStr = res.bonus ? " + 성흔(" + res.bonus + ")" : "";
+    el.innerHTML = '<div class="lab mono">' + (STAT_KO[c.stat] || c.stat) + " 판정</div>" +
+      '<div class="dice mono">d20(' + res.roll + ") + " + (STAT_KO[c.stat] || c.stat) + "(" + statV + ")" + bonusStr + " = " + res.total + " vs 난이도 " + c.difficulty + "</div>" +
+      '<div class="res">' + (res.success ? "성공!" : "실패…") + "</div>";
+    b.appendChild(el); toBottom(true);
   }
 
   // ── 상태바 렌더 ──
-  function renderHP(flash) { var hp = $("hpPips"); hp.innerHTML = ""; for (var i = 0; i < S.hpMax; i++) { var d = document.createElement("span"); d.className = "pip hp" + (i < S.hp ? " on" : ""); hp.appendChild(d); } if (flash && hp.animate) hp.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 600 }); }
-  function renderStig(flash) { $("stigBar").style.width = (S.stigma / S.stigMax * 100) + "%"; $("stigVal").textContent = S.stigma; if (flash) { var e = $("stigVal"); if (e.animate) e.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 700 }); } }
+  function renderHP(flash) { var hp = $("hpPips"); hp.innerHTML = ""; for (var i = 0; i < S.maxHp; i++) { var d = document.createElement("span"); d.className = "pip hp" + (i < S.hp ? " on" : ""); hp.appendChild(d); } if (flash && hp.animate) hp.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 600 }); }
+  function renderStig(flash) { $("stigBar").style.width = (S.stigmaErosion / STIGMA_MAX * 100) + "%"; $("stigVal").textContent = S.stigmaErosion; if (flash) { var e = $("stigVal"); if (e.animate) e.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 700 }); } }
   function renderStats(flash) { var g = $("statgrid"); g.innerHTML = ""; STAT_ORDER.forEach(function (k) { var d = document.createElement("div"); d.className = "sstat"; d.setAttribute("data-stat", k); d.setAttribute("title", STAT_KO[k]); d.innerHTML = '<span class="ic">' + STAT_IC[k] + "</span>" + S.stats[k]; g.appendChild(d); }); if (flash && g.animate) g.animate([{ filter: "brightness(1.8)" }, { filter: "brightness(1)" }], { duration: 600 }); }
 
-  // ── 엔딩 (슬라이스2에서 endingId→라벨/이월 상태 매핑) ──
-  function showEndingCard(sc) {
+  // ── 엔딩 ──
+  function showEndingCard(endingId, sc) {
     clearT(); cont.classList.add("hidden");
     ended = true; scene = null; awaitingChoice = false; cur = { id: null, pi: 0 };
     var b = addBlk(); var e = document.createElement("div"); e.className = "ending";
-    var eid = sc.endingId || "";
-    e.innerHTML = '<div class="tt mono">ENDING' + (eid ? " · " + esc(eid) : "") + "</div>" +
-      '<div class="big">' + esc(sc.title || "끝") + "</div>" +
+    var label = ENDING_KO[endingId] || endingId || "끝";
+    e.innerHTML = '<div class="tt mono">ENDING' + (endingId ? " · " + esc(endingId) : "") + "</div>" +
+      '<div class="big">' + esc(label) + "</div>" +
+      '<div class="desc">' + esc(sc && sc.title ? sc.title : "") + "</div>" +
       '<button type="button" class="again" id="againBtn">↺ 다시 플레이</button>';
-    b.appendChild(e); toBottom(true);
+    b.appendChild(e); toast("에필로그에 도달했습니다."); toBottom(true);
     var ab = $("againBtn"); if (ab) ab.addEventListener("click", restart);
   }
 
@@ -223,7 +238,7 @@ import { stripDirectives } from "./script.js";
   on("title", "click", startGame);
   on("bottombar", "click", function (e) {
     var b = e.target.closest("[data-bb]"); if (!b) return; var k = b.getAttribute("data-bb");
-    if (k === "inv") toast(S.inv.length ? "소지품 · " + S.inv.join(", ") : "소지품 · 비어 있음");
+    if (k === "inv") toast(S.inventory.length ? "소지품 · " + S.inventory.join(", ") : "소지품 · 비어 있음");
     else if (k === "codex") toast("도감(코덱스) — 준비 중");
     else if (k === "rank") toast("업적·랭크 — 준비 중");
     else if (k === "wip") toast("증거 — 작업중…");
