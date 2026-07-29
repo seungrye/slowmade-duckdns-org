@@ -201,3 +201,33 @@ body.app .bottombar { padding-bottom: calc(7px + env(safe-area-inset-bottom)); }
 /* 상단 능력치 칩 — 탭하면 툴팁(어떤 스탯인지) */
 .sstat { cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .sstat:active { transform: translateY(1px); filter: brightness(1.15); }
+
+/* ─────────── 타이틀(시작) 화면 ─────────── */
+.title {
+  position: absolute; inset: 0; z-index: 20; cursor: pointer; overflow: hidden;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  background:
+    radial-gradient(120% 85% at 50% 32%, #22343a 0%, #12202400 0%, #0e181c 55%, #060c0f 100%),
+    linear-gradient(#16262b, #0a1418);
+  color: #e9e0cf;
+}
+/* 픽셀 스캔라인/디더 질감 */
+.title::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5; image-rendering: pixelated;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 3px, rgba(0,0,0,.18) 3px 4px),
+    repeating-linear-gradient(90deg, transparent 0 3px, rgba(255,255,255,.02) 3px 4px);
+}
+/* 은은한 안개 글로우 */
+.title::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(60% 40% at 35% 45%, #57c7b81f, transparent 70%), radial-gradient(45% 35% at 72% 62%, #e3b23c17, transparent 70%);
+}
+.title-inner { position: relative; z-index: 2; }
+.title-name { margin: 0; font-size: clamp(34px, 12vw, 60px); font-weight: 800; letter-spacing: .01em; line-height: 1.06; color: #efe6d2; text-shadow: 0 3px 0 rgba(0,0,0,.55), 0 0 26px rgba(87,199,184,.28); }
+.title-sub { margin: 12px 0 0; font-size: 12px; letter-spacing: .42em; text-transform: uppercase; color: #8fb3ad; }
+.title-tap { position: absolute; z-index: 2; bottom: 13%; margin: 0; font-size: 14px; letter-spacing: .22em; color: #d7d2c6; animation: tapblink 1.6s ease-in-out infinite; }
+.title-tap .en { display: block; margin-top: 5px; font-size: 11px; letter-spacing: .34em; color: #8a938f; }
+@keyframes tapblink { 50% { opacity: .35; } }
+.title-note { position: absolute; z-index: 2; bottom: 3.5%; margin: 0; font-size: 10px; color: #5e6b66; }
+.title.hidden { display: none; }

@@ -12,7 +12,9 @@ function mountApp() {
   document.body.className = "app";
   document.body.innerHTML = bodyInner;
 }
-
+function startGame() {
+  document.getElementById("title").click(); // 타이틀 탭 → 게임 시작
+}
 // 선택지는 '항상 마지막(=plain 경로)'을 눌러 확률판정/조건부 타이머 없이 결정적으로 엔딩까지 진행.
 function driveToEnding(maxSteps = 100) {
   const log = document.getElementById("log");
@@ -25,7 +27,7 @@ function driveToEnding(maxSteps = 100) {
   return !!document.querySelector(".ending");
 }
 
-describe("eternia 엔진 — 엔딩 종료(회귀)", () => {
+describe("eternia 엔진", () => {
   beforeEach(() => {
     vi.resetModules();
     // jsdom: matchMedia 스텁 (reduce-motion=true → 타이핑 즉시완료·동기·결정적)
@@ -37,9 +39,23 @@ describe("eternia 엔진 — 엔딩 종료(회귀)", () => {
     document.body.innerHTML = "";
   });
 
+  it("타이틀 화면이 먼저 뜨고, 탭해야 게임이 시작된다", async () => {
+    mountApp();
+    await import("../src/main.js");
+    const title = document.getElementById("title");
+    // 시작 전: 타이틀 보임, 본문 비어 있음
+    expect(title.classList.contains("hidden")).toBe(false);
+    expect(document.querySelectorAll("#log .blk").length).toBe(0);
+    // 타이틀 탭 → 숨김 + 첫 씬 렌더
+    startGame();
+    expect(title.classList.contains("hidden")).toBe(true);
+    expect(document.querySelectorAll("#log .blk").length).toBeGreaterThan(0);
+  });
+
   it("엔딩 도달 후 본문을 여러 번 탭해도 엔딩이 중복 출력되지 않는다", async () => {
     mountApp();
-    await import("../src/main.js"); // 엔진 시작(goTo 'start')
+    await import("../src/main.js");
+    startGame();
 
     expect(driveToEnding()).toBe(true);
     expect(document.querySelectorAll(".ending").length).toBe(1);

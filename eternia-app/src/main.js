@@ -252,6 +252,9 @@
 
   // ── 컨트롤 ── (요소 없으면 스킵하는 null-safe 배선)
   function on(id, ev, fn){ var el=$(id); if(el) el.addEventListener(ev, fn); }
+  // 타이틀(시작) 화면 → 탭하면 게임 시작
+  function startGame(){ var t=$('title'); if(t) t.classList.add('hidden'); goTo('start'); }
+  on('title','click', startGame);
   // 하단 바 아이콘 탭 → 툴팁
   on('bottombar','click', function(e){
     var b=e.target.closest('[data-bb]'); if(!b) return; var k=b.getAttribute('data-bb');
@@ -265,5 +268,5 @@
   // restart() 는 엔딩 '다시 플레이'(#againBtn)에서 사용
   function restart(){ clearT(); S=initState(); log.innerHTML=''; impactOv.classList.remove('show'); impactOv.innerHTML=''; impactActive=null; newpill.classList.remove('show'); toastEl.classList.remove('show'); stick=true; renderHP(false); renderStig(false); renderStats(false); goTo('start'); }
 
-  renderHP(false); renderStig(false); renderStats(false); goTo('start');
+  renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 startGame()→goTo('start')
 })();
