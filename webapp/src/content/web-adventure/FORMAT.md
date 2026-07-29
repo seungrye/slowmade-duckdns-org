@@ -56,8 +56,10 @@
 
 - **에셋 이름/URL**: `img`/`sfx`/`bgm` 의 첫 인자는 에셋 키 또는 URL. 현재 렌더러는 값을 그대로
   `src` 로 쓴다(키→MinIO URL 해석 파이프라인은 오디오 업로드와 함께 도입 예정).
-- **씬 기본 BGM**: `Scene.bgm?: { src; loop?; volume? }` 로 씬 단위 배경음을 지정(있/없 선택). 중간
-  제어는 `<<bgm …>>`. (재생은 오디오 재생 태스크에서 연결 — 현재 스키마 필드만 존재.)
+- **씬 기본 BGM**: `Scene.bgm?: { src; loop?; volume? }` 로 씬 단위 배경음을 지정(있/없 선택). 씬
+  저작 UI(`/scenes/[id]`)의 **배경음 필드**에서 URL 직접 입력 또는 오디오 파일 업로드
+  (`/api/web-adventure/audio/upload` → MinIO public URL)로 저작한다. 중간 제어는 `<<bgm …>>`.
+  (필드 저작·업로드는 구현 완료 — **실제 재생 연결은 별도 태스크**.)
 - **화면효과는 `prefers-reduced-motion` 시 애니메이션 off**(접근성). 오버레이는 pointer-events 없음.
 
 ### 하위호환
