@@ -48,4 +48,18 @@ describe("renderInline — 서식 규약(FORMAT.md) 토큰", () => {
     const nodes = renderInline('열린 따옴표 "만');
     expect(nodes).toEqual(['열린 따옴표 "만']);
   });
+
+  it("{{변수}} 는 vars 로 치환 후 렌더", () => {
+    expect(renderInline("너는 {{route}}로 갔다", { route: "정문" })).toEqual(["너는 정문로 갔다"]);
+  });
+
+  it("{{변수}} 치환 후 마크업 토큰도 정상 처리", () => {
+    const [el] = renderInline("[[{{loot}}]]", { loot: "금서" }) as El[];
+    expect(el.type).toBe("span");
+    expect(el.props.children).toBe("금서");
+  });
+
+  it("vars 없으면 {{변수}} 원문 유지", () => {
+    expect(renderInline("미정의 {{x}}")).toEqual(["미정의 {{x}}"]);
+  });
 });

@@ -89,6 +89,21 @@ describe("START_GAME", () => {
     if (next.phase !== "playing") throw new Error("expected playing");
     expect(next.character.flags.isStarted).toBe(true);
   });
+
+  it("onEnter.setVars → character.variables 병합({{키}} 치환 소스)", () => {
+    const reg: SceneRegistry = {
+      a: makeScene({ id: "a", choices: [{ kind: "plain", id: "go", label: "go", to: "b" }] }),
+      b: makeScene({ id: "b", onEnter: { setVars: { route: "정문 초소", n: 3 } } }),
+    };
+    let state: GameState = gameReducer(
+      { phase: "creating" },
+      { type: "START_GAME", character: makeChar({ variables: { keep: "값" } }), startScene: "a" },
+      reg,
+    );
+    state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "go" }, reg);
+    if (state.phase !== "playing") throw new Error("expected playing");
+    expect(state.character.variables).toEqual({ keep: "값", route: "정문 초소", n: 3 });
+  });
 });
 
 describe("MAKE_CHOICE — plain", () => {

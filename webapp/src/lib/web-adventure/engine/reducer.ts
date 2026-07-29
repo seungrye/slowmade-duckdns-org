@@ -90,13 +90,14 @@ function pushItems(inventory: string[], toAdd: string[]): string[] {
 /** 씬 onEnter 적용 — setFlags / addItems / incrementCounters / stigmaDelta 를 character 에 반영. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
-  const { setFlags, addItems, incrementCounters, stigmaDelta, hpDelta, rerollDelta } = scene.onEnter as {
+  const { setFlags, addItems, incrementCounters, stigmaDelta, hpDelta, rerollDelta, setVars } = scene.onEnter as {
     setFlags?: Record<string, boolean>;
     addItems?: string[];
     incrementCounters?: string[];
     stigmaDelta?: number;
     hpDelta?: number; // #318 — HP 변화 (음수=데미지, 양수=회복).
     rerollDelta?: number; // 재굴림 횟수 변화 (양수=보충).
+    setVars?: Record<string, string | number>; // 동적 텍스트 변수({{키}} 치환 소스).
   };
   const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
   const itemsChanged = addItems && addItems.length > 0;
@@ -104,7 +105,8 @@ function applyOnEnter(character: Character, scene: Scene): Character {
   const stigmaChanged = typeof stigmaDelta === "number" && stigmaDelta !== 0;
   const hpChanged = typeof hpDelta === "number" && hpDelta !== 0 && Number.isFinite(hpDelta);
   const rerollChanged = typeof rerollDelta === "number" && rerollDelta !== 0 && Number.isFinite(rerollDelta);
-  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged && !hpChanged && !rerollChanged) return character;
+  const varsChanged = setVars && Object.keys(setVars).length > 0;
+  if (!flagsChanged && !itemsChanged && !countersChanged && !stigmaChanged && !hpChanged && !rerollChanged && !varsChanged) return character;
   let nextFlags: Record<string, boolean | number> = character.flags;
   if (flagsChanged || countersChanged) {
     nextFlags = { ...character.flags };
@@ -130,6 +132,10 @@ function applyOnEnter(character: Character, scene: Scene): Character {
   // 재굴림 보충 (음수 방지).
   if (rerollChanged) {
     next = { ...next, rerollsLeft: Math.max(0, next.rerollsLeft + rerollDelta) };
+  }
+  // 동적 텍스트 변수 병합({{키}} 치환 소스).
+  if (varsChanged) {
+    next = { ...next, variables: { ...(next.variables ?? {}), ...setVars } };
   }
   return next;
 }

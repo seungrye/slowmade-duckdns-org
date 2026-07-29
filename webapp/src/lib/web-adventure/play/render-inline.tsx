@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { interpolate } from "../script";
 
 /**
  * 씬 본문·선택지 인라인 마크업 렌더 — 〈에테르니아의 추락〉 서식 규약.
@@ -8,10 +9,13 @@ import type { ReactNode } from "react";
  *   *지문*     무대 지시·서술 강조 — 회색 이탤릭
  *   "대사"     따옴표 대사 — 호박색(가스등 톤). 마크업 불필요, 따옴표만으로 자동 적용
  *   [[명사]]   장소·아이템·고유 개념 — 청록색(괄호는 표시하지 않음)
+ *   {{변수}}   동적 텍스트 — vars 로 치환(character.variables). 미정의는 원문 유지.
  *
  * 중첩은 지원하지 않는 단순 토크나이저(본문은 평면 사용 — 대사 안 마크업 금지).
+ * (`<< 디렉티브 >>` 는 여기서 다루지 않음 — parseScript/SceneRenderer 가 처리.)
  */
-export function renderInline(text: string): ReactNode[] {
+export function renderInline(text: string, vars?: Record<string, string | number>): ReactNode[] {
+  text = interpolate(text, vars);
   const nodes: ReactNode[] = [];
   const re = /(\*\*[^*]+\*\*|\*[^*]+\*|\[\[[^\]]+\]\]|"[^"\n]+")/g;
   let last = 0;
