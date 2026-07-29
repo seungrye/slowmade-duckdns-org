@@ -213,4 +213,34 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     await boot([{ id: "kael_infirmary", title: "섬광", body: ["번쩍 <<fx flash>>"], choices: [] }]);
     expect(document.querySelector("#stage .fx-ov[data-fx='flash']")).toBeTruthy();
   });
+
+  // globalThis.Audio 를 스텁해 생성된 오디오 엘리먼트를 관찰
+  function stubAudio() {
+    const created = [];
+    globalThis.Audio = vi.fn().mockImplementation((src) => {
+      const el = { src, play: vi.fn(), pause: vi.fn(), loop: false, volume: 1, currentTime: 0 };
+      created.push(el);
+      return el;
+    });
+    return created;
+  }
+
+  it("Scene.bgm 진입 시 BGM 재생(loop/volume)", async () => {
+    const created = stubAudio();
+    await boot([{ id: "kael_infirmary", title: "음악", bgm: { src: "https://cdn.test/theme.mp3", loop: true, volume: 0.5 }, body: ["b"], choices: [] }]);
+    const bgm = created.find((e) => e.src === "https://cdn.test/theme.mp3");
+    expect(bgm).toBeTruthy();
+    expect(bgm.loop).toBe(true);
+    expect(bgm.volume).toBe(0.5);
+    expect(bgm.play).toHaveBeenCalled();
+  });
+
+  it("<<sfx>> 디렉티브가 효과음 재생", async () => {
+    const created = stubAudio();
+    await boot([{ id: "kael_infirmary", title: "소리", body: ["칼 <<sfx https://cdn.test/clash.mp3 0.6>>"], choices: [] }]);
+    const sfx = created.find((e) => e.src === "https://cdn.test/clash.mp3");
+    expect(sfx).toBeTruthy();
+    expect(sfx.volume).toBe(0.6);
+    expect(sfx.play).toHaveBeenCalled();
+  });
 });

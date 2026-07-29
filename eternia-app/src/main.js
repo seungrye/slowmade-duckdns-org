@@ -1,5 +1,6 @@
 import { fetchScenes, START_SCENE_ID } from "./content-client.js";
 import { parseScript } from "./script.js";
+import { AudioBus } from "./audio-bus.js";
 import {
   rollProbability, estimateSuccessPercent, stigmaDebuff, rollStat,
   clampStigma, isFullyPetrified, isDead, evalCondition, STIGMA_MAX, INVENTORY_CAP,
@@ -32,6 +33,8 @@ import {
 
   // ── 씬 데이터 (사이트 content/v1 에서 fetch) ──
   var sceneMap = {};
+  // 오디오 버스 — 앱 단일 페이지라 인스턴스 유지(BGM 씬 전환 연속). 테스트는 globalThis.Audio 스텁.
+  var audio = new AudioBus();
 
   // ── 마크업 토크나이저 (**굵게** *지문* "대사" [[명사]] {{변수}}) ──
   function tokenize(raw) {
@@ -94,6 +97,7 @@ import {
     if (!sc) { var b = addBlk("p-blk"); b.innerHTML = '<div class="p" style="opacity:.6">…(씬 없음: ' + esc(String(sceneId)) + ")</div>"; cont.classList.add("hidden"); return; }
     scene = sc; cur = { id: sceneId, pi: 0 }; ended = false; awaitingChoice = false;
     applyOnEnter(sc.onEnter);
+    if (sc.bgm && sc.bgm.src) audio.playBgm(sc.bgm.src, { loop: sc.bgm.loop, volume: sc.bgm.volume }); // 씬 기본 BGM
     // 자동 엔딩(사이트 moveToScene): 명시 isEnding 은 body 렌더 후(afterBody), 침식100/HP0 은 즉시.
     if (!sc.isEnding && isFullyPetrified(S)) { showEndingCard("petrification", sc); return; }
     if (!sc.isEnding && isDead(S)) { showEndingCard("fall", sc); return; }
@@ -122,6 +126,15 @@ import {
   function execDirective(s) {
     if (s.cmd === "img" && s.args[0]) { var fb = addBlk(); fb.appendChild(emitFig(s.args[0], { impact: s.args.indexOf("impact") >= 0, alt: "삽화 " + s.args[0] })); toBottom(); return; }
     if (s.cmd === "fx" && s.args[0]) { var ms = parseInt(s.args[1], 10); execFx(s.args[0], Number.isFinite(ms) ? ms : 0); return; }
+    if (s.cmd === "sfx" && s.args[0]) { var v = parseFloat(s.args[1]); audio.playSfx(s.args[0], Number.isFinite(v) ? v : undefined); return; }
+    if (s.cmd === "bgm" && s.args[0]) {
+      var ctrl = s.args[0];
+      if (ctrl === "play") { if (s.args[1]) audio.playBgm(s.args[1], {}); else audio.resumeBgm(); }
+      else if (ctrl === "stop") audio.stopBgm();
+      else if (ctrl === "pause") audio.pauseBgm();
+      else if (ctrl === "resume") audio.resumeBgm();
+      return;
+    }
   }
   function execFx(effect, ms) {
     if (!ms) ms = effect === "flash" ? 400 : 800;
@@ -274,7 +287,7 @@ import {
     else if (k === "wip") toast("증거 — 작업중…");
   });
   on("statgrid", "click", function (e) { var s = e.target.closest("[data-stat]"); if (!s) return; var k = s.getAttribute("data-stat"); toast(STAT_KO[k] + " · " + S.stats[k]); });
-  function restart() { clearT(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; renderHP(false); renderStig(false); renderStats(false); goTo(START_SCENE_ID); }
+  function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; renderHP(false); renderStig(false); renderStats(false); goTo(START_SCENE_ID); }
 
   renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 startGame()→boot()
 })();
