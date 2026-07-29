@@ -23,6 +23,8 @@ interface Props {
 export function SceneForm({ scene, onChange }: Props) {
   const [newFlagKey, setNewFlagKey] = useState("");
   const [newItemId, setNewItemId] = useState("");
+  const [bgmUploading, setBgmUploading] = useState(false);
+  const [bgmError, setBgmError] = useState<string | null>(null);
 
   const titleMissing = !scene.title.trim();
   const bodyMissing = !scene.body || scene.body.length === 0;
@@ -68,6 +70,36 @@ export function SceneForm({ scene, onChange }: Props) {
 
   function handleRemoveItem(itemId: string) {
     patchOnEnter({ addItems: addItems.filter((x) => x !== itemId) });
+  }
+
+  // ── 배경음(BGM) ─────────────────────────────────────────────────────────
+  function updateBgm(next: NonNullable<Scene["bgm"]> | undefined) {
+    onChange({ ...scene, bgm: next });
+  }
+  function handleBgmSrc(src: string) {
+    if (!src.trim()) return updateBgm(undefined); // 비우면 제거
+    updateBgm({ ...scene.bgm, src });
+  }
+  function handleBgmLoop(loop: boolean) {
+    if (!scene.bgm) return;
+    updateBgm({ ...scene.bgm, loop });
+  }
+  async function handleBgmUpload(file: File) {
+    setBgmUploading(true);
+    setBgmError(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/web-adventure/audio/upload", { method: "POST", body: fd });
+      const json = await res.json().catch(() => null);
+      const url = json?.data?.url as string | undefined;
+      if (!res.ok || !url) throw new Error(json?.message ?? "업로드 실패");
+      updateBgm({ ...scene.bgm, src: url });
+    } catch (e) {
+      setBgmError(e instanceof Error ? e.message : "업로드 실패");
+    } finally {
+      setBgmUploading(false);
+    }
   }
 
   return (
@@ -156,6 +188,49 @@ export function SceneForm({ scene, onChange }: Props) {
             </div>
           );
         })()}
+
+        {/* 배경음(BGM) — URL 직접 입력 또는 오디오 파일 업로드(→ MinIO public URL). */}
+        <div className="block">
+          <span className="block text-xs text-gray-500 mb-0.5">배경음 (BGM, 선택)</span>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="BGM URL"
+              value={scene.bgm?.src ?? ""}
+              onChange={(e) => handleBgmSrc(e.target.value)}
+              placeholder="오디오 URL 또는 파일 업로드"
+              className={inputCls}
+            />
+            <label className="shrink-0 text-xs text-blue-600 hover:text-blue-800 cursor-pointer whitespace-nowrap">
+              {bgmUploading ? "업로드 중…" : "파일 업로드"}
+              <input
+                type="file"
+                accept="audio/*"
+                aria-label="BGM 파일 업로드"
+                className="hidden"
+                disabled={bgmUploading}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleBgmUpload(f);
+                }}
+              />
+            </label>
+          </div>
+          {scene.bgm?.src && (
+            <label className="flex items-center gap-1 text-[11px] text-gray-500 mt-1">
+              <input
+                type="checkbox"
+                aria-label="BGM 반복"
+                checked={scene.bgm?.loop ?? false}
+                onChange={(e) => handleBgmLoop(e.target.checked)}
+              />
+              반복 재생 (loop)
+            </label>
+          )}
+          {bgmError && <p className="text-xs text-red-500 mt-0.5">{bgmError}</p>}
+          <span className="block text-[10px] text-gray-400 mt-0.5">
+            mp3/ogg/wav 등. 중간 제어(정지·재개)는 본문의 {"<<bgm …>>"} 디렉티브.
+          </span>
+        </div>
 
         <label className="block">
           <span className="block text-xs text-gray-500 mb-0.5">본문 (한 줄당 한 문단)</span>

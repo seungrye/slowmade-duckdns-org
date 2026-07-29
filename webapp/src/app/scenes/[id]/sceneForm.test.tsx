@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SceneForm } from './sceneForm';
 import type { Scene } from '@/types/web-adventure';
 
@@ -69,6 +69,51 @@ describe('SceneForm — onEnter setFlags', () => {
     fireEvent.click(removeBtn);
     const arg = fn.mock.calls[fn.mock.calls.length - 1][0] as Scene;
     expect(arg.onEnter?.setFlags?.visited).toBeUndefined();
+  });
+});
+
+describe('SceneForm — bgm (배경음)', () => {
+  it('bgm.src 를 BGM URL 필드에 표시', () => {
+    render(<SceneForm scene={{ ...baseScene, bgm: { src: '/a/theme.mp3' } }} onChange={vi.fn()} />);
+    expect((screen.getByLabelText('BGM URL') as HTMLInputElement).value).toBe('/a/theme.mp3');
+  });
+
+  it('BGM URL 변경 시 onChange(bgm.src)', () => {
+    const fn = vi.fn();
+    render(<SceneForm scene={baseScene} onChange={fn} />);
+    fireEvent.change(screen.getByLabelText('BGM URL'), { target: { value: '/a/x.mp3' } });
+    const arg = fn.mock.calls[fn.mock.calls.length - 1][0] as Scene;
+    expect(arg.bgm?.src).toBe('/a/x.mp3');
+  });
+
+  it('BGM URL 을 비우면 bgm 제거(undefined)', () => {
+    const fn = vi.fn();
+    render(<SceneForm scene={{ ...baseScene, bgm: { src: '/a/x.mp3' } }} onChange={fn} />);
+    fireEvent.change(screen.getByLabelText('BGM URL'), { target: { value: '' } });
+    const arg = fn.mock.calls[fn.mock.calls.length - 1][0] as Scene;
+    expect(arg.bgm).toBeUndefined();
+  });
+
+  it('오디오 파일 업로드 성공 시 반환 URL 을 bgm.src 로 설정', async () => {
+    const fn = vi.fn();
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { url: 'https://cdn.example/x.mp3' } }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+    render(<SceneForm scene={baseScene} onChange={fn} />);
+    const input = screen.getByLabelText('BGM 파일 업로드') as HTMLInputElement;
+    const file = new File(['bytes'], 'theme.mp3', { type: 'audio/mpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => {
+      const arg = fn.mock.calls[fn.mock.calls.length - 1]?.[0] as Scene | undefined;
+      expect(arg?.bgm?.src).toBe('https://cdn.example/x.mp3');
+    });
+    expect(mockFetch).toHaveBeenCalledWith(
+      '/api/web-adventure/audio/upload',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    vi.unstubAllGlobals();
   });
 });
 
