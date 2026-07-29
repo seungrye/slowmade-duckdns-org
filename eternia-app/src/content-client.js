@@ -1,0 +1,68 @@
+// 사이트 web-adventure 콘텐츠 클라이언트 — GET /api/web-adventure/content/v1 → {id: scene} 맵.
+// webapp/src/lib/web-adventure/engine/sceneRegistry.ts 의 fetch+retry 를 앱(JS)으로 이식.
+// 실시간 fetch 전용(오프라인 미지원).
+
+export const DEFAULT_API_BASE = "https://handmade.r-e.kr";
+
+/** Kael 의 시작 씬(사이트 sceneRegistry.START_SCENE_ID 와 동일). */
+export const START_SCENE_ID = "kael_infirmary";
+
+const FETCH_RETRIES = 2;
+const FETCH_BACKOFFS_MS = [500, 1500];
+
+function resolveBase(baseUrl) {
+  if (baseUrl) return baseUrl;
+  // Vite: import.meta.env.VITE_API_BASE 로 override 가능.
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_BASE) {
+      return import.meta.env.VITE_API_BASE;
+    }
+  } catch {
+    /* import.meta 미지원 환경 무시 */
+  }
+  return DEFAULT_API_BASE;
+}
+
+async function fetchOnce(baseUrl, fetchImpl) {
+  const res = await fetchImpl(`${baseUrl}/api/web-adventure/content/v1`);
+  if (!res.ok) throw new Error(`content fetch ${res.status}`);
+  const json = await res.json();
+  const list = (json && json.data && json.data.scenes) || [];
+  const map = {};
+  for (const s of list) {
+    if (s && s.id) map[s.id] = s;
+  }
+  return map;
+}
+
+/**
+ * 씬 맵 fetch.
+ * @param {object} [opts]
+ * @param {string} [opts.baseUrl] API 베이스(기본 DEFAULT_API_BASE / VITE_API_BASE)
+ * @param {function} [opts.fetchImpl] 주입형 fetch(테스트)
+ * @param {boolean} [opts.retry=true] 실패 시 재시도
+ * @param {number[]} [opts.backoffs] 재시도 backoff(ms)
+ * @returns {Promise<Record<string, object>>} {sceneId: Scene}
+ */
+export async function fetchScenes(opts = {}) {
+  const baseUrl = resolveBase(opts.baseUrl);
+  const fetchImpl = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch.bind(globalThis) : null);
+  if (!fetchImpl) throw new Error("fetch unavailable");
+  const retry = opts.retry !== false;
+  const backoffs = opts.backoffs || FETCH_BACKOFFS_MS;
+
+  if (!retry) return fetchOnce(baseUrl, fetchImpl);
+
+  let lastError = null;
+  for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
+    try {
+      return await fetchOnce(baseUrl, fetchImpl);
+    } catch (err) {
+      lastError = err;
+      if (attempt < FETCH_RETRIES) {
+        await new Promise((r) => setTimeout(r, backoffs[attempt] != null ? backoffs[attempt] : 1500));
+      }
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("content fetch failed");
+}
