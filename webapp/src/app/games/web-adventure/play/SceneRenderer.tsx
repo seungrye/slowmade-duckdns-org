@@ -1,11 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
 import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
+import { parseScript } from "@/lib/web-adventure/script";
 import {
   getSkipVisitedEnabled,
   getTypewriterEnabled,
@@ -161,14 +162,16 @@ export default function SceneRenderer({
         data-typewriter-area
         style={{ cursor: revealCount < total ? "pointer" : undefined }}
       >
-        {scene.body.slice(0, revealCount).map((p, i) => (
-          <p
-            key={`${scene.id}-${i}`}
-            className="leading-relaxed web-adventure-fade-in"
-          >
-            {renderInline(p)}
-          </p>
-        ))}
+        {scene.body.slice(0, revealCount).map((p, i) => {
+          // {{변수}} 치환 + << 디렉티브 >> 분리. 디렉티브(sfx/bgm/fx/img/wait)의 재생·삽화 렌더는
+          // 후속 태스크 — 지금은 표시 텍스트만 렌더(디렉티브가 본문에 문자로 새지 않게).
+          const segs = parseScript(p, character.variables);
+          return (
+            <p key={`${scene.id}-${i}`} className="leading-relaxed web-adventure-fade-in">
+              {segs.map((s, j) => (s.kind === "text" ? <Fragment key={j}>{renderInline(s.text)}</Fragment> : null))}
+            </p>
+          );
+        })}
       </div>
 
       {/* 판정 대기(pendingRoll) → 결과 + 재굴림/계속. 없으면 ChoiceList. */}

@@ -53,7 +53,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
                 onClick={() => onChoose(c.id)}
                 className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 transition-colors"
               >
-                {renderInline(c.label)}
+                {renderInline(c.label, character.variables)}
               </button>
             </li>
           );
@@ -74,7 +74,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
                 title={`${STAT_LABELS_SHORT[c.stat] ?? c.stat} ${effectiveStat(character, c.stat)} + d20 ≥ ${c.difficulty}`}
                 className="w-full text-left rounded-md bg-amber-50 border border-amber-300 px-4 py-3 hover:bg-amber-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-700 focus-visible:ring-offset-1 transition-colors flex justify-between items-center"
               >
-                <span>{renderInline(c.label)}</span>
+                <span>{renderInline(c.label, character.variables)}</span>
                 <span className="text-sm text-amber-800 ml-3 shrink-0">
                   [확률 {percent}%]
                 </span>
@@ -119,7 +119,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
                   : "bg-gray-100 border-gray-300 text-gray-500 cursor-not-allowed"
               }`}
             >
-              <span>{renderInline(c.label)}</span>
+              <span>{renderInline(c.label, character.variables)}</span>
               {!allowed && <span className="text-xs ml-2">({reason})</span>}
             </button>
           </li>

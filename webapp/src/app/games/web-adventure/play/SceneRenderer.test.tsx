@@ -50,4 +50,19 @@ describe("SceneRenderer", () => {
     render(<SceneRenderer scene={SCENE} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
     expect(screen.getByText("다음으로")).toBeInTheDocument();
   });
+
+  it("본문 {{변수}} 를 character.variables 로 치환", () => {
+    const scene: Scene = { ...SCENE, body: ["너는 {{route}}로 스며든다"] };
+    const char: Character = { ...SAMPLE_CHAR, variables: { route: "정문 초소" } };
+    render(<SceneRenderer scene={scene} character={char} onChoose={vi.fn()} />);
+    expect(screen.getByText("너는 정문 초소로 스며든다")).toBeInTheDocument();
+  });
+
+  it("<< 디렉티브 >> 는 본문에 문자로 노출되지 않는다", () => {
+    const scene: Scene = { ...SCENE, body: ["덤불이 <<sfx 바스락>> 흔들린다"] };
+    const { container } = render(<SceneRenderer scene={scene} character={SAMPLE_CHAR} onChoose={vi.fn()} />);
+    expect(container.textContent).toContain("흔들린다");
+    expect(container.textContent).not.toContain("<<");
+    expect(container.textContent).not.toContain("바스락");
+  });
 });
