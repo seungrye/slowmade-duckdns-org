@@ -31,7 +31,8 @@ eternia-app/
     style.css           # 픽셀 저널 UI 스타일(목업 이식)
     main.js             # 블록 스트림 미니 엔진(para·figure·choice·roll + {{변수}})
   vite.config.js        # base:'./' (Capacitor file:// 로드용 상대경로 필수)
-  capacitor.config.ts   # appId org.slowmade.eternia · appName "에테르니아의 추락" · webDir dist
+  capacitor.config.json # appId org.slowmade.eternia · appName "에테르니아의 추락" · webDir dist
+                        # (JSON 사용 — .ts 는 typescript 의존 필요, CI 클린빌드 위해 JSON)
   dist/                 # vite 빌드 산출(webDir) — gitignore
   android/              # Capacitor 생성 안드로이드 플랫폼(이 앱 전용)
   setup-build-env.sh    # JDK17 + Android SDK 헤드리스 설치(재현용)
