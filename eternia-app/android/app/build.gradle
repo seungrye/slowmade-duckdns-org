@@ -17,10 +17,28 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            // CI 가 ETERNIA_* env 로 주입(키스토어는 GitHub Secrets base64 → 파일 디코드).
+            // 로컬 등 env 없으면 미설정 → release 는 미서명(아래 buildTypes 에서 조건부 적용).
+            def ksPath = System.getenv('ETERNIA_KEYSTORE_FILE')
+            if (ksPath) {
+                storeFile file(ksPath)
+                storeType 'PKCS12'
+                storePassword System.getenv('ETERNIA_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ETERNIA_KEY_ALIAS')
+                keyPassword System.getenv('ETERNIA_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // keystore(env) 있으면 서명 릴리즈, 없으면 미서명(빌드는 통과).
+            if (System.getenv('ETERNIA_KEYSTORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
