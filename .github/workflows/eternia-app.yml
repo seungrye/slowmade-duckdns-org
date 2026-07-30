@@ -19,9 +19,12 @@ concurrency:
 
 jobs:
   build:
-    name: Debug APK
+    name: Build APK (debug + signed release)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 릴리즈 서명 시크릿이 있으면 서명 릴리즈도 빌드(없으면 debug 만).
+    env:
+      HAS_SIGNING: ${{ secrets.ETERNIA_KEYSTORE_BASE64 != '' }}
     defaults:
       run:
         working-directory: eternia-app
@@ -70,10 +73,33 @@ jobs:
             -PappVersionCode=${{ github.run_number }} \
             -PappVersionName=1.0.${{ github.run_number }}
 
-      - name: Upload APK artifact
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: eternia-debug-apk-build${{ github.run_number }}
           path: eternia-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Assemble signed release APK
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        env:
+          ETERNIA_KEYSTORE_FILE: ${{ runner.temp }}/eternia-release.keystore
+          ETERNIA_KEYSTORE_PASSWORD: ${{ secrets.ETERNIA_KEYSTORE_PASSWORD }}
+          ETERNIA_KEY_ALIAS: ${{ secrets.ETERNIA_KEY_ALIAS }}
+          ETERNIA_KEY_PASSWORD: ${{ secrets.ETERNIA_KEY_PASSWORD }}
+        run: |
+          echo "${{ secrets.ETERNIA_KEYSTORE_BASE64 }}" | base64 -d > "$ETERNIA_KEYSTORE_FILE"
+          cd android && ./gradlew assembleRelease --no-daemon --stacktrace \
+            -PappVersionCode=${{ github.run_number }} \
+            -PappVersionName=1.0.${{ github.run_number }}
+          rm -f "$ETERNIA_KEYSTORE_FILE"
+
+      - name: Upload release APK artifact
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: eternia-release-apk-build${{ github.run_number }}
+          path: eternia-app/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 30
