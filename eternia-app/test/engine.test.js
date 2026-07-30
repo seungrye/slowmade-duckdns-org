@@ -245,6 +245,21 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(document.getElementById("log").textContent).toContain("ascension");
   });
 
+  it("선택지 클릭이 로그 탭으로 오인돼 선택지가 중복 출력되지 않는다 (#5)", async () => {
+    await boot([
+      { id: "kael_infirmary", title: "도전", body: ["b"], choices: [{ kind: "probability", id: "r", label: "뛴다", stat: "int", difficulty: 5, onSuccess: "win", onFailure: "lose" }] },
+      { id: "win", title: "성공", body: ["ok"], isEnding: true, endingId: "ascension", choices: [] },
+      { id: "lose", title: "실패", body: ["no"], isEnding: true, endingId: "fall", choices: [] },
+    ]);
+    document.getElementById("log").click(); // 본문 넘겨 선택지 노출
+    await waitFor(() => document.querySelector(".choices .choice"));
+    expect(document.querySelectorAll(".choices").length).toBe(1);
+    document.querySelector(".choices .choice").click(); // 확률 선택
+    // 판정 카드는 뜨되, 선택지가 다시 출력되면 안 됨(버그 시 버블된 log-click → afterBody → emitChoices).
+    expect(document.querySelector(".rollcard")).toBeTruthy();
+    expect(document.querySelectorAll(".choices").length).toBe(0);
+  });
+
   it("Scene.illustration 을 삽화 이미지로 렌더", async () => {
     await boot([{ id: "kael_infirmary", title: "의무동", illustration: "https://cdn.test/inf.png", body: ["b"], choices: [] }]);
     const img = document.querySelector("#log .fig img.illust");

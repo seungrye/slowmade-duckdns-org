@@ -165,7 +165,12 @@ import {
     if (cur.pi < body.length - 1) { cur.pi++; emitPara(); return; }
     cont.classList.add("hidden"); afterBody();
   }
-  log.addEventListener("click", function () { if (typing) advance(); else if (scene && !ended && !awaitingChoice) advance(); });
+  log.addEventListener("click", function (e) {
+    // 버튼(선택지·엔딩 등) 클릭은 자기 핸들러가 처리 — 로그 탭(진행)으로 오인하지 않는다.
+    // (선택지 클릭이 여기로 버블되면 advance→afterBody→emitChoices 로 선택지가 중복 출력됨.)
+    if (e.target.closest("button")) return;
+    if (typing) advance(); else if (scene && !ended && !awaitingChoice) advance();
+  });
 
   // ── onEnter (사이트 applyOnEnter 이식) ──
   function applyOnEnter(oe) {
