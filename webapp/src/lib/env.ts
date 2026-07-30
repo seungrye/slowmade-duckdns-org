@@ -74,6 +74,11 @@ export const env = {
   // 빈 문자열이면 ingest 전부 차단 (Default secure).
   stockIngestKey: process.env.STOCK_INGEST_KEY ?? '',
 
+  // 로컬 LLM 서버(shim) /llm/* 를 nginx auth_request 로 게이트할 때, 비-브라우저(opencode 등)가
+  // Authorization: Bearer 로 제시하는 키. 관리자 세션(OWNER_EMAIL)은 이 키 없이도 통과.
+  // 빈 문자열이면 키 경로 비활성(세션만 허용, Default secure).
+  llmKey: process.env.LLM_KEY ?? '',
+
   // 서버 내부 self-call(/api/revalidate) 검증 토큰. 백그라운드 작업(AI 태그)이 request scope
   // 밖에서 revalidatePath 를 못 하므로, 라우트 핸들러를 self-fetch 해 캐시를 무효화할 때 쓴다.
   // 새 env 없이 STOCK_INGEST_KEY 를 재사용(프로덕션에 이미 존재 → 즉시 동작, 인스턴스 간 일관).
