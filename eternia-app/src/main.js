@@ -355,7 +355,30 @@ import {
     else if (k === "rank") toast("업적·랭크 — 준비 중");
     else if (k === "wip") toast("증거 — 작업중…");
   });
-  on("statgrid", "click", function (e) { var s = e.target.closest("[data-stat]"); if (!s) return; var k = s.getAttribute("data-stat"); toast(STAT_KO[k] + " · " + S.stats[k]); });
+  // 스탯 툴팁 — 클릭한 아이콘 바로 옆(공간 부족하면 아래)에 앵커. 하단 토스트 대신.
+  var statTipEl = null, statTipT = null;
+  function hideStatTip() { if (statTipEl) { statTipEl.remove(); statTipEl = null; } clearTimeout(statTipT); }
+  function showStatTip(anchor, text) {
+    hideStatTip();
+    var tip = document.createElement("div"); tip.className = "stat-tip"; tip.textContent = text;
+    document.body.appendChild(tip); statTipEl = tip;
+    var r = anchor.getBoundingClientRect();
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var pad = 8, gap = 6, vw = window.innerWidth, vh = window.innerHeight, left, top;
+    if (r.right + gap + tw <= vw - pad) { // 오른쪽 옆
+      left = r.right + gap; top = r.top + (r.height - th) / 2;
+    } else { // 공간 부족 → 아래
+      top = r.bottom + gap; left = r.left + (r.width - tw) / 2;
+    }
+    left = Math.max(pad, Math.min(left, vw - tw - pad));
+    top = Math.max(pad, Math.min(top, vh - th - pad));
+    tip.style.left = left + "px"; tip.style.top = top + "px";
+    tip.classList.add("show");
+    statTipT = setTimeout(hideStatTip, 2200);
+  }
+  on("statgrid", "click", function (e) { var s = e.target.closest("[data-stat]"); if (!s) return; var k = s.getAttribute("data-stat"); showStatTip(s, STAT_KO[k] + " · " + S.stats[k]); });
+  // 다른 곳 탭 시 툴팁 닫기(스탯/툴팁 자신 클릭은 유지)
+  document.addEventListener("click", function (e) { if (statTipEl && !e.target.closest("[data-stat]") && !e.target.closest(".stat-tip")) hideStatTip(); });
   function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; renderHP(false); renderStig(false); renderStats(false); showCreator(); }
 
   renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 showCreator()
