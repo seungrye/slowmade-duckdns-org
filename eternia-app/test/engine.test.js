@@ -108,6 +108,21 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(document.querySelector(".nameplate").textContent).toContain("카엘");
   });
 
+  it("스탯 클릭 시 앵커 툴팁(.stat-tip)으로 표시하고, 다른 곳 탭 시 닫힌다", async () => {
+    mountApp();
+    await import("../src/main.js");
+    // 상태바 스탯은 초기 렌더됨(타이틀 화면에서도)
+    const intStat = document.querySelector('.sstat[data-stat="int"]');
+    expect(intStat).toBeTruthy();
+    intStat.click();
+    const tip = document.querySelector(".stat-tip");
+    expect(tip).toBeTruthy();
+    expect(tip.textContent).toContain("지능"); // STAT_KO.int
+    // 다른 곳(로그) 탭 → 툴팁 닫힘
+    document.getElementById("log").click();
+    expect(document.querySelector(".stat-tip")).toBeNull();
+  });
+
   it("성흔 단계에서 '주인공 다시'로 STEP1 복귀", async () => {
     mountApp();
     await import("../src/main.js");
