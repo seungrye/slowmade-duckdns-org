@@ -1,7 +1,22 @@
 // 피드백 노트 생성 순수 함수 테스트 (#9)
 
 import { describe, it, expect } from 'vitest';
-import { truncateLog, buildMessages, parseOutput, MAX_LOG_CHARS, AUTHOR_NOTE_MARKER } from './feedback-note';
+import { truncateLog, buildMessages, parseOutput, sseDeltaContent, MAX_LOG_CHARS, AUTHOR_NOTE_MARKER } from './feedback-note';
+
+describe('sseDeltaContent', () => {
+  it('data 라인에서 delta.content 추출', () => {
+    expect(sseDeltaContent('data: {"choices":[{"delta":{"content":"안녕"}}]}')).toBe('안녕');
+  });
+  it('[DONE]·비data·빈줄·파싱실패 → 빈 문자열', () => {
+    expect(sseDeltaContent('data: [DONE]')).toBe('');
+    expect(sseDeltaContent(': keep-alive')).toBe('');
+    expect(sseDeltaContent('')).toBe('');
+    expect(sseDeltaContent('data: not-json')).toBe('');
+  });
+  it('delta.content 없으면 빈 문자열(role 청크 등)', () => {
+    expect(sseDeltaContent('data: {"choices":[{"delta":{"role":"assistant"}}]}')).toBe('');
+  });
+});
 
 describe('truncateLog', () => {
   it('예산 이하면 그대로 join', () => {

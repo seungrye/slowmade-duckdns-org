@@ -119,7 +119,26 @@ export function parseOutput(text: string): FeedbackNoteResult {
   return { title, narrative, authorNote };
 }
 
-/** 부수효과: 로컬 shim 에 chat/completions 호출 → 파싱된 결과. 실패 시 throw. */
+/** SSE 'data: {...}' 한 줄에서 delta.content 추출(순수). data/[DONE]/파싱실패면 ''. */
+export function sseDeltaContent(line: string): string {
+  const t = line.trim();
+  if (!t.startsWith('data:')) return '';
+  const data = t.slice(5).trim();
+  if (!data || data === '[DONE]') return '';
+  try {
+    const j = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
+    return j?.choices?.[0]?.delta?.content ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** 부수효과: 로컬 shim 에 chat/completions 호출 → 파싱된 결과. 실패 시 throw.
+ *
+ * **반드시 스트리밍(stream:true)** 으로 호출한다: 생성이 수십 분이라 non-stream 이면 shim 이
+ * 그동안 응답 헤더를 안 보내 Node fetch(undici) 의 기본 headersTimeout(~5분)에 걸려
+ * 'fetch failed' 로 abort 된다(#21 재발). 토큰을 계속 흘려보내면 헤더·바디 타임아웃이 리셋된다.
+ */
 export async function generateFeedbackNote(
   input: FeedbackNoteInput,
   opts?: { model?: string; maxTokens?: number; temperature?: number; signal?: AbortSignal },
@@ -133,17 +152,32 @@ export async function generateFeedbackNote(
       messages: buildMessages(input),
       max_tokens: opts?.maxTokens ?? 4000,
       temperature: opts?.temperature ?? 0.9,
-      stream: false,
+      stream: true,
     }),
     signal: opts?.signal,
   });
   if (!res.ok) {
     throw new Error(`shim ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 500));
   }
-  const json = (await res.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-  };
-  const content = json.choices?.[0]?.message?.content ?? '';
+  if (!res.body) throw new Error('shim 응답 본문 없음');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  let content = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      content += sseDeltaContent(line);
+    }
+  }
+  content += sseDeltaContent(buf); // 마지막 개행 없는 잔여
+
   if (!content.trim()) throw new Error('shim 응답이 비어 있습니다.');
   return parseOutput(content);
 }
