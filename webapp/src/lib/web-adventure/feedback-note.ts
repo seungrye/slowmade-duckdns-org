@@ -74,10 +74,10 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
     '2) 작가 노트: 이 플레이를 근거로 작가에게 줄 제안 — 안 가본 듯한 분기 아이디어, 더 깊게 팔 만한 캐릭터/떡밥, 빈약해 보완이 필요한 지점, 신규 시나리오 힌트.',
     '',
     '출력 형식(반드시 지켜라):',
-    '첫 줄: 제목: <서사 제목>',
-    '그 다음: 서사 본문',
+    '첫 줄: 제목: <서사 제목>   (제목 자체엔 #, * 같은 마크다운 기호를 쓰지 말 것)',
+    '그 다음: 서사 본문 — 마크다운(굵게 **, 기울임 *, 목록, 인용 >)으로 자연스럽게 작성',
     `그 다음 한 줄에 정확히: ${AUTHOR_NOTE_MARKER}`,
-    '그 다음: 작가 노트',
+    '그 다음: 작가 노트 — 마크다운 목록/소제목으로 정리',
   ].join('\n');
 
   const user = [
@@ -97,25 +97,44 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
   ];
 }
 
-/** LLM 원문 → { title, narrative, authorNote }. 순수 함수. 마커 없으면 전체를 서사로. */
+/** 마크다운 인라인 기호(*,#,`,_,>) 제거 후 trim. */
+function stripInlineMd(s: string): string {
+  return s.replace(/[*#`_>]/g, '').trim();
+}
+
+/** LLM 원문 → { title, narrative, authorNote }. 순수 함수. 마커 없으면 전체를 서사로.
+ * 제목은 마크다운으로 감싸질 수 있어(**제목**:, ## 제목: 등) 앞머리 기호를 허용해 파싱하고,
+ * 없으면 서사 첫 의미 있는 줄에서 폴백한다('(제목 없음)' 방지). */
 export function parseOutput(text: string): FeedbackNoteResult {
-  const raw = (text ?? '').trim();
+  let body = (text ?? '').trim();
   let title = '';
-  let body = raw;
 
-  const titleMatch = body.match(/^제목\s*[:：]\s*(.+)$/m);
-  if (titleMatch) {
-    title = titleMatch[1].trim();
-    // 제목 라인 제거(첫 등장만).
-    body = body.replace(titleMatch[0], '').trim();
+  // 제목 라인: 앞에 #,*,>,공백 이 붙거나 "제목" 자체가 ** 로 감싸져도 매칭.
+  const m = body.match(/^[>#*\s]*제목[*#\s]*[:：]\s*(.+)$/m);
+  if (m && typeof m.index === 'number') {
+    title = stripInlineMd(m[1]);
+    body = (body.slice(0, m.index) + body.slice(m.index + m[0].length)).trim();
   }
 
+  // 서사/작가노트 분리.
+  let narrative = body;
+  let authorNote = '';
   const idx = body.indexOf(AUTHOR_NOTE_MARKER);
-  if (idx === -1) {
-    return { title, narrative: body.trim(), authorNote: '' };
+  if (idx !== -1) {
+    narrative = body.slice(0, idx).trim();
+    authorNote = body.slice(idx + AUTHOR_NOTE_MARKER.length).trim();
   }
-  const narrative = body.slice(0, idx).trim();
-  const authorNote = body.slice(idx + AUTHOR_NOTE_MARKER.length).trim();
+  // 서사 앞머리에 남은 구분선(---) 제거.
+  narrative = narrative.replace(/^(?:-{3,}\s*)+/, '').trim();
+
+  // 제목 폴백: 서사 첫 의미 있는 줄(마크다운 기호 제거)에서 40자.
+  if (!title) {
+    for (const line of narrative.split('\n')) {
+      const t = stripInlineMd(line.replace(/^[>#*\-:\s]+/, ''));
+      if (t) { title = t.slice(0, 40); break; }
+    }
+  }
+
   return { title, narrative, authorNote };
 }
 
