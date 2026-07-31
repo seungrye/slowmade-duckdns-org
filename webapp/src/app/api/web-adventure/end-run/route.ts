@@ -29,6 +29,14 @@ export async function POST(req: NextRequest) {
   const scenePath = Array.isArray(body.scenePath)
     ? body.scenePath.filter((s: unknown): s is string => typeof s === 'string').slice(0, 300)
     : [];
+  // #9 서사 로그 (선택) — 피드백 노트 LLM 입력용. 방어적 캡(항목 5000·항목당 4000자).
+  //   실제 32k 토큰 예산 맞춤 절삭은 프롬프트 조립 시(feedback-note.ts)에 처리.
+  const log = Array.isArray(body.log)
+    ? body.log
+        .filter((s: unknown): s is string => typeof s === 'string')
+        .slice(0, 5000)
+        .map((s: string) => s.slice(0, 4000))
+    : [];
 
   await connectToDB();
   const save = await WebAdventureSave.findOne({
@@ -53,6 +61,7 @@ export async function POST(req: NextRequest) {
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
         scenePath,
+        log,
         // #289 — 옛 save (#287 schema 적용 전) 의 character 호환.
         character: hydrateCharacterSnapshot(save.character),
         completedAt: new Date(),

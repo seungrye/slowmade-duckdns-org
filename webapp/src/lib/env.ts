@@ -79,6 +79,14 @@ export const env = {
   // 빈 문자열이면 키 경로 비활성(세션만 허용, Default secure).
   llmKey: process.env.LLM_KEY ?? '',
 
+  // 로컬 LLM shim(BigMoeOnEdge OpenAI 호환) 내부 호출 base URL. 피드백 노트 생성·서버 상태
+  // 조회에 site 백엔드가 직접 호출(외부 노출 없음). 기본은 localhost shim.
+  llmBaseUrl: process.env.LLM_BASE_URL ?? 'http://127.0.0.1:8848/v1',
+
+  // 피드백 노트 워커(/api/web-adventure/feedback-notes/worker) 를 host cron 이 호출할 때 쓰는
+  // 내부 키. 비어 있으면 워커는 owner 세션으로만 실행(cron 불가). STOCK_INGEST_KEY 재사용 가능.
+  llmWorkerKey: process.env.LLM_WORKER_KEY || process.env.STOCK_INGEST_KEY || '',
+
   // 서버 내부 self-call(/api/revalidate) 검증 토큰. 백그라운드 작업(AI 태그)이 request scope
   // 밖에서 revalidatePath 를 못 하므로, 라우트 핸들러를 self-fetch 해 캐시를 무효화할 때 쓴다.
   // 새 env 없이 STOCK_INGEST_KEY 를 재사용(프로덕션에 이미 존재 → 즉시 동작, 인스턴스 간 일관).

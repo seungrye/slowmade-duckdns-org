@@ -269,6 +269,8 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         endingId: state.endingId,
         finalSceneId: state.finalSceneId,
         scenePath: scenePathRef.current,
+        // #9 — 엔딩 시점의 풍부한 서사 로그를 서버로. 피드백 노트 LLM 입력용.
+        log: state.log,
       }),
     })
       .then((res) => {
