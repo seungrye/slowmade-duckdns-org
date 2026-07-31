@@ -26,11 +26,18 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     } as unknown as ReturnType<typeof useSession>);
   });
 
-  it('데스크탑: 인증 사용자에게 씬 (web-adventure) 단일 링크 노출', () => {
+  it('데스크탑: 인증 사용자에게 에테르니아 드롭다운 → 씬 링크 노출', () => {
     render(<Navbar />);
-    const link = screen.getByLabelText('씬 메뉴');
+    fireEvent.click(screen.getByLabelText('에테르니아 메뉴'));
+    const link = screen.getByRole('link', { name: '씬' });
     expect(link.getAttribute('href')).toBe('/scenes');
-    expect(link.textContent).toContain('씬 (web-adventure)');
+  });
+
+  it('데스크탑: 비owner 세션엔 에테르니아 드롭다운에 owner 전용 항목(피드백 노트/서버 상태) 미노출', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('에테르니아 메뉴'));
+    expect(screen.queryByRole('link', { name: '피드백 노트' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '서버 상태' })).toBeNull();
   });
 
   it('데스크탑: 마이페이지 드롭다운엔 개인 메뉴만 — 퀘스트 항목 없음', () => {
@@ -50,32 +57,32 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     expect(screen.queryByLabelText('퀘스트 메뉴')).toBeNull();
   });
 
-  it('씬 링크는 pathname 이 /scenes 일 때 활성 스타일(text-gray-400)', () => {
+  it('에테르니아 메뉴는 pathname 이 /scenes 일 때 활성 스타일(text-gray-400)', () => {
     pathnameMock.mockReturnValue('/scenes');
     render(<Navbar />);
-    const link = screen.getByLabelText('씬 메뉴');
-    expect(link.className).toMatch(/text-gray-400/);
+    const btn = screen.getByLabelText('에테르니아 메뉴');
+    expect(btn.className).toMatch(/text-gray-400/);
   });
 
-  it('씬 링크는 pathname 이 /scenes/{id} 서브 경로일 때도 활성', () => {
-    pathnameMock.mockReturnValue('/scenes/intro');
+  it('에테르니아 메뉴는 pathname 이 /scenes/{id} 서브 경로일 때도 활성', () => {
+    pathnameMock.mockReturnValue('/scenes/feedback-notes');
     render(<Navbar />);
-    const link = screen.getByLabelText('씬 메뉴');
-    expect(link.className).toMatch(/text-gray-400/);
+    const btn = screen.getByLabelText('에테르니아 메뉴');
+    expect(btn.className).toMatch(/text-gray-400/);
   });
 
-  it('씬 링크는 다른 경로일 때 비활성(text-gray-500)', () => {
+  it('에테르니아 메뉴는 다른 경로일 때 비활성(text-gray-500)', () => {
     pathnameMock.mockReturnValue('/');
     render(<Navbar />);
-    const link = screen.getByLabelText('씬 메뉴');
-    expect(link.className).toMatch(/text-gray-500/);
+    const btn = screen.getByLabelText('에테르니아 메뉴');
+    expect(btn.className).toMatch(/text-gray-500/);
   });
 
   it('모바일 메뉴 열면 씬 링크와 마이페이지 collapsible 헤더가 노출', () => {
     pathnameMock.mockReturnValue('/');
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
-    expect(screen.getByLabelText('모바일 씬 링크')).toBeTruthy();
+    expect(screen.getByLabelText('모바일 에테르니아 섹션 토글')).toBeTruthy();
     expect(screen.getByLabelText('모바일 마이페이지 섹션 토글')).toBeTruthy();
     // 옛 퀘스트 모바일 토글은 제거됨
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
@@ -154,9 +161,9 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
     } as unknown as ReturnType<typeof useSession>);
   });
 
-  it('씬 링크가 보이지 않음', () => {
+  it('에테르니아 메뉴가 보이지 않음', () => {
     render(<Navbar />);
-    expect(screen.queryByLabelText('씬 메뉴')).toBeNull();
+    expect(screen.queryByLabelText('에테르니아 메뉴')).toBeNull();
   });
 
   it('마이페이지 메뉴 트리거가 보이지 않음', () => {
@@ -167,7 +174,7 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
   it('모바일 메뉴 열어도 씬 링크/마이페이지 토글 둘 다 미노출', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
-    expect(screen.queryByLabelText('모바일 씬 링크')).toBeNull();
+    expect(screen.queryByLabelText('모바일 에테르니아 섹션 토글')).toBeNull();
     expect(screen.queryByLabelText('모바일 마이페이지 섹션 토글')).toBeNull();
     // 옛 퀘스트 토글도 미노출
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();

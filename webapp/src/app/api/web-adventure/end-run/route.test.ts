@@ -104,6 +104,52 @@ describe('POST /api/web-adventure/end-run', () => {
     expect(call[1].runIndex).toBe(2);
   });
 
+  it('log(서사 로그) 전달 시 past_run upsert 에 포함되고 방어적으로 캡된다', async () => {
+    (auth as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { email: 'a@b.com' } });
+    (WebAdventureSave.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue({
+        userEmail: 'a@b.com',
+        runIndex: 1,
+        character: sampleCharacter,
+        currentSceneId: 'elder_house_ending',
+      }),
+    });
+    (WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({ _id: 'pr1' });
+    (WebAdventureSave.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const bigLog = Array.from({ length: 6000 }, (_, i) => `line ${i}`);
+    bigLog.push('x'.repeat(9000)); // 초장문 항목
+    const res = await POST(
+      makeRequest({ endingId: 'main', finalSceneId: 'elder_house_ending', log: bigLog }),
+    );
+    expect(res.status).toBe(200);
+
+    const prCall = (WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
+    const savedLog = prCall[1].log as string[];
+    expect(Array.isArray(savedLog)).toBe(true);
+    expect(savedLog.length).toBeLessThanOrEqual(5000); // 항목 수 캡
+    expect(savedLog.every((s) => s.length <= 4000)).toBe(true); // 항목 길이 캡
+  });
+
+  it('log 미전달/비배열이면 빈 배열로 저장', async () => {
+    (auth as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { email: 'a@b.com' } });
+    (WebAdventureSave.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
+      lean: vi.fn().mockResolvedValue({
+        userEmail: 'a@b.com',
+        runIndex: 1,
+        character: sampleCharacter,
+        currentSceneId: 'elder_house_ending',
+      }),
+    });
+    (WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({ _id: 'pr1' });
+    (WebAdventureSave.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({});
+
+    const res = await POST(makeRequest({ endingId: 'main', finalSceneId: 'x', log: 'not-array' }));
+    expect(res.status).toBe(200);
+    const prCall = (WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(prCall[1].log).toEqual([]);
+  });
+
   // #252 — 이전 회차에서 *save 갱신 실패* 등으로 runIndex 가 그대로 남은 상태에서
   //   다시 end-run 호출 시 (= save.runIndex 가 이전 past_run 의 runIndex 와 동일)
   //   기존 create 방식은 unique index 충돌로 400 → save 갱신 안 됨 → 갤러리에서
