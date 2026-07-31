@@ -22,10 +22,12 @@ import { generateFeedbackNote } from '@/lib/web-adventure/feedback-note';
 
 const STALE_MS = 30 * 60 * 1000; // 30분 넘게 processing 이면 재시작으로 끊긴 것으로 간주.
 const MAX_ATTEMPTS = 3;
-const GEN_TIMEOUT_MS = 20 * 60 * 1000; // 생성 하드 타임아웃(느린 shim 방어).
+// 생성 하드 타임아웃. max_tokens=4000 을 2~3 tok/s 로 뽑으면 프리필 포함 최대 ~30분+ 걸릴 수
+// 있어 넉넉히 45분(짧으면 EOS 로 훨씬 일찍 끝난다). 이보다 짧으면 긴 노트가 abort→fetch failed.
+const GEN_TIMEOUT_MS = 45 * 60 * 1000;
 
 // 이 라우트는 생성 대기로 오래 걸릴 수 있음.
-export const maxDuration = 1800;
+export const maxDuration = 2820;
 
 async function authorize(req: NextRequest): Promise<boolean> {
   const key = env.llmWorkerKey.trim();
