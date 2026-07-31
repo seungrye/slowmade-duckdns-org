@@ -109,7 +109,10 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   const [runIndex, setRunIndex] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [worldFlags, setWorldFlags] = useState<Record<string, boolean>>({});
-  const endRunSentRef = useRef<string | null>(null);
+  // 엔딩 진입 1회만 end-run 을 보내기 위한 가드. sentKey 에 runIndex 를 넣던 방식은
+  // 성공 시 setRunIndex(n+1) 로 runIndex 가 바뀌면 키가 달라져 effect 가 재발화 → end-run
+  // 무한 루프(회차/피드백노트 폭주, #17)를 유발했다. phase 전이 기반 boolean 가드로 교체.
+  const endRunHandledRef = useRef(false);
   // #273 — 침식 80 첫 도달 트래킹 (회차당 1 회). useRef 로 sentinel.
   const stigmaCriticalSentRef = useRef<number | null>(null);
   // 거쳐간 씬 시퀀스 추적 (경로 분포 통계용) — end-run 시 서버로 전송.
@@ -196,10 +199,14 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   //   가 끝나기 전 갤러리 진입해도 localStorage 의 최신 도달분이 보임). dedup
   //   runIndex 기준.
   useEffect(() => {
-    if (state.phase !== "ended") return;
-    const sentKey = `${runIndex}:${state.endingId}`;
-    if (endRunSentRef.current === sentKey) return;
-    endRunSentRef.current = sentKey;
+    // 엔딩 phase 를 벗어나면(새 회차 시작) 가드 리셋 → 다음 엔딩에서 다시 1회 발화.
+    if (state.phase !== "ended") {
+      endRunHandledRef.current = false;
+      return;
+    }
+    // 이미 이 엔딩을 처리했으면 재발화(runIndex 변경 등) 무시 → end-run 1회만.
+    if (endRunHandledRef.current) return;
+    endRunHandledRef.current = true;
 
     // localStorage 의 past-runs 에 append (dedup by runIndex).
     if (typeof window !== "undefined") {
