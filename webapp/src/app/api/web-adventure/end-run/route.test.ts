@@ -14,11 +14,19 @@ vi.mock('@/models/web-adventure-save', () => ({
 vi.mock('@/models/web-adventure-past-run', () => ({
   default: { create: vi.fn(), findOne: vi.fn(), findOneAndUpdate: vi.fn() },
 }));
+vi.mock('@/lib/env', () => ({ env: { ownerEmail: 'owner@x.com' } }));
+vi.mock('@/models/web-adventure-feedback-note', () => ({
+  default: { countDocuments: vi.fn(), findOne: vi.fn(), create: vi.fn() },
+}));
 
 import { POST } from './route';
 import WebAdventureSave from '@/models/web-adventure-save';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
+import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
+import { env } from '@/lib/env';
 import { auth } from '@/auth';
+
+const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
 
 function makeRequest(body: object): NextRequest {
   return new Request('http://localhost/api/web-adventure/end-run', {
@@ -38,8 +46,19 @@ const sampleCharacter = {
   rerollsLeft: 1,
 };
 
+// 자동 피드백 노트 enqueue 를 위한 기본 mock (개별 테스트에서 덮어씀).
+function setupAutoEnqueueDefaults() {
+  (env as { ownerEmail: string }).ownerEmail = 'owner@x.com';
+  asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(0);
+  asMock(WebAdventureFeedbackNote.findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
+  asMock(WebAdventureFeedbackNote.create).mockResolvedValue({});
+}
+
 describe('POST /api/web-adventure/end-run', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupAutoEnqueueDefaults();
+  });
 
   it('비로그인 → 401', async () => {
     (auth as ReturnType<typeof vi.fn>).mockResolvedValue(null);
@@ -184,5 +203,75 @@ describe('POST /api/web-adventure/end-run', () => {
     const updateFn = WebAdventureSave.findOneAndUpdate as ReturnType<typeof vi.fn>;
     expect(updateFn).toHaveBeenCalled();
     expect(updateFn.mock.calls[0][1].runIndex).toBe(2);
+  });
+});
+
+// #9 — 엔딩 시 피드백 노트 자동 생성(모든 로그인 플레이어, 작가 소유, 볼륨 캡).
+describe('POST /api/web-adventure/end-run — 피드백 노트 자동 생성', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupAutoEnqueueDefaults();
+    asMock(auth).mockResolvedValue({ user: { email: 'player@x.com' } });
+    asMock(WebAdventureSave.findOne).mockReturnValue({
+      lean: vi.fn().mockResolvedValue({
+        userEmail: 'player@x.com', runIndex: 2, character: sampleCharacter, currentSceneId: 's',
+      }),
+    });
+    asMock(WebAdventurePastRun.findOneAndUpdate).mockResolvedValue({
+      _id: 'pr9', runIndex: 2, endingId: 'harmony', finalSceneId: 's',
+    });
+    asMock(WebAdventureSave.findOneAndUpdate).mockResolvedValue({});
+  });
+
+  function endReq(log: string[] | undefined) {
+    return makeRequest({ endingId: 'harmony', finalSceneId: 's', ...(log ? { log } : {}) });
+  }
+
+  it('log 있으면 작가 소유 노트 자동 enqueue(queued, sourceUserEmail=플레이어)', async () => {
+    const res = await POST(endReq(['▶ 시작', '→ 선택', '  본문']));
+    expect(res.status).toBe(200);
+    expect(WebAdventureFeedbackNote.create).toHaveBeenCalledTimes(1);
+    const created = asMock(WebAdventureFeedbackNote.create).mock.calls[0][0];
+    expect(created).toMatchObject({
+      ownerEmail: 'owner@x.com',
+      sourceUserEmail: 'player@x.com',
+      pastRunId: 'pr9',
+      runIndex: 2,
+      endingId: 'harmony',
+      status: 'queued',
+    });
+  });
+
+  it('log 없으면 자동생성 안 함', async () => {
+    const res = await POST(endReq(undefined));
+    expect(res.status).toBe(200);
+    expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+  });
+
+  it('대기 노트가 상한 이상이면 skip', async () => {
+    asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(20);
+    const res = await POST(endReq(['x']));
+    expect(res.status).toBe(200);
+    expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+  });
+
+  it('같은 회차 노트가 이미 있으면 skip', async () => {
+    asMock(WebAdventureFeedbackNote.findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: 'existing' }) });
+    const res = await POST(endReq(['x']));
+    expect(res.status).toBe(200);
+    expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+  });
+
+  it('OWNER_EMAIL 미설정이면 자동생성 안 함', async () => {
+    (env as { ownerEmail: string }).ownerEmail = '';
+    const res = await POST(endReq(['x']));
+    expect(res.status).toBe(200);
+    expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+  });
+
+  it('자동생성이 throw 해도 엔딩 종결(200)은 유지', async () => {
+    asMock(WebAdventureFeedbackNote.countDocuments).mockRejectedValue(new Error('db down'));
+    const res = await POST(endReq(['x']));
+    expect(res.status).toBe(200);
   });
 });
