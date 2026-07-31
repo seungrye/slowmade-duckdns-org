@@ -71,6 +71,15 @@ export default async function FeedbackNoteDetailPage({
               </div>
             </section>
           )}
+          {note.scenarioProposal && (
+            <section className="mt-8 border-t pt-6">
+              <h2 className="text-sm font-semibold text-indigo-700 uppercase tracking-wide mb-2">시나리오 개선안 (검토용)</h2>
+              <p className="text-xs text-gray-400 mb-2">작가 노트를 근거로 생성한 신규 씬 초안·기존 씬 보완 제안. 씬 CMS 는 자동 반영되지 않으며 검토 후 직접 적용하세요.</p>
+              <div className="leading-relaxed bg-indigo-50 rounded-lg p-4">
+                <CommentContent content={note.scenarioProposal} />
+              </div>
+            </section>
+          )}
         </>
       )}
     </main>

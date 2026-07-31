@@ -25,6 +25,9 @@ const WebAdventureFeedbackNoteSchema = new Schema(
     title: { type: String, default: '' },
     narrative: { type: String, default: '' }, // 살 붙인 서사
     authorNote: { type: String, default: '' }, // 작가 노트 = 신규 시나리오 힌트/제안
+    // #27 — 작가 노트를 근거로 생성한 시나리오 개선안(신규 씬 초안 + 기존 씬 보완 제안).
+    //   비파괴 검토용 — 씬 CMS 를 직접 건드리지 않고 노트에 문서로 붙인다(마크다운).
+    scenarioProposal: { type: String, default: '' },
     // 큐/파이프라인 상태.
     status: {
       type: String,
@@ -58,6 +61,7 @@ export interface WebAdventureFeedbackNoteDoc {
   title: string;
   narrative: string;
   authorNote: string;
+  scenarioProposal: string;
   status: FeedbackNoteStatus;
   claimedAt: Date | null;
   attempts: number;
