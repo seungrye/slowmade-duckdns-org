@@ -12,8 +12,48 @@ import { connectToDB } from '@/lib/db';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import WebAdventureSave from '@/models/web-adventure-save';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
+import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
 import { auth } from '@/auth';
+import { env } from '@/lib/env';
 import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
+
+// #9 — 엔딩 시 피드백 노트 자동 생성. 대기/처리 중 노트가 이 수를 넘으면 skip(큐 폭주 방지).
+const MAX_PENDING_FEEDBACK_NOTES = 20;
+
+// 엔딩 회차를 큐에 자동 적재. 노트 소유는 작가(owner). 모든 로그인 플레이어 대상.
+// 실패는 삼킨다 — 회차 종결을 막지 않는다.
+async function autoEnqueueFeedbackNote(
+  pastRun: { _id: unknown; runIndex: number; endingId: string; finalSceneId: string } | null,
+  playerEmail: string,
+  logLen: number,
+): Promise<void> {
+  try {
+    const ownerEmail = env.ownerEmail.trim();
+    if (!ownerEmail) return; // 작가 미설정이면 귀속 대상 없음 → skip.
+    if (!pastRun || logLen === 0) return; // 서사 로그 없으면 살 붙일 게 없음.
+    const pending = await WebAdventureFeedbackNote.countDocuments({
+      status: { $in: ['queued', 'processing'] },
+      isDeleted: { $ne: true },
+    });
+    if (pending >= MAX_PENDING_FEEDBACK_NOTES) return; // 볼륨 캡.
+    const exists = await WebAdventureFeedbackNote.findOne({
+      pastRunId: pastRun._id,
+      isDeleted: { $ne: true },
+    }).lean();
+    if (exists) return; // 같은 회차 중복 방지.
+    await WebAdventureFeedbackNote.create({
+      ownerEmail,
+      pastRunId: pastRun._id,
+      sourceUserEmail: playerEmail,
+      runIndex: pastRun.runIndex,
+      endingId: pastRun.endingId,
+      finalSceneId: pastRun.finalSceneId,
+      status: 'queued',
+    });
+  } catch {
+    /* 자동생성 실패 삼킴 */
+  }
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -52,8 +92,9 @@ export async function POST(req: NextRequest) {
   //   index 충돌(E11000) 로 throw → 400 → save 도 갱신 안 됨 → 새 엔딩이
   //   갤러리에 안 보임. (userEmail, runIndex) 키로 upsert 하면 *마지막 도달*
   //   endingId 가 덮어쓰여 일관 유지.
+  let pastRun;
   try {
-    await WebAdventurePastRun.findOneAndUpdate(
+    pastRun = await WebAdventurePastRun.findOneAndUpdate(
       { userEmail: session.user.email, runIndex: save.runIndex },
       {
         userEmail: session.user.email,
@@ -82,6 +123,9 @@ export async function POST(req: NextRequest) {
     },
     { new: true },
   );
+
+  // 3. #9 — 엔딩 시 피드백 노트 자동 생성(큐 적재). 작가 소유, 볼륨 캡·중복 방지.
+  await autoEnqueueFeedbackNote(pastRun, session.user.email, log.length);
 
   return apiSuccess({ nextRunIndex: save.runIndex + 1 });
 }
