@@ -26,9 +26,10 @@ export interface FeedbackNoteResult {
   authorNote: string;
 }
 
-// 프롬프트 예산: shim n_ctx(32k) 안에서 출력 여유를 남기려 로그를 대략 절삭.
-// 한/영/코드 혼합 보수적으로 ~24000자까지만 로그에 할당(초과 시 앞뒤 보존 + 중략).
-export const MAX_LOG_CHARS = 24000;
+// 프롬프트 예산: shim n_ctx(32k) 안에서 출력(4000토큰) 여유를 남기려 로그를 대략 절삭.
+// ~32000자까지 로그에 할당(초과 시 앞뒤 보존 + 중략). 입력+출력이 n_ctx 를 넘으면
+// shim 이 n_predict 를 자동 클램프하므로 크래시 없이 graceful 하게 줄어든다.
+export const MAX_LOG_CHARS = 32000;
 export const AUTHOR_NOTE_MARKER = '===작가노트===';
 
 const ENDING_LABEL: Record<string, string> = {
@@ -130,7 +131,7 @@ export async function generateFeedbackNote(
     body: JSON.stringify({
       model,
       messages: buildMessages(input),
-      max_tokens: opts?.maxTokens ?? 1500,
+      max_tokens: opts?.maxTokens ?? 4000,
       temperature: opts?.temperature ?? 0.9,
       stream: false,
     }),
