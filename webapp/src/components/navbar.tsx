@@ -20,6 +20,8 @@ import {
     BookOpen,
     LineChart,
     FlaskConical,
+    FileText,
+    Server,
 } from "lucide-react";
 
 const navLinks = [
@@ -37,16 +39,32 @@ const myPageLinks = [
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
 ];
 
-// 인증된 사용자에게만 노출되는 단일 콘텐츠 관리 링크.
-// 과거 questLinks 드롭다운(퀘스트/Villager/Item/Zone/Monster 카탈로그)은
-// Phase E 에서 quest CMS 일괄 제거와 함께 사라졌다. 남은 콘텐츠 CMS 는
-// web-adventure 의 씬 편집 뿐이라 평탄한 단일 링크로 이동한다.
-const scenesLink = {
-    href: "/scenes",
-    label: "씬 (web-adventure)",
-    description: "Web-Adventure 씬 CMS",
-    icon: <BookOpen size={20} />,
-};
+// "에테르니아" 드롭다운 그룹 (#9) — 부모 아래 [씬 | 피드백 노트 | 서버 상태].
+//   씬: 로그인 사용자(session). 피드백 노트·서버 상태: owner 전용(ownerOnly).
+//   씬 편집 + LLM 피드백 노트 + shim 서버 상태를 한 메뉴로 묶는다.
+const eterniaLinks = [
+    {
+        href: "/scenes",
+        label: "씬",
+        description: "Web-Adventure 씬 CMS",
+        icon: <BookOpen size={20} />,
+        ownerOnly: false,
+    },
+    {
+        href: "/scenes/feedback-notes",
+        label: "피드백 노트",
+        description: "플레이 로그 기반 LLM 작가 노트",
+        icon: <FileText size={20} />,
+        ownerOnly: true,
+    },
+    {
+        href: "/scenes/status",
+        label: "서버 상태",
+        description: "로컬 LLM/서버 상태 (읽기 전용)",
+        icon: <Server size={20} />,
+        ownerOnly: true,
+    },
+];
 
 // owner 전용 hidden "주식" 묶음 — session.user.isOwner 가 true 일 때만 노출.
 // 마이페이지 패턴과 동일한 드롭다운 그룹.
@@ -76,9 +94,11 @@ export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isStocksDropdownOpen, setIsStocksDropdownOpen] = useState(false);
+    const [isEterniaDropdownOpen, setIsEterniaDropdownOpen] = useState(false);
     const pathname = usePathname();
     const dropdownRef = useRef<HTMLLIElement>(null);
     const stocksDropdownRef = useRef<HTMLLIElement>(null);
+    const eterniaDropdownRef = useRef<HTMLLIElement>(null);
 
     const isScenesActive = pathname === "/scenes" || pathname.startsWith("/scenes/");
     const isStocksGroupActive =
@@ -91,6 +111,10 @@ export default function Navbar() {
     // 모바일 메뉴 내부 collapsible 섹션 상태.
     const [isMobileMyPageOpen, setIsMobileMyPageOpen] = useState<boolean>(isMyPageActive);
     const [isMobileStocksOpen, setIsMobileStocksOpen] = useState<boolean>(isStocksGroupActive);
+    const [isMobileEterniaOpen, setIsMobileEterniaOpen] = useState<boolean>(isScenesActive);
+
+    // 에테르니아 서브메뉴 — 씬(로그인) + owner 전용(피드백노트/서버상태) 필터.
+    const eterniaVisible = eterniaLinks.filter((l) => !l.ownerOnly || isOwner);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -100,6 +124,9 @@ export default function Navbar() {
             }
             if (stocksDropdownRef.current && !stocksDropdownRef.current.contains(target)) {
                 setIsStocksDropdownOpen(false);
+            }
+            if (eterniaDropdownRef.current && !eterniaDropdownRef.current.contains(target)) {
+                setIsEterniaDropdownOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -130,18 +157,33 @@ export default function Navbar() {
                         </li>
                     ))}
 
-                    {/* 씬 (web-adventure) — 인증 사용자만 */}
+                    {/* 에테르니아 — 인증 사용자만 노출되는 드롭다운 (씬 + owner 전용 항목) */}
                     {session && (
-                        <li className="relative group">
-                            <Link
-                                href={scenesLink.href}
-                                className={`${isScenesActive ? "text-gray-400" : "text-gray-500"
-                                    } hover:text-gray-300 transition flex items-center gap-1`}
-                                aria-label="씬 메뉴"
+                        <li className="relative" ref={eterniaDropdownRef}>
+                            <button
+                                className={`flex items-center gap-1 transition ${isScenesActive ? "text-gray-400" : "text-gray-500"
+                                    } hover:text-gray-300`}
+                                onClick={() => setIsEterniaDropdownOpen((v) => !v)}
+                                aria-label="에테르니아 메뉴"
                             >
-                                {scenesLink.icon}
-                                {scenesLink.label}
-                            </Link>
+                                <BookOpen size={20} /> 에테르니아 <ChevronDown size={16} />
+                            </button>
+                            {isEterniaDropdownOpen && (
+                                <ul className="absolute right-0 mt-2 w-48 bg-gray-800 shadow-lg rounded-lg overflow-hidden z-20">
+                                    {eterniaVisible.map((link) => (
+                                        <li key={link.href}>
+                                            <Link
+                                                href={link.href}
+                                                className="px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
+                                                onClick={() => setIsEterniaDropdownOpen(false)}
+                                            >
+                                                {link.icon}
+                                                {link.label}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
                         </li>
                     )}
 
@@ -257,18 +299,40 @@ export default function Navbar() {
                     {/* 로그인 상태에 따라 모바일 메뉴 변경 */}
                     {session ? (
                         <>
-                            {/* 씬 (web-adventure) 단일 링크 */}
-                            <li className="text-center">
-                                <Link
-                                    href={scenesLink.href}
-                                    className={`block py-2 ${isScenesActive ? "text-gray-400" : "text-gray-500"
-                                        } hover:text-gray-300 transition flex items-center gap-1`}
-                                    onClick={() => setIsOpen(false)}
-                                    aria-label="모바일 씬 링크"
+                            {/* 에테르니아 — 모바일 collapsible 섹션 (씬 + owner 전용 항목) */}
+                            <li>
+                                <button
+                                    type="button"
+                                    className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isScenesActive ? "text-gray-400" : "text-gray-300"}`}
+                                    onClick={() => setIsMobileEterniaOpen((v) => !v)}
+                                    aria-label="모바일 에테르니아 섹션 토글"
+                                    aria-expanded={isMobileEterniaOpen}
                                 >
-                                    {scenesLink.icon}
-                                    {scenesLink.label}
-                                </Link>
+                                    <span className="flex items-center gap-2">
+                                        <BookOpen size={20} />
+                                        에테르니아
+                                    </span>
+                                    <ChevronDown
+                                        size={18}
+                                        className={`transition transform ${isMobileEterniaOpen ? "rotate-180" : ""}`}
+                                    />
+                                </button>
+                                {isMobileEterniaOpen && (
+                                    <ul className="pl-6 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                                        {eterniaVisible.map((link) => (
+                                            <li key={link.href}>
+                                                <Link
+                                                    href={link.href}
+                                                    className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                    onClick={() => setIsOpen(false)}
+                                                >
+                                                    {link.icon}
+                                                    {link.label}
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </li>
 
                             {/* 주식 — owner 전용 모바일 collapsible 섹션 */}
