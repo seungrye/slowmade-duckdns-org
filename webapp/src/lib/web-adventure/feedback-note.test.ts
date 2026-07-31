@@ -82,10 +82,15 @@ describe('parseOutput', () => {
     expect(r.authorNote).toBe('');
   });
 
-  it('제목 없으면 title 빈 문자열', () => {
-    const r = parseOutput(`서사 본문\n${AUTHOR_NOTE_MARKER}\n노트`);
-    expect(r.title).toBe('');
-    expect(r.narrative).toBe('서사 본문');
+  it('마크다운으로 감싼 제목(**제목**:, ## 제목:)도 파싱', () => {
+    expect(parseOutput('**제목**: 석화의 흐름\n\n본문').title).toBe('석화의 흐름');
+    expect(parseOutput('## 제목: 몰락\n\n본문').title).toBe('몰락');
+  });
+
+  it('제목 라인 없으면 서사 첫 의미 줄로 폴백(맨앞 --- / 기호 제거)', () => {
+    const r = parseOutput(`---\n\n어느 겨울밤 이야기\n\n${AUTHOR_NOTE_MARKER}\n노트`);
+    expect(r.title).toBe('어느 겨울밤 이야기');
+    expect(r.narrative).toBe('어느 겨울밤 이야기');
     expect(r.authorNote).toBe('노트');
   });
 });

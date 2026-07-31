@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/require-owner';
 import { connectToDB } from '@/lib/db';
 import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
+import CommentContent from '@/components/comment-content';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,14 +60,14 @@ export default async function FeedbackNoteDetailPage({
         </p>
       ) : (
         <>
-          <section className="mb-8">
-            <div className="whitespace-pre-wrap leading-relaxed">{note.narrative}</div>
+          <section className="mb-8 leading-relaxed">
+            <CommentContent content={note.narrative} />
           </section>
           {note.authorNote && (
             <section className="mt-8 border-t pt-6">
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">작가 노트</h2>
-              <div className="whitespace-pre-wrap leading-relaxed text-gray-700 bg-amber-50 rounded-lg p-4">
-                {note.authorNote}
+              <div className="leading-relaxed bg-amber-50 rounded-lg p-4">
+                <CommentContent content={note.authorNote} />
               </div>
             </section>
           )}
