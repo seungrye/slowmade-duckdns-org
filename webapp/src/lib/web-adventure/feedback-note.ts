@@ -30,9 +30,8 @@ export interface FeedbackNoteResult {
 // ~32000자까지 로그에 할당(초과 시 앞뒤 보존 + 중략). 입력+출력이 n_ctx 를 넘으면
 // shim 이 n_predict 를 자동 클램프하므로 크래시 없이 graceful 하게 줄어든다.
 export const MAX_LOG_CHARS = 32000;
-export const AUTHOR_NOTE_MARKER = '===작가노트===';
 
-const ENDING_LABEL: Record<string, string> = {
+export const ENDING_LABEL: Record<string, string> = {
   ascension: '승천',
   revolution: '혁명',
   harmony: '조화',
@@ -69,15 +68,14 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
   const system = [
     '너는 인터랙티브 픽션 「에테르니아」의 시나리오를 다듬는 창작 보조 편집자다.',
     '입력으로 한 플레이어의 실제 플레이 진행 로그(선택·장면 본문·판정 결과)가 주어진다.',
-    '이 로그를 바탕으로 두 가지를 한국어로 작성하라:',
-    '1) 서사: 로그의 사실(선택·사건·결말)을 절대 바꾸지 말고, 빈약하게 지나간 장면은 감각·심리 묘사로 살을 붙이고, 이미 풍부한 장면은 최대한 보존하며, 하나의 매끄러운 단편 소설처럼 재구성한다. 어조·세계관 일관성 유지.',
-    '2) 작가 노트: 이 플레이를 근거로 작가에게 줄 제안 — 안 가본 듯한 분기 아이디어, 더 깊게 팔 만한 캐릭터/떡밥, 빈약해 보완이 필요한 지점, 신규 시나리오 힌트.',
+    '이 플레이를 근거로 작가에게 줄 **제안과 개선안만** 한국어 마크다운으로 작성하라.',
+    '절대 이야기(서사)를 다시 쓰지 마라. 소설/장면 산문을 쓰지 마라 — 오직 제안·개선안.',
     '',
-    '출력 형식(반드시 지켜라):',
-    '첫 줄: 제목: <서사 제목>   (제목 자체엔 #, * 같은 마크다운 기호를 쓰지 말 것)',
-    '그 다음: 서사 본문 — 마크다운(굵게 **, 기울임 *, 목록, 인용 >)으로 자연스럽게 작성',
-    `그 다음 한 줄에 정확히: ${AUTHOR_NOTE_MARKER}`,
-    '그 다음: 작가 노트 — 마크다운 목록/소제목으로 정리',
+    '다음 소제목으로 정리(마크다운 목록 사용):',
+    '## 안 가본 듯한 분기 아이디어',
+    '## 더 깊게 팔 만한 캐릭터/떡밥',
+    '## 빈약해 보완이 필요한 지점',
+    '## 신규 시나리오 힌트',
   ].join('\n');
 
   const user = [
@@ -95,47 +93,6 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
     { role: 'system', content: system },
     { role: 'user', content: user },
   ];
-}
-
-/** 마크다운 인라인 기호(*,#,`,_,>) 제거 후 trim. */
-function stripInlineMd(s: string): string {
-  return s.replace(/[*#`_>]/g, '').trim();
-}
-
-/** LLM 원문 → { title, narrative, authorNote }. 순수 함수. 마커 없으면 전체를 서사로.
- * 제목은 마크다운으로 감싸질 수 있어(**제목**:, ## 제목: 등) 앞머리 기호를 허용해 파싱하고,
- * 없으면 서사 첫 의미 있는 줄에서 폴백한다('(제목 없음)' 방지). */
-export function parseOutput(text: string): FeedbackNoteResult {
-  let body = (text ?? '').trim();
-  let title = '';
-
-  // 제목 라인: 앞에 #,*,>,공백 이 붙거나 "제목" 자체가 ** 로 감싸져도 매칭.
-  const m = body.match(/^[>#*\s]*제목[*#\s]*[:：]\s*(.+)$/m);
-  if (m && typeof m.index === 'number') {
-    title = stripInlineMd(m[1]);
-    body = (body.slice(0, m.index) + body.slice(m.index + m[0].length)).trim();
-  }
-
-  // 서사/작가노트 분리.
-  let narrative = body;
-  let authorNote = '';
-  const idx = body.indexOf(AUTHOR_NOTE_MARKER);
-  if (idx !== -1) {
-    narrative = body.slice(0, idx).trim();
-    authorNote = body.slice(idx + AUTHOR_NOTE_MARKER.length).trim();
-  }
-  // 서사 앞머리에 남은 구분선(---) 제거.
-  narrative = narrative.replace(/^(?:-{3,}\s*)+/, '').trim();
-
-  // 제목 폴백: 서사 첫 의미 있는 줄(마크다운 기호 제거)에서 40자.
-  if (!title) {
-    for (const line of narrative.split('\n')) {
-      const t = stripInlineMd(line.replace(/^[>#*\-:\s]+/, ''));
-      if (t) { title = t.slice(0, 40); break; }
-    }
-  }
-
-  return { title, narrative, authorNote };
 }
 
 /** SSE 'data: {...}' 한 줄에서 delta.content 추출(순수). data/[DONE]/파싱실패면 ''. */
@@ -198,5 +155,7 @@ export async function generateFeedbackNote(
   content += sseDeltaContent(buf); // 마지막 개행 없는 잔여
 
   if (!content.trim()) throw new Error('shim 응답이 비어 있습니다.');
-  return parseOutput(content);
+  // AI 는 제안/개선안(작가 노트)만 생성한다. 서사·제목은 워커가 원본 로그·엔딩으로 채운다
+  //   (서사 재작성은 잘림·시간 낭비라 제거 — 엔딩 원본 로그를 그대로 서사로 쓴다).
+  return { title: '', narrative: '', authorNote: content.trim() };
 }

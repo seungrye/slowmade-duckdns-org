@@ -1,7 +1,8 @@
 // 피드백 노트 생성 순수 함수 테스트 (#9)
+// AI 는 작가 노트(제안/개선안)만 생성한다. 서사/제목은 워커가 원본 로그·엔딩으로 채운다.
 
 import { describe, it, expect } from 'vitest';
-import { truncateLog, buildMessages, parseOutput, sseDeltaContent, MAX_LOG_CHARS, AUTHOR_NOTE_MARKER } from './feedback-note';
+import { truncateLog, buildMessages, sseDeltaContent, MAX_LOG_CHARS } from './feedback-note';
 
 describe('sseDeltaContent', () => {
   it('data 라인에서 delta.content 추출', () => {
@@ -27,19 +28,18 @@ describe('truncateLog', () => {
     const log = [('x'.repeat(1000))].concat(Array.from({ length: 100 }, (_, i) => `줄${i}`.repeat(500)));
     const out = truncateLog(log, 5000);
     expect(out).toContain('중략');
-    // head+tail+중략 마커 정도라 원본보다 훨씬 짧고 예산 근처.
     expect(out.length).toBeLessThan(6000);
-    expect(out.startsWith('x')).toBe(true); // 앞부분 보존
+    expect(out.startsWith('x')).toBe(true);
   });
 
   it('기본 예산 상수 사용', () => {
-    const big = Array.from({ length: 5000 }, () => 'a'.repeat(100)); // 매우 김
+    const big = Array.from({ length: 5000 }, () => 'a'.repeat(100));
     const out = truncateLog(big);
     expect(out.length).toBeLessThan(MAX_LOG_CHARS + 200);
   });
 });
 
-describe('buildMessages', () => {
+describe('buildMessages (제안/개선안 전용)', () => {
   const input = {
     endingId: 'harmony',
     finalSceneId: 'scene_end',
@@ -48,12 +48,13 @@ describe('buildMessages', () => {
     character: { protagonist: 'kael', ability: 'scholar', stigmaErosion: 30, hp: 8, maxHp: 10, inventory: ['검'] },
   };
 
-  it('system + user 2개, 형식 지시·엔딩·로그 포함', () => {
+  it('system 은 제안/개선안만 지시(서사 재작성 금지), user 에 엔딩·로그 포함', () => {
     const msgs = buildMessages(input);
     expect(msgs).toHaveLength(2);
     expect(msgs[0].role).toBe('system');
-    expect(msgs[0].content).toContain(AUTHOR_NOTE_MARKER);
-    expect(msgs[0].content).toContain('제목:');
+    expect(msgs[0].content).toContain('제안');
+    expect(msgs[0].content).toContain('서사'); // "서사를 다시 쓰지 마라"
+    expect(msgs[0].content).toContain('신규 시나리오 힌트');
     expect(msgs[1].role).toBe('user');
     expect(msgs[1].content).toContain('조화'); // 엔딩 라벨
     expect(msgs[1].content).toContain('문을 연다'); // 로그 반영
@@ -63,34 +64,5 @@ describe('buildMessages', () => {
   it('캐릭터 없어도 안전', () => {
     const msgs = buildMessages({ endingId: 'fall', finalSceneId: 's', scenePath: [], log: ['x'], character: null });
     expect(msgs[1].content).toContain('몰락');
-  });
-});
-
-describe('parseOutput', () => {
-  it('제목 + 서사 + 작가노트 분리', () => {
-    const text = `제목: 어둠 속의 선택\n\n방 안은 어두웠다. 그는 문을 열었다.\n\n${AUTHOR_NOTE_MARKER}\n분기 아이디어: 문을 열지 않는 선택지.`;
-    const r = parseOutput(text);
-    expect(r.title).toBe('어둠 속의 선택');
-    expect(r.narrative).toContain('문을 열었다');
-    expect(r.narrative).not.toContain(AUTHOR_NOTE_MARKER);
-    expect(r.authorNote).toContain('분기 아이디어');
-  });
-
-  it('마커 없으면 전체가 서사, 작가노트 빈 문자열', () => {
-    const r = parseOutput('그냥 서사만 있음');
-    expect(r.narrative).toBe('그냥 서사만 있음');
-    expect(r.authorNote).toBe('');
-  });
-
-  it('마크다운으로 감싼 제목(**제목**:, ## 제목:)도 파싱', () => {
-    expect(parseOutput('**제목**: 석화의 흐름\n\n본문').title).toBe('석화의 흐름');
-    expect(parseOutput('## 제목: 몰락\n\n본문').title).toBe('몰락');
-  });
-
-  it('제목 라인 없으면 서사 첫 의미 줄로 폴백(맨앞 --- / 기호 제거)', () => {
-    const r = parseOutput(`---\n\n어느 겨울밤 이야기\n\n${AUTHOR_NOTE_MARKER}\n노트`);
-    expect(r.title).toBe('어느 겨울밤 이야기');
-    expect(r.narrative).toBe('어느 겨울밤 이야기');
-    expect(r.authorNote).toBe('노트');
   });
 });

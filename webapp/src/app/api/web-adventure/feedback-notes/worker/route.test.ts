@@ -10,7 +10,10 @@ vi.mock('@/models/web-adventure-feedback-note', () => ({
   default: { updateMany: vi.fn(), countDocuments: vi.fn(), findOneAndUpdate: vi.fn() },
 }));
 vi.mock('@/models/web-adventure-past-run', () => ({ default: { findById: vi.fn() } }));
-vi.mock('@/lib/web-adventure/feedback-note', () => ({ generateFeedbackNote: vi.fn() }));
+vi.mock('@/lib/web-adventure/feedback-note', () => ({
+  generateFeedbackNote: vi.fn(),
+  ENDING_LABEL: { harmony: '조화', petrification: '석화' },
+}));
 
 import { POST } from './route';
 import { requireOwner } from '@/lib/require-owner';
@@ -79,17 +82,19 @@ describe('feedback-notes worker', () => {
     asMock(WebAdventureFeedbackNote.findOneAndUpdate).mockResolvedValue(note);
     asMock(WebAdventurePastRun.findById).mockReturnValue({
       lean: vi.fn().mockResolvedValue({
-        endingId: 'harmony', finalSceneId: 's', scenePath: [], log: ['x'], character: null,
+        endingId: 'harmony', finalSceneId: 's', runIndex: 3, scenePath: [], log: ['줄1', '줄2'], character: null,
       }),
     });
-    asMock(generateFeedbackNote).mockResolvedValue({ title: 'T', narrative: 'N', authorNote: 'A' });
+    // AI 는 작가 노트만 반환. 서사·제목은 워커가 원본 로그·엔딩으로 채운다.
+    asMock(generateFeedbackNote).mockResolvedValue({ title: '', narrative: '', authorNote: 'A' });
 
     const res = await POST(req());
     const body = await res.json();
     expect(body.data.state).toBe('done');
     expect(note.status).toBe('ready');
-    expect(note.narrative).toBe('N');
     expect(note.authorNote).toBe('A');
+    expect(note.narrative).toBe('줄1\n줄2'); // 엔딩 원본 로그
+    expect(note.title).toContain('조화'); // 엔딩명 기반 제목
     expect(note.save).toHaveBeenCalled();
   });
 
