@@ -61,7 +61,12 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: '/((?!_next/static|_next/image|favicon.ico).*)',
+      // 대용량 업로드 라우트(api/attachment/upload·audio/upload)는 제외한다.
+      // middleware 가 매칭되면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한 →
+      // 10MB 초과 업로드가 잘려 req.formData() 파싱 실패(500). 이 라우트에서 middleware 가
+      // 하는 일은 응답 CSP·보안헤더뿐이라(owner 검증은 라우트 requireAuth/requireOwner,
+      // nginx 가 nosniff 추가) 제외해도 안전.
+      source: '/((?!_next/static|_next/image|favicon.ico|api/attachment/upload|api/web-adventure/audio/upload).*)',
     },
   ],
 }

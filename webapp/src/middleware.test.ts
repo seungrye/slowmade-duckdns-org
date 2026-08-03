@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { middleware } from './middleware';
+import { middleware, config } from './middleware';
 import { NextRequest } from 'next/server';
 
 function makeRequest(path = '/') {
@@ -84,5 +84,24 @@ describe('middleware', () => {
   it('Permissions-Policy 헤더를 설정한다', () => {
     const res = middleware(makeRequest('/'));
     expect(res.headers.get('Permissions-Policy')).toBe('camera=(), microphone=(), geolocation=()');
+  });
+});
+
+describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
+  // matcher 가 매칭하면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한 → FormData 파싱 실패(500).
+  // 대용량 업로드 라우트는 matcher 의 negative-lookahead 에서 제외해야 한다. source 정규식으로 매칭 재현.
+  const source = (config.matcher as { source: string }[])[0].source;
+  const re = new RegExp('^' + source + '$');
+
+  it('첨부/오디오 업로드 라우트는 제외(middleware 미적용)', () => {
+    expect(re.test('/api/attachment/upload')).toBe(false);
+    expect(re.test('/api/web-adventure/audio/upload')).toBe(false);
+  });
+
+  it('일반 경로·기타 API 는 여전히 적용', () => {
+    expect(re.test('/post/write')).toBe(true);
+    expect(re.test('/api/submit')).toBe(true);
+    expect(re.test('/api/upload')).toBe(true); // 이미지(클라 5MB 게이트)는 그대로
+    expect(re.test('/admin/x')).toBe(true);
   });
 });
