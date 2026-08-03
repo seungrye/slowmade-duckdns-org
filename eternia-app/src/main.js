@@ -1,4 +1,4 @@
-import { fetchScenes, START_SCENE_ID } from "./content-client.js";
+import { fetchScenes, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
 import { parseScript } from "./script.js";
 import { AudioBus } from "./audio-bus.js";
 import { protagonists, PROTAGONIST_ORDER, buildCharacter } from "./protagonists.js";
@@ -94,15 +94,35 @@ import {
 
   // ── 씬 진입/진행 ──
   var scene = null, cur = { id: null, pi: 0 }, ended = false, awaitingChoice = false;
+
+  // ── 진행 로그/경로 누적 (#33) — 엔딩 시 서버(app-end-run)로 보내 AI 피드백 노트 생성.
+  //   웹 GameState.log 포맷과 1:1(▶ 씬제목 (id) / 본문 들여쓰기 / → 선택: / → 판정). ──
+  var flowLog = [], scenePath = [], endRunSent = false;
+  // 본문 1문단의 표시 텍스트(디렉티브 제외, {{변수}} 치환) — emitPara 의 textRaw 와 동일.
+  function bodyText(raw) {
+    var segs = parseScript(raw, S.variables);
+    return segs.filter(function (s) { return s.kind === "text"; }).map(function (s) { return s.text; }).join("");
+  }
+  function characterSnapshot() {
+    return {
+      protagonist: S.protagonist, ability: S.ability, stats: S.stats,
+      hp: S.hp, maxHp: S.maxHp, stigmaErosion: S.stigmaErosion,
+      inventory: S.inventory, rerollsLeft: S.rerollsLeft, flags: S.flags,
+    };
+  }
   function goTo(sceneId) {
     var sc = sceneMap[sceneId];
     if (!sc) { var b = addBlk("p-blk"); b.innerHTML = '<div class="p" style="opacity:.6">…(씬 없음: ' + esc(String(sceneId)) + ")</div>"; cont.classList.add("hidden"); return; }
     scene = sc; cur = { id: sceneId, pi: 0 }; ended = false; awaitingChoice = false;
+    scenePath.push(sceneId); // 진행 경로 누적(#33)
     applyOnEnter(sc.onEnter);
     if (sc.bgm && sc.bgm.src) audio.playBgm(sc.bgm.src, { loop: sc.bgm.loop, volume: sc.bgm.volume }); // 씬 기본 BGM
     // 자동 엔딩(사이트 moveToScene): 명시 isEnding 은 body 렌더 후(afterBody), 침식100/HP0 은 즉시.
     if (!sc.isEnding && isFullyPetrified(S)) { showEndingCard("petrification", sc); return; }
     if (!sc.isEnding && isDead(S)) { showEndingCard("fall", sc); return; }
+    // 진행 로그(#33): 씬 제목 + 본문 문단(디렉티브 제외). 웹 reducer 포맷과 동일.
+    if (sc.title) flowLog.push("▶ " + sc.title + " (" + sceneId + ")");
+    (sc.body || []).forEach(function (raw) { var t = bodyText(raw); if (t) flowLog.push("  " + t); });
     if (sc.title) emitHead(sc);
     if (sc.illustration) emitIllustration(sc.illustration); // 씬 삽화(painter 생성 URL)
     var body = sc.body || [];
@@ -235,10 +255,13 @@ import {
       setTimeout(function () { goTo(target); }, reduce ? 150 : 800);
       return;
     }
+    flowLog.push("→ 선택: " + stripMarks(c.label || "")); // 진행 로그(#33, 비확률 선택)
     applyStig(c.stigmaDelta);
     goTo(c.to);
   }
   function emitRoll(res, c, statV) {
+    // 진행 로그(#33, 판정) — 웹 reducer 포맷: → {선택} — d20={roll}+{stat}(+{bonus}) vs {난이도} → 성공/실패
+    flowLog.push("→ " + stripMarks(c.label || "") + " — d20=" + res.roll + "+" + statV + "(+" + (res.bonus || 0) + ") vs " + c.difficulty + " → " + (res.success ? "성공" : "실패"));
     var b = addBlk(); var el = document.createElement("div"); el.className = "rollcard " + (res.success ? "ok" : "fail");
     var bonusStr = res.bonus ? " + 성흔(" + res.bonus + ")" : "";
     el.innerHTML = '<div class="lab mono">' + (STAT_KO[c.stat] || c.stat) + " 판정</div>" +
@@ -267,6 +290,19 @@ import {
   function showEndingCard(endingId, sc) {
     clearT(); cont.classList.add("hidden");
     ended = true; scene = null; awaitingChoice = false; cur = { id: null, pi: 0 };
+    // 진행 로그(#33) 자동엔딩 꼬리말 + 엔딩 결과를 서버로 1회 전송(AI 피드백 노트).
+    if (endingId === "petrification") flowLog.push("성흔 침식이 한계에 도달했다. 몸이 굳어간다…");
+    else if (endingId === "fall") flowLog.push("체력이 다하여 쓰러진다…");
+    if (!endRunSent) {
+      endRunSent = true;
+      submitAppEndRun({
+        endingId: endingId,
+        finalSceneId: (sc && sc.id) || "",
+        scenePath: scenePath.slice(),
+        log: flowLog.slice(),
+        character: characterSnapshot(),
+      });
+    }
     var b = addBlk(); var e = document.createElement("div"); e.className = "ending";
     var label = ENDING_KO[endingId] || endingId || "끝";
     e.innerHTML = '<div class="tt mono">ENDING' + (endingId ? " · " + esc(endingId) : "") + "</div>" +
@@ -384,7 +420,7 @@ import {
   on("statgrid", "click", function (e) { var s = e.target.closest("[data-stat]"); if (!s) return; var k = s.getAttribute("data-stat"); showStatTip(s, STAT_KO[k] + " · " + S.stats[k]); });
   // 다른 곳 탭 시 툴팁 닫기(스탯/툴팁 자신 클릭은 유지)
   document.addEventListener("click", function (e) { if (statTipEl && !e.target.closest("[data-stat]") && !e.target.closest(".stat-tip")) hideStatTip(); });
-  function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; renderHP(false); renderStig(false); renderStats(false); showCreator(); }
+  function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; flowLog = []; scenePath = []; endRunSent = false; renderHP(false); renderStig(false); renderStats(false); showCreator(); }
 
   renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 showCreator()
 })();

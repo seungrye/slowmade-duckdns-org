@@ -13,3 +13,9 @@ android/capacitor-cordova-android-plugins/
 *.apk
 *.aab
 !debug.keystore
+
+# 릴리스 서명 자격증명 (절대 커밋 금지)
+eternia-release-credentials.txt
+*.keystore
+*.jks
+!debug.keystore
