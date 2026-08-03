@@ -61,7 +61,7 @@ import { useWindowSize } from "@/hooks/use-window-size"
 
 // --- Lib ---
 import { MAX_FILE_SIZE } from "@/lib/tiptap-utils"
-import { uploadImage } from "./editor.upload"
+import { uploadImage, uploadAttachment } from "./editor.upload"
 
 // --- Styles ---
 import "./editor.scss"
@@ -226,7 +226,15 @@ export interface RichWebEditorHandle {
     focus: () => void;
 }
 
-export const RichWebEditor = React.forwardRef<RichWebEditorHandle, { onAttach?: (meta: AttachmentMeta) => void }>((props, ref) => {
+// 첨부 업로드 라이프사이클 — 부모(작성 폼)가 진행 칩·성공/실패 UI 를 그리도록 방출.
+export type RichWebEditorProps = {
+    onAttachStart?: (p: { tempId: string; name: string; size: number; mimeType: string }) => void;
+    onAttachProgress?: (tempId: string, percent: number) => void;
+    onAttachDone?: (tempId: string, meta: AttachmentMeta) => void;
+    onAttachError?: (tempId: string, name: string, message: string) => void;
+};
+
+export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditorProps>((props, ref) => {
     const isMobile = useMobile()
     const windowSize = useWindowSize()
     const [mobileView, setMobileView] = React.useState<
@@ -303,18 +311,15 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, { onAttach?: 
     // 파일 첨부 — /api/attachment/upload 로 올린 뒤 상위(작성 폼)로 메타 콜백. 본문에 삽입하지 않고,
     // 폼 하단 전용 첨부 영역에 칩으로 쌓인다(제출 시 서버 프록시가 key·권한 해석).
     const uploadOne = React.useCallback(async (file: File) => {
+        const tempId = crypto.randomUUID();
+        props.onAttachStart?.({ tempId, name: file.name, size: file.size, mimeType: file.type || "application/octet-stream" });
         try {
-            const fd = new FormData();
-            fd.append("file", file);
-            const res = await fetch("/api/attachment/upload", { method: "POST", body: fd });
-            const json = await res.json();
-            if (!res.ok || !json?.data?.id) {
-                console.error("첨부 업로드 실패:", json?.message);
-                return;
-            }
-            props.onAttach?.(json.data as AttachmentMeta);
+            const meta = await uploadAttachment(file, (e) => props.onAttachProgress?.(tempId, e.progress));
+            props.onAttachDone?.(tempId, meta);
         } catch (e) {
+            const message = e instanceof Error ? e.message : "업로드에 실패했습니다.";
             console.error("첨부 업로드 오류:", e);
+            props.onAttachError?.(tempId, file.name, message);
         }
     }, [props]);
 
