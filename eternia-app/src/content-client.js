@@ -23,6 +23,40 @@ function resolveBase(baseUrl) {
   return DEFAULT_API_BASE;
 }
 
+function resolveAppKey() {
+  try {
+    if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_APP_KEY) {
+      return import.meta.env.VITE_APP_KEY;
+    }
+  } catch {
+    /* import.meta 미지원 무시 */
+  }
+  return "";
+}
+
+/**
+ * 엔딩 결과를 앱 전용 엔드포인트(/api/web-adventure/app-end-run)로 제출 → AI 피드백 노트 생성.
+ * 로그인 없이 공유 앱 키(x-app-key = VITE_APP_KEY)로 인증. 실패는 삼킨다(플레이 방해 금지).
+ * @param {object} payload {endingId, finalSceneId, scenePath, log, character}
+ * @param {object} [opts] {appKey, baseUrl, fetchImpl}
+ */
+export async function submitAppEndRun(payload, opts = {}) {
+  const key = opts.appKey || resolveAppKey();
+  if (!key) return; // 키 미주입(빌드에 VITE_APP_KEY 없음) → 미전송.
+  const baseUrl = resolveBase(opts.baseUrl);
+  const fetchImpl = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch.bind(globalThis) : null);
+  if (!fetchImpl) return;
+  try {
+    await fetchImpl(`${baseUrl}/api/web-adventure/app-end-run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-app-key": key },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    /* 전송 실패 삼킴 */
+  }
+}
+
 async function fetchOnce(baseUrl, fetchImpl) {
   const res = await fetchImpl(`${baseUrl}/api/web-adventure/content/v1`);
   if (!res.ok) throw new Error(`content fetch ${res.status}`);

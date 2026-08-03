@@ -87,6 +87,11 @@ export const env = {
   // 내부 키. 비어 있으면 워커는 owner 세션으로만 실행(cron 불가). STOCK_INGEST_KEY 재사용 가능.
   llmWorkerKey: process.env.LLM_WORKER_KEY || process.env.STOCK_INGEST_KEY || '',
 
+  // 안드로이드 앱(로그인 없음)이 엔딩 결과를 /api/web-adventure/app-end-run 에 제출할 때 쓰는
+  // 공유 키(APK 빌드에 주입, x-app-key 헤더). 클라이언트에 있어 강보안은 아니며 오용 방지·회전용.
+  // 빈 문자열이면 app-end-run 비활성(default secure). STOCK_INGEST_KEY 재사용 가능.
+  appKey: process.env.APP_KEY || process.env.STOCK_INGEST_KEY || '',
+
   // 서버 내부 self-call(/api/revalidate) 검증 토큰. 백그라운드 작업(AI 태그)이 request scope
   // 밖에서 revalidatePath 를 못 하므로, 라우트 핸들러를 self-fetch 해 캐시를 무효화할 때 쓴다.
   // 새 env 없이 STOCK_INGEST_KEY 를 재사용(프로덕션에 이미 존재 → 즉시 동작, 인스턴스 간 일관).

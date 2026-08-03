@@ -12,48 +12,9 @@ import { connectToDB } from '@/lib/db';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import WebAdventureSave from '@/models/web-adventure-save';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
-import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
 import { auth } from '@/auth';
-import { env } from '@/lib/env';
 import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
-
-// #9 — 엔딩 시 피드백 노트 자동 생성. 대기/처리 중 노트가 이 수를 넘으면 skip(큐 폭주 방지).
-const MAX_PENDING_FEEDBACK_NOTES = 20;
-
-// 엔딩 회차를 큐에 자동 적재. 노트 소유는 작가(owner). 모든 로그인 플레이어 대상.
-// 실패는 삼킨다 — 회차 종결을 막지 않는다.
-async function autoEnqueueFeedbackNote(
-  pastRun: { _id: unknown; runIndex: number; endingId: string; finalSceneId: string } | null,
-  playerEmail: string,
-  logLen: number,
-): Promise<void> {
-  try {
-    const ownerEmail = env.ownerEmail.trim();
-    if (!ownerEmail) return; // 작가 미설정이면 귀속 대상 없음 → skip.
-    if (!pastRun || logLen === 0) return; // 서사 로그 없으면 살 붙일 게 없음.
-    const pending = await WebAdventureFeedbackNote.countDocuments({
-      status: { $in: ['queued', 'processing'] },
-      isDeleted: { $ne: true },
-    });
-    if (pending >= MAX_PENDING_FEEDBACK_NOTES) return; // 볼륨 캡.
-    const exists = await WebAdventureFeedbackNote.findOne({
-      pastRunId: pastRun._id,
-      isDeleted: { $ne: true },
-    }).lean();
-    if (exists) return; // 같은 회차 중복 방지.
-    await WebAdventureFeedbackNote.create({
-      ownerEmail,
-      pastRunId: pastRun._id,
-      sourceUserEmail: playerEmail,
-      runIndex: pastRun.runIndex,
-      endingId: pastRun.endingId,
-      finalSceneId: pastRun.finalSceneId,
-      status: 'queued',
-    });
-  } catch {
-    /* 자동생성 실패 삼킴 */
-  }
-}
+import { enqueueFeedbackNote, capScenePath, capLog } from '@/lib/web-adventure/enqueue-feedback-note';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -65,18 +26,8 @@ export async function POST(req: NextRequest) {
   if (typeof body.endingId !== 'string' || typeof body.finalSceneId !== 'string') {
     return apiError('endingId, finalSceneId 는 필수입니다.', 400);
   }
-  // 경로 시퀀스 (선택) — 문자열만, 최대 300 (무한 루프 방어).
-  const scenePath = Array.isArray(body.scenePath)
-    ? body.scenePath.filter((s: unknown): s is string => typeof s === 'string').slice(0, 300)
-    : [];
-  // #9 서사 로그 (선택) — 피드백 노트 LLM 입력용. 방어적 캡(항목 5000·항목당 4000자).
-  //   실제 32k 토큰 예산 맞춤 절삭은 프롬프트 조립 시(feedback-note.ts)에 처리.
-  const log = Array.isArray(body.log)
-    ? body.log
-        .filter((s: unknown): s is string => typeof s === 'string')
-        .slice(0, 5000)
-        .map((s: string) => s.slice(0, 4000))
-    : [];
+  const scenePath = capScenePath(body.scenePath);
+  const log = capLog(body.log); // #9 서사 로그 — 피드백 노트 LLM 입력용.
 
   await connectToDB();
   const save = await WebAdventureSave.findOne({
@@ -125,7 +76,7 @@ export async function POST(req: NextRequest) {
   );
 
   // 3. #9 — 엔딩 시 피드백 노트 자동 생성(큐 적재). 작가 소유, 볼륨 캡·중복 방지.
-  await autoEnqueueFeedbackNote(pastRun, session.user.email, log.length);
+  await enqueueFeedbackNote(pastRun, session.user.email, log.length);
 
   return apiSuccess({ nextRunIndex: save.runIndex + 1 });
 }
