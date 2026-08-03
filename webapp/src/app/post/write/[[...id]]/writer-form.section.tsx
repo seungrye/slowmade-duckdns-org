@@ -24,6 +24,7 @@ export default function PostWriterForm() {
     const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
     const [isPrivate, setIsPrivate] = useState(false); // 비공개(작성자만 열람). 기본 공개. 제목 옆 자물쇠로 토글.
     const [attachments, setAttachments] = useState<AttachmentMeta[]>([]); // 본문 하단 전용 첨부 영역(태그처럼). 툴바 클립 → 칩 추가.
+    const [pending, setPending] = useState<{ tempId: string; name: string; size: number; mimeType: string; progress: number }[]>([]); // 업로드 진행 중 첨부(진행 칩).
     const [loading, setLoading] = useState(false);
     const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
     const isMobile = useMobile();
@@ -179,7 +180,7 @@ export default function PostWriterForm() {
             <div className={`border border-gray-300 border-t-0 has-focus:shadow-sm rounded-b-lg flex flex-col ${isMobile ? "" : "flex-1 min-h-0"}`}>
                 {/* 에디터 래퍼: 테두리 없이 .rich-web-editor-wrapper(내부 스크롤·overflow)만 유지 */}
                 <div
-                    className={`rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"} ${attachments.length === 0 ? "rounded-b-lg" : ""}`}
+                    className={`rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"} ${attachments.length === 0 && pending.length === 0 ? "rounded-b-lg" : ""}`}
                     onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                     onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                     tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
@@ -187,17 +188,33 @@ export default function PostWriterForm() {
                 >
                     <RichWebEditor
                         ref={editorRef}
-                        onAttach={(m) => setAttachments((prev) => [...prev, m])}
+                        onAttachStart={(p) => setPending((prev) => [...prev, { ...p, progress: 0 }])}
+                        onAttachProgress={(tempId, percent) => setPending((prev) => prev.map((x) => x.tempId === tempId ? { ...x, progress: percent } : x))}
+                        onAttachDone={(tempId, meta) => {
+                            setPending((prev) => prev.filter((x) => x.tempId !== tempId));
+                            setAttachments((prev) => [...prev, meta]);
+                        }}
+                        onAttachError={(tempId, name, message) => {
+                            setPending((prev) => prev.filter((x) => x.tempId !== tempId));
+                            toast.error(`${name}: ${message}`);
+                        }}
                     />
                 </div>
-                {/* 첨부행: 박스 안 하단, border-t 구분선(뷰와 일관). 첨부 없으면 숨김. */}
-                {attachments.length > 0 && (
+                {/* 첨부행: 박스 안 하단, border-t 구분선(뷰와 일관). 완료 칩 + 진행 칩. 둘 다 없으면 숨김. */}
+                {(attachments.length > 0 || pending.length > 0) && (
                     <div className="shrink-0 border-t border-t-gray-200 dark:border-t-gray-700 p-3 flex flex-nowrap items-center gap-2 overflow-x-auto">
                         {attachments.map((att) => (
                             <AttachmentChip
                                 key={att.id}
                                 att={att}
                                 onRemove={() => setAttachments((prev) => prev.filter((a) => a.id !== att.id))}
+                            />
+                        ))}
+                        {pending.map((p) => (
+                            <AttachmentChip
+                                key={p.tempId}
+                                att={{ id: p.tempId, name: p.name, size: p.size, mimeType: p.mimeType }}
+                                progress={p.progress}
                             />
                         ))}
                     </div>
@@ -214,11 +231,11 @@ export default function PostWriterForm() {
             <div className="flex justify-end mt-4 shrink-0">
                 <button
                     onClick={handleSubmit}
-                    className={`bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition duration-200 ${loading && "opacity-50 cursor-not-allowed"}`}
-                    disabled={loading}
+                    className={`bg-blue-500 hover:bg-blue-600 text-white font-medium px-4 py-2 rounded-lg transition duration-200 ${(loading || pending.length > 0) && "opacity-50 cursor-not-allowed"}`}
+                    disabled={loading || pending.length > 0}
                     aria-label="Submit"
                 >
-                    {loading ? "업로드 중..." : "Submit"}
+                    {loading ? "업로드 중..." : pending.length > 0 ? "첨부 업로드 중..." : "Submit"}
                 </button>
             </div>
         </div>

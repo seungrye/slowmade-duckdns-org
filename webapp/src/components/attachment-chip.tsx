@@ -35,12 +35,16 @@ export function AttachmentChip({
   att,
   onRemove,
   downloadHref,
+  progress,
 }: {
   att: AttachmentChipData;
   onRemove?: () => void;
   downloadHref?: string;
+  /** 지정 시 '업로드 진행 중' 상태 — 아이콘을 흐리게 + 스피너·퍼센트 오버레이(삭제/다운로드 비활성). */
+  progress?: number;
 }) {
   const label = `${att.name} (${fmtBytes(att.size)})`;
+  const pending = progress !== undefined;
   const [open, setOpen] = React.useState(false);
 
   const { refs, floatingStyles, context } = useFloating({
@@ -65,9 +69,16 @@ export function AttachmentChip({
       <img
         src={attachmentIconDataUri(att.mimeType)}
         alt=""
-        className="h-8 w-auto block transition group-hover:drop-shadow-md"
+        className={`h-8 w-auto block transition group-hover:drop-shadow-md ${pending ? "opacity-40" : ""}`}
       />
-      {onRemove && (
+      {pending && (
+        /* 업로드 진행 오버레이 — 스피너 링 + 퍼센트(결정 진행률). 100% 도달 후엔 서버 저장까지 스피너 유지. */
+        <span className="absolute inset-0 flex items-center justify-center" aria-label={`업로드 중 ${progress}%`}>
+          <span className="absolute h-7 w-7 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" aria-hidden="true" />
+          <span className="relative text-[9px] font-bold tabular-nums text-blue-700 dark:text-blue-300">{progress}%</span>
+        </span>
+      )}
+      {!pending && onRemove && (
         <button
           type="button"
           onClick={(e) => {
@@ -90,7 +101,7 @@ export function AttachmentChip({
           </svg>
         </button>
       )}
-      {downloadHref && (
+      {!pending && downloadHref && (
         /* 다운로드 배지 — 호버/포커스 시 아이콘 우하단에 표시(파란 원+흰 아래화살표). 클릭은 링크가 처리. */
         <span
           data-role="download-badge"
@@ -116,7 +127,7 @@ export function AttachmentChip({
         className={`pointer-events-none z-50 whitespace-nowrap rounded-lg bg-gray-900/95 px-2.5 py-1 text-xs font-medium text-white shadow-lg backdrop-blur-sm transition-opacity duration-150 dark:bg-gray-700/95 ${open ? "opacity-100" : "opacity-0"}`}
       >
         {att.name}
-        <span className="ml-1.5 text-gray-300 dark:text-gray-400">{fmtBytes(att.size)}</span>
+        <span className="ml-1.5 text-gray-300 dark:text-gray-400">{pending ? `업로드 중 ${progress}%` : fmtBytes(att.size)}</span>
       </div>
     </FloatingPortal>
   );
