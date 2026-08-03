@@ -18,7 +18,7 @@ import { apiSuccess } from '@/lib/api-response';
 import { env } from '@/lib/env';
 import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
-import { generateFeedbackNote } from '@/lib/web-adventure/feedback-note';
+import { generateFeedbackNote, ENDING_LABEL } from '@/lib/web-adventure/feedback-note';
 
 const STALE_MS = 30 * 60 * 1000; // 30분 넘게 processing 이면 재시작으로 끊긴 것으로 간주.
 const MAX_ATTEMPTS = 3;
@@ -90,9 +90,10 @@ export async function POST(req: NextRequest) {
       { signal: AbortSignal.timeout(GEN_TIMEOUT_MS) },
     );
 
-    note.title = result.title;
-    note.narrative = result.narrative;
+    // AI 는 작가 노트(제안/개선안)만 생성. 서사는 엔딩 원본 로그를 그대로, 제목은 엔딩명.
     note.authorNote = result.authorNote;
+    note.narrative = (run.log ?? []).join('\n');
+    note.title = `${ENDING_LABEL[run.endingId] ?? run.endingId} 회차 #${run.runIndex}`;
     note.status = 'ready';
     note.error = '';
     note.claimedAt = null;
