@@ -60,24 +60,20 @@ export default async function FeedbackNoteDetailPage({
         </p>
       ) : (
         <>
-          {note.authorNote && (
+          {note.narrative && (
             <section className="mb-8">
+              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">진행 내역</h2>
+              <div className="leading-relaxed bg-gray-50 rounded-lg p-4">
+                <CommentContent content={note.narrative} />
+              </div>
+            </section>
+          )}
+          {note.authorNote && (
+            <section className="mt-8 border-t pt-6">
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-2">작가 노트 (제안·개선안)</h2>
               <div className="leading-relaxed bg-amber-50 rounded-lg p-4">
                 <CommentContent content={note.authorNote} />
               </div>
-            </section>
-          )}
-          {note.narrative && (
-            <section className="mt-8 border-t pt-6">
-              <details>
-                <summary className="cursor-pointer text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                  📜 진행 내역 (엔딩 원본)
-                </summary>
-                <div className="mt-2 whitespace-pre-wrap leading-relaxed text-sm text-gray-700 max-h-[28rem] overflow-y-auto bg-gray-50 rounded-lg p-4">
-                  {note.narrative}
-                </div>
-              </details>
             </section>
           )}
           {note.scenarioProposal && (
