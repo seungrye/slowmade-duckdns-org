@@ -212,7 +212,7 @@ const MobileToolbarContent = ({
         ) : type === "link" ? (
             <LinkContent />
         ) : (
-            <div className="math-popover-content" style={{ alignSelf: "flex-start" }}>
+            <div className="math-popover-content math-popover-content--toolbar">
                 <MathContent onApply={onBack} />
             </div>
         )}

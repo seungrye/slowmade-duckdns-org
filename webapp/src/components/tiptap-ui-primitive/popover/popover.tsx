@@ -160,10 +160,14 @@ const PopoverTrigger = React.forwardRef<HTMLElement, TriggerElementProps>(
       return React.cloneElement(
         children,
         context.getReferenceProps({
-          ref,
           ...props,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           ...(children.props as any),
+          // ref 는 반드시 children.props 뒤에 와야 한다. React 19 에서 ref 는 일반
+          // prop 이라, 자식이 ref 를 들고 있으면 앞에 둔 앵커 ref 를 덮어써
+          // floating-ui 가 기준점을 잃는다. 자식 ref 는 위 useMergeRefs 에서 병합됨.
+          // (#43 — 드롭다운에서 실제로 터진 버그. 여기도 같은 함정이라 함께 막는다.)
+          ref,
           "data-state": context.open ? "open" : "closed",
         })
       )

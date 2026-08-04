@@ -4,6 +4,35 @@
   width: 100%;
 }
 
+// 좁은 폭에서는 팝오버 대신 툴바 안에 인라인으로 들어간다. 그때는 세로 스택이
+// 아니라 가로 한 줄로 배치해야 툴바의 세로 중앙 정렬을 따르고(링크 입력과 동일)
+// 툴바 높이도 커지지 않는다. (#43)
+.math-popover-content--toolbar {
+  flex-direction: row;
+  align-items: center;
+  width: auto;
+  min-width: 0;
+
+  .math-popover-input {
+    // 팝오버용 18rem 을 강제하면 좁은 툴바가 넘친다. 링크 입력과 같은 수준으로.
+    min-width: 0;
+    width: 12rem;
+  }
+
+  .math-popover-preview {
+    min-height: 0;
+    padding: 0 0.5rem;
+    max-width: 10rem;
+    white-space: nowrap;
+    border-top: none;
+    border-left: 1px solid var(--tt-border-color, rgba(0, 0, 0, 0.1));
+
+    .dark & {
+      border-left-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+}
+
 .math-popover-input {
   display: block;
   width: 100%;
