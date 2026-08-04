@@ -96,6 +96,9 @@ const MainToolbarContent = ({
                     display: 'flex',
                     alignItems: 'center',
                     flexWrap: 'nowrap',
+                    // 수축하면 툴바가 넘치지 않아 스크롤 여지가 안 생기고, 대신 안의 버튼만
+                    // 잘려서 클릭할 수 없게 된다. 넘치게 둬야 툴바가 가로로 스크롤된다.
+                    flexShrink: 0,
                     ...(isMarkdownMode ? { opacity: 0.35, pointerEvents: 'none' } : {}),
                 }}
                 aria-hidden={isMarkdownMode || undefined}
