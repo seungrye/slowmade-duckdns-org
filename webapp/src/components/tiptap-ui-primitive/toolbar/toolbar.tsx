@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Separator } from "@/components/tiptap-ui-primitive/separator"
+import { useWheelScrollX } from "@/hooks/use-drag-scroll"
 import "@/components/tiptap-ui-primitive/toolbar/toolbar.scss"
 
 type BaseProps = React.HTMLAttributes<HTMLDivElement>
@@ -232,6 +233,10 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
   ({ children, className, variant = "fixed", ...props }, ref) => {
     const toolbarRef = React.useRef<HTMLDivElement>(null)
     const isVisible = useToolbarVisibility(toolbarRef)
+    // 툴바가 창보다 넓을 때 세로 휠로 좌우 스크롤. 스크롤바를 숨겨 둔 탓에(toolbar.scss)
+    // 이게 없으면 잘린 오른쪽 아이콘에 마우스로 닿을 수가 없다.
+    // floating 변형은 overflow:hidden 이라 스크롤할 게 없으므로 끈다.
+    const { ref: wheelRef } = useWheelScrollX<HTMLDivElement>(variant === "fixed")
 
     useToolbarKeyboardNav(toolbarRef)
 
@@ -239,7 +244,7 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
 
     return (
       <div
-        ref={mergeRefs([toolbarRef, ref])}
+        ref={mergeRefs([toolbarRef, wheelRef, ref])}
         role="toolbar"
         aria-label="toolbar"
         data-variant={variant}

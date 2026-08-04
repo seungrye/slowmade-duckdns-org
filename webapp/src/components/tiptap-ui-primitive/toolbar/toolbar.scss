@@ -19,6 +19,9 @@
     display: flex;
     align-items: center;
     gap: 0.125rem;
+    // 수축하면 툴바가 넘치는 대신 그룹이 찌그러져 버튼이 잘린다. 넘쳐야 overflow-x 가
+    // 스크롤을 만들고, 그래야 잘린 아이콘에 손이 닿는다.
+    flex: 0 0 auto;
 
     &:empty {
       display: none;
@@ -60,10 +63,6 @@
       padding: 0 0.5rem var(--tt-safe-area-bottom);
       flex-wrap: nowrap;
       justify-content: flex-start;
-
-      .tiptap-toolbar-group {
-        flex: 0 0 auto;
-      }
     }
   }
 
