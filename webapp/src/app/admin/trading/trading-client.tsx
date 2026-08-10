@@ -411,8 +411,8 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
       </section>
 
       <p className="text-sm">
-        <a href="/dashboard/trading" className="text-blue-600 hover:underline">
-          실행 이력·주문 로그 보기 → /dashboard/trading
+        <a href="/admin/trading/monitor" className="text-blue-600 hover:underline">
+          실행 이력·주문 로그 보기 → 자동매매 모니터링
         </a>
       </p>
     </div>
