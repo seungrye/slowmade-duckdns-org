@@ -80,7 +80,7 @@ export default function TradingMonitorClient() {
           <h1 className="text-2xl font-bold">자동매매 모니터링</h1>
           <p className="text-sm text-gray-500 mt-1">
             30초 자동 갱신{updatedAt && ` · 마지막 ${updatedAt.toLocaleTimeString("ko-KR")}`}
-            {" · "}설정은 <a href="/dashboard/settings" className="text-blue-600 hover:underline">마이페이지 설정</a>의 자동매매 섹션
+            {" · "}<a href="/admin/trading" className="text-blue-600 hover:underline">자동매매 설정</a>
           </p>
         </div>
         <select value={accountId}

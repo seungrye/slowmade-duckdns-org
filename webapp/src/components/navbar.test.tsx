@@ -181,8 +181,9 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
   });
 });
 
-// 자동매매 설정은 /dashboard/settings 안에만 있어, 주식 작업 중 파라미터를 고치려면
-// 마이페이지로 나갔다 와야 했다. 주식 드롭다운에 진입점을 둔다. (#45)
+// 자동매매 설정은 owner 전용인데 일반 사용자용 개인 설정 페이지에 얹혀 있었다.
+// 주식 메뉴 아래 전용 페이지(/admin/trading)로 분리하고, 마이페이지 설정엔 테마만
+// 남긴다. (#45 진입점 추가 → #47 분리)
 describe('Navbar — 주식 메뉴의 자동매매 설정 진입점', () => {
   const mockSession = (isOwner: boolean) =>
     vi.mocked(useSession).mockReturnValue({
@@ -201,7 +202,7 @@ describe('Navbar — 주식 메뉴의 자동매매 설정 진입점', () => {
     fireEvent.click(screen.getByLabelText('주식 메뉴'));
 
     const link = screen.getByRole('link', { name: /자동매매 설정/ });
-    expect(link.getAttribute('href')).toBe('/dashboard/settings#trading');
+    expect(link.getAttribute('href')).toBe('/admin/trading');
   });
 
   it('owner: 기존 주식 항목들도 그대로 유지', () => {
@@ -229,6 +230,6 @@ describe('Navbar — 주식 메뉴의 자동매매 설정 진입점', () => {
     fireEvent.click(screen.getByLabelText('모바일 주식 섹션 토글'));
 
     const links = screen.getAllByRole('link', { name: /자동매매 설정/ });
-    expect(links.some((l) => l.getAttribute('href') === '/dashboard/settings#trading')).toBe(true);
+    expect(links.some((l) => l.getAttribute('href') === '/admin/trading')).toBe(true);
   });
 });
