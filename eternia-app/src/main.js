@@ -1,4 +1,5 @@
 import { fetchScenes, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
+import { checkForUpdate } from "./update-check.js";
 import { parseScript } from "./script.js";
 import { AudioBus } from "./audio-bus.js";
 import { protagonists, PROTAGONIST_ORDER, buildCharacter } from "./protagonists.js";
@@ -423,4 +424,39 @@ import {
   function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; flowLog = []; scenePath = []; endRunSent = false; renderHP(false); renderStig(false); renderStats(false); showCreator(); }
 
   renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 showCreator()
+
+  // ── 업데이트 안내 (#55 후속) ─────────────────────────────────
+  // 설치는 사용자가 한다. 앱이 직접 설치하려면 REQUEST_INSTALL_PACKAGES 권한과
+  // FileProvider 가 필요해 범위가 커진다. 여기선 알림 + 다운로드 열기까지.
+  function showUpdateBanner(info) {
+    var bar = document.createElement("div");
+    bar.className = "update-bar";
+    bar.setAttribute("role", "status");
+
+    var msg = document.createElement("span");
+    msg.className = "update-msg";
+    msg.textContent = "새 버전 v" + info.latestVersion + " (현재 v" + info.currentVersion + ")";
+
+    var get = document.createElement("button");
+    get.type = "button";
+    get.className = "update-btn";
+    get.textContent = "받기";
+    get.addEventListener("click", function () {
+      // apk 자산이 없으면 릴리스 페이지로 보낸다.
+      var url = info.apkUrl || info.releaseUrl;
+      if (url) window.open(url, "_blank");
+    });
+
+    var later = document.createElement("button");
+    later.type = "button";
+    later.className = "update-btn update-btn-ghost";
+    later.textContent = "나중에";
+    later.addEventListener("click", function () { bar.remove(); });
+
+    bar.appendChild(msg); bar.appendChild(get); bar.appendChild(later);
+    document.body.insertBefore(bar, document.body.firstChild);
+  }
+
+  // 확인 실패는 update-check 안에서 삼킨다(null 반환) — 게임 진행을 막지 않는다.
+  checkForUpdate().then(function (u) { if (u) showUpdateBanner(u); });
 })();
