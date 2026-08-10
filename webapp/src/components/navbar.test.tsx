@@ -26,16 +26,18 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     } as unknown as ReturnType<typeof useSession>);
   });
 
-  it('데스크탑: 인증 사용자에게 에테르니아 드롭다운 → 씬 링크 노출', () => {
+  it('데스크탑: 게임 → 에테르니아 하위 메뉴에 씬 링크 노출', () => {
     render(<Navbar />);
-    fireEvent.click(screen.getByLabelText('에테르니아 메뉴'));
+    fireEvent.click(screen.getByLabelText('게임 메뉴'));
+    fireEvent.click(screen.getByLabelText('에테르니아의 추락 하위 메뉴'));
     const link = screen.getByRole('link', { name: '씬' });
     expect(link.getAttribute('href')).toBe('/scenes');
   });
 
-  it('데스크탑: 비owner 세션엔 에테르니아 드롭다운에 owner 전용 항목(피드백 노트/서버 상태) 미노출', () => {
+  it('데스크탑: 비owner 세션엔 owner 전용 항목(피드백 노트/서버 상태) 미노출', () => {
     render(<Navbar />);
-    fireEvent.click(screen.getByLabelText('에테르니아 메뉴'));
+    fireEvent.click(screen.getByLabelText('게임 메뉴'));
+    fireEvent.click(screen.getByLabelText('에테르니아의 추락 하위 메뉴'));
     expect(screen.queryByRole('link', { name: '피드백 노트' })).toBeNull();
     expect(screen.queryByRole('link', { name: '서버 상태' })).toBeNull();
   });
@@ -57,32 +59,39 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     expect(screen.queryByLabelText('퀘스트 메뉴')).toBeNull();
   });
 
-  it('에테르니아 메뉴는 pathname 이 /scenes 일 때 활성 스타일(text-gray-400)', () => {
+  it('게임 메뉴는 pathname 이 /scenes 일 때 활성 스타일(text-gray-400)', () => {
     pathnameMock.mockReturnValue('/scenes');
     render(<Navbar />);
-    const btn = screen.getByLabelText('에테르니아 메뉴');
+    const btn = screen.getByLabelText('게임 메뉴');
     expect(btn.className).toMatch(/text-gray-400/);
   });
 
-  it('에테르니아 메뉴는 pathname 이 /scenes/{id} 서브 경로일 때도 활성', () => {
+  it('게임 메뉴는 pathname 이 /scenes/{id} 서브 경로일 때도 활성', () => {
     pathnameMock.mockReturnValue('/scenes/feedback-notes');
     render(<Navbar />);
-    const btn = screen.getByLabelText('에테르니아 메뉴');
+    const btn = screen.getByLabelText('게임 메뉴');
     expect(btn.className).toMatch(/text-gray-400/);
   });
 
-  it('에테르니아 메뉴는 다른 경로일 때 비활성(text-gray-500)', () => {
+  it('게임 메뉴는 플레이 경로(/games/*)에서도 활성', () => {
+    pathnameMock.mockReturnValue('/games/web-adventure');
+    render(<Navbar />);
+    const btn = screen.getByLabelText('게임 메뉴');
+    expect(btn.className).toMatch(/text-gray-400/);
+  });
+
+  it('게임 메뉴는 다른 경로일 때 비활성(text-gray-500)', () => {
     pathnameMock.mockReturnValue('/');
     render(<Navbar />);
-    const btn = screen.getByLabelText('에테르니아 메뉴');
+    const btn = screen.getByLabelText('게임 메뉴');
     expect(btn.className).toMatch(/text-gray-500/);
   });
 
-  it('모바일 메뉴 열면 씬 링크와 마이페이지 collapsible 헤더가 노출', () => {
+  it('모바일 메뉴 열면 게임 섹션과 마이페이지 collapsible 헤더가 노출', () => {
     pathnameMock.mockReturnValue('/');
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
-    expect(screen.getByLabelText('모바일 에테르니아 섹션 토글')).toBeTruthy();
+    expect(screen.getByLabelText('모바일 게임 섹션 토글')).toBeTruthy();
     expect(screen.getByLabelText('모바일 마이페이지 섹션 토글')).toBeTruthy();
     // 옛 퀘스트 모바일 토글은 제거됨
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
@@ -118,10 +127,10 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
   });
 });
 
-// #219 — 게임 메뉴를 bevy-rogue → web-adventure 로 교체.
-// bevy-rogue 라우트(/games/bevy-rogue) 자체는 라이브 유지(URL 직접 접근 가능)지만
-// navbar 노출은 web-adventure 만.
-describe('Navbar — 게임 메뉴 (#219: bevy-rogue → web-adventure 교체)', () => {
+// #219 — navbar 게임 노출은 web-adventure 만(bevy-rogue 라우트 자체는 라이브 유지).
+// #49 — 게임이 여러 개가 될 수 있어 [게임 ▾ → 게임별 ▸ → 항목] 2단 중첩으로 바꿨다.
+//   플레이는 공개, 씬은 인증, 피드백 노트·서버 상태는 owner.
+describe('Navbar — 게임 2단 메뉴 (비로그인)', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/');
     vi.mocked(useSession).mockReturnValue({
@@ -129,27 +138,44 @@ describe('Navbar — 게임 메뉴 (#219: bevy-rogue → web-adventure 교체)',
     } as unknown as ReturnType<typeof useSession>);
   });
 
-  it('데스크탑: 게임 메뉴 링크가 /games/web-adventure 를 가리킨다', () => {
+  it('데스크탑: 비로그인도 게임 메뉴가 보인다 (플레이는 공개)', () => {
     render(<Navbar />);
-    const link = screen.getByRole('link', { name: /게임/ });
+    expect(screen.getByLabelText('게임 메뉴')).toBeTruthy();
+  });
+
+  it('데스크탑: 게임 → 에테르니아 하위의 플레이가 /games/web-adventure', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('게임 메뉴'));
+    fireEvent.click(screen.getByLabelText('에테르니아의 추락 하위 메뉴'));
+    const link = screen.getByRole('link', { name: '플레이' });
     expect(link.getAttribute('href')).toBe('/games/web-adventure');
+  });
+
+  it('데스크탑: 비로그인에겐 제작 항목(씬)이 하위에도 없다', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('게임 메뉴'));
+    fireEvent.click(screen.getByLabelText('에테르니아의 추락 하위 메뉴'));
+    expect(screen.queryByRole('link', { name: '씬' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '피드백 노트' })).toBeNull();
+    expect(screen.queryByRole('link', { name: '서버 상태' })).toBeNull();
   });
 
   it('데스크탑: /games/bevy-rogue 링크가 노출되지 않는다', () => {
     render(<Navbar />);
-    const links = screen.getAllByRole('link');
-    const bevyLinks = links.filter((l) => l.getAttribute('href') === '/games/bevy-rogue');
-    expect(bevyLinks).toHaveLength(0);
+    fireEvent.click(screen.getByLabelText('게임 메뉴'));
+    fireEvent.click(screen.getByLabelText('에테르니아의 추락 하위 메뉴'));
+    const bevy = screen.getAllByRole('link').filter((l) => l.getAttribute('href') === '/games/bevy-rogue');
+    expect(bevy).toHaveLength(0);
   });
 
-  it('모바일: 게임 메뉴 링크가 /games/web-adventure', () => {
+  it('모바일: 게임 → 에테르니아 를 펼치면 플레이가 /games/web-adventure', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    fireEvent.click(screen.getByLabelText('모바일 게임 섹션 토글'));
+    fireEvent.click(screen.getByLabelText('모바일 에테르니아의 추락 토글'));
     const links = screen.getAllByRole('link');
-    const webAdvLinks = links.filter((l) => l.getAttribute('href') === '/games/web-adventure');
-    expect(webAdvLinks.length).toBeGreaterThanOrEqual(1);
-    const bevyLinks = links.filter((l) => l.getAttribute('href') === '/games/bevy-rogue');
-    expect(bevyLinks).toHaveLength(0);
+    expect(links.filter((l) => l.getAttribute('href') === '/games/web-adventure').length).toBeGreaterThanOrEqual(1);
+    expect(links.filter((l) => l.getAttribute('href') === '/games/bevy-rogue')).toHaveLength(0);
   });
 });
 
@@ -161,9 +187,11 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
     } as unknown as ReturnType<typeof useSession>);
   });
 
-  it('에테르니아 메뉴가 보이지 않음', () => {
+  it('최상위 에테르니아 메뉴는 없다 (게임 아래로 편입됨)', () => {
     render(<Navbar />);
     expect(screen.queryByLabelText('에테르니아 메뉴')).toBeNull();
+    // 게임 메뉴 자체는 공개라 보인다.
+    expect(screen.getByLabelText('게임 메뉴')).toBeTruthy();
   });
 
   it('마이페이지 메뉴 트리거가 보이지 않음', () => {
@@ -171,13 +199,20 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
     expect(screen.queryByLabelText('마이페이지 메뉴')).toBeNull();
   });
 
-  it('모바일 메뉴 열어도 씬 링크/마이페이지 토글 둘 다 미노출', () => {
+  it('모바일: 게임 섹션은 보이되 제작 항목·마이페이지 토글은 미노출', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    // 게임(플레이)은 공개라 섹션이 보인다.
+    expect(screen.getByLabelText('모바일 게임 섹션 토글')).toBeTruthy();
+    // 옛 최상위 에테르니아 섹션·마이페이지·퀘스트 토글은 없다.
     expect(screen.queryByLabelText('모바일 에테르니아 섹션 토글')).toBeNull();
     expect(screen.queryByLabelText('모바일 마이페이지 섹션 토글')).toBeNull();
-    // 옛 퀘스트 토글도 미노출
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
+
+    // 펼쳐도 제작 항목은 없다.
+    fireEvent.click(screen.getByLabelText('모바일 게임 섹션 토글'));
+    fireEvent.click(screen.getByLabelText('모바일 에테르니아의 추락 토글'));
+    expect(screen.queryByRole('link', { name: '씬' })).toBeNull();
   });
 });
 

@@ -27,9 +27,7 @@ import {
 const navLinks = [
     { href: "/", label: "홈", description: "사이트로 돌아가기", icon: <Home size={20} /> },
     { href: "/tags", label: "태그", description: "태그 클라우드 보기", icon: <Layers size={20} /> },
-    // #219 — navbar 게임 메뉴는 web-adventure 로 교체. bevy-rogue 라우트
-    // (/games/bevy-rogue) 자체는 라이브 유지(URL 직접 접근 가능).
-    { href: "/games/web-adventure", label: "게임", description: "에테르니아의 추락 — 다크 에픽 CYOA", icon: <Gamepad2 size={20} /> },
+    // 게임은 평탄한 링크가 아니라 gameLinks 2단 드롭다운으로 노출한다. (#49)
 ];
 
 const myPageLinks = [
@@ -39,30 +37,51 @@ const myPageLinks = [
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
 ];
 
-// "에테르니아" 드롭다운 그룹 (#9) — 부모 아래 [씬 | 피드백 노트 | 서버 상태].
-//   씬: 로그인 사용자(session). 피드백 노트·서버 상태: owner 전용(ownerOnly).
-//   씬 편집 + LLM 피드백 노트 + shim 서버 상태를 한 메뉴로 묶는다.
-const eterniaLinks = [
+// "게임" 2단 메뉴 (#49) — 게임 ▾ → 게임별 ▸ → 항목.
+//   게임이 여러 개가 될 수 있어 게임을 한 단계 두고, 그 아래 플레이와 제작 도구를 묶는다.
+//   권한은 항목별: 플레이는 공개, 씬은 로그인(authOnly), 피드백 노트·서버 상태는 owner.
+//   따라서 게임 메뉴 자체는 비로그인에게도 보인다(예전 "에테르니아" 드롭다운은 통째로 숨겼다).
+//   bevy-rogue 라우트(/games/bevy-rogue)는 라이브 유지하되 navbar 에는 노출하지 않는다(#219).
+const gameLinks = [
     {
-        href: "/scenes",
-        label: "씬",
-        description: "Web-Adventure 씬 CMS",
-        icon: <BookOpen size={20} />,
-        ownerOnly: false,
-    },
-    {
-        href: "/scenes/feedback-notes",
-        label: "피드백 노트",
-        description: "플레이 로그 기반 LLM 작가 노트",
-        icon: <FileText size={20} />,
-        ownerOnly: true,
-    },
-    {
-        href: "/scenes/status",
-        label: "서버 상태",
-        description: "로컬 LLM/서버 상태 (읽기 전용)",
-        icon: <Server size={20} />,
-        ownerOnly: true,
+        key: "web-adventure",
+        label: "에테르니아의 추락",
+        description: "다크 에픽 CYOA",
+        icon: <Gamepad2 size={20} />,
+        children: [
+            {
+                href: "/games/web-adventure",
+                label: "플레이",
+                description: "게임 시작",
+                icon: <Gamepad2 size={20} />,
+                authOnly: false,
+                ownerOnly: false,
+            },
+            {
+                href: "/scenes",
+                label: "씬",
+                description: "Web-Adventure 씬 CMS",
+                icon: <BookOpen size={20} />,
+                authOnly: true,
+                ownerOnly: false,
+            },
+            {
+                href: "/scenes/feedback-notes",
+                label: "피드백 노트",
+                description: "플레이 로그 기반 LLM 작가 노트",
+                icon: <FileText size={20} />,
+                authOnly: true,
+                ownerOnly: true,
+            },
+            {
+                href: "/scenes/status",
+                label: "서버 상태",
+                description: "로컬 LLM/서버 상태 (읽기 전용)",
+                icon: <Server size={20} />,
+                authOnly: true,
+                ownerOnly: true,
+            },
+        ],
     },
 ];
 
@@ -102,13 +121,18 @@ export default function Navbar() {
     const [isOpen, setIsOpen] = useState(false);
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isStocksDropdownOpen, setIsStocksDropdownOpen] = useState(false);
-    const [isEterniaDropdownOpen, setIsEterniaDropdownOpen] = useState(false);
+    const [isGamesDropdownOpen, setIsGamesDropdownOpen] = useState(false);
+    // 2단 중첩 — 데스크톱에서 하위 메뉴가 펼쳐진 게임(null 이면 모두 접힘).
+    const [openGameKey, setOpenGameKey] = useState<string | null>(null);
     const pathname = usePathname();
     const dropdownRef = useRef<HTMLLIElement>(null);
     const stocksDropdownRef = useRef<HTMLLIElement>(null);
-    const eterniaDropdownRef = useRef<HTMLLIElement>(null);
+    const gamesDropdownRef = useRef<HTMLLIElement>(null);
 
-    const isScenesActive = pathname === "/scenes" || pathname.startsWith("/scenes/");
+    const isGamesGroupActive =
+        pathname.startsWith("/games") ||
+        pathname === "/scenes" ||
+        pathname.startsWith("/scenes/");
     const isStocksGroupActive =
         pathname.startsWith("/admin/stocks") ||
         pathname.startsWith("/admin/portfolio") ||
@@ -120,10 +144,18 @@ export default function Navbar() {
     // 모바일 메뉴 내부 collapsible 섹션 상태.
     const [isMobileMyPageOpen, setIsMobileMyPageOpen] = useState<boolean>(isMyPageActive);
     const [isMobileStocksOpen, setIsMobileStocksOpen] = useState<boolean>(isStocksGroupActive);
-    const [isMobileEterniaOpen, setIsMobileEterniaOpen] = useState<boolean>(isScenesActive);
+    const [isMobileGamesOpen, setIsMobileGamesOpen] = useState<boolean>(isGamesGroupActive);
+    const [mobileOpenGameKey, setMobileOpenGameKey] = useState<string | null>(
+        isGamesGroupActive ? gameLinks[0]?.key ?? null : null,
+    );
 
-    // 에테르니아 서브메뉴 — 씬(로그인) + owner 전용(피드백노트/서버상태) 필터.
-    const eterniaVisible = eterniaLinks.filter((l) => !l.ownerOnly || isOwner);
+    // 항목별 권한 필터 — 플레이는 공개, 씬은 로그인, 피드백노트·서버상태는 owner.
+    const visibleChildren = (game: (typeof gameLinks)[number]) =>
+        game.children.filter(
+            (c) => (!c.authOnly || Boolean(session)) && (!c.ownerOnly || isOwner),
+        );
+    // 보여줄 항목이 하나도 없는 게임은 메뉴에서 뺀다.
+    const visibleGames = gameLinks.filter((g) => visibleChildren(g).length > 0);
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
@@ -134,8 +166,9 @@ export default function Navbar() {
             if (stocksDropdownRef.current && !stocksDropdownRef.current.contains(target)) {
                 setIsStocksDropdownOpen(false);
             }
-            if (eterniaDropdownRef.current && !eterniaDropdownRef.current.contains(target)) {
-                setIsEterniaDropdownOpen(false);
+            if (gamesDropdownRef.current && !gamesDropdownRef.current.contains(target)) {
+                setIsGamesDropdownOpen(false);
+                setOpenGameKey(null); // 하위 메뉴도 같이 접는다.
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -166,29 +199,59 @@ export default function Navbar() {
                         </li>
                     ))}
 
-                    {/* 에테르니아 — 인증 사용자만 노출되는 드롭다운 (씬 + owner 전용 항목) */}
-                    {session && (
-                        <li className="relative" ref={eterniaDropdownRef}>
+                    {/* 게임 — 2단 중첩 드롭다운. 게임 ▾ → 게임별 ▸ → 항목 (#49).
+                        플레이가 공개라 메뉴 자체는 비로그인에게도 보인다. */}
+                    {visibleGames.length > 0 && (
+                        <li className="relative" ref={gamesDropdownRef}>
                             <button
-                                className={`flex items-center gap-1 transition ${isScenesActive ? "text-gray-400" : "text-gray-500"
+                                className={`flex items-center gap-1 transition ${isGamesGroupActive ? "text-gray-400" : "text-gray-500"
                                     } hover:text-gray-300`}
-                                onClick={() => setIsEterniaDropdownOpen((v) => !v)}
-                                aria-label="에테르니아 메뉴"
+                                onClick={() => setIsGamesDropdownOpen((v) => !v)}
+                                aria-label="게임 메뉴"
                             >
-                                <BookOpen size={20} /> 에테르니아 <ChevronDown size={16} />
+                                <Gamepad2 size={20} /> 게임 <ChevronDown size={16} />
                             </button>
-                            {isEterniaDropdownOpen && (
-                                <ul className="absolute right-0 mt-2 w-48 bg-gray-800 shadow-lg rounded-lg overflow-hidden z-20">
-                                    {eterniaVisible.map((link) => (
-                                        <li key={link.href}>
-                                            <Link
-                                                href={link.href}
-                                                className="px-4 py-2 hover:bg-gray-700 transition flex items-center gap-1"
-                                                onClick={() => setIsEterniaDropdownOpen(false)}
+                            {isGamesDropdownOpen && (
+                                <ul className="absolute right-0 mt-2 w-56 bg-gray-800 shadow-lg rounded-lg z-20 py-1">
+                                    {visibleGames.map((game) => (
+                                        <li key={game.key} className="relative">
+                                            <button
+                                                type="button"
+                                                className="w-full px-4 py-2 hover:bg-gray-700 transition flex items-center justify-between gap-2 text-left"
+                                                onClick={() =>
+                                                    setOpenGameKey((k) => (k === game.key ? null : game.key))
+                                                }
+                                                aria-label={`${game.label} 하위 메뉴`}
+                                                aria-expanded={openGameKey === game.key}
                                             >
-                                                {link.icon}
-                                                {link.label}
-                                            </Link>
+                                                <span className="flex items-center gap-2">
+                                                    {game.icon}
+                                                    {game.label}
+                                                </span>
+                                                <ChevronDown
+                                                    size={16}
+                                                    className={`transition transform ${openGameKey === game.key ? "rotate-180" : ""}`}
+                                                />
+                                            </button>
+                                            {openGameKey === game.key && (
+                                                <ul className="pl-6 border-l border-gray-700 ml-4 my-1 space-y-1">
+                                                    {visibleChildren(game).map((link) => (
+                                                        <li key={link.href}>
+                                                            <Link
+                                                                href={link.href}
+                                                                className={`px-2 py-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                                onClick={() => {
+                                                                    setIsGamesDropdownOpen(false);
+                                                                    setOpenGameKey(null);
+                                                                }}
+                                                            >
+                                                                {link.icon}
+                                                                {link.label}
+                                                            </Link>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>
@@ -305,45 +368,74 @@ export default function Navbar() {
                         </li>
                     ))}
 
+                    {/* 게임 — 모바일 2단 collapsible (#49). 게임 섹션 → 게임별 → 항목.
+                        플레이가 공개라 session 블록 밖에 둔다. */}
+                    {visibleGames.length > 0 && (
+                        <li>
+                            <button
+                                type="button"
+                                className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isGamesGroupActive ? "text-gray-400" : "text-gray-300"}`}
+                                onClick={() => setIsMobileGamesOpen((v) => !v)}
+                                aria-label="모바일 게임 섹션 토글"
+                                aria-expanded={isMobileGamesOpen}
+                            >
+                                <span className="flex items-center gap-2">
+                                    <Gamepad2 size={20} />
+                                    게임
+                                </span>
+                                <ChevronDown
+                                    size={18}
+                                    className={`transition transform ${isMobileGamesOpen ? "rotate-180" : ""}`}
+                                />
+                            </button>
+                            {isMobileGamesOpen && (
+                                <ul className="pl-4 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                                    {visibleGames.map((game) => (
+                                        <li key={game.key}>
+                                            <button
+                                                type="button"
+                                                className="w-full py-2 px-2 rounded hover:bg-gray-700 transition flex items-center justify-between gap-1 text-gray-300"
+                                                onClick={() =>
+                                                    setMobileOpenGameKey((k) => (k === game.key ? null : game.key))
+                                                }
+                                                aria-label={`모바일 ${game.label} 토글`}
+                                                aria-expanded={mobileOpenGameKey === game.key}
+                                            >
+                                                <span className="flex items-center gap-2">
+                                                    {game.icon}
+                                                    {game.label}
+                                                </span>
+                                                <ChevronDown
+                                                    size={16}
+                                                    className={`transition transform ${mobileOpenGameKey === game.key ? "rotate-180" : ""}`}
+                                                />
+                                            </button>
+                                            {mobileOpenGameKey === game.key && (
+                                                <ul className="pl-5 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                                                    {visibleChildren(game).map((link) => (
+                                                        <li key={link.href}>
+                                                            <Link
+                                                                href={link.href}
+                                                                className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                                onClick={() => setIsOpen(false)}
+                                                            >
+                                                                {link.icon}
+                                                                {link.label}
+                                                            </Link>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </li>
+                    )}
+
                     {/* 로그인 상태에 따라 모바일 메뉴 변경 */}
                     {session ? (
                         <>
-                            {/* 에테르니아 — 모바일 collapsible 섹션 (씬 + owner 전용 항목) */}
-                            <li>
-                                <button
-                                    type="button"
-                                    className={`w-full py-2 hover:bg-gray-700 transition flex items-center justify-between gap-1 ${isScenesActive ? "text-gray-400" : "text-gray-300"}`}
-                                    onClick={() => setIsMobileEterniaOpen((v) => !v)}
-                                    aria-label="모바일 에테르니아 섹션 토글"
-                                    aria-expanded={isMobileEterniaOpen}
-                                >
-                                    <span className="flex items-center gap-2">
-                                        <BookOpen size={20} />
-                                        에테르니아
-                                    </span>
-                                    <ChevronDown
-                                        size={18}
-                                        className={`transition transform ${isMobileEterniaOpen ? "rotate-180" : ""}`}
-                                    />
-                                </button>
-                                {isMobileEterniaOpen && (
-                                    <ul className="pl-6 border-l border-gray-700 ml-2 mt-1 space-y-1">
-                                        {eterniaVisible.map((link) => (
-                                            <li key={link.href}>
-                                                <Link
-                                                    href={link.href}
-                                                    className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
-                                                    onClick={() => setIsOpen(false)}
-                                                >
-                                                    {link.icon}
-                                                    {link.label}
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </li>
-
                             {/* 주식 — owner 전용 모바일 collapsible 섹션 */}
                             {isOwner && (
                                 <li>
