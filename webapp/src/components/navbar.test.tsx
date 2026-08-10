@@ -180,3 +180,55 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
   });
 });
+
+// 자동매매 설정은 /dashboard/settings 안에만 있어, 주식 작업 중 파라미터를 고치려면
+// 마이페이지로 나갔다 와야 했다. 주식 드롭다운에 진입점을 둔다. (#45)
+describe('Navbar — 주식 메뉴의 자동매매 설정 진입점', () => {
+  const mockSession = (isOwner: boolean) =>
+    vi.mocked(useSession).mockReturnValue({
+      data: { user: { name: '테스터', isOwner } },
+      status: 'authenticated',
+      update: vi.fn(),
+    } as unknown as ReturnType<typeof useSession>);
+
+  beforeEach(() => {
+    pathnameMock.mockReturnValue('/');
+  });
+
+  it('owner: 주식 드롭다운에 자동매매 설정 링크가 앵커까지 붙어 노출', () => {
+    mockSession(true);
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('주식 메뉴'));
+
+    const link = screen.getByRole('link', { name: /자동매매 설정/ });
+    expect(link.getAttribute('href')).toBe('/dashboard/settings#trading');
+  });
+
+  it('owner: 기존 주식 항목들도 그대로 유지', () => {
+    mockSession(true);
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('주식 메뉴'));
+
+    expect(screen.getByRole('link', { name: /종목 차트/ }).getAttribute('href')).toBe('/admin/stocks');
+    expect(screen.getByRole('link', { name: /매매 차트/ }).getAttribute('href')).toBe('/admin/portfolio');
+    expect(screen.getByRole('link', { name: /백테스트/ }).getAttribute('href')).toBe('/admin/backtest');
+  });
+
+  it('비owner: 주식 메뉴 자체가 없으므로 자동매매 설정도 미노출', () => {
+    mockSession(false);
+    render(<Navbar />);
+
+    expect(screen.queryByLabelText('주식 메뉴')).toBeNull();
+    expect(screen.queryByRole('link', { name: /자동매매 설정/ })).toBeNull();
+  });
+
+  it('모바일: owner 주식 섹션을 펼치면 자동매매 설정이 보인다', () => {
+    mockSession(true);
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    fireEvent.click(screen.getByLabelText('모바일 주식 섹션 토글'));
+
+    const links = screen.getAllByRole('link', { name: /자동매매 설정/ });
+    expect(links.some((l) => l.getAttribute('href') === '/dashboard/settings#trading')).toBe(true);
+  });
+});

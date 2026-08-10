@@ -56,3 +56,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .claude/settings.local.json
+
+# 일회성/진단 스크립트 모음 (재사용·참조용으로 남기되 커밋하지 않음)
+/scripts/adhoc/
