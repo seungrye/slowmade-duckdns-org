@@ -2,7 +2,13 @@
 // AI 는 작가 노트(제안/개선안)만 생성한다. 서사/제목은 워커가 원본 로그·엔딩으로 채운다.
 
 import { describe, it, expect } from 'vitest';
-import { truncateLog, buildMessages, sseDeltaContent, MAX_LOG_CHARS } from './feedback-note';
+import {
+  truncateLog,
+  buildMessages,
+  sseDeltaContent,
+  looksLikeProposal,
+  MAX_LOG_CHARS,
+} from './feedback-note';
 
 describe('sseDeltaContent', () => {
   it('data 라인에서 delta.content 추출', () => {
@@ -64,5 +70,41 @@ describe('buildMessages (제안/개선안 전용)', () => {
   it('캐릭터 없어도 안전', () => {
     const msgs = buildMessages({ endingId: 'fall', finalSceneId: 's', scenePath: [], log: ['x'], character: null });
     expect(msgs[1].content).toContain('몰락');
+  });
+});
+
+// 실제 사고: LLM 이 "서사를 다시 쓰지 마라" 지시를 무시하고 다른 회차의 산문을 써냈는데,
+// 검증 없이 authorNote 에 그대로 저장됐다. 형식 위반은 거부해 워커가 재시도하게 한다.
+describe('looksLikeProposal', () => {
+  it('요구 소제목이 있으면 제안으로 인정', () => {
+    const ok = [
+      '## 안 가본 듯한 분기 아이디어',
+      '- 정령 활을 버리는 선택지',
+      '## 신규 시나리오 힌트',
+      '- 세계수 이전의 기록',
+    ].join('\n');
+    expect(looksLikeProposal(ok)).toBe(true);
+  });
+
+  it('소제목을 일부만 써도 인정(LLM 이 항목을 줄일 수 있다)', () => {
+    expect(looksLikeProposal('## 빈약해 보완이 필요한 지점\n- 중반 밀도가 낮다')).toBe(true);
+  });
+
+  it('### 등 다른 깊이의 헤딩도 인정', () => {
+    expect(looksLikeProposal('### 더 깊게 팔 만한 캐릭터/떡밥\n- 마릭 영감')).toBe(true);
+  });
+
+  it('서사를 써버린 응답은 거부 — 이번 사고 형태', () => {
+    const bad = ['제목: 어떤 제목', '', '**서사:**', '', '차가운 금속 침대가 몸을 떠받치고 있었다.'].join('\n');
+    expect(looksLikeProposal(bad)).toBe(false);
+  });
+
+  it('장면 산문만 있고 소제목이 없으면 거부', () => {
+    expect(looksLikeProposal('▶ Scene 01 — 안개 낀 사냥터\n  안개가 깔린다. d20=12+7 성공.')).toBe(false);
+  });
+
+  it('빈 응답 거부', () => {
+    expect(looksLikeProposal('')).toBe(false);
+    expect(looksLikeProposal('   \n  ')).toBe(false);
   });
 });

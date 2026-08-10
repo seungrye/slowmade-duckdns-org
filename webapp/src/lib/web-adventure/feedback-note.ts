@@ -70,12 +70,16 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
     '입력으로 한 플레이어의 실제 플레이 진행 로그(선택·장면 본문·판정 결과)가 주어진다.',
     '이 플레이를 근거로 작가에게 줄 **제안과 개선안만** 한국어 마크다운으로 작성하라.',
     '절대 이야기(서사)를 다시 쓰지 마라. 소설/장면 산문을 쓰지 마라 — 오직 제안·개선안.',
+    '"제목:" 이나 "**서사:**" 같은 머리말을 쓰지 마라. 장면 묘사·대사·주사위 판정을 재현하지 마라.',
     '',
-    '다음 소제목으로 정리(마크다운 목록 사용):',
+    '출력은 반드시 아래 소제목(## 로 시작)으로만 구성하고, 각 항목은 마크다운 목록으로 쓴다.',
+    '첫 줄은 반드시 "## 안 가본 듯한 분기 아이디어" 로 시작한다.',
     '## 안 가본 듯한 분기 아이디어',
     '## 더 깊게 팔 만한 캐릭터/떡밥',
     '## 빈약해 보완이 필요한 지점',
     '## 신규 시나리오 힌트',
+    '',
+    '이 형식을 벗어난 응답(특히 서사 산문)은 폐기되고 다시 생성된다.',
   ].join('\n');
 
   const user = [
@@ -93,6 +97,24 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
     { role: 'system', content: system },
     { role: 'user', content: user },
   ];
+}
+
+/** 요구한 소제목의 핵심어 — LLM 이 표기를 조금 바꿔도(##/###, 어미 변형) 잡히도록 느슨하게 본다. */
+const PROPOSAL_HEADING_KEYS = ['분기', '캐릭터', '떡밥', '보완', '시나리오 힌트'];
+
+/**
+ * 응답이 '제안·개선안' 형식인가(순수).
+ *
+ * LLM 이 "서사를 다시 쓰지 마라" 지시를 어기고 산문을 써낸 적이 있는데, 검증이 없어
+ * 그대로 작가 노트로 저장됐다. 소제목이 하나도 없으면 형식 위반으로 보고 거부한다.
+ */
+export function looksLikeProposal(content: string): boolean {
+  const text = String(content ?? '');
+  if (!text.trim()) return false;
+  return text
+    .split('\n')
+    .filter((line) => /^\s{0,3}#{2,4}\s/.test(line))
+    .some((heading) => PROPOSAL_HEADING_KEYS.some((key) => heading.includes(key)));
 }
 
 /** SSE 'data: {...}' 한 줄에서 delta.content 추출(순수). data/[DONE]/파싱실패면 ''. */
@@ -155,6 +177,13 @@ export async function generateFeedbackNote(
   content += sseDeltaContent(buf); // 마지막 개행 없는 잔여
 
   if (!content.trim()) throw new Error('shim 응답이 비어 있습니다.');
+  // 형식 위반(서사 산문)은 저장하지 않고 던진다 — 워커가 queued 로 되돌려 재시도한다.
+  // 검증이 없던 탓에 다른 회차의 서사가 작가 노트로 저장된 적이 있다.
+  if (!looksLikeProposal(content)) {
+    throw new Error(
+      `LLM 이 제안 형식을 따르지 않음(서사 재작성 추정) — 앞부분: ${content.trim().slice(0, 80)}`,
+    );
+  }
   // AI 는 제안/개선안(작가 노트)만 생성한다. 서사·제목은 워커가 원본 로그·엔딩으로 채운다
   //   (서사 재작성은 잘림·시간 낭비라 제거 — 엔딩 원본 로그를 그대로 서사로 쓴다).
   return { title: '', narrative: '', authorNote: content.trim() };
