@@ -264,3 +264,27 @@ body.app .bottombar { padding-bottom: calc(7px + env(safe-area-inset-bottom)); }
 @keyframes tapblink { 50% { opacity: .35; } }
 .title-note { position: absolute; z-index: 2; bottom: 3.5%; margin: 0; font-size: 10px; color: #5e6b66; }
 .title.hidden { display: none; }
+
+/* 업데이트 안내 배너 — 상단 고정. 팔레트 변수를 쓰므로 라이트/다크 모두 따라간다.
+   body.app 이 overflow:hidden 이라 fixed 로 띄운다. (#55 후속) */
+.update-bar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem .75rem;
+  padding-top: calc(.5rem + env(safe-area-inset-top, 0px)); /* 노치 회피 */
+  background: var(--panel); color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, .5);
+  font-size: .85rem;
+}
+.update-msg {
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.update-btn {
+  flex: 0 0 auto; cursor: pointer;
+  padding: .3rem .7rem; border-radius: .4rem;
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  font-size: .82rem;
+}
+.update-btn-ghost { background: transparent; color: var(--muted); border-color: var(--line); }
