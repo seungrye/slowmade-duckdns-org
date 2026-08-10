@@ -216,6 +216,10 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     await waitFor(() => endRunCalls().length >= 1);
     expect(endRunCalls().length).toBe(1);
 
+    // 재전송 시 서버가 중복을 걸러낼 수 있도록 멱등 키를 함께 보낸다. (#63)
+    const firstBody = JSON.parse(endRunCalls()[0][1].body);
+    expect(firstBody.clientRunId).toBeTruthy();
+
     // 엔딩 카드 → 다시 플레이(restart) → 캐릭터 생성부터 재시작
     document.getElementById("againBtn").click();
     document.querySelector('.cr-prota[data-p="kael"]').click();

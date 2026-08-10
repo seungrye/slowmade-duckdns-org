@@ -49,6 +49,9 @@ const WebAdventurePastRunSchema = new Schema(
     //   클라이언트 GameState.log 를 그대로 저장. 기존 데이터엔 없음.
     log: { type: [String], default: [] },
     character: { type: CharacterSchema, required: true },
+    // #63 — 클라이언트가 회차마다 만드는 고유 id. 앱 재시도 큐(#61)가 같은 회차를 다시
+    //   보내도 한 번만 저장하기 위한 멱등 키. 웹/기존 데이터엔 없으므로 기본 빈 문자열.
+    clientRunId: { type: String, default: '' },
     completedAt: { type: Date, required: true, default: () => new Date() },
   },
   { timestamps: true },
@@ -56,6 +59,13 @@ const WebAdventurePastRunSchema = new Schema(
 
 // 한 사용자의 같은 runIndex 가 중복 적치되지 않도록 unique 복합 인덱스.
 WebAdventurePastRunSchema.index({ userEmail: 1, runIndex: 1 }, { unique: true });
+
+// 멱등 키 — 값이 있는 문서끼리만 unique. 기존 문서·웹 회차는 빈 문자열이라 제외된다
+// (partial 이 아니면 빈 문자열이 서로 충돌해 두 번째 회차부터 저장이 막힌다).
+WebAdventurePastRunSchema.index(
+  { userEmail: 1, clientRunId: 1 },
+  { unique: true, partialFilterExpression: { clientRunId: { $gt: '' } } },
+);
 
 export interface WebAdventurePastRunDoc {
   _id: unknown;

@@ -9,7 +9,7 @@ vi.mock('@/lib/web-adventure/hydrate-character', () => ({
   hydrateCharacterSnapshot: (x: unknown) => x ?? {},
 }));
 vi.mock('@/models/web-adventure-past-run', () => ({
-  default: { countDocuments: vi.fn(), create: vi.fn() },
+  default: { countDocuments: vi.fn(), create: vi.fn(), findOne: vi.fn() },
 }));
 vi.mock('@/models/web-adventure-feedback-note', () => ({
   default: { countDocuments: vi.fn(), findOne: vi.fn(), create: vi.fn() },
@@ -38,6 +38,7 @@ describe('app-end-run', () => {
     asMock(WebAdventureFeedbackNote.findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
     asMock(WebAdventureFeedbackNote.create).mockResolvedValue({ _id: 'note1' });
     asMock(WebAdventurePastRun.countDocuments).mockResolvedValue(4);
+    asMock(WebAdventurePastRun.findOne).mockResolvedValue(null); // 기본: 같은 회차 없음
     asMock(WebAdventurePastRun.create).mockResolvedValue({
       _id: 'pr1', runIndex: 5, endingId: 'harmony', finalSceneId: 's',
     });
@@ -83,5 +84,54 @@ describe('app-end-run', () => {
     expect(res.status).toBe(200);
     expect(WebAdventurePastRun.create).toHaveBeenCalled();
     expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+  });
+
+  // 앱의 재시도 큐(#61)는 응답을 못 받으면 다시 보낸다. 서버가 도달한 적 있는 회차를
+  // 걸러내지 않으면 같은 플레이가 두 번 쌓인다. (#63)
+  describe('clientRunId 멱등', () => {
+    it('이미 저장된 clientRunId 면 새로 만들지 않고 200', async () => {
+      asMock(WebAdventurePastRun.findOne).mockResolvedValue({ _id: 'pr-existing', runIndex: 3 });
+
+      const res = await POST(req({ endingId: 'harmony', finalSceneId: 's', clientRunId: 'run-abc' }));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ duplicate: true });
+      expect(WebAdventurePastRun.create).not.toHaveBeenCalled();
+      expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+    });
+
+    it('처음 보는 clientRunId 면 생성하고 문서에 함께 저장', async () => {
+      const res = await POST(
+        req({ endingId: 'harmony', finalSceneId: 's', log: ['a'], clientRunId: 'run-new' }),
+      );
+
+      expect(res.status).toBe(200);
+      expect(WebAdventurePastRun.create).toHaveBeenCalledWith(
+        expect.objectContaining({ clientRunId: 'run-new' }),
+      );
+    });
+
+    it('clientRunId 가 없으면 종전대로 조회 없이 생성', async () => {
+      const res = await POST(req({ endingId: 'harmony', finalSceneId: 's' }));
+
+      expect(res.status).toBe(200);
+      expect(WebAdventurePastRun.findOne).not.toHaveBeenCalled();
+      expect(WebAdventurePastRun.create).toHaveBeenCalled();
+    });
+
+    it('저장 중 clientRunId 가 겹치면(경쟁) 중복으로 보고 200', async () => {
+      // 조회 시점엔 없었는데 그 사이 다른 요청이 먼저 넣은 경우.
+      asMock(WebAdventurePastRun.findOne)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValue({ _id: 'pr-race' });
+      asMock(WebAdventurePastRun.create).mockRejectedValue(
+        new Error('E11000 duplicate key error collection: x index: userEmail_1_clientRunId_1'),
+      );
+
+      const res = await POST(req({ endingId: 'harmony', finalSceneId: 's', clientRunId: 'run-race' }));
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toMatchObject({ duplicate: true });
+    });
   });
 });
