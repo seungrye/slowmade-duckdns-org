@@ -17,7 +17,9 @@ export default async function SettingsPage() {
             <h1 className="text-3xl font-bold mb-6 text-gray-900">설정</h1>
             <SettingsFormSection />
             {trading && (
-                <div className="mt-6 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
+                // 주식 메뉴의 "자동매매 설정" 이 이 섹션으로 바로 오도록 앵커. (#45)
+                // scroll-mt 는 sticky navbar 에 제목이 가리지 않게 하는 여백.
+                <div id="trading" className="scroll-mt-24 mt-6 bg-white dark:bg-gray-900 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-6">
                     <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">자동매매 설정</h2>
                     <TradingSettingsClient initial={trading} />
                 </div>
