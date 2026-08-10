@@ -87,12 +87,12 @@ const stocksLinks = [
         description: "무한매수 v1 과거 시뮬레이션",
         icon: <FlaskConical size={20} />,
     },
-    // 설정 페이지는 그대로 두고 진입점만 여기 둔다 — 모니터링(/dashboard/trading)을 보다가
-    // 파라미터를 고치려면 마이페이지로 나갔다 와야 했다. 앵커로 해당 섹션에 바로 닿는다. (#45)
+    // owner 전용 설정이라 개인 설정 페이지에서 떼어내 여기 둔다. 마이페이지 설정엔
+    // 테마만 남는다. (#47)
     {
-        href: "/dashboard/settings#trading",
+        href: "/admin/trading",
         label: "자동매매 설정",
-        description: "계좌·전략·실행 시각 (마이페이지 설정의 자동매매 섹션)",
+        description: "계좌·전략·실행 시각",
         icon: <Settings size={20} />,
     },
 ];
@@ -112,7 +112,8 @@ export default function Navbar() {
     const isStocksGroupActive =
         pathname.startsWith("/admin/stocks") ||
         pathname.startsWith("/admin/portfolio") ||
-        pathname.startsWith("/admin/backtest");
+        pathname.startsWith("/admin/backtest") ||
+        pathname.startsWith("/admin/trading");
     const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
     const isOwner = Boolean(session?.user?.isOwner);
 
