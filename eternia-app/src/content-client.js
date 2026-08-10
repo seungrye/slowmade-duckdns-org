@@ -42,18 +42,20 @@ function resolveAppKey() {
  */
 export async function submitAppEndRun(payload, opts = {}) {
   const key = opts.appKey || resolveAppKey();
-  if (!key) return; // 키 미주입(빌드에 VITE_APP_KEY 없음) → 미전송.
+  if (!key) return false; // 키 미주입(빌드에 VITE_APP_KEY 없음) → 미전송.
   const baseUrl = resolveBase(opts.baseUrl);
   const fetchImpl = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch.bind(globalThis) : null);
-  if (!fetchImpl) return;
+  if (!fetchImpl) return false;
   try {
-    await fetchImpl(`${baseUrl}/api/web-adventure/app-end-run`, {
+    const res = await fetchImpl(`${baseUrl}/api/web-adventure/app-end-run`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-app-key": key },
       body: JSON.stringify(payload),
     });
+    // 성공 여부를 돌려줘야 재시도 큐가 언제 지울지 판단할 수 있다(#61).
+    return Boolean(res && res.ok);
   } catch {
-    /* 전송 실패 삼킴 */
+    return false; // 전송 실패는 여전히 삼킨다 — 플레이를 막지 않는다.
   }
 }
 
