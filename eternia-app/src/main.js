@@ -1,5 +1,6 @@
 import { fetchScenes, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
 import { checkForUpdate } from "./update-check.js";
+import { enqueue, remove, flushQueue } from "./end-run-queue.js";
 import { parseScript } from "./script.js";
 import { AudioBus } from "./audio-bus.js";
 import { protagonists, PROTAGONIST_ORDER, buildCharacter } from "./protagonists.js";
@@ -296,13 +297,17 @@ import {
     else if (endingId === "fall") flowLog.push("체력이 다하여 쓰러진다…");
     if (!endRunSent) {
       endRunSent = true;
-      submitAppEndRun({
+      var payload = {
         endingId: endingId,
         finalSceneId: (sc && sc.id) || "",
         scenePath: scenePath.slice(),
         log: flowLog.slice(),
         character: characterSnapshot(),
-      });
+      };
+      // 전송을 기다리지 않으므로(엔딩 카드를 바로 띄운다) 앱이 곧장 닫히면 요청이 유실된다.
+      // 먼저 큐에 넣고 성공했을 때만 지운다 — 실패분은 다음 실행에서 재전송. (#61)
+      var qid = enqueue(pendingStore(), payload);
+      submitAppEndRun(payload).then(function (ok) { if (ok) remove(pendingStore(), qid); });
     }
     var b = addBlk(); var e = document.createElement("div"); e.className = "ending";
     var label = ENDING_KO[endingId] || endingId || "끝";
@@ -425,6 +430,11 @@ import {
 
   renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 showCreator()
 
+  // 사생활 보호 모드 등에서 localStorage 접근이 던질 수 있다 — 없으면 큐를 포기하고 진행.
+  function pendingStore() {
+    try { return window.localStorage; } catch { return null; }
+  }
+
   // ── 업데이트 안내 (#55 후속) ─────────────────────────────────
   // 설치는 사용자가 한다. 앱이 직접 설치하려면 REQUEST_INSTALL_PACKAGES 권한과
   // FileProvider 가 필요해 범위가 커진다. 여기선 알림 + 다운로드 열기까지.
@@ -459,4 +469,7 @@ import {
 
   // 확인 실패는 update-check 안에서 삼킨다(null 반환) — 게임 진행을 막지 않는다.
   checkForUpdate().then(function (u) { if (u) showUpdateBanner(u); });
+
+  // 이전 실행에서 못 보낸 엔딩 회차 재전송 (#61). 실패분은 큐에 남아 다음 기회를 노린다.
+  flushQueue({ storage: pendingStore(), submit: submitAppEndRun });
 })();

@@ -74,10 +74,33 @@ describe("content-client submitAppEndRun", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("전송 실패는 삼킨다(throw 안 함)", async () => {
+  // 실패를 삼키되 성공 여부는 돌려준다 — 재시도 큐가 언제 지울지 판단해야 하므로. (#61)
+  it("전송 실패는 삼키고 false 를 돌려준다(throw 안 함)", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("net"));
     await expect(
       submitAppEndRun({ endingId: "x", finalSceneId: "s" }, { appKey: "K", baseUrl: "http://t", fetchImpl }),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(false);
+  });
+
+  it("서버가 4xx/5xx 면 false", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+    await expect(
+      submitAppEndRun({ endingId: "x", finalSceneId: "s" }, { appKey: "K", baseUrl: "http://t", fetchImpl }),
+    ).resolves.toBe(false);
+  });
+
+  it("200 이면 true", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    await expect(
+      submitAppEndRun({ endingId: "x", finalSceneId: "s" }, { appKey: "K", baseUrl: "http://t", fetchImpl }),
+    ).resolves.toBe(true);
+  });
+
+  it("키가 없으면 전송하지 않고 false", async () => {
+    const fetchImpl = vi.fn();
+    await expect(
+      submitAppEndRun({ endingId: "x", finalSceneId: "s" }, { appKey: "", baseUrl: "http://t", fetchImpl }),
+    ).resolves.toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

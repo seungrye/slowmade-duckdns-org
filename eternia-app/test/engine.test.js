@@ -68,6 +68,9 @@ function driveToEnding(maxSteps = 100) {
 describe("eternia 엔진 (사이트 계약 소비)", () => {
   beforeEach(() => {
     vi.resetModules();
+    // 엔딩 재시도 큐(#61)가 localStorage 에 남아 다음 테스트 시작 시 재전송되면
+    // app-end-run 호출 수가 어긋난다. 테스트마다 비운다.
+    try { window.localStorage.clear(); } catch { /* 저장소 없음 */ }
     // jsdom: matchMedia 스텁 (reduce-motion=true → 타이핑 즉시완료·결정적)
     window.matchMedia = () => ({
       matches: true,
@@ -195,6 +198,35 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(document.querySelectorAll(".ending").length).toBe(1);
     expect(t).toContain("petrification");
     expect(t).toContain("석화");
+  });
+
+  // 앱에서 sylvan_bond 엔딩 뒤 '다시 플레이' 로 이어서 본 석화 엔딩이 서버에 도달하지
+  // 않은 사례. restart() 가 endRunSent 를 리셋하므로 두 번째도 전송돼야 한다.
+  it("다시 플레이 후 두 번째 엔딩(석화)도 app-end-run 으로 전송", async () => {
+    vi.stubEnv("VITE_APP_KEY", "test-key"); // 키가 없으면 submitAppEndRun 이 즉시 return
+    const scenes = [
+      { id: "kael_infirmary", title: "시작", body: ["b"], choices: [{ kind: "plain", id: "g", label: "간다", to: "doom" }] },
+      { id: "doom", title: "심연", onEnter: { stigmaDelta: 100 }, body: ["돌이 된다"], choices: [] },
+    ];
+    const endRunCalls = () =>
+      globalThis.fetch.mock.calls.filter((c) => String(c[0]).includes("app-end-run"));
+
+    await boot(scenes);
+    driveToEnding();
+    await waitFor(() => endRunCalls().length >= 1);
+    expect(endRunCalls().length).toBe(1);
+
+    // 엔딩 카드 → 다시 플레이(restart) → 캐릭터 생성부터 재시작
+    document.getElementById("againBtn").click();
+    document.querySelector('.cr-prota[data-p="kael"]').click();
+    document.getElementById("cr-start").click();
+    await waitFor(() => document.querySelector(".stitle") || document.querySelector(".ending"));
+
+    driveToEnding();
+    await waitFor(() => endRunCalls().length >= 2, { timeout: 2000 });
+    expect(endRunCalls().length).toBe(2);
+
+    vi.unstubAllEnvs();
   });
 
   it("onEnter.hpDelta 가 HP 를 깎는다(카엘 maxHp 120)", async () => {
