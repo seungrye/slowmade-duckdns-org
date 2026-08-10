@@ -1,6 +1,6 @@
 import { fetchScenes, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
 import { checkForUpdate } from "./update-check.js";
-import { enqueue, remove, flushQueue } from "./end-run-queue.js";
+import { enqueue, remove, flushQueue, makeId } from "./end-run-queue.js";
 import { parseScript } from "./script.js";
 import { AudioBus } from "./audio-bus.js";
 import { protagonists, PROTAGONIST_ORDER, buildCharacter } from "./protagonists.js";
@@ -306,7 +306,10 @@ import {
       };
       // 전송을 기다리지 않으므로(엔딩 카드를 바로 띄운다) 앱이 곧장 닫히면 요청이 유실된다.
       // 먼저 큐에 넣고 성공했을 때만 지운다 — 실패분은 다음 실행에서 재전송. (#61)
-      var qid = enqueue(pendingStore(), payload);
+      // 같은 id 를 clientRunId 로 함께 보내 재전송돼도 서버가 한 번만 저장하게 한다. (#63)
+      var qid = makeId();
+      payload.clientRunId = qid;
+      enqueue(pendingStore(), payload, qid);
       submitAppEndRun(payload).then(function (ok) { if (ok) remove(pendingStore(), qid); });
     }
     var b = addBlk(); var e = document.createElement("div"); e.className = "ending";

@@ -13,7 +13,8 @@
 export const QUEUE_KEY = "eternia.pendingEndRuns";
 export const MAX_QUEUED = 20; // 오래 오프라인이어도 무한정 쌓이지 않게
 
-function makeId() {
+/** 회차 고유 id. 큐 항목 식별자이자 서버 멱등 키(clientRunId)로 함께 보낸다. (#63) */
+export function makeId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 

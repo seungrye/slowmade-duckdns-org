@@ -41,8 +41,15 @@ export async function POST(req: NextRequest) {
   }
   const scenePath = capScenePath(body.scenePath);
   const log = capLog(body.log);
+  // 앱 재시도 큐(#61)가 같은 회차를 다시 보낼 수 있다. 멱등 키로 중복 적치를 막는다. (#63)
+  const clientRunId = typeof body.clientRunId === 'string' ? body.clientRunId.slice(0, 64) : '';
 
   await connectToDB();
+
+  if (clientRunId) {
+    const already = await WebAdventurePastRun.findOne({ userEmail: APP_USER, clientRunId });
+    if (already) return json({ ok: true, duplicate: true }, 200);
+  }
 
   // 합성 사용자 past-run 생성. runIndex 는 count+1(저볼륨), 동시성 충돌 시 재count 재시도.
   let pastRun = null;
@@ -57,11 +64,17 @@ export async function POST(req: NextRequest) {
         scenePath,
         log,
         character: hydrateCharacterSnapshot(body.character),
+        clientRunId,
         completedAt: new Date(),
       });
       break;
     } catch (err) {
       const dup = err instanceof Error && err.message.includes('E11000');
+      // 조회 후 저장 사이에 다른 요청이 같은 회차를 먼저 넣은 경우 — 중복으로 본다.
+      if (dup && clientRunId) {
+        const raced = await WebAdventurePastRun.findOne({ userEmail: APP_USER, clientRunId });
+        if (raced) return json({ ok: true, duplicate: true }, 200);
+      }
       if (dup && attempt < 2) continue; // runIndex 충돌 → 재count 후 재시도.
       const message = err instanceof Error ? err.message : '회차 적치 실패';
       return json({ message }, 500);
