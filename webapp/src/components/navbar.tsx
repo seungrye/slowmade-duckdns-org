@@ -213,47 +213,66 @@ export default function Navbar() {
                             </button>
                             {isGamesDropdownOpen && (
                                 <ul className="absolute right-0 mt-2 w-56 bg-gray-800 shadow-lg rounded-lg z-20 py-1">
-                                    {visibleGames.map((game) => (
-                                        <li key={game.key} className="relative">
-                                            <button
-                                                type="button"
-                                                className="w-full px-4 py-2 hover:bg-gray-700 transition flex items-center justify-between gap-2 text-left"
-                                                onClick={() =>
-                                                    setOpenGameKey((k) => (k === game.key ? null : game.key))
-                                                }
-                                                aria-label={`${game.label} 하위 메뉴`}
-                                                aria-expanded={openGameKey === game.key}
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    {game.icon}
-                                                    {game.label}
-                                                </span>
-                                                <ChevronDown
-                                                    size={16}
-                                                    className={`transition transform ${openGameKey === game.key ? "rotate-180" : ""}`}
-                                                />
-                                            </button>
-                                            {openGameKey === game.key && (
-                                                <ul className="pl-6 border-l border-gray-700 ml-4 my-1 space-y-1">
-                                                    {visibleChildren(game).map((link) => (
-                                                        <li key={link.href}>
-                                                            <Link
-                                                                href={link.href}
-                                                                className={`px-2 py-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
-                                                                onClick={() => {
-                                                                    setIsGamesDropdownOpen(false);
-                                                                    setOpenGameKey(null);
-                                                                }}
-                                                            >
-                                                                {link.icon}
-                                                                {link.label}
-                                                            </Link>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </li>
-                                    ))}
+                                    {visibleGames.map((game) => {
+                                        const children = visibleChildren(game);
+                                        // 하위가 하나뿐이면(예: 비로그인 = 플레이만) 펼치는 게 헛클릭이라
+                                        // 게임 이름 자체를 그 항목 링크로 만든다. (#51)
+                                        const only = children.length === 1 ? children[0] : null;
+                                        return (
+                                            <li key={game.key} className="relative">
+                                                {only ? (
+                                                    <Link
+                                                        href={only.href}
+                                                        className={`px-4 py-2 hover:bg-gray-700 transition flex items-center gap-2 ${pathname === only.href ? "text-gray-400" : "text-gray-300"}`}
+                                                        onClick={() => setIsGamesDropdownOpen(false)}
+                                                    >
+                                                        {game.icon}
+                                                        {game.label}
+                                                    </Link>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            className="w-full px-4 py-2 hover:bg-gray-700 transition flex items-center justify-between gap-2 text-left"
+                                                            onClick={() =>
+                                                                setOpenGameKey((k) => (k === game.key ? null : game.key))
+                                                            }
+                                                            aria-label={`${game.label} 하위 메뉴`}
+                                                            aria-expanded={openGameKey === game.key}
+                                                        >
+                                                            <span className="flex items-center gap-2">
+                                                                {game.icon}
+                                                                {game.label}
+                                                            </span>
+                                                            <ChevronDown
+                                                                size={16}
+                                                                className={`transition transform ${openGameKey === game.key ? "rotate-180" : ""}`}
+                                                            />
+                                                        </button>
+                                                        {openGameKey === game.key && (
+                                                            <ul className="pl-6 border-l border-gray-700 ml-4 my-1 space-y-1">
+                                                                {children.map((link) => (
+                                                                    <li key={link.href}>
+                                                                        <Link
+                                                                            href={link.href}
+                                                                            className={`px-2 py-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                                            onClick={() => {
+                                                                                setIsGamesDropdownOpen(false);
+                                                                                setOpenGameKey(null);
+                                                                            }}
+                                                                        >
+                                                                            {link.icon}
+                                                                            {link.label}
+                                                                        </Link>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             )}
                         </li>
@@ -390,44 +409,62 @@ export default function Navbar() {
                             </button>
                             {isMobileGamesOpen && (
                                 <ul className="pl-4 border-l border-gray-700 ml-2 mt-1 space-y-1">
-                                    {visibleGames.map((game) => (
-                                        <li key={game.key}>
-                                            <button
-                                                type="button"
-                                                className="w-full py-2 px-2 rounded hover:bg-gray-700 transition flex items-center justify-between gap-1 text-gray-300"
-                                                onClick={() =>
-                                                    setMobileOpenGameKey((k) => (k === game.key ? null : game.key))
-                                                }
-                                                aria-label={`모바일 ${game.label} 토글`}
-                                                aria-expanded={mobileOpenGameKey === game.key}
-                                            >
-                                                <span className="flex items-center gap-2">
-                                                    {game.icon}
-                                                    {game.label}
-                                                </span>
-                                                <ChevronDown
-                                                    size={16}
-                                                    className={`transition transform ${mobileOpenGameKey === game.key ? "rotate-180" : ""}`}
-                                                />
-                                            </button>
-                                            {mobileOpenGameKey === game.key && (
-                                                <ul className="pl-5 border-l border-gray-700 ml-2 mt-1 space-y-1">
-                                                    {visibleChildren(game).map((link) => (
-                                                        <li key={link.href}>
-                                                            <Link
-                                                                href={link.href}
-                                                                className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
-                                                                onClick={() => setIsOpen(false)}
-                                                            >
-                                                                {link.icon}
-                                                                {link.label}
-                                                            </Link>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            )}
-                                        </li>
-                                    ))}
+                                    {visibleGames.map((game) => {
+                                        const children = visibleChildren(game);
+                                        // 하위가 하나뿐이면 게임 이름이 곧 그 링크. (#51)
+                                        const only = children.length === 1 ? children[0] : null;
+                                        return (
+                                            <li key={game.key}>
+                                                {only ? (
+                                                    <Link
+                                                        href={only.href}
+                                                        className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === only.href ? "text-gray-400" : "text-gray-300"}`}
+                                                        onClick={() => setIsOpen(false)}
+                                                    >
+                                                        {game.icon}
+                                                        {game.label}
+                                                    </Link>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            className="w-full py-2 px-2 rounded hover:bg-gray-700 transition flex items-center justify-between gap-1 text-gray-300"
+                                                            onClick={() =>
+                                                                setMobileOpenGameKey((k) => (k === game.key ? null : game.key))
+                                                            }
+                                                            aria-label={`모바일 ${game.label} 토글`}
+                                                            aria-expanded={mobileOpenGameKey === game.key}
+                                                        >
+                                                            <span className="flex items-center gap-2">
+                                                                {game.icon}
+                                                                {game.label}
+                                                            </span>
+                                                            <ChevronDown
+                                                                size={16}
+                                                                className={`transition transform ${mobileOpenGameKey === game.key ? "rotate-180" : ""}`}
+                                                            />
+                                                        </button>
+                                                        {mobileOpenGameKey === game.key && (
+                                                            <ul className="pl-5 border-l border-gray-700 ml-2 mt-1 space-y-1">
+                                                                {children.map((link) => (
+                                                                    <li key={link.href}>
+                                                                        <Link
+                                                                            href={link.href}
+                                                                            className={`py-2 px-2 rounded hover:bg-gray-700 transition flex items-center gap-2 ${pathname === link.href ? "text-gray-400" : "text-gray-300"}`}
+                                                                            onClick={() => setIsOpen(false)}
+                                                                        >
+                                                                            {link.icon}
+                                                                            {link.label}
+                                                                        </Link>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             )}
                         </li>
