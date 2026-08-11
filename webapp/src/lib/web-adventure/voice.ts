@@ -60,14 +60,58 @@ export function listVoices(scenes: VoicedScene[]): string[] {
  * @param rnd 0<=x<1 (테스트에서 주입)
  */
 export function pickVoice(scenes: VoicedScene[], rnd: () => number = Math.random): string {
-  const cov = voiceCoverage(scenes);
+  return pickVoiceFromCoverage(voiceCoverage(scenes), rnd);
+}
+
+/**
+ * coverage 만 가지고 문체를 고른다 (#79).
+ *
+ * 클라이언트는 variants 가 제거된 씬을 받으므로 scenes 로는 완비 여부를 알 수 없다.
+ * 그래서 API 응답의 voices(coverage)로 뽑는다. 완비된 것만 후보에 넣는 이유는
+ * 미완비 문체를 고르면 빈 씬이 기본 본문으로 폴백돼 한 판 안에서 문체가 섞이기 때문이다.
+ */
+export function pickVoiceFromCoverage(
+  coverage: Record<string, Coverage>,
+  rnd: () => number = Math.random,
+): string {
   const candidates = [
     DEFAULT_VOICE,
-    ...Object.entries(cov)
+    ...Object.entries(coverage)
       .filter(([voice, c]) => c.complete && voice !== DEFAULT_VOICE)
       .map(([voice]) => voice)
       .sort(),
   ];
   const i = Math.min(candidates.length - 1, Math.max(0, Math.floor(rnd() * candidates.length)));
   return candidates[i];
+}
+
+/** 한 판(run) 동안 쓸 문체를 저장해 두는 키. */
+export const RUN_VOICE_KEY = 'web-adventure:run-voice';
+
+type VoiceStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+/**
+ * 이번 판에 쓸 문체를 정한다 (#79).
+ *
+ * 우선순위: URL 지정(override) > 이 판에서 이미 뽑아 둔 값 > 새로 뽑기.
+ * 한 판 안에서 씬마다 문체가 갈리면 몰입이 깨지므로 한 번 뽑은 값을 저장해 유지한다.
+ * 저장된 문체가 더 이상 완비가 아니면(예: 씬이 추가돼 커버리지가 깨짐) 다시 뽑는다.
+ */
+export function chooseRunVoice(args: {
+  coverage: Record<string, Coverage>;
+  override?: string;
+  storage?: VoiceStorage;
+  rnd?: () => number;
+}): string {
+  const { coverage, override, storage, rnd = Math.random } = args;
+  if (override) return override;
+
+  const isUsable = (v: string) => v === DEFAULT_VOICE || coverage[v]?.complete === true;
+
+  const saved = storage?.getItem(RUN_VOICE_KEY) ?? null;
+  if (saved && isUsable(saved)) return saved;
+
+  const picked = pickVoiceFromCoverage(coverage, rnd);
+  storage?.setItem(RUN_VOICE_KEY, picked);
+  return picked;
 }

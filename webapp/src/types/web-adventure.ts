@@ -141,6 +141,13 @@ export type Scene = {
   illustrations?: string[];
   title: string;
   body: string[];
+  /**
+   * #73 사건의 뼈대(집필용 정본). **화면에 절대 나가지 않는다** —
+   * 문체 변형이 없으면 body 로 폴백한다.
+   */
+  treatment?: string[];
+  /** #73 문체별 본문 `{ [voice]: string[] }`. 없으면 body 로 폴백. */
+  variants?: Record<string, string[]>;
   choices: Choice[];
   /**
    * 씬 진입 BGM(선택). body 문단은 인라인 스크립트 확장 지원 — `{{변수}}` 치환 +

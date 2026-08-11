@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 import type { Scene } from "@/types/web-adventure";
+import {
+  TREATMENT_TAB,
+  BODY_TAB,
+  bodyTabs,
+  readTab,
+  writeTab,
+  tabLabel,
+} from "@/lib/web-adventure/scene-body-tabs";
 
 // #253 〈에테르니아〉 — CMS 의 endingId 드롭다운.
 const ENDING_IDS: NonNullable<Scene["endingId"]>[] = [
@@ -25,6 +33,9 @@ export function SceneForm({ scene, onChange }: Props) {
   const [newItemId, setNewItemId] = useState("");
   const [bgmUploading, setBgmUploading] = useState(false);
   const [bgmError, setBgmError] = useState<string | null>(null);
+  // 본문 탭 (#79) — 기본은 「기본」 탭.
+  const [activeTab, setActiveTab] = useState<string>(BODY_TAB);
+  const tabs = bodyTabs(scene);
 
   const titleMissing = !scene.title.trim();
   const bodyMissing = !scene.body || scene.body.length === 0;
@@ -232,23 +243,67 @@ export function SceneForm({ scene, onChange }: Props) {
           </span>
         </div>
 
-        <label className="block">
-          <span className="block text-xs text-gray-500 mb-0.5">본문 (한 줄당 한 문단)</span>
+        {/* 본문 탭 — 트리트먼트(집필용 뼈대) / 기본 / 문체별 변형 (#79). */}
+        <div className="block">
+          <div className="flex flex-wrap items-center gap-1 mb-1">
+            {tabs.map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setActiveTab(t)}
+                aria-pressed={activeTab === t}
+                className={
+                  "rounded px-2 py-0.5 text-xs border " +
+                  (activeTab === t
+                    ? "bg-amber-600 text-white border-amber-600"
+                    : "bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300")
+                }
+              >
+                {tabLabel(t)}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                const name = window.prompt("추가할 문체 키 (예: hemingway)")?.trim();
+                if (!name) return;
+                if (name.startsWith(":")) return; // 내부 예약 키와 충돌 방지
+                onChange(writeTab(scene, name, readTab(scene, name)));
+                setActiveTab(name);
+              }}
+              className="rounded px-2 py-0.5 text-xs border border-dashed text-gray-500"
+            >
+              + 문체 추가
+            </button>
+          </div>
+
+          <span className="block text-xs text-gray-500 mb-0.5">
+            {activeTab === TREATMENT_TAB
+              ? "트리트먼트 — 사건의 뼈대(집필용). 화면에는 나가지 않습니다."
+              : `${tabLabel(activeTab)} 본문 (한 줄당 한 문단)`}
+          </span>
           <textarea
-            aria-label="본문"
-            value={(scene.body ?? []).join("\n")}
+            aria-label={activeTab === BODY_TAB ? "본문" : `${tabLabel(activeTab)} 본문`}
+            value={readTab(scene, activeTab).join("\n")}
             onChange={(e) => {
               const lines = e.target.value.split("\n");
               // 후행 빈 줄 1개는 입력 중 자연스러운 상태, 그러나 모두 빈 줄은 빈 배열
               const cleaned = lines.filter((l) => l.length > 0);
-              onChange({ ...scene, body: cleaned });
+              onChange(writeTab(scene, activeTab, cleaned));
             }}
             rows={4}
-            placeholder="씬 본문..."
+            placeholder={activeTab === TREATMENT_TAB ? "이 씬에서 일어나는 일..." : "씬 본문..."}
             className={`${inputCls} font-mono`}
           />
-          {bodyMissing && <p className="text-xs text-red-500 mt-0.5">본문 은 한 줄 이상 입력해야 합니다.</p>}
-        </label>
+          {activeTab === BODY_TAB && bodyMissing && (
+            <p className="text-xs text-red-500 mt-0.5">본문 은 한 줄 이상 입력해야 합니다.</p>
+          )}
+          {activeTab !== TREATMENT_TAB && activeTab !== BODY_TAB && (
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              비워 두면 이 문체로 플레이할 때 기본 본문으로 대체됩니다.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* onEnter — setFlags */}

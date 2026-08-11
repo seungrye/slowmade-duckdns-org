@@ -8,6 +8,7 @@
 // `START_SCENE_ID` 는 export 유지 (백업: scripts/backups/web-adventure-pre-aethernia-*.json).
 
 import type { SceneRegistry } from "@/types/web-adventure";
+import type { Coverage } from "../voice";
 
 /** 정적 fallback — 콘텐츠 리프래시 후 비어 있음 (mongo 가 단일 소스). */
 export const scenes: SceneRegistry = {};
@@ -35,14 +36,28 @@ export interface GetScenesOptions {
 const FETCH_RETRIES = 2;
 const FETCH_BACKOFFS_MS = [500, 1500];
 
+// 마지막 응답의 문체 커버리지 (#79).
+// 클라이언트가 받는 씬에는 variants 가 제거돼 있어 완비 여부를 알 수 없다.
+// 랜덤 문체를 고르려면 이 값이 필요하므로 응답에서 따로 챙겨 둔다.
+let lastVoices: Record<string, Coverage> = {};
+
+/** 마지막 content fetch 가 알려 준 문체별 커버리지. fetch 전에는 빈 객체. */
+export function getVoiceCoverage(): Record<string, Coverage> {
+  return lastVoices;
+}
+
 async function fetchContentOnce(voice?: string): Promise<SceneRegistry> {
   const qs = voice ? `?voice=${encodeURIComponent(voice)}` : "";
   const res = await fetch(`/api/web-adventure/content/v1${qs}`);
   if (!res.ok) throw new Error(`content fetch ${res.status}`);
   const json = (await res.json()) as {
     success?: boolean;
-    data?: { scenes?: Array<{ id: string } & Record<string, unknown>> };
+    data?: {
+      scenes?: Array<{ id: string } & Record<string, unknown>>;
+      voices?: Record<string, Coverage>;
+    };
   };
+  lastVoices = json?.data?.voices ?? {};
   const list = json?.data?.scenes ?? [];
   const map: SceneRegistry = {};
   for (const s of list) {
@@ -93,4 +108,5 @@ export function resetSceneCache(): void {
   cachedScenes = null;
   cachedVoice = "";
   inflight = null;
+  lastVoices = {};
 }
