@@ -30,8 +30,6 @@ import {
   Controls,
   MarkerType,
   useReactFlow,
-  useNodesState,
-  useEdgesState,
   type Edge,
   type Node,
   type NodeTypes,
@@ -105,10 +103,13 @@ function GraphInner() {
   const searchParams = useSearchParams();
   const focusParam = searchParams?.get("focus") ?? null;
   // #235 — 카메라 이동용 setCenter 훅.
-  // #330 — getZoom 추가: 선택 시 *현재 zoom 유지* (확대 금지).
   // #341/fix — getNodes: focus URL 진입의 setTimeout 안에서 *최신* 노드 좌표
   // 가 필요. closure 의 rfNodes 는 stale (마운트 시점 빈 배열).
-  const { setCenter, getZoom, getNodes, setNodes, setEdges } = useReactFlow();
+  //
+  // #330 은 "선택 시 현재 zoom 유지(확대 금지)" 를 위해 getZoom 을 들여왔으나, #341 에서
+  // focus 진입을 zoom 1.2 고정으로 바꾸면서 쓰이지 않게 됐다(아래 setCenter 참조).
+  // 지금은 zoom 유지 동작이 없다 — 되살리려면 setCenter 의 zoom 을 getZoom() 으로 바꿔야 한다.
+  const { setCenter, getNodes, setNodes, setEdges } = useReactFlow();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // #226 — 사이드패널 편집 대상 씬 id.
