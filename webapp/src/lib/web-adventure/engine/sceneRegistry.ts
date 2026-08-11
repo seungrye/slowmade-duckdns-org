@@ -17,6 +17,7 @@ export const START_SCENE_ID = "kael_infirmary";
 
 // ── Phase D 동적 fetch (mongo 기반) ───────────────────────────────────────────
 let cachedScenes: SceneRegistry | null = null;
+let cachedVoice = ""; // 어떤 문체로 받아둔 캐시인지 (#73)
 let inflight: Promise<SceneRegistry> | null = null;
 
 export interface GetScenesOptions {
@@ -24,6 +25,8 @@ export interface GetScenesOptions {
   force?: boolean;
   /** false 면 retry 비활성 (단일 fetch). 기본 true (#292). */
   retry?: boolean;
+  /** 문체(#73). 미지정이면 기본 문체. 값이 바뀌면 캐시를 무효화한다. */
+  voice?: string;
 }
 
 // #292 — 일시 네트워크 fail 대응 retry 정책.
@@ -32,8 +35,9 @@ export interface GetScenesOptions {
 const FETCH_RETRIES = 2;
 const FETCH_BACKOFFS_MS = [500, 1500];
 
-async function fetchContentOnce(): Promise<SceneRegistry> {
-  const res = await fetch("/api/web-adventure/content/v1");
+async function fetchContentOnce(voice?: string): Promise<SceneRegistry> {
+  const qs = voice ? `?voice=${encodeURIComponent(voice)}` : "";
+  const res = await fetch(`/api/web-adventure/content/v1${qs}`);
   if (!res.ok) throw new Error(`content fetch ${res.status}`);
   const json = (await res.json()) as {
     success?: boolean;
@@ -49,21 +53,24 @@ async function fetchContentOnce(): Promise<SceneRegistry> {
 
 /** /api/web-adventure/content/v1 에서 씬을 fetch (모듈 캐시 + inflight 싱글톤 + retry). */
 export async function getScenes(opts: GetScenesOptions = {}): Promise<SceneRegistry> {
-  if (!opts.force && cachedScenes) return cachedScenes;
-  if (inflight) return inflight;
+  const voice = opts.voice ?? "";
+  // 문체가 바뀌면 본문이 통째로 달라지므로 캐시·진행 중 요청을 재사용하지 않는다.
+  if (!opts.force && cachedScenes && cachedVoice === voice) return cachedScenes;
+  if (inflight && cachedVoice === voice) return inflight;
 
   const retry = opts.retry !== false;
+  cachedVoice = voice;
   inflight = (async () => {
     try {
       if (!retry) {
-        const map = await fetchContentOnce();
+        const map = await fetchContentOnce(voice);
         cachedScenes = map;
         return map;
       }
       let lastError: unknown = null;
       for (let attempt = 0; attempt <= FETCH_RETRIES; attempt++) {
         try {
-          const map = await fetchContentOnce();
+          const map = await fetchContentOnce(voice);
           cachedScenes = map;
           return map;
         } catch (err) {
@@ -84,5 +91,6 @@ export async function getScenes(opts: GetScenesOptions = {}): Promise<SceneRegis
 /** 테스트/강제 새로고침 — 모듈 캐시 초기화. */
 export function resetSceneCache(): void {
   cachedScenes = null;
+  cachedVoice = "";
   inflight = null;
 }

@@ -31,6 +31,17 @@ import MobileDrawer from "./MobileDrawer";
 
 const initialState: GameState = { phase: "creating" };
 
+/**
+ * 문체 지정 — /play?voice=tolkien (#73).
+ *
+ * 지금은 수동 지정만 지원한다. 완비된 문체가 생기면 회차 시작 시 랜덤 선택으로 확장한다
+ * (lib/web-adventure/voice.ts 의 pickVoice). useSearchParams 대신 location 을 직접 읽어
+ * Suspense 경계를 늘리지 않는다.
+ */
+function readVoice(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return new URLSearchParams(window.location.search).get("voice") ?? undefined;
+}
 
 export default function WebAdventurePlayPage() {
   const [scenes, setScenes] = useState<SceneRegistry | null>(null);
@@ -39,7 +50,7 @@ export default function WebAdventurePlayPage() {
   const loadScenes = useCallback(() => {
     setError(null);
     setScenes(null);
-    getScenes({ force: true })
+    getScenes({ force: true, voice: readVoice() })
       .then((data) => setScenes(data))
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
@@ -50,7 +61,7 @@ export default function WebAdventurePlayPage() {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    getScenes()
+    getScenes({ voice: readVoice() })
       .then((data) => {
         if (!cancelled) setScenes(data);
       })

@@ -137,6 +137,11 @@ const WebAdventureSceneSchema = new Schema(
         message: "body 는 비어있지 않은 배열이어야 합니다.",
       },
     },
+    // #73 문체 변형 — treatment 는 사건의 뼈대(집필용 정본), variants 는 문체별 본문.
+    //   treatment 는 **화면에 절대 나가지 않는다**(변형이 없으면 body 로 폴백한다).
+    //   variants 는 { [voice]: string[] } 자유 키라 Mixed — 작가를 늘려도 스키마를 안 고친다.
+    treatment: { type: [String], default: [] },
+    variants: { type: Schema.Types.Mixed, default: {} },
     choices: { type: [ChoiceSchema], required: true, default: [] },
     onEnter: { type: OnEnterSchema },
     // 씬 진입 기본 BGM(선택). 중간 제어는 body 의 <<bgm …>> 디렉티브.
@@ -167,6 +172,10 @@ export interface WebAdventureSceneDoc {
   illustration: string;
   illustrations?: string[];
   body: string[];
+  /** #73 사건의 뼈대(집필용). 화면에 나가지 않는다. */
+  treatment?: string[];
+  /** #73 문체별 본문 { [voice]: string[] }. 없으면 body 로 폴백. */
+  variants?: Record<string, string[]>;
   choices: Array<Record<string, unknown>>;
   onEnter?: {
     setFlags?: Map<string, boolean>;
