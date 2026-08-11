@@ -3,7 +3,8 @@
 import { useEffect, useReducer, useRef, useState, useCallback } from "react";
 import type { GameState, SceneRegistry } from "@/types/web-adventure";
 import { gameReducer, type Action } from "@/lib/web-adventure/engine/reducer";
-import { getScenes } from "@/lib/web-adventure/engine/sceneRegistry";
+import { getScenes, getVoiceCoverage } from "@/lib/web-adventure/engine/sceneRegistry";
+import { chooseRunVoice, DEFAULT_VOICE } from "@/lib/web-adventure/voice";
 import { useAutoSave, LOCAL_STORAGE_KEY as LOCAL_STORAGE_SAVE_KEY } from "@/lib/web-adventure/use-auto-save";
 import {
   useMigrateOnLogin,
@@ -34,13 +35,31 @@ const initialState: GameState = { phase: "creating" };
 /**
  * 문체 지정 — /play?voice=tolkien (#73).
  *
- * 지금은 수동 지정만 지원한다. 완비된 문체가 생기면 회차 시작 시 랜덤 선택으로 확장한다
- * (lib/web-adventure/voice.ts 의 pickVoice). useSearchParams 대신 location 을 직접 읽어
- * Suspense 경계를 늘리지 않는다.
+ * useSearchParams 대신 location 을 직접 읽어 Suspense 경계를 늘리지 않는다.
  */
 function readVoice(): string | undefined {
   if (typeof window === "undefined") return undefined;
   return new URLSearchParams(window.location.search).get("voice") ?? undefined;
+}
+
+/**
+ * 이번 판의 문체를 정해 씬을 받아온다 (#79).
+ *
+ * 클라이언트가 받는 씬에는 variants 가 없어 완비 여부를 알 수 없으므로, 우선 한 번 받아
+ * 커버리지를 확보한 뒤 문체를 고른다. 고른 값은 sessionStorage 에 남겨 한 판 안에서는
+ * 씬마다 문체가 갈리지 않게 한다. `?voice=` 를 준 경우엔 그것이 우선한다.
+ */
+async function loadScenesForRun(force = false): Promise<SceneRegistry> {
+  const override = readVoice();
+  const first = await getScenes({ force, voice: override });
+  if (override) return first;
+
+  const voice = chooseRunVoice({
+    coverage: getVoiceCoverage(),
+    storage: typeof window === "undefined" ? undefined : window.sessionStorage,
+  });
+  if (voice === DEFAULT_VOICE) return first;
+  return getScenes({ force, voice });
 }
 
 export default function WebAdventurePlayPage() {
@@ -50,7 +69,7 @@ export default function WebAdventurePlayPage() {
   const loadScenes = useCallback(() => {
     setError(null);
     setScenes(null);
-    getScenes({ force: true, voice: readVoice() })
+    loadScenesForRun(true)
       .then((data) => setScenes(data))
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
@@ -61,7 +80,7 @@ export default function WebAdventurePlayPage() {
   useEffect(() => {
     let cancelled = false;
     setError(null);
-    getScenes({ voice: readVoice() })
+    loadScenesForRun()
       .then((data) => {
         if (!cancelled) setScenes(data);
       })
