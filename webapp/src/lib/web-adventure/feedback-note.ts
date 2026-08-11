@@ -3,6 +3,8 @@
 // 프롬프트 조립(buildMessages)·출력 파싱(parseOutput)은 순수 함수(단위 테스트 용이).
 // generateFeedbackNote 만 부수효과(로컬 shim fetch). site 백엔드가 127.0.0.1 로 내부 호출.
 
+import { randomUUID } from 'node:crypto';
+
 import { env } from '@/lib/env';
 
 export interface FeedbackNoteInput {
@@ -52,7 +54,10 @@ export function truncateLog(log: string[], maxChars = MAX_LOG_CHARS): string {
 }
 
 /** 회차 입력 → LLM chat messages (system + user). 순수 함수. */
-export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; content: string }> {
+export function buildMessages(
+  input: FeedbackNoteInput,
+  opts: { echoToken?: string } = {},
+): Array<{ role: string; content: string }> {
   const endingLabel = ENDING_LABEL[input.endingId] ?? input.endingId;
   const c = input.character ?? {};
   const charLine = [
@@ -72,8 +77,14 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
     '절대 이야기(서사)를 다시 쓰지 마라. 소설/장면 산문을 쓰지 마라 — 오직 제안·개선안.',
     '"제목:" 이나 "**서사:**" 같은 머리말을 쓰지 마라. 장면 묘사·대사·주사위 판정을 재현하지 마라.',
     '',
+    // 오배달 감지용 — 응답이 이 요청의 것인지 대조한다(#65). 토큰이 없으면 지시하지 않는다.
+    ...(opts.echoToken
+      ? [`출력의 맨 첫 줄에는 정확히 [[NOTE:${opts.echoToken}]] 만 쓰고 줄을 바꾼다.`]
+      : []),
     '출력은 반드시 아래 소제목(## 로 시작)으로만 구성하고, 각 항목은 마크다운 목록으로 쓴다.',
-    '첫 줄은 반드시 "## 안 가본 듯한 분기 아이디어" 로 시작한다.',
+    opts.echoToken
+      ? '토큰 줄 다음 줄은 반드시 "## 안 가본 듯한 분기 아이디어" 로 시작한다.'
+      : '첫 줄은 반드시 "## 안 가본 듯한 분기 아이디어" 로 시작한다.',
     '## 안 가본 듯한 분기 아이디어',
     '## 더 깊게 팔 만한 캐릭터/떡밥',
     '## 빈약해 보완이 필요한 지점',
@@ -97,6 +108,20 @@ export function buildMessages(input: FeedbackNoteInput): Array<{ role: string; c
     { role: 'system', content: system },
     { role: 'user', content: user },
   ];
+}
+
+/** 응답 첫 줄에 실려 오는 에코 토큰. 없으면 null(모델이 생략할 수 있다). */
+export function extractEchoToken(content: string): string | null {
+  const m = String(content ?? '').match(/^\s*\[\[NOTE:([A-Za-z0-9_-]{4,64})\]\]/);
+  return m ? m[1] : null;
+}
+
+/** 저장 전에 토큰 줄을 걷어낸다. 토큰이 없으면 원문 그대로. */
+export function stripEchoToken(content: string): string {
+  const text = String(content ?? '');
+  return extractEchoToken(text)
+    ? text.replace(/^\s*\[\[NOTE:[A-Za-z0-9_-]{4,64}\]\][^\n]*\n?/, '')
+    : text;
 }
 
 /** 요구한 소제목의 핵심어 — LLM 이 표기를 조금 바꿔도(##/###, 어미 변형) 잡히도록 느슨하게 본다. */
@@ -139,15 +164,23 @@ export function sseDeltaContent(line: string): string {
  */
 export async function generateFeedbackNote(
   input: FeedbackNoteInput,
-  opts?: { model?: string; maxTokens?: number; temperature?: number; signal?: AbortSignal },
+  opts?: {
+    model?: string;
+    maxTokens?: number;
+    temperature?: number;
+    signal?: AbortSignal;
+    echoToken?: string; // 테스트에서 고정하려고 주입 (#65)
+  },
 ): Promise<FeedbackNoteResult> {
   const model = opts?.model ?? 'Qwen3-30B-A3B-Q4_K_M';
+  // 오배달 감지용 토큰 — shim 이 직전 요청의 응답을 돌려준 사고가 있었다(#65).
+  const echoToken = opts?.echoToken ?? randomUUID().replace(/-/g, '').slice(0, 12);
   const res = await fetch(`${env.llmBaseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
-      messages: buildMessages(input),
+      messages: buildMessages(input, { echoToken }),
       max_tokens: opts?.maxTokens ?? 4000,
       temperature: opts?.temperature ?? 0.9,
       stream: true,
@@ -177,6 +210,15 @@ export async function generateFeedbackNote(
   content += sseDeltaContent(buf); // 마지막 개행 없는 잔여
 
   if (!content.trim()) throw new Error('shim 응답이 비어 있습니다.');
+
+  // 다른 요청의 응답이 넘어온 경우 — 토큰이 이 요청 것과 다르면 저장하지 않는다(#65).
+  // 모델이 토큰을 생략했으면(null) 통과시켜 오탐을 만들지 않는다.
+  const echoed = extractEchoToken(content);
+  if (echoed && echoed !== echoToken) {
+    throw new Error(`응답 토큰 불일치 — 다른 요청의 응답으로 보임(기대 ${echoToken} / 받음 ${echoed})`);
+  }
+  content = stripEchoToken(content);
+
   // 형식 위반(서사 산문)은 저장하지 않고 던진다 — 워커가 queued 로 되돌려 재시도한다.
   // 검증이 없던 탓에 다른 회차의 서사가 작가 노트로 저장된 적이 있다.
   if (!looksLikeProposal(content)) {
