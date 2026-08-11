@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import WebAdventureScene from "@/models/web-adventure-scene";
+import { DEFAULT_VOICE, resolveBody, voiceCoverage } from "@/lib/web-adventure/voice";
 
 // 공개 read-only 컨텐츠 — 앱(Capacitor WebView, cross-origin)도 소비하므로 CORS 허용.
 const CORS_HEADERS = {
@@ -13,11 +14,33 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, OPTIONS",
 };
 
-export async function GET() {
+type SceneDoc = Record<string, unknown> & {
+  body: string[];
+  treatment?: string[];
+  variants?: Record<string, string[]>;
+};
+
+/**
+ * @param req ?voice= 로 문체를 고른다. 없으면 기본 문체.
+ *   랜덤 선택은 **클라이언트 몫**이다 — 서버가 매번 랜덤을 돌리면 응답을 캐시할 수 없다.
+ *   클라이언트는 함께 내려주는 voices(완비율)를 보고 고른 뒤 그 값으로 다시 요청한다. (#73)
+ */
+export async function GET(req: Request) {
   await connectToDB();
-  const scenes = await WebAdventureScene.find({ isDeleted: { $ne: true } }).lean();
+  const docs = (await WebAdventureScene.find({ isDeleted: { $ne: true } }).lean()) as SceneDoc[];
+
+  const requested = req?.url ? new URL(req.url).searchParams.get("voice") : null;
+  const voice = requested || DEFAULT_VOICE;
+
+  // treatment(뼈대)·variants 는 클라이언트로 내보내지 않는다 — 노출 금지 + 페이로드 절감.
+  const scenes = docs.map((doc) => {
+    const { treatment: _t, variants: _v, ...rest } = doc;
+    void _t; void _v;
+    return { ...rest, body: resolveBody(doc, voice) };
+  });
+
   return NextResponse.json(
-    { success: true, data: { scenes } },
+    { success: true, data: { scenes, voice, voices: voiceCoverage(docs) } },
     {
       status: 200,
       headers: {
