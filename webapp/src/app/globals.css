@@ -69,6 +69,25 @@ body {
   display: inline-block;
 }
 
+/*
+ * D2Coding (NAVER, OFL-1.1 — 고지: /fonts/d2coding-code.LICENSE.txt)
+ * 코드블록 전용 고정폭. 한글이 섞인 ASCII 다이어그램의 정렬을 위해 넣었다 (#75).
+ *
+ * 라틴·숫자·박스드로잉(─│═║╔►)이 전부 0.5em, 한글이 정확히 1.0em 이라
+ * **한 폰트로 전부 렌더할 때만** 세로줄이 맞는다. 그래서 폴백 체인 맨 앞에 둔다 —
+ * 라틴만 다른 폰트가 잡으면 폭 비율이 어긋나 다시 깨진다.
+ *
+ * 원본 26,188 글리프에서 코드에 안 쓰이는 한자를 뺀 서브셋(한글 완성형 11,172 자는 전부).
+ * @font-face 는 실제로 쓰이는 페이지에서만 내려받으므로 코드블록 없는 글엔 부담이 없다.
+ */
+@font-face {
+  font-family: 'D2Coding';
+  src: url('/fonts/d2coding-code.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 *:focus {
   outline: none;
 }
