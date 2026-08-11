@@ -7,6 +7,8 @@ import {
   buildMessages,
   sseDeltaContent,
   looksLikeProposal,
+  extractEchoToken,
+  stripEchoToken,
   MAX_LOG_CHARS,
 } from './feedback-note';
 
@@ -70,6 +72,43 @@ describe('buildMessages (제안/개선안 전용)', () => {
   it('캐릭터 없어도 안전', () => {
     const msgs = buildMessages({ endingId: 'fall', finalSceneId: 's', scenePath: [], log: ['x'], character: null });
     expect(msgs[1].content).toContain('몰락');
+  });
+});
+
+// shim 이 직전 요청의 응답을 돌려주는 오배달이 실제로 있었다(#65). 서버를 고쳤지만
+// 애플리케이션도 스스로 알아채야 한다 — 요청마다 토큰을 심고 응답에서 대조한다.
+describe('에코 토큰', () => {
+  it('buildMessages 에 토큰을 주면 system 지시에 포함된다', () => {
+    const msgs = buildMessages(
+      { endingId: 'harmony', finalSceneId: 's', scenePath: [], log: ['x'], character: null },
+      { echoToken: 'tok-123' },
+    );
+    expect(msgs[0].content).toContain('[[NOTE:tok-123]]');
+  });
+
+  it('토큰을 안 주면 지시가 붙지 않는다(기존 동작)', () => {
+    const msgs = buildMessages({ endingId: 'harmony', finalSceneId: 's', scenePath: [], log: ['x'], character: null });
+    expect(msgs[0].content).not.toContain('[[NOTE:');
+  });
+
+  it('응답 첫 줄에서 토큰을 뽑는다', () => {
+    expect(extractEchoToken('[[NOTE:abc-123]]\n## 안 가본 듯한 분기 아이디어')).toBe('abc-123');
+  });
+
+  it('토큰이 없으면 null (모델이 생략할 수 있다)', () => {
+    expect(extractEchoToken('## 안 가본 듯한 분기 아이디어\n- 어쩌고')).toBeNull();
+    expect(extractEchoToken('')).toBeNull();
+  });
+
+  it('저장 전에 토큰 줄을 걷어낸다', () => {
+    const out = stripEchoToken('[[NOTE:abc-123]]\n## 안 가본 듯한 분기 아이디어\n- 어쩌고');
+    expect(out.startsWith('## 안 가본')).toBe(true);
+    expect(out).not.toContain('[[NOTE:');
+  });
+
+  it('토큰이 없으면 본문을 그대로 둔다', () => {
+    const body = '## 안 가본 듯한 분기 아이디어\n- 어쩌고';
+    expect(stripEchoToken(body)).toBe(body);
   });
 });
 
