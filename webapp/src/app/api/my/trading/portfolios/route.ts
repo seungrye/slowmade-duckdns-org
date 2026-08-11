@@ -5,6 +5,7 @@ import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
 import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
+import { appendStrategyChange, type StrategyChange } from "@/lib/trading/strategy-history";
 
 /** 포트폴리오의 (env, currency) 로 매매기록·이력 숨김/복구 토글 — 소프트 삭제.
  *  (accountId, market) 이 unique 라 (env,currency)당 포트폴리오는 유일 → 다른 블록 안 건드림. */
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
   // *재생성*(신규 or 소프트 삭제됐던 걸 되살림)일 때만 state 를 초기화한다 — 그래야 지웠다
   // 다시 만든 포트폴리오가 옛 V4 사이클(T·장부현금)을 이어가지 않고 깨끗하게 시작한다.
   const prev = await TradingPortfolio.findOne({ accountId: body.accountId, market })
-    .select({ isDeleted: 1 }).lean();
+    .select({ isDeleted: 1, strategy: 1, strategyHistory: 1 }).lean();
   const isRecreate = !prev || (prev as { isDeleted?: boolean }).isDeleted === true;
   const setFields: Record<string, unknown> = {
     strategy, runAt,
@@ -91,6 +92,12 @@ export async function POST(req: NextRequest) {
     // 소프트 삭제됐던 (accountId,market) 문서를 재생성 시 재사용(undelete).
     isDeleted: false, deletedAt: null,
   };
+  // #83 — 전략이 바뀌었을 때만 이력 한 줄. 저장 버튼만 눌러도 여기를 지나므로
+  // 같으면 아무것도 하지 않아야 이력이 같은 줄로 도배되지 않는다.
+  const prevDoc = prev as { strategy?: string; strategyHistory?: StrategyChange[] } | null;
+  const prevHistory = prevDoc?.strategyHistory ?? [];
+  const history = appendStrategyChange(prevHistory, prevDoc?.strategy, strategy, new Date());
+  if (history !== prevHistory) setFields.strategyHistory = history;
   if (isRecreate) setFields.state = {}; // 재생성/신규 — 사이클 상태 초기화
   const doc = await TradingPortfolio.findOneAndUpdate(
     { accountId: body.accountId, market },
