@@ -19,7 +19,7 @@ import type { CycleLogger } from "./engines";
 import { TossClient } from "./toss-client";
 import { sendTradingMail } from "./mailer";
 import { UNIVERSES, EXCD_MAPS } from "./universes";
-import { normalizeTradeTime } from "@/lib/trade-time";
+import { buildTradeUpsertOp } from "./trade-upsert";
 import { formatMoney } from "@/lib/format";
 
 type Json = Record<string, unknown>;
@@ -151,16 +151,9 @@ async function upsertPrices(records: Json[]): Promise<number> {
 
 async function upsertTrades(records: Json[]): Promise<number> {
   if (!records.length) return 0;
-  const ops = records.map((r) => {
-    const time = normalizeTradeTime(String(r.time));
-    return {
-      updateOne: {
-        filter: { env: r.env, ticker: r.ticker, time },
-        update: { $set: { ...r, time } },
-        upsert: true,
-      },
-    };
-  });
+  // strategy 만은 $setOnInsert 로 간다 — 재푸시가 과거 기록의 전략 태그를 덮지 않도록 (#77).
+  // 조립 규칙은 trade-upsert.ts(순수 함수, 테스트 있음)에 있다.
+  const ops = records.map(buildTradeUpsertOp);
   const res = await StockTrade.collection.bulkWrite(ops as never[], { ordered: false });
   return (res.upsertedCount ?? 0) + (res.modifiedCount ?? 0);
 }
