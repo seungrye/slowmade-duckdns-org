@@ -221,7 +221,9 @@ function GraphInner() {
           : { ...n, selected: n.id === selectedSceneId },
       );
     });
-  }, [selectedSceneId]);
+    // #85 — setNodes 는 useReactFlow() 가 돌려주는 안정적 참조라(리렌더해도 같은 함수)
+    // 의존성에 넣어도 effect 가 다시 돌지 않는다. 테스트로 확인했다.
+  }, [selectedSceneId, setNodes]);
 
   // #334/#347 — 선택 노드의 connected edges 에 노란 drop-shadow glow.
   // 변경 없는 edge 는 *동일 reference* 반환 — 114 edge 모두 spread 부담 차단.
@@ -250,7 +252,8 @@ function GraphInner() {
       });
       return changed ? next : edges;
     });
-  }, [selectedSceneId]);
+    // #85 — setEdges 도 setNodes 와 같이 안정적 참조다.
+  }, [selectedSceneId, setEdges]);
 
   // #235 (제거) — 노드 클릭 시 setCenter 카메라 이동 제거.
   //   #347: 69 노드 + 114 edge 환경에서 *클릭 응답성 저하 주요 원인*.
