@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { fetchScenes, submitAppEndRun, DEFAULT_API_BASE, START_SCENE_ID } from "../src/content-client.js";
+import {
+  fetchScenes, submitAppEndRun, DEFAULT_API_BASE, START_SCENE_ID,
+  getVoiceCoverage, fetchScenesForRun,
+} from "../src/content-client.js";
 
 function okResponse(scenes) {
   return { ok: true, json: async () => ({ success: true, data: { scenes } }) };
@@ -102,5 +105,66 @@ describe("content-client submitAppEndRun", () => {
       submitAppEndRun({ endingId: "x", finalSceneId: "s" }, { appKey: "", baseUrl: "http://t", fetchImpl }),
     ).resolves.toBe(false);
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+});
+
+// ── #87 문체(voice) 지원 ───────────────────────────────────────────────
+describe("문체 지원 (#87)", () => {
+  const scenesPayload = (bodyFirst) => ({
+    ok: true,
+    json: async () => ({
+      data: {
+        scenes: [{ id: "kael_infirmary", body: [bodyFirst] }],
+        voices: { tolkien: { filled: 1, total: 1, complete: true } },
+      },
+    }),
+  });
+
+  it("voice 를 주면 쿼리로 붙여 요청한다", async () => {
+    const urls = [];
+    const fetchImpl = async (u) => { urls.push(u); return scenesPayload("톨킨"); };
+    await fetchScenes({ baseUrl: "https://x", fetchImpl, voice: "tolkien" });
+    expect(urls[0]).toContain("?voice=tolkien");
+  });
+
+  it("voice 가 없으면 쿼리를 붙이지 않는다", async () => {
+    const urls = [];
+    const fetchImpl = async (u) => { urls.push(u); return scenesPayload("기본"); };
+    await fetchScenes({ baseUrl: "https://x", fetchImpl });
+    expect(urls[0]).not.toContain("voice=");
+  });
+
+  it("응답의 voices 를 커버리지로 노출한다", async () => {
+    const fetchImpl = async () => scenesPayload("기본");
+    await fetchScenes({ baseUrl: "https://x", fetchImpl });
+    expect(getVoiceCoverage().tolkien.complete).toBe(true);
+  });
+
+  it("fetchScenesForRun 은 완비된 문체를 골라 그 본문을 돌려준다", async () => {
+    const urls = [];
+    const fetchImpl = async (u) => {
+      urls.push(u);
+      return scenesPayload(u.includes("voice=tolkien") ? "톨킨 본문" : "기본 본문");
+    };
+    const out = await fetchScenesForRun({
+      baseUrl: "https://x", fetchImpl,
+      storage: { getItem: () => null, setItem: () => {} },
+      rnd: () => 0.99, // tolkien 이 뽑히도록
+    });
+    expect(out.voice).toBe("tolkien");
+    expect(out.scenes.kael_infirmary.body[0]).toBe("톨킨 본문");
+    expect(urls.length).toBe(2); // 커버리지 확보용 1 회 + 선택 문체 1 회
+  });
+
+  it("기본 문체가 뽑히면 두 번 받지 않는다", async () => {
+    const urls = [];
+    const fetchImpl = async (u) => { urls.push(u); return scenesPayload("기본 본문"); };
+    const out = await fetchScenesForRun({
+      baseUrl: "https://x", fetchImpl,
+      storage: { getItem: () => null, setItem: () => {} },
+      rnd: () => 0, // default 가 뽑히도록
+    });
+    expect(out.voice).toBe("default");
+    expect(urls.length).toBe(1);
   });
 });
