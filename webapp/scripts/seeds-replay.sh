@@ -72,6 +72,13 @@ PATCHES=(
   scripts/seed-361-rin-awakening.mjs # #361 린 각성 루트 + 신규 엔딩
   scripts/seed-362-dialogue-format.mjs # #362 서식 일원화 정정 (FORMAT.md)
   scripts/seed-363-classic-tales.mjs # #363 고전 삽화 이벤트 4편 12씬
+  # 트리트먼트(집필용 정본) + 문체 변형. 본문(body)을 건드리는 위 patch 들이 모두 끝난
+  # 뒤에 얹는다 — 서로 다른 필드라 충돌하지는 않지만, 정본을 마지막에 두는 편이 읽기 쉽다.
+  # 확장 씬 10 개 + 그리로 가는 부모 선택지. treatment/variants 를 얹는 seed-354 보다
+  # **먼저** 돌아야 한다 — 씬이 없으면 그쪽이 건너뛴다.
+  scripts/seed-365-expansion-scenes.mjs # 씬 확장분(성흔 분기 4·회상 2·유대 2·설화 2)
+  scripts/seed-366-body-snapshot.mjs # 본문 정본 고정(드리프트 해소 — #91 정정 포함)
+  scripts/seed-367-voices.mjs # #73/#87 treatment + variants(tolkien/eco)
 )
 
 run_one() {

@@ -1,0 +1,512 @@
+{
+ "scenes": [
+  {
+   "id": "climax_harmony_lunar",
+   "title": "거꾸로 읽는 궤도",
+   "body": [
+    "[[발화기]]의 표면은 문자로 빼곡하다. 세 달의 궤도가 톱니처럼 맞물려 돌고, 그 사이로 룬이 순서대로 밝아진다 — *하나, 둘, 셋.* 남들 눈엔 어지러운 빛일 뿐인 그것이, 너의 눈엔 *읽힌다*.",
+    "마지막으로 밝아진 룬에 손끝을 얹는다. 그리고 *거꾸로* 짚어 내린다. 셋에서 둘로, 둘에서 하나로 — 밝아지던 차례를 너의 손가락이 *되짚어 내린다*. 맞물린 톱니가 잠시 멈칫하더니, 반대로 돌기 시작한다.",
+    "빨아들이던 빛이 *뱉어진다*. 삼켜졌던 마력이 실오라기처럼 풀려, 왔던 첨탑들로 되돌아간다. 너는 숨을 죽이고 다음 룬을, 또 그 다음을 짚는다 — 한 획이라도 어긋나면 *모든 것이 한꺼번에 쏟아진다*.",
+    "세 달의 그림자가 표면 위에서 천천히 어긋난다. 겹쳐 있던 원 세 개가 벌어지고, 새벽 하늘이 다시 *세 개의 달로* 나뉜다. 마지막 룬이 꺼지자 — 발화기는 그저 차가운 금속으로 식는다."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "to_harmony",
+     "label": "마지막 획을 거꾸로 긋고 — 순환을 제자리로 돌려보낸다.",
+     "to": "ending_harmony"
+    }
+   ],
+   "illustration": "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784191864229-d1cd599391c6.jpg",
+   "illustrations": [
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784191864229-d1cd599391c6.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192194077-3819d01ed760.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192225040-383b3a793001.jpg"
+   ],
+   "position": {
+    "x": 8650,
+    "y": 1000
+   },
+   "__v": 0
+  },
+  {
+   "id": "climax_harmony_selene",
+   "title": "안에서부터 흩다",
+   "body": [
+    "[[에테르 코어]]가 정점에서 *굶주린 심장처럼* 뛴다. 빨아들일수록 커지는 그 박동 위로, 너는 두 손바닥을 마주 붙인다. 손목의 푸른 결정이 *맞울음*으로 달아오른다.",
+    "삼키게 두지 않는다. 반대로 — *밀어넣는다*. 평생 너를 좀먹던 마력을 팔뚝에서 손바닥으로, 손바닥에서 코어 속으로 *역류시킨다*. 정맥이 불거지고, 결정이 살갗을 찢을 듯 부푼다.",
+    "코어가 *너를 게워내려* 발버둥친다. 그러나 굶주린 것은 멈출 줄을 모른다 — 너는 이를 악물고 *더* 부어 넣는다. 삼킬 수 있는 것보다 많이. 표면에 실금이 번지고, 안에서 빛이 *터지기 직전으로* 부푼다.",
+    "마침내 — 코어가 안에서부터 *하얗게 무너진다*. 빨려들던 마력이 갈 곳을 잃고 사방으로 흩어져, 새벽 공기 속으로 *숨처럼* 풀린다. 너의 결정이 잿빛으로 식고, 텅 빈 두 손이 떨린다."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "to_harmony",
+     "label": "마지막 한 줌까지 부어 넣고 — 코어를 안에서 흩어놓는다.",
+     "to": "ending_harmony"
+    }
+   ],
+   "illustration": "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192271709-24903b57e4fd.jpg",
+   "illustrations": [
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192271709-24903b57e4fd.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192598492-60aace9b87f9.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192623359-a983dc2c1811.jpg"
+   ],
+   "position": {
+    "x": 8650,
+    "y": 1200
+   },
+   "__v": 0
+  },
+  {
+   "id": "climax_harmony_hecate",
+   "title": "가면 아래의 사람",
+   "body": [
+    "백은 가면 열둘이 [[발화기]]를 둘러싸고 주문을 왼다. 너는 그 원 한가운데로 걸어 들어가 — 입을 연다. 흘러나온 것은 *너의 목소리가 아니다*. 낮고 둥근, 달빛처럼 사람의 뼛속으로 스미는 소리다.",
+    "주문이 *끊긴다*. 가면 아래에서 눈들이 흔들린다 — 그 뒤에 숨어 있던 얼굴들이, 처음으로 *자기 자신을* 떠올린 듯이. 누군가의 손가락이 발화기에서 슬며시 떨어진다.",
+    "너는 이름을 부르지 않는다. 다만 *그들이 삼켰던 것*을 소리로 되돌려 준다 — 두고 온 이름, 태워버린 얼굴, 가면 쓰기 전의 어느 새벽. 한 사제가 무릎을 꿇고, 또 한 사제가 제 손으로 레버를 *반대로 당긴다*.",
+    "원이 안에서부터 풀린다. 홀린 듯, 혹은 *깨어난 듯*, 열두 손이 저마다 의식을 멈춘다. 마지막 가면이 벗겨져 바닥에 구른다 — 그 아래 얼굴은, 그저 지쳐 우는 한 사람이다."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "to_harmony",
+     "label": "가면 아래의 사람에게 마지막 말을 건네고 — 그들 손으로 멈추게 한다.",
+     "to": "ending_harmony"
+    }
+   ],
+   "illustration": "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192685540-f7bd9039e796.jpg",
+   "illustrations": [
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784192685540-f7bd9039e796.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784193013046-75f3ed5117eb.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784193036305-8ff6762bfc5f.jpg"
+   ],
+   "position": {
+    "x": 8650,
+    "y": 1400
+   },
+   "__v": 0
+  },
+  {
+   "id": "climax_harmony_none",
+   "title": "달이 삼킬 수 없는 자",
+   "body": [
+    "마력이 한 점으로 빨려드는 곳 — 발화기의 심장에는 아무도 서지 못한다. 성흔을 지닌 자라면 그 자리에서 *돌이 될 테니까*. 너는 걸어 들어간다. 표식 없는 맨살로, 소용돌이의 *정중앙에* 선다.",
+    "세 달의 빛이 너에게 쏟아진다. 그리고 — *걸리는 것이 없다*. 다른 몸이라면 여기서 마력을 게워냈겠지만, 너의 살갗엔 삼킬 결정도, 빨아낼 표식도 없다. 빛이 너를 *통과해* 갈 곳을 잃는다.",
+    "코어의 공명이 *더듬거린다*. 사방에서 모여들던 흐름이 중심에서 빈 그릇을 만나 — *박자를 놓친다*. 우웅, 하고 울리던 소리가 흔들리고, 겹쳐 돌던 세 원이 서로를 *놓친다*.",
+    "너는 그저 서 있을 뿐이다. 아무것도 하지 않는 것으로, 아무것도 되지 않는 것으로. 굶주린 의식이 삼킬 것을 찾다 못해 — *제 스스로 흩어진다*. 정적이, 새벽을 가득 채운다."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "to_harmony",
+     "label": "숨을 죽인 채 한복판에 서서 — 삼킬 수 없는 자로 남는다.",
+     "to": "ending_harmony"
+    }
+   ],
+   "illustration": "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784193089266-7aed9120a3e1.jpg",
+   "illustrations": [
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784193089266-7aed9120a3e1.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784193419592-266301cdf049.jpg",
+    "https://minio-api.slowmade.duckdns.org/handmade-site/painter-images/1784193443076-199294d7604e.jpg"
+   ],
+   "position": {
+    "x": 8650,
+    "y": 1600
+   },
+   "__v": 0
+  },
+  {
+   "id": "solwen_bond_accept",
+   "title": "Scene 03b — 거두지 않은 빛",
+   "position": {
+    "x": 2166,
+    "y": 900
+   },
+   "onEnter": {
+    "setFlags": {
+     "sylvanLight": true
+    },
+    "stigmaDelta": 7
+   },
+   "body": [
+    "너는 결정을 거두지 않는다. 대신 두 손으로 감싸 *가슴에 댄다*.",
+    "흰눈의 마지막 호흡이 너의 갈비뼈 사이로 스며든다. 뜨겁지 않다 — 오히려 *서늘한 물살* 처럼, 오래 참았던 숨을 대신 쉬어 주는 것처럼.",
+    "푸른 결정이 손등을 타고 팔뚝까지 번진다. 침식이다. 너는 그것을 안다. 알면서도 손을 떼지 않는다.",
+    "*\"깨우는 법을 잊었을 뿐.\"* — 흰눈의 목소리가 이번엔 너의 안쪽에서 울린다. 빌려준 심장 박동이, 이제 돌아왔다.",
+    "숲의 소리가 달라진다. 이끼가 자라는 속도, 뿌리가 물을 끌어올리는 방향 — 전에는 *보이지 않던 결* 이 눈에 잡힌다."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "to_echo",
+     "label": "눈을 감고 — 결을 따라간다.",
+     "to": "solwen_bond_echo"
+    }
+   ],
+   "__v": 0
+  },
+  {
+   "id": "solwen_bond_echo",
+   "title": "Scene 03c — 뿌리가 보여주는 것",
+   "position": {
+    "x": 2380,
+    "y": 900
+   },
+   "body": [
+    "뿌리를 따라 감각이 미끄러진다. 세계수 아래로, 더 아래로.",
+    "놀랍게도 뿌리는 숲에서 끝나지 않는다. 검은 광산 지대를 지나 — *인간의 도시 밑* 까지 뻗어 있다.",
+    "솔라리스의 첨탑 아래, 말라붙은 실뿌리 한 가닥. 아이언가드의 굴뚝 밑, 강철에 눌려 굽은 뿌리 한 무더기.",
+    "살아 있다. 잘린 것이 아니라 *잠들어 있다*. 누군가 깨우는 법을 잊었을 뿐이라는 말이, 숲만의 이야기가 아니었다.",
+    "환영이 걷힌다. 손바닥의 결정이 식는다. 그러나 방향은 남았다 — 어디를 두드리면 울리는지."
+   ],
+   "choices": [
+    {
+     "kind": "conditional",
+     "id": "deeper_look",
+     "label": "[지혜] 더 깊이 — 뿌리가 어디서 끊겼는지 본다.",
+     "condition": {
+      "kind": "minStat",
+      "stat": "wis",
+      "min": 7
+     },
+     "to": "solwen_departure",
+     "hidden": true,
+     "stigmaDelta": -3
+    },
+    {
+     "kind": "plain",
+     "id": "to_departure",
+     "label": "눈을 뜬다 — 갈 길이 있다.",
+     "to": "solwen_departure"
+    }
+   ],
+   "__v": 0
+  },
+  {
+   "id": "tale_knight_past",
+   "title": "Scene 04b-ii — 노기사의 옛 상처",
+   "position": {
+    "x": 1980,
+    "y": 1180
+   },
+   "body": [
+    "랜스를 건네는 노기사의 손목에서, 너의 새 감각이 *무언가를 알아본다*.",
+    "흉터가 아니다. 오래된 *마력의 자국* — 푸른빛이 한 번 지나간 자리.",
+    "**노기사** *(네 시선을 따라 손목을 내려다보며)*",
+    "\"…젊었을 적에 말이지. 숲에서 흰 짐승을 하나 만났네. 사슴 같기도 하고, 아니기도 하고.\"",
+    "\"창을 들었지. 그게 내 일이었으니까. 헌데 그 짐승이 — 피하지를 않아. 그냥 나를 보더군.\"",
+    "*투구를 고쳐 쓰는 손이 잠깐 멈춘다.*",
+    "\"그날 이후로 거인이 보이기 시작했네. 사람들은 내가 미쳤다 하지.\" *웃는다.* \"미친 게 나을 때도 있어.\"",
+    "너는 안다. 그가 본 것이 무엇이었는지. 그리고 흰눈이 왜 피하지 않았는지도."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "say_nothing",
+     "label": "아무 말도 하지 않는다 — 그 편이 낫다.",
+     "to": "omphalos_outskirts"
+    },
+    {
+     "kind": "plain",
+     "id": "tell_truth",
+     "label": "\"거인이 아니었습니다.\" — 본 것을 말해 준다.",
+     "to": "omphalos_outskirts",
+     "stigmaDelta": -2
+    }
+   ],
+   "__v": 0
+  },
+  {
+   "id": "kael_marik_truth",
+   "title": "Scene 02b-i — 세 번 돌아온 이유",
+   "position": {
+    "x": 780,
+    "y": 520
+   },
+   "onEnter": {
+    "setFlags": {
+     "marikTruth": true
+    }
+   },
+   "body": [
+    "너는 빗자루를 멈춰 세운다. *\"어떻게 세 번이나 돌아왔습니까.\"*",
+    "**마릭 영감** *(쓸던 손을 멈추지 않고)*",
+    "\"돌아온 게 아니라, *안 보내진* 거지. 명단에 이름이 없으면 못 데려가. 있으면 — 멀쩡해도 데려가고.\"",
+    "\"저 사람들 침식도 재는 거, 자네 봤나? 재긴 재. 근데 숫자가 모자라는 달엔 *덜 아픈 놈도 채워 넣어*.\"",
+    "푸른 가루가 쓸려 모인다. 노인의 손등에도 같은 빛이 앉아 있다 — 너보다 오래된, 그러나 멈춘 결정.",
+    "\"내 이름은 세 번 다 *다른 철자* 로 올라갔거든. 서기가 늙어서 그런 줄 알았지.\" *처음으로 너를 똑바로 본다.* \"아니었어.\"",
+    "너의 손목이 저릿하다. 링크 하사. 침식도가 너보다 낮았던 자. 먼저 실려 간 자."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "marik_to_dock",
+     "label": "명단이라는 말을 삼킨 채 — 도크로.",
+     "to": "kael_cargo_container"
+    }
+   ],
+   "__v": 0
+  },
+  {
+   "id": "tale_serum_ward",
+   "title": "Scene 02c-ii — 문턱을 붙잡는 법",
+   "position": {
+    "x": 1120,
+    "y": 760
+   },
+   "onEnter": {
+    "setFlags": {
+     "serumWard": true
+    }
+   },
+   "body": [
+    "병을 내려놓기 전에, 일지의 남은 장을 넘긴다. 앞장의 자신만만한 필체가 뒤로 갈수록 흔들린다.",
+    "*\"문은 양쪽으로 열린다. 밀면 저쪽이 들어오고, 당기면 — 잠시, 아주 잠시 닫힌다.\"*",
+    "여백에 계산이 빼곡하다. 복용량과 시간. 그리고 붉은 밑줄 한 줄. *\"두 번은 안 됨.\"*",
+    "너는 이해한다. 이 병은 힘을 주는 물건이 아니다. **한 번, 결정이 너를 삼키려 할 때 그 순간을 뒤로 미루는** 물건이다.",
+    "남은 것을 조심스럽게 갈무리한다. 팔의 결정이 조용하다 — 지금은."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "ward_to_dock",
+     "label": "병을 안주머니에 넣고 — 도크로.",
+     "to": "kael_cargo_container"
+    }
+   ],
+   "__v": 0
+  },
+  {
+   "id": "kael_gate_recall",
+   "title": "Scene 04c-i — 그날의 차트",
+   "position": {
+    "x": 2040,
+    "y": 1420
+   },
+   "body": [
+    "떠나기 전, 잔해 위에 앉아 그날을 되짚는다. 명단이라는 말이 자꾸 걸린다.",
+    "벤딕트는 차트를 넘기며 말했다. *\"침식도가 80을 넘었습니다.\"* — 그런데 그는 **너를 보지 않았다.** 차트만 봤다.",
+    "군의관이었던 자다. 사람을 살리려 배운 손으로 지금은 명단을 읽는다. 사제단에 들어온 지 삼 년.",
+    "*\"좋은 군인이었네. 헌신에 경의를.\"* 진심이 없다고 생각했다. 지금 보니 다르다 — 진심을 **꺼내면 안 되는** 자리에 있었던 것이다.",
+    "그가 숫자를 잘못 읽었을 수도 있다. 알고도 넘겼을 수도 있다. 어느 쪽이든, 너를 지운 건 그의 손이었다.",
+    "그리고 링크 하사의 이름도 같은 손을 지나갔다."
+   ],
+   "choices": [
+    {
+     "kind": "plain",
+     "id": "recall_leave",
+     "label": "차트는 사람을 모른다 — 일어선다.",
+     "to": "omphalos_outskirts"
+    },
+    {
+     "kind": "conditional",
+     "id": "recall_ward",
+     "label": "[변성 혈청] 지금 한 모금 — 결정이 조용해진다.",
+     "condition": {
+      "kind": "flag",
+      "key": "serumWard",
+      "expect": true
+     },
+     "to": "omphalos_outskirts",
+     "hidden": true,
+     "stigmaDelta": -8
+    }
+   ],
+   "__v": 0
+  }
+ ],
+ "choices": {
+  "kael_corridor_clear": [
+   {
+    "kind": "plain",
+    "id": "to_cargo_dock_after_id",
+    "label": "결국 수송선 도크로 — 컨테이너에 잠입한다.",
+    "to": "kael_cargo_container"
+   },
+   {
+    "kind": "plain",
+    "id": "tale_serum_hook",
+    "label": "반쯤 열린 조제실 문틈으로 — 푸른 빛이 샌다.",
+    "to": "tale_serum_lab"
+   },
+   {
+    "kind": "plain",
+    "id": "ask_marik",
+    "label": "빗자루를 멈춰 세운다 — *\"어떻게 세 번이나 돌아왔습니까.\"*",
+    "to": "kael_marik_truth"
+   }
+  ],
+  "solwen_grief": [
+   {
+    "kind": "plain",
+    "id": "to_revenge",
+    "label": "복수의 길로.",
+    "to": "solwen_departure"
+   },
+   {
+    "kind": "conditional",
+    "id": "wisdom_vision",
+    "label": "[지혜] 영수의 마지막 호흡 — *세계수의 시야* 를 받아들인다.",
+    "condition": {
+     "kind": "minStat",
+     "stat": "wis",
+     "min": 7
+    },
+    "to": "solwen_departure",
+    "hidden": true,
+    "stigmaDelta": -2
+   },
+   {
+    "kind": "plain",
+    "id": "accept_light",
+    "label": "[영수의 깃털] 결정을 거두지 않는다 — *받아들인다*.",
+    "to": "solwen_bond_accept"
+   }
+  ],
+  "climax_harmony_path": [
+   {
+    "kind": "probability",
+    "id": "still_the_engine",
+    "label": "[지혜] 세 달의 순환에 발화기를 *동조* 시킨다.",
+    "stat": "wis",
+    "difficulty": 17,
+    "onSuccess": "ending_harmony",
+    "onFailure": "ending_fall",
+    "stigmaDelta": 5,
+    "stigmaDeltaOnFailure": 10
+   },
+   {
+    "kind": "conditional",
+    "id": "crystal_echo",
+    "label": "[옛 결정체의 빛] 잠든 자의 흩어진 마력이 발화기를 진정시킨다.",
+    "condition": {
+     "kind": "flag",
+     "key": "world.last_one_fell"
+    },
+    "to": "ending_harmony",
+    "hidden": true,
+    "stigmaDelta": -5
+   },
+   {
+    "kind": "conditional",
+    "id": "stigma_lunar",
+    "label": "[루나 성흔] 점화의 순서를 읽어 — 궤도를 거꾸로 되짚는다.",
+    "condition": {
+     "kind": "ability",
+     "required": "lunar"
+    },
+    "hidden": true,
+    "to": "climax_harmony_lunar"
+   },
+   {
+    "kind": "conditional",
+    "id": "stigma_selene",
+    "label": "[셀레네 성흔] 코어에 손을 얹고 — 네 마력을 안으로 역류시킨다.",
+    "condition": {
+     "kind": "ability",
+     "required": "selene"
+    },
+    "hidden": true,
+    "to": "climax_harmony_selene"
+   },
+   {
+    "kind": "conditional",
+    "id": "stigma_hecate",
+    "label": "[헤카테 성흔] 집전하는 가면들에게 — 달의 목소리로 명한다.",
+    "condition": {
+     "kind": "ability",
+     "required": "hecate"
+    },
+    "hidden": true,
+    "to": "climax_harmony_hecate"
+   },
+   {
+    "kind": "conditional",
+    "id": "stigma_none",
+    "label": "[무흔] 삼킬 것 없는 몸으로 — 발화기의 심장에 선다.",
+    "condition": {
+     "kind": "ability",
+     "required": "none"
+    },
+    "hidden": true,
+    "to": "climax_harmony_none"
+   }
+  ],
+  "kael_truth_gate": [
+   {
+    "kind": "conditional",
+    "id": "piece_it_together",
+    "label": "[진실] 흩어진 조각이 — *하나의 그림* 이 된다.",
+    "condition": {
+     "kind": "minFlag",
+     "key": "kael_clue",
+     "min": 2
+    },
+    "to": "kael_truth_revealed",
+    "hidden": true
+   },
+   {
+    "kind": "plain",
+    "id": "leave_uncertain",
+    "label": "아직 모르겠다 — 외곽으로.",
+    "to": "omphalos_outskirts"
+   },
+   {
+    "kind": "conditional",
+    "id": "recall_chart",
+    "label": "명단이라는 말이 걸린다 — 그날의 차트를 되짚는다.",
+    "condition": {
+     "kind": "flag",
+     "key": "marikTruth",
+     "expect": true
+    },
+    "to": "kael_gate_recall",
+    "hidden": true
+   }
+  ],
+  "tale_serum_lab": [
+   {
+    "kind": "probability",
+    "id": "drink_serum",
+    "label": "[체력] 병을 비운다 — 몸이 견뎌 주기를.",
+    "stat": "con",
+    "difficulty": 11,
+    "onSuccess": "tale_serum_power",
+    "onFailure": "tale_serum_bad"
+   },
+   {
+    "kind": "plain",
+    "id": "leave_serum",
+    "label": "손대지 않는다. 지금 필요한 건 힘이 아니라 시간이다.",
+    "to": "kael_cargo_container"
+   },
+   {
+    "kind": "plain",
+    "id": "read_journal",
+    "label": "병에 손대기 전에 — 일지의 남은 장을 넘긴다.",
+    "to": "tale_serum_ward"
+   }
+  ],
+  "tale_knight_bond": [
+   {
+    "kind": "plain",
+    "id": "take_lance",
+    "label": "[[노기사의 랜스]]를 받아 들고, 가던 길을 간다.",
+    "to": "omphalos_outskirts"
+   },
+   {
+    "kind": "conditional",
+    "id": "knight_past",
+    "label": "노기사의 손목 — *푸른 자국* 이 눈에 들어온다.",
+    "condition": {
+     "kind": "flag",
+     "key": "sylvanLight",
+     "expect": true
+    },
+    "to": "tale_knight_past",
+    "hidden": true
+   }
+  ]
+ }
+}
