@@ -16,6 +16,7 @@ vi.mock('@/lib/web-adventure/feedback-note', () => ({
 }));
 
 import { POST } from './route';
+import { STALE_MS, GEN_TIMEOUT_MS } from '@/lib/web-adventure/feedback-worker-timing';
 import { requireOwner } from '@/lib/require-owner';
 import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
@@ -123,5 +124,11 @@ describe('feedback-notes worker', () => {
     const body = await res.json();
     expect(body.data.state).toBe('failed');
     expect(note.status).toBe('failed');
+  });
+
+  // 저사양 머신에서 생성이 30분을 넘기자, 아직 돌고 있는 작업을 stale 로 판단해 다른 틱이
+  // 다시 집어갔다 — 중복 생성 + attempts 소진으로 failed. 두 상수의 대소를 고정한다.
+  it('stale 판정은 생성 타임아웃보다 길어야 한다', () => {
+    expect(STALE_MS).toBeGreaterThan(GEN_TIMEOUT_MS);
   });
 });
