@@ -25,6 +25,20 @@ jobs:
     defaults:
       run:
         working-directory: webapp
+    # 서사 검증(lib/web-adventure/__tests__)은 mongo 에서 씬을 읽는다. MONGO_URI 가 없으면
+    # 그 테스트들이 조용히 빠져나가 **아무것도 검증하지 않은 채 초록**이 된다(#91 에서 발견).
+    # 빈 mongo 를 띄우고 seeds-replay 로 콘텐츠를 세운 뒤 검증한다 — 재해 복구 경로를
+    # 매번 실제로 밟아 보는 효과도 있다.
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,5 +58,12 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
+      - name: Seed content (재해 복구 경로 그대로)
+        run: ./scripts/seeds-replay.sh
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
+
       - name: Run tests
         run: pnpm test
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
