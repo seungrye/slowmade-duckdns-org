@@ -1,4 +1,4 @@
-import { fetchScenes, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
+import { fetchScenesForRun, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
 import { checkForUpdate } from "./update-check.js";
 import { enqueue, remove, flushQueue, makeId } from "./end-run-queue.js";
 import { parseScript } from "./script.js";
@@ -398,7 +398,8 @@ import {
   async function boot() {
     loadingBlk = showMsg("불러오는 중…");
     try {
-      sceneMap = await fetchScenes({});
+      // #87 — 이번 판의 문체를 정해 받는다(완비된 문체 중 랜덤, 한 판 내내 유지).
+      sceneMap = (await fetchScenesForRun({})).scenes;
     } catch (e) {
       if (loadingBlk) { loadingBlk.remove(); loadingBlk = null; }
       var eb = showMsg("콘텐츠를 불러오지 못했습니다. 탭해서 다시 시도하세요.");
