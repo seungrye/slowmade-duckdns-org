@@ -241,6 +241,10 @@ export default function MultiChartClient({ stocks }: Props) {
     return () => { cancelled = true; };
   }, [selected, range, anchorEnd]);
 
+  // #85 — setSelected 는 useState setter 가 아니라 market 에 따라 갈리는 파생값이다
+  // (setSelectedKr | setSelectedUs). 그래서 의존성에 반드시 넣어야 한다. 빠뜨리면 최초
+  // market 의 setter 를 클로저에 가둔 채 재생성되지 않아, 탭을 옮긴 뒤 누르면 엉뚱한
+  // 시장의 목록이 바뀐다.
   const addTicker = useCallback(
     (ticker: string) => {
       if (selected.length >= MAX_SELECTED) return;
@@ -250,12 +254,12 @@ export default function MultiChartClient({ stocks }: Props) {
       setInput("");
       setShowSuggest(false);
     },
-    [selected, metaByTicker],
+    [selected, metaByTicker, setSelected],
   );
 
   const removeTicker = useCallback((ticker: string) => {
     setSelected((prev) => prev.filter((t) => t !== ticker));
-  }, []);
+  }, [setSelected]);
 
   const handleSubmit = useCallback(
     (e: React.FormEvent) => {
