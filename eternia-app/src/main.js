@@ -95,6 +95,11 @@ import {
   }
 
   // ── 씬 진입/진행 ──
+  // 문단 뒤에서 '탭하여 계속' 으로 멈출 디렉티브. 화면을 차지하거나 눈길을 요구하는 것만
+  // 넣는다 — 소리(sfx/bgm)는 글을 읽는 동안 들려도 되므로 뺐다. 소리에서도 멈추고 싶으면
+  // 여기에 "sfx" 를 추가하면 된다. (#71)
+  var STOP_DIRECTIVES = ["img", "fx"];
+
   var scene = null, cur = { id: null, pi: 0 }, ended = false, awaitingChoice = false;
 
   // ── 진행 로그/경로 누적 (#33) — 엔딩 시 서버(app-end-run)로 보내 AI 피드백 노트 생성.
@@ -144,7 +149,15 @@ import {
     var segs = parseScript(scene.body[cur.pi], S.variables);
     var textRaw = segs.filter(function (s) { return s.kind === "text"; }).map(function (s) { return s.text; }).join("");
     segs.forEach(function (s) { if (s.kind === "directive") execDirective(s); });
-    typeInto(p, textRaw, function () { cont.classList.remove("hidden"); });
+    // 멈출 이유가 있을 때만 '탭하여 계속' 을 띄운다. 예전엔 순수 텍스트에도 무조건 떠서
+    // 문단마다 탭해야 했다. 소리는 텍스트와 동시에 들려도 되므로 흘려보낸다. (#71)
+    var mustStop = segs.some(function (s) {
+      return s.kind === "directive" && STOP_DIRECTIVES.indexOf(s.cmd) >= 0;
+    });
+    typeInto(p, textRaw, function () {
+      if (!mustStop && cur.pi < scene.body.length - 1) { cur.pi++; emitPara(); return; }
+      cont.classList.remove("hidden");
+    });
   }
   // << 디렉티브 >> 실행 — img(삽화)·fx(화면효과). sfx/bgm 은 슬라이스3-audio.
   function execDirective(s) {

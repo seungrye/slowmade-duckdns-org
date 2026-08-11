@@ -233,6 +233,48 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     vi.unstubAllEnvs();
   });
 
+  // 문단마다 '탭하여 계속' 이 떠서 순수 텍스트에도 탭이 필요했다. 멈출 이유(삽화·화면효과)가
+  // 있을 때만 멈추고, 나머지는 이어서 낸다. (#71)
+  it("순수 텍스트 문단은 탭 없이 이어서 출력된다", async () => {
+    await boot([
+      { id: "kael_infirmary", title: "연속", body: ["첫째 줄.", "둘째 줄.", "셋째 줄."], choices: [] },
+    ]);
+    // 진입만 하고 클릭하지 않았는데도 세 문단이 모두 나와 있어야 한다.
+    const text = document.getElementById("log").textContent;
+    expect(text).toContain("첫째 줄.");
+    expect(text).toContain("둘째 줄.");
+    expect(text).toContain("셋째 줄.");
+  });
+
+  it("삽화(img) 가 있는 문단에서는 멈춘다", async () => {
+    await boot([
+      {
+        id: "kael_infirmary",
+        title: "삽화",
+        body: ["앞 문단. <<img https://cdn.test/a.png>>", "뒤 문단은 아직."],
+        choices: [],
+      },
+    ]);
+    const text = document.getElementById("log").textContent;
+    expect(text).toContain("앞 문단.");
+    expect(text).not.toContain("뒤 문단은 아직."); // 탭 대기
+    expect(document.getElementById("cont").classList.contains("hidden")).toBe(false);
+  });
+
+  it("소리(sfx) 만 있는 문단은 멈추지 않는다", async () => {
+    await boot([
+      {
+        id: "kael_infirmary",
+        title: "소리",
+        body: ["칼이 부딪친다. <<sfx https://cdn.test/clash.mp3 0.6>>", "그리고 이어진다."],
+        choices: [],
+      },
+    ]);
+    const text = document.getElementById("log").textContent;
+    expect(text).toContain("칼이 부딪친다.");
+    expect(text).toContain("그리고 이어진다.");
+  });
+
   it("onEnter.hpDelta 가 HP 를 깎는다(카엘 maxHp 120)", async () => {
     await boot([
       { id: "kael_infirmary", title: "시작", onEnter: { hpDelta: -20 }, body: ["아프다"], choices: [] },
