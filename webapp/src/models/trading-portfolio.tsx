@@ -31,6 +31,16 @@ const TradingPortfolioSchema = new Schema(
     runAt: { type: String, required: true, default: "09:05" }, // kr=KST, us=ET
     weekdaysOnly: { type: Boolean, default: true },
     enabled: { type: Boolean, default: true },
+    // #83 전략 변경 이력(오래된 것부터). 전략을 갈아탈 때 strategy 필드를 덮어쓰므로
+    // 그것만으로는 "언제 무엇에서 무엇으로 바뀌었는지" 를 알 수 없다. #77 에서 매매기록의
+    // 전략 태그를 되돌릴 때 이 기록이 없어 매매 패턴으로 추론해야 했다.
+    strategyHistory: {
+      type: [new Schema({
+        strategy: { type: String, required: true },
+        changedAt: { type: Date, required: true },
+      }, { _id: false })],
+      default: [],
+    },
     config: { type: Schema.Types.Mixed, default: {} },
     state: { type: Schema.Types.Mixed, default: {} },
     // 소프트 삭제 — 삭제해도 문서를 지우지 않고 숨긴다(재생성 시 같은 (accountId,market)
