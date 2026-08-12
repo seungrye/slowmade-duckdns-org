@@ -16,20 +16,36 @@ export interface PlayerUrlOptions {
   rom: string;
   /** 플레이어 화면에 띄울 이름. */
   name?: string;
+  /** 적용할 패치 주소 (#112). 롬과 같은 출처 제약을 받는다. */
+  patch?: string;
+  /**
+   * SFC 512 바이트 헤더를 떼고 패치할지 (#112).
+   *
+   * 지정하지 않으면 플레이어가 판단한다 — BPS·UPS 는 CRC 로 맞는 쪽을 자동으로 찾고,
+   * IPS 는 검증값이 없어 관행(헤더가 보이면 떼기)을 따른다. 사용자가 뒤집을 때만 실어 보낸다.
+   */
+  stripHeader?: boolean;
 }
 
 /**
- * @throws 코어가 화이트리스트 밖이거나 롬 주소가 외부 출처면 던진다.
+ * @throws 코어가 화이트리스트 밖이거나 롬·패치 주소가 외부 출처면 던진다.
  *   iframe 은 우리 오리진에서 도는 코드라, 여기로 임의 URL 이 새 나가면 남의 서버 파일을
  *   우리 플레이어로 트는 통로가 된다.
  */
-export function buildPlayerUrl({ core, rom, name }: PlayerUrlOptions): string {
+export function buildPlayerUrl({ core, rom, name, patch, stripHeader }: PlayerUrlOptions): string {
   if (!SUPPORTED_CORES.has(core)) throw new Error(`지원하지 않는 코어: ${core || '(빈 값)'}`);
   if (!rom) throw new Error('롬 주소가 비었습니다.');
   if (!isSameOriginRom(rom)) throw new Error(`외부 출처 롬은 실행하지 않습니다: ${rom}`);
+  if (patch && !isSameOriginRom(patch)) {
+    throw new Error(`외부 출처 패치는 적용하지 않습니다: ${patch}`);
+  }
 
   const params = new URLSearchParams({ core, rom });
   if (name) params.set('name', name);
+  if (patch) {
+    params.set('patch', patch);
+    if (typeof stripHeader === 'boolean') params.set('strip', stripHeader ? '1' : '0');
+  }
   return `${PLAYER_PATH}?${params.toString()}`;
 }
 

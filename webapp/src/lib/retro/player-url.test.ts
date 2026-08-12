@@ -38,4 +38,34 @@ describe('retro/player-url — iframe 에 넘길 주소를 만든다', () => {
     expect(() => buildPlayerUrl({ core: 'fceumm', rom: 'https://evil.test/a.nes' })).toThrow();
     expect(() => buildPlayerUrl({ core: 'fceumm', rom: '//evil.test/a.nes' })).toThrow();
   });
+
+  describe('패치 (#112)', () => {
+    it('패치 주소를 함께 싣는다', () => {
+      const url = buildPlayerUrl({
+        core: 'snes9x',
+        rom: '/api/games/retro/roms/1/file',
+        patch: '/api/games/retro/roms/1/patches/2/file',
+      });
+      expect(params(url).get('patch')).toBe('/api/games/retro/roms/1/patches/2/file');
+    });
+
+    it('패치가 없으면 파라미터 자체가 없다', () => {
+      const url = buildPlayerUrl({ core: 'snes9x', rom: '/x.sfc' });
+      expect(params(url).has('patch')).toBe(false);
+      expect(params(url).has('strip')).toBe(false);
+    });
+
+    it('헤더 처리 지시를 실어 보낸다 — IPS 는 자동 판별이 안 되므로 사용자가 정한다', () => {
+      const base = { core: 'snes9x', rom: '/x.sfc', patch: '/p.ips' };
+      expect(params(buildPlayerUrl({ ...base, stripHeader: true })).get('strip')).toBe('1');
+      expect(params(buildPlayerUrl({ ...base, stripHeader: false })).get('strip')).toBe('0');
+      // 지정하지 않으면 플레이어가 알아서 판단하도록 비워 둔다.
+      expect(params(buildPlayerUrl(base)).has('strip')).toBe(false);
+    });
+
+    it('외부 출처 패치는 거부한다 — 롬과 같은 이유', () => {
+      expect(() => buildPlayerUrl({ core: 'snes9x', rom: '/x.sfc', patch: 'https://evil.test/p.ips' })).toThrow();
+      expect(() => buildPlayerUrl({ core: 'snes9x', rom: '/x.sfc', patch: '//evil.test/p.ips' })).toThrow();
+    });
+  });
 });

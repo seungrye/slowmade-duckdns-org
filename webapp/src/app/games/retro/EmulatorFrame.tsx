@@ -8,6 +8,10 @@ interface Props {
   /** 같은 출처의 절대경로 또는 blob: URL. */
   rom: string;
   name?: string;
+  /** 적용할 패치 주소 (#112). 합치기는 iframe 안에서 일어난다. */
+  patch?: string;
+  /** SFC 512 바이트 헤더 처리 — 지정하지 않으면 플레이어가 판단한다. */
+  stripHeader?: boolean;
 }
 
 /**
@@ -17,14 +21,14 @@ interface Props {
  * 하지 않는다 — 화면을 떠나면 React 가 iframe 을 지우고, 그때 안의 전역·워커·오디오가 함께
  * 사라진다. 그게 iframe 을 쓰는 이유다.
  */
-export default function EmulatorFrame({ core, rom, name }: Props) {
+export default function EmulatorFrame({ core, rom, name, patch, stripHeader }: Props) {
   const src = useMemo(() => {
     try {
-      return buildPlayerUrl({ core, rom, name });
+      return buildPlayerUrl({ core, rom, name, patch, stripHeader });
     } catch {
       return null;
     }
-  }, [core, rom, name]);
+  }, [core, rom, name, patch, stripHeader]);
 
   if (!src) {
     return (
@@ -37,7 +41,7 @@ export default function EmulatorFrame({ core, rom, name }: Props) {
   return (
     <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black shadow-lg">
       <iframe
-        // key 를 src 로 두면 다른 게임으로 넘어갈 때 iframe 이 새로 만들어진다.
+        // key 를 src 로 두면 다른 게임(또는 다른 패치)으로 넘어갈 때 iframe 이 새로 만들어진다.
         // 같은 iframe 을 재사용하면 EmulatorJS 가 이전 게임 상태를 물고 있다.
         key={src}
         src={src}

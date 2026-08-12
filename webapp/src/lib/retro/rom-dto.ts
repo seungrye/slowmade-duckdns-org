@@ -12,6 +12,41 @@ export interface LeanRom {
   platform: string;
   size: number;
   createdAt?: Date;
+  patches?: LeanPatch[];
+}
+
+export interface LeanPatch {
+  _id: unknown;
+  name: string;
+  format: string;
+  size: number;
+  objectKey?: string;
+  isDeleted?: boolean;
+  createdAt?: Date;
+}
+
+/** 화면에 내보내는 패치 한 개 (#112). objectKey 는 여기에도 없다. */
+export interface UserPatchDto {
+  id: string;
+  name: string;
+  format: string;
+  size: number;
+  createdAt: string;
+}
+
+export function toPatchDto(doc: LeanPatch): UserPatchDto {
+  return {
+    id: String(doc._id),
+    name: doc.name,
+    format: doc.format,
+    size: doc.size,
+    createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
+  };
+}
+
+/** 지우지 않은 패치만, 올린 순서대로. */
+export function livePatches(doc: { patches?: LeanPatch[] }): UserPatchDto[] {
+  return (doc.patches ?? []).filter((p) => !p.isDeleted).map(toPatchDto);
 }
 
 export function toRomDto(doc: LeanRom): UserRomDto {
