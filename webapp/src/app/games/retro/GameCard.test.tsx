@@ -49,10 +49,20 @@ describe('GameCard', () => {
     );
   });
 
-  describe('세이브 점', () => {
-    it('세이브가 있으면 표시한다', () => {
+  describe('세이브 표시 (#118)', () => {
+    it('세이브가 있으면 디스켓 아이콘을 보여 준다', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
-      expect(screen.getByLabelText('저장된 상태 있음')).toBeInTheDocument();
+      const badge = screen.getByLabelText('저장된 상태 있음');
+      expect(badge).toBeInTheDocument();
+      // 점이 아니라 아이콘이다.
+      expect(badge.querySelector('svg')).not.toBeNull();
+    });
+
+    it('기종 배지 옆(좌상단)에 붙는다 — 표시를 한 자리로 모은다', () => {
+      render(<GameCard game={rom({ hasSave: true })} />);
+      const row = screen.getByText('MD').parentElement!;
+      expect(row.className).toContain('left-2');
+      expect(row).toContainElement(screen.getByLabelText('저장된 상태 있음'));
     });
 
     it('없으면 아무것도 없다', () => {
@@ -144,12 +154,13 @@ describe('GameCard', () => {
       expect(ev.defaultPrevented).toBe(true);
     });
 
-    it('세이브 점이 있으면 겹치지 않게 왼쪽으로 비킨다', () => {
+    // #118 — 세이브 표시가 좌상단으로 옮겨 가 우상단이 비었다. 자리를 비킬 일이 없다.
+    it('세이브 유무와 관계없이 우상단에 그대로 있다', () => {
       const { rerender } = render(<GameCard game={rom()} onDelete={vi.fn()} />);
       expect(screen.getByRole('button', { name: '내 롬 삭제' }).className).toContain('right-2');
 
       rerender(<GameCard game={rom({ hasSave: true })} onDelete={vi.fn()} />);
-      expect(screen.getByRole('button', { name: '내 롬 삭제' }).className).toContain('right-7');
+      expect(screen.getByRole('button', { name: '내 롬 삭제' }).className).toContain('right-2');
     });
   });
 });
