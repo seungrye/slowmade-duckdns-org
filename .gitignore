@@ -29,3 +29,9 @@ coverage/
 # bevy-rogue WASM 산출물 — bevy-rogue repo 가 publish-to-site.sh 로 채움.
 # (A안 — 산출물은 site 의 git 에 절대 커밋하지 않는다.)
 /webapp/public/games/bevy-rogue/
+
+# 고전 게임 에뮬레이터 자산 (#109) — scripts/games/fetch-emulatorjs.sh 로 내려받는다.
+# 에뮬레이터 본체·코어·홈브류 롬은 합쳐 수십 MB 라 저장소에 넣지 않는다(bevy-rogue 와 같은 방식).
+# player.html 은 우리가 쓴 작은 파일이라 커밋한다 — 아래에서 되살린다.
+/webapp/public/games/retro/*
+!/webapp/public/games/retro/player.html

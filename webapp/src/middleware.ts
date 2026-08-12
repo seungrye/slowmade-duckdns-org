@@ -25,15 +25,35 @@ function hasSessionCookie(request: NextRequest): boolean {
   )
 }
 
+/**
+ * 레트로 에뮬레이터 플레이어 (#109) — /games/retro 의 플레이 화면이 iframe 으로 띄우는 문서.
+ *
+ * 이 문서 **하나만** CSP 를 두 군데 낮춘다. 사이트 전체 정책은 그대로다.
+ *
+ * 1. `frame-ancestors 'self'` — 기본값 'none' 을 그대로 두면 우리 자신이 띄우는 것까지 막힌다.
+ *    외부 사이트가 감싸는 건 여전히 안 된다.
+ *
+ * 2. `'unsafe-eval'` — EmulatorJS 의 코어 파일(`cores/*-wasm.data`)은 **7z 아카이브**라
+ *    브라우저에서 풀어야 하는데, 그 일을 하는 emscripten 글루가
+ *    `cwrap("extract", "number", ["string"])` 를 부른다. emscripten 의 cwrap 은 인자·반환이
+ *    전부 number 일 때만 eval 없이 끝나고, 여기처럼 string 이 끼면 래퍼를 eval 로 만든다.
+ *    즉 이게 없으면 **모든 코어 로딩이 조용히 실패한다**(wasm-unsafe-eval 로는 부족 — 그건
+ *    WebAssembly 만 허용한다).
+ *    이 문서가 부르는 스크립트는 전부 same-origin 이고, 유일한 반사 입력인 `name` 은
+ *    player.html 이 정화한다.
+ */
+const EMULATOR_PLAYER_PATH = '/games/retro/player.html'
+
 export function middleware(request: NextRequest) {
   if (isOwnerOnlyPath(request.nextUrl.pathname) && !hasSessionCookie(request)) {
     return new NextResponse(null, { status: 404 })
   }
+  const isEmulatorPlayer = request.nextUrl.pathname === EMULATOR_PLAYER_PATH
   const cspHeader = [
     "default-src 'self'",
     // 'wasm-unsafe-eval' — /games/bevy-rogue 의 Bevy(WASM) 컴파일 허용.
     // 'unsafe-eval' 보다 안전(JS eval 은 여전히 금지, WebAssembly 만 허용).
-    "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com",
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isEmulatorPlayer ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://www.googletagmanager.com`,
     // cdn.jsdelivr.net — Pretendard 폰트 CSS(@font-face) 로드 허용(#247).
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "img-src 'self' blob: data: https:",
@@ -42,7 +62,7 @@ export function middleware(request: NextRequest) {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    isEmulatorPlayer ? "frame-ancestors 'self'" : "frame-ancestors 'none'",
     "connect-src 'self' https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://firebaseremoteconfig.googleapis.com https://www.google-analytics.com https://analytics.google.com https://firebaselogging.googleapis.com https://firebaselogging-pa.googleapis.com",
     "worker-src 'self' blob:",
     "upgrade-insecure-requests",
@@ -61,12 +81,16 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // 대용량 업로드 라우트(api/attachment/upload·audio/upload)는 제외한다.
+      // 대용량 업로드 라우트(api/attachment/upload·audio/upload·games/retro/rom-upload)는 제외한다.
       // middleware 가 매칭되면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한 →
       // 10MB 초과 업로드가 잘려 req.formData() 파싱 실패(500). 이 라우트에서 middleware 가
       // 하는 일은 응답 CSP·보안헤더뿐이라(owner 검증은 라우트 requireAuth/requireOwner,
       // nginx 가 nosniff 추가) 제외해도 안전.
-      source: '/((?!_next/static|_next/image|favicon.ico|api/attachment/upload|api/web-adventure/audio/upload).*)',
+      //
+      // 롬 업로드가 목록(`api/games/retro/roms`)과 **다른 경로**인 이유가 여기 있다 — 접두사로
+      // 빼면 하위 `[id]/file`(롬 내려받기)까지 딸려 빠져 보안 헤더가 사라진다.
+      // attachment 도 같은 이유로 upload 를 따로 뒀다.
+      source: '/((?!_next/static|_next/image|favicon.ico|api/attachment/upload|api/web-adventure/audio/upload|api/games/retro/rom-upload).*)',
     },
   ],
 }
