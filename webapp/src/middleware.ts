@@ -41,6 +41,15 @@ function hasSessionCookie(request: NextRequest): boolean {
  *    WebAssembly 만 허용한다).
  *    이 문서가 부르는 스크립트는 전부 same-origin 이고, 유일한 반사 입력인 `name` 은
  *    player.html 이 정화한다.
+ *
+ * 3. `blob:` (script-src·connect-src) — 코어를 7z 에서 푼 뒤 그 결과를 Blob 으로 만들어
+ *    `<script>` 로 싣고 fetch 로 읽는다. 둘 중 하나만 열면 "Loading the script 'blob:…'
+ *    violates CSP" 또는 "Failed to fetch" 로 부팅이 멈춘다. 헤드리스 브라우저로 다섯 기종을
+ *    돌려 가며 확인한 값이다.
+ *
+ * 여기 없는 것은 일부러 없는 것이다 — EmulatorJS 는 시작할 때 cdn.emulatorjs.org 로 버전을
+ * 확인하는데, `connect-src` 에 그 호스트를 넣지 않아 **막힌다.** 자체 호스팅이 목적이므로
+ * 막히는 게 맞다(그 실패는 player.html 이 조용히 삼킨다).
  */
 const EMULATOR_PLAYER_PATH = '/games/retro/player.html'
 
@@ -53,7 +62,7 @@ export function middleware(request: NextRequest) {
     "default-src 'self'",
     // 'wasm-unsafe-eval' — /games/bevy-rogue 의 Bevy(WASM) 컴파일 허용.
     // 'unsafe-eval' 보다 안전(JS eval 은 여전히 금지, WebAssembly 만 허용).
-    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isEmulatorPlayer ? " 'unsafe-eval'" : ''} https://cdn.jsdelivr.net https://www.googletagmanager.com`,
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isEmulatorPlayer ? " 'unsafe-eval' blob:" : ''} https://cdn.jsdelivr.net https://www.googletagmanager.com`,
     // cdn.jsdelivr.net — Pretendard 폰트 CSS(@font-face) 로드 허용(#247).
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "img-src 'self' blob: data: https:",
@@ -63,7 +72,7 @@ export function middleware(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     isEmulatorPlayer ? "frame-ancestors 'self'" : "frame-ancestors 'none'",
-    "connect-src 'self' https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://firebaseremoteconfig.googleapis.com https://www.google-analytics.com https://analytics.google.com https://firebaselogging.googleapis.com https://firebaselogging-pa.googleapis.com",
+    `connect-src 'self'${isEmulatorPlayer ? ' blob:' : ''} https://firebase.googleapis.com https://firebaseinstallations.googleapis.com https://firebaseremoteconfig.googleapis.com https://www.google-analytics.com https://analytics.google.com https://firebaselogging.googleapis.com https://firebaselogging-pa.googleapis.com`,
     "worker-src 'self' blob:",
     "upgrade-insecure-requests",
   ].join('; ')
