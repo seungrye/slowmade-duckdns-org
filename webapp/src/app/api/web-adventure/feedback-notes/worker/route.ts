@@ -39,11 +39,14 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
 
-  // 1) stale 복구.
+  // 1) stale 복구 — 실행 결과를 기록하지 못한 시도는 **시도로 치지 않는다** (#101).
+  //    배포로 인스턴스가 죽으면 catch 도 돌지 못해 processing 인 채 남는다. 종전에는 claim
+  //    시점에 올려 둔 attempts 가 그대로여서, 배포 세 번이면 사람이 손대야 하는 failed 가
+  //    됐다(2026-08-12 사고). 되돌릴 때 attempts 를 함께 깎는다.
   const staleCutoff = new Date(Date.now() - STALE_MS);
   await WebAdventureFeedbackNote.updateMany(
-    { status: 'processing', claimedAt: { $lt: staleCutoff } },
-    { status: 'queued', claimedAt: null },
+    { status: 'processing', claimedAt: { $lt: staleCutoff }, attempts: { $gt: 0 } },
+    { $set: { status: 'queued', claimedAt: null }, $inc: { attempts: -1 } },
   );
 
   // 2) 순차 보장 — 살아있는 processing 있으면 skip.
@@ -91,6 +94,7 @@ export async function POST(req: NextRequest) {
     note.authorNote = result.authorNote;
     note.narrative = (run.log ?? []).join('\n');
     note.title = `${ENDING_LABEL[run.endingId] ?? run.endingId} 회차 #${run.runIndex}`;
+    note.voice = run.voice ?? '';
     note.status = 'ready';
     note.error = '';
     note.claimedAt = null;

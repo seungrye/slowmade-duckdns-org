@@ -1,5 +1,6 @@
 import { fetchScenesForRun, submitAppEndRun, START_SCENE_ID, getItemCatalog, getInventoryCap } from "./content-client.js";
 import { isUsableItem, applyItemUse } from "./items.js";
+import { RUN_VOICE_KEY, DEFAULT_VOICE } from "./voice.js";
 import { checkForUpdate } from "./update-check.js";
 import { enqueue, remove, flushQueue, makeId } from "./end-run-queue.js";
 import { parseScript } from "./script.js";
@@ -72,6 +73,10 @@ import {
   function toBottom(force) { if (force || stick) { log.scrollTop = log.scrollHeight; newpill.classList.remove("show"); } else { newpill.classList.add("show"); } }
   newpill.addEventListener("click", function () { stick = true; log.scrollTop = log.scrollHeight; newpill.classList.remove("show"); });
   var toastT = null;
+  /** 이번 판에 쓰인 문체 — end-run 에 함께 보낸다 (#90). */
+  function readRunVoice() {
+    try { return sessionStorage.getItem(RUN_VOICE_KEY) || DEFAULT_VOICE; } catch (e) { return DEFAULT_VOICE; }
+  }
   function toast(msg) { if (!msg) return; toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove("show"); }, 1800); }
   function addBlk(cls) { var d = document.createElement("div"); d.className = "blk " + (cls || ""); log.appendChild(d); return d; }
 
@@ -317,6 +322,8 @@ import {
         scenePath: scenePath.slice(),
         log: flowLog.slice(),
         character: characterSnapshot(),
+        // #90 — 이번 판의 문체. 노트가 인용한 문장의 출처 추적용.
+        voice: readRunVoice(),
       };
       // 전송을 기다리지 않으므로(엔딩 카드를 바로 띄운다) 앱이 곧장 닫히면 요청이 유실된다.
       // 먼저 큐에 넣고 성공했을 때만 지운다 — 실패분은 다음 실행에서 재전송. (#61)

@@ -132,3 +132,34 @@ describe('feedback-notes worker', () => {
     expect(STALE_MS).toBeGreaterThan(GEN_TIMEOUT_MS);
   });
 });
+
+// ── #101 중단(프로세스 사망)은 재시도 횟수를 깎지 않는다 ─────────────────────
+//
+// 배포로 인스턴스가 종료되면 catch 도 돌지 못해 note 가 processing 인 채 남는다. stale 복구가
+// 나중에 queued 로 되돌리는데, 그때 claim 시점에 올려 둔 attempts 는 그대로였다. 그래서
+// **배포 세 번이면 사람이 손대야 하는 failed** 가 됐다(2026-08-12 실제 사고).
+// 실행 결과를 기록하지 못한 시도는 시도로 치지 않는다.
+describe('중단된 작업의 재시도 횟수 (#101)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    asMock(requireOwner).mockResolvedValue({ email: 'o@x' });
+    asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(0);
+    asMock(WebAdventureFeedbackNote.findOneAndUpdate).mockResolvedValue(null); // idle 로 끝냄
+  });
+
+  it('stale 복구는 attempts 를 되돌린다', async () => {
+    await POST({ headers: new Headers({ 'x-worker-key': 'wkey' }) } as unknown as NextRequest);
+
+    const [filter, update] = asMock(WebAdventureFeedbackNote.updateMany).mock.calls[0];
+    expect(filter.status).toBe('processing');
+    // queued 로 되돌리면서 attempts 를 하나 깎는다.
+    expect(update.$inc).toEqual({ attempts: -1 });
+    expect(update.$set ?? update).toMatchObject({ status: 'queued' });
+  });
+
+  it('되돌린 attempts 가 음수가 되지 않도록 조건을 건다', async () => {
+    await POST({ headers: new Headers({ 'x-worker-key': 'wkey' }) } as unknown as NextRequest);
+    const [filter] = asMock(WebAdventureFeedbackNote.updateMany).mock.calls[0];
+    expect(filter.attempts).toMatchObject({ $gt: 0 });
+  });
+});

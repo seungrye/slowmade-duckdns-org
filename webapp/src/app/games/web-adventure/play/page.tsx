@@ -4,7 +4,7 @@ import { useEffect, useReducer, useRef, useState, useCallback } from "react";
 import type { GameState, SceneRegistry } from "@/types/web-adventure";
 import { gameReducer, type Action } from "@/lib/web-adventure/engine/reducer";
 import { getScenes, getVoiceCoverage } from "@/lib/web-adventure/engine/sceneRegistry";
-import { chooseRunVoice, DEFAULT_VOICE } from "@/lib/web-adventure/voice";
+import { chooseRunVoice, DEFAULT_VOICE, RUN_VOICE_KEY } from "@/lib/web-adventure/voice";
 import { useAutoSave, LOCAL_STORAGE_KEY as LOCAL_STORAGE_SAVE_KEY } from "@/lib/web-adventure/use-auto-save";
 import {
   useMigrateOnLogin,
@@ -60,6 +60,16 @@ async function loadScenesForRun(force = false): Promise<SceneRegistry> {
   });
   if (voice === DEFAULT_VOICE) return first;
   return getScenes({ force, voice });
+}
+
+/** 이번 판에 쓰인 문체 — end-run 에 함께 보낸다 (#90). 없으면 기본 문체로 본다. */
+function readRunVoice(): string {
+  if (typeof window === "undefined") return DEFAULT_VOICE;
+  try {
+    return window.sessionStorage.getItem(RUN_VOICE_KEY) || DEFAULT_VOICE;
+  } catch {
+    return DEFAULT_VOICE;
+  }
 }
 
 export default function WebAdventurePlayPage() {
@@ -308,6 +318,8 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         scenePath: scenePathRef.current,
         // #9 — 엔딩 시점의 풍부한 서사 로그를 서버로. 피드백 노트 LLM 입력용.
         log: state.log,
+        // #90 — 어떤 문체로 읽은 회차인지. 노트가 인용한 문장의 출처를 추적할 수 있다.
+        voice: readRunVoice(),
       }),
     })
       .then((res) => {

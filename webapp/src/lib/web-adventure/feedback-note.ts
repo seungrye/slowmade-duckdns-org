@@ -6,6 +6,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { env } from '@/lib/env';
+import { Agent } from 'undici';
+import { GEN_TIMEOUT_MS } from './feedback-worker-timing';
 
 export interface FeedbackNoteInput {
   endingId: string;
@@ -162,6 +164,15 @@ export function sseDeltaContent(line: string): string {
  * 그동안 응답 헤더를 안 보내 Node fetch(undici) 의 기본 headersTimeout(~5분)에 걸려
  * 'fetch failed' 로 abort 된다(#21 재발). 토큰을 계속 흘려보내면 헤더·바디 타임아웃이 리셋된다.
  */
+// #102 — Node 내장 fetch(undici)의 기본 바디/헤더 타임아웃(각 5 분)이 먼저 끊어 버린다.
+//   워커는 AbortSignal 로 45 분을 의도하는데 실제로는 10 분쯤에 "terminated" 로 죽었다
+//   (2026-08-12 사고). 로컬 LLM 은 프롬프트 처리만으로도 몇 분이 걸리므로 명시적으로 늘린다.
+//   헤더(첫 응답)와 바디(청크 간격) 둘 다 같은 한도를 준다 — 어느 쪽이 늦어도 죽지 않게.
+const llmDispatcher = new Agent({
+  headersTimeout: GEN_TIMEOUT_MS,
+  bodyTimeout: GEN_TIMEOUT_MS,
+});
+
 export async function generateFeedbackNote(
   input: FeedbackNoteInput,
   opts?: {
@@ -186,7 +197,9 @@ export async function generateFeedbackNote(
       stream: true,
     }),
     signal: opts?.signal,
-  });
+    // dispatcher 는 표준 RequestInit 에 없지만 Node(undici) 가 받는다.
+    dispatcher: llmDispatcher,
+  } as RequestInit & { dispatcher?: unknown });
   if (!res.ok) {
     throw new Error(`shim ${res.status}: ${await res.text().catch(() => '')}`.slice(0, 500));
   }
