@@ -59,6 +59,8 @@ export async function POST(req: NextRequest) {
       pastRun = await WebAdventurePastRun.create({
         userEmail: APP_USER,
         runIndex: count + 1,
+        // #90 — 어떤 문체로 읽었는지 함께 남긴다.
+        voice: typeof body.voice === 'string' ? body.voice.slice(0, 32) : '',
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
         scenePath,

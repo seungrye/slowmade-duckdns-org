@@ -20,6 +20,8 @@ const WebAdventureFeedbackNoteSchema = new Schema(
     sourceUserEmail: { type: String, required: true }, // 그 회차를 플레이한 사용자
     runIndex: { type: Number, required: true },
     endingId: { type: String, required: true },
+    // #90 — 그 회차의 문체(pastRun 에서 복사). 표시·추적용이며 생성 프롬프트에는 쓰지 않는다.
+    voice: { type: String, default: '' },
     finalSceneId: { type: String, required: true },
     // 생성 결과 (LLM 원문 유지).
     title: { type: String, default: '' },
@@ -57,6 +59,8 @@ export interface WebAdventureFeedbackNoteDoc {
   sourceUserEmail: string;
   runIndex: number;
   endingId: string;
+  /** #90 그 회차의 문체(pastRun 에서 복사). 표시·추적용. */
+  voice?: string;
   finalSceneId: string;
   title: string;
   narrative: string;

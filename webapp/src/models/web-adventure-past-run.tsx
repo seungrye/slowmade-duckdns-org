@@ -37,6 +37,8 @@ const WebAdventurePastRunSchema = new Schema(
   {
     userEmail: { type: String, required: true, index: true },
     runIndex: { type: Number, required: true, min: 1 },
+    // #90 — 그 회차를 어떤 문체로 읽었는지. 노트가 인용한 문장의 출처 추적용.
+    voice: { type: String, default: '' },
     endingId: {
       type: String,
       required: true,
@@ -72,6 +74,8 @@ export interface WebAdventurePastRunDoc {
   userEmail: string;
   runIndex: number;
   endingId: 'ascension' | 'revolution' | 'harmony' | 'fall' | 'petrification' | 'sylvan_bond';
+  /** #90 그 회차를 읽은 문체. 미기록이면 빈 문자열. */
+  voice?: string;
   finalSceneId: string;
   scenePath: string[];
   log: string[];

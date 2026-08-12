@@ -50,6 +50,8 @@ export async function POST(req: NextRequest) {
       {
         userEmail: session.user.email,
         runIndex: save.runIndex,
+        // #90 — 어떤 문체로 읽었는지 함께 남긴다.
+        voice: typeof body.voice === 'string' ? body.voice.slice(0, 32) : '',
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
         scenePath,
