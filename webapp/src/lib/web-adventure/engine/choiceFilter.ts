@@ -50,6 +50,8 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
     // #359 각성.
     case "stigmaAtLeast":
       return character.stigmaErosion >= cond.min;
+    case "stigmaAtMost":
+      return character.stigmaErosion <= cond.max;
     case "all":
       return cond.conditions.every((c) => evalCondition(c, character));
   }
@@ -108,6 +110,8 @@ function reasonForCondition(c: ChoiceCondition, character: Character): string | 
     // #359 각성.
     case "stigmaAtLeast":
       return `침식도 ${c.min} 이상 필요`;
+    case "stigmaAtMost":
+      return `침식도 ${c.max} 이하여야 함`;
     case "all": {
       const parts = c.conditions
         .map((sub) => reasonForCondition(sub, character))

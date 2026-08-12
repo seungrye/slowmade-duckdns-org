@@ -122,6 +122,11 @@ export type ChoiceCondition =
   | { kind: "ability"; required: AbilityKey }
   /** #359 각성 — 침식도(stigmaErosion) 가 min 이상일 때 충족. */
   | { kind: "stigmaAtLeast"; min: number }
+  /**
+   * #99 — 침식도가 max 이하일 때 충족. 「표식 없는 맨살」처럼 *몸이 아직 성한* 것을 전제하는
+   * 선택지에 쓴다. 성흔 능력(ability)과 침식도는 별개 축이라 ability 조건만으로는 못 막는다.
+   */
+  | { kind: "stigmaAtMost"; max: number }
   /** #359 각성 — 복합 AND. 모든 하위 조건을 만족할 때 충족(각성 다중 조건 게이트용). */
   | { kind: "all"; conditions: ChoiceCondition[] };
 

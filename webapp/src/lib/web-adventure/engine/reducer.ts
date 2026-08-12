@@ -62,6 +62,9 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
     // #359 각성 — 침식도 임계.
     case "stigmaAtLeast":
       return character.stigmaErosion >= cond.min;
+    // #99 — 「표식 없는 맨살」처럼 몸이 성한 것을 전제하는 선택지.
+    case "stigmaAtMost":
+      return character.stigmaErosion <= cond.max;
     // #359 각성 — 복합 AND (모든 하위 조건 충족).
     case "all":
       return cond.conditions.every((c) => evalCondition(c, character));

@@ -119,3 +119,54 @@ describe("getUnavailableReason", () => {
     expect(reason).toMatch(/정제수|ether/);
   });
 });
+
+// ── #99 stigmaAtMost — 「침식이 적을 것」 조건 ──────────────────────────────
+//
+// 왜 필요한가: 조건에 하한(stigmaAtLeast)만 있어서 "표식 없는 맨살" 같은 서술을 지킬 수
+// 없었다. 성흔 능력(ability)과 침식도는 별개 축이라, 침식 80 인 카엘도 능력만 「무흔」이면
+// 그 선택지를 골랐다.
+describe("stigmaAtMost (#99)", () => {
+  const choice = (max: number): Choice => ({
+    kind: "conditional",
+    id: "c",
+    label: "무흔",
+    to: "next",
+    condition: { kind: "stigmaAtMost", max },
+  });
+
+  it("침식이 max 이하면 고를 수 있다", () => {
+    expect(isChoiceAvailable(choice(20), makeChar({ stigmaErosion: 0 }))).toBe(true);
+    expect(isChoiceAvailable(choice(20), makeChar({ stigmaErosion: 20 }))).toBe(true);
+  });
+
+  it("침식이 max 를 넘으면 막힌다", () => {
+    expect(isChoiceAvailable(choice(20), makeChar({ stigmaErosion: 21 }))).toBe(false);
+    expect(isChoiceAvailable(choice(20), makeChar({ stigmaErosion: 80 }))).toBe(false);
+  });
+
+  it("막힌 이유를 사람 말로 알려 준다", () => {
+    const reason = getUnavailableReason(choice(20), makeChar({ stigmaErosion: 80 }));
+    expect(reason).toContain("20");
+  });
+
+  // 실제 쓰임 — 무흔 능력이면서 침식도 낮아야 한다.
+  it("ability=none 과 함께 AND 로 묶인다", () => {
+    const both: Choice = {
+      kind: "conditional",
+      id: "c",
+      label: "무흔",
+      to: "next",
+      condition: {
+        kind: "all",
+        conditions: [
+          { kind: "ability", required: "none" },
+          { kind: "stigmaAtMost", max: 20 },
+        ],
+      },
+    };
+    expect(isChoiceAvailable(both, makeChar({ ability: "none", stigmaErosion: 0 }))).toBe(true);
+    // 능력은 무흔인데 몸에는 결정이 돋아 있는 경우 — 종전에는 통과했다.
+    expect(isChoiceAvailable(both, makeChar({ ability: "none", stigmaErosion: 80 }))).toBe(false);
+    expect(isChoiceAvailable(both, makeChar({ ability: "lunar", stigmaErosion: 0 }))).toBe(false);
+  });
+});
