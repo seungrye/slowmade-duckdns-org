@@ -44,6 +44,23 @@ function notice(html) {
   if (el) el.outerHTML = '<div class="notice"><div>' + html + '</div></div>';
 }
 
+// 방향키·스페이스가 **문서를 스크롤하지 않게** 막는다 (#123).
+// 게임 조작에 쓰는 키라 기본 동작(스크롤)이 함께 일어나면 화면이 밀린다.
+// `preventDefault` 만 하고 전파는 막지 않는다 — EmulatorJS 는 이 이벤트를 그대로 받아야 한다.
+const SCROLL_KEYS = new Set([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'PageUp', 'PageDown', 'Home', 'End',
+]);
+window.addEventListener(
+  'keydown',
+  (e) => {
+    // 설정 창의 입력란에서는 건드리지 않는다.
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (SCROLL_KEYS.has(e.key)) e.preventDefault();
+  },
+  { passive: false },
+);
+
 // EmulatorJS 는 시작할 때 cdn.emulatorjs.org 로 버전을 확인한다. 자체 호스팅이 목적이라
 // CSP 가 그 요청을 막고, 막힌 fetch 가 처리되지 않은 거부로 콘솔에 남는다. 기능과 무관하므로
 // **그 한 건만** 삼킨다. 끄는 설정은 EmulatorJS 에 없다(stable 은 항상 확인한다).

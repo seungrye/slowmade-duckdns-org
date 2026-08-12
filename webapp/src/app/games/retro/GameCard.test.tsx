@@ -21,6 +21,13 @@ const rom = (over: Partial<UserRomDto> = {}) => romEntry({ ...ROM_BASE, ...over 
 
 const PATCH = { id: 'p1', name: '한글패치.ips', format: 'ips', size: 4096 };
 
+/** 카드 위 조작이 플레이 링크로 새지 않는지 — 클릭이 삼켜졌는가. */
+function clickInside(el: Element) {
+  const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+  el.dispatchEvent(ev);
+  return ev.defaultPrevented;
+}
+
 describe('GameCard', () => {
   describe('커버', () => {
     it('있으면 이미지를 그린다', () => {
@@ -84,24 +91,31 @@ describe('GameCard', () => {
     });
   });
 
-  describe('패치 칩', () => {
+  describe('패치 버튼', () => {
     const handlers = () => ({ onPatchUpload: vi.fn(), onPatchToggle: vi.fn() });
 
     it('기본 제공 게임에는 나오지 않는다 — 패치 대상이 아니다', () => {
       render(<GameCard game={WITH_COVER} {...handlers()} />);
-      expect(screen.queryByText('+ 패치')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /패치/ })).not.toBeInTheDocument();
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
-    it('패치가 없으면 "+ 패치" 를 보여 준다', () => {
+    it('패치가 없으면 버튼만, 체크박스는 없다 — 켤 게 없다', () => {
       render(<GameCard game={rom()} {...handlers()} />);
-      expect(screen.getByText('+ 패치')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '내 롬 패치 올리기' })).toBeInTheDocument();
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
-    it('패치가 있으면 이름과 체크박스를 보여 준다', () => {
+    // #122 — 파일명을 늘 보여 줄 이유가 없다. 카드가 좁다.
+    it('파일명을 화면에 적지 않는다 — 툴팁으로만 알려 준다', () => {
       render(<GameCard game={rom({ patch: PATCH, patchEnabled: true })} {...handlers()} />);
-      expect(screen.getByText('한글패치.ips')).toBeInTheDocument();
+      expect(screen.queryByText('한글패치.ips')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '내 롬 패치 교체' }).getAttribute('title'))
+        .toContain('한글패치.ips');
+    });
+
+    it('패치가 있으면 체크박스가 생긴다', () => {
+      render(<GameCard game={rom({ patch: PATCH, patchEnabled: true })} {...handlers()} />);
       expect(screen.getByRole('checkbox')).toBeChecked();
     });
 
@@ -128,17 +142,10 @@ describe('GameCard', () => {
     });
 
     // 카드 전체가 플레이 링크라, 여기서 새면 패치를 만지려다 게임이 뜬다.
-    it('칩을 눌러도 플레이 링크로 새지 않는다', () => {
+    it('버튼을 눌러도 플레이 링크로 새지 않는다', () => {
       const h = handlers();
       render(<GameCard game={rom({ patch: PATCH })} {...h} />);
-
-      const clickInside = (el: Element) => {
-        const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
-        el.dispatchEvent(ev);
-        return ev.defaultPrevented;
-      };
-      // 칩 컨테이너에서 발생한 클릭은 삼켜진다.
-      expect(clickInside(screen.getByText('한글패치.ips'))).toBe(true);
+      expect(clickInside(screen.getByRole('button', { name: '내 롬 패치 교체' }))).toBe(true);
       expect(clickInside(screen.getByRole('checkbox'))).toBe(true);
     });
 
@@ -159,12 +166,8 @@ describe('GameCard', () => {
       const game = rom();
       render(<GameCard game={game} onDelete={onDelete} />);
 
-      const btn = screen.getByRole('button', { name: '내 롬 삭제' });
-      const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
-      btn.dispatchEvent(ev);
-
+      expect(clickInside(screen.getByRole('button', { name: '내 롬 삭제' }))).toBe(true);
       expect(onDelete).toHaveBeenCalledWith(game);
-      expect(ev.defaultPrevented).toBe(true);
     });
 
     // #118 — 세이브 표시가 좌상단으로 옮겨 가 우상단이 비었다. 자리를 비킬 일이 없다.
@@ -174,6 +177,98 @@ describe('GameCard', () => {
 
       rerender(<GameCard game={rom({ hasSave: true })} onDelete={vi.fn()} />);
       expect(screen.getByRole('button', { name: '내 롬 삭제' }).className).toContain('right-2');
+    });
+  });
+
+  // #122 — 카드 그림과 제목을 직접 고친다.
+  describe('커버 그림', () => {
+    it('기본 제공 게임에는 버튼이 없다', () => {
+      render(<GameCard game={WITH_COVER} onCoverUpload={vi.fn()} />);
+      expect(screen.queryByRole('button', { name: /카드 그림/ })).not.toBeInTheDocument();
+    });
+
+    it('파일을 고르면 알린다', () => {
+      const onCoverUpload = vi.fn();
+      const game = rom();
+      render(<GameCard game={game} onCoverUpload={onCoverUpload} />);
+
+      const file = new File([new Uint8Array(8)], 'cover.png', { type: 'image/png' });
+      fireEvent.change(screen.getByLabelText('내 롬 커버 이미지'), { target: { files: [file] } });
+      expect(onCoverUpload).toHaveBeenCalledWith(game, file);
+    });
+
+    it('커버가 있으면 타일 대신 그림을 그린다', () => {
+      render(<GameCard game={rom({ coverUrl: '/api/games/retro/roms/1/cover' })} onCoverUpload={vi.fn()} />);
+      expect(document.querySelector('img')?.getAttribute('src')).toBe('/api/games/retro/roms/1/cover');
+      expect(screen.queryByText('내')).not.toBeInTheDocument();
+    });
+
+    it('눌러도 플레이 링크로 새지 않는다', () => {
+      render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
+      expect(clickInside(screen.getByRole('button', { name: '내 롬 카드 그림' }))).toBe(true);
+    });
+  });
+
+  describe('제목 고치기', () => {
+    const startEdit = () => fireEvent.click(screen.getByRole('button', { name: '내 롬 이름 바꾸기' }));
+
+    it('기본 제공 게임에는 연필이 없다', () => {
+      render(<GameCard game={WITH_COVER} onRename={vi.fn()} />);
+      expect(screen.queryByRole('button', { name: /이름 바꾸기/ })).not.toBeInTheDocument();
+    });
+
+    it('연필을 누르면 입력이 되고, Enter 로 저장한다', () => {
+      const onRename = vi.fn();
+      const game = rom();
+      render(<GameCard game={game} onRename={onRename} />);
+
+      startEdit();
+      const input = screen.getByLabelText('제목');
+      fireEvent.change(input, { target: { value: '젤다의 전설' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(onRename).toHaveBeenCalledWith(game, '젤다의 전설');
+    });
+
+    it('Esc 로 취소하면 저장하지 않는다', () => {
+      const onRename = vi.fn();
+      render(<GameCard game={rom()} onRename={onRename} />);
+
+      startEdit();
+      const input = screen.getByLabelText('제목');
+      fireEvent.change(input, { target: { value: '바뀐 이름' } });
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(onRename).not.toHaveBeenCalled();
+      expect(screen.getByText('내 롬')).toBeInTheDocument();
+    });
+
+    it('빈 이름은 저장하지 않는다 — 이름 없는 카드를 만들지 않는다', () => {
+      const onRename = vi.fn();
+      render(<GameCard game={rom()} onRename={onRename} />);
+
+      startEdit();
+      const input = screen.getByLabelText('제목');
+      fireEvent.change(input, { target: { value: '   ' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      expect(onRename).not.toHaveBeenCalled();
+    });
+
+    it('그대로면 저장하지 않는다 — 헛된 요청을 보내지 않는다', () => {
+      const onRename = vi.fn();
+      render(<GameCard game={rom()} onRename={onRename} />);
+
+      startEdit();
+      fireEvent.keyDown(screen.getByLabelText('제목'), { key: 'Enter' });
+      expect(onRename).not.toHaveBeenCalled();
+    });
+
+    it('연필과 입력 모두 플레이 링크로 새지 않는다', () => {
+      render(<GameCard game={rom()} onRename={vi.fn()} />);
+      // fireEvent 는 preventDefault 되면 false 를 돌려준다. 이걸 써야 편집 진입이 함께 반영된다.
+      expect(fireEvent.click(screen.getByRole('button', { name: '내 롬 이름 바꾸기' }))).toBe(false);
+      expect(fireEvent.click(screen.getByLabelText('제목'))).toBe(false);
     });
   });
 });

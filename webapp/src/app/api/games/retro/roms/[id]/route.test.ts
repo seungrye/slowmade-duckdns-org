@@ -77,6 +77,43 @@ describe('DELETE /api/games/retro/roms/[id]', () => {
       expect(mockUpdateOne).not.toHaveBeenCalled();
     });
 
+    // #122 — 제목도 카드에서 고친다.
+    describe('제목', () => {
+      const withTitle = (v: unknown) =>
+        new Request('http://x', { method: 'PATCH', body: JSON.stringify({ title: v }) });
+
+      it('다듬어 저장한다', async () => {
+        expect((await PATCH(withTitle('  젤다의 전설  '), ctx(ROM_ID))).status).toBe(200);
+        expect(mockUpdateOne.mock.calls[0][1]).toEqual({ $set: { title: '젤다의 전설' } });
+      });
+
+      it('빈 제목은 400 — 이름 없는 카드를 만들지 않는다', async () => {
+        expect((await PATCH(withTitle('   '), ctx(ROM_ID))).status).toBe(400);
+        expect((await PATCH(withTitle(123), ctx(ROM_ID))).status).toBe(400);
+        expect(mockUpdateOne).not.toHaveBeenCalled();
+      });
+
+      it('원본 파일명은 건드리지 않는다 — 내려받을 때 쓰는 이름이다', async () => {
+        await PATCH(withTitle('새 이름'), ctx(ROM_ID));
+        expect(JSON.stringify(mockUpdateOne.mock.calls[0][1])).not.toContain('filename');
+      });
+
+      it('토글과 함께 보낼 수도 있다', async () => {
+        const req = new Request('http://x', {
+          method: 'PATCH',
+          body: JSON.stringify({ title: '이름', patchEnabled: false }),
+        });
+        expect((await PATCH(req, ctx(ROM_ID))).status).toBe(200);
+        expect(mockUpdateOne.mock.calls[0][1]).toEqual({ $set: { patchEnabled: false, title: '이름' } });
+      });
+
+      it('아무 필드도 없으면 400', async () => {
+        const req = new Request('http://x', { method: 'PATCH', body: JSON.stringify({ nope: 1 }) });
+        expect((await PATCH(req, ctx(ROM_ID))).status).toBe(400);
+        expect(mockUpdateOne).not.toHaveBeenCalled();
+      });
+    });
+
     it('id 형식이 이상하면 404', async () => {
       expect((await PATCH(body(true), ctx('nope'))).status).toBe(404);
       expect(mockUpdateOne).not.toHaveBeenCalled();

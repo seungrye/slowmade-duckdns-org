@@ -9,6 +9,7 @@ import { requireAuth } from '@/lib/require-auth';
 import { connectToDB } from '@/lib/db';
 import RetroRom from '@/models/retro-rom';
 import { isRomId } from '@/lib/retro/rom-dto';
+import { normalizeRomTitle } from '@/lib/retro/rom-edit';
 
 export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const authed = await requireAuth();
@@ -31,10 +32,13 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
 }
 
 /**
- * 패치 적용 여부 토글 (#116) — 카드의 체크박스.
+ * 카드에서 고치는 것들 — 패치 적용 토글(#116)과 제목(#122).
  *
- * 지금은 `patchEnabled` 하나만 받는다. 다른 필드를 받게 되면 화이트리스트를 늘릴 것 —
- * 요청 본문을 그대로 `$set` 에 넘기면 무엇이든 덮어쓸 수 있게 된다.
+ * **화이트리스트로 받는다.** 요청 본문을 그대로 `$set` 에 넘기면 무엇이든 덮어쓸 수 있다.
+ * 필드를 늘릴 때는 여기 분기를 함께 늘릴 것.
+ *
+ * 제목을 바꿔도 원본 파일명(`filename`)은 건드리지 않는다 — 내려받을 때 쓰는 이름이고,
+ * 화면 이름과 원본을 분리해 두는 편이 낫다.
  */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const authed = await requireAuth();
@@ -44,14 +48,26 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!isRomId(id)) return apiError('롬을 찾을 수 없습니다.', 404);
 
   const body = await req.json().catch(() => null);
-  if (typeof body?.patchEnabled !== 'boolean') return apiError('잘못된 요청입니다.', 400);
+  const update: { patchEnabled?: boolean; title?: string } = {};
+
+  if (body && 'patchEnabled' in body) {
+    if (typeof body.patchEnabled !== 'boolean') return apiError('잘못된 요청입니다.', 400);
+    update.patchEnabled = body.patchEnabled;
+  }
+  if (body && 'title' in body) {
+    const title = normalizeRomTitle(body.title);
+    if (!title) return apiError('제목을 입력해 주세요.', 400);
+    update.title = title;
+  }
+
+  if (!Object.keys(update).length) return apiError('잘못된 요청입니다.', 400);
 
   await connectToDB();
   const res = await RetroRom.updateOne(
     { _id: id, userEmail: authed.email, isDeleted: { $ne: true } },
-    { $set: { patchEnabled: body.patchEnabled } },
+    { $set: update },
   );
 
   if (!res.matchedCount) return apiError('롬을 찾을 수 없습니다.', 404);
-  return apiSuccess({ patchEnabled: body.patchEnabled });
+  return apiSuccess(update);
 }

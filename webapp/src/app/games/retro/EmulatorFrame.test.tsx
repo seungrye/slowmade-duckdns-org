@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import EmulatorFrame from './EmulatorFrame';
 
 function iframe(): HTMLIFrameElement | null {
@@ -46,5 +46,28 @@ describe('EmulatorFrame', () => {
     expect(iframe()).not.toBeNull();
     unmount();
     expect(iframe()).toBeNull();
+  });
+
+  // #123 — 포커스가 바깥에 있으면 방향키가 페이지를 스크롤한다.
+  describe('포커스', () => {
+    it('불러오기가 끝나면 iframe 에 포커스를 준다 — 방향키가 페이지를 밀지 않게', () => {
+      render(<EmulatorFrame core="fceumm" rom="/games/retro/roms/a.nes" />);
+      const el = iframe()!;
+      const focus = vi.spyOn(el, 'focus');
+
+      fireEvent.load(el);
+
+      expect(focus).toHaveBeenCalled();
+    });
+
+    it('화면을 누르면 다시 포커스를 가져온다 — 바깥을 클릭한 뒤에도 조작이 이어지게', () => {
+      render(<EmulatorFrame core="fceumm" rom="/games/retro/roms/a.nes" />);
+      const el = iframe()!;
+      const focus = vi.spyOn(el, 'focus');
+
+      fireEvent.mouseDown(el.parentElement!);
+
+      expect(focus).toHaveBeenCalled();
+    });
   });
 });
