@@ -3,6 +3,8 @@
 import { envLabel } from "@/lib/env-label";
 
 import { useMemo } from "react";
+import { useMobile } from "@/hooks/use-mobile";
+import { recentDates } from "../recent-points";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
@@ -74,6 +76,7 @@ export default function PortfolioDetailClient({
   names,
   history,
 }: Props) {
+  const isMobile = useMobile();
   const label = (tk: string) => names[tk] ?? tk;
   const tickers = Object.keys(pricesByTicker);
 
@@ -87,9 +90,15 @@ export default function PortfolioDetailClient({
 
   const option = useMemo<EChartsOption>(() => {
     // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
-    const allDates = Array.from(
-      new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
-    ).sort();
+    // 화면에 맞는 구간만 (#131 — 매매 차트와 같은 규칙: 모바일 30 일·데스크톱 90 일).
+    // **이동평균은 아래에서 자르기 전 전체 rows 로 계산한다** — 그래야 60 일선이 짧은 창에서도
+    // 제 값을 유지한다. 여기서는 x 축에 그릴 날짜만 줄인다.
+    const allDates = recentDates(
+      Array.from(
+        new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
+      ).sort(),
+      isMobile,
+    );
 
     const legendNames: string[] = [];
     const selected: Record<string, boolean> = {};
@@ -169,7 +178,7 @@ export default function PortfolioDetailClient({
       dataZoom: [{ type: "inside", start: center ? 60 : 0, end: 100 }],
       series,
     };
-  }, [pricesByTicker, trades, names, center]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pricesByTicker, trades, names, center, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 범례엔 종목명만 있으므로, 종목 종가를 켜고/끌 때 그 종목의 20/60일선도 같이 토글.
   const handleLegendToggle = (

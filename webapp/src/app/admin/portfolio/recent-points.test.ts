@@ -1,7 +1,7 @@
 // #95 — 모바일에서 매매 차트를 최근 N 일로 자른다.
 // #129 — **날짜로** 자른다. 개수로 자르면 거래일만 쌓이는 스냅샷에서 30 점이 6 주가 된다.
 import { describe, it, expect } from 'vitest';
-import { recentPoints, MOBILE_CHART_DAYS, DESKTOP_CHART_DAYS } from './recent-points';
+import { recentDates, recentPoints, MOBILE_CHART_DAYS, DESKTOP_CHART_DAYS } from './recent-points';
 
 /** 하루 한 점씩, 마지막이 base 인 배열. */
 function daily(n: number, base = '2026-08-12') {
@@ -84,5 +84,39 @@ describe('recentPoints', () => {
   it('날짜를 읽을 수 없으면 자르지 않는다 — 잘못 잘라 없애느니 다 보여 준다', () => {
     const junk = [{ dateStr: 'nope' }, { dateStr: 'also-nope' }];
     expect(recentPoints(junk, true)).toBe(junk);
+  });
+
+  // #131 — 종목 상세 차트의 x 축(날짜 문자열 배열)도 같은 규칙을 쓴다.
+  describe('recentDates — 날짜 배열용', () => {
+    const dates = (rows: { dateStr: string }[]) => rows.map((r) => r.dateStr);
+    const spanOf = (ds: string[]) =>
+      Math.round((Date.parse(ds[ds.length - 1]) - Date.parse(ds[0])) / 86_400_000) + 1;
+
+    it('모바일은 한 달로 자른다', () => {
+      expect(spanOf(recentDates(dates(daily(100)), true))).toBeLessThanOrEqual(MOBILE_CHART_DAYS);
+    });
+
+    it('거래일만 있어도 달력 기준으로 자른다', () => {
+      const ds = dates(tradingDays(33));
+      expect(spanOf(ds)).toBeGreaterThan(MOBILE_CHART_DAYS);
+      expect(spanOf(recentDates(ds, true))).toBeLessThanOrEqual(MOBILE_CHART_DAYS);
+    });
+
+    it('자를 것이 없으면 같은 참조', () => {
+      const ds = dates(daily(10));
+      expect(recentDates(ds, true)).toBe(ds);
+    });
+
+    it('recentPoints 와 같은 구간을 남긴다 — 두 차트가 어긋나면 안 된다', () => {
+      const rows = tradingDays(60);
+      const byPoints = recentPoints(rows, true).map((r) => r.dateStr);
+      const byDates = recentDates(dates(rows), true);
+      expect(byDates).toEqual(byPoints);
+    });
+
+    it('빈 배열도 안전하다', () => {
+      const empty: string[] = [];
+      expect(recentDates(empty, true)).toBe(empty);
+    });
   });
 });
