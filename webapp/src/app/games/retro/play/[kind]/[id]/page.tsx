@@ -7,10 +7,12 @@ import RetroRom from "@/models/retro-rom";
 import { builtinBySlug } from "@/lib/retro/library";
 import { builtinEntry, romEntry } from "@/lib/retro/entry";
 import { isRomId, livePatches, type LeanPatch } from "@/lib/retro/rom-dto";
+import { builtinKey, romKey } from "@/lib/retro/game-key";
 import { platformById } from "@/lib/retro/platforms";
 import EmulatorFrame from "../../../EmulatorFrame";
 import LoginRequired from "../../../LoginRequired";
 import PatchPanel from "../../../PatchPanel";
+import SaveStatePanel from "../../../SaveStatePanel";
 
 export const metadata: Metadata = {
   title: "고전 게임 플레이",
@@ -66,6 +68,9 @@ export default async function PlayPage({
   // 지정이 없으면 undefined 로 둔다 — 플레이어가 형식에 맞게 판단한다.
   const stripHeader = strip === "1" ? true : strip === "0" ? false : undefined;
 
+  // 세이브를 매달 키 — 기본 제공 게임과 올린 롬을 한 방식으로 다룬다 (#114).
+  const gameKey = kind === "builtin" ? builtinKey(game.entry.id) : romKey(game.entry.id);
+
   return (
     <main className="mx-auto max-w-4xl px-4 py-6">
       <div className="mb-4 flex items-center gap-3">
@@ -89,10 +94,13 @@ export default async function PlayPage({
         name={game.entry.title}
         patch={patchUrl}
         stripHeader={stripHeader}
+        saveKey={gameKey}
       />
 
       <section className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-400">
         {game.description && <p>{game.description}</p>}
+
+        <SaveStatePanel gameKey={gameKey} />
 
         {/* 기본 제공 홈브류는 패치 대상이 아니다 — 내가 올린 롬에만 띄운다. */}
         {kind === "rom" && (

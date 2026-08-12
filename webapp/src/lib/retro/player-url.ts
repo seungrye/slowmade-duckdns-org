@@ -25,6 +25,11 @@ export interface PlayerUrlOptions {
    * IPS 는 검증값이 없어 관행(헤더가 보이면 떼기)을 따른다. 사용자가 뒤집을 때만 실어 보낸다.
    */
   stripHeader?: boolean;
+  /**
+   * 세이브를 매달 게임 키 (#114) — `builtin:<slug>` 또는 `rom:<id>`.
+   * 주면 플레이어가 네이티브 Save/Load 버튼을 서버로 돌린다. 없으면 저장 기능이 붙지 않는다.
+   */
+  saveKey?: string;
 }
 
 /**
@@ -32,7 +37,7 @@ export interface PlayerUrlOptions {
  *   iframe 은 우리 오리진에서 도는 코드라, 여기로 임의 URL 이 새 나가면 남의 서버 파일을
  *   우리 플레이어로 트는 통로가 된다.
  */
-export function buildPlayerUrl({ core, rom, name, patch, stripHeader }: PlayerUrlOptions): string {
+export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey }: PlayerUrlOptions): string {
   if (!SUPPORTED_CORES.has(core)) throw new Error(`지원하지 않는 코어: ${core || '(빈 값)'}`);
   if (!rom) throw new Error('롬 주소가 비었습니다.');
   if (!isSameOriginRom(rom)) throw new Error(`외부 출처 롬은 실행하지 않습니다: ${rom}`);
@@ -46,6 +51,7 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader }: PlayerUr
     params.set('patch', patch);
     if (typeof stripHeader === 'boolean') params.set('strip', stripHeader ? '1' : '0');
   }
+  if (saveKey) params.set('save', saveKey);
   return `${PLAYER_PATH}?${params.toString()}`;
 }
 

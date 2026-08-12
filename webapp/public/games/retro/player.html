@@ -24,6 +24,10 @@
     color: #d4d4d8; text-align: center;
   }
   .notice code { color: #fca5a5; word-break: break-all; }
+  /* 오른쪽 클릭 메뉴를 쓰지 않는다 (#114). EmulatorJS 는 인라인 style 로 여는데,
+     스타일시트의 !important 가 인라인(비-important)을 이긴다.
+     안에 있던 quickSave·quickLoad 도 함께 사라져, 서버 저장과 경쟁하는 로컬 저장 경로가 없어진다. */
+  .ejs_context_menu { display: none !important; }
 </style>
 </head>
 <body>
@@ -51,6 +55,8 @@ const q = new URLSearchParams(location.search);
 const core = q.get('core') || '';
 const rom = q.get('rom') || '';
 const patch = q.get('patch') || '';
+// 세이브를 매달 게임 키 (#114) — `builtin:<slug>` 또는 `rom:<id>`. 없으면 서버 저장을 안 건다.
+const saveKey = q.get('save') || '';
 
 // 이 문서는 CSP 에서 'unsafe-eval' 이 열려 있다(코어 7z 해제에 필요 — middleware.ts 참고).
 // name 은 EmulatorJS UI 로 흘러 들어가는 **유일한 반사 입력**이므로, 그쪽이 어떻게 그리든
@@ -102,6 +108,18 @@ async function start() {
   window.EJS_startOnLoaded = true;
   // 사이트 강조색(blue-500)과 맞춘다.
   window.EJS_color = '#3b82f6';
+
+  // 게임을 벗어나는 건 페이지의 「← 목록」이 한다 (#114).
+  window.EJS_Buttons = { exitEmulation: false };
+
+  // 하단바의 "Context Menu" 버튼도 없앤다. 이건 EJS_Buttons 로 못 끈다 —
+  // buildButtonOptions 가 `if ("contextMenu" !== n)` 로 이 키만 건너뛴다. 그래서 직접 숨긴다.
+  window.EJS_onGameStart = () => {
+    const btn = window.EJS_emulator?.elements?.bottomBar?.contextMenu?.[0];
+    if (btn) btn.style.setProperty('display', 'none', 'important');
+  };
+
+  if (saveKey) installServerSaves(saveKey);
   // EJS_threads 는 켜지 않는다 — SharedArrayBuffer 가 필요해지고 그러면 COOP/COEP 헤더를
   // 걸어야 한다. 이 다섯 기종은 단일 스레드로 충분하다.
 
@@ -113,6 +131,51 @@ async function start() {
     '를 실행해 <code>public/games/retro/data/</code> 를 채워 주세요.',
   );
   document.body.appendChild(s);
+}
+
+/**
+ * 세이브/로드를 서버로 돌린다 (#114).
+ *
+ * EmulatorJS 는 저장 버튼에서 `callEvent("saveState", …) > 0` 이면 **자기 기본 저장을
+ * 건너뛴다**(callEvent 는 등록된 리스너 수를 돌려준다). 그래서 이 콜백을 등록하는 것만으로
+ * 네이티브 버튼 UI 는 그대로 두고 저장 위치만 바꿀 수 있다 — 새 UI 를 만들 필요가 없다.
+ *
+ * 슬롯은 게임당 하나다. 네이티브 「Load State」 버튼이 인자를 받지 않기 때문이다.
+ */
+function installServerSaves(gameKey) {
+  const STATES = '/api/games/retro/states';
+  const say = (msg) => window.EJS_emulator?.displayMessage?.(msg);
+
+  window.EJS_onSaveState = async ({ state, screenshot, format }) => {
+    try {
+      const form = new FormData();
+      form.set('game', gameKey);
+      form.set('state', new Blob([state]), 'state.bin');
+      // 스크린샷은 있으면 함께 — 목록에서 "언제 저장한 것인지" 를 날짜보다 빨리 알아본다.
+      if (screenshot) {
+        const type = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        form.set('shot', new Blob([screenshot], { type }), 'shot');
+      }
+      const res = await fetch(STATES, { method: 'PUT', body: form });
+      if (!res.ok) throw new Error(String(res.status));
+      say('서버에 저장했습니다');
+    } catch (err) {
+      say('저장 실패 — ' + ((err && err.message) || err));
+    }
+  };
+
+  window.EJS_onLoadState = async () => {
+    try {
+      const res = await fetch(`${STATES}/file?game=${encodeURIComponent(gameKey)}`);
+      if (res.status === 404) return say('저장된 세이브가 없습니다');
+      if (!res.ok) throw new Error(String(res.status));
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      await window.EJS_emulator.gameManager.loadState(bytes);
+      say('서버에서 불러왔습니다');
+    } catch (err) {
+      say('불러오기 실패 — ' + ((err && err.message) || err));
+    }
+  };
 }
 
 async function fetchBytes(url) {

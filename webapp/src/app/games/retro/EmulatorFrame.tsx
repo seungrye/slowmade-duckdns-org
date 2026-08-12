@@ -12,6 +12,8 @@ interface Props {
   patch?: string;
   /** SFC 512 바이트 헤더 처리 — 지정하지 않으면 플레이어가 판단한다. */
   stripHeader?: boolean;
+  /** 세이브를 매달 게임 키 (#114). 주면 Save/Load 버튼이 서버를 쓴다. */
+  saveKey?: string;
 }
 
 /**
@@ -21,14 +23,14 @@ interface Props {
  * 하지 않는다 — 화면을 떠나면 React 가 iframe 을 지우고, 그때 안의 전역·워커·오디오가 함께
  * 사라진다. 그게 iframe 을 쓰는 이유다.
  */
-export default function EmulatorFrame({ core, rom, name, patch, stripHeader }: Props) {
+export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey }: Props) {
   const src = useMemo(() => {
     try {
-      return buildPlayerUrl({ core, rom, name, patch, stripHeader });
+      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey });
     } catch {
       return null;
     }
-  }, [core, rom, name, patch, stripHeader]);
+  }, [core, rom, name, patch, stripHeader, saveKey]);
 
   if (!src) {
     return (
