@@ -131,6 +131,20 @@ ensure_bevy_wasm() {
     SITE_PATH="$REPO_DIR" bash "$publish_script"
 }
 
+ensure_retro_assets() {
+    # 고전 게임 에뮬레이터(#109) 자산이 배치돼 있는지 본다.
+    #
+    # bevy 와 달리 **없어도 배포를 막지 않는다.** 게임 코너 하나 때문에 사이트 전체 배포가
+    # 멈추면 안 되고, 앱도 자산이 없으면 목록을 감추고 설치 안내를 띄우도록 만들어 뒀다.
+    # 자동 실행도 하지 않는다 — 수십 MB 를 내려받는 일이 배포 중에 조용히 벌어지면 곤란하다.
+    if [[ -f "$WEBAPP_DIR/public/games/retro/data/loader.js" ]]; then
+        log "retro 에뮬레이터 자산 확인됨"
+    else
+        warn "retro 에뮬레이터 자산 없음 — /games/retro 는 설치 안내만 표시됩니다.
+        채우려면: bash scripts/games/fetch-emulatorjs.sh"
+    fi
+}
+
 main() {
     cd "$WEBAPP_DIR"
 
@@ -141,6 +155,7 @@ main() {
 
     # build 직전에 wasm 번들 보장.
     ensure_bevy_wasm
+    ensure_retro_assets
 
     log "build (NEXT_DISTDIR=.next-${inactive})"
     NEXT_DISTDIR=".next-${inactive}" pnpm install --frozen-lockfile

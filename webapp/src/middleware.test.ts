@@ -104,4 +104,34 @@ describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
     expect(re.test('/api/upload')).toBe(true); // 이미지(클라 5MB 게이트)는 그대로
     expect(re.test('/admin/x')).toBe(true);
   });
+
+  // #109 — 레트로 에뮬레이터 플레이어 문서만 CSP 를 두 군데 낮춘다.
+  describe('레트로 플레이어 iframe (/games/retro/player.html)', () => {
+    const PLAYER = '/games/retro/player.html';
+    const cspOf = (path: string) =>
+      middleware(makeRequest(path)).headers.get('Content-Security-Policy') ?? '';
+
+    it('플레이어는 same-origin 에서 감쌀 수 있다 — frame-ancestors 가 self', () => {
+      expect(cspOf(PLAYER)).toMatch(/frame-ancestors 'self'/);
+    });
+
+    it('플레이어에는 unsafe-eval 을 준다 — 없으면 코어 7z 해제가 통째로 막힌다', () => {
+      // EmulatorJS 의 emscripten 글루가 cwrap("extract","number",["string"]) 를 부르는데,
+      // string 인자가 끼면 래퍼를 eval 로 만든다. wasm-unsafe-eval 로는 부족하다.
+      expect(cspOf(PLAYER)).toMatch(/script-src [^;]*'unsafe-eval'/);
+    });
+
+    it('다른 경로는 종전대로 — 완화가 새 나가지 않는다', () => {
+      const csp = cspOf('/');
+      expect(csp).toMatch(/frame-ancestors 'none'/);
+      expect(csp).not.toMatch(/script-src [^;]*'unsafe-eval'/);
+      // wasm-unsafe-eval 은 unsafe-eval 을 포함하지 않는 별개 토큰이다(bevy-rogue 용).
+      expect(csp).toMatch(/script-src [^;]*'wasm-unsafe-eval'/);
+    });
+
+    it('비슷한 이름의 다른 경로에는 적용되지 않는다', () => {
+      expect(cspOf('/games/retro/player.html.bak')).toMatch(/frame-ancestors 'none'/);
+      expect(cspOf('/games/retro')).toMatch(/frame-ancestors 'none'/);
+    });
+  });
 });

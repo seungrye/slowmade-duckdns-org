@@ -98,6 +98,22 @@ server {
 		add_header X-Frame-Options "DENY" always;
 	}
 
+	# 고전 게임 롬 업로드 (#109) — 앱 로직이 owner 64MB, 일반 유저 15MB 에서 413.
+	# GBA 대작이 32MB 라 server 기본 16M 로는 owner 도 못 올린다. 이 경로만 열어 둔다.
+	# 이 블록이 없으면 16MB 를 넘는 순간 nginx 가 앱에 닿기 전에 413 을 낸다.
+	location = /api/games/retro/rom-upload {
+		client_max_body_size 64M;
+		proxy_pass http://webapp;
+		proxy_http_version 1.1;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection 'upgrade';
+		proxy_set_header Host $host;
+		proxy_cache_bypass $http_upgrade;
+
+		add_header X-Content-Type-Options "nosniff" always;
+		add_header X-Frame-Options "DENY" always;
+	}
+
 	location /api/ {
 		proxy_pass http://webapp;
 		proxy_http_version 1.1;

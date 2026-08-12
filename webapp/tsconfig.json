@@ -38,7 +38,8 @@
     ".next/types/**/*.ts",
     "next-env.d.ts",
     "src/types/*.tsx",
-    "vitest.d.ts"
+    "vitest.d.ts",
+    ".next-verify/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

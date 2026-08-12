@@ -22,6 +22,7 @@ import {
     FlaskConical,
     FileText,
     Server,
+    Joystick,
 } from "lucide-react";
 
 const navLinks = [
@@ -80,6 +81,23 @@ const gameLinks = [
                 icon: <Server size={20} />,
                 authOnly: true,
                 ownerOnly: true,
+            },
+        ],
+    },
+    {
+        // #109 — EmulatorJS 로 도는 고전 게임. 자기가 올린 롬을 다루므로 로그인 전용이다.
+        key: "retro",
+        label: "고전 게임",
+        description: "브라우저에서 바로 즐기는 레트로",
+        icon: <Joystick size={20} />,
+        children: [
+            {
+                href: "/games/retro",
+                label: "라이브러리",
+                description: "홈브류 모음 + 내가 올린 롬",
+                icon: <Joystick size={20} />,
+                authOnly: true,
+                ownerOnly: false,
             },
         ],
     },
