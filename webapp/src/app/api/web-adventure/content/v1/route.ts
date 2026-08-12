@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
 import WebAdventureScene from "@/models/web-adventure-scene";
 import { DEFAULT_VOICE, resolveBody, voiceCoverage } from "@/lib/web-adventure/voice";
+import { items, INVENTORY_CAP } from "@/content/web-adventure/items";
 
 // 공개 read-only 컨텐츠 — 앱(Capacitor WebView, cross-origin)도 소비하므로 CORS 허용.
 const CORS_HEADERS = {
@@ -39,8 +40,15 @@ export async function GET(req: Request) {
     return { ...rest, body: resolveBody(doc, voice) };
   });
 
+  // #103 — 아이템 카탈로그도 함께 내려보낸다. 앱이 가방 모달에서 이름·설명·효과를 그리고
+  //   사용 가능 여부(kind === "consumable")를 판단하는 데 쓴다. 앱에 미러를 박지 않는 이유는
+  //   이중 관리로 어긋나기 때문이다 — 문체 규칙을 양쪽에 둔 탓에 표기가 갈린 전례가 있다.
+  //   정적 데이터라 캐시 정책(아래 60 초)에도 영향이 없다.
   return NextResponse.json(
-    { success: true, data: { scenes, voice, voices: voiceCoverage(docs) } },
+    {
+      success: true,
+      data: { scenes, voice, voices: voiceCoverage(docs), items, inventoryCap: INVENTORY_CAP },
+    },
     {
       status: 200,
       headers: {

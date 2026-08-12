@@ -64,10 +64,23 @@ export async function submitAppEndRun(payload, opts = {}) {
 // 마지막 응답의 문체 커버리지 (#87).
 // 서버는 씬에서 variants 를 떼고 보내므로, 어떤 문체가 완비인지는 이 값으로만 알 수 있다.
 let lastVoices = {};
+// #103 — 아이템 카탈로그. 앱에 미러하지 않고 서버가 준 것을 쓴다(이중 관리 방지).
+let lastItems = {};
+let lastInventoryCap = 8;
 
 /** 마지막 content fetch 가 알려 준 문체별 커버리지. fetch 전에는 빈 객체. */
 export function getVoiceCoverage() {
   return lastVoices;
+}
+
+/** 마지막 content fetch 가 준 아이템 카탈로그 `{id: Item}`. fetch 전에는 빈 객체. */
+export function getItemCatalog() {
+  return lastItems;
+}
+
+/** 소지품 한도. 서버가 안 주면 8(웹 INVENTORY_CAP 기본값). */
+export function getInventoryCap() {
+  return lastInventoryCap;
 }
 
 async function fetchOnce(baseUrl, fetchImpl, voice) {
@@ -76,6 +89,8 @@ async function fetchOnce(baseUrl, fetchImpl, voice) {
   if (!res.ok) throw new Error(`content fetch ${res.status}`);
   const json = await res.json();
   lastVoices = (json && json.data && json.data.voices) || {};
+  lastItems = (json && json.data && json.data.items) || {};
+  if (json && json.data && Number.isFinite(json.data.inventoryCap)) lastInventoryCap = json.data.inventoryCap;
   const list = (json && json.data && json.data.scenes) || [];
   const map = {};
   for (const s of list) {
