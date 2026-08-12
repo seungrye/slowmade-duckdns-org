@@ -35,3 +35,4 @@ coverage/
 # player.html 은 우리가 쓴 작은 파일이라 커밋한다 — 아래에서 되살린다.
 /webapp/public/games/retro/*
 !/webapp/public/games/retro/player.html
+!/webapp/public/games/retro/rom-patch.js
