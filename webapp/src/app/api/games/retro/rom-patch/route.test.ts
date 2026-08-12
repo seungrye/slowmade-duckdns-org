@@ -4,6 +4,7 @@ const mockPutObject = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockRemoveObject = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockExists = vi.hoisted(() => vi.fn());
 const mockFindOneAndUpdate = vi.hoisted(() => vi.fn());
+const mockUpdateOne = vi.hoisted(() => vi.fn());
 
 vi.hoisted(() => {
   process.env.MINIO_ENDPOINT = 'test-endpoint.com';
@@ -21,7 +22,7 @@ vi.mock('minio', () => ({
   },
 }));
 vi.mock('@/models/retro-rom', () => ({
-  default: { exists: mockExists, findOneAndUpdate: mockFindOneAndUpdate },
+  default: { exists: mockExists, findOneAndUpdate: mockFindOneAndUpdate, updateOne: mockUpdateOne },
 }));
 
 import { POST } from './route';
@@ -64,6 +65,7 @@ describe('POST /api/games/retro/rom-patch', () => {
     mockAuth.mockResolvedValue({ user: { email: 'me@test.com' } });
     mockExists.mockResolvedValue({ _id: ROM_ID });
     mockPutObject.mockResolvedValue(undefined);
+    mockUpdateOne.mockResolvedValue({ matchedCount: 1 });
     updateReturns({
       patches: [
         { _id: PATCH_ID, name: 'ko.ips', format: 'ips', size: 64, objectKey: 'retro-patches/secret.ips', createdAt: new Date(0) },
@@ -131,5 +133,30 @@ describe('POST /api/games/retro/rom-patch', () => {
     expect((await POST(request(form(patchFile('ko.ips'), ROM_ID)))).status).toBe(500);
     expect(mockRemoveObject).toHaveBeenCalledTimes(1);
     expect(mockRemoveObject.mock.calls[0][1]).toBe(mockPutObject.mock.calls[0][1]);
+  });
+
+  // #116 — 롬당 패치 하나. 새로 올리면 교체한다.
+  describe('교체 의미', () => {
+    it('기존 패치를 먼저 soft delete 한다', async () => {
+      await POST(request(form(patchFile('new.ips'), ROM_ID)));
+
+      const [filter, update, opts] = mockUpdateOne.mock.calls[0];
+      expect(filter).toMatchObject({ _id: ROM_ID, userEmail: 'me@test.com' });
+      expect(update).toEqual({ $set: { 'patches.$[live].isDeleted': true } });
+      // 살아 있는 것만 골라 접는다 — 이미 지운 걸 또 건드리지 않는다.
+      expect(opts).toEqual({ arrayFilters: [{ 'live.isDeleted': { $ne: true } }] });
+    });
+
+    it('접은 다음에 새것을 넣는다 — 순서가 뒤집히면 새것까지 접힌다', async () => {
+      await POST(request(form(patchFile('new.ips'), ROM_ID)));
+      expect(mockUpdateOne.mock.invocationCallOrder[0])
+        .toBeLessThan(mockFindOneAndUpdate.mock.invocationCallOrder[0]);
+    });
+
+    it('올리면 적용도 함께 켠다 — 올렸다는 건 쓰겠다는 뜻이다', async () => {
+      await POST(request(form(patchFile('new.ips'), ROM_ID)));
+      const [, update] = mockFindOneAndUpdate.mock.calls[0];
+      expect(update.$set).toEqual({ patchEnabled: true });
+    });
   });
 });

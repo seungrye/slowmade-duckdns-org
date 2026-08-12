@@ -29,3 +29,29 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
   if (!res.matchedCount) return apiError('롬을 찾을 수 없습니다.', 404);
   return apiSuccess({ id });
 }
+
+/**
+ * 패치 적용 여부 토글 (#116) — 카드의 체크박스.
+ *
+ * 지금은 `patchEnabled` 하나만 받는다. 다른 필드를 받게 되면 화이트리스트를 늘릴 것 —
+ * 요청 본문을 그대로 `$set` 에 넘기면 무엇이든 덮어쓸 수 있게 된다.
+ */
+export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const authed = await requireAuth();
+  if (authed instanceof NextResponse) return authed;
+
+  const { id } = await ctx.params;
+  if (!isRomId(id)) return apiError('롬을 찾을 수 없습니다.', 404);
+
+  const body = await req.json().catch(() => null);
+  if (typeof body?.patchEnabled !== 'boolean') return apiError('잘못된 요청입니다.', 400);
+
+  await connectToDB();
+  const res = await RetroRom.updateOne(
+    { _id: id, userEmail: authed.email, isDeleted: { $ne: true } },
+    { $set: { patchEnabled: body.patchEnabled } },
+  );
+
+  if (!res.matchedCount) return apiError('롬을 찾을 수 없습니다.', 404);
+  return apiSuccess({ patchEnabled: body.patchEnabled });
+}

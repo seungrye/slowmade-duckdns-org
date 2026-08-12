@@ -19,5 +19,5 @@ export async function GET() {
     .sort({ createdAt: -1 })
     .lean()) as unknown as LeanRom[];
 
-  return apiSuccess(docs.map(toRomDto));
+  return apiSuccess(docs.map((d) => toRomDto(d)));
 }

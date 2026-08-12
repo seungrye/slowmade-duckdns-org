@@ -4,6 +4,8 @@ import { connectToDB } from "@/lib/db";
 import RetroRom from "@/models/retro-rom";
 import { BUILTIN_GAMES, filterExistingBuiltins, withExistingCovers } from "@/lib/retro/library";
 import { toRomDto, type LeanRom } from "@/lib/retro/rom-dto";
+import { romKey } from "@/lib/retro/game-key";
+import RetroSaveState from "@/models/retro-save-state";
 import type { UserRomDto } from "@/lib/retro/entry";
 import { emulatorAssetsInstalled, retroAssetExists } from "./assets";
 import LoginRequired from "./LoginRequired";
@@ -24,7 +26,17 @@ async function myRoms(email: string): Promise<UserRomDto[]> {
   const docs = (await RetroRom.find({ userEmail: email, isDeleted: { $ne: true } })
     .sort({ createdAt: -1 })
     .lean()) as unknown as LeanRom[];
-  return docs.map(toRomDto);
+
+  // 세이브 유무는 **한 번에** 조회한다 — 카드마다 요청하면 롬 수만큼 왕복이 생긴다 (#116).
+  const keys = docs.map((d) => romKey(String(d._id)));
+  const saved = keys.length
+    ? await RetroSaveState.find({ userEmail: email, gameKey: { $in: keys } })
+        .select('gameKey')
+        .lean<{ gameKey: string }[]>()
+    : [];
+  const savedKeys = new Set(saved.map((s) => s.gameKey));
+
+  return docs.map((d) => toRomDto(d, { hasSave: savedKeys.has(romKey(String(d._id))) }));
 }
 
 export default async function RetroGamesPage() {

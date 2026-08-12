@@ -3,7 +3,7 @@
 // 라우트 셋(목록·업로드·페이지)이 같은 변환을 쓰므로 한 곳에 둔다. 핵심은
 // **`objectKey` 를 절대 싣지 않는 것** — MinIO 키가 새 나가면 인증 프록시를 우회할 실마리가 된다.
 
-import type { UserRomDto } from './entry';
+import type { RomPatchDto, UserRomDto } from './entry';
 import type { PlatformId } from './platforms';
 
 export interface LeanRom {
@@ -13,6 +13,7 @@ export interface LeanRom {
   size: number;
   createdAt?: Date;
   patches?: LeanPatch[];
+  patchEnabled?: boolean;
 }
 
 export interface LeanPatch {
@@ -49,13 +50,30 @@ export function livePatches(doc: { patches?: LeanPatch[] }): UserPatchDto[] {
   return (doc.patches ?? []).filter((p) => !p.isDeleted).map(toPatchDto);
 }
 
-export function toRomDto(doc: LeanRom): UserRomDto {
+/**
+ * 지금 쓰는 패치 하나 (#116).
+ *
+ * 배열에 살아 있는 게 여럿이어도 **마지막 것**을 쓴다 — 업로드가 교체 방식이라 정상적으로는
+ * 하나뿐이지만, 옛 데이터나 경쟁 상태로 여럿 남았을 때 "가장 최근에 올린 것" 이 맞다.
+ */
+export function activePatch(doc: { patches?: LeanPatch[] }): RomPatchDto | undefined {
+  const live = (doc.patches ?? []).filter((p) => !p.isDeleted);
+  const last = live[live.length - 1];
+  if (!last) return undefined;
+  return { id: String(last._id), name: last.name, format: last.format, size: last.size };
+}
+
+export function toRomDto(doc: LeanRom, extra?: { hasSave?: boolean }): UserRomDto {
   return {
     id: String(doc._id),
     title: doc.title,
     platform: doc.platform as PlatformId,
     size: doc.size,
     createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
+    patch: activePatch(doc),
+    // 값이 없던 옛 문서는 켜진 것으로 본다 — 패치를 올려 뒀다면 쓰려던 것이다.
+    patchEnabled: doc.patchEnabled !== false,
+    hasSave: extra?.hasSave ?? false,
   };
 }
 

@@ -104,4 +104,67 @@ describe('RetroLibrary', () => {
       expect(screen.getByText('내가 올린 롬')).toBeInTheDocument();
     });
   });
+
+  // #116 — 관리가 카드로 옮겨 왔다.
+  describe('카드에서 패치 다루기', () => {
+    const PATCHED: UserRomDto[] = [
+      { ...MY_ROMS[0], patch: { id: 'p1', name: 'ko.ips', format: 'ips', size: 4096 }, patchEnabled: true },
+    ];
+
+    it('패치를 올리면 카드가 바로 그 패치를 보여 준다', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, data: { id: 'p9', name: 'new.ips', format: 'ips', size: 8 } }),
+      }));
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
+
+      fireEvent.change(screen.getByLabelText('내가 올린 롬 패치 파일'), {
+        target: { files: [new File([new Uint8Array(8)], 'new.ips')] },
+      });
+
+      expect(await screen.findByText('new.ips')).toBeInTheDocument();
+      const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toBe('/api/games/retro/rom-patch');
+      expect((init.body as FormData).get('romId')).toBe(MY_ROMS[0].id);
+    });
+
+    it('업로드가 실패하면 이유를 보여 주고 카드는 그대로 둔다', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false, json: async () => ({ message: 'IPS·BPS·UPS 패치 파일이 아닙니다.' }),
+      }));
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
+
+      fireEvent.change(screen.getByLabelText('내가 올린 롬 패치 파일'), {
+        target: { files: [new File([new Uint8Array(8)], 'nope.zip')] },
+      });
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('IPS·BPS·UPS');
+      expect(screen.getByText('+ 패치')).toBeInTheDocument();
+    });
+
+    it('체크를 끄면 서버에 알린다', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) }));
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={PATCHED} />);
+
+      fireEvent.click(screen.getByRole('checkbox'));
+
+      await waitFor(() =>
+        expect(fetch).toHaveBeenCalledWith(
+          `/api/games/retro/roms/${MY_ROMS[0].id}`,
+          expect.objectContaining({ method: 'PATCH' }),
+        ),
+      );
+      expect(screen.getByRole('checkbox')).not.toBeChecked();
+    });
+
+    it('토글이 실패하면 체크를 되돌린다 — 화면과 서버가 어긋나면 안 된다', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={PATCHED} />);
+
+      fireEvent.click(screen.getByRole('checkbox'));
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox')).toBeChecked();
+    });
+  });
 });

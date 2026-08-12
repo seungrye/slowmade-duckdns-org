@@ -21,6 +21,10 @@ export interface GameEntry {
   playHref: string;
   /** 카드 아래 작은 글씨 — 출처 또는 파일 크기. */
   subtitle?: string;
+  /** 아래 셋은 업로드 롬에만 있다 (#116) — 카드가 패치 칩과 세이브 점을 그리는 데 쓴다. */
+  patch?: RomPatchDto;
+  patchEnabled?: boolean;
+  hasSave?: boolean;
 }
 
 export interface BuiltinGame {
@@ -37,12 +41,25 @@ export interface BuiltinGame {
   description?: string;
 }
 
+export interface RomPatchDto {
+  id: string;
+  name: string;
+  format: string;
+  size: number;
+}
+
 export interface UserRomDto {
   id: string;
   title: string;
   platform: PlatformId;
   size: number;
   createdAt: string;
+  /** 살아 있는 패치 — 롬당 최대 하나 (#116). */
+  patch?: RomPatchDto;
+  /** 패치를 적용할지. 카드의 체크박스가 뒤집는다. */
+  patchEnabled?: boolean;
+  /** 서버 세이브가 있는지 — 카드 모서리의 작은 점. */
+  hasSave?: boolean;
 }
 
 export const BUILTIN_ROM_DIR = '/games/retro/roms';
@@ -74,6 +91,9 @@ export function romEntry(rom: UserRomDto): GameEntry {
     romUrl: `/api/games/retro/roms/${rom.id}/file`,
     playHref: `/games/retro/play/rom/${rom.id}`,
     subtitle: formatBytes(rom.size),
+    patch: rom.patch,
+    patchEnabled: rom.patchEnabled,
+    hasSave: rom.hasSave,
   };
 }
 

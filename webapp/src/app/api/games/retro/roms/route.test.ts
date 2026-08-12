@@ -52,6 +52,9 @@ describe('GET /api/games/retro/roms — 내 롬 목록', () => {
       platform: 'gba',
       size: 4096,
       createdAt: '1970-01-01T00:00:00.000Z',
+      // #116 — 카드가 쓰는 값들. 목록 API 는 세이브 유무를 모르므로 false.
+      patchEnabled: true,
+      hasSave: false,
     });
     expect(JSON.stringify(body)).not.toContain('secret-key');
   });
