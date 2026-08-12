@@ -50,6 +50,22 @@ class StubResizeObserver {
   disconnect(): void {}
 }
 
+// jsdom 에는 matchMedia 도 없다. useMobile() 이 마운트 시점에 부르므로, 그 훅을 쓰는
+// 컴포넌트를 렌더하는 테스트가 전부 죽는다(#95 에서 겪었다). 기본은 "모바일 아님".
+// 모바일 동작을 검증하려면 테스트에서 window.matchMedia 와 innerWidth 를 함께 바꾼다.
+if (typeof window !== 'undefined' && !window.matchMedia) {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as typeof window.matchMedia;
+}
+
 if (typeof globalThis !== 'undefined') {
   const g = globalThis as Record<string, unknown>;
   if (!g.ResizeObserver) g.ResizeObserver = StubResizeObserver;

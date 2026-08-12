@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { envLabel } from "@/lib/env-label";
 import { useDragScrollX } from "@/hooks/use-drag-scroll";
+import { useMobile } from "@/hooks/use-mobile";
+import { recentPoints } from "./recent-points";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 
@@ -50,6 +52,8 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
   const router = useRouter();
   const [env, setEnv] = useState<Env>(initialData?.env ?? combos[0]?.env ?? "paper");
   const tabScroll = useDragScrollX<HTMLDivElement>();
+  // #95 — 좁은 화면에서는 차트를 최근 구간만 그린다(요약 수치는 전체 기준 유지).
+  const isMobile = useMobile();
   const [currency, setCurrency] = useState<Currency>(initialData?.currency ?? combos[0]?.currency ?? "KRW");
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(false);
@@ -89,10 +93,14 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     if (!data || data.history.length === 0) return null;
     if (Object.keys(data.tradesByDate ?? {}).length === 0) return null; // 매매 없는 시장 숨김
 
-    const dates = data.history.map((h) => h.dateStr);
-    const totalData = data.history.map((h) => h.totalValue);
-    const cashData = data.history.map((h) => h.cash);
-    const holdingsData = data.history.map((h) => h.holdingsValue);
+    // #95 — 좁은 화면에서는 최근 구간만. 아래 마커·툴팁도 이 배열을 보므로 범위가 함께 맞는다.
+    //   하단 요약("총 N 사이클"·누적손익)은 전체 기준이라 data.history 를 그대로 쓴다.
+    const history = recentPoints(data.history, isMobile);
+
+    const dates = history.map((h) => h.dateStr);
+    const totalData = history.map((h) => h.totalValue);
+    const cashData = history.map((h) => h.cash);
+    const holdingsData = history.map((h) => h.holdingsValue);
 
     // 매매 마커 — totalValue line 위에 표시.
     // 매수만: ▲ 빨강 / 매도만: ▼ 파랑 / 둘 다: ■ 보라.
@@ -102,7 +110,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     const both: Array<[string, number]> = [];
     const tradeMeta: Record<string, TradeStats> = data.tradesByDate;
 
-    for (const h of data.history) {
+    for (const h of history) {
       const stats = tradeMeta[h.dateStr];
       if (!stats) continue;
       const point: [string, number] = [h.dateStr, h.totalValue];
@@ -128,7 +136,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
           `▼ 매도 ${stats.sell}건 · ${formatMoney(stats.sellAmount, currency)}`,
         );
       }
-      const tv = data.history.find((h) => h.dateStr === d);
+      const tv = history.find((h) => h.dateStr === d);
       if (tv) {
         lines.push(`총자산 ${formatMoney(tv.totalValue, currency)}`);
       }
@@ -264,7 +272,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
       ],
       series,
     };
-  }, [data, currency]);
+  }, [data, currency, isMobile]);
 
   // 차트 클릭 → 그 날 매매 종목 list 가 있으면 종목 차트로 이동.
   // currency 에 따라 market (KR/US) 자동 분기. center 쿼리로 그 날짜 중앙 표시.
