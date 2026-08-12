@@ -106,12 +106,27 @@ describe('GameCard', () => {
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
-    // #122 — 파일명을 늘 보여 줄 이유가 없다. 카드가 좁다.
-    it('파일명을 화면에 적지 않는다 — 툴팁으로만 알려 준다', () => {
+    // #122 — 파일명을 늘 보여 줄 이유는 없다. 다만 #125 — 아이콘만 두면 무슨 버튼인지 모른다.
+    it('긴 파일명 대신 **형식**을 적는다', () => {
       render(<GameCard game={rom({ patch: PATCH, patchEnabled: true })} {...handlers()} />);
       expect(screen.queryByText('한글패치.ips')).not.toBeInTheDocument();
+      expect(screen.getByText('IPS')).toBeInTheDocument();
+      // 전체 이름은 툴팁에 남는다.
       expect(screen.getByRole('button', { name: '내 롬 패치 교체' }).getAttribute('title'))
         .toContain('한글패치.ips');
+    });
+
+    it.each([
+      ['bps', 'BPS'],
+      ['ups', 'UPS'],
+    ])('%s 패치는 %s 로 적는다', (format, label) => {
+      render(<GameCard game={rom({ patch: { ...PATCH, format } })} {...handlers()} />);
+      expect(screen.getByText(label)).toBeInTheDocument();
+    });
+
+    it('패치가 없으면 "패치" 라고 적어 무엇을 올리는 자리인지 알린다', () => {
+      render(<GameCard game={rom()} {...handlers()} />);
+      expect(screen.getByText('패치')).toBeInTheDocument();
     });
 
     it('패치가 있으면 체크박스가 생긴다', () => {
@@ -207,6 +222,11 @@ describe('GameCard', () => {
       render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
       expect(clickInside(screen.getByRole('button', { name: '내 롬 카드 그림' }))).toBe(true);
     });
+
+    it('무슨 버튼인지 글자로 알린다 (#125)', () => {
+      render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
+      expect(screen.getByText('그림')).toBeInTheDocument();
+    });
   });
 
   describe('제목 고치기', () => {
@@ -269,6 +289,36 @@ describe('GameCard', () => {
       // fireEvent 는 preventDefault 되면 false 를 돌려준다. 이걸 써야 편집 진입이 함께 반영된다.
       expect(fireEvent.click(screen.getByRole('button', { name: '내 롬 이름 바꾸기' }))).toBe(false);
       expect(fireEvent.click(screen.getByLabelText('제목'))).toBe(false);
+    });
+  });
+
+  // #125 — 실제로 버튼을 눌렀을 때 파일 선택창이 열리는가.
+  // 지금까지는 숨은 input 에 change 를 쏴서 검증해 **버튼 클릭 경로를 한 번도 안 봤다.**
+  describe('버튼이 파일 선택을 연다', () => {
+    /**
+     * `input.click()` 을 진짜와 같게 흉내 낸다 — **버블링되고 취소 가능한** 클릭.
+     * 위에서 누가 preventDefault 하면 브라우저는 파일 선택창을 열지 않는다.
+     * 단순히 `click` 이 불렸는지만 보면 이 사고를 놓친다(실제로 놓쳤다).
+     */
+    function pickerOpens(buttonName: string, inputLabel: string): boolean {
+      const input = screen.getByLabelText(inputLabel) as HTMLInputElement;
+      let opened = false;
+      vi.spyOn(input, 'click').mockImplementation(() => {
+        const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+        opened = input.dispatchEvent(ev); // preventDefault 되면 false
+      });
+      fireEvent.click(screen.getByRole('button', { name: buttonName }));
+      return opened;
+    }
+
+    it('패치 버튼을 누르면 파일 선택창이 열린다', () => {
+      render(<GameCard game={rom()} onPatchUpload={vi.fn()} onCoverUpload={vi.fn()} />);
+      expect(pickerOpens('내 롬 패치 올리기', '내 롬 패치 파일')).toBe(true);
+    });
+
+    it('커버 버튼을 누르면 파일 선택창이 열린다', () => {
+      render(<GameCard game={rom()} onPatchUpload={vi.fn()} onCoverUpload={vi.fn()} />);
+      expect(pickerOpens('내 롬 카드 그림', '내 롬 커버 이미지')).toBe(true);
     });
   });
 });
