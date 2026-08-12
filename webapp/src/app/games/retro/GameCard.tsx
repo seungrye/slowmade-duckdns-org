@@ -115,11 +115,12 @@ export default function GameCard({
 
           {canManage && (
             // 좌하단 패치 · 우하단 커버. 모바일엔 hover 가 없으므로 **항상 보인다**.
-            <div onClick={swallow} className="absolute inset-x-2 bottom-2 flex items-end justify-between">
+            // 숨은 file input 은 여기 두지 않는다 — 아래 주석 참고.
+            <div onClick={swallow} className="absolute inset-x-2 bottom-2 flex items-end justify-between gap-1">
               <div className="flex items-center gap-1">
-                {/* 패치가 있을 때만 켜고 끌 것이 있다. 파일명은 툴팁으로만 — 카드가 좁다. */}
+                {/* 패치가 있을 때만 켜고 끌 것이 있다. */}
                 {game.patch && (
-                  <span className={`${TOOL} bg-black/65`}>
+                  <span className={`${TOOL} px-1`}>
                     <input
                       type="checkbox"
                       checked={game.patchEnabled !== false}
@@ -134,11 +135,15 @@ export default function GameCard({
                   type="button"
                   disabled={busy}
                   onClick={() => patchRef.current?.click()}
-                  title={game.patch ? `패치: ${game.patch.name} — 눌러서 교체` : "패치 올리기"}
+                  title={game.patch ? `패치: ${game.patch.name} — 눌러서 교체` : "패치 파일 올리기"}
                   aria-label={game.patch ? `${game.title} 패치 교체` : `${game.title} 패치 올리기`}
-                  className={TOOL}
+                  className={`${TOOL} gap-1 px-1.5`}
                 >
-                  <FileDiff size={14} aria-hidden />
+                  <FileDiff size={12} aria-hidden />
+                  {/* 아이콘만 있으면 무슨 버튼인지 모른다 — 형식(IPS·BPS·UPS)을 적어 준다. */}
+                  <span className="text-[10px] font-semibold leading-none">
+                    {game.patch ? game.patch.format.toUpperCase() : "패치"}
+                  </span>
                 </button>
               </div>
 
@@ -148,35 +153,11 @@ export default function GameCard({
                 onClick={() => coverRef.current?.click()}
                 title={game.cover ? "카드 그림 바꾸기" : "카드 그림 넣기"}
                 aria-label={`${game.title} 카드 그림`}
-                className={TOOL}
+                className={`${TOOL} gap-1 px-1.5`}
               >
-                {game.cover ? <ImageIcon size={14} aria-hidden /> : <ImagePlus size={14} aria-hidden />}
+                {game.cover ? <ImageIcon size={12} aria-hidden /> : <ImagePlus size={12} aria-hidden />}
+                <span className="text-[10px] font-semibold leading-none">그림</span>
               </button>
-
-              <input
-                ref={patchRef}
-                type="file"
-                accept=".ips,.bps,.ups"
-                aria-label={`${game.title} 패치 파일`}
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onPatchUpload?.(game, file);
-                  e.target.value = "";
-                }}
-              />
-              <input
-                ref={coverRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                aria-label={`${game.title} 커버 이미지`}
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) onCoverUpload?.(game, file);
-                  e.target.value = "";
-                }}
-              />
             </div>
           )}
         </div>
@@ -225,6 +206,43 @@ export default function GameCard({
           <p className="truncate px-0.5 text-xs text-gray-500 dark:text-gray-400">{game.subtitle}</p>
         )}
       </Link>
+
+      {/*
+        숨은 file input 은 **링크와 조작 영역 밖**에 둔다 (#125).
+
+        `input.click()` 이 만드는 클릭도 평범하게 버블링된다. 조작 영역 안에 두면 위의
+        `swallow` 가 그 클릭까지 `preventDefault` 해 **파일 선택창이 열리지 않는다.**
+        `<Link>` 안에 두면 이번엔 앵커까지 올라가 페이지가 이동한다. 그래서 둘 다 벗어난
+        카드 뿌리에 둔다. `display:none` 이라 자리는 차지하지 않는다.
+      */}
+      {canManage && (
+        <>
+          <input
+            ref={patchRef}
+            type="file"
+            accept=".ips,.bps,.ups"
+            aria-label={`${game.title} 패치 파일`}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onPatchUpload?.(game, file);
+              e.target.value = "";
+            }}
+          />
+          <input
+            ref={coverRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            aria-label={`${game.title} 커버 이미지`}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onCoverUpload?.(game, file);
+              e.target.value = "";
+            }}
+          />
+        </>
+      )}
 
       {onDelete && (
         <button
