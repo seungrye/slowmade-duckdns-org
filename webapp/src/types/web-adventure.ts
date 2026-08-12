@@ -65,6 +65,11 @@ export type Character = {
 // 항상 노출된다(해금·도전 분기라 랜덤 대상 아님). 추첨은 non-pinned plain 만 대상.
 export type Choice =
   | { kind: "plain"; id: string; label: string; to: string;
+      /**
+       * #89 이 선택지를 고른 흔적. 도착 씬이 같은 갈래들(골목의 동류 접촉, 갱도 거래 등)은
+       * 씬의 onEnter 로는 어느 쪽을 골랐는지 남길 수 없어 선택이 사라졌다. 여기에 남긴다.
+       */
+      setFlags?: Record<string, boolean>;
       /** #253 — 〈에테르니아〉 침식도 변동 (예: 마법 사용 시 +N, 정제수 사용 시 -N). */
       stigmaDelta?: number;
       /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출. */
@@ -94,6 +99,8 @@ export type Choice =
     }
   | {
       kind: "conditional";
+      /** #89 이 선택지를 고른 흔적. plain 과 같은 뜻. */
+      setFlags?: Record<string, boolean>;
       id: string;
       label: string;
       condition: ChoiceCondition;

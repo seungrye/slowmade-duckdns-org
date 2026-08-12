@@ -56,6 +56,8 @@ const ChoiceSchema = new Schema(
     onSuccess: { type: String },
     onFailure: { type: String },
 
+    // #89 — 이 선택지를 고른 흔적(도착 씬이 같은 갈래를 구분하기 위함).
+    setFlags: { type: Map, of: Boolean },
     // conditional
     condition: { type: ChoiceConditionSchema },
     // 4 주차 — conditional 의 *완전 숨김* 모드 (조건 미충족 시 UI 에서 렌더 X).

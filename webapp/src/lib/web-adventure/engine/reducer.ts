@@ -39,6 +39,19 @@ export type Action =
   // #238 — 저장에서 불러올 때. character + currentSceneId 로 playing 즉시 진입.
   | { type: "RESTORE"; character: Character; currentSceneId: string };
 
+/**
+ * 선택지가 남기는 흔적을 캐릭터 flags 에 얹는다 (#89).
+ * 기존 flag 는 지우지 않는다. 엔딩으로 넘어간 경우엔 손대지 않는다(더 쓸 데가 없다).
+ */
+function applyChoiceFlags(state: GameState, setFlags?: Record<string, boolean>): GameState {
+  if (!setFlags || Object.keys(setFlags).length === 0) return state;
+  if (state.phase !== "playing") return state;
+  return {
+    ...state,
+    character: { ...state.character, flags: { ...state.character.flags, ...setFlags } },
+  };
+}
+
 function evalCondition(cond: ChoiceCondition, character: Character): boolean {
   switch (cond.kind) {
     case "minStat":
@@ -291,13 +304,19 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
 
       switch (choice.kind) {
         case "plain":
-          return moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0);
+          return applyChoiceFlags(
+            moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0),
+            choice.setFlags,
+          );
         case "probability":
           // 즉시 전이하지 않고 *판정 대기*(pendingRoll). 결과를 보고 재굴림/계속 선택.
           return buildPendingRoll(state, choice, action.rng);
         case "conditional": {
           if (!evalCondition(choice.condition, state.character)) return state;
-          return moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0);
+          return applyChoiceFlags(
+            moveTo(state, choice.to, scenes, `선택: ${choice.label}`, choice.stigmaDelta ?? 0),
+            choice.setFlags,
+          );
         }
       }
       return state;
