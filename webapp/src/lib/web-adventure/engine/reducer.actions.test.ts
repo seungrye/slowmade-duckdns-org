@@ -275,3 +275,68 @@ describe("onEnter.rerollDelta", () => {
     expect(state.character.rerollsLeft).toBe(2);
   });
 });
+
+// ── #89 선택지가 남기는 흔적(setFlags) ──────────────────────────────────────
+//
+// 도착 씬이 같은 선택지들이 있다(골목의 동류 접촉, 갱도 안내 거래 등). 씬의 onEnter 로는
+// 어느 쪽을 골랐는지 남길 수 없어 **선택이 통째로 사라졌다**. 선택지 자체에 흔적을 남긴다.
+// stigmaDelta 가 이미 같은 방식으로 붙어 있어 그 패턴을 따른다.
+describe("선택지 setFlags (#89)", () => {
+  const scenesWith = (choice: Scene["choices"][number]): SceneRegistry => ({
+    here: makeScene({ id: "here", choices: [choice] }),
+    there: makeScene({ id: "there" }),
+  });
+  const playing = (flags: Record<string, boolean | number> = {}): GameState => ({
+    phase: "playing",
+    character: makeChar({ flags }),
+    currentScene: "here",
+    log: [],
+  });
+
+  it("plain 선택지의 flag 가 캐릭터에 남는다", () => {
+    const s = gameReducer(
+      playing(),
+      { type: "MAKE_CHOICE", choiceId: "c" },
+      scenesWith({ kind: "plain", id: "c", label: "거래에 응한다", to: "there", setFlags: { tunnelDebt: true } }),
+    );
+    expect(s.phase).toBe("playing");
+    if (s.phase !== "playing") return;
+    expect(s.character.flags.tunnelDebt).toBe(true);
+    expect(s.currentScene).toBe("there");
+  });
+
+  it("conditional 선택지도 남긴다", () => {
+    const s = gameReducer(
+      playing({ gate: true }),
+      { type: "MAKE_CHOICE", choiceId: "c" },
+      scenesWith({
+        kind: "conditional", id: "c", label: "조건부", to: "there",
+        condition: { kind: "flag", key: "gate" },
+        setFlags: { cameoAlly: true },
+      }),
+    );
+    if (s.phase !== "playing") return;
+    expect(s.character.flags.cameoAlly).toBe(true);
+  });
+
+  it("기존 flag 를 지우지 않고 얹는다", () => {
+    const s = gameReducer(
+      playing({ old: true }),
+      { type: "MAKE_CHOICE", choiceId: "c" },
+      scenesWith({ kind: "plain", id: "c", label: "x", to: "there", setFlags: { fresh: true } }),
+    );
+    if (s.phase !== "playing") return;
+    expect(s.character.flags).toMatchObject({ old: true, fresh: true });
+  });
+
+  it("setFlags 가 없으면 flags 를 건드리지 않는다", () => {
+    const before = playing({ old: true });
+    const s = gameReducer(
+      before,
+      { type: "MAKE_CHOICE", choiceId: "c" },
+      scenesWith({ kind: "plain", id: "c", label: "x", to: "there" }),
+    );
+    if (s.phase !== "playing") return;
+    expect(s.character.flags).toEqual({ old: true });
+  });
+});

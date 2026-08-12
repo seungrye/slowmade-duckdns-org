@@ -78,6 +78,7 @@ PATCHES=(
   # **먼저** 돌아야 한다 — 씬이 없으면 그쪽이 건너뛴다.
   scripts/seed-365-expansion-scenes.mjs # 씬 확장분(성흔 분기 4·회상 2·유대 2·설화 2)
   scripts/seed-366-body-snapshot.mjs # 본문 정본 고정(드리프트 해소 — #91 정정 포함)
+  scripts/seed-369-choice-traces.mjs # #89 헛도는 판정 제거 + 선택 흔적(flag)
   scripts/seed-368-stigma-gates.mjs # #99 침식 게이트(승천 하한·무흔 상한)
   scripts/seed-367-voices.mjs # #73/#87 treatment + variants(tolkien/eco)
 )
