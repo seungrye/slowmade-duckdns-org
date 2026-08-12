@@ -87,12 +87,28 @@ for f in compression/extract7z.js compression/extractzip.js compression/libunrar
     fetch "$CDN/$f" "$DATA_DIR/$f" || die "$f 를 받지 못했습니다(코어 압축 해제에 반드시 필요)."
 done
 
+# 언어 파일 — 없으면 실행마다 "Missing language en-US" 404 가 뜬다(치명적이진 않지만 시끄럽다).
+fetch "$CDN/localization/en-US.json" "$DATA_DIR/localization/en-US.json" || true
+
 # ── 2. 코어 ─────────────────────────────────────────────────────────────────
-log "코어 ${#CORES[@]} 종"
+# **변종 둘을 다 받는다.** EmulatorJS 는 WebGL2 를 쓸 수 있으면 `<core>-wasm.data`,
+# 아니면 `<core>-legacy-wasm.data` 를 찾는다. 어느 쪽이 될지는 브라우저와 아래 리포트 JSON 이
+# 정한다 — 하나만 받아 두면 반대쪽 브라우저에서 "Error downloading core" 로 죽는다.
+# (-thread- 변종은 받지 않는다. 스레드를 켜지 않으므로 절대 요청되지 않는다.)
+#
+# 리포트 JSON 이 **필수다.** 이게 없으면 EmulatorJS 가 `defaultWebGL2` 를 못 읽어
+# webgl2Enabled 를 false 로 떨어뜨리고, 그러면 WebGL2 되는 브라우저까지 legacy 코어를 찾는다.
+# 실제로 이것 때문에 전 기종이 실행되지 않았다.
+log "코어 ${#CORES[@]} 종 (변종 2 + 리포트)"
 for core in "${CORES[@]}"; do
-    if fetch "$CDN/cores/$core-wasm.data" "$CORES_DIR/$core-wasm.data"; then
-        printf '  %-18s %s\n' "$core" "$(du -h "$CORES_DIR/$core-wasm.data" | cut -f1)"
-    fi
+    got=""
+    for variant in "$core-wasm.data" "$core-legacy-wasm.data"; do
+        fetch "$CDN/cores/$variant" "$CORES_DIR/$variant" \
+            && got="$got $(du -h "$CORES_DIR/$variant" | cut -f1)"
+    done
+    fetch "$CDN/cores/reports/$core.json" "$CORES_DIR/reports/$core.json" \
+        || warn "  $core 리포트 없음 — legacy 코어로만 돌게 됩니다."
+    printf '  %-18s%s\n' "$core" "$got"
 done
 
 # ── 3. 홈브류 롬·커버 ────────────────────────────────────────────────────────

@@ -38,6 +38,13 @@
     document.getElementById('game').outerHTML = '<div class="notice"><div>' + html + '</div></div>';
   }
 
+  // EmulatorJS 는 시작할 때 cdn.emulatorjs.org 로 버전을 확인한다. 자체 호스팅이 목적이라
+  // CSP 가 그 요청을 막고, 막힌 fetch 가 처리되지 않은 거부로 콘솔에 남는다. 기능과 무관하므로
+  // **그 한 건만** 삼킨다. 끄는 설정은 EmulatorJS 에 없다(stable 은 항상 확인한다).
+  window.addEventListener('unhandledrejection', function (ev) {
+    if (String(ev.reason && ev.reason.message) === 'Failed to fetch') ev.preventDefault();
+  });
+
   var q = new URLSearchParams(location.search);
   var core = q.get('core') || '';
   var rom = q.get('rom') || '';

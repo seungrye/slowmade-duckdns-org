@@ -121,12 +121,25 @@ describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
       expect(cspOf(PLAYER)).toMatch(/script-src [^;]*'unsafe-eval'/);
     });
 
+    it('플레이어에는 blob: 을 준다 — 코어를 푼 뒤 Blob 스크립트로 싣고 fetch 로 읽는다', () => {
+      // 헤드리스로 다섯 기종을 돌려 확인한 값이다. 둘 중 하나만 열면 부팅이 멈춘다.
+      const csp = cspOf(PLAYER);
+      expect(csp).toMatch(/script-src [^;]*blob:/);
+      expect(csp).toMatch(/connect-src [^;]*blob:/);
+    });
+
+    it('플레이어에서도 cdn.emulatorjs.org 로는 못 나간다 — 자체 호스팅이 목적이다', () => {
+      expect(cspOf(PLAYER)).not.toContain('cdn.emulatorjs.org');
+    });
+
     it('다른 경로는 종전대로 — 완화가 새 나가지 않는다', () => {
       const csp = cspOf('/');
       expect(csp).toMatch(/frame-ancestors 'none'/);
       expect(csp).not.toMatch(/script-src [^;]*'unsafe-eval'/);
       // wasm-unsafe-eval 은 unsafe-eval 을 포함하지 않는 별개 토큰이다(bevy-rogue 용).
       expect(csp).toMatch(/script-src [^;]*'wasm-unsafe-eval'/);
+      expect(csp).not.toMatch(/script-src [^;]*blob:/);
+      expect(csp).not.toMatch(/connect-src [^;]*blob:/);
     });
 
     it('비슷한 이름의 다른 경로에는 적용되지 않는다', () => {
