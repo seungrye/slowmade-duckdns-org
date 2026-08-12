@@ -14,9 +14,11 @@ import { Schema, model, models, Model } from "mongoose";
 // ── Choice 의 condition (conditional 종류일 때만 사용) ─────────────────────
 const ChoiceConditionSchema = new Schema(
   {
-    kind: { type: String, enum: ["minStat", "hasItem", "flag", "minFlag", "ability", "stigmaAtLeast", "all"], required: true },
+    kind: { type: String, enum: ["minStat", "hasItem", "flag", "minFlag", "ability", "stigmaAtLeast", "stigmaAtMost", "all"], required: true },
     stat: { type: String },
     min: { type: Number },
+    // #99 stigmaAtMost 상한.
+    max: { type: Number },
     itemId: { type: String },
     key: { type: String },
     // 5 주차 (#221) — flag 조건의 *반전 매치* (expect=false 시 flag 미설정일 때 충족).

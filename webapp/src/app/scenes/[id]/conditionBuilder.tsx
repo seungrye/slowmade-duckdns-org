@@ -35,6 +35,8 @@ function emptyForKind(kind: ChoiceCondition["kind"]): ChoiceCondition {
       return { kind: "ability", required: "lunar" };
     case "stigmaAtLeast":
       return { kind: "stigmaAtLeast", min: 70 };
+    case "stigmaAtMost":
+      return { kind: "stigmaAtMost", max: 20 };
     case "all":
       return { kind: "all", conditions: [] };
   }
