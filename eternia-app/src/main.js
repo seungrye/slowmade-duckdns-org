@@ -1,4 +1,5 @@
-import { fetchScenesForRun, submitAppEndRun, START_SCENE_ID } from "./content-client.js";
+import { fetchScenesForRun, submitAppEndRun, START_SCENE_ID, getItemCatalog, getInventoryCap } from "./content-client.js";
+import { isUsableItem, applyItemUse } from "./items.js";
 import { checkForUpdate } from "./update-check.js";
 import { enqueue, remove, flushQueue, makeId } from "./end-run-queue.js";
 import { parseScript } from "./script.js";
@@ -410,11 +411,82 @@ import {
     if (loadingBlk) { loadingBlk.remove(); loadingBlk = null; }
     goTo(startSceneId);
   }
+  // ── 가방 모달 (#103) ────────────────────────────────────────────────
+  // 종전에는 토스트로 이름만 늘어놓았고 아이템을 쓸 수 없었다. 화면 중앙 그리드로 띄우고
+  // 소모품은 그 자리에서 쓴다. 규칙은 items.js(웹 reducer 의 USE_ITEM 과 같은 규칙).
+  var invEl = null;
+  function closeInv() { if (invEl) { invEl.remove(); invEl = null; } }
+  function itemEffectText(it) {
+    var p = [];
+    if (it.heal) p.push("+" + it.heal + " HP");
+    if (it.stigmaDelta) p.push("침식 " + (it.stigmaDelta > 0 ? "+" : "") + it.stigmaDelta);
+    if (p.length) return p.join(" · ");
+    if (it.kind === "weapon") return "무기";
+    if (it.kind === "key") return "열쇠";
+    if (it.kind === "passive") return "지속 효과";
+    return "쓸 수 없음";
+  }
+  function openInv() {
+    closeInv();
+    var cat = getItemCatalog();
+    var wrap = document.createElement("div");
+    wrap.className = "invwrap";
+    var box = document.createElement("div");
+    box.className = "invbox";
+    var head = document.createElement("div");
+    head.className = "invhead";
+    head.innerHTML = '<span class="t">가방</span><span class="cap">' +
+      S.inventory.length + " / " + getInventoryCap() + '</span>';
+    var x = document.createElement("button");
+    x.className = "invx"; x.type = "button"; x.textContent = "✕";
+    x.setAttribute("aria-label", "닫기");
+    head.appendChild(x);
+    box.appendChild(head);
+
+    if (!S.inventory.length) {
+      var em = document.createElement("p");
+      em.className = "invempty"; em.textContent = "비어 있다.";
+      box.appendChild(em);
+    } else {
+      var grid = document.createElement("div");
+      grid.className = "invgrid";
+      S.inventory.forEach(function (id) {
+        // 카탈로그에 없는 id 라도 이름만이라도 보여 준다(서버가 늦게 알려 줄 수 있다).
+        var it = cat[id] || { id: id, displayName: id, kind: "quest" };
+        var usable = isUsableItem(it);
+        var cell = document.createElement("button");
+        cell.type = "button";
+        cell.className = "invcell" + (usable ? "" : " na");
+        cell.innerHTML = '<span class="n"></span><span class="e"></span>';
+        cell.querySelector(".n").textContent = it.displayName || id;
+        cell.querySelector(".e").textContent = itemEffectText(it);
+        cell.addEventListener("click", function () {
+          if (!usable) { toast(it.desc || "지금은 쓸 수 없다."); return; }
+          var out = applyItemUse(S, it);
+          if (!out.log) { toast("쓸 수 없다."); return; }
+          Object.assign(S, out.character);
+          renderHP(true); renderStig(true);
+          toast(out.log);
+          openInv(); // 목록 갱신 — 다 썼으면 칸이 사라진다.
+        });
+        grid.appendChild(cell);
+      });
+      box.appendChild(grid);
+    }
+
+    wrap.appendChild(box);
+    wrap.addEventListener("click", function (e) { if (e.target === wrap) closeInv(); });
+    x.addEventListener("click", closeInv);
+    // .screen 이 position:relative 라 inset:0 이 화면에 딱 맞는다(둥근 모서리·overflow 도 상속).
+    ($("screen") || document.body).appendChild(wrap);
+    invEl = wrap;
+  }
+
   function on(id, ev, fn) { var el = $(id); if (el) el.addEventListener(ev, fn); }
   on("title", "click", showCreator); // 타이틀 탭 → 캐릭터 생성
   on("bottombar", "click", function (e) {
     var b = e.target.closest("[data-bb]"); if (!b) return; var k = b.getAttribute("data-bb");
-    if (k === "inv") toast(S.inventory.length ? "소지품 · " + S.inventory.join(", ") : "소지품 · 비어 있음");
+    if (k === "inv") openInv();
     else if (k === "codex") toast("도감(코덱스) — 준비 중");
     else if (k === "rank") toast("업적·랭크 — 준비 중");
     else if (k === "wip") toast("증거 — 작업중…");
