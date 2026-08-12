@@ -52,7 +52,8 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
   const router = useRouter();
   const [env, setEnv] = useState<Env>(initialData?.env ?? combos[0]?.env ?? "paper");
   const tabScroll = useDragScrollX<HTMLDivElement>();
-  // #95 — 좁은 화면에서는 차트를 최근 구간만 그린다(요약 수치는 전체 기준 유지).
+  // #95/#97 — 차트는 최근 구간만 그린다(모바일 30 일 · 데스크톱 90 일).
+  //   요약 수치는 전체 기준을 유지한다.
   const isMobile = useMobile();
   const [currency, setCurrency] = useState<Currency>(initialData?.currency ?? combos[0]?.currency ?? "KRW");
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
@@ -93,8 +94,9 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     if (!data || data.history.length === 0) return null;
     if (Object.keys(data.tradesByDate ?? {}).length === 0) return null; // 매매 없는 시장 숨김
 
-    // #95 — 좁은 화면에서는 최근 구간만. 아래 마커·툴팁도 이 배열을 보므로 범위가 함께 맞는다.
-    //   하단 요약("총 N 사이클"·누적손익)은 전체 기준이라 data.history 를 그대로 쓴다.
+    // #95/#97 — 최근 구간만(모바일 30 일 · 데스크톱 90 일). 아래 마커·툴팁도 이 배열을
+    //   보므로 범위가 함께 맞는다. 하단 요약("총 N 사이클"·누적손익)은 전체 기준이라
+    //   data.history 를 그대로 쓴다.
     const history = recentPoints(data.history, isMobile);
 
     const dates = history.map((h) => h.dateStr);
