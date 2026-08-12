@@ -100,10 +100,13 @@ describe('GameCard', () => {
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
-    it('패치가 없으면 버튼만, 체크박스는 없다 — 켤 게 없다', () => {
+    // #127 — 감추는 대신 비활성. 패치를 올려도 버튼 위치가 밀리지 않는다.
+    it('패치가 없으면 체크박스가 자리는 지키되 비활성이다', () => {
       render(<GameCard game={rom()} {...handlers()} />);
       expect(screen.getByRole('button', { name: '내 롬 패치 올리기' })).toBeInTheDocument();
-      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      const box = screen.getByRole('checkbox');
+      expect(box).toBeDisabled();
+      expect(box).not.toBeChecked();
     });
 
     // #122 — 파일명을 늘 보여 줄 이유는 없다. 다만 #125 — 아이콘만 두면 무슨 버튼인지 모른다.
@@ -129,9 +132,19 @@ describe('GameCard', () => {
       expect(screen.getByText('패치')).toBeInTheDocument();
     });
 
-    it('패치가 있으면 체크박스가 생긴다', () => {
+    it('패치가 있으면 체크박스를 쓸 수 있다', () => {
       render(<GameCard game={rom({ patch: PATCH, patchEnabled: true })} {...handlers()} />);
-      expect(screen.getByRole('checkbox')).toBeChecked();
+      const box = screen.getByRole('checkbox');
+      expect(box).toBeEnabled();
+      expect(box).toBeChecked();
+    });
+
+    // #127 — w-6 이 글자 있는 버튼까지 24px 로 묶어 오른쪽이 잘렸다.
+    it('글자가 있는 버튼은 너비를 고정하지 않는다 — 글자가 넘쳐 여백이 사라진다', () => {
+      render(<GameCard game={rom({ patch: PATCH })} {...handlers()} />);
+      const cls = screen.getByRole('button', { name: '내 롬 패치 교체' }).className;
+      expect(cls).not.toMatch(/\bw-6\b/);
+      expect(cls).toMatch(/\bpx-1\.5\b/);
     });
 
     it('적용이 꺼져 있으면 체크가 풀려 있다', () => {
@@ -223,9 +236,11 @@ describe('GameCard', () => {
       expect(clickInside(screen.getByRole('button', { name: '내 롬 카드 그림' }))).toBe(true);
     });
 
-    it('무슨 버튼인지 글자로 알린다 (#125)', () => {
+    // #127 — 그림 아이콘은 그 자체로 뜻이 통한다. 글자는 패치 버튼에만.
+    it('글자 없이 아이콘만 둔다', () => {
       render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
-      expect(screen.getByText('그림')).toBeInTheDocument();
+      expect(screen.queryByText('그림')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '내 롬 카드 그림' }).className).toMatch(/\bw-6\b/);
     });
   });
 
