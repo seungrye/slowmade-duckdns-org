@@ -18,7 +18,18 @@ const BADGE =
 
 /** 커버 아래쪽 조작 버튼 — 어두운 그림 위에서도 보이도록 반투명 배경을 깐다. */
 const TOOL =
-  "inline-flex h-6 w-6 items-center justify-center rounded bg-black/65 text-white/90 backdrop-blur-sm transition hover:bg-black/85 hover:text-white disabled:opacity-50";
+  "inline-flex h-6 items-center justify-center rounded bg-black/65 text-white/90 backdrop-blur-sm transition hover:bg-black/85 hover:text-white disabled:opacity-50";
+
+/**
+ * 아이콘만 있는 버튼 — 정사각형.
+ *
+ * **글자가 있는 버튼에는 쓰지 말 것.** 너비를 24px 로 묶어 버려 글자가 오른쪽으로 넘치고
+ * 여백이 없어 보인다(#127 에서 실제로 그랬다).
+ */
+const TOOL_ICON = `${TOOL} w-6`;
+
+/** 아이콘 + 글자 — 너비는 내용에 맡기고 좌우 여백만 준다. */
+const TOOL_LABEL = `${TOOL} gap-1 px-1.5`;
 
 interface Props {
   game: GameEntry;
@@ -118,26 +129,28 @@ export default function GameCard({
             // 숨은 file input 은 여기 두지 않는다 — 아래 주석 참고.
             <div onClick={swallow} className="absolute inset-x-2 bottom-2 flex items-end justify-between gap-1">
               <div className="flex items-center gap-1">
-                {/* 패치가 있을 때만 켜고 끌 것이 있다. */}
-                {game.patch && (
-                  <span className={`${TOOL} px-1`}>
-                    <input
-                      type="checkbox"
-                      checked={game.patchEnabled !== false}
-                      disabled={busy}
-                      aria-label={`${game.patch.name} 적용`}
-                      onChange={(e) => onPatchToggle?.(game, e.target.checked)}
-                      className="h-3.5 w-3.5 accent-blue-500"
-                    />
-                  </span>
-                )}
+                {/*
+                  체크박스는 **늘 자리를 지킨다** (#127). 패치가 없으면 감추는 대신 비활성으로
+                  둔다 — 패치를 올리고 나서 버튼 위치가 밀리지 않는다.
+                */}
+                <span className={TOOL_ICON}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(game.patch) && game.patchEnabled !== false}
+                    disabled={busy || !game.patch}
+                    title={game.patch ? `${game.patch.name} 적용` : "패치를 올리면 켤 수 있습니다"}
+                    aria-label={game.patch ? `${game.patch.name} 적용` : "적용할 패치 없음"}
+                    onChange={(e) => onPatchToggle?.(game, e.target.checked)}
+                    className="h-3.5 w-3.5 accent-blue-500 disabled:opacity-40"
+                  />
+                </span>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => patchRef.current?.click()}
                   title={game.patch ? `패치: ${game.patch.name} — 눌러서 교체` : "패치 파일 올리기"}
                   aria-label={game.patch ? `${game.title} 패치 교체` : `${game.title} 패치 올리기`}
-                  className={`${TOOL} gap-1 px-1.5`}
+                  className={TOOL_LABEL}
                 >
                   <FileDiff size={12} aria-hidden />
                   {/* 아이콘만 있으면 무슨 버튼인지 모른다 — 형식(IPS·BPS·UPS)을 적어 준다. */}
@@ -147,16 +160,16 @@ export default function GameCard({
                 </button>
               </div>
 
+              {/* 그림 아이콘은 그 자체로 뜻이 통한다 — 글자를 붙이지 않는다. */}
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => coverRef.current?.click()}
                 title={game.cover ? "카드 그림 바꾸기" : "카드 그림 넣기"}
                 aria-label={`${game.title} 카드 그림`}
-                className={`${TOOL} gap-1 px-1.5`}
+                className={TOOL_ICON}
               >
-                {game.cover ? <ImageIcon size={12} aria-hidden /> : <ImagePlus size={12} aria-hidden />}
-                <span className="text-[10px] font-semibold leading-none">그림</span>
+                {game.cover ? <ImageIcon size={13} aria-hidden /> : <ImagePlus size={13} aria-hidden />}
               </button>
             </div>
           )}
