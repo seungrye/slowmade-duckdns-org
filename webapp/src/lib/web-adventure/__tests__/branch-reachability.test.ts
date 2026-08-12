@@ -94,6 +94,12 @@ describe("분기 도달성 (#286)", () => {
     const setterKeys = new Set<string>();
     for (const s of Object.values(loaded)) {
       for (const k of Object.keys(s.onEnter?.setFlags ?? {})) setterKeys.add(k);
+      // #89 — 선택지도 흔적을 남긴다. 도착 씬이 같은 갈래는 onEnter 로 구분할 수 없어
+      //   선택지 자체에 setFlags 를 달았으므로, 여기서도 setter 로 인정해야 한다.
+      for (const c of s.choices ?? []) {
+        const cf = (c as { setFlags?: Record<string, boolean> }).setFlags;
+        for (const k of Object.keys(cf ?? {})) setterKeys.add(k);
+      }
     }
     const missing: string[] = [];
     for (const c of conds) {
