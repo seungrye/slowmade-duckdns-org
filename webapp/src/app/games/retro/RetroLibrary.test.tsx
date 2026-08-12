@@ -122,7 +122,11 @@ describe('RetroLibrary', () => {
         target: { files: [new File([new Uint8Array(8)], 'new.ips')] },
       });
 
-      expect(await screen.findByText('new.ips')).toBeInTheDocument();
+      // 파일명은 화면에 적지 않는다 — 버튼 툴팁으로만 확인한다 (#122).
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: '내가 올린 롬 패치 교체' }).getAttribute('title'))
+          .toContain('new.ips'),
+      );
       const [url, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
       expect(url).toBe('/api/games/retro/rom-patch');
       expect((init.body as FormData).get('romId')).toBe(MY_ROMS[0].id);
@@ -139,7 +143,8 @@ describe('RetroLibrary', () => {
       });
 
       expect(await screen.findByRole('alert')).toHaveTextContent('IPS·BPS·UPS');
-      expect(screen.getByText('+ 패치')).toBeInTheDocument();
+      // 실패했으니 여전히 "올리기" 상태다.
+      expect(screen.getByRole('button', { name: '내가 올린 롬 패치 올리기' })).toBeInTheDocument();
     });
 
     it('체크를 끄면 서버에 알린다', async () => {

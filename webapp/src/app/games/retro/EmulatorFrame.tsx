@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { buildPlayerUrl } from "@/lib/retro/player-url";
 
 interface Props {
@@ -32,6 +32,19 @@ export default function EmulatorFrame({ core, rom, name, patch, stripHeader, sav
     }
   }, [core, rom, name, patch, stripHeader, saveKey]);
 
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+
+  /**
+   * iframe 에 포커스를 준다 (#123).
+   *
+   * 포커스가 바깥 문서에 있으면 방향키가 **페이지를 스크롤한다** — 게임을 하는 중에 화면이
+   * 밀려 올라간다. 키 이벤트는 iframe 경계를 넘지 않으므로, 안으로 포커스를 넣어 주는 것이
+   * 해법이다. 불러오기가 끝난 뒤와 사용자가 화면을 누를 때 둘 다 챙긴다.
+   */
+  const focusFrame = useCallback(() => {
+    frameRef.current?.focus();
+  }, []);
+
   if (!src) {
     return (
       <div className="flex aspect-[4/3] w-full items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
@@ -41,12 +54,18 @@ export default function EmulatorFrame({ core, rom, name, patch, stripHeader, sav
   }
 
   return (
-    <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black shadow-lg">
+    <div
+      onMouseDown={focusFrame}
+      onTouchStart={focusFrame}
+      className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black shadow-lg"
+    >
       <iframe
         // key 를 src 로 두면 다른 게임(또는 다른 패치)으로 넘어갈 때 iframe 이 새로 만들어진다.
         // 같은 iframe 을 재사용하면 EmulatorJS 가 이전 게임 상태를 물고 있다.
         key={src}
+        ref={frameRef}
         src={src}
+        onLoad={focusFrame}
         title={name ?? "레트로 플레이어"}
         className="absolute inset-0 h-full w-full border-0"
         // gamepad — 이걸 안 주면 iframe 안에서 게임패드가 잡히지 않는다(Permissions Policy).

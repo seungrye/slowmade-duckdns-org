@@ -60,6 +60,9 @@ export interface RetroRomDoc {
   patches: RetroPatchDoc[];
   /** 패치를 실제로 적용할지 (#116). 카드의 체크박스가 이 값을 뒤집는다. */
   patchEnabled?: boolean;
+  /** 사용자가 올린 카드 커버 (#122). 없으면 카드가 제목 첫 글자 타일을 그린다. */
+  coverKey?: string;
+  coverFormat?: string;
   isDeleted?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -77,6 +80,8 @@ const RetroRomSchema = new Schema<RetroRomDoc>(
     patches: { type: [RetroPatchSchema], default: [] },
     // 올렸다면 쓰겠다는 뜻이므로 기본은 켜짐.
     patchEnabled: { type: Boolean, default: true },
+    coverKey: { type: String },
+    coverFormat: { type: String },
     // 삭제는 항상 soft — 실수로 지운 롬을 되살릴 수 있어야 한다. MinIO 오브젝트도 남긴다.
     isDeleted: { type: Boolean, default: false, index: true },
   },

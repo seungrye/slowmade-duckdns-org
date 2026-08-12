@@ -58,8 +58,10 @@ export interface UserRomDto {
   patch?: RomPatchDto;
   /** 패치를 적용할지. 카드의 체크박스가 뒤집는다. */
   patchEnabled?: boolean;
-  /** 서버 세이브가 있는지 — 카드 모서리의 작은 점. */
+  /** 서버 세이브가 있는지 — 카드 모서리의 표시. */
   hasSave?: boolean;
+  /** 사용자가 올린 커버 주소 (#122). 없으면 카드가 폴백 타일을 그린다. */
+  coverUrl?: string;
 }
 
 export const BUILTIN_ROM_DIR = '/games/retro/roms';
@@ -86,6 +88,8 @@ export function romEntry(rom: UserRomDto): GameEntry {
     id: rom.id,
     title: rom.title,
     platform: rom.platform,
+    // 카드는 cover 가 있으면 그림을, 없으면 타일을 그린다 — 분기를 새로 만들 필요가 없다.
+    cover: rom.coverUrl,
     // 공개 /s3/ 경로를 쓰지 않는다 — 주소만 알면 남이 받아 갈 수 있다.
     // 올린 사람 본인만 통과하는 인증 프록시로만 내려준다.
     romUrl: `/api/games/retro/roms/${rom.id}/file`,

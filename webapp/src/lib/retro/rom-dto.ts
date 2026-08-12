@@ -14,6 +14,7 @@ export interface LeanRom {
   createdAt?: Date;
   patches?: LeanPatch[];
   patchEnabled?: boolean;
+  coverKey?: string;
 }
 
 export interface LeanPatch {
@@ -74,6 +75,8 @@ export function toRomDto(doc: LeanRom, extra?: { hasSave?: boolean }): UserRomDt
     // 값이 없던 옛 문서는 켜진 것으로 본다 — 패치를 올려 뒀다면 쓰려던 것이다.
     patchEnabled: doc.patchEnabled !== false,
     hasSave: extra?.hasSave ?? false,
+    // 인증 프록시로만 내려준다 — 오브젝트 키는 싣지 않는다.
+    coverUrl: doc.coverKey ? `/api/games/retro/roms/${String(doc._id)}/cover` : undefined,
   };
 }
 

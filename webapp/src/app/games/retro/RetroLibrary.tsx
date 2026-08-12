@@ -93,6 +93,52 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
     }
   }
 
+  /** 카드 그림을 바꾼다. 주소는 그대로이고 내용만 바뀌므로 캐시를 깨는 값을 붙인다. */
+  async function handleCoverUpload(game: GameEntry, file: File) {
+    setError(null);
+    setWorking(game.id);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const res = await fetch(`/api/games/retro/roms/${game.id}/cover`, { method: "POST", body: form });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(body?.message ?? "커버를 올리지 못했습니다.");
+        return;
+      }
+      setRoms((prev) =>
+        prev.map((r) =>
+          r.id === game.id ? { ...r, coverUrl: `${body.data.coverUrl}?v=${body.data.updatedAt}` } : r,
+        ),
+      );
+    } catch {
+      setError("업로드 중 문제가 생겼습니다.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function handleRename(game: GameEntry, title: string) {
+    setError(null);
+    setWorking(game.id);
+    const before = game.title;
+    // 먼저 화면을 바꾸고, 실패하면 되돌린다.
+    setRoms((prev) => prev.map((r) => (r.id === game.id ? { ...r, title } : r)));
+    try {
+      const res = await fetch(`/api/games/retro/roms/${game.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setRoms((prev) => prev.map((r) => (r.id === game.id ? { ...r, title: before } : r)));
+      setError("제목을 바꾸지 못했습니다.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
   return (
     <div className="md:flex md:gap-8">
       <aside className="md:w-52 md:shrink-0">
@@ -141,6 +187,8 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
                   onDelete={game.source === "rom" ? handleDelete : undefined}
                   onPatchUpload={game.source === "rom" ? handlePatchUpload : undefined}
                   onPatchToggle={game.source === "rom" ? handlePatchToggle : undefined}
+                  onCoverUpload={game.source === "rom" ? handleCoverUpload : undefined}
+                  onRename={game.source === "rom" ? handleRename : undefined}
                   busy={deleting === game.id || working === game.id}
                 />
               </li>
