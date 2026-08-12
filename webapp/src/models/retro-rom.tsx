@@ -52,8 +52,14 @@ export interface RetroRomDoc {
   size: number;
   /** MinIO 오브젝트 키. */
   objectKey: string;
-  /** 이 롬에 매단 패치들 (#112). 실행할 때 하나를 골라 브라우저에서 합친다. */
+  /**
+   * 이 롬에 매단 패치 (#112). 배열이지만 **살아 있는 항목은 항상 최대 하나**다 (#116) —
+   * 새로 올리면 이전 것을 soft delete 하고 교체한다. 카드의 체크박스 하나로 다루기 위해서다.
+   * 스키마를 배열로 둔 건 나중에 여러 개로 되돌릴 문을 닫지 않으려는 것.
+   */
   patches: RetroPatchDoc[];
+  /** 패치를 실제로 적용할지 (#116). 카드의 체크박스가 이 값을 뒤집는다. */
+  patchEnabled?: boolean;
   isDeleted?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -69,6 +75,8 @@ const RetroRomSchema = new Schema<RetroRomDoc>(
     size: { type: Number, required: true },
     objectKey: { type: String, required: true },
     patches: { type: [RetroPatchSchema], default: [] },
+    // 올렸다면 쓰겠다는 뜻이므로 기본은 켜짐.
+    patchEnabled: { type: Boolean, default: true },
     // 삭제는 항상 soft — 실수로 지운 롬을 되살릴 수 있어야 한다. MinIO 오브젝트도 남긴다.
     isDeleted: { type: Boolean, default: false, index: true },
   },

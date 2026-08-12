@@ -25,6 +25,9 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [query, setQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  // 패치 업로드·토글이 도는 동안 그 카드만 잠근다.
+  const [working, setWorking] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // 내가 올린 것을 앞에 둔다 — 방금 올린 롬이 스크롤 없이 보여야 한다.
   const entries = useMemo<GameEntry[]>(
@@ -43,6 +46,50 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
       if (res.ok) setRoms((prev) => prev.filter((r) => r.id !== game.id));
     } finally {
       setDeleting(null);
+    }
+  }
+
+  /** 패치를 올린다 — 서버가 기존 것을 교체하고 적용을 켠다. */
+  async function handlePatchUpload(game: GameEntry, file: File) {
+    setError(null);
+    setWorking(game.id);
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      form.set("romId", game.id);
+      const res = await fetch("/api/games/retro/rom-patch", { method: "POST", body: form });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError(body?.message ?? "패치를 올리지 못했습니다.");
+        return;
+      }
+      setRoms((prev) =>
+        prev.map((r) => (r.id === game.id ? { ...r, patch: body.data, patchEnabled: true } : r)),
+      );
+    } catch {
+      setError("업로드 중 문제가 생겼습니다.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function handlePatchToggle(game: GameEntry, enabled: boolean) {
+    setError(null);
+    setWorking(game.id);
+    // 먼저 화면을 바꾸고, 실패하면 되돌린다 — 체크박스는 즉각 반응해야 한다.
+    setRoms((prev) => prev.map((r) => (r.id === game.id ? { ...r, patchEnabled: enabled } : r)));
+    try {
+      const res = await fetch(`/api/games/retro/roms/${game.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ patchEnabled: enabled }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      setRoms((prev) => prev.map((r) => (r.id === game.id ? { ...r, patchEnabled: !enabled } : r)));
+      setError("패치 설정을 바꾸지 못했습니다.");
+    } finally {
+      setWorking(null);
     }
   }
 
@@ -68,6 +115,12 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
           <PlatformNav variant="chips" value={platform} counts={counts} onChange={setPlatform} />
         </div>
 
+        {error && (
+          <p role="alert" className="mb-3 text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
+
         {assetsMissing && (
           <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
             에뮬레이터 파일이 서버에 아직 없습니다. 배포 호스트에서{" "}
@@ -86,7 +139,9 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
                 <GameCard
                   game={game}
                   onDelete={game.source === "rom" ? handleDelete : undefined}
-                  deleting={deleting === game.id}
+                  onPatchUpload={game.source === "rom" ? handlePatchUpload : undefined}
+                  onPatchToggle={game.source === "rom" ? handlePatchToggle : undefined}
+                  busy={deleting === game.id || working === game.id}
                 />
               </li>
             ))}

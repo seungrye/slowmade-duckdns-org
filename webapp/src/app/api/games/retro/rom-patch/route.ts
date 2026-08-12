@@ -1,4 +1,7 @@
-// 롬에 패치 붙이기 (#112).
+// 롬에 패치 붙이기 (#112) — **교체 방식** (#116).
+//
+// 롬당 패치는 하나다(카드의 체크박스 하나로 다룬다). 새로 올리면 기존 것을 soft delete 하고
+// 새것을 넣는다. 배열 스키마는 그대로 둬 나중에 여러 개로 되돌릴 문을 닫지 않는다.
 //
 // 롬과 패치는 **따로** 둔다. 합친 결과는 저장하지 않는다 — 합치기는 실행할 때 브라우저가 하고
 // (`public/games/retro/rom-patch.js`), 그래서 원본 하나에 패치를 갈아 끼울 수 있다.
@@ -64,10 +67,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // 기존 패치를 먼저 접는다 — 살아 있는 항목이 늘 최대 하나가 되도록.
+    await RetroRom.updateOne(
+      { _id: romId, userEmail: authed.email, isDeleted: { $ne: true } },
+      { $set: { 'patches.$[live].isDeleted': true } },
+      { arrayFilters: [{ 'live.isDeleted': { $ne: true } }] },
+    );
+
     const patch = { name: check.name, format: check.format, size: file.size, objectKey: key };
     const updated = await RetroRom.findOneAndUpdate(
       { _id: romId, userEmail: authed.email, isDeleted: { $ne: true } },
-      { $push: { patches: patch } },
+      // 올렸다는 건 쓰겠다는 뜻이므로 적용도 함께 켠다.
+      { $push: { patches: patch }, $set: { patchEnabled: true } },
       { new: true, projection: { patches: 1 } },
     ).lean<{ patches: LeanPatch[] } | null>();
 
