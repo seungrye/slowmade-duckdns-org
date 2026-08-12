@@ -52,17 +52,30 @@ describe('GameCard', () => {
   describe('세이브 표시 (#118)', () => {
     it('세이브가 있으면 디스켓 아이콘을 보여 준다', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
-      const badge = screen.getByLabelText('저장된 상태 있음');
-      expect(badge).toBeInTheDocument();
+      const icon = screen.getByLabelText('저장된 상태 있음');
+      expect(icon).toBeInTheDocument();
       // 점이 아니라 아이콘이다.
-      expect(badge.querySelector('svg')).not.toBeNull();
+      expect(icon.tagName.toLowerCase()).toBe('svg');
     });
 
-    it('기종 배지 옆(좌상단)에 붙는다 — 표시를 한 자리로 모은다', () => {
+    it('기종 배지 옆(좌상단)에 나란히 놓인다', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
       const row = screen.getByText('MD').parentElement!;
       expect(row.className).toContain('left-2');
       expect(row).toContainElement(screen.getByLabelText('저장된 상태 있음'));
+    });
+
+    // #120 — 뜻이 다르니 배지는 따로. 다만 높이가 어긋나면 지저분하다.
+    it('기종 배지와 **높이가 같다** — 글자와 아이콘은 줄 높이가 달라 고정해야 맞는다', () => {
+      render(<GameCard game={rom({ hasSave: true })} />);
+      const platform = screen.getByText('MD');
+      const saveBadge = screen.getByLabelText('저장된 상태 있음').parentElement!;
+
+      const heightOf = (el: Element) =>
+        (el.getAttribute('class') ?? '').split(/\s+/).find((c) => /^h-\[/.test(c));
+
+      expect(heightOf(platform)).toBeDefined();
+      expect(heightOf(saveBadge)).toBe(heightOf(platform));
     });
 
     it('없으면 아무것도 없다', () => {

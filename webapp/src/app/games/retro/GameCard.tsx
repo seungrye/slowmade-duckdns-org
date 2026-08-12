@@ -6,6 +6,15 @@ import { Save } from "lucide-react";
 import type { GameEntry } from "@/lib/retro/entry";
 import { platformById } from "@/lib/retro/platforms";
 
+/**
+ * 커버 위 배지의 **공통 모양** (#120).
+ *
+ * 높이를 값으로 고정한 이유: 안에 든 것이 글자(10px)냐 아이콘(11px)이냐에 따라 줄 높이가 달라져,
+ * 패딩만 맞춰서는 나란히 놓았을 때 한 픽셀씩 어긋난다. 가로 여백만 각자 정한다.
+ */
+const BADGE =
+  "inline-flex h-[18px] items-center rounded bg-black/60 text-[10px] font-semibold leading-none tracking-wide text-white";
+
 interface Props {
   game: GameEntry;
   /** 업로드한 롬에만 준다 — 기본 제공 게임은 지울 수 없다. */
@@ -58,21 +67,18 @@ export default function GameCard({ game, onDelete, onPatchUpload, onPatchToggle,
             </div>
           )}
 
-          {/* 기종과 세이브 표시를 좌상단 한 자리에 모은다 — 흩어 두면 카드가 산만해진다. */}
+          {/*
+            기종과 세이브는 **뜻이 다르니 배지도 따로** 둔다 (#120) — 한 칸에 넣으면
+            "MD 저장" 처럼 하나의 이름으로 읽힌다.
+            대신 높이를 `BADGE` 로 못 박아 나란히 맞춘다. 패딩만 맞추면 글자(10px)와
+            아이콘(11px)의 높이가 달라 한 픽셀씩 어긋난다.
+          */}
           <div className="absolute left-2 top-2 flex items-center gap-1">
-            <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-              {meta?.label ?? game.platform}
-            </span>
+            <span className={`${BADGE} px-1.5`}>{meta?.label ?? game.platform}</span>
 
-            {/* 저장된 상태가 있다는 표시. 자세한 건 보여 주지 않는다 — 있다는 것만 알면 된다.
-                점보다 디스켓이 한눈에 읽힌다 (#118). */}
             {game.hasSave && (
-              <span
-                title="저장된 상태가 있습니다"
-                aria-label="저장된 상태 있음"
-                className="flex items-center rounded bg-black/60 px-1 py-[3px] text-white"
-              >
-                <Save size={11} aria-hidden />
+              <span className={`${BADGE} px-1`} title="저장된 상태가 있습니다">
+                <Save size={11} aria-label="저장된 상태 있음" role="img" />
               </span>
             )}
           </div>
