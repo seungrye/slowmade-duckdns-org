@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef } from "react";
+import { Save } from "lucide-react";
 import type { GameEntry } from "@/lib/retro/entry";
 import { platformById } from "@/lib/retro/platforms";
 
@@ -57,18 +58,24 @@ export default function GameCard({ game, onDelete, onPatchUpload, onPatchToggle,
             </div>
           )}
 
-          <span className="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
-            {meta?.label ?? game.platform}
-          </span>
+          {/* 기종과 세이브 표시를 좌상단 한 자리에 모은다 — 흩어 두면 카드가 산만해진다. */}
+          <div className="absolute left-2 top-2 flex items-center gap-1">
+            <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-white">
+              {meta?.label ?? game.platform}
+            </span>
 
-          {/* 세이브가 있다는 표시. 자세한 건 보여 주지 않는다 — 있다는 것만 알면 된다. */}
-          {game.hasSave && (
-            <span
-              title="저장된 상태가 있습니다"
-              aria-label="저장된 상태 있음"
-              className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-black/40"
-            />
-          )}
+            {/* 저장된 상태가 있다는 표시. 자세한 건 보여 주지 않는다 — 있다는 것만 알면 된다.
+                점보다 디스켓이 한눈에 읽힌다 (#118). */}
+            {game.hasSave && (
+              <span
+                title="저장된 상태가 있습니다"
+                aria-label="저장된 상태 있음"
+                className="flex items-center rounded bg-black/60 px-1 py-[3px] text-white"
+              >
+                <Save size={11} aria-hidden />
+              </span>
+            )}
+          </div>
 
           {isRom && (onPatchUpload || onPatchToggle) && (
             // 좌하단 패치 칩. 커버가 어두운 그림일 수 있어 반투명 배경을 깐다.
@@ -135,7 +142,6 @@ export default function GameCard({ game, onDelete, onPatchUpload, onPatchToggle,
       </Link>
 
       {onDelete && (
-        // 세이브 점과 겹치지 않게 그 왼쪽에 둔다.
         <button
           type="button"
           onClick={(e) => {
@@ -144,7 +150,7 @@ export default function GameCard({ game, onDelete, onPatchUpload, onPatchToggle,
           }}
           disabled={busy}
           aria-label={`${game.title} 삭제`}
-          className={`absolute top-2 ${game.hasSave ? "right-7" : "right-2"} rounded-full bg-black/60 px-2 py-0.5 text-xs text-white opacity-0 transition hover:bg-red-600 focus:opacity-100 focus:outline-none group-hover:opacity-100 disabled:opacity-50`}
+          className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white opacity-0 transition hover:bg-red-600 focus:opacity-100 focus:outline-none group-hover:opacity-100 disabled:opacity-50"
         >
           {busy ? "…" : "삭제"}
         </button>
