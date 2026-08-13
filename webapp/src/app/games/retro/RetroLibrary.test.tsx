@@ -84,21 +84,52 @@ describe('RetroLibrary', () => {
       expect(screen.queryByRole('button', { name: 'Nomolos 삭제' })).not.toBeInTheDocument();
     });
 
-    it('내 롬은 지우면 목록에서 빠진다', async () => {
+    // #155 — 카드의 삭제 버튼은 손이 스치기 쉬운 자리에 있다. 한 번 누르면 끝나면 안 된다.
+    it('버튼을 눌러도 **바로 지우지 않는다** — 먼저 확인을 받는다', async () => {
       render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
       fireEvent.click(screen.getByRole('button', { name: '내가 올린 롬 삭제' }));
+
+      expect(fetch).not.toHaveBeenCalled();
+      // 확인 창에도 이름이 실리므로 목록 쪽으로 범위를 좁혀 본다.
+      const grid = screen.getByRole('list', { name: '게임 목록' });
+      expect(within(grid).getByText('내가 올린 롬')).toBeInTheDocument();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('확인 창이 무엇을 지우는지 이름으로 알려 준다', () => {
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
+      fireEvent.click(screen.getByRole('button', { name: '내가 올린 롬 삭제' }));
+      expect(within(screen.getByRole('dialog')).getByText(/내가 올린 롬/)).toBeInTheDocument();
+    });
+
+    it('취소하면 아무 일도 없다', async () => {
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
+      fireEvent.click(screen.getByRole('button', { name: '내가 올린 롬 삭제' }));
+      fireEvent.click(screen.getByRole('button', { name: '롬 삭제 취소' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(fetch).not.toHaveBeenCalled();
+      expect(screen.getByText('내가 올린 롬')).toBeInTheDocument();
+    });
+
+    it('확인해야 지운다', async () => {
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
+      fireEvent.click(screen.getByRole('button', { name: '내가 올린 롬 삭제' }));
+      fireEvent.click(screen.getByRole('button', { name: '롬 삭제 확인' }));
 
       await waitFor(() => expect(screen.queryByText('내가 올린 롬')).not.toBeInTheDocument());
       expect(fetch).toHaveBeenCalledWith(
         `/api/games/retro/roms/${MY_ROMS[0].id}`,
         expect.objectContaining({ method: 'DELETE' }),
       );
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
     it('서버가 거부하면 목록에 그대로 둔다', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }));
       render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
       fireEvent.click(screen.getByRole('button', { name: '내가 올린 롬 삭제' }));
+      fireEvent.click(screen.getByRole('button', { name: '롬 삭제 확인' }));
 
       await waitFor(() => expect(fetch).toHaveBeenCalled());
       expect(screen.getByText('내가 올린 롬')).toBeInTheDocument();

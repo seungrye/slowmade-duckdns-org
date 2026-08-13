@@ -6,7 +6,7 @@
 #
 # 받는 것:
 #   1. EmulatorJS 본체  → webapp/public/games/retro/data/
-#   2. 기종별 코어 2종  → .../data/cores/            (snes9x ~1MB, fbneo ~8MB)
+#   2. 기종별 코어 3종  → .../data/cores/            (snes9x·mgba ~1MB, fbneo ~8MB)
 #   3. 홈브류 롬·커버   → .../roms/, .../covers/
 #
 # 왜 저장소에 안 넣나: 에뮬레이터 릴리스 전체가 압축 289MB 다. 필요한 것만 골라 받으면 수십 MB 로
@@ -28,7 +28,7 @@ MANIFEST="$REPO_DIR/webapp/src/lib/retro/builtin-games.json"
 
 CDN="${EMULATORJS_CDN:-https://cdn.emulatorjs.org/stable/data}"
 # src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 기종을 늘리면 여기도 함께 늘릴 것.
-CORES=(snes9x fbneo)
+CORES=(snes9x mgba fbneo)
 
 FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1

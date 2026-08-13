@@ -10,7 +10,7 @@ import { patchedRomPath, romFileNameFromUrl } from './rom-name.js';
 
 const DATA_PATH = '/games/retro/data/';
 // src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 양쪽을 함께 고칠 것.
-const CORES = ['snes9x', 'fbneo'];
+const CORES = ['snes9x', 'mgba', 'fbneo'];
 
 function notice(html) {
   const el = document.getElementById('game');
@@ -353,5 +353,5 @@ async function fetchBytes(url) {
 
 /** 코어에 맞는 확장자 — 주소에서 이름을 못 뽑았을 때만 쓴다. */
 function extensionFor(c) {
-  return { snes9x: 'sfc', fbneo: 'zip' }[c] || 'bin';
+  return { snes9x: 'sfc', mgba: 'gba', fbneo: 'zip' }[c] || 'bin';
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Modal from "@/components/common/modal";
 import GameCard from "./GameCard";
 import PlatformNav from "./PlatformNav";
 import RomUploader from "./RomUploader";
@@ -25,6 +26,9 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [query, setQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
+  // 지울지 물어보는 중인 롬 (#155). 카드의 삭제 버튼은 손이 스치기 쉬운 자리라
+  // 한 번 누르면 끝나면 안 된다 — 되돌릴 수 없는 일이다.
+  const [pendingDelete, setPendingDelete] = useState<GameEntry | null>(null);
   // 패치 업로드·토글이 도는 동안 그 카드만 잠근다.
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,14 +42,22 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
   const counts = useMemo(() => countByPlatform(entries), [entries]);
   const visible = useMemo(() => filterGames(entries, platform, query), [entries, platform, query]);
 
-  async function handleDelete(game: GameEntry) {
+  /** 카드의 삭제 버튼 — 바로 지우지 않고 확인부터 받는다 (#155). */
+  function handleDelete(game: GameEntry) {
     if (game.source !== "rom") return;
+    setPendingDelete(game);
+  }
+
+  async function confirmDelete() {
+    const game = pendingDelete;
+    if (!game) return;
     setDeleting(game.id);
     try {
       const res = await fetch(`/api/games/retro/roms/${game.id}`, { method: "DELETE" });
       if (res.ok) setRoms((prev) => prev.filter((r) => r.id !== game.id));
     } finally {
       setDeleting(null);
+      setPendingDelete(null);
     }
   }
 
@@ -206,6 +218,42 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
           <RomUploader onUploaded={(rom) => setRoms((prev) => [rom, ...prev])} />
         </div>
       </div>
+
+      {/* 삭제 확인 (#155) — 되돌릴 수 없으므로 한 번 더 묻는다. */}
+      <Modal
+        isOpen={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="롬 삭제 확인"
+      >
+        <div className="text-gray-700 dark:text-gray-300">
+          <p>
+            <span className="font-semibold">{pendingDelete?.title}</span> 을(를) 삭제할까요?
+          </p>
+          <p className="mt-1 text-sm text-red-600">
+            올린 롬 파일과 함께 붙여 둔 패치·커버·세이브도 사라집니다.
+          </p>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setPendingDelete(null)}
+            disabled={deleting !== null}
+            aria-label="롬 삭제 취소"
+            className="rounded-md bg-gray-200 px-4 py-2 text-gray-800 transition hover:bg-gray-300 disabled:opacity-50 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={confirmDelete}
+            disabled={deleting !== null}
+            aria-label="롬 삭제 확인"
+            className="rounded-md bg-red-600 px-4 py-2 text-white transition hover:bg-red-700 disabled:bg-red-400"
+          >
+            {deleting !== null ? "삭제 중…" : "삭제"}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }
