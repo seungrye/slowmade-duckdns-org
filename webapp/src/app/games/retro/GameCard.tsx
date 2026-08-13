@@ -233,7 +233,9 @@ export default function GameCard({
           <input
             ref={patchRef}
             type="file"
-            accept=".ips,.bps,.ups"
+            // accept 를 걸지 않는다 (#145). `.ips,.bps,.ups` 만 받고 있어 **zip 묶음
+            // 패치(#143)를 아예 고를 수 없었다.** 목록을 늘리는 대신 떼었다 — 형식 검사는
+            // 어차피 매직 바이트로 하고, 모바일 선택기는 확장자 필터를 잘 못 다룬다.
             aria-label={`${game.title} 패치 파일`}
             className="hidden"
             onChange={(e) => {

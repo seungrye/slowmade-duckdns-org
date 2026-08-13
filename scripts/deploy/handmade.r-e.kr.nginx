@@ -1,5 +1,5 @@
 server {
-	server_name slowmade.duckdns.org;
+	server_name handmade.r-e.kr;
 	client_max_body_size 16M;
 
 	gzip on;
@@ -146,8 +146,8 @@ server {
 	}
 
 	listen 443 ssl; # managed by Certbot
-	ssl_certificate /etc/letsencrypt/live/slowmade.duckdns.org/fullchain.pem; # managed by Certbot
-	ssl_certificate_key /etc/letsencrypt/live/slowmade.duckdns.org/privkey.pem; # managed by Certbot
+	ssl_certificate /etc/letsencrypt/live/handmade.r-e.kr/fullchain.pem; # managed by Certbot
+	ssl_certificate_key /etc/letsencrypt/live/handmade.r-e.kr/privkey.pem; # managed by Certbot
 	include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
 	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
 
@@ -156,160 +156,6 @@ server {
 server {
 	listen 80;
 	listen [::]:80; # Add IPv6 listening if you have it enabled on your server
-	server_name slowmade.duckdns.org;
+	server_name handmade.r-e.kr;
 	return 301 https://$host$request_uri;
 }
-
-upstream minio_s3 {
-   least_conn;
-   server 127.0.0.1:9000;
-}
-
-upstream minio_console {
-   least_conn;
-   server 127.0.0.1:9090;
-}
-
-server {
-	listen 443 ssl;
-	http2 on;
-	listen [::]:443 ssl;
-
-	server_name minio-api.slowmade.duckdns.org;
-
-	# Allow special characters in headers
-	ignore_invalid_headers off;
-	# Allow any size file to be uploaded.
-	# Set to a value such as 1000m; to restrict file size to a specific value
-	client_max_body_size 0;
-	# Disable buffering
-	proxy_buffering off;
-	proxy_request_buffering off;
-
-	# 보안 관련 헤더 (선택 사항)
-	add_header X-Content-Type-Options "nosniff";
-	add_header X-XSS-Protection "1; mode=block";
-	add_header X-Frame-Options "SAMEORIGIN";
-
-	location / {
-		# minio-api.slowmade.duckdns.org 접속 시 호스트의 9000번 포트로 프록시
-		proxy_pass http://minio_s3;
-		proxy_set_header Host $http_host;
-		proxy_set_header X-Real-IP $remote_addr;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_set_header X-Forwarded-Proto $scheme;
-		#proxy_set_header X-Nginx-Proxy true;
-		proxy_connect_timeout 300s;
-		proxy_send_timeout 300s;
-		proxy_read_timeout 300s;
-		proxy_buffering off;
-		proxy_redirect off;
-
-		# Default is HTTP/1, keepalive is only enabled in HTTP/1.1
-		proxy_http_version 1.1;
-		proxy_set_header Connection "";
-		chunked_transfer_encoding off;
-
-    		add_header Cache-Control "no-cache" always;
-	}
-
-	#location / {
-	#	proxy_pass http://localhost:9000;  # api server
-	#	proxy_http_version 1.1;
-	#	proxy_set_header Upgrade $http_upgrade;
-	#	proxy_set_header Connection 'upgrade';
-	#	proxy_set_header Host $host;
-	#	proxy_cache_bypass $http_upgrade;
-	#}
-
-	#listen [::]:443 ssl ipv6only=on; # managed by Certbot
-	#listen 443 ssl; # managed by Certbot
-	ssl_certificate /etc/letsencrypt/live/minio-api.slowmade.duckdns.org/fullchain.pem; # managed by Certbot
-	ssl_certificate_key /etc/letsencrypt/live/minio-api.slowmade.duckdns.org/privkey.pem; # managed by Certbot
-	include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
-	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
-}
-
-server {
-	listen 80;
-	listen [::]:80;
-	server_name minio-api.slowmade.duckdns.org;
-	return 301 https://$host$request_uri;
-}
-
-server {
-	listen 443 ssl;
-	http2 on;
-	listen [::]:443 ssl;
-
-	server_name minio-console.slowmade.duckdns.org;
-
-	# Allow special characters in headers
-	ignore_invalid_headers off;
-	# Allow any size file to be uploaded.
-	# Set to a value such as 1000m; to restrict file size to a specific value
-	client_max_body_size 0;
-	# Disable buffering
-	proxy_buffering off;
-	proxy_request_buffering off;
-
-	# 보안 관련 헤더 (선택 사항)
-	add_header X-Content-Type-Options "nosniff";
-	add_header X-XSS-Protection "1; mode=block";
-	add_header X-Frame-Options "SAMEORIGIN";
-
-	location / {
-		# minio-console.slowmade.duckdns.org 접속 시 호스트의 9090번 포트로 프록시
-		# 내부망(192.168.0.0/24)·로컬만 — 콘솔 인터넷 노출 차단(보안 감사 HIGH)
-		allow 192.168.0.0/24;
-		allow 127.0.0.1;
-		deny all;
-		proxy_pass http://minio_console;
-		proxy_set_header Host $http_host;
-		proxy_set_header X-Real-IP $remote_addr;
-		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		proxy_set_header X-Forwarded-Proto $scheme;
-		proxy_set_header X-Nginx-Proxy true;
-		proxy_connect_timeout 300s;
-		proxy_send_timeout 300s;
-		proxy_read_timeout 300s;
-		proxy_buffering off;
-		proxy_redirect off;
-
-		# This is necessary to pass the correct IP to be hashed
-		real_ip_header X-Real-IP;
-
-		# To support websocket
-		proxy_http_version 1.1;
-		proxy_set_header Upgrade $http_upgrade;
-		proxy_set_header Connection "upgrade";
-
-		chunked_transfer_encoding off;
-
-    		add_header Cache-Control "no-cache" always;
-	}
-
-	#location / {
-	#	proxy_pass http://localhost:9090;  # api console
-	#	proxy_http_version 1.1;
-	#	proxy_set_header Upgrade $http_upgrade;
-	#	proxy_set_header Connection 'upgrade';
-	#	proxy_set_header Host $host;
-	#	proxy_cache_bypass $http_upgrade;
-	#}
-
-	#listen [::]:443 ssl; # managed by Certbot
-	#listen 443 ssl; # managed by Certbot
-	ssl_certificate /etc/letsencrypt/live/minio-console.slowmade.duckdns.org/fullchain.pem; # managed by Certbot
-	ssl_certificate_key /etc/letsencrypt/live/minio-console.slowmade.duckdns.org/privkey.pem; # managed by Certbot
-	include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
-	ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
-}
-
-server {
-	listen 80;
-	listen [::]:80;
-	server_name minio-console.slowmade.duckdns.org;
-	return 301 https://$host$request_uri;
-}
-

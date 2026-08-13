@@ -336,4 +336,18 @@ describe('GameCard', () => {
       expect(pickerOpens('내 롬 카드 그림', '내 롬 커버 이미지')).toBe(true);
     });
   });
+
+  // #145 — `.ips,.bps,.ups` 만 받아 zip 묶음 패치를 고를 수 없었다.
+  describe('패치 파일 선택 (#145)', () => {
+    it('확장자 accept 를 걸지 않는다 — zip 묶음 패치도 고를 수 있어야 한다', () => {
+      render(<GameCard game={rom()} onPatchUpload={vi.fn()} onCoverUpload={vi.fn()} />);
+      const input = screen.getByLabelText('내 롬 패치 파일');
+      expect(input.getAttribute('accept')).toBeNull();
+    });
+
+    it('커버는 MIME 이라 그대로 둔다 — 모바일에서도 잘 동작한다', () => {
+      render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
+      expect(screen.getByLabelText('내 롬 커버 이미지').getAttribute('accept')).toContain('image/');
+    });
+  });
 });

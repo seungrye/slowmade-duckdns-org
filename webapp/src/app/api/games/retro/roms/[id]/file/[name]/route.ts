@@ -43,7 +43,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; na
 
   try {
     const stream = await minioClient.getObject(env.minio.bucket, rom.objectKey);
-    // 통째로 버퍼링하지 않는다 — 롬은 최대 64MB 라 메모리에 다 올리면 부담이 크다.
+    // 통째로 버퍼링하지 않는다 — 롬은 최대 50MB(MAX_ROM_BYTES) 라 메모리에 다 올리면 부담이 크다.
     const body = Readable.toWeb(stream) as unknown as ReadableStream<Uint8Array>;
     return new NextResponse(body, {
       headers: {

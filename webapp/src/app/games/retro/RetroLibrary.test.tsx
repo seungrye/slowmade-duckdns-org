@@ -183,4 +183,14 @@ describe('RetroLibrary', () => {
       });
     });
   });
+
+  // 분할 셋은 파일을 여럿 골라야 한다 (#143).
+  describe('롬 업로드 파일 선택', () => {
+    it('여러 파일을 고를 수 있다', () => {
+      render(<RetroLibrary builtins={BUILTINS} initialRoms={[]} />);
+      // 데스크톱 사이드바·모바일 아래쪽 둘 다 렌더되므로 첫 번째를 본다.
+      const input = screen.getAllByLabelText('롬 파일')[0];
+      expect(input).toHaveAttribute('multiple');
+    });
+  });
 });

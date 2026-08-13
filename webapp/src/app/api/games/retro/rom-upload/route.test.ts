@@ -13,7 +13,6 @@ vi.hoisted(() => {
 
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@/lib/require-owner', () => ({ isOwner: vi.fn().mockResolvedValue(false) }));
 vi.mock('minio', () => ({
   Client: class {
     putObject = mockPutObject;
@@ -25,11 +24,9 @@ vi.mock('@/models/retro-rom', () => ({ default: { create: mockCreate } }));
 import { POST } from './route';
 import { NextRequest } from 'next/server';
 import { auth } from '@/auth';
-import { isOwner } from '@/lib/require-owner';
 import { MAX_ROM_BYTES } from '@/lib/retro/rom-upload';
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
-const mockIsOwner = isOwner as unknown as ReturnType<typeof vi.fn>;
 
 function romFile(name: string, size = 1024): File {
   return new File([new Uint8Array(size)], name, { type: 'application/octet-stream' });
@@ -46,7 +43,6 @@ describe('POST /api/games/retro/rom-upload', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ user: { email: 'me@test.com' } });
-    mockIsOwner.mockResolvedValue(false);
     mockPutObject.mockResolvedValue(undefined);
     mockCreate.mockImplementation((doc) => Promise.resolve({ ...doc, _id: 'newid', createdAt: new Date(0) }));
   });
@@ -110,13 +106,6 @@ describe('POST /api/games/retro/rom-upload', () => {
     form.set('file', romFile('big.sfc', MAX_ROM_BYTES + 1));
     expect((await POST(request(form))).status).toBe(413);
     expect(mockPutObject).not.toHaveBeenCalled();
-  });
-
-  it('owner 는 일반 한도를 넘겨도 받는다', async () => {
-    mockIsOwner.mockResolvedValue(true);
-    const form = new FormData();
-    form.set('file', romFile('big.sfc', MAX_ROM_BYTES + 1));
-    expect((await POST(request(form))).status).toBe(201);
   });
 
   it('DB 기록이 실패하면 올린 오브젝트를 지운다 — 고아 파일을 남기지 않는다', async () => {
