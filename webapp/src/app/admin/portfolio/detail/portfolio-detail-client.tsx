@@ -4,7 +4,7 @@ import { envLabel } from "@/lib/env-label";
 
 import { useMemo } from "react";
 import { useMobile } from "@/hooks/use-mobile";
-import { windowStartDate } from "../recent-points";
+import { windowAround, windowStartDate } from "../recent-points";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
@@ -172,11 +172,17 @@ export default function PortfolioDetailClient({
       yAxis: { type: "value", scale: true, axisLabel: { show: false } },
       // 하단 슬라이더(브러시)는 감추고 휠/드래그 줌(inside)만 — center 면 최근 구간을 확대.
       dataZoom: [
-        // 매매 마커에서 넘어온 경우(center)는 그 지점을 보여 주던 기존 동작을 지키고,
-        // 그 밖에는 매매 차트와 같은 창(모바일 30 일·데스크톱 90 일)으로 연다 (#131·#133).
-        center
-          ? { type: "inside", start: 60, end: 100 }
-          : { type: "inside", startValue: windowStartDate(allDates, isMobile) },
+        // 창 길이는 늘 같다(모바일 30 일·데스크톱 90 일). center 가 있으면 그 날짜를 품도록
+        // 자리만 옮긴다 (#135).
+        //
+        // 예전엔 center 일 때 `start: 60, end: 100`(전체의 뒤 40%)이었는데, 마커로 들어오면
+        // center 가 **항상** 붙으므로 그 예외가 늘 이겨 30 일 창이 한 번도 적용되지 않았다.
+        {
+          type: "inside",
+          ...((center && windowAround(allDates, center, isMobile)) ?? {
+            startValue: windowStartDate(allDates, isMobile),
+          }),
+        },
       ],
       series,
     };
