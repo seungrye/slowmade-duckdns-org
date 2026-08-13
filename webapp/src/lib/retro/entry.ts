@@ -25,7 +25,7 @@ export interface GameEntry {
   patch?: RomPatchDto;
   patchEnabled?: boolean;
   hasSave?: boolean;
-  /** 함께 병합할 부모 롬셋 주소들 (#143). */
+  /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. 합치지 않고 따로 둔다 (#148). */
   parentUrls?: string[];
 }
 
@@ -66,7 +66,7 @@ export interface UserRomDto {
   hasSave?: boolean;
   /** 사용자가 올린 커버 주소 (#122). 없으면 카드가 폴백 타일을 그린다. */
   coverUrl?: string;
-  /** 함께 병합할 부모 롬셋 이름들 (#143) — 순서가 곧 병합 순서다. */
+  /** 코어에 함께 놓을 부모 롬셋 이름들 (#143) — 이름이 곧 아카이브 이름이라 그대로 쓴다. */
   parentSets?: string[];
 }
 

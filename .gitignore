@@ -36,3 +36,5 @@ coverage/
 /webapp/public/games/retro/*
 !/webapp/public/games/retro/player.html
 !/webapp/public/games/retro/rom-patch.js
+!/webapp/public/games/retro/rom-name.js
+!/webapp/public/games/retro/player.js

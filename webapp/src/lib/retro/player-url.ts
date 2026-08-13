@@ -30,7 +30,7 @@ export interface PlayerUrlOptions {
    * 주면 플레이어가 네이티브 Save/Load 버튼을 서버로 돌린다. 없으면 저장 기능이 붙지 않는다.
    */
   saveKey?: string;
-  /** 함께 병합할 부모 롬셋 주소들 (#143) — 일반적인 것부터. */
+  /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 일반적인 것부터. */
   parents?: string[];
 }
 
@@ -54,7 +54,7 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, p
     if (typeof stripHeader === 'boolean') params.set('strip', stripHeader ? '1' : '0');
   }
   if (saveKey) params.set('save', saveKey);
-  // 순서가 곧 병합 순서다 — URLSearchParams 는 넣은 순서를 지킨다.
+  // 넘긴 순서를 그대로 지킨다 — URLSearchParams 는 넣은 순서를 보존한다.
   for (const p of parents ?? []) {
     if (!isSameOriginRom(p)) throw new Error(`외부 출처 롬셋은 쓰지 않습니다: ${p}`);
     params.append('set', p);

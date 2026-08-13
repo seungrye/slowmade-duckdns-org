@@ -418,7 +418,8 @@ export async function applyBundlePatch(romZip, patchZip, opts = {}) {
     applied++;
   }
 
-  // 분할 셋은 **미리 합쳐서** 넘긴다(mergeZips) — 그러면 여기선 언제나 완전한 셋을 본다.
+  // 분할 셋이면 칩이 아카이브마다 흩어져 있어 여기서 0 개인 것도 정상이다 — 그때는 호출측
+  // (applyBundlePatchToSet)이 전체를 모아 보고 판단한다.
   if (applied === 0 && !opts.allowNoMatch) {
     throw new Error(describeMismatch(romEntries, patchEntries));
   }
@@ -446,23 +447,38 @@ export function describeMismatch(romEntries, patchEntries) {
 }
 
 /**
- * 분할(split) 롬셋을 하나로 합친다 (#143).
+ * 묶음 패치를 **분할 셋 전체**에 먹인다 (#148).
  *
- * 아케이드 클론 셋은 리전별 파일만 담고 나머지는 부모 zip 에 있다. 둘을 풀어 **클론이 부모를
- * 덮어쓰는** 방식으로 합치면, 코어에는 완전한 셋 하나만 넘기면 된다 — EmulatorJS 의 부모 롬
- * 연동에 기대지 않아도 되고, 패치도 한 번에 먹일 수 있다.
+ * 예전에는 부모+클론을 zip 하나로 합쳐서(mergeZips) 한 번에 패치했다. 그런데 FBA 는 클론을
+ * 열 때 부모 아카이브를 따로 찾기 때문에(`Failed to find archive: /ddsom`) 합치면 아예 안 뜬다.
+ * 그래서 아카이브를 **그대로 두고** 패치만 가로질러 먹인다.
  *
- * @param zips 앞에서 뒤 순서로 겹쳐 쌓는다. **뒤에 온 것이 이긴다**(부모, 클론 순으로 넘길 것).
+ * 칩이 어느 아카이브에 있는지는 패치가 알려 주지 않으므로 각 아카이브에 다 대 본다. 아카이브
+ * 하나에서 0 개 맞는 건 정상이고, **전체에서 0 개일 때만** 롬셋이 다르다고 판단한다.
+ *
+ * @param zips 부모들 + 본체. 넘긴 순서 그대로 돌려준다.
+ * @returns {{roms: Uint8Array[], applied: number, total: number}}
  */
-export async function mergeZips(zips) {
-  const merged = new Map(); // key: 소문자 이름 → { name, data }
-  for (const z of zips) {
-    if (!z) continue;
-    for (const e of await readZip(z)) {
-      // 경로가 붙어 있으면 파일명만 남긴다 — 칩 이름이 곧 키다.
-      const name = e.name.split('/').pop() ?? e.name;
-      merged.set(name.toLowerCase(), { name, data: e.data });
-    }
+export async function applyBundlePatchToSet(zips, patchZip) {
+  const patchEntries = (await readZip(patchZip)).filter((e) => /\.ips$/i.test(e.name));
+  if (patchEntries.length === 0) {
+    throw new Error('패치 묶음 안에 IPS 파일이 없습니다.');
   }
-  return writeZip([...merged.values()]);
+
+  const roms = [];
+  const seenNames = [];
+  let applied = 0;
+
+  for (const z of zips) {
+    const out = await applyBundlePatch(z, patchZip, { allowNoMatch: true });
+    roms.push(out.rom);
+    seenNames.push(...out.romNames);
+    applied += out.applied;
+  }
+
+  if (applied === 0) {
+    throw new Error(describeMismatch(seenNames, patchEntries));
+  }
+
+  return { roms, applied, total: patchEntries.length };
 }

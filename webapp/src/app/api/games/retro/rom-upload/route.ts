@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
   try {
     await minioClient.putObject(env.minio.bucket, key, Buffer.from(await file.arrayBuffer()));
-    // 부모는 **일반적인 것부터** 저장한다 — 실행할 때 그 순서로 쌓고 클론이 마지막에 이긴다.
+    // 부모는 **일반적인 것부터** 저장한다 — 실행할 때 코어 파일시스템에 그 순서로 놓는다.
     for (const name of picked.parents) {
       const pf = parents.find((f) => f.name === name);
       if (!pf) continue;
