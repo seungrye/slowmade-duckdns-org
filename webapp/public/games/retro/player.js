@@ -4,7 +4,8 @@
 // 대상이 아니었고, 정의도 없는 함수를 부르는 채로 배포됐다(`romFileName is not defined` —
 // 패치·병합이 통째로 죽었다). 별도 파일이면 `no-undef` 가 잡는다.
 
-import { applyBundlePatchToSet, applyRomPatch, isZip } from './rom-patch.js';
+import { applyBundlePatchToSet, applyRomPatch, ensurePhoenixKey, isZip } from './rom-patch.js';
+import { pickLoadErrors } from './core-log.js';
 import { patchedRomPath, romFileNameFromUrl } from './rom-name.js';
 
 const DATA_PATH = '/games/retro/data/';
@@ -41,6 +42,8 @@ window.addEventListener('unhandledrejection', (ev) => {
 });
 
 const q = new URLSearchParams(location.search);
+// 코어가 콘솔에 흘린 줄들 — 실패했을 때만 들여다본다 (#153).
+const CORE_LOG = [];
 const core = q.get('core') || '';
 const rom = q.get('rom') || '';
 const patch = q.get('patch') || '';
@@ -59,6 +62,21 @@ const name = (q.get('name') || '').replace(/[<>"'&]/g, '').slice(0, 80);
 // 있으므로, 이 검사가 없으면 누구나 남의 서버 파일을 우리 플레이어로 트는 통로가 된다.
 const sameOrigin = (u) => u.startsWith('blob:') || (u.startsWith('/') && !u.startsWith('//'));
 
+// `&diag=1` 이면 EmulatorJS 의 debug 를 켜 코어 로그를 받는다. 기본으로 켜지 않는 이유는
+// debug 가 롬의 IndexedDB 캐시 확인까지 건너뛰어 매번 다시 받게 되기 때문이다.
+if (q.get('diag') === '1') {
+  const orig = console.log;
+  console.log = (...args) => {
+    if (CORE_LOG.length < 4000 && typeof args[0] === 'string') CORE_LOG.push(args[0]);
+    orig.apply(console, args);
+  };
+  const prevReady = window.EJS_ready;
+  window.EJS_ready = () => {
+    if (window.EJS_emulator) window.EJS_emulator.debug = true;
+    if (typeof prevReady === 'function') prevReady();
+  };
+}
+
 if (CORES.indexOf(core) < 0) {
   notice('지원하지 않는 기종입니다.');
 } else if (!rom) {
@@ -74,7 +92,12 @@ async function start() {
   // 코어 가상 파일시스템에 직접 놓을 것들 — {path, data}.
   const fsFiles = [];
 
-  if (patch || parentUrls.length) {
+  // 아케이드는 패치가 없어도 손볼 것이 있다 (#153): FBNeo 는 CPS2 롬셋에서 `<셋>.key` 를
+  // 읽는데, Phoenix(복호화) 세트가 쓰는 `phoenix.key` 는 "암호화 없음"을 뜻하는 공개 상수라
+  // 빠져 있으면 우리가 채워 넣는다.
+  const arcade = core === 'fbneo';
+
+  if (patch || parentUrls.length || arcade) {
     // 여기서 다 만든다 — 패치 적용, 부모 준비. **결과는 어디에도 저장하지 않는다**:
     // 이 페이지가 닫히면 사라지고, 서버엔 원본들이 따로 남을 뿐이다.
     try {
@@ -85,15 +108,30 @@ async function start() {
       ]);
 
       const romName = romFileNameFromUrl(rom, extensionFor(core));
-      const parents = parentBytes.map((data, i) => ({
+      let parents = parentBytes.map((data, i) => ({
         name: romFileNameFromUrl(parentUrls[i], extensionFor(core)),
         data,
       }));
 
-      // 부모는 **원본 그대로** 루트에 놓는다. 코어가 콘텐츠와 같은 디렉터리에서 찾는다.
+      let romData = romBytes;
+      let keyAdded = false;
+
+      if (arcade) {
+        const g = await ensurePhoenixKey(romData);
+        romData = g.zip;
+        keyAdded = g.added;
+        parents = await Promise.all(
+          parents.map(async (p) => {
+            const r = await ensurePhoenixKey(p.data);
+            keyAdded = keyAdded || r.added;
+            return { ...p, data: r.zip };
+          }),
+        );
+      }
+
+      // 부모는 루트에 놓는다. 코어가 콘텐츠와 같은 디렉터리에서 찾는다.
       for (const p of parents) fsFiles.push({ path: '/' + p.name, data: p.data });
 
-      let romData = romBytes;
       let patchedParents = null;
 
       if (patchBytes) {
@@ -111,8 +149,8 @@ async function start() {
         }
       }
 
-      if (patchBytes) {
-        const patchedPath = patchedRomPath(core, romName);
+      if (patchBytes || keyAdded) {
+        const patchedPath = patchBytes ? patchedRomPath(core, romName) : null;
         if (patchedPath) {
           // FBNeo — 패치본은 **patched 경로**에 놓는다. 코어가 그쪽을 먼저 보고, 거기서 온 롬은
           // CRC 가 달라도 이름으로 받아 준다(rom-name.js 주석). 콘텐츠는 원본 주소를 그대로 둬
@@ -122,9 +160,9 @@ async function start() {
             fsFiles.push({ path: patchedRomPath(core, p.name), data: p.data });
           }
         } else {
-          // 그 밖의 코어 — 패치본을 콘텐츠로 직접 넘긴다. EJS_gameUrl 은 File 도 받는다
-          // (EmulatorJS 가 gameUrl.name 으로 바꿔 쓴다). **아케이드는 파일명이 곧 롬셋
-          // 이름**이라 원래 이름을 살려야 한다.
+          // 패치가 없거나(키만 채운 경우) patched 규약이 없는 코어 — 바꾼 바이트를 콘텐츠로
+          // 직접 넘긴다. EJS_gameUrl 은 File 도 받는다(EmulatorJS 가 gameUrl.name 으로 바꿔
+          // 쓴다). **아케이드는 파일명이 곧 롬셋 이름**이라 원래 이름을 살려야 한다.
           gameUrl = new File([romData], romName);
         }
       }
@@ -156,6 +194,7 @@ async function start() {
   window.EJS_onGameStart = () => {
     const btn = window.EJS_emulator?.elements?.bottomBar?.contextMenu?.[0];
     if (btn) btn.style.setProperty('display', 'none', 'important');
+    watchLoadFailure();
   };
 
   if (saveKey) installServerSaves(saveKey);
@@ -190,7 +229,10 @@ async function start() {
  * 시작되고 20ms 뒤에 울리므로 항상 그보다 앞선다.
  */
 function installFsFiles(files) {
+  // 다른 데서도 EJS_ready 를 쓴다(진단 모드) — 덮어쓰지 말고 이어 붙인다.
+  const prevReady = window.EJS_ready;
   window.EJS_ready = () => {
+    if (typeof prevReady === 'function') prevReady();
     const em = window.EJS_emulator;
     if (!em || typeof em.on !== 'function') return;
     em.on('saveDatabaseLoaded', (FS) => {
@@ -205,6 +247,43 @@ function installFsFiles(files) {
       }
     });
   };
+}
+
+/**
+ * 롬셋을 못 읽었으면 **이유를 화면에 올린다** (#153).
+ *
+ * 아케이드 코어는 롬셋이 어긋나도 예외를 던지지 않는다 — 조용히 RetroArch 메뉴를 띄운다.
+ * 사용자 눈에는 낯선 설정 화면만 보이고 정작 원인(`ddsoma.key` 가 없다)은 콘솔 수백 줄에 묻힌다.
+ *
+ * 실패 신호가 따로 없어 **세이브스테이트로 판정한다** — 게임이 안 올라오면 상태가 비어 있어
+ * `getState()` 가 던진다. 코어 로그는 EmulatorJS 가 `debug` 일 때만 콘솔로 흘리므로,
+ * 그때만 console.log 를 감싸 모은다(기본 실행에는 손대지 않는다 — 캐시 동작이 달라진다).
+ */
+function watchLoadFailure() {
+  setTimeout(async () => {
+    const em = window.EJS_emulator;
+    if (!em?.gameManager) return;
+    try {
+      await em.gameManager.getState();
+      return; // 잘 돌고 있다
+    } catch {
+      // 아래에서 안내한다
+    }
+
+    const found = pickLoadErrors(CORE_LOG);
+    const missing = found.missing.length
+      ? '<br><br>롬셋에 없는 파일: <code>' + found.missing.join('</code>, <code>') + '</code>'
+      : '';
+    const hint = found.missing.some((n) => /\.key$/i.test(n))
+      ? '<br><br>CPS2 롬셋에는 <code>&lt;셋&gt;.key</code> 가 들어 있어야 합니다.' +
+        ' 복호화된 Phoenix 세트(<code>…d</code>)는 <code>phoenix.key</code> 만 쓰며 그건 자동으로 채웁니다.'
+      : '<br><br>롬셋이 이 코어가 아는 판본과 다를 수 있습니다.';
+    const detail = found.lines.length
+      ? '<br><br><code>' + found.lines.join('<br>').replace(/[<>]/g, '') + '</code>'
+      : '<br><br>자세한 이유는 주소 끝에 <code>&amp;diag=1</code> 을 붙여 다시 열면 보입니다.';
+
+    notice('롬을 실행하지 못했습니다.' + missing + hint + detail);
+  }, 6000);
 }
 
 /** 파일의 상위 디렉터리를 만든다. 이미 있으면 조용히 넘어간다. */
