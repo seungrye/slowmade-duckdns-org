@@ -27,7 +27,7 @@ interface Params {
 
 type LeanRom = {
   _id: unknown; title: string; platform: string; core: string; size: number;
-  createdAt?: Date; patches?: LeanPatch[]; patchEnabled?: boolean;
+  createdAt?: Date; filename?: string; patches?: LeanPatch[]; patchEnabled?: boolean;
 };
 
 export default async function PlayPage({
@@ -163,7 +163,7 @@ async function loadMyRom(id: string, email: string) {
   await connectToDB();
   // userEmail 을 조건에 넣어 남의 롬은 애초에 걸리지 않게 한다 — 없는 것과 같은 404 가 된다.
   const doc = (await RetroRom.findOne({ _id: id, userEmail: email, isDeleted: { $ne: true } })
-    .select("title platform core size createdAt patches patchEnabled")
+    .select("title platform core size createdAt filename patches patchEnabled")
     .lean()) as LeanRom | null;
   if (!doc) return null;
 
@@ -174,6 +174,9 @@ async function loadMyRom(id: string, email: string) {
       platform: doc.platform as never,
       size: doc.size,
       createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
+      // **아케이드는 이게 없으면 게임을 못 찾는다** (#141) — zip 이름이 곧 롬셋 이름이라,
+      // 빠지면 주소가 `<id>.zip` 이 되고 코어가 내용을 못 알아봐 RetroArch 메뉴만 뜬다.
+      filename: doc.filename,
     }),
     core: doc.core,
     description: undefined,
