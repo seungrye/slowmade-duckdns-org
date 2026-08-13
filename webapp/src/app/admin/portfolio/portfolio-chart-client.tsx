@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { envLabel } from "@/lib/env-label";
 import { useDragScrollX } from "@/hooks/use-drag-scroll";
 import { useMobile } from "@/hooks/use-mobile";
-import { recentPoints } from "./recent-points";
+import { windowStartDate } from "./recent-points";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
 
@@ -94,10 +94,10 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     if (!data || data.history.length === 0) return null;
     if (Object.keys(data.tradesByDate ?? {}).length === 0) return null; // 매매 없는 시장 숨김
 
-    // #95/#97 — 최근 구간만(모바일 30 일 · 데스크톱 90 일). 아래 마커·툴팁도 이 배열을
-    //   보므로 범위가 함께 맞는다. 하단 요약("총 N 사이클"·누적손익)은 전체 기준이라
-    //   data.history 를 그대로 쓴다.
-    const history = recentPoints(data.history, isMobile);
+    // #133 — **자르지 않는다.** 데이터는 전부 넘기고 아래 dataZoom 으로 처음 보이는 창만
+    //   최근 구간(모바일 30 일 · 데스크톱 90 일)으로 잡는다. 그래야 밀어서 이전 기간을 볼 수
+    //   있다. 마커·툴팁도 같은 배열을 보므로 확대하면 함께 따라온다.
+    const history = data.history;
 
     const dates = history.map((h) => h.dateStr);
     const totalData = history.map((h) => h.totalValue);
@@ -270,7 +270,15 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
         axisLabel: { show: false },   // y축 값 숨김 — 호버 시 툴팁으로 확인
       },
       dataZoom: [
-        { type: "inside", zoomOnMouseWheel: true, moveOnMouseMove: true, moveOnMouseWheel: false },
+        // startValue 로 처음 보이는 구간만 잡는다. 데이터는 그대로라 밀면 이전 기간이 나온다.
+        // 잡을 것이 없으면(데이터가 이미 그 안이면) undefined 라 전체가 보인다.
+        {
+          type: "inside",
+          zoomOnMouseWheel: true,
+          moveOnMouseMove: true,
+          moveOnMouseWheel: false,
+          startValue: windowStartDate(dates, isMobile),
+        },
       ],
       series,
     };

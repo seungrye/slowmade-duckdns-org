@@ -4,7 +4,7 @@ import { envLabel } from "@/lib/env-label";
 
 import { useMemo } from "react";
 import { useMobile } from "@/hooks/use-mobile";
-import { recentDates } from "../recent-points";
+import { windowStartDate } from "../recent-points";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
@@ -90,15 +90,11 @@ export default function PortfolioDetailClient({
 
   const option = useMemo<EChartsOption>(() => {
     // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
-    // 화면에 맞는 구간만 (#131 — 매매 차트와 같은 규칙: 모바일 30 일·데스크톱 90 일).
-    // **이동평균은 아래에서 자르기 전 전체 rows 로 계산한다** — 그래야 60 일선이 짧은 창에서도
-    // 제 값을 유지한다. 여기서는 x 축에 그릴 날짜만 줄인다.
-    const allDates = recentDates(
-      Array.from(
-        new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
-      ).sort(),
-      isMobile,
-    );
+    // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
+    // **자르지 않는다** (#133) — 처음 보이는 창만 아래 dataZoom 에서 잡는다.
+    const allDates = Array.from(
+      new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
+    ).sort();
 
     const legendNames: string[] = [];
     const selected: Record<string, boolean> = {};
@@ -175,7 +171,13 @@ export default function PortfolioDetailClient({
       xAxis: { type: "category", data: allDates },
       yAxis: { type: "value", scale: true, axisLabel: { show: false } },
       // 하단 슬라이더(브러시)는 감추고 휠/드래그 줌(inside)만 — center 면 최근 구간을 확대.
-      dataZoom: [{ type: "inside", start: center ? 60 : 0, end: 100 }],
+      dataZoom: [
+        // 매매 마커에서 넘어온 경우(center)는 그 지점을 보여 주던 기존 동작을 지키고,
+        // 그 밖에는 매매 차트와 같은 창(모바일 30 일·데스크톱 90 일)으로 연다 (#131·#133).
+        center
+          ? { type: "inside", start: 60, end: 100 }
+          : { type: "inside", startValue: windowStartDate(allDates, isMobile) },
+      ],
       series,
     };
   }, [pricesByTicker, trades, names, center, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
