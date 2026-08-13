@@ -6,7 +6,7 @@
 #
 # 받는 것:
 #   1. EmulatorJS 본체  → webapp/public/games/retro/data/
-#   2. 기종별 코어 5종  → .../data/cores/            (기종당 ~1MB)
+#   2. 기종별 코어 2종  → .../data/cores/            (기종당 ~1MB)
 #   3. 홈브류 롬·커버   → .../roms/, .../covers/
 #
 # 왜 저장소에 안 넣나: 에뮬레이터 릴리스 전체가 압축 289MB 다. 필요한 것만 골라 받으면 수십 MB 로
@@ -28,7 +28,7 @@ MANIFEST="$REPO_DIR/webapp/src/lib/retro/builtin-games.json"
 
 CDN="${EMULATORJS_CDN:-https://cdn.emulatorjs.org/stable/data}"
 # src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 기종을 늘리면 여기도 함께 늘릴 것.
-CORES=(fceumm snes9x gambatte mgba genesis_plus_gx)
+CORES=(snes9x fbalpha2012_cps2)
 
 FORCE=0
 [[ "${1:-}" == "--force" ]] && FORCE=1
@@ -133,6 +133,34 @@ done < <(node -e '
         process.stdout.write([g.file, g.cover || "", raw].join("\t") + "\n");
     }
 ' "$MANIFEST")
+
+# ── 정리: 매니페스트·코어 목록에 없는 파일 치우기 ────────────────────────────
+# 기종을 줄였을 때 옛 롬·코어가 남아 용량만 먹는 걸 막는다.
+log "목록에 없는 파일 정리"
+node -e '
+  const fs = require("fs"), path = require("path");
+  const [manifest, romsDir, coversDir, coresDir, coreList] = process.argv.slice(1);
+  const games = JSON.parse(fs.readFileSync(manifest, "utf8"));
+  const keepRoms = new Set(games.map((g) => g.file));
+  const keepCovers = new Set(games.map((g) => g.cover).filter(Boolean));
+  const keepCores = new Set();
+  for (const c of coreList.split(" ").filter(Boolean)) {
+    keepCores.add(c + "-wasm.data");
+    keepCores.add(c + "-legacy-wasm.data");
+  }
+  let n = 0;
+  const prune = (dir, keep) => {
+    if (!fs.existsSync(dir)) return;
+    for (const f of fs.readdirSync(dir)) {
+      if (fs.statSync(path.join(dir, f)).isDirectory()) continue;
+      if (!keep.has(f)) { fs.unlinkSync(path.join(dir, f)); n++; }
+    }
+  };
+  prune(romsDir, keepRoms);
+  prune(coversDir, keepCovers);
+  prune(coresDir, keepCores);
+  console.log("  치운 파일: " + n + " 개");
+' "$MANIFEST" "$ROMS_DIR" "$COVERS_DIR" "$CORES_DIR" "${CORES[*]}"
 
 # ── 마무리 ───────────────────────────────────────────────────────────────────
 echo

@@ -37,7 +37,7 @@ import { applyRomPatch } from './rom-patch.js';
 
 const DATA_PATH = '/games/retro/data/';
 // src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 양쪽을 함께 고칠 것.
-const CORES = ['fceumm', 'snes9x', 'gambatte', 'mgba', 'genesis_plus_gx'];
+const CORES = ['snes9x', 'fbalpha2012_cps2'];
 
 function notice(html) {
   const el = document.getElementById('game');
@@ -203,7 +203,7 @@ async function fetchBytes(url) {
 
 /** 코어에 맞는 확장자 — EmulatorJS 가 파일명으로 형식을 짐작하는 자리가 있다. */
 function extensionFor(c) {
-  return { fceumm: 'nes', snes9x: 'sfc', gambatte: 'gb', mgba: 'gba', genesis_plus_gx: 'md' }[c] || 'bin';
+  return { snes9x: 'sfc', fbalpha2012_cps2: 'zip' }[c] || 'bin';
 }
 </script>
 </body>

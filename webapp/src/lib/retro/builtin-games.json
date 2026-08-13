@@ -1,15 +1,5 @@
 [
   {
-    "slug": "nomolos",
-    "title": "Nomolos: Storming the CATsle",
-    "platform": "nes",
-    "file": "nomolos.nes",
-    "cover": "nomolos.png",
-    "source": "https://github.com/retrobrews/nes-games",
-    "license": "자유 배포 홈브류",
-    "description": "고전 액션 플랫포머의 문법을 곧이곧대로 지킨 홈브류."
-  },
-  {
     "slug": "super-boss-gaiden",
     "title": "Super Boss Gaiden",
     "platform": "snes",
@@ -18,35 +8,5 @@
     "source": "https://github.com/retrobrews/snes-games",
     "license": "자유 배포 홈브류",
     "description": "보스만 줄줄이 나오는 슈퍼패미컴 액션."
-  },
-  {
-    "slug": "ucity",
-    "title": "µCity",
-    "platform": "gb",
-    "file": "ucity.gbc",
-    "cover": "ucity.png",
-    "source": "https://github.com/retrobrews/gbc-games",
-    "license": "자유 배포 홈브류",
-    "description": "게임보이 컬러로 만든 도시 경영."
-  },
-  {
-    "slug": "anguna",
-    "title": "Anguna: Warriors of Virtue",
-    "platform": "gba",
-    "file": "anguna.gba",
-    "cover": "anguna.png",
-    "source": "https://github.com/retrobrews/gba-games",
-    "license": "자유 배포 홈브류",
-    "description": "던전을 파고드는 젤다풍 액션 RPG."
-  },
-  {
-    "slug": "old-towers",
-    "title": "Old Towers",
-    "platform": "md",
-    "file": "oldtowers.bin",
-    "cover": "oldtowers.png",
-    "source": "https://github.com/retrobrews/md-games",
-    "license": "자유 배포 홈브류",
-    "description": "탑을 오르는 미로 액션 퍼즐."
   }
 ]

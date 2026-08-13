@@ -9,40 +9,40 @@ import {
 describe('retro/rom-upload', () => {
   describe('romTitleFromFilename — 파일명에서 보여줄 제목 뽑기', () => {
     it.each([
-      ['Super Mario Bros.nes', 'Super Mario Bros'],
+      ['Super Mario Bros.sfc', 'Super Mario Bros'],
       ['zelda_a_link_to_the_past.sfc', 'zelda a link to the past'],
-      ['Sonic - The Hedgehog (World).md', 'Sonic - The Hedgehog (World)'],
-      ['../../etc/passwd.gba', 'passwd'],
+      ['Sonic - The Hedgehog (World).smc', 'Sonic - The Hedgehog (World)'],
+      ['../../etc/passwd.sfc', 'passwd'],
     ])('%s → %s', (filename, expected) => {
       expect(romTitleFromFilename(filename)).toBe(expected);
     });
 
     it('이름이 비면 기본값을 준다', () => {
-      expect(romTitleFromFilename('.nes')).toBe('이름 없는 롬');
+      expect(romTitleFromFilename('.sfc')).toBe('이름 없는 롬');
       expect(romTitleFromFilename('')).toBe('이름 없는 롬');
     });
 
     it('지나치게 긴 이름은 잘린다', () => {
-      expect(romTitleFromFilename('a'.repeat(300) + '.nes').length).toBeLessThanOrEqual(120);
+      expect(romTitleFromFilename('a'.repeat(300) + '.sfc').length).toBeLessThanOrEqual(120);
     });
   });
 
   describe('validateRomUpload', () => {
     it('확장자로 플랫폼을 추론한다', () => {
-      const r = validateRomUpload({ filename: 'tetris.gb', size: 32 * 1024 });
+      const r = validateRomUpload({ filename: 'tetris.sfc', size: 32 * 1024 });
       expect(r.ok).toBe(true);
       if (r.ok) {
-        expect(r.platform).toBe('gb');
-        expect(r.core).toBe('gambatte');
+        expect(r.platform).toBe('snes');
+        expect(r.core).toBe('snes9x');
         expect(r.title).toBe('tetris');
       }
     });
 
     it('플랫폼을 직접 지정하면 확장자 추론보다 우선한다', () => {
       // .bin 처럼 추론 못 하는 파일을 위해 필요하다.
-      const r = validateRomUpload({ filename: 'game.bin', size: 1024, platform: 'md' });
+      const r = validateRomUpload({ filename: 'game.bin', size: 1024, platform: 'cps2' });
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.platform).toBe('md');
+      if (r.ok) expect(r.platform).toBe('cps2');
     });
 
     it('추론도 못 하고 지정도 없으면 거부한다', () => {
@@ -57,22 +57,22 @@ describe('retro/rom-upload', () => {
     });
 
     it('빈 파일은 거부한다', () => {
-      const r = validateRomUpload({ filename: 'a.nes', size: 0 });
+      const r = validateRomUpload({ filename: 'a.sfc', size: 0 });
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.reason).toContain('비어');
     });
 
     it('한도를 넘으면 거부하고, owner 는 한도가 더 높다', () => {
-      const big = { filename: 'a.gba', size: MAX_ROM_BYTES + 1 };
+      const big = { filename: 'a.sfc', size: MAX_ROM_BYTES + 1 };
       expect(validateRomUpload(big).ok).toBe(false);
       expect(validateRomUpload({ ...big, isOwner: true }).ok).toBe(true);
 
-      const huge = { filename: 'a.gba', size: OWNER_MAX_ROM_BYTES + 1, isOwner: true };
+      const huge = { filename: 'a.sfc', size: OWNER_MAX_ROM_BYTES + 1, isOwner: true };
       expect(validateRomUpload(huge).ok).toBe(false);
     });
 
     it('한도 초과 사유에 MB 숫자가 들어간다 — 사용자가 얼마나 줄여야 하는지 알아야 한다', () => {
-      const r = validateRomUpload({ filename: 'a.gba', size: MAX_ROM_BYTES + 1 });
+      const r = validateRomUpload({ filename: 'a.sfc', size: MAX_ROM_BYTES + 1 });
       if (!r.ok) expect(r.reason).toMatch(/\d+\s*MB/);
     });
 

@@ -36,22 +36,16 @@ describe('retro/library — 기본 제공 홈브류 목록', () => {
     }
   });
 
-  it('모든 기종에 적어도 하나씩 있다 — 사이드바에 빈 칸이 생기지 않게', () => {
+  // #139 — 아케이드(CPS2)는 자유 배포 롬셋이 없어 기본 제공이 비어 있다. 사용자가 올려서 쓴다.
+  it('기종마다 많아야 하나 — 목록이 무심코 불어나지 않게', () => {
     for (const p of PLATFORMS) {
-      expect(BUILTIN_GAMES.some((g) => g.platform === p.id), `${p.id} 가 비었다`).toBe(true);
+      const n = BUILTIN_GAMES.filter((g) => g.platform === p.id).length;
+      expect(n, `${p.id}`).toBeLessThanOrEqual(1);
     }
-  });
-
-  it('기종마다 정확히 한 종 — 목록을 짧게 유지한다', () => {
-    // 늘리고 싶으면 이 단언을 먼저 고칠 것. 무심코 불어나는 걸 막는다.
-    for (const p of PLATFORMS) {
-      expect(BUILTIN_GAMES.filter((g) => g.platform === p.id), `${p.id}`).toHaveLength(1);
-    }
-    expect(BUILTIN_GAMES).toHaveLength(PLATFORMS.length);
   });
 
   it('builtinBySlug', () => {
-    expect(builtinBySlug('anguna')?.platform).toBe('gba');
+    expect(builtinBySlug('super-boss-gaiden')?.platform).toBe('snes');
     expect(builtinBySlug('없는-게임')).toBeUndefined();
   });
 

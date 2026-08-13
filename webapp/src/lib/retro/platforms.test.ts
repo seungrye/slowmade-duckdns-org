@@ -4,6 +4,7 @@ import {
   SUPPORTED_CORES,
   platformById,
   platformForFilename,
+  isArcade,
   type PlatformId,
 } from './platforms';
 
@@ -24,35 +25,42 @@ describe('retro/platforms', () => {
 
   it('SUPPORTED_CORES 가 플랫폼 목록에서 파생된다', () => {
     for (const p of PLATFORMS) expect(SUPPORTED_CORES.has(p.core)).toBe(true);
-    expect(SUPPORTED_CORES.has('psx')).toBe(false); // BIOS 저작권 — 이번 범위 밖
+    expect(SUPPORTED_CORES.has('psx')).toBe(false); // 지원 목록 밖
   });
 
   it('platformById 는 없는 id 에 undefined 를 준다', () => {
-    expect(platformById('nes')?.label).toBe('NES');
+    expect(platformById('snes')?.label).toBe('SNES');
     expect(platformById('n64' as PlatformId)).toBeUndefined();
   });
 
   describe('platformForFilename — 확장자로 플랫폼 추론', () => {
     it.each([
-      ['SuperMario.nes', 'nes'],
       ['zelda.SFC', 'snes'],
-      ['tetris.gb', 'gb'],
-      ['pokemon.gbc', 'gb'],
-      ['metroid.gba', 'gba'],
-      ['sonic.md', 'md'],
-      ['sonic.gen', 'md'],
+      ['tales.sfc', 'snes'],
+      ['chrono.smc', 'snes'],
+      // 아케이드 롬셋은 zip 묶음이다 (#139).
+      ['ssf2t.zip', 'cps2'],
     ])('%s → %s', (filename, expected) => {
       expect(platformForFilename(filename)?.id).toBe(expected);
     });
 
     it('알 수 없는 확장자는 undefined — 사용자가 직접 고르게 한다', () => {
-      expect(platformForFilename('save.zip')).toBeUndefined();
       expect(platformForFilename('noext')).toBeUndefined();
       expect(platformForFilename('')).toBeUndefined();
+      expect(platformForFilename('game.nes')).toBeUndefined(); // 이제 지원하지 않는 기종
     });
 
     it('.bin 은 추론하지 않는다 — 여러 기종이 공유하는 확장자라 오추론이 더 나쁘다', () => {
       expect(platformForFilename('game.bin')).toBeUndefined();
+    });
+  });
+
+  // #139 — 아케이드만 파일명이 게임 식별자라 다르게 다뤄야 한다.
+  describe('isArcade', () => {
+    it('CPS2 만 아케이드다', () => {
+      expect(isArcade('cps2')).toBe(true);
+      expect(isArcade('snes')).toBe(false);
+      expect(isArcade(undefined)).toBe(false);
     });
   });
 });

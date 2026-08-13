@@ -8,7 +8,7 @@ const patch = (id: string, over: Record<string, unknown> = {}) => ({
 const baseRom: LeanRom = {
   _id: '653f1a2b3c4d5e6f70819202',
   title: '내 롬',
-  platform: 'md',
+  platform: 'snes',
   size: 2048,
   createdAt: new Date(0),
 };

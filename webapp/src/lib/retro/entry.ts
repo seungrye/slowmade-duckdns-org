@@ -3,7 +3,7 @@
 // 목록에는 성격이 다른 둘이 섞인다 — 저장소에 딸려 오는 **기본 제공 홈브류**와 사용자가
 // **직접 올린 롬**. 화면·검색·필터가 둘을 구분하지 않아도 되도록 여기서 같은 모양으로 만든다.
 
-import { platformById, type PlatformId } from './platforms';
+import { isArcade, platformById, type PlatformId } from './platforms';
 
 export type GameSource = 'builtin' | 'rom';
 
@@ -54,6 +54,8 @@ export interface UserRomDto {
   platform: PlatformId;
   size: number;
   createdAt: string;
+  /** 올릴 때의 원본 파일명 — 아케이드는 이 이름으로 게임을 식별한다 (#139). */
+  filename?: string;
   /** 살아 있는 패치 — 롬당 최대 하나 (#116). */
   patch?: RomPatchDto;
   /** 패치를 적용할지. 카드의 체크박스가 뒤집는다. */
@@ -109,7 +111,13 @@ export function romEntry(rom: UserRomDto): GameEntry {
  * 있을 때 엉뚱한 게임이 뜰 수 있다. id 를 넣어 롬마다 키가 갈리게 한다.
  * 확장자는 코어가 쓰는 가상 파일명에도 그대로 붙는다.
  */
-export function romFileUrl(rom: { id: string; platform: PlatformId }): string {
+export function romFileUrl(rom: { id: string; platform: PlatformId; filename?: string }): string {
+  // 아케이드는 **파일명이 곧 게임 이름**이다(ssf2t.zip). 바꾸면 코어가 롬을 못 찾는다.
+  // 그 대신 캐시 키도 파일명으로 갈리는데, 같은 이름·같은 크기를 두 번 올리는 경우에만
+  // 겹치므로 실질적인 위험은 없다.
+  if (isArcade(rom.platform) && rom.filename) {
+    return `/api/games/retro/roms/${rom.id}/file/${encodeURIComponent(rom.filename)}`;
+  }
   const ext = platformById(rom.platform)?.extensions[0] ?? '.bin';
   return `/api/games/retro/roms/${rom.id}/file/${rom.id}${ext}`;
 }

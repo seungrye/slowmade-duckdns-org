@@ -5,12 +5,12 @@ import RetroLibrary from './RetroLibrary';
 import type { BuiltinGame, UserRomDto } from '@/lib/retro/entry';
 
 const BUILTINS: BuiltinGame[] = [
-  { slug: 'nomolos', title: 'Nomolos', platform: 'nes', file: 'nomolos.nes', source: 'https://x.test', license: '홈브류' },
-  { slug: 'anguna', title: 'Anguna', platform: 'gba', file: 'anguna.gba', source: 'https://x.test', license: '홈브류' },
+  { slug: 'nomolos', title: 'Nomolos', platform: 'snes', file: 'nomolos.sfc', source: 'https://x.test', license: '홈브류' },
+  { slug: 'anguna', title: 'Anguna', platform: 'cps2', file: 'anguna.zip', source: 'https://x.test', license: '홈브류' },
 ];
 
 const MY_ROMS: UserRomDto[] = [
-  { id: '653f1a2b3c4d5e6f70819202', title: '내가 올린 롬', platform: 'md', size: 2 * 1024 * 1024, createdAt: '2026-08-12T00:00:00.000Z' },
+  { id: '653f1a2b3c4d5e6f70819202', title: '내가 올린 롬', platform: 'cps2', size: 2 * 1024 * 1024, createdAt: '2026-08-12T00:00:00.000Z' },
 ];
 
 /** 사이드바·칩이 둘 다 렌더되므로(CSS 로만 감춤) 사이드바 쪽 버튼을 집어 쓴다. */
@@ -42,7 +42,7 @@ describe('RetroLibrary', () => {
 
   it('기종을 고르면 그 기종만 남는다', () => {
     render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
-    fireEvent.click(sidebarButton('NES'));
+    fireEvent.click(sidebarButton('SNES'));
     expect(screen.getByText('Nomolos')).toBeInTheDocument();
     expect(screen.queryByText('Anguna')).not.toBeInTheDocument();
     expect(screen.queryByText('내가 올린 롬')).not.toBeInTheDocument();
@@ -51,8 +51,8 @@ describe('RetroLibrary', () => {
   it('사이드바 배지가 기종별 개수를 보여 준다', () => {
     render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
     expect(sidebarButton('전체')).toHaveTextContent('3');
-    expect(sidebarButton('NES')).toHaveTextContent('1');
-    expect(sidebarButton('SNES')).toHaveTextContent('0');
+    expect(sidebarButton('SNES')).toHaveTextContent('1');
+    expect(sidebarButton('CPS2')).toHaveTextContent('2');
   });
 
   it('검색으로 거른다', () => {

@@ -12,6 +12,7 @@ export interface LeanRom {
   platform: string;
   size: number;
   createdAt?: Date;
+  filename?: string;
   patches?: LeanPatch[];
   patchEnabled?: boolean;
   coverKey?: string;
@@ -71,6 +72,8 @@ export function toRomDto(doc: LeanRom, extra?: { hasSave?: boolean }): UserRomDt
     platform: doc.platform as PlatformId,
     size: doc.size,
     createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
+    // 아케이드가 게임을 식별하는 데 쓴다 (#139).
+    filename: doc.filename,
     patch: activePatch(doc),
     // 값이 없던 옛 문서는 켜진 것으로 본다 — 패치를 올려 뒀다면 쓰려던 것이다.
     patchEnabled: doc.patchEnabled !== false,
