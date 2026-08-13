@@ -6,7 +6,7 @@
 //
 // N64·PS1 은 넣지 않는다 — 무겁고, PS1 은 BIOS 저작권이 걸린다.
 
-export type PlatformId = 'snes' | 'cps2';
+export type PlatformId = 'snes' | 'arcade';
 
 export interface PlatformMeta {
   id: PlatformId;
@@ -23,6 +23,13 @@ export interface PlatformMeta {
   extensions: string[];
   /** 커버 없는 카드의 폴백 타일 그라디언트(tailwind 클래스). */
   accent: string;
+  /**
+   * 아케이드 계열인가 (#139).
+   *
+   * EmulatorJS 는 코어가 arcade·mame 계열이면 롬을 **파일명 그대로** 가상 FS 에 쓴다.
+   * 아케이드 코어는 그 이름으로 어느 게임인지 판단하므로, 이름을 바꾸면 못 찾는다.
+   */
+  arcade?: boolean;
 }
 
 export const PLATFORMS: PlatformMeta[] = [
@@ -35,25 +42,26 @@ export const PLATFORMS: PlatformMeta[] = [
     accent: 'from-violet-500 to-indigo-700',
   },
   {
-    id: 'cps2',
-    label: 'CPS2',
-    fullName: '캡콤 플레이 시스템 2 (아케이드)',
-    core: 'fbalpha2012_cps2',
-    // 아케이드 롬은 zip 묶음이고 **zip 이름이 곧 게임 식별자**다(ssf2t.zip).
-    // 그래서 이 기종만 원본 파일명을 그대로 살려 내려준다 — `entry.ts` 의 romFileUrl 참고.
+    // 아케이드는 FBNeo 하나로 간다 — CPS2 전용 fbalpha2012 를 **대체했다** (#151).
+    //   fbalpha2012 : CPS2 복호화 키를 내장하지만 **수정된 롬을 CRC 로 거부**해 런타임
+    //                 한글패치가 원천적으로 불가능하다(#150). 1바이트만 달라도 적재 실패.
+    //   fbneo       : 롬셋에 `<셋>.key`(20바이트)가 들어 있어야 한다. 대신 patched 경로의
+    //                 롬은 CRC 가 달라도 이름으로 받아 주므로 **런타임 패치가 된다**.
+    //                 CPS1·네오지오 등 훨씬 넓은 기판도 함께 돌린다.
+    // 최신 MAME/FBNeo 롬셋에는 .key 가 들어 있다. 없으면 적재 시 무엇이 필요한지 로그로 알려 준다.
+    id: 'arcade',
+    label: 'FBNeo',
+    fullName: '아케이드 (FBNeo) — 롬셋에 .key 필요',
+    core: 'fbneo',
     extensions: ['.zip'],
-    accent: 'from-yellow-500 to-amber-700',
+    accent: 'from-emerald-500 to-teal-700',
+    arcade: true,
   },
 ];
 
-/**
- * 아케이드 계열인가 (#139).
- *
- * EmulatorJS 는 코어가 arcade·mame 계열이면 롬을 **파일명 그대로** 가상 FS 에 쓴다.
- * 아케이드 코어는 그 이름으로 어느 게임인지 판단하므로, 이름을 바꾸면 못 찾는다.
- */
+/** 아케이드 계열인가 (#139) — 배열의 `arcade` 플래그에서 파생된다. */
 export function isArcade(platform: PlatformId | string | undefined): boolean {
-  return platform === 'cps2';
+  return platformById(platform)?.arcade === true;
 }
 
 /** 플레이어에 넘길 수 있는 코어 화이트리스트 — 임의 문자열 차단용. */

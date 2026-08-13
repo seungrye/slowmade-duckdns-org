@@ -18,8 +18,8 @@ function entry(over: Partial<GameEntry>): GameEntry {
 const GAMES: GameEntry[] = [
   entry({ key: 'a', id: 'a', title: 'Lan Master', platform: 'snes' }),
   entry({ key: 'b', id: 'b', title: 'Alter Ego', platform: 'snes' }),
-  entry({ key: 'c', id: 'c', title: 'Uwol', platform: 'cps2' }),
-  entry({ key: 'd', id: 'd', title: '내 롬 파일', platform: 'cps2', source: 'rom' }),
+  entry({ key: 'c', id: 'c', title: 'Uwol', platform: 'arcade' }),
+  entry({ key: 'd', id: 'd', title: '내 롬 파일', platform: 'arcade', source: 'rom' }),
 ];
 
 describe('retro/filter', () => {
@@ -31,7 +31,7 @@ describe('retro/filter', () => {
 
   it('플랫폼으로 거른다', () => {
     expect(filterGames(GAMES, 'snes', '').map((g) => g.id)).toEqual(['a', 'b']);
-    expect(filterGames(GAMES, 'cps2', '').map((g) => g.id)).toEqual(['c', 'd']);
+    expect(filterGames(GAMES, 'arcade', '').map((g) => g.id)).toEqual(['c', 'd']);
   });
 
   it('제목 검색은 대소문자를 가리지 않는다', () => {
@@ -47,13 +47,13 @@ describe('retro/filter', () => {
     // 'ego' 는 NES 의 Alter Ego 에만 있다.
     expect(filterGames(GAMES, 'snes', 'ego').map((g) => g.id)).toEqual(['b']);
     // 검색어가 맞아도 플랫폼이 다르면 빠진다.
-    expect(filterGames(GAMES, 'cps2', 'ego')).toEqual([]);
+    expect(filterGames(GAMES, 'arcade', 'ego')).toEqual([]);
   });
 
   it('countByPlatform 이 전체와 플랫폼별 개수를 센다', () => {
     const counts = countByPlatform(GAMES);
     expect(counts.all).toBe(4);
     expect(counts.snes).toBe(2);
-    expect(counts.cps2).toBe(2);
+    expect(counts.arcade).toBe(2);
   });
 });

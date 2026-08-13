@@ -9,12 +9,12 @@ const WITH_COVER = builtinEntry({
   cover: 'nomolos.png', source: 'https://x.test', license: '홈브류',
 });
 const NO_COVER = builtinEntry({
-  slug: 'anguna', title: 'Anguna', platform: 'cps2', file: 'anguna.zip',
+  slug: 'anguna', title: 'Anguna', platform: 'arcade', file: 'anguna.zip',
   source: 'https://x.test', license: '홈브류',
 });
 
 const ROM_BASE: UserRomDto = {
-  id: '653f1a2b3c4d5e6f70819202', title: '내 롬', platform: 'cps2',
+  id: '653f1a2b3c4d5e6f70819202', title: '내 롬', platform: 'arcade',
   size: 2 * 1024 * 1024, createdAt: '2026-08-12T00:00:00.000Z',
 };
 const rom = (over: Partial<UserRomDto> = {}) => romEntry({ ...ROM_BASE, ...over });
@@ -44,7 +44,7 @@ describe('GameCard', () => {
 
   it('기종 배지와 부제를 보여 준다', () => {
     render(<GameCard game={rom()} />);
-    expect(screen.getByText('CPS2')).toBeInTheDocument();
+    expect(screen.getByText('FBNeo')).toBeInTheDocument();
     expect(screen.getByText('2.0 MB')).toBeInTheDocument();
   });
 
@@ -67,7 +67,7 @@ describe('GameCard', () => {
 
     it('기종 배지 옆(좌상단)에 나란히 놓인다', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
-      const row = screen.getByText('CPS2').parentElement!;
+      const row = screen.getByText('FBNeo').parentElement!;
       expect(row.className).toContain('left-2');
       expect(row).toContainElement(screen.getByLabelText('저장된 상태 있음'));
     });
@@ -75,7 +75,7 @@ describe('GameCard', () => {
     // #120 — 뜻이 다르니 배지는 따로. 다만 높이가 어긋나면 지저분하다.
     it('기종 배지와 **높이가 같다** — 글자와 아이콘은 줄 높이가 달라 고정해야 맞는다', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
-      const platform = screen.getByText('CPS2');
+      const platform = screen.getByText('FBNeo');
       const saveBadge = screen.getByLabelText('저장된 상태 있음').parentElement!;
 
       const heightOf = (el: Element) =>

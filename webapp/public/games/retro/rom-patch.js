@@ -394,10 +394,52 @@ export function writeZip(entries, opts = {}) {
 const chipKey = (name) => (name.split('/').pop() ?? '').replace(/\.ips$/i, '').toLowerCase();
 
 /**
+ * 구분자를 지운 키 (#151).
+ *
+ * 롬셋은 `dd2.13m`, 패치는 `dd2_13m` 으로 **같은 칩**을 부른다. 표기만 다를 뿐인데 이걸 못
+ * 이으면 한글 패치가 통째로 못 먹는다(실제로 13 개 중 0 개였다).
+ */
+const looseKey = (name) => chipKey(name).replace(/[._-]/g, '');
+
+/** IPS 가 건드리는 가장 뒤 오프셋 — 칩 크기를 넘는지 보는 데 쓴다. 모르면 null. */
+function ipsMaxOffset(patch) {
+  if (detectPatchFormat(patch) !== 'ips') return null;
+  let p = 5;
+  let max = 0;
+  while (p < patch.length) {
+    if (p + 3 > patch.length) return null;
+    if (patch[p] === 0x45 && patch[p + 1] === 0x4f && patch[p + 2] === 0x46) break; // "EOF"
+    const offset = (patch[p] << 16) | (patch[p + 1] << 8) | patch[p + 2];
+    p += 3;
+    if (p + 2 > patch.length) return null;
+    const size = (patch[p] << 8) | patch[p + 1];
+    p += 2;
+    if (size === 0) {
+      if (p + 3 > patch.length) return null;
+      const count = (patch[p] << 8) | patch[p + 1];
+      p += 3;
+      max = Math.max(max, offset + count);
+    } else {
+      p += size;
+      max = Math.max(max, offset + size);
+    }
+  }
+  return max;
+}
+
+/**
  * 묶음 패치를 적용한다 (#143) — 롬 zip 안쪽 칩마다 IPS 를 먹인다.
  *
- * **이름이 짝인 것만** 건드리고 나머지는 그대로 둔다. `.`/`_` 같은 규칙 차이는 **보정하지
- * 않는다** — 억지로 맞추면 엉뚱한 칩에 패치를 먹여 조용히 망가진다.
+ * **이름이 짝인 것만** 건드리고 나머지는 그대로 둔다. 이름이 그대로 맞는 쪽이 언제나 우선이고,
+ * 없을 때만 구분자를 지워 다시 본다 (#151 — `dd2.13m` ↔ `dd2_13m`).
+ *
+ * 느슨한 짝은 **두 조건을 다 넘을 때만** 붙인다. 억지로 맞추면 엉뚱한 칩을 고쳐 조용히 망가진다:
+ *   1. 그 키로 걸리는 칩이 **딱 하나**여야 한다 (둘 이상이면 손대지 않는다)
+ *   2. 패치가 **칩 크기를 넘기지 않아야** 한다 — 아케이드 칩은 하드웨어가 크기를 정하므로
+ *      늘어난다면 그건 애초에 다른 롬이다
+ *
+ * **이름은 롬셋 것을 지킨다.** FBNeo 는 patched 아카이브의 롬을 이름으로 찾는데 그 표기가
+ * 롬셋 쪽(`dd2.13m`)이다. 패치 표기로 개명하면 오히려 못 찾는다.
  *
  * @throws 짝이 하나도 없으면 **양쪽 이름을 담아** 던진다. 롬셋이 다르다는 걸 바로 알 수 있게.
  */
@@ -409,13 +451,31 @@ export async function applyBundlePatch(romZip, patchZip, opts = {}) {
   }
 
   const byKey = new Map(romEntries.map((e) => [chipKey(e.name), e]));
+  const byLoose = new Map(); // 구분자 지운 키 → 후보 목록
+  for (const e of romEntries) {
+    const k = looseKey(e.name);
+    byLoose.set(k, [...(byLoose.get(k) ?? []), e]);
+  }
+
   let applied = 0;
+  let loose = 0;
 
   for (const p of patchEntries) {
-    const target = byKey.get(chipKey(p.name));
-    if (!target) continue;
+    let target = byKey.get(chipKey(p.name));
+    let viaLoose = false;
+
+    if (!target) {
+      const candidates = byLoose.get(looseKey(p.name)) ?? [];
+      if (candidates.length !== 1) continue; // 하나로 갈리지 않으면 고르지 않는다
+      const max = ipsMaxOffset(p.data);
+      if (max === null || max > candidates[0].data.length) continue;
+      target = candidates[0];
+      viaLoose = true;
+    }
+
     target.data = applyRomPatch(target.data, p.data, { stripHeader: false }).rom;
     applied++;
+    if (viaLoose) loose++;
   }
 
   // 분할 셋이면 칩이 아카이브마다 흩어져 있어 여기서 0 개인 것도 정상이다 — 그때는 호출측
@@ -427,6 +487,7 @@ export async function applyBundlePatch(romZip, patchZip, opts = {}) {
   return {
     rom: writeZip(romEntries),
     applied,
+    loose,
     total: patchEntries.length,
     romNames: romEntries.map((e) => e.name),
     patchNames: patchEntries.map((e) => chipKey(e.name)),
@@ -468,17 +529,19 @@ export async function applyBundlePatchToSet(zips, patchZip) {
   const roms = [];
   const seenNames = [];
   let applied = 0;
+  let loose = 0;
 
   for (const z of zips) {
     const out = await applyBundlePatch(z, patchZip, { allowNoMatch: true });
     roms.push(out.rom);
     seenNames.push(...out.romNames);
     applied += out.applied;
+    loose += out.loose;
   }
 
   if (applied === 0) {
     throw new Error(describeMismatch(seenNames, patchEntries));
   }
 
-  return { roms, applied, total: patchEntries.length };
+  return { roms, applied, loose, total: patchEntries.length };
 }

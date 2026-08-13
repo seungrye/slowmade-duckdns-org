@@ -36,7 +36,7 @@ describe('retro/library — 기본 제공 홈브류 목록', () => {
     }
   });
 
-  // #139 — 아케이드(CPS2)는 자유 배포 롬셋이 없어 기본 제공이 비어 있다. 사용자가 올려서 쓴다.
+  // #139 — 아케이드(FBNeo)는 자유 배포 롬셋이 없어 기본 제공이 비어 있다. 사용자가 올려서 쓴다.
   it('기종마다 많아야 하나 — 목록이 무심코 불어나지 않게', () => {
     for (const p of PLATFORMS) {
       const n = BUILTIN_GAMES.filter((g) => g.platform === p.id).length;

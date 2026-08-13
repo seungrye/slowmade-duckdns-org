@@ -5,11 +5,11 @@
 // 패치·병합이 통째로 죽었다). 별도 파일이면 `no-undef` 가 잡는다.
 
 import { applyBundlePatchToSet, applyRomPatch, isZip } from './rom-patch.js';
-import { romFileNameFromUrl } from './rom-name.js';
+import { patchedRomPath, romFileNameFromUrl } from './rom-name.js';
 
 const DATA_PATH = '/games/retro/data/';
 // src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 양쪽을 함께 고칠 것.
-const CORES = ['snes9x', 'fbalpha2012_cps2'];
+const CORES = ['snes9x', 'fbneo'];
 
 function notice(html) {
   const el = document.getElementById('game');
@@ -47,7 +47,7 @@ const patch = q.get('patch') || '';
 // 세이브를 매달 게임 키 (#114) — `builtin:<slug>` 또는 `rom:<id>`. 없으면 서버 저장을 안 건다.
 const saveKey = q.get('save') || '';
 // 아케이드 분할 셋 — 코어 파일시스템에 함께 놓을 부모 롬셋들 (#143, #148).
-// 합치지 않는다 — FBA 는 부모 아카이브를 따로 찾는다(installParentSets 주석 참고).
+// 합치지 않는다 — 아케이드 코어는 부모 아카이브를 따로 찾는다(installFsFiles 주석 참고).
 const parentUrls = q.getAll('set');
 
 // 이 문서는 CSP 에서 'unsafe-eval' 이 열려 있다(코어 7z 해제에 필요 — middleware.ts 참고).
@@ -71,8 +71,8 @@ if (CORES.indexOf(core) < 0) {
 
 async function start() {
   let gameUrl = rom;
-  // 코어 가상 파일시스템에 함께 놓을 부모 아카이브들 — {name, data}.
-  let parentFiles = [];
+  // 코어 가상 파일시스템에 직접 놓을 것들 — {path, data}.
+  const fsFiles = [];
 
   if (patch || parentUrls.length) {
     // 여기서 다 만든다 — 패치 적용, 부모 준비. **결과는 어디에도 저장하지 않는다**:
@@ -84,22 +84,25 @@ async function start() {
         ...parentUrls.map(fetchBytes),
       ]);
 
-      let romData = romBytes;
-      parentFiles = parentBytes.map((data, i) => ({
+      const romName = romFileNameFromUrl(rom, extensionFor(core));
+      const parents = parentBytes.map((data, i) => ({
         name: romFileNameFromUrl(parentUrls[i], extensionFor(core)),
         data,
       }));
+
+      // 부모는 **원본 그대로** 루트에 놓는다. 코어가 콘텐츠와 같은 디렉터리에서 찾는다.
+      for (const p of parents) fsFiles.push({ path: '/' + p.name, data: p.data });
+
+      let romData = romBytes;
+      let patchedParents = null;
 
       if (patchBytes) {
         if (isZip(patchBytes)) {
           // 아케이드 묶음 패치 — zip 안쪽 칩마다 IPS 를 먹인다. 분할 셋이면 칩이 부모·클론에
           // 나뉘어 있으므로 **아카이브마다** 짝이 맞는 것만 먹이고, 전체에서 하나도 못 맞출 때만
           // 오류를 낸다.
-          const out = await applyBundlePatchToSet(
-            [...parentFiles.map((f) => f.data), romData],
-            patchBytes,
-          );
-          parentFiles = parentFiles.map((f, i) => ({ ...f, data: out.roms[i] }));
+          const out = await applyBundlePatchToSet([...parents.map((p) => p.data), romData], patchBytes);
+          patchedParents = parents.map((p, i) => ({ ...p, data: out.roms[i] }));
           romData = out.roms[out.roms.length - 1];
         } else {
           const strip = q.get('strip');
@@ -108,12 +111,22 @@ async function start() {
         }
       }
 
-      // 패치를 먹였을 때만 File 로 바꾼다 — 손대지 않았으면 주소 그대로 두는 편이 낫다
-      // (EmulatorJS 가 IndexedDB 에 캐시해 두 번째 실행이 빨라진다).
       if (patchBytes) {
-        // EJS_gameUrl 은 File 도 받는다(EmulatorJS 가 gameUrl.name 으로 바꿔 쓴다).
-        // **아케이드는 파일명이 곧 롬셋 이름**이라 원래 이름을 그대로 살려야 한다 — rom-name.js.
-        gameUrl = new File([romData], romFileNameFromUrl(rom, extensionFor(core)));
+        const patchedPath = patchedRomPath(core, romName);
+        if (patchedPath) {
+          // FBNeo — 패치본은 **patched 경로**에 놓는다. 코어가 그쪽을 먼저 보고, 거기서 온 롬은
+          // CRC 가 달라도 이름으로 받아 준다(rom-name.js 주석). 콘텐츠는 원본 주소를 그대로 둬
+          // EmulatorJS 의 캐시도 살린다.
+          fsFiles.push({ path: patchedPath, data: romData });
+          for (const p of patchedParents ?? []) {
+            fsFiles.push({ path: patchedRomPath(core, p.name), data: p.data });
+          }
+        } else {
+          // 그 밖의 코어 — 패치본을 콘텐츠로 직접 넘긴다. EJS_gameUrl 은 File 도 받는다
+          // (EmulatorJS 가 gameUrl.name 으로 바꿔 쓴다). **아케이드는 파일명이 곧 롬셋
+          // 이름**이라 원래 이름을 살려야 한다.
+          gameUrl = new File([romData], romName);
+        }
       }
     } catch (err) {
       return notice(
@@ -124,7 +137,7 @@ async function start() {
     }
   }
 
-  if (parentFiles.length) installParentSets(parentFiles);
+  if (fsFiles.length) installFsFiles(fsFiles);
 
   window.EJS_player = '#game';
   window.EJS_core = core;
@@ -160,36 +173,52 @@ async function start() {
 }
 
 /**
- * 부모 롬셋을 코어의 가상 파일시스템에 놓는다 (#148).
+ * 아카이브를 코어의 가상 파일시스템에 직접 놓는다 (#148, #151).
  *
- * **합치지 않는다.** 처음엔 부모+클론을 zip 하나로 병합해 넘겼는데, FBA 는 클론을 열 때
- * 부모 아카이브를 **콘텐츠와 같은 디렉터리에서 따로** 찾는다:
+ * **부모 롬셋을 합치지 않는다.** 처음엔 부모+클론을 zip 하나로 병합해 넘겼는데, 아케이드 코어는
+ * 클론을 열 때 부모 아카이브를 **콘텐츠와 같은 디렉터리에서 따로** 찾는다:
  *
  *     [FBA] Archive: ddsoma
  *     [FBA] Archive: ddsom
  *     [FBA] ERROR Failed to find archive: /ddsom   ← 합쳐 놓으면 여기서 죽는다
  *
- * 그래서 각 아카이브를 제 이름 그대로 `/` 에 써 준다.
+ * 그래서 각 아카이브를 제 이름 그대로 놓는다. 패치본의 자리는 코어마다 다르다 — rom-name.js 의
+ * `patchedRomPath` 참고.
  *
  * 자리는 `saveDatabaseLoaded` 뿐이다 — FS 를 넘겨주면서 `downloadRom()` **직전**에 불린다.
  * 이 이벤트는 전역으로 노출돼 있지 않아 `ready` 안에서 직접 등록한다. `ready` 는 코어 내려받기가
  * 시작되고 20ms 뒤에 울리므로 항상 그보다 앞선다.
  */
-function installParentSets(files) {
+function installFsFiles(files) {
   window.EJS_ready = () => {
     const em = window.EJS_emulator;
     if (!em || typeof em.on !== 'function') return;
     em.on('saveDatabaseLoaded', (FS) => {
       for (const f of files) {
         try {
-          FS.writeFile('/' + f.name, f.data);
+          mkdirp(FS, f.path);
+          FS.writeFile(f.path, f.data);
         } catch (err) {
-          // 부모 하나가 실패해도 나머지는 놓아 본다 — 코어가 무엇을 찾는지는 코어만 안다.
-          console.error('부모 롬셋을 놓지 못했습니다: ' + f.name, err);
+          // 하나가 실패해도 나머지는 놓아 본다 — 코어가 무엇을 찾는지는 코어만 안다.
+          console.error('롬셋을 놓지 못했습니다: ' + f.path, err);
         }
       }
     });
   };
+}
+
+/** 파일의 상위 디렉터리를 만든다. 이미 있으면 조용히 넘어간다. */
+function mkdirp(FS, path) {
+  const parts = path.split('/').slice(1, -1);
+  let at = '';
+  for (const p of parts) {
+    at += '/' + p;
+    try {
+      FS.mkdir(at);
+    } catch {
+      // 이미 있음 — emscripten FS 는 EEXIST 를 던진다.
+    }
+  }
 }
 
 /**
@@ -245,5 +274,5 @@ async function fetchBytes(url) {
 
 /** 코어에 맞는 확장자 — 주소에서 이름을 못 뽑았을 때만 쓴다. */
 function extensionFor(c) {
-  return { snes9x: 'sfc', fbalpha2012_cps2: 'zip' }[c] || 'bin';
+  return { snes9x: 'sfc', fbneo: 'zip' }[c] || 'bin';
 }

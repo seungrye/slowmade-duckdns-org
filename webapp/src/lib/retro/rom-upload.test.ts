@@ -35,9 +35,9 @@ describe('retro/rom-upload', () => {
 
     it('플랫폼을 직접 지정하면 확장자 추론보다 우선한다', () => {
       // .bin 처럼 추론 못 하는 파일을 위해 필요하다.
-      const r = validateRomUpload({ filename: 'game.bin', size: 1024, platform: 'cps2' });
+      const r = validateRomUpload({ filename: 'game.bin', size: 1024, platform: 'arcade' });
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.platform).toBe('cps2');
+      if (r.ok) expect(r.platform).toBe('arcade');
     });
 
     it('추론도 못 하고 지정도 없으면 거부한다', () => {

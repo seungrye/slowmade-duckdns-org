@@ -2,7 +2,11 @@
 //
 // 배포되는 파일을 그대로 불러 검증한다 — player.js 가 import 하는 것과 같은 하나다.
 import { describe, it, expect } from 'vitest';
-import { romFileNameFromUrl } from '../../../public/games/retro/rom-name.js';
+import {
+  PATCHED_ROM_DIR,
+  patchedRomPath,
+  romFileNameFromUrl,
+} from '../../../public/games/retro/rom-name.js';
 
 describe('romFileNameFromUrl', () => {
   // #148 의 핵심 — 아케이드는 **파일명이 곧 롬셋 이름**이다. 여기가 틀어지면 코어가 롬을
@@ -57,5 +61,25 @@ describe('romFileNameFromUrl', () => {
   it('망가진 퍼센트 이스케이프에도 던지지 않는다', () => {
     expect(() => romFileNameFromUrl('/x/%E0%A4%A.zip', 'zip')).not.toThrow();
     expect(romFileNameFromUrl('/x/%E0%A4%A.zip', 'zip')).toBeTruthy();
+  });
+});
+
+// #151 — FBNeo 는 `<system>/fbneo/patched/<셋>` 을 먼저 보고, 거기서 온 롬은 **CRC 가 달라도
+// 이름으로** 받아 준다(WARN 만). 번역 패치를 위해 있는 기능이다. 루트(`/`)에 놓으면 CRC 검사에
+// 걸려 `ROM at index N ... is required` 로 적재가 실패한다.
+describe('patchedRomPath', () => {
+  it('FBNeo 는 patched 경로에 놓는다', () => {
+    expect(patchedRomPath('fbneo', 'ddsoma.zip')).toBe('/fbneo/patched/ddsoma.zip');
+    expect(PATCHED_ROM_DIR).toBe('/fbneo/patched');
+  });
+
+  it('다른 코어는 patched 경로를 쓰지 않는다 — 그런 규약이 없다', () => {
+    expect(patchedRomPath('fbalpha2012_cps2', 'ddsoma.zip')).toBeNull();
+    expect(patchedRomPath('snes9x', 'a.sfc')).toBeNull();
+    expect(patchedRomPath('', 'a.zip')).toBeNull();
+  });
+
+  it('경로 조각이 섞인 이름은 파일명만 남긴다', () => {
+    expect(patchedRomPath('fbneo', 'a/b/ddsoma.zip')).toBe('/fbneo/patched/ddsoma.zip');
   });
 });
