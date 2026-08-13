@@ -3,7 +3,7 @@
 // 목록에는 성격이 다른 둘이 섞인다 — 저장소에 딸려 오는 **기본 제공 홈브류**와 사용자가
 // **직접 올린 롬**. 화면·검색·필터가 둘을 구분하지 않아도 되도록 여기서 같은 모양으로 만든다.
 
-import type { PlatformId } from './platforms';
+import { platformById, type PlatformId } from './platforms';
 
 export type GameSource = 'builtin' | 'rom';
 
@@ -92,13 +92,26 @@ export function romEntry(rom: UserRomDto): GameEntry {
     cover: rom.coverUrl,
     // 공개 /s3/ 경로를 쓰지 않는다 — 주소만 알면 남이 받아 갈 수 있다.
     // 올린 사람 본인만 통과하는 인증 프록시로만 내려준다.
-    romUrl: `/api/games/retro/roms/${rom.id}/file`,
+    romUrl: romFileUrl(rom),
     playHref: `/games/retro/play/rom/${rom.id}`,
     subtitle: formatBytes(rom.size),
     patch: rom.patch,
     patchEnabled: rom.patchEnabled,
     hasSave: rom.hasSave,
   };
+}
+
+/**
+ * 롬 파일 주소 (#137).
+ *
+ * 끝을 `<id>.<확장자>` 로 맺는다. **EmulatorJS 는 URL 의 마지막 조각을 브라우저 캐시(IndexedDB)
+ * 키로 쓴다** — 예전처럼 모두 `.../file` 로 끝나면 키가 하나로 겹쳐, 바이트 크기가 같은 두 롬이
+ * 있을 때 엉뚱한 게임이 뜰 수 있다. id 를 넣어 롬마다 키가 갈리게 한다.
+ * 확장자는 코어가 쓰는 가상 파일명에도 그대로 붙는다.
+ */
+export function romFileUrl(rom: { id: string; platform: PlatformId }): string {
+  const ext = platformById(rom.platform)?.extensions[0] ?? '.bin';
+  return `/api/games/retro/roms/${rom.id}/file/${rom.id}${ext}`;
 }
 
 export function formatBytes(bytes: number): string {

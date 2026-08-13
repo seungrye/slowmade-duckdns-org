@@ -19,7 +19,7 @@ describe('EmulatorFrame', () => {
   });
 
   it('게임패드를 허용한다 — 안 주면 iframe 안에서 패드가 안 잡힌다', () => {
-    render(<EmulatorFrame core="mgba" rom="/api/games/retro/roms/1/file" />);
+    render(<EmulatorFrame core="mgba" rom="/api/games/retro/roms/1/file/1.gba" />);
     expect(iframe()!.getAttribute('allow')).toContain('gamepad');
   });
 
