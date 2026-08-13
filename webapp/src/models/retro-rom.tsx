@@ -64,7 +64,7 @@ export interface RetroRomDoc {
   coverKey?: string;
   coverFormat?: string;
   /**
-   * 함께 병합할 부모 롬셋들 (#143) — 아케이드 분할 셋.
+   * 코어에 함께 놓을 부모 롬셋들 (#143) — 아케이드 분할 셋.
    * **일반적인 것부터** 담는다. 실행할 때 이 순서로 쌓고 마지막에 본체(클론)가 이긴다.
    */
   parentSets: { name: string; size: number; objectKey: string }[];

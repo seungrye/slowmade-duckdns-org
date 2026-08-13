@@ -4,8 +4,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   applyBundlePatch,
+  applyBundlePatchToSet,
   isZip,
-  mergeZips,
   readZip,
   writeZip,
 } from '../../../public/games/retro/rom-patch.js';
@@ -146,60 +146,62 @@ describe('retro/zip', () => {
     });
   });
 
-  // #143 — 분할 셋은 **미리 합쳐서** 다룬다. 그러면 코어에 완전한 셋 하나만 주면 되고
-  // 패치도 한 번에 먹는다.
-  describe('mergeZips — 부모 + 클론', () => {
+  // #148 — 분할 셋은 **합치지 않는다**. FBA 가 부모 아카이브를 따로 찾기 때문에 각각 그대로
+  // 두고, 패치만 아카이브를 가로질러 먹인다.
+  describe('applyBundlePatchToSet — 아카이브를 가로지르는 묶음 패치', () => {
     const parent = () =>
       writeZip([
         { name: 'dd2_13m', data: new Uint8Array(8).fill(0x10) },
-        { name: 'dd2_06g', data: new Uint8Array(8).fill(0x99) }, // 클론이 덮어쓸 것
+        { name: 'dd2_14m', data: new Uint8Array(8).fill(0x11) },
       ]);
     const clone = () =>
       writeZip([
         { name: 'dd2a_03g', data: new Uint8Array(8).fill(0x20) },
-        { name: 'dd2_06g', data: new Uint8Array(8).fill(0x30) }, // 리전별 교체본
+        { name: 'dd2a_04g', data: new Uint8Array(8).fill(0x21) },
+      ]);
+    const bundle = () =>
+      writeZip([
+        { name: 'x/dd2_13m.ips', data: ips(0, [0xaa]) },   // 부모 쪽 칩
+        { name: 'x/dd2a_03g.ips', data: ips(0, [0xbb]) },  // 클론 쪽 칩
+        { name: 'x/readme.txt', data: bytes(1) },
       ]);
 
-    it('둘의 파일이 모두 들어간다', async () => {
-      const back = await readZip(await mergeZips([parent(), clone()]));
-      expect(back.map((e) => e.name).sort()).toEqual(['dd2_06g', 'dd2_13m', 'dd2a_03g']);
-    });
-
-    it('**클론이 부모를 덮어쓴다** — 분할 셋의 규칙이다', async () => {
-      const back = await readZip(await mergeZips([parent(), clone()]));
-      const byName = Object.fromEntries(back.map((e) => [e.name, e.data]));
-      expect(byName['dd2_06g'][0]).toBe(0x30); // 부모의 0x99 가 아니라 클론의 0x30
-      expect(byName['dd2_13m'][0]).toBe(0x10); // 부모에만 있는 것은 그대로
-    });
-
-    it('순서를 뒤집으면 부모가 이긴다 — 넘기는 순서가 규칙이다', async () => {
-      const back = await readZip(await mergeZips([clone(), parent()]));
-      const byName = Object.fromEntries(back.map((e) => [e.name, e.data]));
-      expect(byName['dd2_06g'][0]).toBe(0x99);
-    });
-
-    it('경로가 붙어 있어도 파일명만 남긴다', async () => {
-      const nested = writeZip([{ name: 'ddsoma/dd2_99z', data: new Uint8Array(4) }]);
-      const back = await readZip(await mergeZips([nested]));
-      expect(back[0].name).toBe('dd2_99z');
-    });
-
-    it('하나만 줘도 된다 — 완전 셋이면 합칠 게 없다', async () => {
-      const back = await readZip(await mergeZips([clone(), undefined]));
-      expect(back).toHaveLength(2);
-    });
-
-    it('합친 뒤에는 패치가 한 번에 먹는다', async () => {
-      const bundle = writeZip([
-        { name: 'x/dd2a_03g.ips', data: ips(0, [0x11]) },
-        { name: 'x/dd2_13m.ips', data: ips(0, [0x22]) },
-      ]);
-      const out = await applyBundlePatch(await mergeZips([parent(), clone()]), bundle);
+    it('칩이 어느 아카이브에 있든 제자리에 먹인다', async () => {
+      const out = await applyBundlePatchToSet([parent(), clone()], bundle());
       expect(out.applied).toBe(2);
 
-      const byName = Object.fromEntries((await readZip(out.rom)).map((e) => [e.name, e.data]));
-      expect(byName['dd2a_03g'][0]).toBe(0x11);
-      expect(byName['dd2_13m'][0]).toBe(0x22);
+      const p = Object.fromEntries((await readZip(out.roms[0])).map((e) => [e.name, e.data]));
+      const c = Object.fromEntries((await readZip(out.roms[1])).map((e) => [e.name, e.data]));
+      expect(p['dd2_13m'][0]).toBe(0xaa);
+      expect(c['dd2a_03g'][0]).toBe(0xbb);
+      // 짝이 없던 칩은 손대지 않는다.
+      expect(p['dd2_14m'][0]).toBe(0x11);
+      expect(c['dd2a_04g'][0]).toBe(0x21);
+    });
+
+    it('넘긴 순서를 그대로 돌려준다 — 호출측이 이름과 짝지어야 한다', async () => {
+      const out = await applyBundlePatchToSet([parent(), clone()], bundle());
+      expect(out.roms).toHaveLength(2);
+      expect((await readZip(out.roms[0])).map((e) => e.name)).toContain('dd2_13m');
+      expect((await readZip(out.roms[1])).map((e) => e.name)).toContain('dd2a_03g');
+    });
+
+    it('한 아카이브만 맞아도 통과한다 — 부분 적용이 정상이다', async () => {
+      const only = writeZip([{ name: 'x/dd2_13m.ips', data: ips(0, [0xaa]) }]);
+      const out = await applyBundlePatchToSet([parent(), clone()], only);
+      expect(out.applied).toBe(1);
+    });
+
+    it('전체에서 하나도 못 맞추면 **양쪽 이름을 담아** 오류', async () => {
+      const mameStyle = writeZip([{ name: 'dd2.13m', data: new Uint8Array(4) }]);
+      await expect(applyBundlePatchToSet([mameStyle], bundle())).rejects.toThrow(
+        /dd2\.13m[\s\S]*dd2_13m|dd2_13m[\s\S]*dd2\.13m/,
+      );
+    });
+
+    it('패치 zip 에 ips 가 하나도 없으면 오류', async () => {
+      const noIps = writeZip([{ name: 'readme.txt', data: bytes(1) }]);
+      await expect(applyBundlePatchToSet([parent()], noIps)).rejects.toThrow(/IPS/);
     });
   });
 });

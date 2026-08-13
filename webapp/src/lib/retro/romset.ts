@@ -12,7 +12,7 @@
 export interface RomSetClassification {
   /** 코어에 넘길 게임 이름 — 이 zip 의 이름이 곧 롬셋 이름이다. */
   game: string | null;
-  /** 밑에 깔 부모들. **일반적인 것부터** 나열된다(뒤에 오는 것이 이긴다). */
+  /** 함께 놓을 부모들. **일반적인 것부터** 나열된다 — 코어가 필요할 때 거슬러 찾는다. */
   parents: string[];
   /** 이름 규칙으로 못 가렸다 — 화면에서 확인을 받는 편이 좋다. */
   ambiguous: boolean;

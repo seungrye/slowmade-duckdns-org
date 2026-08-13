@@ -14,7 +14,7 @@ interface Props {
   stripHeader?: boolean;
   /** 세이브를 매달 게임 키 (#114). 주면 Save/Load 버튼이 서버를 쓴다. */
   saveKey?: string;
-  /** 함께 병합할 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. */
+  /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. */
   parents?: string[];
 }
 
