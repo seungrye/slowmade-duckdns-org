@@ -545,3 +545,119 @@ export async function applyBundlePatchToSet(zips, patchZip) {
 
   return { roms, applied, loose, total: patchEntries.length };
 }
+
+// ── CPS2 키 채우기 (#153) ────────────────────────────────────────────────────
+//
+// FBNeo 는 CPS2 롬셋에서 `<셋>.key` 를 읽는다(구형 fbalpha2012 는 코드에 내장했다).
+// 암호화 세트의 키는 진짜 키라 만들어 낼 수 없지만, **Phoenix(복호화) 세트가 요구하는
+// `phoenix.key` 는 "암호화 없음"을 뜻하는 공개 상수**다 — 20 바이트 0xFF(CRC 0x2cf772b0).
+// 롬셋에 그게 빠져 있다는 이유만으로 못 돌리는 건 아까우니 우리가 채워 넣는다.
+
+export const PHOENIX_KEY_NAME = 'phoenix.key';
+
+/** FBNeo 가 기대하는 phoenix.key 내용. */
+export function phoenixKeyBytes() {
+  return new Uint8Array(20).fill(0xff);
+}
+
+/** zip 의 항목 이름만 읽는다 — 압축을 풀지 않는다. zip 이 아니면 빈 목록. */
+export async function zipEntryNames(bytes) {
+  if (!isZip(bytes) || bytes.length < 22) return [];
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (u32(view, i) === ZIP_EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) return [];
+
+  const count = u16(view, eocd + 10);
+  let p = u32(view, eocd + 16);
+  const names = [];
+  const decoder = new TextDecoder();
+  for (let i = 0; i < count; i++) {
+    if (u32(view, p) !== ZIP_CENTRAL) return names;
+    const nameLen = u16(view, p + 28);
+    const extraLen = u16(view, p + 30);
+    const commentLen = u16(view, p + 32);
+    names.push(decoder.decode(bytes.subarray(p + 46, p + 46 + nameLen)));
+    p += 46 + nameLen + extraLen + commentLen;
+  }
+  return names;
+}
+
+/**
+ * 롬셋에 키가 하나도 없으면 `phoenix.key` 를 넣어 준다 (#153).
+ *
+ * **다시 묶지 않고 덧붙인다.** 실제 롬 zip 은 전부 deflate 라, 풀었다 무압축으로 다시 묶으면
+ * 16MB 짜리가 34MB 로 부푼다. 중앙 디렉터리 앞에 항목 하나를 끼워 넣고 디렉터리만 다시 쓰면
+ * 원래 압축된 바이트를 그대로 살릴 수 있다.
+ *
+ * 이미 `.key` 가 있으면 손대지 않는다 — 암호화 세트는 제 이름의 키를 요구하므로 우리가 끼워
+ * 넣을 것이 없다.
+ *
+ * @returns {{zip: Uint8Array, added: boolean}} 안 넣었으면 받은 배열을 그대로 돌려준다.
+ */
+export async function ensurePhoenixKey(bytes) {
+  const names = await zipEntryNames(bytes);
+  if (names.length === 0) return { zip: bytes, added: false };
+  if (names.some((n) => /\.key$/i.test(n))) return { zip: bytes, added: false };
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (u32(view, i) === ZIP_EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) return { zip: bytes, added: false };
+
+  const cdAt = u32(view, eocd + 16);
+  const cdSize = u32(view, eocd + 12);
+  const count = u16(view, eocd + 10);
+
+  const key = phoenixKeyBytes();
+  const name = new TextEncoder().encode(PHOENIX_KEY_NAME);
+  const crc = crc32(key);
+
+  // 새 로컬 항목 — 중앙 디렉터리가 시작되던 자리에 놓는다(기존 항목의 오프셋은 안 변한다).
+  const local = new Uint8Array(30 + name.length + key.length);
+  const lv = new DataView(local.buffer);
+  lv.setUint32(0, ZIP_LOCAL, true);
+  lv.setUint16(4, 20, true);
+  lv.setUint16(8, 0, true); // 무압축 — 20 바이트다
+  lv.setUint32(14, crc, true);
+  lv.setUint32(18, key.length, true);
+  lv.setUint32(22, key.length, true);
+  lv.setUint16(26, name.length, true);
+  local.set(name, 30);
+  local.set(key, 30 + name.length);
+
+  const central = new Uint8Array(46 + name.length);
+  const cv = new DataView(central.buffer);
+  cv.setUint32(0, ZIP_CENTRAL, true);
+  cv.setUint16(4, 20, true);
+  cv.setUint16(6, 20, true);
+  cv.setUint16(10, 0, true);
+  cv.setUint32(16, crc, true);
+  cv.setUint32(20, key.length, true);
+  cv.setUint32(24, key.length, true);
+  cv.setUint16(28, name.length, true);
+  cv.setUint32(42, cdAt, true); // 새 로컬 항목의 자리
+  central.set(name, 46);
+
+  const newCdAt = cdAt + local.length;
+  const eocdOut = new Uint8Array(22);
+  const ev = new DataView(eocdOut.buffer);
+  ev.setUint32(0, ZIP_EOCD, true);
+  ev.setUint16(8, count + 1, true);
+  ev.setUint16(10, count + 1, true);
+  ev.setUint32(12, cdSize + central.length, true);
+  ev.setUint32(16, newCdAt, true);
+
+  const out = new Uint8Array(newCdAt + cdSize + central.length + eocdOut.length);
+  let at = 0;
+  out.set(bytes.subarray(0, cdAt), at); at += cdAt;             // 원래 로컬 항목들(압축 그대로)
+  out.set(local, at); at += local.length;                        // 새 항목
+  out.set(bytes.subarray(cdAt, cdAt + cdSize), at); at += cdSize; // 원래 중앙 디렉터리
+  out.set(central, at); at += central.length;                    // 새 중앙 디렉터리 항목
+  out.set(eocdOut, at);
+  return { zip: out, added: true };
+}
