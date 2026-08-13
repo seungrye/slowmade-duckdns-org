@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  MAX_ROM_BYTES,
-  OWNER_MAX_ROM_BYTES,
-  romTitleFromFilename,
-  validateRomUpload,
-} from './rom-upload';
+import { MAX_ROM_BYTES, romTitleFromFilename, validateRomUpload } from './rom-upload';
 
 describe('retro/rom-upload', () => {
   describe('romTitleFromFilename — 파일명에서 보여줄 제목 뽑기', () => {
@@ -62,13 +57,14 @@ describe('retro/rom-upload', () => {
       if (!r.ok) expect(r.reason).toContain('비어');
     });
 
-    it('한도를 넘으면 거부하고, owner 는 한도가 더 높다', () => {
-      const big = { filename: 'a.sfc', size: MAX_ROM_BYTES + 1 };
-      expect(validateRomUpload(big).ok).toBe(false);
-      expect(validateRomUpload({ ...big, isOwner: true }).ok).toBe(true);
+    it('한도를 넘으면 거부한다', () => {
+      expect(validateRomUpload({ filename: 'a.sfc', size: MAX_ROM_BYTES }).ok).toBe(true);
+      expect(validateRomUpload({ filename: 'a.sfc', size: MAX_ROM_BYTES + 1 }).ok).toBe(false);
+    });
 
-      const huge = { filename: 'a.sfc', size: OWNER_MAX_ROM_BYTES + 1, isOwner: true };
-      expect(validateRomUpload(huge).ok).toBe(false);
+    // #146 — nginx 의 location 값과 어긋나면 사용자에게 이유가 안 보이는 413 이 난다.
+    it('상한은 50MB 다 — nginx location 과 같은 값이어야 한다', () => {
+      expect(MAX_ROM_BYTES).toBe(50 * 1024 * 1024);
     });
 
     it('한도 초과 사유에 MB 숫자가 들어간다 — 사용자가 얼마나 줄여야 하는지 알아야 한다', () => {
@@ -76,9 +72,6 @@ describe('retro/rom-upload', () => {
       if (!r.ok) expect(r.reason).toMatch(/\d+\s*MB/);
     });
 
-    it('일반 한도는 nginx 서버 기본값(16M) 안에 있다', () => {
-      // 넘기면 nginx 가 앱에 닿기 전에 413 을 내 사용자에게 이유가 안 보인다.
-      expect(MAX_ROM_BYTES).toBeLessThan(16 * 1024 * 1024);
-    });
+
   });
 });

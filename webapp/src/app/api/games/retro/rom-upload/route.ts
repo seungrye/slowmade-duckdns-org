@@ -14,7 +14,6 @@ import { randomUUID } from 'crypto';
 import { env } from '@/lib/env';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { requireAuth } from '@/lib/require-auth';
-import { isOwner } from '@/lib/require-owner';
 import { connectToDB } from '@/lib/db';
 import RetroRom from '@/models/retro-rom';
 import { validateRomUpload } from '@/lib/retro/rom-upload';
@@ -46,13 +45,11 @@ export async function POST(req: NextRequest) {
   const parents = all.filter((f) => f !== file);
 
   const platform = formData.get('platform');
-  const owner = await isOwner();
 
   const check = validateRomUpload({
     filename: file.name,
     size: file.size,
     platform: typeof platform === 'string' && platform ? platform : undefined,
-    isOwner: owner,
   });
   if (!check.ok) {
     // 크기 초과만 413 — nginx·브라우저가 내는 413 과 의미를 맞춰 클라이언트가 한 갈래로 처리한다.

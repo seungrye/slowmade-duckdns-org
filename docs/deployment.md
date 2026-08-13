@@ -110,20 +110,31 @@ seungrye ALL=(root) NOPASSWD: /bin/systemctl start webapp@*, \
 
 ### 6. nginx sites 파일 코드화 (재해 복구)
 
-`/etc/nginx/sites-enabled/slowmade.duckdns.org` 의 *최신 내용* 을 `scripts/deploy/slowmade.duckdns.org.nginx` 로 git 추적한다. 새 도메인/cert/header 변경 시 항상 둘을 동기화.
+`/etc/nginx/sites-enabled/` 의 **두 도메인 모두** *최신 내용* 을 `scripts/deploy/<도메인>.nginx` 로
+git 추적한다 — `slowmade.duckdns.org` · `handmade.r-e.kr`. 새 도메인/cert/header/업로드 상한
+변경 시 항상 둘을 함께 동기화.
+
+> **한쪽만 고치지 말 것** (#146 에서 실제로 겪음). 업로드 상한을 slowmade 스냅샷에만 적어 두면
+> 실서버에는 반영되지 않고, handmade 로 들어온 요청은 server 기본값에서 413 이 난다. 게다가
+> 실패가 nginx 단이라 앱 로그에 아무것도 안 남아 원인을 찾기 어렵다.
 
 ```bash
-# 변경 → git 으로 회수
-sudo cp /etc/nginx/sites-enabled/slowmade.duckdns.org \
-    /home/seungrye/site/scripts/deploy/slowmade.duckdns.org.nginx
-sudo chown $USER:$USER scripts/deploy/slowmade.duckdns.org.nginx
-git add scripts/deploy/slowmade.duckdns.org.nginx && git commit
+# 변경 → git 으로 회수 (두 도메인)
+for d in slowmade.duckdns.org handmade.r-e.kr; do
+    sudo cp "/etc/nginx/sites-enabled/$d" "/home/seungrye/site/scripts/deploy/$d.nginx"
+    sudo chown "$USER:$USER" "scripts/deploy/$d.nginx"
+done
+git add scripts/deploy/*.nginx && git commit
 
 # 재해 복구 (서버 재구축)
-sudo install -m 0644 scripts/deploy/slowmade.duckdns.org.nginx \
-    /etc/nginx/sites-enabled/slowmade.duckdns.org
+for d in slowmade.duckdns.org handmade.r-e.kr; do
+    sudo install -m 0644 "scripts/deploy/$d.nginx" "/etc/nginx/sites-enabled/$d"
+done
 sudo nginx -t && sudo nginx -s reload
 ```
+
+**백업 파일을 `sites-enabled/` 안에 두지 말 것.** include 글롭이 `*.bak` 까지 읽어
+`duplicate upstream` 으로 `nginx -t` 가 깨진다. 백업은 `/etc/nginx/config-backups/` 로.
 
 ssl 경로 (`/etc/letsencrypt/...`) 는 표준 경로라 공개 안전. 실 인증서는 별도 systemd timer / certbot 으로 갱신.
 

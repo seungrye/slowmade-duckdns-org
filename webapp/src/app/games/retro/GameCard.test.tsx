@@ -337,9 +337,9 @@ describe('GameCard', () => {
     });
   });
 
-  // #145 — 안드로이드는 확장자 accept 를 MIME 으로 못 바꿔 제한된 선택기로 떨어진다.
-  describe('모바일 파일 선택 (#145)', () => {
-    it('패치 입력에 확장자 accept 를 걸지 않는다', () => {
+  // #145 — `.ips,.bps,.ups` 만 받아 zip 묶음 패치를 고를 수 없었다.
+  describe('패치 파일 선택 (#145)', () => {
+    it('확장자 accept 를 걸지 않는다 — zip 묶음 패치도 고를 수 있어야 한다', () => {
       render(<GameCard game={rom()} onPatchUpload={vi.fn()} onCoverUpload={vi.fn()} />);
       const input = screen.getByLabelText('내 롬 패치 파일');
       expect(input.getAttribute('accept')).toBeNull();

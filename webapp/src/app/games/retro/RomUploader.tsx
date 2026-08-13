@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { PLATFORMS } from "@/lib/retro/platforms";
+import { ALL_ROM_EXTENSIONS, PLATFORMS } from "@/lib/retro/platforms";
 import { MAX_ROM_BYTES, validateRomUpload } from "@/lib/retro/rom-upload";
 import { classifyRomSet } from "@/lib/retro/romset";
 import { formatBytes, type UserRomDto } from "@/lib/retro/entry";
@@ -99,9 +99,7 @@ export default function RomUploader({ onUploaded }: Props) {
           ref={inputRef}
           type="file"
           multiple
-          // accept 를 걸지 않는다 (#145). 안드로이드는 `.sfc`·`.smc` 같은 확장자를 MIME 으로
-          // 바꾸지 못해 제한된 선택기로 떨어지고, 거기선 **다중 선택이 막힌다**. 롬 확장자는
-          // 기종마다 제각각이라 걸러 봐야 이득도 적다 — 형식 검사는 어차피 올린 뒤에 한다.
+          accept={ALL_ROM_EXTENSIONS.concat(".bin").join(",")}
           disabled={busy}
           aria-label="롬 파일"
           onChange={(e) => {

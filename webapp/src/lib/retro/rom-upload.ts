@@ -4,29 +4,23 @@
 import { platformById, platformForFilename, type PlatformId } from './platforms';
 
 /**
- * 일반 로그인 사용자 한도.
+ * 롬 한 개의 크기 상한 (#146 — 50MB).
  *
- * **nginx 의 `client_max_body_size` 서버 기본값 16M 안에 있어야 한다.** 넘기면 nginx 가 앱에
- * 닿기 전에 413 을 내버려서 사용자에게는 이유가 안 보인다(`api/attachment/upload` 가 같은 이유로
- * 15MB 를 쓴다). 테스트가 이 관계를 지킨다.
- */
-export const MAX_ROM_BYTES = 15 * 1024 * 1024;
-
-/**
- * owner 한도 — GBA 대작(32MB)까지 받는다.
+ * **nginx 와 짝을 맞춰야 한다.** 서버 기본값은 16M 이라, 이 값을 쓰려면
+ * `location = /api/games/retro/rom-upload { client_max_body_size 50M; }` 가 있어야 한다.
+ * **두 도메인 스냅샷 모두**(`scripts/deploy/{slowmade.duckdns.org,handmade.r-e.kr}.nginx`) —
+ * 한쪽만 고치면 그 도메인으로 들어온 업로드가 nginx 단에서 413 이 나고, 앱 로그에는
+ * 아무것도 안 남아 이유가 안 보인다.
  *
- * **이 한도를 실제로 쓰려면 nginx 에 `location = /api/games/retro/roms { client_max_body_size 64M; }`
- * 가 있어야 한다.** 없으면 16MB 를 넘는 순간 nginx 413 이다. 설정은
- * `scripts/deploy/slowmade.duckdns.org.nginx` 참고.
+ * owner 와 일반 사용자를 나누지 않는다 — nginx 가 어차피 모두를 같은 값으로 막는다.
  */
-export const OWNER_MAX_ROM_BYTES = 64 * 1024 * 1024;
+export const MAX_ROM_BYTES = 50 * 1024 * 1024;
 
 export interface RomUploadInput {
   filename: string;
   size: number;
   /** 사용자가 직접 고른 기종. 확장자 추론보다 우선한다. */
   platform?: PlatformId | string;
-  isOwner?: boolean;
 }
 
 export type RomValidation =
@@ -49,11 +43,10 @@ export function romTitleFromFilename(filename: string): string {
 }
 
 export function validateRomUpload(input: RomUploadInput): RomValidation {
-  const limit = input.isOwner ? OWNER_MAX_ROM_BYTES : MAX_ROM_BYTES;
-
   if (input.size <= 0) return { ok: false, reason: '파일이 비어 있습니다.' };
-  if (input.size > limit) {
-    return { ok: false, reason: `파일이 너무 큽니다 (최대 ${Math.floor(limit / (1024 * 1024))}MB).` };
+  if (input.size > MAX_ROM_BYTES) {
+    const mb = Math.floor(MAX_ROM_BYTES / (1024 * 1024));
+    return { ok: false, reason: `파일이 너무 큽니다 (최대 ${mb}MB).` };
   }
 
   // 사용자가 고른 기종이 있으면 그걸 믿는다 — .bin 처럼 추론이 불가능한 파일 때문에 필요하다.
