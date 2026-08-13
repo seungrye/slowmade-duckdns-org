@@ -39,7 +39,7 @@ describe('retro/platforms', () => {
       ['tales.sfc', 'snes'],
       ['chrono.smc', 'snes'],
       // 아케이드 롬셋은 zip 묶음이다 (#139).
-      ['ssf2t.zip', 'cps2'],
+      ['ssf2t.zip', 'arcade'],
     ])('%s → %s', (filename, expected) => {
       expect(platformForFilename(filename)?.id).toBe(expected);
     });
@@ -57,10 +57,35 @@ describe('retro/platforms', () => {
 
   // #139 — 아케이드만 파일명이 게임 식별자라 다르게 다뤄야 한다.
   describe('isArcade', () => {
-    it('CPS2 만 아케이드다', () => {
-      expect(isArcade('cps2')).toBe(true);
+    it('아케이드 기종만 참이다', () => {
+      expect(isArcade('arcade')).toBe(true);
       expect(isArcade('snes')).toBe(false);
       expect(isArcade(undefined)).toBe(false);
+    });
+  });
+
+  // #151 — 아케이드를 FBNeo 로 **교체**했다(CPS2 전용 fbalpha2012 제거). 두 코어의 차이:
+  // fbalpha2012 는 키를 내장하지만 수정된 롬을 CRC 로 거부하고, FBNeo 는 롬셋에 .key 를
+  // 요구하는 대신 patched 경로의 롬을 이름으로 받아 준다(= 런타임 한글패치 가능).
+  describe('FBNeo 기종 (#151)', () => {
+    it('arcade 기종이 fbneo 코어로 등록돼 있다', () => {
+      const p = platformById('arcade');
+      expect(p?.core).toBe('fbneo');
+      expect(p?.extensions).toContain('.zip');
+    });
+
+    it('CPS2 전용 코어는 더 쓰지 않는다 — 패치가 원천적으로 불가능했다 (#150)', () => {
+      expect(platformById('cps2')).toBeUndefined();
+      expect(SUPPORTED_CORES.has('fbalpha2012_cps2')).toBe(false);
+    });
+
+    it('아케이드로 취급된다 — 파일명이 곧 롬셋 이름이다', () => {
+      expect(isArcade('arcade')).toBe(true);
+      expect(isArcade('snes')).toBe(false);
+    });
+
+    it('아케이드 여부는 배열에서 파생된다 — 새 아케이드 코어를 넣어도 따라온다', () => {
+      for (const p of PLATFORMS) expect(isArcade(p.id)).toBe(p.arcade === true);
     });
   });
 });

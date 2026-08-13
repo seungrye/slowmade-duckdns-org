@@ -96,9 +96,9 @@ describe('POST /api/games/retro/rom-upload', () => {
   it('기종을 직접 지정하면 확장자를 몰라도 받는다', async () => {
     const form = new FormData();
     form.set('file', romFile('mystery.bin'));
-    form.set('platform', 'cps2');
+    form.set('platform', 'arcade');
     expect((await POST(request(form))).status).toBe(201);
-    expect(mockCreate.mock.calls[0][0].platform).toBe('cps2');
+    expect(mockCreate.mock.calls[0][0].platform).toBe('arcade');
   });
 
   it('한도를 넘으면 413 이고 저장하지 않는다', async () => {

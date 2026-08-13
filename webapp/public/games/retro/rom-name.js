@@ -37,3 +37,27 @@ export function romFileNameFromUrl(url, fallbackExt = 'bin') {
   if (!name) return `game.${fallbackExt}`;
   return /\.[^.]+$/.test(name) ? name : `${name}.${fallbackExt}`;
 }
+
+/**
+ * FBNeo 의 패치 롬셋 디렉터리 (#151).
+ *
+ * 시스템 디렉터리가 비어 있으므로 코어가 보는 경로는 `//fbneo/patched/<셋>` = `/fbneo/patched`.
+ */
+export const PATCHED_ROM_DIR = '/fbneo/patched';
+
+/**
+ * 패치한 롬셋을 놓을 자리 (#151). 규약이 없는 코어면 null.
+ *
+ * FBNeo 는 롬셋을 찾을 때 **patched 경로를 먼저** 보고, 거기서 온 롬은 CRC 가 달라도 이름으로
+ * 받아 준다 — 로그에 `Using ROM with unknown crc ... from archive //fbneo/patched/...` 가
+ * 남고 그대로 실행된다. 번역 패치를 위해 있는 기능이다.
+ *
+ * 루트(`/`)에 놓으면 CRC 검사에 걸려 `ROM at index N ... is required` 로 적재가 실패한다 —
+ * fbalpha2012 는 이 규약 자체가 없어 패치된 롬셋을 아예 못 돌린다(#150).
+ */
+export function patchedRomPath(core, fileName) {
+  if (core !== 'fbneo') return null;
+  const base = String(fileName ?? '').split('/').pop();
+  if (!base) return null;
+  return `${PATCHED_ROM_DIR}/${base}`;
+}

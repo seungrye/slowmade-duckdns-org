@@ -146,6 +146,69 @@ describe('retro/zip', () => {
     });
   });
 
+  // #151 — MAME/FBNeo 는 `dd2.13m`, 패치는 FBA 표기 `dd2_13m` 으로 **같은 칩**을 부른다.
+  // 구분자만 다른데 짝을 못 지어 한글 패치가 통째로 못 먹었다(13 개 중 0 개).
+  //
+  // **이름은 바꾸지 않는다.** FBNeo 는 patched 아카이브의 롬을 이름으로 찾는데, 그 표기가
+  // 점 쪽(`dd2.13m`)이다. 패치 표기로 개명하면 오히려 못 찾는다.
+  describe('구분자만 다른 이름 잇기', () => {
+    const dotRom = () =>
+      writeZip([
+        { name: 'dd2.13m', data: new Uint8Array(16).fill(0) },
+        { name: 'dd2a.03g', data: new Uint8Array(16).fill(0) },
+      ]);
+    const usPatch = () =>
+      writeZip([
+        { name: 'x/dd2_13m.ips', data: ips(0, [0xaa]) },
+        { name: 'x/dd2a_03g.ips', data: ips(2, [0xbb]) },
+      ]);
+
+    it('점↔밑줄을 이어 준다 — 같은 칩의 다른 표기다', async () => {
+      const out = await applyBundlePatch(dotRom(), usPatch());
+      expect(out.applied).toBe(2);
+      expect(out.loose).toBe(2);
+      const byName = Object.fromEntries((await readZip(out.rom)).map((e) => [e.name, e.data]));
+      expect(byName['dd2.13m'][0]).toBe(0xaa);
+      expect(byName['dd2a.03g'][2]).toBe(0xbb);
+    });
+
+    it('**이름은 롬셋 것을 지킨다** — 코어가 그 이름으로 찾는다', async () => {
+      const out = await applyBundlePatch(dotRom(), usPatch());
+      const names = (await readZip(out.rom)).map((e) => e.name).sort();
+      expect(names).toEqual(['dd2.13m', 'dd2a.03g']);
+    });
+
+    it('이름이 그대로 맞으면 그쪽이 이긴다 — 느슨한 짝은 뒷순위', async () => {
+      const both = writeZip([
+        { name: 'dd2_13m', data: new Uint8Array(16).fill(0) },
+        { name: 'dd2.13m', data: new Uint8Array(16).fill(0xee) },
+      ]);
+      const out = await applyBundlePatch(both, writeZip([{ name: 'dd2_13m.ips', data: ips(0, [0xaa]) }]));
+      const byName = Object.fromEntries((await readZip(out.rom)).map((e) => [e.name, e.data]));
+      expect(byName['dd2_13m'][0]).toBe(0xaa);
+      expect(byName['dd2.13m'][0]).toBe(0xee); // 건드리지 않는다
+      expect(out.loose).toBe(0);
+    });
+
+    it('둘 이상이 걸리면 **아무것도 건드리지 않는다** — 엉뚱한 칩을 고치면 조용히 망가진다', async () => {
+      const ambiguous = writeZip([
+        { name: 'dd2.13m', data: new Uint8Array(16).fill(0x11) },
+        { name: 'dd2-13m', data: new Uint8Array(16).fill(0x22) },
+      ]);
+      await expect(
+        applyBundlePatch(ambiguous, writeZip([{ name: 'dd2_13m.ips', data: ips(0, [0xaa]) }])),
+      ).rejects.toThrow();
+    });
+
+    // 아케이드 칩은 하드웨어가 크기를 정한다 — 늘어나면 그건 다른 롬이다.
+    it('칩 크기를 넘기는 패치는 잇지 않는다', async () => {
+      const small = writeZip([{ name: 'dd2.13m', data: new Uint8Array(4) }]);
+      await expect(
+        applyBundlePatch(small, writeZip([{ name: 'dd2_13m.ips', data: ips(100, [0xaa]) }])),
+      ).rejects.toThrow();
+    });
+  });
+
   // #148 — 분할 셋은 **합치지 않는다**. FBA 가 부모 아카이브를 따로 찾기 때문에 각각 그대로
   // 두고, 패치만 아카이브를 가로질러 먹인다.
   describe('applyBundlePatchToSet — 아카이브를 가로지르는 묶음 패치', () => {
@@ -192,10 +255,11 @@ describe('retro/zip', () => {
       expect(out.applied).toBe(1);
     });
 
+    // 구분자만 다른 이름은 #151 에서 이어 주므로, 여기선 **아예 다른 롬셋**으로 확인한다.
     it('전체에서 하나도 못 맞추면 **양쪽 이름을 담아** 오류', async () => {
-      const mameStyle = writeZip([{ name: 'dd2.13m', data: new Uint8Array(4) }]);
-      await expect(applyBundlePatchToSet([mameStyle], bundle())).rejects.toThrow(
-        /dd2\.13m[\s\S]*dd2_13m|dd2_13m[\s\S]*dd2\.13m/,
+      const other = writeZip([{ name: 'ssf2t.03', data: new Uint8Array(4) }]);
+      await expect(applyBundlePatchToSet([other], bundle())).rejects.toThrow(
+        /ssf2t\.03[\s\S]*dd2_13m|dd2_13m[\s\S]*ssf2t\.03/,
       );
     });
 

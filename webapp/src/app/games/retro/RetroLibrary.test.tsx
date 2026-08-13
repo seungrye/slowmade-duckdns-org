@@ -6,11 +6,11 @@ import type { BuiltinGame, UserRomDto } from '@/lib/retro/entry';
 
 const BUILTINS: BuiltinGame[] = [
   { slug: 'nomolos', title: 'Nomolos', platform: 'snes', file: 'nomolos.sfc', source: 'https://x.test', license: '홈브류' },
-  { slug: 'anguna', title: 'Anguna', platform: 'cps2', file: 'anguna.zip', source: 'https://x.test', license: '홈브류' },
+  { slug: 'anguna', title: 'Anguna', platform: 'arcade', file: 'anguna.zip', source: 'https://x.test', license: '홈브류' },
 ];
 
 const MY_ROMS: UserRomDto[] = [
-  { id: '653f1a2b3c4d5e6f70819202', title: '내가 올린 롬', platform: 'cps2', size: 2 * 1024 * 1024, createdAt: '2026-08-12T00:00:00.000Z' },
+  { id: '653f1a2b3c4d5e6f70819202', title: '내가 올린 롬', platform: 'arcade', size: 2 * 1024 * 1024, createdAt: '2026-08-12T00:00:00.000Z' },
 ];
 
 /** 사이드바·칩이 둘 다 렌더되므로(CSS 로만 감춤) 사이드바 쪽 버튼을 집어 쓴다. */
@@ -52,7 +52,7 @@ describe('RetroLibrary', () => {
     render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
     expect(sidebarButton('전체')).toHaveTextContent('3');
     expect(sidebarButton('SNES')).toHaveTextContent('1');
-    expect(sidebarButton('CPS2')).toHaveTextContent('2');
+    expect(sidebarButton('FBNeo')).toHaveTextContent('2');
   });
 
   it('검색으로 거른다', () => {

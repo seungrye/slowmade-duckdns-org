@@ -66,20 +66,20 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
   });
 
   // #139 — 아케이드는 zip 이름이 곧 게임 이름이다. 바꾸면 코어가 못 찾는다.
-  describe('아케이드(CPS2)', () => {
+  describe('아케이드(FBNeo)', () => {
     it('원본 파일명을 그대로 주소에 쓴다', () => {
-      const e = romEntry({ ...ROM, platform: 'cps2', filename: 'ssf2t.zip' });
+      const e = romEntry({ ...ROM, platform: 'arcade', filename: 'ssf2t.zip' });
       expect(e.romUrl.endsWith('/ssf2t.zip')).toBe(true);
     });
 
     it('이름에 특수문자가 있어도 안전하게 인코딩한다', () => {
-      const e = romEntry({ ...ROM, platform: 'cps2', filename: 'a b&c.zip' });
+      const e = romEntry({ ...ROM, platform: 'arcade', filename: 'a b&c.zip' });
       expect(e.romUrl).not.toContain(' ');
       expect(decodeURIComponent(e.romUrl.split('/').pop()!)).toBe('a b&c.zip');
     });
 
     it('파일명을 모르면 id 로 되돌아간다 — 주소가 깨지지 않게', () => {
-      const e = romEntry({ ...ROM, platform: 'cps2' });
+      const e = romEntry({ ...ROM, platform: 'arcade' });
       expect(e.romUrl.endsWith('.zip')).toBe(true);
       expect(e.romUrl).toContain(ROM.id);
     });
@@ -89,7 +89,7 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
   // 아케이드 코어가 롬셋을 못 알아봐 RetroArch 메뉴만 떴다.
   describe('아케이드 롬 주소는 파일명을 잃으면 안 된다', () => {
     it('파일명을 주면 반드시 주소 끝에 실린다', () => {
-      const e = romEntry({ ...ROM, platform: 'cps2', filename: 'ddsoma.zip' });
+      const e = romEntry({ ...ROM, platform: 'arcade', filename: 'ddsoma.zip' });
       expect(e.romUrl.endsWith('/ddsoma.zip')).toBe(true);
     });
 
