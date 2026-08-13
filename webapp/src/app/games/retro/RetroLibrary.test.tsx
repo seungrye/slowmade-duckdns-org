@@ -159,7 +159,13 @@ describe('RetroLibrary', () => {
           expect.objectContaining({ method: 'PATCH' }),
         ),
       );
-      expect(screen.getByRole('checkbox')).not.toBeChecked();
+      // **가라앉은 뒤** 본다. 요청이 도는 동안엔 busy 로 잠겨 있어, 곧바로 재면 CI 부하에서
+      // 중간 상태를 잡는다(실제로 그렇게 깨졌다).
+      await waitFor(() => {
+        const box = screen.getByRole('checkbox');
+        expect(box).toBeEnabled();
+        expect(box).not.toBeChecked();
+      });
     });
 
     it('토글이 실패하면 체크를 되돌린다 — 화면과 서버가 어긋나면 안 된다', async () => {
@@ -169,7 +175,12 @@ describe('RetroLibrary', () => {
       fireEvent.click(screen.getByRole('checkbox'));
 
       expect(await screen.findByRole('alert')).toBeInTheDocument();
-      expect(screen.getByRole('checkbox')).toBeChecked();
+      // 되돌림도 요청이 끝난 뒤에 일어난다 — 가라앉은 상태를 본다.
+      await waitFor(() => {
+        const box = screen.getByRole('checkbox');
+        expect(box).toBeEnabled();
+        expect(box).toBeChecked();
+      });
     });
   });
 });

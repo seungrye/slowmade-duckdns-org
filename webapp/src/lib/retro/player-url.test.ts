@@ -15,7 +15,7 @@ describe('retro/player-url — iframe 에 넘길 주소를 만든다', () => {
   });
 
   it('특수문자를 인코딩한다', () => {
-    const url = buildPlayerUrl({ core: 'mgba', rom: '/api/games/retro/roms/1/file', name: 'A&B ?=#' });
+    const url = buildPlayerUrl({ core: 'mgba', rom: '/api/games/retro/roms/1/file/1.gba', name: 'A&B ?=#' });
     expect(url).not.toContain(' ');
     expect(params(url).get('name')).toBe('A&B ?=#');
   });
@@ -43,7 +43,7 @@ describe('retro/player-url — iframe 에 넘길 주소를 만든다', () => {
     it('패치 주소를 함께 싣는다', () => {
       const url = buildPlayerUrl({
         core: 'snes9x',
-        rom: '/api/games/retro/roms/1/file',
+        rom: '/api/games/retro/roms/1/file/1.gba',
         patch: '/api/games/retro/roms/1/patches/2/file',
       });
       expect(params(url).get('patch')).toBe('/api/games/retro/roms/1/patches/2/file');
