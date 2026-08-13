@@ -84,4 +84,18 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
       expect(e.romUrl).toContain(ROM.id);
     });
   });
+
+  // #141 — 실제로 겪은 사고: 플레이 화면이 filename 을 안 넘겨 주소가 `<id>.zip` 이 됐고,
+  // 아케이드 코어가 롬셋을 못 알아봐 RetroArch 메뉴만 떴다.
+  describe('아케이드 롬 주소는 파일명을 잃으면 안 된다', () => {
+    it('파일명을 주면 반드시 주소 끝에 실린다', () => {
+      const e = romEntry({ ...ROM, platform: 'cps2', filename: 'ddsoma.zip' });
+      expect(e.romUrl.endsWith('/ddsoma.zip')).toBe(true);
+    });
+
+    it('SNES 는 파일명을 줘도 id 규칙을 쓴다 — 캐시 키가 확실히 갈리도록', () => {
+      const e = romEntry({ ...ROM, platform: 'snes', filename: 'Tales.sfc' });
+      expect(e.romUrl.endsWith(`/${ROM.id}.sfc`)).toBe(true);
+    });
+  });
 });
