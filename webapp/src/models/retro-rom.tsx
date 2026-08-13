@@ -63,6 +63,11 @@ export interface RetroRomDoc {
   /** 사용자가 올린 카드 커버 (#122). 없으면 카드가 제목 첫 글자 타일을 그린다. */
   coverKey?: string;
   coverFormat?: string;
+  /**
+   * 함께 병합할 부모 롬셋들 (#143) — 아케이드 분할 셋.
+   * **일반적인 것부터** 담는다. 실행할 때 이 순서로 쌓고 마지막에 본체(클론)가 이긴다.
+   */
+  parentSets: { name: string; size: number; objectKey: string }[];
   isDeleted?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -82,6 +87,10 @@ const RetroRomSchema = new Schema<RetroRomDoc>(
     patchEnabled: { type: Boolean, default: true },
     coverKey: { type: String },
     coverFormat: { type: String },
+    parentSets: {
+      type: [new Schema({ name: String, size: Number, objectKey: String }, { _id: false })],
+      default: [],
+    },
     // 삭제는 항상 soft — 실수로 지운 롬을 되살릴 수 있어야 한다. MinIO 오브젝트도 남긴다.
     isDeleted: { type: Boolean, default: false, index: true },
   },

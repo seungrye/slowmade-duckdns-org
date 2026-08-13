@@ -5,6 +5,12 @@
 
 import { detectPatchFormat } from '../../../public/games/retro/rom-patch.js';
 
+/** 7z 매직 — 받지는 않지만 **왜 안 되는지** 알려 주려고 구분한다. */
+function is7z(bytes: Uint8Array): boolean {
+  return bytes.length >= 6 && bytes[0] === 0x37 && bytes[1] === 0x7a &&
+    bytes[2] === 0xbc && bytes[3] === 0xaf && bytes[4] === 0x27 && bytes[5] === 0x1c;
+}
+
 /**
  * 패치 한 개의 크기 한도.
  *
@@ -14,7 +20,7 @@ import { detectPatchFormat } from '../../../public/games/retro/rom-patch.js';
  */
 export const MAX_PATCH_BYTES = 8 * 1024 * 1024;
 
-export type PatchFormat = 'ips' | 'bps' | 'ups';
+export type PatchFormat = 'ips' | 'bps' | 'ups' | 'zip';
 
 export interface PatchUploadInput {
   filename: string;
@@ -46,7 +52,11 @@ export function validatePatchUpload(input: PatchUploadInput): PatchValidation {
   // 확장자가 아니라 내용(매직)으로 본다 — 이름은 얼마든지 바꿀 수 있다.
   const format = detectPatchFormat(input.bytes) as PatchFormat | null;
   if (!format) {
-    return { ok: false, reason: 'IPS·BPS·UPS 패치 파일이 아닙니다.' };
+    // 7z 은 브라우저에서 풀 수단이 없다 — zip 으로 다시 묶으면 그대로 쓸 수 있다.
+    if (is7z(input.bytes)) {
+      return { ok: false, reason: '7z 은 지원하지 않습니다. zip 으로 다시 묶어 올려 주세요.' };
+    }
+    return { ok: false, reason: 'IPS·BPS·UPS 또는 패치 묶음(zip) 이 아닙니다.' };
   }
 
   return { ok: true, format, name: patchNameFromFilename(input.filename) };

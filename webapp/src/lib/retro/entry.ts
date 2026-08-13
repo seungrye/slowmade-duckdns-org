@@ -25,6 +25,8 @@ export interface GameEntry {
   patch?: RomPatchDto;
   patchEnabled?: boolean;
   hasSave?: boolean;
+  /** 함께 병합할 부모 롬셋 주소들 (#143). */
+  parentUrls?: string[];
 }
 
 export interface BuiltinGame {
@@ -64,6 +66,8 @@ export interface UserRomDto {
   hasSave?: boolean;
   /** 사용자가 올린 커버 주소 (#122). 없으면 카드가 폴백 타일을 그린다. */
   coverUrl?: string;
+  /** 함께 병합할 부모 롬셋 이름들 (#143) — 순서가 곧 병합 순서다. */
+  parentSets?: string[];
 }
 
 export const BUILTIN_ROM_DIR = '/games/retro/roms';
@@ -100,6 +104,9 @@ export function romEntry(rom: UserRomDto): GameEntry {
     patch: rom.patch,
     patchEnabled: rom.patchEnabled,
     hasSave: rom.hasSave,
+    parentUrls: (rom.parentSets ?? []).map(
+      (n) => `/api/games/retro/roms/${rom.id}/set/${encodeURIComponent(n)}`,
+    ),
   };
 }
 

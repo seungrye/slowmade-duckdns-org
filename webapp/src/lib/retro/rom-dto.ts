@@ -16,6 +16,7 @@ export interface LeanRom {
   patches?: LeanPatch[];
   patchEnabled?: boolean;
   coverKey?: string;
+  parentSets?: { name: string; size: number; objectKey: string }[];
 }
 
 export interface LeanPatch {
@@ -80,6 +81,8 @@ export function toRomDto(doc: LeanRom, extra?: { hasSave?: boolean }): UserRomDt
     hasSave: extra?.hasSave ?? false,
     // 인증 프록시로만 내려준다 — 오브젝트 키는 싣지 않는다.
     coverUrl: doc.coverKey ? `/api/games/retro/roms/${String(doc._id)}/cover` : undefined,
+    // 오브젝트 키가 아니라 **이름만** 내보낸다 — 주소는 이름으로 만든다.
+    parentSets: (doc.parentSets ?? []).map((p) => p.name),
   };
 }
 

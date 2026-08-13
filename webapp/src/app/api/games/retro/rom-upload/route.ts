@@ -18,6 +18,8 @@ import { isOwner } from '@/lib/require-owner';
 import { connectToDB } from '@/lib/db';
 import RetroRom from '@/models/retro-rom';
 import { validateRomUpload } from '@/lib/retro/rom-upload';
+import { classifyRomSet } from '@/lib/retro/romset';
+import { isArcade } from '@/lib/retro/platforms';
 import { toRomDto, type LeanRom } from '@/lib/retro/rom-dto';
 
 const minioClient = new Minio.Client({
@@ -35,8 +37,13 @@ export async function POST(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
 
   const formData = await req.formData();
-  const file = formData.get('file');
-  if (!file || !(file instanceof File)) return apiError('롬 파일이 없습니다.', 400);
+  // 아케이드 분할 셋은 부모·클론을 함께 올린다 (#143). 어느 쪽이 게임인지는 이름으로 가른다.
+  const all = formData.getAll('file').filter((f): f is File => f instanceof File);
+  if (all.length === 0) return apiError('롬 파일이 없습니다.', 400);
+
+  const picked = classifyRomSet(all.map((f) => f.name));
+  const file = all.find((f) => f.name === picked.game) ?? all[0];
+  const parents = all.filter((f) => f !== file);
 
   const platform = formData.get('platform');
   const owner = await isOwner();
@@ -52,11 +59,26 @@ export async function POST(req: NextRequest) {
     return apiError(check.reason, check.reason.includes('너무 큽니다') ? 413 : 400);
   }
 
+  // 아케이드가 아닌데 여러 개를 올린 건 실수일 가능성이 크다 — 조용히 버리지 않는다.
+  if (parents.length > 0 && !isArcade(check.platform)) {
+    return apiError('이 기종은 파일을 하나만 올립니다.', 400);
+  }
+
   const safeName = file.name.replace(/[/\\]/g, '_').slice(0, 200) || 'rom';
   const key = `${KEY_PREFIX}/${randomUUID()}-${safeName}`; // 랜덤 프리픽스 — 키 추측 방지
+  const parentSets: { name: string; size: number; objectKey: string }[] = [];
 
   try {
     await minioClient.putObject(env.minio.bucket, key, Buffer.from(await file.arrayBuffer()));
+    // 부모는 **일반적인 것부터** 저장한다 — 실행할 때 그 순서로 쌓고 클론이 마지막에 이긴다.
+    for (const name of picked.parents) {
+      const pf = parents.find((f) => f.name === name);
+      if (!pf) continue;
+      const pName = pf.name.replace(/[/\\]/g, '_').slice(0, 200) || 'parent';
+      const pKey = `${KEY_PREFIX}/${randomUUID()}-${pName}`;
+      await minioClient.putObject(env.minio.bucket, pKey, Buffer.from(await pf.arrayBuffer()));
+      parentSets.push({ name: pName, size: pf.size, objectKey: pKey });
+    }
   } catch (err) {
     console.error('rom upload failed:', err);
     return apiError('롬 업로드에 실패했습니다.', 500);
@@ -72,15 +94,18 @@ export async function POST(req: NextRequest) {
       filename: safeName,
       size: file.size,
       objectKey: key,
+      parentSets,
     });
     return apiSuccess(toRomDto(doc as unknown as LeanRom), 201);
   } catch (err) {
     // 기록이 안 됐으면 파일만 남아 아무도 못 찾는 고아가 된다 — 되돌린다.
-    console.error('rom record failed, rolling back object:', err);
-    try {
-      await minioClient.removeObject(env.minio.bucket, key);
-    } catch (cleanupErr) {
-      console.error('rom rollback failed:', cleanupErr);
+    console.error('rom record failed, rolling back objects:', err);
+    for (const k of [key, ...parentSets.map((p) => p.objectKey)]) {
+      try {
+        await minioClient.removeObject(env.minio.bucket, k);
+      } catch (cleanupErr) {
+        console.error('rom rollback failed:', cleanupErr);
+      }
     }
     return apiError('롬 정보를 저장하지 못했습니다.', 500);
   }

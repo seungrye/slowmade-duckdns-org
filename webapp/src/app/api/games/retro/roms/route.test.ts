@@ -43,6 +43,8 @@ describe('GET /api/games/retro/roms — 내 롬 목록', () => {
         size: 4096,
         objectKey: 'retro-roms/secret-key.gba',
         createdAt: new Date(0),
+        // #143 — 부모 셋에도 오브젝트 키가 있다. 이쪽으로도 새면 안 된다.
+        parentSets: [{ name: 'ddsom.zip', size: 10, objectKey: 'retro-roms/secret-parent.zip' }],
       },
     ]);
     const body = await (await GET()).json();
@@ -55,7 +57,10 @@ describe('GET /api/games/retro/roms — 내 롬 목록', () => {
       // #116 — 카드가 쓰는 값들. 목록 API 는 세이브 유무를 모르므로 false.
       patchEnabled: true,
       hasSave: false,
+      // 이름만 나가고 오브젝트 키는 빠진다.
+      parentSets: ['ddsom.zip'],
     });
     expect(JSON.stringify(body)).not.toContain('secret-key');
+    expect(JSON.stringify(body)).not.toContain('secret-parent');
   });
 });

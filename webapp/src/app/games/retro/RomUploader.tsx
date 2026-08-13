@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { ALL_ROM_EXTENSIONS, PLATFORMS } from "@/lib/retro/platforms";
 import { MAX_ROM_BYTES, validateRomUpload } from "@/lib/retro/rom-upload";
+import { classifyRomSet } from "@/lib/retro/romset";
 import { formatBytes, type UserRomDto } from "@/lib/retro/entry";
 
 interface Props {
@@ -21,18 +22,27 @@ export default function RomUploader({ onUploaded }: Props) {
   const [platform, setPlatform] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  async function handleFile(file: File) {
+  async function handleFiles(files: File[]) {
     setError(null);
+    setNotice(null);
 
-    const check = validateRomUpload({ filename: file.name, size: file.size, platform: platform || undefined });
+    // 아케이드 분할 셋은 부모·클론을 함께 고른다 (#143). 무엇이 게임인지는 이름으로 가른다.
+    const picked = classifyRomSet(files.map((f) => f.name));
+    const main = files.find((f) => f.name === picked.game) ?? files[0];
+
+    const check = validateRomUpload({ filename: main.name, size: main.size, platform: platform || undefined });
     if (!check.ok) {
       setError(check.reason);
       return;
     }
+    if (files.length > 1) setNotice(picked.summary);
 
     const form = new FormData();
-    form.set("file", file);
+    // 게임을 먼저, 부모를 뒤에 — 서버도 이름으로 다시 가리지만 순서를 맞춰 둔다.
+    form.append("file", main);
+    for (const f of files) if (f !== main) form.append("file", f);
     if (platform) form.set("platform", platform);
 
     setBusy(true);
@@ -88,18 +98,20 @@ export default function RomUploader({ onUploaded }: Props) {
         <input
           ref={inputRef}
           type="file"
+          multiple
           accept={ALL_ROM_EXTENSIONS.concat(".bin").join(",")}
           disabled={busy}
           aria-label="롬 파일"
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void handleFile(file);
+            const files = Array.from(e.target.files ?? []);
+            if (files.length) void handleFiles(files);
           }}
           className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 disabled:opacity-50 dark:text-gray-300"
         />
       </div>
 
       {busy && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">올리는 중…</p>}
+      {notice && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{notice}</p>}
       {error && (
         <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
           {error}
@@ -109,6 +121,8 @@ export default function RomUploader({ onUploaded }: Props) {
       <p className="mt-3 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         {/* .bin 은 여러 기종이 함께 쓰는 확장자라 자동 인식이 안 된다. */}
         <code>.bin</code> 처럼 기종을 알 수 없는 파일은 위에서 직접 골라 주세요.
+        아케이드 분할 셋은 <strong>부모와 클론을 함께</strong> 고르면 됩니다 — 어느 쪽이 게임인지는
+        이름으로 알아서 가립니다.
       </p>
     </div>
   );
