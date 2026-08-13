@@ -1,8 +1,16 @@
 name: webapp tests
 
-# webapp/ 변경이 main 에 push 될 때 테스트 실행 + 언제든 수동 실행(workflow_dispatch).
+# webapp/ 변경을 **PR 시점에** 검증하고, main 에 들어간 뒤 한 번 더 확인한다.
 # public 레포 → GitHub 호스티드 러너 무료.
+#
+# pull_request 가 핵심이다 (#146). 예전엔 push:main 뿐이라 **머지한 뒤에야** 결과를 알았다 —
+# 배포 전 확인이 목적인데 순서가 거꾸로였고, 확인하려면 매번 수동 dispatch 해야 했다.
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "webapp/**"
+      - ".github/workflows/webapp-test.yml"
   push:
     branches: [main]
     paths:
@@ -63,7 +71,54 @@ jobs:
         env:
           MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
 
+      # 타입·린트는 초 단위라 테스트 앞에 둔다 — 빨리 실패해야 빨리 안다.
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
       - name: Run tests
         run: pnpm test
         env:
           MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
+
+  # `tsc --noEmit` 이 통과해도 프로덕션 빌드는 깨질 수 있다 — Next 는 라우트 파일의 export 모양을
+  # 빌드 때만 검사해서, 라우트가 상수를 export 하면 여기서만 잡힌다(실제로 두 번 겪음).
+  # 배포가 하는 일과 같으므로 배포 전 확인의 마지막 조각이다.
+  build:
+    name: next build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: webapp
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: webapp/pnpm-lock.yaml
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # 빌드는 DB·객체저장소에 닿지 않아야 정상이다. 자리만 채운 값을 주는 이유는, 여기서
+      # 연결을 시도해 실패한다면 그 자체가 잡아야 할 문제이기 때문이다(빌드 타임 I/O).
+      - name: Build
+        run: pnpm build
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/build-should-not-connect
+          MINIO_ENDPOINT: 127.0.0.1
+          MINIO_ACCESSKEY: ci
+          MINIO_SECRETKEY: ci-secret
+          MINIO_BUCKET: ci
