@@ -45,3 +45,42 @@ export function windowStartDate(
 
   return new Date(cutoff).toISOString().slice(0, 10);
 }
+
+/**
+ * 특정 날짜를 **품는** 창 (#135) — 매매 마커를 눌러 종목 상세로 넘어왔을 때.
+ *
+ * 그 날짜를 가운데 두되 길이는 평소와 같다(모바일 30 일·데스크톱 90 일). 데이터 끝을 넘으면
+ * 길이를 유지한 채 안으로 민다 — 창이 데이터 밖으로 나가 절반이 비는 걸 막는다.
+ *
+ * center 를 읽을 수 없으면 undefined 를 돌려준다 — 호출측이 최근 창으로 되돌아가면 된다.
+ */
+export function windowAround(
+  dates: string[],
+  center: string,
+  isMobile: boolean,
+  days?: number,
+): { startValue: string; endValue: string } | undefined {
+  if (dates.length === 0) return undefined;
+
+  const mid = Date.parse(center);
+  const oldest = Date.parse(dates[0]);
+  const newest = Date.parse(dates[dates.length - 1]);
+  if (Number.isNaN(mid) || Number.isNaN(oldest) || Number.isNaN(newest)) return undefined;
+
+  const span = (windowDays(isMobile, days) - 1) * 86_400_000;
+  let start = mid - Math.floor(span / 2);
+  let end = start + span;
+
+  // 데이터 밖으로 나가면 길이를 지킨 채 안으로 민다.
+  if (end > newest) {
+    end = newest;
+    start = end - span;
+  }
+  if (start < oldest) {
+    start = oldest;
+    end = Math.min(newest, start + span);
+  }
+
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  return { startValue: iso(start), endValue: iso(end) };
+}

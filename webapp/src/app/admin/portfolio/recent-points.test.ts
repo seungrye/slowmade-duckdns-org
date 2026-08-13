@@ -3,6 +3,7 @@
 // #133 — **자르지 않는다.** 데이터는 다 두고 처음 보이는 창만 잡는다.
 import { describe, it, expect } from 'vitest';
 import {
+  windowAround,
   windowStartDate,
   windowDays,
   MOBILE_CHART_DAYS,
@@ -91,5 +92,51 @@ describe('windowStartDate', () => {
   it('days 를 직접 줄 수 있다', () => {
     const dates = daily(50);
     expect(spanFrom(windowStartDate(dates, true, 7)!, dates)).toBe(7);
+  });
+});
+
+// #135 — 매매 마커를 눌러 종목 상세로 넘어왔을 때. 그 날짜가 보이면서 창 길이는 그대로.
+describe('windowAround', () => {
+  const lenOf = (w: { startValue: string; endValue: string }) =>
+    Math.round((Date.parse(w.endValue) - Date.parse(w.startValue)) / 86_400_000) + 1;
+  const contains = (w: { startValue: string; endValue: string }, d: string) =>
+    Date.parse(w.startValue) <= Date.parse(d) && Date.parse(d) <= Date.parse(w.endValue);
+
+  it('가운데 날짜를 품고 길이는 한 달', () => {
+    const dates = daily(200);
+    const w = windowAround(dates, '2026-06-01', true)!;
+    expect(contains(w, '2026-06-01')).toBe(true);
+    expect(lenOf(w)).toBe(MOBILE_CHART_DAYS);
+  });
+
+  it('데스크톱은 3 개월', () => {
+    const dates = daily(300);
+    expect(lenOf(windowAround(dates, '2026-05-01', false)!)).toBe(DESKTOP_CHART_DAYS);
+  });
+
+  it('마지막 날 근처면 **길이를 지킨 채** 안으로 민다 — 절반이 비지 않게', () => {
+    const dates = daily(200);
+    const w = windowAround(dates, dates[dates.length - 1], true)!;
+    expect(w.endValue).toBe(dates[dates.length - 1]);
+    expect(lenOf(w)).toBe(MOBILE_CHART_DAYS);
+  });
+
+  it('첫 날 근처도 마찬가지', () => {
+    const dates = daily(200);
+    const w = windowAround(dates, dates[0], true)!;
+    expect(w.startValue).toBe(dates[0]);
+    expect(lenOf(w)).toBe(MOBILE_CHART_DAYS);
+  });
+
+  it('데이터가 창보다 짧으면 데이터 전체', () => {
+    const dates = daily(10);
+    const w = windowAround(dates, dates[5], true)!;
+    expect(w.startValue).toBe(dates[0]);
+    expect(w.endValue).toBe(dates[dates.length - 1]);
+  });
+
+  it('center 를 못 읽으면 undefined — 호출측이 최근 창으로 돌아간다', () => {
+    expect(windowAround(daily(50), 'nope', true)).toBeUndefined();
+    expect(windowAround([], '2026-08-01', true)).toBeUndefined();
   });
 });
