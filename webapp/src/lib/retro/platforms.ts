@@ -6,7 +6,7 @@
 //
 // N64·PS1 은 넣지 않는다 — 무겁고, PS1 은 BIOS 저작권이 걸린다.
 
-export type PlatformId = 'snes' | 'arcade';
+export type PlatformId = 'snes' | 'gba' | 'arcade';
 
 export interface PlatformMeta {
   id: PlatformId;
@@ -40,6 +40,15 @@ export const PLATFORMS: PlatformMeta[] = [
     core: 'snes9x',
     extensions: ['.sfc', '.smc'],
     accent: 'from-violet-500 to-indigo-700',
+  },
+  {
+    id: 'gba',
+    label: 'GBA',
+    fullName: '게임보이 어드밴스',
+    // mGBA 는 BIOS 없이 돈다(HLE) — 별도 파일을 받게 하지 않아도 된다.
+    core: 'mgba',
+    extensions: ['.gba'],
+    accent: 'from-sky-500 to-blue-700',
   },
   {
     // 아케이드는 FBNeo 하나로 간다 — CPS2 전용 fbalpha2012 를 **대체했다** (#151).

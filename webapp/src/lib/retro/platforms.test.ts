@@ -88,4 +88,22 @@ describe('retro/platforms', () => {
       for (const p of PLATFORMS) expect(isArcade(p.id)).toBe(p.arcade === true);
     });
   });
+
+  // #156 — GBA 추가. 아케이드와 달리 파일 하나로 끝나고 BIOS 도 필요 없다(mGBA 는 HLE).
+  describe('GBA 기종 (#156)', () => {
+    it('gba 기종이 mgba 코어로 등록돼 있다', () => {
+      const p = platformById('gba');
+      expect(p?.core).toBe('mgba');
+      expect(p?.extensions).toContain('.gba');
+    });
+
+    it('확장자로 추론된다 — 다른 기종과 겹치지 않는다', () => {
+      expect(platformForFilename('pokemon.gba')?.id).toBe('gba');
+      expect(platformForFilename('POKEMON.GBA')?.id).toBe('gba');
+    });
+
+    it('아케이드가 아니다 — 파일명이 게임 식별자가 아니다', () => {
+      expect(isArcade('gba')).toBe(false);
+    });
+  });
 });
