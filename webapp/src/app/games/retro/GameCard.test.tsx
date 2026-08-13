@@ -336,4 +336,18 @@ describe('GameCard', () => {
       expect(pickerOpens('내 롬 카드 그림', '내 롬 커버 이미지')).toBe(true);
     });
   });
+
+  // #145 — 안드로이드는 확장자 accept 를 MIME 으로 못 바꿔 제한된 선택기로 떨어진다.
+  describe('모바일 파일 선택 (#145)', () => {
+    it('패치 입력에 확장자 accept 를 걸지 않는다', () => {
+      render(<GameCard game={rom()} onPatchUpload={vi.fn()} onCoverUpload={vi.fn()} />);
+      const input = screen.getByLabelText('내 롬 패치 파일');
+      expect(input.getAttribute('accept')).toBeNull();
+    });
+
+    it('커버는 MIME 이라 그대로 둔다 — 모바일에서도 잘 동작한다', () => {
+      render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
+      expect(screen.getByLabelText('내 롬 커버 이미지').getAttribute('accept')).toContain('image/');
+    });
+  });
 });
