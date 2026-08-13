@@ -93,6 +93,19 @@ jobs:
     defaults:
       run:
         working-directory: webapp
+    # 빌드도 mongo 가 필요하다. `/post/view/[[...id]]` 의 generateStaticParams 가 포스트 목록을
+    # 읽어 prerender 하므로, DB 가 없으면 "Failed to collect page data" 로 죽는다.
+    # 빌드 타임 I/O 는 실수가 아니라 의도된 정적 생성이다.
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -112,12 +125,16 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      # 빌드는 DB·객체저장소에 닿지 않아야 정상이다. 자리만 채운 값을 주는 이유는, 여기서
-      # 연결을 시도해 실패한다면 그 자체가 잡아야 할 문제이기 때문이다(빌드 타임 I/O).
+      - name: Seed content (prerender 가 읽을 포스트)
+        run: ./scripts/seeds-replay.sh
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
+
+      # MINIO_* 는 자리만 채운다 — 이미지는 런타임에 프록시로 내보내므로 빌드는 닿지 않는다.
       - name: Build
         run: pnpm build
         env:
-          MONGO_URI: mongodb://127.0.0.1:27017/build-should-not-connect
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
           MINIO_ENDPOINT: 127.0.0.1
           MINIO_ACCESSKEY: ci
           MINIO_SECRETKEY: ci-secret
