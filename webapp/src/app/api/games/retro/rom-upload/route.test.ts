@@ -54,7 +54,7 @@ describe('POST /api/games/retro/rom-upload', () => {
   it('로그인하지 않으면 401 이고 아무것도 저장하지 않는다', async () => {
     mockAuth.mockResolvedValue(null);
     const form = new FormData();
-    form.set('file', romFile('a.nes'));
+    form.set('file', romFile('a.sfc'));
     expect((await POST(request(form))).status).toBe(401);
     expect(mockPutObject).not.toHaveBeenCalled();
   });
@@ -65,7 +65,7 @@ describe('POST /api/games/retro/rom-upload', () => {
 
   it('올리면 MinIO 에 넣고 내 소유로 기록한다', async () => {
     const form = new FormData();
-    form.set('file', romFile('Super Mario.nes', 2048));
+    form.set('file', romFile('Super Mario.sfc', 2048));
     const res = await POST(request(form));
     expect(res.status).toBe(201);
 
@@ -76,15 +76,15 @@ describe('POST /api/games/retro/rom-upload', () => {
 
     const doc = mockCreate.mock.calls[0][0];
     expect(doc.userEmail).toBe('me@test.com');
-    expect(doc.platform).toBe('nes');
-    expect(doc.core).toBe('fceumm');
+    expect(doc.platform).toBe('snes');
+    expect(doc.core).toBe('snes9x');
     expect(doc.title).toBe('Super Mario');
     expect(doc.size).toBe(2048);
   });
 
   it('응답에 오브젝트 키가 들어가지 않는다', async () => {
     const form = new FormData();
-    form.set('file', romFile('a.nes'));
+    form.set('file', romFile('a.sfc'));
     const body = await (await POST(request(form))).json();
     expect(JSON.stringify(body)).not.toContain('retro-roms/');
   });
@@ -100,14 +100,14 @@ describe('POST /api/games/retro/rom-upload', () => {
   it('기종을 직접 지정하면 확장자를 몰라도 받는다', async () => {
     const form = new FormData();
     form.set('file', romFile('mystery.bin'));
-    form.set('platform', 'md');
+    form.set('platform', 'cps2');
     expect((await POST(request(form))).status).toBe(201);
-    expect(mockCreate.mock.calls[0][0].platform).toBe('md');
+    expect(mockCreate.mock.calls[0][0].platform).toBe('cps2');
   });
 
   it('한도를 넘으면 413 이고 저장하지 않는다', async () => {
     const form = new FormData();
-    form.set('file', romFile('big.gba', MAX_ROM_BYTES + 1));
+    form.set('file', romFile('big.sfc', MAX_ROM_BYTES + 1));
     expect((await POST(request(form))).status).toBe(413);
     expect(mockPutObject).not.toHaveBeenCalled();
   });
@@ -115,14 +115,14 @@ describe('POST /api/games/retro/rom-upload', () => {
   it('owner 는 일반 한도를 넘겨도 받는다', async () => {
     mockIsOwner.mockResolvedValue(true);
     const form = new FormData();
-    form.set('file', romFile('big.gba', MAX_ROM_BYTES + 1));
+    form.set('file', romFile('big.sfc', MAX_ROM_BYTES + 1));
     expect((await POST(request(form))).status).toBe(201);
   });
 
   it('DB 기록이 실패하면 올린 오브젝트를 지운다 — 고아 파일을 남기지 않는다', async () => {
     mockCreate.mockRejectedValue(new Error('db down'));
     const form = new FormData();
-    form.set('file', romFile('a.nes'));
+    form.set('file', romFile('a.sfc'));
     expect((await POST(request(form))).status).toBe(500);
     expect(mockRemoveObject).toHaveBeenCalledTimes(1);
     expect(mockRemoveObject.mock.calls[0][1]).toBe(mockPutObject.mock.calls[0][1]);

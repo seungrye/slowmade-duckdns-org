@@ -6,7 +6,7 @@
 //
 // N64·PS1 은 넣지 않는다 — 무겁고, PS1 은 BIOS 저작권이 걸린다.
 
-export type PlatformId = 'nes' | 'snes' | 'gb' | 'gba' | 'md';
+export type PlatformId = 'snes' | 'cps2';
 
 export interface PlatformMeta {
   id: PlatformId;
@@ -27,14 +27,6 @@ export interface PlatformMeta {
 
 export const PLATFORMS: PlatformMeta[] = [
   {
-    id: 'nes',
-    label: 'NES',
-    fullName: '패미컴 / NES',
-    core: 'fceumm',
-    extensions: ['.nes', '.fds', '.unf'],
-    accent: 'from-red-500 to-rose-700',
-  },
-  {
     id: 'snes',
     label: 'SNES',
     fullName: '슈퍼 패미컴 / SNES',
@@ -43,30 +35,26 @@ export const PLATFORMS: PlatformMeta[] = [
     accent: 'from-violet-500 to-indigo-700',
   },
   {
-    id: 'gb',
-    label: 'GB',
-    fullName: '게임보이 / 게임보이 컬러',
-    core: 'gambatte',
-    extensions: ['.gb', '.gbc'],
-    accent: 'from-lime-500 to-emerald-700',
-  },
-  {
-    id: 'gba',
-    label: 'GBA',
-    fullName: '게임보이 어드밴스',
-    core: 'mgba',
-    extensions: ['.gba'],
-    accent: 'from-sky-500 to-blue-700',
-  },
-  {
-    id: 'md',
-    label: 'MD',
-    fullName: '메가드라이브 / 제네시스',
-    core: 'genesis_plus_gx',
-    extensions: ['.md', '.gen', '.smd'],
-    accent: 'from-amber-500 to-orange-700',
+    id: 'cps2',
+    label: 'CPS2',
+    fullName: '캡콤 플레이 시스템 2 (아케이드)',
+    core: 'fbalpha2012_cps2',
+    // 아케이드 롬은 zip 묶음이고 **zip 이름이 곧 게임 식별자**다(ssf2t.zip).
+    // 그래서 이 기종만 원본 파일명을 그대로 살려 내려준다 — `entry.ts` 의 romFileUrl 참고.
+    extensions: ['.zip'],
+    accent: 'from-yellow-500 to-amber-700',
   },
 ];
+
+/**
+ * 아케이드 계열인가 (#139).
+ *
+ * EmulatorJS 는 코어가 arcade·mame 계열이면 롬을 **파일명 그대로** 가상 FS 에 쓴다.
+ * 아케이드 코어는 그 이름으로 어느 게임인지 판단하므로, 이름을 바꾸면 못 찾는다.
+ */
+export function isArcade(platform: PlatformId | string | undefined): boolean {
+  return platform === 'cps2';
+}
 
 /** 플레이어에 넘길 수 있는 코어 화이트리스트 — 임의 문자열 차단용. */
 export const SUPPORTED_CORES: Set<string> = new Set(PLATFORMS.map((p) => p.core));
