@@ -27,6 +27,8 @@ export function detectPatchFormat(patch) {
   if (magic.startsWith('PATCH')) return 'ips';
   if (magic.startsWith('BPS1')) return 'bps';
   if (magic.startsWith('UPS1')) return 'ups';
+  // 아케이드 패치는 IPS 여러 개를 zip 으로 묶어 배포한다 (#143).
+  if (patch[0] === 0x50 && patch[1] === 0x4b && patch[2] === 0x03 && patch[3] === 0x04) return 'zip';
   return null;
 }
 
@@ -247,4 +249,220 @@ export function applyRomPatch(rom, patch, opts = {}) {
     }
     throw err;
   }
+}
+
+// ── zip 다루기 (#143) ────────────────────────────────────────────────────────
+//
+// 아케이드 패치는 롬 zip **안쪽 칩 파일마다** IPS 를 먹인다. 그래서 zip 을 풀고 다시 묶어야
+// 하는데, 라이브러리를 들이지 않는다 — 브라우저 표준으로 충분하다.
+//   읽기: 중앙 디렉터리를 훑고, deflate 는 `DecompressionStream('deflate-raw')` 로 푼다.
+//   쓰기: **무압축(method 0)** 으로 묶는다. 메모리에만 잠깐 존재하고 코어는 문제없이 읽는다.
+
+const ZIP_LOCAL = 0x04034b50;
+const ZIP_CENTRAL = 0x02014b50;
+const ZIP_EOCD = 0x06054b50;
+
+/** zip 매직인가. */
+export function isZip(bytes) {
+  return !!bytes && bytes.length >= 4 &&
+    bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
+}
+
+const u16 = (v, at) => v.getUint16(at, true);
+const u32 = (v, at) => v.getUint32(at, true);
+
+async function inflateRaw(bytes) {
+  const ds = new DecompressionStream('deflate-raw');
+  const w = ds.writable.getWriter();
+  void w.write(bytes);
+  void w.close();
+  return new Uint8Array(await new Response(ds.readable).arrayBuffer());
+}
+
+/**
+ * zip 을 풀어 `{ name, data }` 목록으로. 디렉터리 항목은 뺀다.
+ *
+ * @throws zip 이 아니거나 구조가 깨졌으면.
+ */
+export async function readZip(bytes) {
+  if (!bytes || bytes.length < 22) throw new Error('zip 파일이 아닙니다.');
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  // EOCD 를 뒤에서부터 찾는다(주석이 붙어 있을 수 있다).
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (u32(view, i) === ZIP_EOCD) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('zip 파일이 아닙니다 (끝 표식을 찾지 못했습니다).');
+
+  const count = u16(view, eocd + 10);
+  let p = u32(view, eocd + 16);
+  const out = [];
+  const decoder = new TextDecoder();
+
+  for (let i = 0; i < count; i++) {
+    if (u32(view, p) !== ZIP_CENTRAL) throw new Error('zip 구조가 깨졌습니다.');
+    const method = u16(view, p + 10);
+    const compSize = u32(view, p + 20);
+    const nameLen = u16(view, p + 28);
+    const extraLen = u16(view, p + 30);
+    const commentLen = u16(view, p + 32);
+    const localAt = u32(view, p + 42);
+    const name = decoder.decode(bytes.subarray(p + 46, p + 46 + nameLen));
+    p += 46 + nameLen + extraLen + commentLen;
+
+    if (name.endsWith('/')) continue; // 디렉터리
+
+    if (u32(view, localAt) !== ZIP_LOCAL) throw new Error('zip 구조가 깨졌습니다.');
+    const lNameLen = u16(view, localAt + 26);
+    const lExtraLen = u16(view, localAt + 28);
+    const dataAt = localAt + 30 + lNameLen + lExtraLen;
+    const raw = bytes.subarray(dataAt, dataAt + compSize);
+
+    if (method === 0) out.push({ name, data: raw.slice() });
+    else if (method === 8) out.push({ name, data: await inflateRaw(raw) });
+    else throw new Error(`지원하지 않는 zip 압축 방식입니다 (method ${method}).`);
+  }
+  return out;
+}
+
+/**
+ * `{ name, data }` 목록을 zip 으로 묶는다. **무압축**이다.
+ *
+ * @param opts.deflated 시험용 — 특정 이름을 미리 deflate 된 바이트로 넣는다.
+ */
+export function writeZip(entries, opts = {}) {
+  const encoder = new TextEncoder();
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+
+  for (const e of entries) {
+    const name = encoder.encode(e.name);
+    const pre = opts.deflated && opts.deflated[e.name];
+    const stored = pre ? pre : e.data;
+    const method = pre ? 8 : 0;
+    const crc = crc32(e.data);
+
+    const local = new Uint8Array(30 + name.length + stored.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, ZIP_LOCAL, true);
+    lv.setUint16(4, 20, true);           // version
+    lv.setUint16(8, method, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, stored.length, true);
+    lv.setUint32(22, e.data.length, true);
+    lv.setUint16(26, name.length, true);
+    local.set(name, 30);
+    local.set(stored, 30 + name.length);
+    locals.push(local);
+
+    const central = new Uint8Array(46 + name.length);
+    const cv = new DataView(central.buffer);
+    cv.setUint32(0, ZIP_CENTRAL, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(10, method, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, stored.length, true);
+    cv.setUint32(24, e.data.length, true);
+    cv.setUint16(28, name.length, true);
+    cv.setUint32(42, offset, true);
+    central.set(name, 46);
+    centrals.push(central);
+
+    offset += local.length;
+  }
+
+  const centralSize = centrals.reduce((n, c) => n + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, ZIP_EOCD, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+
+  const total = offset + centralSize + eocd.length;
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const b of [...locals, ...centrals, eocd]) { out.set(b, at); at += b.length; }
+  return out;
+}
+
+/** 경로·확장자를 떼고 소문자로 — 짝을 찾을 때 쓴다. */
+const chipKey = (name) => (name.split('/').pop() ?? '').replace(/\.ips$/i, '').toLowerCase();
+
+/**
+ * 묶음 패치를 적용한다 (#143) — 롬 zip 안쪽 칩마다 IPS 를 먹인다.
+ *
+ * **이름이 짝인 것만** 건드리고 나머지는 그대로 둔다. `.`/`_` 같은 규칙 차이는 **보정하지
+ * 않는다** — 억지로 맞추면 엉뚱한 칩에 패치를 먹여 조용히 망가진다.
+ *
+ * @throws 짝이 하나도 없으면 **양쪽 이름을 담아** 던진다. 롬셋이 다르다는 걸 바로 알 수 있게.
+ */
+export async function applyBundlePatch(romZip, patchZip, opts = {}) {
+  const romEntries = await readZip(romZip);
+  const patchEntries = (await readZip(patchZip)).filter((e) => /\.ips$/i.test(e.name));
+  if (patchEntries.length === 0) {
+    throw new Error('패치 묶음 안에 IPS 파일이 없습니다.');
+  }
+
+  const byKey = new Map(romEntries.map((e) => [chipKey(e.name), e]));
+  let applied = 0;
+
+  for (const p of patchEntries) {
+    const target = byKey.get(chipKey(p.name));
+    if (!target) continue;
+    target.data = applyRomPatch(target.data, p.data, { stripHeader: false }).rom;
+    applied++;
+  }
+
+  // 분할 셋은 **미리 합쳐서** 넘긴다(mergeZips) — 그러면 여기선 언제나 완전한 셋을 본다.
+  if (applied === 0 && !opts.allowNoMatch) {
+    throw new Error(describeMismatch(romEntries, patchEntries));
+  }
+
+  return {
+    rom: writeZip(romEntries),
+    applied,
+    total: patchEntries.length,
+    romNames: romEntries.map((e) => e.name),
+    patchNames: patchEntries.map((e) => chipKey(e.name)),
+  };
+}
+
+/** 짝이 하나도 없을 때 **양쪽 이름을 나란히** 보여 준다 — 원인을 바로 알 수 있게. */
+export function describeMismatch(romEntries, patchEntries) {
+  const show = (xs) => xs.slice(0, 6).join(', ') + (xs.length > 6 ? ' …' : '');
+  const romNames = romEntries.map((e) => (typeof e === 'string' ? e : e.name));
+  const patchNames = patchEntries.map((e) => (typeof e === 'string' ? e : chipKey(e.name)));
+  return (
+    `패치를 적용하지 못했습니다 (${patchNames.length} 개 중 0 개 짝 맞음).\n` +
+    `롬 안: ${show(romNames)}\n` +
+    `패치 기대: ${show(patchNames)}\n` +
+    `이름 규칙이 다릅니다 — 패치와 같은 계열의 롬셋이 필요합니다.`
+  );
+}
+
+/**
+ * 분할(split) 롬셋을 하나로 합친다 (#143).
+ *
+ * 아케이드 클론 셋은 리전별 파일만 담고 나머지는 부모 zip 에 있다. 둘을 풀어 **클론이 부모를
+ * 덮어쓰는** 방식으로 합치면, 코어에는 완전한 셋 하나만 넘기면 된다 — EmulatorJS 의 부모 롬
+ * 연동에 기대지 않아도 되고, 패치도 한 번에 먹일 수 있다.
+ *
+ * @param zips 앞에서 뒤 순서로 겹쳐 쌓는다. **뒤에 온 것이 이긴다**(부모, 클론 순으로 넘길 것).
+ */
+export async function mergeZips(zips) {
+  const merged = new Map(); // key: 소문자 이름 → { name, data }
+  for (const z of zips) {
+    if (!z) continue;
+    for (const e of await readZip(z)) {
+      // 경로가 붙어 있으면 파일명만 남긴다 — 칩 이름이 곧 키다.
+      const name = e.name.split('/').pop() ?? e.name;
+      merged.set(name.toLowerCase(), { name, data: e.data });
+    }
+  }
+  return writeZip([...merged.values()]);
 }

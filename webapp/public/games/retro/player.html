@@ -33,7 +33,7 @@
 <body>
 <div id="game"></div>
 <script type="module">
-import { applyRomPatch } from './rom-patch.js';
+import { applyBundlePatch, applyRomPatch, isZip, mergeZips } from './rom-patch.js';
 
 const DATA_PATH = '/games/retro/data/';
 // src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 양쪽을 함께 고칠 것.
@@ -74,6 +74,8 @@ const rom = q.get('rom') || '';
 const patch = q.get('patch') || '';
 // 세이브를 매달 게임 키 (#114) — `builtin:<slug>` 또는 `rom:<id>`. 없으면 서버 저장을 안 건다.
 const saveKey = q.get('save') || '';
+// 아케이드 분할 셋 — 함께 병합할 부모 롬셋들 (#143). 넣은 순서가 곧 쌓는 순서다.
+const parentUrls = q.getAll('set');
 
 // 이 문서는 CSP 에서 'unsafe-eval' 이 열려 있다(코어 7z 해제에 필요 — middleware.ts 참고).
 // name 은 EmulatorJS UI 로 흘러 들어가는 **유일한 반사 입력**이므로, 그쪽이 어떻게 그리든
@@ -88,7 +90,7 @@ if (CORES.indexOf(core) < 0) {
   notice('지원하지 않는 기종입니다.');
 } else if (!rom) {
   notice('실행할 롬이 지정되지 않았습니다.');
-} else if (!sameOrigin(rom) || (patch && !sameOrigin(patch))) {
+} else if (!sameOrigin(rom) || (patch && !sameOrigin(patch)) || parentUrls.some((u) => !sameOrigin(u))) {
   notice('외부 출처의 파일은 실행하지 않습니다.');
 } else {
   start();
@@ -97,22 +99,38 @@ if (CORES.indexOf(core) < 0) {
 async function start() {
   let gameUrl = rom;
 
-  if (patch) {
-    // 롬과 패치를 여기서 합친다. **합친 결과는 어디에도 저장하지 않는다** — 이 페이지가 닫히면
-    // 사라진다. 서버에는 원본과 패치가 따로 남을 뿐이다.
+  if (patch || parentUrls.length) {
+    // 여기서 다 만든다 — 부모 셋 병합, 패치 적용. **결과는 어디에도 저장하지 않는다**:
+    // 이 페이지가 닫히면 사라지고, 서버엔 원본들이 따로 남을 뿐이다.
     try {
-      const [romBytes, patchBytes] = await Promise.all([fetchBytes(rom), fetchBytes(patch)]);
-      const strip = q.get('strip');
-      const opts = strip === '1' ? { stripHeader: true } : strip === '0' ? { stripHeader: false } : {};
-      const result = applyRomPatch(romBytes, patchBytes, opts);
+      const [romBytes, patchBytes, ...parentBytes] = await Promise.all([
+        fetchBytes(rom),
+        patch ? fetchBytes(patch) : Promise.resolve(null),
+        ...parentUrls.map(fetchBytes),
+      ]);
+
+      // 분할 셋: 부모를 먼저 깔고 본체(클론)를 마지막에 얹어 **클론이 이기게** 한다.
+      let romData = parentBytes.length ? await mergeZips([...parentBytes, romBytes]) : romBytes;
+
+      if (patchBytes) {
+        if (isZip(patchBytes)) {
+          // 아케이드 묶음 패치 — zip 안쪽 칩마다 IPS 를 먹인다.
+          romData = (await applyBundlePatch(romData, patchBytes)).rom;
+        } else {
+          const strip = q.get('strip');
+          const opts = strip === '1' ? { stripHeader: true } : strip === '0' ? { stripHeader: false } : {};
+          romData = applyRomPatch(romData, patchBytes, opts).rom;
+        }
+      }
+
       // EJS_gameUrl 은 File 도 받는다(EmulatorJS 가 toData 로 먼저 가로챈다).
-      // 이름에 확장자를 줘야 EmulatorJS 가 파일명을 제대로 잡는다.
-      gameUrl = new File([result.rom], (name || 'game') + '.' + extensionFor(core));
+      // **아케이드는 파일명이 곧 게임 이름**이라 원래 이름을 그대로 살려야 한다.
+      gameUrl = new File([romData], romFileName());
     } catch (err) {
       return notice(
-        '패치를 적용하지 못했습니다.<br><br><code>' +
-        String((err && err.message) || err).replace(/[<>]/g, '') +
-        '</code><br><br>패치가 이 롬 판본에 맞는지 확인해 주세요.',
+        '롬을 준비하지 못했습니다.<br><br><code>' +
+        String((err && err.message) || err).replace(/[<>]/g, '').replace(/\n/g, '<br>') +
+        '</code>',
       );
     }
   }

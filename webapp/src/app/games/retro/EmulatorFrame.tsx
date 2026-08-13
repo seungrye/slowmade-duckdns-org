@@ -14,6 +14,8 @@ interface Props {
   stripHeader?: boolean;
   /** 세이브를 매달 게임 키 (#114). 주면 Save/Load 버튼이 서버를 쓴다. */
   saveKey?: string;
+  /** 함께 병합할 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. */
+  parents?: string[];
 }
 
 /**
@@ -23,14 +25,14 @@ interface Props {
  * 하지 않는다 — 화면을 떠나면 React 가 iframe 을 지우고, 그때 안의 전역·워커·오디오가 함께
  * 사라진다. 그게 iframe 을 쓰는 이유다.
  */
-export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey }: Props) {
+export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey, parents }: Props) {
   const src = useMemo(() => {
     try {
-      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey });
+      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents });
     } catch {
       return null;
     }
-  }, [core, rom, name, patch, stripHeader, saveKey]);
+  }, [core, rom, name, patch, stripHeader, saveKey, parents]);
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 

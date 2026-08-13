@@ -30,6 +30,8 @@ export interface PlayerUrlOptions {
    * 주면 플레이어가 네이티브 Save/Load 버튼을 서버로 돌린다. 없으면 저장 기능이 붙지 않는다.
    */
   saveKey?: string;
+  /** 함께 병합할 부모 롬셋 주소들 (#143) — 일반적인 것부터. */
+  parents?: string[];
 }
 
 /**
@@ -37,7 +39,7 @@ export interface PlayerUrlOptions {
  *   iframe 은 우리 오리진에서 도는 코드라, 여기로 임의 URL 이 새 나가면 남의 서버 파일을
  *   우리 플레이어로 트는 통로가 된다.
  */
-export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey }: PlayerUrlOptions): string {
+export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents }: PlayerUrlOptions): string {
   if (!SUPPORTED_CORES.has(core)) throw new Error(`지원하지 않는 코어: ${core || '(빈 값)'}`);
   if (!rom) throw new Error('롬 주소가 비었습니다.');
   if (!isSameOriginRom(rom)) throw new Error(`외부 출처 롬은 실행하지 않습니다: ${rom}`);
@@ -52,6 +54,11 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey }:
     if (typeof stripHeader === 'boolean') params.set('strip', stripHeader ? '1' : '0');
   }
   if (saveKey) params.set('save', saveKey);
+  // 순서가 곧 병합 순서다 — URLSearchParams 는 넣은 순서를 지킨다.
+  for (const p of parents ?? []) {
+    if (!isSameOriginRom(p)) throw new Error(`외부 출처 롬셋은 쓰지 않습니다: ${p}`);
+    params.append('set', p);
+  }
   return `${PLAYER_PATH}?${params.toString()}`;
 }
 
