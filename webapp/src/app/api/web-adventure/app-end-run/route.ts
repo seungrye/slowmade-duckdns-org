@@ -10,6 +10,7 @@ import { env } from '@/lib/env';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
 import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
 import { enqueueFeedbackNote, capScenePath, capLog } from '@/lib/web-adventure/enqueue-feedback-note';
+import { enqueueSceneImage } from '@/lib/web-adventure/enqueue-scene-image';
 
 const APP_USER = 'app@eternia'; // 앱발 익명 플레이어 합성 계정.
 
@@ -85,6 +86,9 @@ export async function POST(req: NextRequest) {
 
   // 피드백 노트 큐 적재(작가 소유, sourceUserEmail='app', 볼륨 캡·중복 방지·로그 있을 때만).
   await enqueueFeedbackNote(pastRun, 'app', log.length);
+
+  // #158 — 엔딩마다 씬 삽화 한 장 추가(큐 적재). 앱 회차도 그림을 늘린다.
+  await enqueueSceneImage(pastRun, 'app');
 
   return json({ ok: true }, 200);
 }
