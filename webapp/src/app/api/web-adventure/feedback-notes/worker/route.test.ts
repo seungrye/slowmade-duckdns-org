@@ -10,6 +10,10 @@ vi.mock('@/models/web-adventure-feedback-note', () => ({
   default: { updateMany: vi.fn(), countDocuments: vi.fn(), findOneAndUpdate: vi.fn() },
 }));
 vi.mock('@/models/web-adventure-past-run', () => ({ default: { findById: vi.fn() } }));
+// #163 — 워커가 씬 목록(제목)을 프롬프트에 싣는다. 여기선 DB 를 안 타게만 한다.
+vi.mock('@/models/web-adventure-scene', () => ({
+  default: { find: () => ({ select: () => ({ lean: async () => [] }) }) },
+}));
 vi.mock('@/lib/web-adventure/feedback-note', () => ({
   generateFeedbackNote: vi.fn(),
   ENDING_LABEL: { harmony: '조화', petrification: '석화' },

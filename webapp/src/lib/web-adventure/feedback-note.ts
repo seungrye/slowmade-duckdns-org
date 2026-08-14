@@ -14,6 +14,12 @@ export interface FeedbackNoteInput {
   finalSceneId: string;
   scenePath: string[];
   log: string[];
+  /**
+   * 전체 씬 목록(id·제목) (#163). 있으면 user 에 실어 **이미 쓰인 것**을 알려 준다.
+   *
+   * 없으면 종전과 같이 동작한다 — 모델은 로그만 보고 쓴다.
+   */
+  sceneIndex?: Array<{ id: string; title?: string }>;
   character?: {
     protagonist?: string;
     ability?: string;
@@ -75,6 +81,11 @@ export function buildMessages(
   const system = [
     '너는 인터랙티브 픽션 「에테르니아」의 시나리오를 다듬는 창작 보조 편집자다.',
     '입력으로 한 플레이어의 실제 플레이 진행 로그(선택·장면 본문·판정 결과)가 주어진다.',
+    // #163 — 이 한 줄이 없어서, 그 회차가 안 지난 장면을 "없다·빈약하다" 로 단정했다.
+    //   실제로 "세 달이 겹치는 새벽" 떡밥은 6 개 씬에서 회수되고 있는데도 부족하다는 노트가 나왔다.
+    '**너는 전체 이야기 중 이 회차가 지난 한 경로만 본다.** 보지 못한 장면이 훨씬 많다.',
+    '로그에 없다는 이유로 "없다·부족하다·회수되지 않았다" 라고 단정하지 마라.',
+    '그런 지적을 하려면 "이 경로에서는 …가 드러나지 않았다" 처럼 **경로를 한정해서** 쓴다.',
     '이 플레이를 근거로 작가에게 줄 **제안과 개선안만** 한국어 마크다운으로 작성하라.',
     '절대 이야기(서사)를 다시 쓰지 마라. 소설/장면 산문을 쓰지 마라 — 오직 제안·개선안.',
     '"제목:" 이나 "**서사:**" 같은 머리말을 쓰지 마라. 장면 묘사·대사·주사위 판정을 재현하지 마라.',
@@ -95,10 +106,23 @@ export function buildMessages(
     '이 형식을 벗어난 응답(특히 서사 산문)은 폐기되고 다시 생성된다.',
   ].join('\n');
 
+  // 전체 씬 목록 — 이미 쓰인 것을 알면 "없다" 대신 "연결이 약하다" 로 말할 수 있다.
+  // 제목만 실으므로 길지 않고, 그래도 넘치면 잘라 낸다(프롬프트 예산 보호).
+  const sceneIndexLine = (() => {
+    const idx = input.sceneIndex ?? [];
+    if (idx.length === 0) return '';
+    const lines = idx.map((s) => `${s.id}${s.title ? ` — ${s.title}` : ''}`);
+    let out = lines.join('\n');
+    if (out.length > 8000) out = out.slice(0, 8000) + '\n…(이하 생략)';
+    return `── 전체 씬 목록(제목만) ──\n${out}`;
+  })();
+
   const user = [
     `엔딩: ${endingLabel} (${input.endingId})`,
     charLine ? `캐릭터: ${charLine}` : '',
     input.scenePath.length ? `씬 경로(${input.scenePath.length}): ${input.scenePath.join(' → ')}` : '',
+    '',
+    sceneIndexLine,
     '',
     '── 플레이 진행 로그 ──',
     truncateLog(input.log),
