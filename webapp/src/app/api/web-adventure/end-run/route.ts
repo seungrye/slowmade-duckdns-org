@@ -15,6 +15,7 @@ import WebAdventurePastRun from '@/models/web-adventure-past-run';
 import { auth } from '@/auth';
 import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
 import { enqueueFeedbackNote, capScenePath, capLog } from '@/lib/web-adventure/enqueue-feedback-note';
+import { enqueueSceneImage } from '@/lib/web-adventure/enqueue-scene-image';
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -79,6 +80,9 @@ export async function POST(req: NextRequest) {
 
   // 3. #9 — 엔딩 시 피드백 노트 자동 생성(큐 적재). 작가 소유, 볼륨 캡·중복 방지.
   await enqueueFeedbackNote(pastRun, session.user.email, log.length);
+
+  // 4. #158 — 엔딩마다 씬 삽화 한 장 추가(큐 적재). 회차를 거듭할수록 그림이 늘어난다.
+  await enqueueSceneImage(pastRun, session.user.email);
 
   return apiSuccess({ nextRunIndex: save.runIndex + 1 });
 }

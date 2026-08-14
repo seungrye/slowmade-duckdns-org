@@ -3,6 +3,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
+vi.mock('@/lib/web-adventure/enqueue-scene-image', () => ({
+  // #158 — 삽화 큐 적재는 자체 테스트로 검증한다. 여기선 DB 를 안 타게만 한다.
+  enqueueSceneImage: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/lib/env', () => ({ env: { appKey: 'appsecret', ownerEmail: 'owner@x.com' } }));
 vi.mock('@/lib/web-adventure/hydrate-character', () => ({

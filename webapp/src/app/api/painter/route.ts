@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as Minio from 'minio';
 import { auth } from '@/auth';
 import { apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
@@ -10,20 +9,7 @@ import { env } from '@/lib/env';
 import { nanoid } from 'nanoid';
 import { translateAndGenerate } from '@/lib/painter/imageGen';
 import { tryConsumeDailyQuota } from '@/lib/painter/quota';
-
-let _minioClient: Minio.Client | null = null;
-function getMinioClient(): Minio.Client {
-  if (!_minioClient) {
-    _minioClient = new Minio.Client({
-      endPoint: env.minio.endpoint,
-      port: env.minio.port,
-      useSSL: true,
-      accessKey: env.minio.accessKey,
-      secretKey: env.minio.secretKey,
-    });
-  }
-  return _minioClient;
-}
+import { getMinioClient } from '@/lib/minio-client';
 
 function isAllowedOrigin(req: NextRequest): boolean {
   const siteUrl = env.siteUrl.replace(/\/$/, '');
