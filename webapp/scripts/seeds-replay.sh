@@ -80,6 +80,7 @@ PATCHES=(
   scripts/seed-366-body-snapshot.mjs # 본문 정본 고정(드리프트 해소 — #91 정정 포함)
   scripts/seed-370-choice-payoffs.mjs # #107 흔적 회수(동류 합류·갱도 뒷문·언론 패)
   scripts/seed-369-choice-traces.mjs # #89 헛도는 판정 제거 + 선택 흔적(flag)
+  scripts/seed-371-stigma-felt.mjs # #160 침식 체감 파생 변수 삽입
   scripts/seed-368-stigma-gates.mjs # #99 침식 게이트(승천 하한·무흔 상한)
   scripts/seed-367-voices.mjs # #73/#87 treatment + variants(tolkien/eco)
 )

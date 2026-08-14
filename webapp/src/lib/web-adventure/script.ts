@@ -13,10 +13,16 @@ export type ScriptSegment =
   | { kind: "text"; text: string }
   | { kind: "directive"; cmd: string; args: string[]; raw: string };
 
-/** `{{변수}}` 를 vars 값으로 치환. 미정의 변수는 원문 유지(작가 오탈자를 감추지 않기 위함). */
+/**
+ * `{{변수}}` 를 vars 값으로 치환. 미정의 변수는 원문 유지(작가 오탈자를 감추지 않기 위함).
+ *
+ * 변수명에 **한글을 허용한다** (#370). 처음엔 `\w` 였는데 그건 ASCII 만 매치해서
+ * `{{침식_손}}` 같은 이름이 조용히 원문으로 남았다. 한국어로 쓰는 이야기에서 변수명만
+ * 영문이어야 할 이유가 없다. 바꿀 때 기존 콘텐츠에 쓰인 변수는 하나도 없어 회귀 위험도 없었다.
+ */
 export function interpolate(text: string, vars?: Record<string, string | number>): string {
   if (!vars) return text;
-  return text.replace(/\{\{(\w+)\}\}/g, (whole, key: string) =>
+  return text.replace(/\{\{([\p{L}\p{N}_]+)\}\}/gu, (whole, key: string) =>
     Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : whole,
   );
 }
