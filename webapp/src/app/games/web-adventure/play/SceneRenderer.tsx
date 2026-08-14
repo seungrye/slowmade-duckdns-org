@@ -7,6 +7,7 @@ import ChoiceList from "./ChoiceList";
 import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
 import { parseScript } from "@/lib/web-adventure/script";
+import { stigmaVars } from "@/lib/web-adventure/stigma-sense";
 import { AudioBus } from "./audio-bus";
 import {
   getSkipVisitedEnabled,
@@ -165,13 +166,22 @@ export default function SceneRenderer({
   }, [scene.id, revealCount, skipAll, skipSequential, total]);
 
   // <<fx …>> 발동 — 새로 노출된 문단(firedRef..revealCount)의 fx 디렉티브 실행.
+  // #370 — 침식 체감 변수를 본문 보간에 얹는다. 침식도가 오르면 `{{침식_손}}` 같은 문장이
+  // 저절로 무거워진다. 작가가 setVars 로 같은 이름을 직접 정했다면 그쪽이 이긴다.
+  const bodyVars = useMemo(
+    () => ({ ...stigmaVars(character.stigmaErosion), ...(character.variables ?? {}) }),
+    [character.stigmaErosion, character.variables],
+  );
+
   useEffect(() => {
     if (fxSceneRef.current !== scene.id) {
       fxSceneRef.current = scene.id;
       firedRef.current = 0;
     }
     for (let idx = firedRef.current; idx < revealCount; idx++) {
-      const segs = parseScript(scene.body[idx] ?? "", character.variables);
+      // 이 효과는 디렉티브(fx/sfx)만 읽는다. vars 는 표시 텍스트에만 쓰이므로 넘기지 않는다
+      // — 넘기면 침식도가 바뀔 때마다 효과가 다시 걸릴 위험만 생긴다.
+      const segs = parseScript(scene.body[idx] ?? "");
       for (const s of segs) {
         if (s.kind !== "directive" || !s.args[0]) continue;
         if (s.cmd === "fx") {
@@ -248,7 +258,7 @@ export default function SceneRenderer({
         {scene.body.slice(0, revealCount).map((p, i) => {
           // {{변수}} 치환 + << 디렉티브 >> 분리. 표시 텍스트는 <p>, <<img>> 는 블록 삽화로.
           // (오디오/화면효과 디렉티브 재생은 후속 태스크 — 여기선 표시에 영향 없음.)
-          const segs = parseScript(p, character.variables);
+          const segs = parseScript(p, bodyVars);
           const texts = segs.filter((s) => s.kind === "text");
           const imgs = segs.filter((s) => s.kind === "directive" && s.cmd === "img");
           return (
