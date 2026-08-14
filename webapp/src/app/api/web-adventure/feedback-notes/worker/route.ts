@@ -18,6 +18,7 @@ import { apiSuccess } from '@/lib/api-response';
 import { env } from '@/lib/env';
 import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
+import WebAdventureScene from '@/models/web-adventure-scene';
 import { generateFeedbackNote, ENDING_LABEL } from '@/lib/web-adventure/feedback-note';
 import { STALE_MS, GEN_TIMEOUT_MS } from '@/lib/web-adventure/feedback-worker-timing';
 
@@ -70,8 +71,15 @@ export async function POST(req: NextRequest) {
     const run = await WebAdventurePastRun.findById(note.pastRunId).lean();
     if (!run) throw new Error('원천 회차(past-run)를 찾을 수 없습니다.');
 
+    // #163 — 전체 씬 목록(제목만)을 함께 준다. 노트는 한 회차의 로그만 보므로, 이게 없으면
+    //   그 회차가 안 지난 장면을 "없다" 라고 단정한다.
+    const sceneIndex = (await WebAdventureScene.find({ isDeleted: { $ne: true } })
+      .select('id title')
+      .lean()) as unknown as Array<{ id: string; title?: string }>;
+
     const result = await generateFeedbackNote(
       {
+        sceneIndex,
         endingId: run.endingId,
         finalSceneId: run.finalSceneId,
         scenePath: run.scenePath ?? [],

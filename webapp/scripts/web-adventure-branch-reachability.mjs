@@ -47,11 +47,24 @@ function bfsScenes(registry, roots) {
   return visited;
 }
 
+/**
+ * 이 flag 를 세우는 곳을 모두 찾는다.
+ *
+ * 씬 `onEnter` 만 보면 안 된다 — **선택지에도 setFlags 가 있고**(#89 선택의 흔적) 엔진이
+ * 실제로 적용한다(engine/reducer 의 applyChoiceFlags). 처음엔 onEnter 만 봐서, 멀쩡히
+ * 도달 가능한 분기 3 개를 "도달 불가" 로 신고했다. 이야기를 지키라고 만든 검사가 늑대를
+ * 외치면 아무도 믿지 않게 된다.
+ */
 function flagSetters(registry, flag) {
   const result = [];
   for (const [id, s] of Object.entries(registry)) {
     if (s.onEnter?.setFlags?.[flag] === true) {
       result.push(`scene:${id} onEnter`);
+    }
+    for (const c of s.choices ?? []) {
+      if (c.setFlags?.[flag] === true) {
+        result.push(`choice:${id}/${c.id ?? '?'}`);
+      }
     }
   }
   return result;

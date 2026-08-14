@@ -146,4 +146,49 @@ describe('looksLikeProposal', () => {
     expect(looksLikeProposal('')).toBe(false);
     expect(looksLikeProposal('   \n  ')).toBe(false);
   });
+
+// #163 — 노트는 **한 회차의 로그**만 본다. 그런데 프롬프트가 그 사실을 말하지 않아,
+// 그 회차가 안 지난 장면을 "없다·빈약하다" 라고 단정했다. 실제로 "세 달이 겹치는 새벽"
+// 떡밥은 6 개 씬에서 회수되고 있는데도 "회수가 부족하다" 는 노트가 나왔다.
+describe('한 경로만 본다는 사실을 프롬프트에 명시 (#163)', () => {
+  const input = {
+    endingId: 'harmony',
+    finalSceneId: 's9',
+    scenePath: ['a', 'b'],
+    log: ['로그'],
+  };
+
+  it('경로 한정임을 못 박는다', () => {
+    const sys = buildMessages(input)[0].content;
+    expect(sys).toMatch(/한 경로|일부만|전체 이야기/);
+  });
+
+  it('없다고 단정하지 말라고 지시한다', () => {
+    const sys = buildMessages(input)[0].content;
+    expect(sys).toMatch(/단정하지|없다고/);
+  });
+
+  it('씬 목록을 주면 user 에 싣는다 — 이미 있는 것을 알게 한다', () => {
+    const msgs = buildMessages({
+      ...input,
+      sceneIndex: [
+        { id: 'omphalos_station', title: '정거장' },
+        { id: 'kael_truth_revealed', title: '진실' },
+      ],
+    });
+    expect(msgs[1].content).toContain('omphalos_station');
+    expect(msgs[1].content).toContain('정거장');
+  });
+
+  it('씬 목록이 없으면 종전과 같다 — 하위호환', () => {
+    const withOut = buildMessages(input)[1].content;
+    expect(withOut).not.toContain('전체 씬 목록');
+  });
+
+  it('씬 목록이 많아도 프롬프트가 무한정 길어지지 않는다', () => {
+    const many = Array.from({ length: 500 }, (_, i) => ({ id: `s${i}`, title: `제목${i}` }));
+    const msgs = buildMessages({ ...input, sceneIndex: many });
+    expect(msgs[1].content.length).toBeLessThan(20000);
+  });
+});
 });
