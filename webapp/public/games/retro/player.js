@@ -338,11 +338,37 @@ function installServerSaves(gameKey) {
       if (!res.ok) throw new Error(String(res.status));
       const bytes = new Uint8Array(await res.arrayBuffer());
       await window.EJS_emulator.gameManager.loadState(bytes);
+      nudgeVideo();
       say('서버에서 불러왔습니다');
     } catch (err) {
       say('불러오기 실패 — ' + ((err && err.message) || err));
     }
   };
+}
+
+/**
+ * 상태를 불러온 뒤 화면을 한 번 깨운다 (#170).
+ *
+ * 상태 자체는 제대로 들어가는데(소리는 계속 난다) **화면만 검은 채로 남는** 환경이 있다 —
+ * 코어가 다음 프레임을 다시 그리지 않는 경우다. 메인 루프를 잠깐 껐다 켜면 강제로 다시 그린다.
+ * 사용자가 일시정지 → 재생을 손으로 누르는 것과 같은 동작이라, 이미 정상인 환경에서는 무해하다.
+ */
+function nudgeVideo() {
+  const em = window.EJS_emulator;
+  if (!em) return;
+  try {
+    em.pause();
+    // 같은 틱에 되돌리면 코어가 프레임을 못 넘긴다 — 한 박자 뒤에 재개한다.
+    setTimeout(() => {
+      try {
+        em.play();
+      } catch (err) {
+        console.error('재생 재개 실패', err);
+      }
+    }, 80);
+  } catch (err) {
+    console.error('화면 깨우기 실패', err);
+  }
 }
 
 async function fetchBytes(url) {
