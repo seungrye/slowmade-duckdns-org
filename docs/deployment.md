@@ -138,6 +138,42 @@ sudo nginx -t && sudo nginx -s reload
 
 ssl 경로 (`/etc/letsencrypt/...`) 는 표준 경로라 공개 안전. 실 인증서는 별도 systemd timer / certbot 으로 갱신.
 
+
+### 7. MinIO 접근 제어 (#165)
+
+버킷은 한때 익명에게 **읽기·목록·쓰기·삭제**를 모두 허용하고 있었고, nginx 가 버킷 전체를
+프록시해 앱의 인증이 통째로 우회됐다. 두 겹으로 막는다.
+
+1. **버킷 정책** — `scripts/deploy/minio-bucket-policy.json`. 익명에게는 공개 prefix
+   (`painter-images/`·`thumbnails/`·`paper-fig-*`·루트 타임스탬프 파일)의 `GetObject` 만 준다.
+   `ListBucket`·`PutObject`·`DeleteObject` 는 익명에서 제거했다.
+   앱은 `seungrye`(readwrite)의 **서비스 계정**으로 붙으므로 이 정책과 무관하다.
+
+   ```bash
+   mc anonymous set-json scripts/deploy/minio-bucket-policy.json <alias>/handmade-site
+   ```
+
+   되돌리기: `minio-bucket-policy.before.json` 이 변경 전 정책이다.
+
+2. **nginx** — `scripts/deploy/minio-guard.conf` 를 `/etc/nginx/conf.d/` 에 둔다.
+   서명 헤더가 없는(익명) 요청만 버킷 목록·비공개 prefix 에서 404 로 돌린다.
+   각 프록시 블록 안에서 `if ($minio_deny_anon) { return 404; }` 로 쓰며,
+   **`rewrite … break` 보다 앞에** 둬야 한다(뒤에 두면 rewrite 모듈이 처리를 끊어 무시된다).
+
+3. **MinIO 포트** — 컨테이너를 `127.0.0.1:9000`·`127.0.0.1:9090` 으로만 바인딩한다.
+   앱은 `minio-api…:443`(nginx 경유)로 붙으므로 9000 을 밖에 열 이유가 없다.
+
+   ```bash
+   docker run -d --name minio-cloudstorage --restart unless-stopped \
+     -p 127.0.0.1:9000:9000 -p 127.0.0.1:9090:9090 \
+     -v /home/seungrye/minio-data:/data \
+     -e MINIO_ROOT_USER=… -e MINIO_ROOT_PASSWORD=… -e MINIO_BROWSER_REDIRECT_URL=… \
+     quay.io/minio/minio:latest server /data --console-address ":9090"
+   ```
+
+   데이터는 호스트 바인드 마운트(`/home/seungrye/minio-data`)라 컨테이너를 다시 만들어도
+   영향이 없다. 그래도 바꾸기 전후로 객체 수·용량을 대조할 것.
+
 ## 일상 배포
 
 ```bash
