@@ -7,6 +7,7 @@
 import { applyBundlePatchToSet, applyRomPatch, ensurePhoenixKey, isZip } from './rom-patch.js';
 import { pickLoadErrors } from './core-log.js';
 import { patchedRomPath, romFileNameFromUrl } from './rom-name.js';
+import { baseFromGameUrl, planLegacySaveRestore } from './legacy-save.js';
 
 const DATA_PATH = '/games/retro/data/';
 // src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 양쪽을 함께 고칠 것.
@@ -52,6 +53,9 @@ const saveKey = q.get('save') || '';
 // 아케이드 분할 셋 — 코어 파일시스템에 함께 놓을 부모 롬셋들 (#143, #148).
 // 합치지 않는다 — 아케이드 코어는 부모 아카이브를 따로 찾는다(installFsFiles 주석 참고).
 const parentUrls = q.getAll('set');
+// 옛 이름(`file.srm`)으로 남은 게임 세이브를 되살릴 대상인가 (#175).
+// 서버가 판단해 넘긴다 — 아무 게임이나 가져가면 남의 세이브를 끌어온다(entry.ts 참고).
+const legacySave = q.get('legacy') === '1';
 
 // 이 문서는 CSP 에서 'unsafe-eval' 이 열려 있다(코어 7z 해제에 필요 — middleware.ts 참고).
 // name 은 EmulatorJS UI 로 흘러 들어가는 **유일한 반사 입력**이므로, 그쪽이 어떻게 그리든
@@ -197,6 +201,7 @@ async function start() {
     watchLoadFailure();
   };
 
+  if (legacySave) restoreLegacySaves();
   if (saveKey) installServerSaves(saveKey);
   // EJS_threads 는 켜지 않는다 — SharedArrayBuffer 가 필요해지고 그러면 COOP/COEP 헤더를
   // 걸어야 한다. 이 두 기종은 단일 스레드로 충분하다.
@@ -247,6 +252,67 @@ function installFsFiles(files) {
       }
     });
   };
+}
+
+/**
+ * 예전 이름으로 남은 게임 세이브(SRAM)를 되살린다 (#175).
+ *
+ * #137 이전에는 롬 주소가 전부 `.../file` 로 끝났다. EmulatorJS 는 주소의 마지막 조각으로
+ * 코어에 줄 파일명을 정하고, 코어는 그 이름으로 배터리 세이브를 남긴다 — 그래서 그 시절
+ * 세이브는 모두 `/data/saves/<코어>/file.srm` 한 자리에 쌓였다. #137 이 주소를
+ * `.../file/<id>.sfc` 로 바꾸면서 코어가 찾는 이름이 `<id>.srm` 으로 옮겨 갔고, 파일은
+ * 브라우저(IndexedDB)에 그대로인데 게임은 「저장된 데이터 없음」을 띄우게 됐다.
+ *
+ * **복사**이지 이동이 아니다. 원본 `file.srm` 은 그대로 둔다 — 잘못 짚었을 때 되돌릴 자리가
+ * 남아야 한다. 이미 이 게임 이름으로 저장된 것이 있으면 그게 최신이므로 손대지 않는다.
+ *
+ * 자리는 `installFsFiles` 와 같은 `saveDatabaseLoaded` 다. 이때 세이브 디렉터리는 이미
+ * IndexedDB 에서 올라와 있고(실측), 코어가 롬을 읽기 **직전**이라 복사본이 제때 눈에 띈다.
+ * 다만 이 시점엔 `emulator.fileName` 이 아직 없어서, 대상 이름은 EmulatorJS 와 같은 방식으로
+ * `config.gameUrl` 에서 직접 뽑는다.
+ */
+function restoreLegacySaves() {
+  const prevReady = window.EJS_ready;
+  window.EJS_ready = () => {
+    if (typeof prevReady === 'function') prevReady();
+    const em = window.EJS_emulator;
+    if (!em || typeof em.on !== 'function') return;
+    em.on('saveDatabaseLoaded', (FS) => {
+      try {
+        const targetBase = baseFromGameUrl(em.config && em.config.gameUrl);
+        if (!targetBase) return;
+        // 코어마다 제 이름의 하위 디렉터리를 쓴다(예: /data/saves/Snes9x).
+        for (const dir of saveDirs(FS)) {
+          const entries = FS.readdir(dir).filter((n) => n !== '.' && n !== '..');
+          for (const { from, to } of planLegacySaveRestore({ entries, targetBase })) {
+            FS.writeFile(dir + '/' + to, FS.readFile(dir + '/' + from));
+            console.log('예전 이름의 세이브를 되살렸습니다: ' + from + ' → ' + to);
+          }
+        }
+      } catch (err) {
+        // 되살리기는 덤이다 — 실패해도 게임은 그대로 시작한다.
+        console.error('예전 세이브를 되살리지 못했습니다.', err);
+      }
+    });
+  };
+}
+
+/** `/data/saves` 아래의 코어별 디렉터리들. 없으면 빈 배열. */
+function saveDirs(FS) {
+  const root = '/data/saves';
+  let names;
+  try {
+    names = FS.readdir(root).filter((n) => n !== '.' && n !== '..');
+  } catch {
+    return []; // 세이브를 한 번도 안 한 브라우저 — 되살릴 것도 없다.
+  }
+  return names.filter((n) => {
+    try {
+      return FS.isDir(FS.stat(root + '/' + n).mode);
+    } catch {
+      return false;
+    }
+  }).map((n) => root + '/' + n);
 }
 
 /**

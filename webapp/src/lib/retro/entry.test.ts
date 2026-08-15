@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { builtinEntry, romEntry } from './entry';
+import { ROM_URL_CHANGED_AT, builtinEntry, romEntry } from './entry';
 
 const BUILTIN = {
   slug: 'lan-master',
@@ -97,5 +97,29 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
       const e = romEntry({ ...ROM, platform: 'snes', filename: 'Tales.sfc' });
       expect(e.romUrl.endsWith(`/${ROM.id}.sfc`)).toBe(true);
     });
+  });
+});
+
+// #137 이전에 올린 롬만 옛 이름(`file.srm`)의 세이브를 가질 수 있다 (#175).
+// 그 뒤에 올린 롬은 처음부터 새 주소로만 실행됐으니, 남의 세이브를 끌어갈 여지를 없앤다.
+describe('romEntry — 옛 세이브 복원 대상 판별', () => {
+  it('#137 배포 전에 올린 롬은 대상이다', () => {
+    expect(romEntry({ ...ROM, createdAt: '2026-08-12T14:53:13.635Z' }).legacySave).toBe(true);
+  });
+
+  it('#137 배포 뒤에 올린 롬은 대상이 아니다 — 옛 이름을 만든 적이 없다', () => {
+    expect(romEntry({ ...ROM, createdAt: '2026-08-13T04:24:06.929Z' }).legacySave).toBe(false);
+  });
+
+  it('경계 시각 자체는 대상이 아니다', () => {
+    expect(romEntry({ ...ROM, createdAt: ROM_URL_CHANGED_AT }).legacySave).toBe(false);
+  });
+
+  it('올린 시각을 모르면 대상이 아니다 — 모를 때는 건드리지 않는다', () => {
+    expect(romEntry({ ...ROM, createdAt: '' }).legacySave).toBe(false);
+  });
+
+  it('기본 제공 게임은 해당 없음 — 주소가 바뀐 적이 없다', () => {
+    expect(builtinEntry(BUILTIN).legacySave).toBeUndefined();
   });
 });

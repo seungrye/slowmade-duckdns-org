@@ -94,6 +94,7 @@ export default async function PlayPage({
         stripHeader={stripHeader}
         saveKey={gameKey}
         parents={game.entry.parentUrls}
+        legacySave={game.entry.legacySave}
       />
 
       <section className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-400">
