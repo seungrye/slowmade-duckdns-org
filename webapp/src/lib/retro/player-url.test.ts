@@ -69,3 +69,17 @@ describe('retro/player-url — iframe 에 넘길 주소를 만든다', () => {
     });
   });
 });
+
+// #175 — 옛 이름의 게임 세이브를 되살릴지는 서버가 판단해 플래그로 넘긴다.
+describe('buildPlayerUrl — 옛 세이브 복원 플래그', () => {
+  const base = { core: 'snes9x', rom: '/api/games/retro/roms/1/file/1.sfc' };
+
+  it('대상이면 legacy=1 을 싣는다', () => {
+    expect(buildPlayerUrl({ ...base, legacySave: true })).toContain('legacy=1');
+  });
+
+  it('대상이 아니면 아예 싣지 않는다', () => {
+    expect(buildPlayerUrl({ ...base, legacySave: false })).not.toContain('legacy');
+    expect(buildPlayerUrl(base)).not.toContain('legacy');
+  });
+});

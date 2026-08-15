@@ -39,3 +39,4 @@ coverage/
 !/webapp/public/games/retro/rom-name.js
 !/webapp/public/games/retro/player.js
 !/webapp/public/games/retro/core-log.js
+!/webapp/public/games/retro/legacy-save.js

@@ -32,6 +32,13 @@ export interface PlayerUrlOptions {
   saveKey?: string;
   /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 일반적인 것부터. */
   parents?: string[];
+  /**
+   * 옛 이름으로 남은 게임 세이브를 되살릴지 (#175).
+   *
+   * 판단은 서버가 한다(`entry.ts` 의 `ROM_URL_CHANGED_AT`) — 옛 이름 `file.srm` 은 게임끼리
+   * 공유하던 자리라, 아무 게임이나 가져가면 남의 세이브를 끌어오게 된다.
+   */
+  legacySave?: boolean;
 }
 
 /**
@@ -39,7 +46,7 @@ export interface PlayerUrlOptions {
  *   iframe 은 우리 오리진에서 도는 코드라, 여기로 임의 URL 이 새 나가면 남의 서버 파일을
  *   우리 플레이어로 트는 통로가 된다.
  */
-export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents }: PlayerUrlOptions): string {
+export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave }: PlayerUrlOptions): string {
   if (!SUPPORTED_CORES.has(core)) throw new Error(`지원하지 않는 코어: ${core || '(빈 값)'}`);
   if (!rom) throw new Error('롬 주소가 비었습니다.');
   if (!isSameOriginRom(rom)) throw new Error(`외부 출처 롬은 실행하지 않습니다: ${rom}`);
@@ -54,6 +61,7 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, p
     if (typeof stripHeader === 'boolean') params.set('strip', stripHeader ? '1' : '0');
   }
   if (saveKey) params.set('save', saveKey);
+  if (legacySave) params.set('legacy', '1');
   // 넘긴 순서를 그대로 지킨다 — URLSearchParams 는 넣은 순서를 보존한다.
   for (const p of parents ?? []) {
     if (!isSameOriginRom(p)) throw new Error(`외부 출처 롬셋은 쓰지 않습니다: ${p}`);

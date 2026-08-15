@@ -27,6 +27,8 @@ export interface GameEntry {
   hasSave?: boolean;
   /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. 합치지 않고 따로 둔다 (#148). */
   parentUrls?: string[];
+  /** 옛 이름(`file.srm`)의 게임 세이브를 되살릴 대상인가 (#175). `ROM_URL_CHANGED_AT` 참고. */
+  legacySave?: boolean;
 }
 
 export interface BuiltinGame {
@@ -70,6 +72,22 @@ export interface UserRomDto {
   parentSets?: string[];
 }
 
+/**
+ * #137(롬 주소 끝을 `<id>.<확장자>` 로 바꾼 변경)이 배포된 시각 — PR #138 병합 시점.
+ *
+ * 이 변경으로 코어가 배터리 세이브를 찾는 이름이 `file.srm` 에서 `<id>.srm` 으로 옮겨 갔다.
+ * 그래서 **이 시각 이전에 올린 롬만** 옛 이름의 세이브를 가질 수 있다 — 그 뒤에 올린 롬은
+ * 처음부터 새 주소로만 실행됐다. `file.srm` 은 게임끼리 **공유하던 이름**이라, 이 경계가
+ * 남의 세이브를 엉뚱한 게임이 끌어가는 것을 막는 자물쇠다.
+ */
+export const ROM_URL_CHANGED_AT = '2026-08-13T03:21:16.000Z';
+
+/** 옛 이름(`file.srm`)의 세이브가 있을 수 있는 롬인가 (#175). 모르면 false — 모를 땐 안 건드린다. */
+function hasLegacySave(createdAt: string | undefined): boolean {
+  const t = Date.parse(createdAt ?? '');
+  return Number.isFinite(t) && t < Date.parse(ROM_URL_CHANGED_AT);
+}
+
 export const BUILTIN_ROM_DIR = '/games/retro/roms';
 export const BUILTIN_COVER_DIR = '/games/retro/covers';
 
@@ -107,6 +125,7 @@ export function romEntry(rom: UserRomDto): GameEntry {
     parentUrls: (rom.parentSets ?? []).map(
       (n) => `/api/games/retro/roms/${rom.id}/set/${encodeURIComponent(n)}`,
     ),
+    legacySave: hasLegacySave(rom.createdAt),
   };
 }
 

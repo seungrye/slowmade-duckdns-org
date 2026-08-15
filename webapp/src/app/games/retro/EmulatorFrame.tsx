@@ -16,6 +16,8 @@ interface Props {
   saveKey?: string;
   /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. */
   parents?: string[];
+  /** 옛 이름으로 남은 게임 세이브를 되살릴지 (#175). 판단은 서버 몫. */
+  legacySave?: boolean;
 }
 
 /**
@@ -25,14 +27,14 @@ interface Props {
  * 하지 않는다 — 화면을 떠나면 React 가 iframe 을 지우고, 그때 안의 전역·워커·오디오가 함께
  * 사라진다. 그게 iframe 을 쓰는 이유다.
  */
-export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey, parents }: Props) {
+export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave }: Props) {
   const src = useMemo(() => {
     try {
-      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents });
+      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave });
     } catch {
       return null;
     }
-  }, [core, rom, name, patch, stripHeader, saveKey, parents]);
+  }, [core, rom, name, patch, stripHeader, saveKey, parents, legacySave]);
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
