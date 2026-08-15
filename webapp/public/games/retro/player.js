@@ -77,25 +77,7 @@ if (q.get('diag') === '1') {
   };
 }
 
-// `&reset=1` — 이 게임에 저장된 에뮬레이터 설정을 지우고 기본값으로 띄운다 (#172).
-//
-// EmulatorJS 는 설정(셰이더·화면비·WebGL 등)을 **게임 이름별로** localStorage 에 남긴다
-// (`<gameId>-<코어>-<게임이름>`). 그래서 한 게임만 화면이 안 나오는 식의 증상이 생길 수 있고,
-// 그때 개발자도구 없이 되돌릴 방법이 없었다. 주소에 붙이기만 하면 되게 한다.
-if (q.get('reset') === '1') {
-  try {
-    const suffix = '-' + name;
-    for (const key of Object.keys(localStorage)) {
-      // `1-snes-게임이름` 형태 + 전역 볼륨 설정.
-      if (key === 'ejs-settings' || (/^\d+-[a-z0-9_]+-/i.test(key) && key.endsWith(suffix))) {
-        localStorage.removeItem(key);
-      }
-    }
-    notice('이 게임의 저장된 설정을 지웠습니다.<br><br>주소에서 <code>&amp;reset=1</code> 을 빼고 다시 열어 주세요.');
-  } catch (err) {
-    notice('설정을 지우지 못했습니다.<br><br><code>' + String(err && err.message).replace(/[<>]/g, '') + '</code>');
-  }
-} else if (CORES.indexOf(core) < 0) {
+if (CORES.indexOf(core) < 0) {
   notice('지원하지 않는 기종입니다.');
 } else if (!rom) {
   notice('실행할 롬이 지정되지 않았습니다.');
@@ -356,37 +338,11 @@ function installServerSaves(gameKey) {
       if (!res.ok) throw new Error(String(res.status));
       const bytes = new Uint8Array(await res.arrayBuffer());
       await window.EJS_emulator.gameManager.loadState(bytes);
-      nudgeVideo();
       say('서버에서 불러왔습니다');
     } catch (err) {
       say('불러오기 실패 — ' + ((err && err.message) || err));
     }
   };
-}
-
-/**
- * 상태를 불러온 뒤 화면을 한 번 깨운다 (#170).
- *
- * 상태 자체는 제대로 들어가는데(소리는 계속 난다) **화면만 검은 채로 남는** 환경이 있다 —
- * 코어가 다음 프레임을 다시 그리지 않는 경우다. 메인 루프를 잠깐 껐다 켜면 강제로 다시 그린다.
- * 사용자가 일시정지 → 재생을 손으로 누르는 것과 같은 동작이라, 이미 정상인 환경에서는 무해하다.
- */
-function nudgeVideo() {
-  const em = window.EJS_emulator;
-  if (!em) return;
-  try {
-    em.pause();
-    // 같은 틱에 되돌리면 코어가 프레임을 못 넘긴다 — 한 박자 뒤에 재개한다.
-    setTimeout(() => {
-      try {
-        em.play();
-      } catch (err) {
-        console.error('재생 재개 실패', err);
-      }
-    }, 80);
-  } catch (err) {
-    console.error('화면 깨우기 실패', err);
-  }
 }
 
 async function fetchBytes(url) {
