@@ -62,6 +62,24 @@ server {
 
 	# MinIO(S3) apex 경로 프록시 — minio-api 서브도메인 DNS 간헐 실패 우회.
 	# /s3/<bucket>/<key> → minio_s3 의 /<bucket>/<key> (path-style 이라 Host 무관).
+	# ── MinIO 노출 차단 (#165) ─────────────────────────────────────────────
+	# `/s3/` 는 버킷 **전체**를 익명으로 프록시한다. 그래서 앱이 인증으로 지키던 것들이
+	# 주소만으로 새어 나갔다 — 롬(retro-roms)·세이브(retro-states)·비공개 글 첨부(attachments).
+	# 코드의 의도는 분명하다: "공개 /s3/ 경로를 쓰지 않는 이유: 주소만 알면 누구나 받아 갈 수
+	# 있기 때문"(api/games/retro/roms/[id]/file). 그 의도를 여기서 강제한다.
+	#
+	# regex location 은 prefix location(/s3/) 보다 우선하므로 아래가 먼저 걸린다.
+
+	# 버킷 목록 금지 — 키가 랜덤이어도 목록이 열리면 무의미해진다(실제로 1000+ 건 열거됐다).
+	location ~ ^/s3/[^/]+/?$ {
+		return 404;
+	}
+
+	# 앱이 인증으로 내려주는 것들은 공개 경로로 못 가져간다.
+	location ~ ^/s3/[^/]+/(retro-roms|retro-states|retro-patches|retro-covers|attachments)/ {
+		return 404;
+	}
+
 	location /s3/ {
 		rewrite ^/s3/(.*)$ /$1 break;
 		proxy_pass http://minio_s3;
@@ -190,6 +208,16 @@ server {
 	add_header X-Content-Type-Options "nosniff";
 	add_header X-XSS-Protection "1; mode=block";
 	add_header X-Frame-Options "SAMEORIGIN";
+
+	# ── MinIO 직접 노출 차단 (#165) ────────────────────────────────────────
+	# 이 도메인은 MinIO 를 그대로 프록시한다. `/s3/` 를 막아도 여기가 열려 있으면 소용없다.
+	# (실제로 여기서도 목록 조회와 롬 다운로드가 됐다.)
+	location ~ ^/[^/]+/?$ {
+		return 404;
+	}
+	location ~ ^/[^/]+/(retro-roms|retro-states|retro-patches|retro-covers|attachments)/ {
+		return 404;
+	}
 
 	location / {
 		# minio-api.slowmade.duckdns.org 접속 시 호스트의 9000번 포트로 프록시
