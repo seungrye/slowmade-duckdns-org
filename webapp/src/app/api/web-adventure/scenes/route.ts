@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
-import { requireAuth } from "@/lib/require-auth";
+import { requireOwner } from "@/lib/require-owner";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import WebAdventureScene from "@/models/web-adventure-scene";
 
@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const authed = await requireAuth(); // 씬 생성은 로그인 필요(무인증 변조/DoS 차단)
+  const authed = await requireOwner(); // 씬 생성은 작성자만 (#179)
   if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const body = await req.json();

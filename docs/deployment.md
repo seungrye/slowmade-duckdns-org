@@ -227,6 +227,39 @@ Blue/Green 전환 순간 두 버전이 같은 MongoDB 를 동시에 본다. 따�
 | nginx reload 후 502 | `proxy_pass` 가 `http://webapp` 가 아닌 `localhost:3010` 으로 남아있는지 확인. |
 | 두 인스턴스가 같은 `.next` 사용 | `NEXT_DISTDIR` 환경변수 누락. systemd 유닛 또는 deploy.sh 의 env 확인. |
 
+## MongoDB 원격 접근 차단 (#179)
+
+`mongodb` 컨테이너는 포트를 `0.0.0.0:27017` 로 게시하고 **인증이 없다** — 붙기만 하면 전체
+DB 읽기·쓰기가 된다. 그런데 도커가 게시한 포트는 자기 iptables 규칙을 직접 넣기 때문에
+**ufw 를 그냥 지나간다.** 도커가 그 목적으로 비워 두는 `DOCKER-USER` 체인에서 막는다.
+
+```bash
+sudo install -m 0755 scripts/deploy/mongo-firewall.sh /usr/local/sbin/mongo-firewall.sh
+sudo install -m 0644 scripts/deploy/mongo-firewall.service /etc/systemd/system/mongo-firewall.service
+sudo systemctl daemon-reload && sudo systemctl enable --now mongo-firewall
+```
+
+허용은 둘뿐이다 — `127.0.0.0/8`(사이트가 `mongodb://127.0.0.1` 로 붙는다)과
+`172.16.0.0/12`(컨테이너들. 어차피 컨테이너는 게시 포트를 거치지 않고 컨테이너 IP 로 갈 수
+있어 여기서 막아 봐야 의미가 없다). 나머지는 DROP.
+
+iptables 규칙은 재부팅하면 사라지고 이 호스트엔 netfilter-persistent 가 없어서, 도커가
+체인을 만든 뒤에 다시 넣는 oneshot 유닛으로 영속화한다.
+
+```bash
+sudo iptables -S DOCKER-USER          # 확인 — [루프백 RETURN, 도커 RETURN, DROP] 순서여야 한다
+sudo systemctl disable --now mongo-firewall   # 해제(규칙은 재부팅 전까지 남는다)
+```
+
+**검증 방법**(막혔다고 믿지 말 것 — 호스트 자신에서의 접속은 `FORWARD` 를 안 타서 이 규칙에
+걸리지 않는다. 원격을 흉내 내려면 허용 대역 **밖**의 도커 네트워크에서 쏴야 한다):
+
+```bash
+docker network create --subnet 10.77.0.0/16 pt-outside
+docker run --rm --network pt-outside redis:alpine nc -z -w4 192.168.0.11 27017   # 실패해야 정상
+docker network rm pt-outside
+```
+
 ## 관련 파일
 
 - `scripts/deploy/webapp@.service` — systemd 템플릿 유닛
@@ -234,3 +267,4 @@ Blue/Green 전환 순간 두 버전이 같은 MongoDB 를 동시에 본다. 따�
 - `scripts/deploy/deploy.sh` — 배포 오케스트레이션
 - `webapp/next.config.ts` — `distDir` 환경변수 인식
 - `webapp/src/app/api/health/route.ts` — liveness 엔드포인트
+- `scripts/deploy/mongo-firewall.sh` · `.service` — MongoDB 원격 접근 차단 (#179)

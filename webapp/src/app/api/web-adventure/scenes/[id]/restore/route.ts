@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
-import { requireAuth } from "@/lib/require-auth";
+import { requireOwner } from "@/lib/require-owner";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import WebAdventureScene from "@/models/web-adventure-scene";
 import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
@@ -17,7 +17,7 @@ import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const authed = await requireAuth(); // 리비전 복원은 로그인 필요
+  const authed = await requireOwner(); // 리비전 복원은 작성자만 (#179)
   if (authed instanceof NextResponse) return authed;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { version?: number };
