@@ -24,7 +24,9 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_req: NextRequest, { params }: Params) {
   await connectToDB();
   const { id } = await params;
-  const scene = await WebAdventureScene.findOne({ id }).lean();
+  // 삭제된 씬은 없는 것으로 본다 (#177). 목록·`content/v1` 과 같은 조건 —
+  // 여기만 빠져 있어서, 지운 씬도 id 만 알면 계속 읽혔다(모든 삭제가 soft-delete 다).
+  const scene = await WebAdventureScene.findOne({ id, isDeleted: { $ne: true } }).lean();
   if (!scene) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
   return apiSuccess(scene);
 }
