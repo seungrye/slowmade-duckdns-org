@@ -11,6 +11,7 @@ import WebAdventurePastRun from '@/models/web-adventure-past-run';
 import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character';
 import { enqueueFeedbackNote, capScenePath, capLog } from '@/lib/web-adventure/enqueue-feedback-note';
 import { enqueueSceneImage } from '@/lib/web-adventure/enqueue-scene-image';
+import { rateLimit, clientIp } from '@/lib/rate-limit';
 
 const APP_USER = 'app@eternia'; // 앱발 익명 플레이어 합성 계정.
 
@@ -35,6 +36,13 @@ export async function POST(req: NextRequest) {
   const key = env.appKey.trim();
   if (!key) return json({ message: 'app 제출 비활성(APP_KEY 미설정)' }, 503);
   if (req.headers.get('x-app-key') !== key) return json({ message: 'unauthorized' }, 401);
+
+  // 요청 1건마다 LLM 피드백 노트 + 이미지 생성이 큐에 쌓인다 — 둘 다 돈이 든다 (#177).
+  // 인증이 앱에 박히는 정적 키 하나뿐이라, 키가 APK 에서 추출되면 무제한으로 돌릴 수 있다.
+  // 정상 플레이는 한 회차를 끝내는 데 한참 걸리므로 이 한도에 걸릴 일이 없다.
+  if (!rateLimit(`app-end-run:${clientIp(req)}`, 10, 60 * 60_000)) {
+    return json({ message: '요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.' }, 429);
+  }
 
   const body = await req.json().catch(() => ({}));
   if (typeof body.endingId !== 'string' || typeof body.finalSceneId !== 'string') {
