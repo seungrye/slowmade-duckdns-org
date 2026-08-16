@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
-import { requireAuth } from "@/lib/require-auth";
+import { requireOwner } from "@/lib/require-owner";
 import { apiSuccess, apiError } from "@/lib/api-response";
 import WebAdventureScene from "@/models/web-adventure-scene";
 import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
@@ -32,7 +32,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  const authed = await requireAuth(); // 씬 수정은 로그인 필요
+  const authed = await requireOwner(); // 씬 수정은 작성자만 (#179)
   if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const { id } = await params;
@@ -87,7 +87,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const authed = await requireAuth(); // 씬 삭제는 로그인 필요
+  const authed = await requireOwner(); // 씬 삭제는 작성자만 (#179)
   if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const { id } = await params;

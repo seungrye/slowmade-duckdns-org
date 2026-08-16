@@ -1,0 +1,26 @@
+# MongoDB 원격 접근 차단 규칙을 부팅 때 다시 넣는다 (#179).
+#
+# iptables 규칙은 재부팅하면 사라진다. 이 호스트엔 netfilter-persistent 가 없어서,
+# 도커가 체인을 만든 **뒤에** 우리 규칙을 다시 넣는 oneshot 유닛으로 영속화한다.
+#
+# 설치:
+#   sudo install -m 0755 mongo-firewall.sh /usr/local/sbin/mongo-firewall.sh
+#   sudo install -m 0644 mongo-firewall.service /etc/systemd/system/mongo-firewall.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now mongo-firewall
+#
+# 확인:  sudo iptables -S DOCKER-USER
+# 해제:  sudo systemctl disable --now mongo-firewall  (규칙은 재부팅 전까지 남는다)
+
+[Unit]
+Description=Block remote access to MongoDB published port (DOCKER-USER)
+# 도커가 DOCKER-USER 체인을 만든 뒤여야 규칙을 넣을 수 있다.
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/mongo-firewall.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -9,7 +9,8 @@ import { NextRequest, NextResponse } from 'next/server'
  * `__Secure-authjs.session-token` (prod). 쿠키 존재 = 인증된 *어떤* 사용자
  * — 진짜 owner 검증은 server component 측에서.
  */
-const OWNER_ONLY_PREFIXES = ['/admin/', '/api/admin/']
+// `/scenes/` — 〈에테르니아〉 작성 도구 (#179). 진짜 검증은 scenes/layout.tsx 의 requireOwner.
+const OWNER_ONLY_PREFIXES = ['/admin/', '/api/admin/', '/scenes/']
 
 function isOwnerOnlyPath(pathname: string): boolean {
   return OWNER_ONLY_PREFIXES.some((p) => pathname === p.slice(0, -1) || pathname.startsWith(p))

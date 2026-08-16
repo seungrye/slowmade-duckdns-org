@@ -9,6 +9,8 @@ import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
+// #179 — 씬 쓰기는 작성자 전용이 됐다(가입만 하면 남이 고칠 수 있었다). 인가는 목으로 갈아 끼운다.
+vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
     findOne: vi.fn(),
@@ -24,6 +26,7 @@ vi.mock('@/models/web-adventure-scene-revision', () => ({
 
 import { POST } from './route';
 import { auth } from '@/auth';
+import { requireOwner } from '@/lib/require-owner';
 import WebAdventureScene from '@/models/web-adventure-scene';
 import WebAdventureSceneRevision from '@/models/web-adventure-scene-revision';
 
@@ -46,12 +49,14 @@ describe('POST /api/web-adventure/scenes/[id]/restore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
+    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // 기본 작성자
   });
 
-  it('로그인하지 않으면 401 (무인증 복원 차단)', async () => {
-    asMock(auth).mockResolvedValue(null);
+  it('작성자가 아니면 404 (복원는 작성자만 — #179)', async () => {
+    const { NextResponse } = await import('next/server');
+    vi.mocked(requireOwner).mockResolvedValue(NextResponse.json({ message: 'Not found' }, { status: 404 }));
     const res = await POST(makeRequest({ version: 0 }), { params });
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(404);
   });
 
   it('version 미지정 시 400', async () => {
