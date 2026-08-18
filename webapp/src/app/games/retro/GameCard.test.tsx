@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import GameCard from './GameCard';
 import { builtinEntry, romEntry, type UserRomDto } from '@/lib/retro/entry';
@@ -349,5 +349,41 @@ describe('GameCard', () => {
       render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
       expect(screen.getByLabelText('내 롬 커버 이미지').getAttribute('accept')).toContain('image/');
     });
+  });
+});
+
+// 내려받기 (#194) — 앵커로 두면 이 영역의 `swallow`(preventDefault)가 다운로드를 취소해
+// **아무 일도 일어나지 않았다** (#196). 버튼으로 두고 직접 주소로 보낸다.
+describe('내려받기 버튼', () => {
+  const originalLocation = window.location;
+  beforeEach(() => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: '' },
+    });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+  });
+
+  it('누르면 다운로드 주소로 보낸다', () => {
+    render(<GameCard game={rom()} onPatchToggle={() => {}} />);
+    fireEvent.click(screen.getByLabelText(/내려받기/));
+    expect(window.location.href).toContain('/download');
+  });
+
+  it('앵커가 아니라 버튼이다 — 카드가 <Link> 라 앵커 중첩이 되면 안 된다', () => {
+    render(<GameCard game={rom()} onPatchToggle={() => {}} />);
+    expect(screen.getByLabelText(/내려받기/).tagName).toBe('BUTTON');
+  });
+
+  it('패치가 있으면 묶어서 받는다고 알려 준다', () => {
+    render(<GameCard game={rom({ patch: PATCH })} onPatchToggle={() => {}} />);
+    expect(screen.getByLabelText(/내려받기/).getAttribute('title')).toContain('묶어');
+  });
+
+  it('기본 제공 게임에는 없다 — 올린 롬만 받는다', () => {
+    render(<GameCard game={WITH_COVER} />);
+    expect(screen.queryByLabelText(/내려받기/)).toBeNull();
   });
 });
