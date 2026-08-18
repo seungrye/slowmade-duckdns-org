@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // 롬에 패치 붙이기 (#112) — **교체 방식** (#116).
 //
 // 롬당 패치는 하나다(카드의 체크박스 하나로 다룬다). 새로 올리면 기존 것을 soft delete 하고
@@ -74,7 +75,11 @@ export async function POST(req: NextRequest) {
       { arrayFilters: [{ 'live.isDeleted': { $ne: true } }] },
     );
 
-    const patch = { name: check.name, format: check.format, size: file.size, objectKey: key };
+    // 패치 내용도 방 번호에 들어간다 (#188) — 켠 쪽과 끈 쪽이 같은 방에 붙으면 desync 난다.
+    const patch = {
+      name: check.name, format: check.format, size: file.size, objectKey: key,
+      sha256: createHash('sha256').update(buf).digest('hex'),
+    };
     const updated = await RetroRom.findOneAndUpdate(
       { _id: romId, userEmail: authed.email, isDeleted: { $ne: true } },
       // 올렸다는 건 쓰겠다는 뜻이므로 적용도 함께 켠다.

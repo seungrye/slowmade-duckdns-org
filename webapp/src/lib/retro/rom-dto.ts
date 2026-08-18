@@ -16,7 +16,9 @@ export interface LeanRom {
   patches?: LeanPatch[];
   patchEnabled?: boolean;
   coverKey?: string;
-  parentSets?: { name: string; size: number; objectKey: string }[];
+  parentSets?: { name: string; size: number; objectKey: string; sha256?: string }[];
+  /** 파일 내용의 sha256 (#188) — netplay 방을 가르는 근거. 옛 문서엔 없다. */
+  sha256?: string;
 }
 
 export interface LeanPatch {
@@ -25,6 +27,8 @@ export interface LeanPatch {
   format: string;
   size: number;
   objectKey?: string;
+  /** 파일 내용의 sha256 (#188). */
+  sha256?: string;
   isDeleted?: boolean;
   createdAt?: Date;
 }
@@ -60,10 +64,18 @@ export function livePatches(doc: { patches?: LeanPatch[] }): UserPatchDto[] {
  * 하나뿐이지만, 옛 데이터나 경쟁 상태로 여럿 남았을 때 "가장 최근에 올린 것" 이 맞다.
  */
 export function activePatch(doc: { patches?: LeanPatch[] }): RomPatchDto | undefined {
-  const live = (doc.patches ?? []).filter((p) => !p.isDeleted);
-  const last = live[live.length - 1];
+  const last = activeLeanPatch(doc);
   if (!last) return undefined;
   return { id: String(last._id), name: last.name, format: last.format, size: last.size };
+}
+
+/**
+ * 위와 **같은 규칙**으로 고른 원본 패치 — 해시처럼 화면에 내보내지 않는 값이 필요할 때 쓴다 (#188).
+ * 고르는 규칙이 둘로 갈리면 netplay 방이 화면과 어긋난다.
+ */
+export function activeLeanPatch(doc: { patches?: LeanPatch[] }): LeanPatch | undefined {
+  const live = (doc.patches ?? []).filter((p) => !p.isDeleted);
+  return live[live.length - 1];
 }
 
 export function toRomDto(doc: LeanRom, extra?: { hasSave?: boolean }): UserRomDto {
