@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 // 롬 올리기 (#109).
 //
 // 목록(`../roms`)과 **경로를 나눈 이유**: 이 라우트는 `src/middleware.ts` 의 matcher 에서 빠져야
@@ -63,18 +64,27 @@ export async function POST(req: NextRequest) {
 
   const safeName = file.name.replace(/[/\\]/g, '_').slice(0, 200) || 'rom';
   const key = `${KEY_PREFIX}/${randomUUID()}-${safeName}`; // 랜덤 프리픽스 — 키 추측 방지
-  const parentSets: { name: string; size: number; objectKey: string }[] = [];
+  const parentSets: { name: string; size: number; objectKey: string; sha256: string }[] = [];
+  // netplay 방을 가르는 근거 (#188) — 바이트가 다르면 락스텝 동기화가 조용히 어긋난다.
+  // 어차피 업로드하려고 바이트를 들고 있으니 여기서 떠 두면 비용이 없다.
+  let romSha = '';
 
   try {
-    await minioClient.putObject(env.minio.bucket, key, Buffer.from(await file.arrayBuffer()));
+    const romBuf = Buffer.from(await file.arrayBuffer());
+    romSha = createHash('sha256').update(romBuf).digest('hex');
+    await minioClient.putObject(env.minio.bucket, key, romBuf);
     // 부모는 **일반적인 것부터** 저장한다 — 실행할 때 코어 파일시스템에 그 순서로 놓는다.
     for (const name of picked.parents) {
       const pf = parents.find((f) => f.name === name);
       if (!pf) continue;
       const pName = pf.name.replace(/[/\\]/g, '_').slice(0, 200) || 'parent';
       const pKey = `${KEY_PREFIX}/${randomUUID()}-${pName}`;
-      await minioClient.putObject(env.minio.bucket, pKey, Buffer.from(await pf.arrayBuffer()));
-      parentSets.push({ name: pName, size: pf.size, objectKey: pKey });
+      const pBuf = Buffer.from(await pf.arrayBuffer());
+      await minioClient.putObject(env.minio.bucket, pKey, pBuf);
+      parentSets.push({
+        name: pName, size: pf.size, objectKey: pKey,
+        sha256: createHash('sha256').update(pBuf).digest('hex'),
+      });
     }
   } catch (err) {
     console.error('rom upload failed:', err);
@@ -91,6 +101,7 @@ export async function POST(req: NextRequest) {
       filename: safeName,
       size: file.size,
       objectKey: key,
+      sha256: romSha,
       parentSets,
     });
     return apiSuccess(toRomDto(doc as unknown as LeanRom), 201);

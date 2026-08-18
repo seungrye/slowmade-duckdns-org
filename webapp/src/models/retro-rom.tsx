@@ -22,6 +22,8 @@ export interface RetroPatchDoc {
   format: string;
   size: number;
   objectKey: string;
+  /** 파일 내용의 sha256 (#188). 옛 문서엔 없다 — 백필 스크립트가 채운다. */
+  sha256?: string;
   isDeleted?: boolean;
   createdAt: Date;
 }
@@ -32,6 +34,9 @@ const RetroPatchSchema = new Schema<RetroPatchDoc>(
     format: { type: String, required: true },
     size: { type: Number, required: true },
     objectKey: { type: String, required: true },
+    // netplay 방을 가르는 근거 (#188). 패치를 켠 쪽과 끈 쪽이 같은 방에 붙으면
+    // 조용히 desync 나므로, 패치 내용까지 방 번호에 들어가야 한다.
+    sha256: { type: String, default: '' },
     // 롬과 같은 원칙 — 배열에서 빼지 않고 플래그만 세운다.
     isDeleted: { type: Boolean, default: false },
   },
@@ -52,6 +57,8 @@ export interface RetroRomDoc {
   size: number;
   /** MinIO 오브젝트 키. */
   objectKey: string;
+  /** 파일 내용의 sha256 (#188). 옛 문서엔 없다 — 백필 스크립트가 채운다. */
+  sha256?: string;
   /**
    * 이 롬에 매단 패치 (#112). 배열이지만 **살아 있는 항목은 항상 최대 하나**다 (#116) —
    * 새로 올리면 이전 것을 soft delete 하고 교체한다. 카드의 체크박스 하나로 다루기 위해서다.
@@ -67,7 +74,7 @@ export interface RetroRomDoc {
    * 코어에 함께 놓을 부모 롬셋들 (#143) — 아케이드 분할 셋.
    * **일반적인 것부터** 담는다. 실행할 때 이 순서로 쌓고 마지막에 본체(클론)가 이긴다.
    */
-  parentSets: { name: string; size: number; objectKey: string }[];
+  parentSets: { name: string; size: number; objectKey: string; sha256?: string }[];
   isDeleted?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -82,13 +89,16 @@ const RetroRomSchema = new Schema<RetroRomDoc>(
     filename: { type: String, required: true },
     size: { type: Number, required: true },
     objectKey: { type: String, required: true },
+    // netplay 방을 가르는 근거 (#188) — 롬 바이트가 다르면 락스텝 동기화가 어긋난다.
+    sha256: { type: String, default: '' },
     patches: { type: [RetroPatchSchema], default: [] },
     // 올렸다면 쓰겠다는 뜻이므로 기본은 켜짐.
     patchEnabled: { type: Boolean, default: true },
     coverKey: { type: String },
     coverFormat: { type: String },
     parentSets: {
-      type: [new Schema({ name: String, size: Number, objectKey: String }, { _id: false })],
+      // 부모셋도 코어가 읽는 바이트라 sha256 을 함께 둔다 (#188).
+      type: [new Schema({ name: String, size: Number, objectKey: String, sha256: String }, { _id: false })],
       default: [],
     },
     // 삭제는 항상 soft — 실수로 지운 롬을 되살릴 수 있어야 한다. MinIO 오브젝트도 남긴다.

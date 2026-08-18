@@ -1,16 +1,16 @@
-// /api/internal/owner-check — nginx auth_request 게이트 (#186).
+// /api/internal/netplay-check — nginx auth_request 게이트 (#186).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
+vi.mock('@/lib/require-auth', () => ({ requireAuth: vi.fn() }));
 
 import { GET } from './route';
-import { requireOwner } from '@/lib/require-owner';
+import { requireAuth } from '@/lib/require-auth';
 
-describe('GET /api/internal/owner-check', () => {
+describe('GET /api/internal/netplay-check', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('작성자면 200 — nginx 가 통과시킨다', async () => {
-    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' });
+  it('로그인했으면 200 — nginx 가 통과시킨다', async () => {
+    vi.mocked(requireAuth).mockResolvedValue({ email: 'someone@test' });
     expect((await GET()).status).toBe(200);
   });
 
@@ -18,12 +18,12 @@ describe('GET /api/internal/owner-check', () => {
   // 게이트가 통째로 깨진다.
   it('아니면 401 — 404 가 아니다', async () => {
     const { NextResponse } = await import('next/server');
-    vi.mocked(requireOwner).mockResolvedValue(NextResponse.json({ message: 'Not found' }, { status: 404 }));
+    vi.mocked(requireAuth).mockResolvedValue(NextResponse.json({ message: 'Not found' }, { status: 404 }));
     expect((await GET()).status).toBe(401);
   });
 
   it('본문을 싣지 않는다 — auth_request 는 상태 코드만 본다', async () => {
-    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' });
+    vi.mocked(requireAuth).mockResolvedValue({ email: 'someone@test' });
     expect(await (await GET()).text()).toBe('');
   });
 });

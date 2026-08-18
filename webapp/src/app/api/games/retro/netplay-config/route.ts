@@ -3,16 +3,16 @@
 // URL 파라미터로 넘기지 않는 이유: ICE 목록에 **TURN 자격증명**이 들어갈 수 있는데, URL 에
 // 실으면 브라우저 기록·리퍼러·서버 로그에 그대로 남는다. 인가된 요청으로만 내려준다.
 //
-// 소유자 전용이다 — netplay 는 어차피 소유자 계정 두 대로 하는 기능이고, 시그널링 경로
-// (`/netplay/`)도 nginx 에서 같은 기준으로 막혀 있다.
+// 로그인 사용자면 받는다 (#188) — 같은 롬을 각자 올린 다른 계정끼리도 함께 할 수 있어야 한다.
+// 시그널링 경로(`/netplay/`)도 nginx 에서 같은 기준으로 막혀 있다.
 
 import { NextResponse } from 'next/server';
-import { requireOwner } from '@/lib/require-owner';
+import { requireAuth } from '@/lib/require-auth';
 import { env } from '@/lib/env';
 
 export async function GET() {
-  const owner = await requireOwner();
-  if (owner instanceof NextResponse) return owner;
+  const authed = await requireAuth();
+  if (authed instanceof NextResponse) return authed;
 
   if (!env.netplay.enabled) {
     return NextResponse.json({ message: 'netplay 가 꺼져 있습니다. (RETRO_NETPLAY 미설정)' }, { status: 503 });

@@ -6,12 +6,13 @@ import { connectToDB } from "@/lib/db";
 import RetroRom from "@/models/retro-rom";
 import { builtinBySlug } from "@/lib/retro/library";
 import { builtinEntry, romEntry } from "@/lib/retro/entry";
-import { activePatch, isRomId, type LeanPatch } from "@/lib/retro/rom-dto";
+import { activeLeanPatch, activePatch, isRomId, type LeanPatch } from "@/lib/retro/rom-dto";
 import { builtinKey, romKey } from "@/lib/retro/game-key";
 import { platformById } from "@/lib/retro/platforms";
 import EmulatorFrame from "../../../EmulatorFrame";
 import LoginRequired from "../../../LoginRequired";
 import { env } from "@/lib/env";
+import { contentKeyOf } from "@/lib/retro/content-hash";
 
 export const metadata: Metadata = {
   title: "고전 게임 플레이",
@@ -29,7 +30,9 @@ interface Params {
 type LeanRom = {
   _id: unknown; title: string; platform: string; core: string; size: number;
   createdAt?: Date; filename?: string; patches?: LeanPatch[]; patchEnabled?: boolean;
-  parentSets?: { name: string; size: number; objectKey: string }[];
+  parentSets?: { name: string; size: number; objectKey: string; sha256?: string }[];
+  /** 파일 내용의 sha256 (#188) — netplay 방을 가르는 근거. 옛 문서엔 없다. */
+  sha256?: string;
 };
 
 export default async function PlayPage({
@@ -60,7 +63,6 @@ export default async function PlayPage({
 
   const meta = platformById(game.entry.platform);
   // 시그널링 서버가 떠 있어야 의미가 있으므로, 꺼져 있으면 진입 자체를 감춘다.
-  const netplayEnabled = env.netplay.enabled;
 
   // 패치는 주소가 아니라 **롬에 저장된 설정**으로 정한다 (#116) — 카드의 체크박스가 그 값을 쥔다.
   const patchUrl = game.patch
@@ -73,6 +75,12 @@ export default async function PlayPage({
 
   // 세이브를 매달 키 — 기본 제공 게임과 올린 롬을 한 방식으로 다룬다 (#114).
   const gameKey = kind === "builtin" ? builtinKey(game.entry.id) : romKey(game.entry.id);
+
+  // 콘텐츠 키가 없으면(해시 백필 전 문서) netplay 를 열지 않는다 — 엉뚱한 방에 붙어
+  // 조용히 desync 나느니 안 되는 편이 낫다. 기본 제공 게임은 모두 같은 파일이라 키가 필요 없다.
+  const netplayKey = kind === "builtin" ? gameKey : game.netplayKey ?? null;
+  const netplayEnabled = env.netplay.enabled && !!netplayKey;
+
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-6">
@@ -98,12 +106,19 @@ export default async function PlayPage({
                 ? "bg-green-600 text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
             }`}
-            title="다른 PC 에서도 같은 계정으로 로그인해 이 주소를 열면 함께 할 수 있습니다."
+            title="다른 PC 에서 이 주소를 열면 함께 할 수 있습니다. 다른 계정이라면 같은 롬을 올리고 패치 설정도 같아야 같은 방이 됩니다."
           >
             {netplayOn ? "함께 하기 켜짐" : "함께 하기"}
           </Link>
         )}
       </div>
+
+      {netplayOn && (
+        <p className="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
+          함께 하기가 켜졌습니다. 상대는 <b>같은 롬</b>을(다른 계정이면 각자 올려서) <b>같은 패치 설정</b>으로
+          이 화면을 열어야 같은 방에 들어옵니다 — 설정이 다르면 방이 갈려 서로 보이지 않습니다.
+        </p>
+      )}
 
       <EmulatorFrame
         core={game.core}
@@ -115,7 +130,7 @@ export default async function PlayPage({
         parents={game.entry.parentUrls}
         legacySave={game.entry.legacySave}
         netplay={netplayOn}
-        gameKeyForNetplay={gameKey}
+        gameKeyForNetplay={netplayKey ?? gameKey}
       />
 
       <section className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-400">
@@ -178,6 +193,8 @@ async function loadBuiltin(slug: string) {
     description: game.description,
     patch: undefined,
     sourceLabel: `출처 ${game.source} · ${game.license}`,
+    // 기본 제공 게임은 저장소에서 같은 파일이 나가므로 콘텐츠 키가 필요 없다 (#188).
+    netplayKey: null as string | null,
   };
 }
 
@@ -187,9 +204,12 @@ async function loadMyRom(id: string, email: string) {
   await connectToDB();
   // userEmail 을 조건에 넣어 남의 롬은 애초에 걸리지 않게 한다 — 없는 것과 같은 404 가 된다.
   const doc = (await RetroRom.findOne({ _id: id, userEmail: email, isDeleted: { $ne: true } })
-    .select("title platform core size createdAt filename patches patchEnabled parentSets")
+    .select("title platform core size createdAt filename patches patchEnabled parentSets sha256")
     .lean()) as LeanRom | null;
   if (!doc) return null;
+
+  // 적용이 꺼져 있으면 아예 없는 것으로 본다 — 플레이 화면엔 선택 UI 가 없다.
+  const patchInUse = doc.patchEnabled === false ? undefined : activePatch(doc);
 
   return {
     entry: romEntry({
@@ -208,5 +228,14 @@ async function loadMyRom(id: string, email: string) {
     // 적용이 꺼져 있으면 아예 없는 것으로 본다 — 플레이 화면엔 선택 UI 가 없다.
     patch: doc.patchEnabled === false ? undefined : activePatch(doc),
     sourceLabel: "내가 올린 롬 — 나만 볼 수 있습니다",
+    // netplay 방을 가르는 키 (#188). 문서 id 가 아니라 **코어가 실제로 읽는 바이트**로 묶는다 —
+    // 그래야 다른 계정이 올린 같은 롬과 같은 방이 되고, 패치 설정이 다르면 애초에 안 만난다.
+    // 해시가 아직 없으면 null 이고, 그때는 netplay 진입을 감춘다.
+    netplayKey: contentKeyOf({
+      romHash: doc.sha256,
+      patchHash: patchInUse ? activeLeanPatch(doc)?.sha256 : undefined,
+      hasPatch: !!patchInUse,
+      parentHashes: (doc.parentSets ?? []).map((ps) => ps.sha256 ?? ''),
+    }),
   };
 }
