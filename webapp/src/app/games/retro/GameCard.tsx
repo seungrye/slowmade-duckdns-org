@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { FileDiff, Image as ImageIcon, ImagePlus, Pencil, Save } from "lucide-react";
+import { Download, FileDiff, Image as ImageIcon, ImagePlus, Pencil, Save } from "lucide-react";
 import type { GameEntry } from "@/lib/retro/entry";
 import { platformById } from "@/lib/retro/platforms";
 import { normalizeRomTitle } from "@/lib/retro/rom-edit";
@@ -159,6 +159,22 @@ export default function GameCard({
                   </span>
                 </button>
               </div>
+
+              {/* 내려받기 (#194) — 링크 하나면 된다. 상태도 fetch 도 필요 없다.
+                  `download` 속성은 일부러 뺐다: 붙이면 브라우저가 URL 에서 이름을 짐작하는데,
+                  서버가 한글 이름을 헤더로 실어 보내기 때문이다. */}
+              <a
+                href={`/api/games/retro/roms/${game.id}/download`}
+                title={
+                  game.patch || (game.parentUrls?.length ?? 0) > 0
+                    ? "롬과 패치를 한 파일로 묶어 내려받기"
+                    : "롬 파일 내려받기"
+                }
+                aria-label={`${game.title} 내려받기`}
+                className={TOOL_ICON}
+              >
+                <Download size={13} aria-hidden />
+              </a>
 
               {/* 그림 아이콘은 그 자체로 뜻이 통한다 — 글자를 붙이지 않는다. */}
               <button
