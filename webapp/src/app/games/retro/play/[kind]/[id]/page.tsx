@@ -11,6 +11,7 @@ import { builtinKey, romKey } from "@/lib/retro/game-key";
 import { platformById } from "@/lib/retro/platforms";
 import EmulatorFrame from "../../../EmulatorFrame";
 import LoginRequired from "../../../LoginRequired";
+import { env } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "고전 게임 플레이",
@@ -36,10 +37,10 @@ export default async function PlayPage({
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: Promise<{ strip?: string }>;
+  searchParams: Promise<{ strip?: string; netplay?: string }>;
 }) {
   const { kind, id } = await params;
-  const { strip } = await searchParams;
+  const { strip, netplay } = await searchParams;
 
   const session = await auth();
   const email = session?.user?.email;
@@ -58,6 +59,8 @@ export default async function PlayPage({
   if (!game) notFound();
 
   const meta = platformById(game.entry.platform);
+  // 시그널링 서버가 떠 있어야 의미가 있으므로, 꺼져 있으면 진입 자체를 감춘다.
+  const netplayEnabled = env.netplay.enabled;
 
   // 패치는 주소가 아니라 **롬에 저장된 설정**으로 정한다 (#116) — 카드의 체크박스가 그 값을 쥔다.
   const patchUrl = game.patch
@@ -65,6 +68,8 @@ export default async function PlayPage({
     : undefined;
   // 지정이 없으면 undefined 로 둔다 — 플레이어가 형식에 맞게 판단한다.
   const stripHeader = strip === "1" ? true : strip === "0" ? false : undefined;
+  // 함께 하기(netplay) — 두 PC 가 **같은 주소**를 열면 같은 방이 된다 (#186).
+  const netplayOn = netplay === "1";
 
   // 세이브를 매달 키 — 기본 제공 게임과 올린 롬을 한 방식으로 다룬다 (#114).
   const gameKey = kind === "builtin" ? builtinKey(game.entry.id) : romKey(game.entry.id);
@@ -84,6 +89,20 @@ export default async function PlayPage({
         <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
           {meta?.label ?? game.entry.platform}
         </span>
+        {netplayEnabled && (
+          // 다른 PC 에서도 **같은 계정으로 로그인해 이 주소를 그대로** 열면 같은 방이 된다.
+          <Link
+            href={netplayOn ? "?" : "?netplay=1"}
+            className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium transition ${
+              netplayOn
+                ? "bg-green-600 text-white"
+                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            }`}
+            title="다른 PC 에서도 같은 계정으로 로그인해 이 주소를 열면 함께 할 수 있습니다."
+          >
+            {netplayOn ? "함께 하기 켜짐" : "함께 하기"}
+          </Link>
+        )}
       </div>
 
       <EmulatorFrame
@@ -95,6 +114,8 @@ export default async function PlayPage({
         saveKey={gameKey}
         parents={game.entry.parentUrls}
         legacySave={game.entry.legacySave}
+        netplay={netplayOn}
+        gameKeyForNetplay={gameKey}
       />
 
       <section className="mt-4 space-y-3 text-sm text-gray-600 dark:text-gray-400">

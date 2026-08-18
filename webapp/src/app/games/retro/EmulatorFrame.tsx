@@ -18,6 +18,10 @@ interface Props {
   parents?: string[];
   /** 옛 이름으로 남은 게임 세이브를 되살릴지 (#175). 판단은 서버 몫. */
   legacySave?: boolean;
+  /** 함께 하기(netplay)로 열지 (#186). */
+  netplay?: boolean;
+  /** netplay 방을 가르는 게임 키 — 두 PC 가 같은 값을 써야 같은 방이 된다. */
+  gameKeyForNetplay?: string;
 }
 
 /**
@@ -27,14 +31,14 @@ interface Props {
  * 하지 않는다 — 화면을 떠나면 React 가 iframe 을 지우고, 그때 안의 전역·워커·오디오가 함께
  * 사라진다. 그게 iframe 을 쓰는 이유다.
  */
-export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave }: Props) {
+export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave, netplay, gameKeyForNetplay }: Props) {
   const src = useMemo(() => {
     try {
-      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave });
+      return buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave, netplay, gameKeyForNetplay });
     } catch {
       return null;
     }
-  }, [core, rom, name, patch, stripHeader, saveKey, parents, legacySave]);
+  }, [core, rom, name, patch, stripHeader, saveKey, parents, legacySave, netplay, gameKeyForNetplay]);
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 

@@ -26,7 +26,13 @@ ROMS_DIR="$RETRO_DIR/roms"
 COVERS_DIR="$RETRO_DIR/covers"
 MANIFEST="$REPO_DIR/webapp/src/lib/retro/builtin-games.json"
 
-CDN="${EMULATORJS_CDN:-https://cdn.emulatorjs.org/stable/data}"
+# **nightly 를 쓴다** (#186). netplay 는 stable 릴리스(v4.2.3)에 없다 — 거기서는
+# `EJS_DEBUG_XX && EJS_EXPERIMENTAL_NETPLAY` 로 잠겨 있고 WebRTC 자체가 빠져 있다.
+# nightly 번들에는 `RTCPeerConnection`·`EJS_netplayICEServers` 가 있고 잠금이 풀려 있다.
+#
+# 되돌리려면 stable 로 다시 받으면 된다(자산은 gitignore 대상이라 흔적이 남지 않는다):
+#   EMULATORJS_CDN=https://cdn.emulatorjs.org/stable/data bash scripts/games/fetch-emulatorjs.sh --force
+CDN="${EMULATORJS_CDN:-https://cdn.emulatorjs.org/nightly/data}"
 # src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 기종을 늘리면 여기도 함께 늘릴 것.
 CORES=(snes9x mgba fbneo)
 
@@ -165,6 +171,8 @@ node -e '
 # ── 마무리 ───────────────────────────────────────────────────────────────────
 echo
 log "완료 — 롬 ${rom_ok} 개 받음$([[ $rom_fail -gt 0 ]] && echo ", ${rom_fail} 개 실패(그 항목은 목록에서 빠집니다)")"
+log "  CDN    $CDN"
+log "  버전   $(grep -ohoE 'version=\"[0-9.]+\"' "$DATA_DIR/emulator.min.js" 2>/dev/null | head -1 || echo '(불명)')  netplay(WebRTC) $(grep -c RTCPeerConnection "$DATA_DIR/emulator.min.js" 2>/dev/null || echo 0)건"
 log "  data   $(du -sh "$DATA_DIR"   2>/dev/null | cut -f1)"
 log "  roms   $(du -sh "$ROMS_DIR"   2>/dev/null | cut -f1)"
 log "  covers $(du -sh "$COVERS_DIR" 2>/dev/null | cut -f1)"
