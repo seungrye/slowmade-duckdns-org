@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from "react-hot-toast";
 import { RichWebEditor, RichWebEditorHandle } from '@/components/rich-web-editor/editor';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
+import { draftKey, isEmptyDraft, parseDraft, serializeDraft, type PostDraft } from '@/lib/post-draft';
 import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
 import { showAchievementToasts } from '@/lib/show-achievement-toast';
 import { useMobile } from '@/hooks/use-mobile';
@@ -32,6 +33,94 @@ export default function PostWriterForm() {
     // 데스크톱에서만: 에디터(제목·본문·태그·제출 전체)를 뷰포트에 고정하고 본문을 내부
     // 스크롤(editor.scss). 모바일은 플로팅 툴바가 페이지 스크롤을 전제하므로 고정하지 않고
     // 원래대로 페이지가 늘어나게 둔다(내부 스크롤 미적용).
+    // ── 임시 저장 (#199)
+    //
+    // 글을 쓰다 페이지를 벗어나거나 새로고침하면 전부 사라졌다. 브라우저에 담아 뒀다 되살린다.
+    //
+    // **본문은 "떠나는 순간"에만 담는다.** `getContent()` 가 마크다운 모드에서 에디터를
+    // 건드리므로(내부 setContent) 타이핑 중에 계속 부를 수는 없다. 제목·태그처럼 평범한
+    // 상태는 바뀔 때마다(디바운스) 담는다.
+    const storageKey = draftKey(typeof _id === 'string' ? _id : undefined);
+    const [restoredAt, setRestoredAt] = useState<number | null>(null);
+    // 수정 글은 서버에서 불러온 **뒤에** 초안을 얹는다 — 초안이 더 최근 작업이다.
+    const [serverLoaded, setServerLoaded] = useState(!_id);
+    const restoredRef = useRef(false);
+
+    const saveDraft = useCallback(() => {
+        const content = editorRef.current?.getContent();
+        const draft: PostDraft = {
+            title, tags, isPrivate, attachments,
+            jsonContent: content?.jsonContent ?? null,
+            uploadImageUrls: content?.uploadImageUrls ?? [],
+            savedAt: Date.now(),
+        };
+        try {
+            // 빈 상태를 담아 두면 다음에 "복원했습니다" 만 뜨고 내용은 없다 — 지운다.
+            if (isEmptyDraft(draft)) return localStorage.removeItem(storageKey);
+            const raw = serializeDraft(draft);
+            if (!raw) return console.warn('임시 저장본이 너무 커서 건너뜁니다.');
+            localStorage.setItem(storageKey, raw);
+        } catch (err) {
+            // 저장 실패가 글쓰기를 막으면 안 된다(용량 초과·프라이빗 모드 등).
+            console.warn('임시 저장에 실패했습니다.', err);
+        }
+    }, [storageKey, title, tags, isPrivate, attachments]);
+
+    // 리스너는 한 번만 건다 — 최신 함수는 ref 로 넘긴다.
+    const saveRef = useRef(saveDraft);
+    useEffect(() => { saveRef.current = saveDraft; }, [saveDraft]);
+
+    // 평범한 필드가 바뀌면 잠시 뒤 담는다.
+    useEffect(() => {
+        if (!restoredRef.current) return; // 복원 전에는 빈 값으로 덮지 않는다
+        const t = setTimeout(() => saveRef.current(), 1200);
+        return () => clearTimeout(t);
+    }, [title, tags, isPrivate, attachments]);
+
+    // 떠나는 순간 — 새로고침·탭 닫기(pagehide), 탭 숨김, 화면 이탈(언마운트).
+    useEffect(() => {
+        const onHide = () => saveRef.current();
+        const onVisibility = () => { if (document.hidden) saveRef.current(); };
+        window.addEventListener('pagehide', onHide);
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => {
+            window.removeEventListener('pagehide', onHide);
+            document.removeEventListener('visibilitychange', onVisibility);
+            if (restoredRef.current) saveRef.current();
+        };
+    }, []);
+
+    // 복원 — 새 글은 바로, 수정 글은 서버 글을 불러온 뒤.
+    useEffect(() => {
+        if (!serverLoaded || restoredRef.current) return;
+        restoredRef.current = true;
+        let draft: PostDraft | null = null;
+        try {
+            draft = parseDraft(localStorage.getItem(storageKey), Date.now());
+        } catch {
+            return; // 저장소를 못 읽어도 글쓰기는 계속돼야 한다
+        }
+        if (!draft) return;
+        setTitle(draft.title);
+        setTags(draft.tags);
+        setIsPrivate(draft.isPrivate);
+        setAttachments(draft.attachments as typeof attachments);
+        if (draft.jsonContent) {
+            editorRef.current?.setContent(draft.jsonContent as never, draft.uploadImageUrls as never);
+        }
+        setRestoredAt(draft.savedAt);
+    }, [serverLoaded, storageKey]);
+
+    const discardDraft = () => {
+        try { localStorage.removeItem(storageKey); } catch { /* 무시 */ }
+        setTitle('');
+        setTags([]);
+        setIsPrivate(false);
+        setAttachments([]);
+        editorRef.current?.setContent('' as never);
+        setRestoredAt(null);
+    };
+
     useEffect(() => {
         if (isMobile) {
             setMaxHeight(undefined);
@@ -90,7 +179,7 @@ export default function PostWriterForm() {
             }
         };
 
-        fetchPost(_id as string);
+        fetchPost(_id as string).finally(() => setServerLoaded(true));
     }, [_id]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLButtonElement>) => {
@@ -157,6 +246,24 @@ export default function PostWriterForm() {
             style={!isMobile && maxHeight ? { height: `${maxHeight}px` } : undefined}
             className={!isMobile ? "flex flex-col" : undefined}
         >
+            {/* 임시 저장본을 되살렸을 때만 뜬다 (#199).
+                자동 복원은 편하지만, 일부러 비우고 새로 쓰려던 경우엔 당황스럽다 — 한 번에
+                되돌릴 수 있게 해 둔다. */}
+            {restoredAt !== null && (
+                <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+                    <span>
+                        작성 중이던 내용을 되살렸습니다
+                        <span className="opacity-70">{` · ${new Date(restoredAt).toLocaleString('ko-KR')}`}</span>
+                    </span>
+                    <button
+                        type="button"
+                        onClick={discardDraft}
+                        className="shrink-0 rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
+                    >
+                        새로 쓰기
+                    </button>
+                </div>
+            )}
             <div className="border border-gray-300 rounded-b-none rounded-lg has-focus:shadow-sm shrink-0 flex items-center">
                 <input
                     type="text"
