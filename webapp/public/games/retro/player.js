@@ -195,7 +195,12 @@ async function start() {
   // 를 넓히지 않아도 되고, 세션 쿠키가 실려 가 nginx 가 소유자만 통과시킬 수 있다.
   if (netplay && Number.isSafeInteger(gameNumber) && gameNumber > 0) {
     window.EJS_gameID = gameNumber;
-    window.EJS_netplayServer = location.origin + '/netplay/';
+    // **끝 슬래시를 붙이지 않는다** (#192). EmulatorJS 는 `io(url)` 을 path 옵션 없이 부르고,
+    // socket.io 는 URL 의 경로를 "경로"가 아니라 **네임스페이스**로 해석한다. 슬래시가 있고
+    // 없고에 따라 네임스페이스가 `/netplay/` 와 `/netplay` 로 갈리므로 하나로 굳혀 둔다
+    // (서버가 등록해 둔 것과 같아야 연결이 받아들여진다).
+    // REST 는 `getOpenRooms` 가 `url + "/list"` 로 만들어 그대로 `/netplay/list` 가 된다.
+    window.EJS_netplayServer = location.origin + '/netplay';
     // 비어 있으면 EmulatorJS 가 "같은 랜에서만 붙는다"고 콘솔에 경고한다(실측).
     // 밖에서 접속하려면 STUN 이, 양쪽 다 symmetric NAT 면 TURN 이 필요하다.
     // ICE 목록은 **인가된 API 로** 받는다. URL 에 실으면 TURN 자격증명이 브라우저 기록·

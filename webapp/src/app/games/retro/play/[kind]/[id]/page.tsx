@@ -40,10 +40,10 @@ export default async function PlayPage({
   searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: Promise<{ strip?: string; netplay?: string }>;
+  searchParams: Promise<{ strip?: string }>;
 }) {
   const { kind, id } = await params;
-  const { strip, netplay } = await searchParams;
+  const { strip } = await searchParams;
 
   const session = await auth();
   const email = session?.user?.email;
@@ -70,8 +70,6 @@ export default async function PlayPage({
     : undefined;
   // 지정이 없으면 undefined 로 둔다 — 플레이어가 형식에 맞게 판단한다.
   const stripHeader = strip === "1" ? true : strip === "0" ? false : undefined;
-  // 함께 하기(netplay) — 두 PC 가 **같은 주소**를 열면 같은 방이 된다 (#186).
-  const netplayOn = netplay === "1";
 
   // 세이브를 매달 키 — 기본 제공 게임과 올린 롬을 한 방식으로 다룬다 (#114).
   const gameKey = kind === "builtin" ? builtinKey(game.entry.id) : romKey(game.entry.id);
@@ -97,29 +95,7 @@ export default async function PlayPage({
         <span className="shrink-0 rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
           {meta?.label ?? game.entry.platform}
         </span>
-        {netplayEnabled && (
-          // 다른 PC 에서도 **같은 계정으로 로그인해 이 주소를 그대로** 열면 같은 방이 된다.
-          <Link
-            href={netplayOn ? "?" : "?netplay=1"}
-            className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium transition ${
-              netplayOn
-                ? "bg-green-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-            }`}
-            title="다른 PC 에서 이 주소를 열면 함께 할 수 있습니다. 다른 계정이라면 같은 롬을 올리고 패치 설정도 같아야 같은 방이 됩니다."
-          >
-            {netplayOn ? "함께 하기 켜짐" : "함께 하기"}
-          </Link>
-        )}
       </div>
-
-      {netplayOn && (
-        <p className="mb-3 rounded border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300">
-          함께 하기가 켜졌습니다. 상대는 <b>같은 롬</b>을(다른 계정이면 각자 올려서) <b>같은 패치 설정</b>으로
-          이 화면을 열어야 같은 방에 들어옵니다 — 설정이 다르면 방이 갈려 서로 보이지 않습니다.
-        </p>
-      )}
-
       <EmulatorFrame
         core={game.core}
         rom={game.entry.romUrl}
@@ -129,7 +105,7 @@ export default async function PlayPage({
         saveKey={gameKey}
         parents={game.entry.parentUrls}
         legacySave={game.entry.legacySave}
-        netplay={netplayOn}
+        netplay={netplayEnabled}
         gameKeyForNetplay={netplayKey ?? gameKey}
       />
 
@@ -149,6 +125,24 @@ export default async function PlayPage({
             처음 실행할 때 에뮬레이터 코어를 몇 MB 내려받습니다 — 모바일 데이터 사용에 유의하세요.
           </p>
         </div>
+
+        {netplayEnabled && (
+          // 조작 박스와 같은 모양으로 둔다 — 화면 위 토글이 아니라 설명으로 (#192).
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+            <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              함께 하기
+            </h2>
+            <p className="text-xs leading-relaxed">
+              화면 아래 메뉴의 <b>Netplay</b> 에서 방을 만들면 다른 사람이 들어올 수 있습니다.
+              상대는 <b>같은 롬</b>을 <b>같은 패치 설정</b>으로 열어야 같은 방에 나타납니다 —
+              설정이 다르면 방이 갈려 서로 보이지 않습니다.
+            </p>
+            <p className="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+              내 다른 기기와 할 때는 같은 계정으로 로그인해 이 주소를 그대로 열면 됩니다.
+              방에 비밀번호를 걸면 아는 사람만 들어옵니다.
+            </p>
+          </div>
+        )}
 
         {patchUrl && (
           // IPS 는 헤더 기준을 파일만으로 알 수 없다. 어긋나면 글자가 깨지는데, 이 줄이 없으면
