@@ -14,6 +14,18 @@ function safeName(raw: string, fallback: string): string {
   return cleaned || fallback;
 }
 
+/** 파일명에서 확장자만(점 포함). 없으면 빈 문자열. */
+function extOf(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot) : '';
+}
+
+/** 확장자를 뗀 이름. */
+function baseOf(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(0, dot) : name;
+}
+
 /** `a.zip` → `a (2).zip`. 확장자를 살려 둔다 — 안 그러면 열리지 않는다. */
 function numbered(name: string, n: number): string {
   const dot = name.lastIndexOf('.');
@@ -35,9 +47,15 @@ export interface BundleParts {
  * 어렵다(zip 은 조용히 마지막 것만 남긴다).
  */
 export function bundleEntryNames({ romName, patchName, parentNames }: BundleParts): string[] {
+  const rom = safeName(romName, 'rom');
+  // 패치는 **롬 이름 + `-patch`** 로 굳힌다 (#198). 원래 이름을 그대로 쓰면 어느 게 패치인지
+  // 알기 어렵다 — 실제로 롬과 패치 이름이 똑같은 경우가 있었다(`ddsomu.zip`). 확장자는 살려
+  // 형식(ips·bps·zip)이 보이게 한다.
+  const patch = patchName ? `${baseOf(rom)}-patch${extOf(safeName(patchName, 'patch'))}` : null;
+
   const wanted = [
-    safeName(romName, 'rom'),
-    ...(patchName ? [safeName(patchName, 'patch')] : []),
+    rom,
+    ...(patch ? [patch] : []),
     ...(parentNames ?? []).map((n, i) => safeName(n, `parent${i + 1}`)),
   ];
 
