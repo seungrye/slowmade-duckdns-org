@@ -8,13 +8,22 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { draftKey, serializeDraft, type PostDraft } from '@/lib/post-draft';
 
 // 에디터는 무겁고 jsdom 에서 못 그린다 — 우리가 쓰는 핸들만 흉내 낸다.
-const editorState = vi.hoisted(() => ({ content: null as unknown, urls: [] as unknown[] }));
+// 실제 에디터는 `immediatelyRender: false` 라 첫 렌더에 준비돼 있지 않다. 그 상태에서
+// setContent 는 조용히 무시된다 — 이번 버그(#201)의 본질이라 목도 그렇게 흉내 낸다.
+const editorState = vi.hoisted(() => ({ content: null as unknown, urls: [] as unknown[], ready: true }));
 vi.mock('@/components/rich-web-editor/editor', async () => {
   const React = await import('react');
   const Mock = React.forwardRef(function MockEditor(_props: unknown, ref: React.Ref<unknown>) {
     React.useImperativeHandle(ref, () => ({
-      getContent: () => ({ jsonContent: editorState.content, htmlContent: '<p/>', uploadImageUrls: editorState.urls }),
-      setContent: (c: unknown, u: unknown[]) => { editorState.content = c; editorState.urls = u ?? []; },
+      isReady: () => editorState.ready,
+      getContent: () => (editorState.ready
+        ? { jsonContent: editorState.content, htmlContent: '<p/>', uploadImageUrls: editorState.urls }
+        : { jsonContent: undefined, htmlContent: undefined, uploadImageUrls: [] }),
+      // 준비 전 호출은 실제와 같이 **무시한다** — 이번 버그(#201)의 본질이다.
+      setContent: (c: unknown, u: unknown[]) => {
+        if (!editorState.ready) return;
+        editorState.content = c; editorState.urls = u ?? [];
+      },
       focus: () => {},
     }));
     return React.createElement('div', { 'data-testid': 'editor' });
@@ -51,6 +60,7 @@ describe('글 작성 임시 저장', () => {
     localStorage.clear();
     editorState.content = null;
     editorState.urls = [];
+    editorState.ready = true;
     vi.clearAllMocks();
   });
   afterEach(() => localStorage.clear());
@@ -112,6 +122,44 @@ describe('글 작성 임시 저장', () => {
       fireEvent.change(screen.getByPlaceholderText('제목을 입력하세요'), { target: { value: '새 제목' } });
       await vi.advanceTimersByTimeAsync(1500);
       expect(localStorage.getItem(KEY)).toContain('새 제목');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// #201 — 제목은 되살아나는데 본문은 안 되던 문제.
+describe('에디터가 늦게 뜰 때 (#201)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    editorState.content = null;
+    editorState.urls = [];
+    editorState.ready = false; // 첫 렌더에는 아직 준비되지 않았다
+    vi.clearAllMocks();
+  });
+
+  it('에디터가 준비된 뒤에 본문을 넣는다', async () => {
+    localStorage.setItem(KEY, serializeDraft(draft())!);
+    render(<PostWriterForm />);
+
+    // 아직 준비 전 — 본문은 들어가지 않았다.
+    await waitFor(() => expect(screen.getByPlaceholderText('제목을 입력하세요')).toBeTruthy());
+    expect(editorState.content).toBeNull();
+
+    editorState.ready = true;              // 에디터가 떴다
+    await waitFor(() => expect(editorState.content).toEqual(body), { timeout: 3000 });
+  });
+
+  // 이게 더 위험했다 — 되살릴 방법이 없는 손실이다.
+  it('에디터가 없는 사이에 저장돼도 초안의 본문을 지우지 않는다', async () => {
+    vi.useFakeTimers();
+    try {
+      localStorage.setItem(KEY, serializeDraft(draft())!);
+      render(<PostWriterForm />);
+      // 제목이 복원되며 디바운스 저장이 걸린다 — 이때 에디터는 아직 없다.
+      await vi.advanceTimersByTimeAsync(1500);
+      const saved = JSON.parse(localStorage.getItem(KEY)!);
+      expect(saved.jsonContent).toEqual(body);
     } finally {
       vi.useRealTimers();
     }
