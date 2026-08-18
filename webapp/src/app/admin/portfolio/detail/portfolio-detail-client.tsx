@@ -2,12 +2,16 @@
 
 import { envLabel } from "@/lib/env-label";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMobile } from "@/hooks/use-mobile";
 import { windowAround, windowStartDate } from "../recent-points";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
+import Pager, { pageOfIndex, pageSlice } from "@/components/pager";
 import type { EChartsOption } from "echarts";
+
+/** 한 페이지에 보여줄 행 수. monitor 화면의 주문 로그와 같은 값으로 맞춘다 (#184). */
+const PAGE_SIZE = 25;
 
 type Env = string;
 type Currency = "KRW" | "USD";
@@ -214,6 +218,14 @@ export default function PortfolioDetailClient({
   const tradesDesc = [...trades].reverse(); // 최신 매매가 위로
   const historyDesc = [...history].reverse();
 
+  // 이 화면은 차트 마커를 눌러 `?center=<날짜>` 로 들어온다. 페이징을 넣으면서 무턱대고
+  // 1페이지를 보여 주면 **누른 마커의 매매가 안 보인다** — 있던 기능이 사라지는 셈이다.
+  // 그 날짜가 든 페이지로 연다(없으면 첫 페이지).
+  const [tradesPage, setTradesPage] = useState(() =>
+    pageOfIndex(center ? tradesDesc.findIndex((t) => t.date === center) : -1, PAGE_SIZE),
+  );
+  const [historyPage, setHistoryPage] = useState(0);
+
   return (
     <main className="mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
@@ -257,8 +269,13 @@ export default function PortfolioDetailClient({
             </tr>
           </thead>
           <tbody>
-            {tradesDesc.map((t, i) => (
-              <tr key={`${t.date}-${t.ticker}-${i}`} className="border-b border-gray-100 dark:border-gray-800">
+            {pageSlice(tradesDesc, tradesPage, PAGE_SIZE).map((t, i) => (
+              <tr
+                key={`${t.date}-${t.ticker}-${i}`}
+                className={`border-b border-gray-100 dark:border-gray-800${
+                  center && t.date === center ? " bg-yellow-50 dark:bg-yellow-900/20" : ""
+                }`}
+              >
                 <td className="py-1.5 pr-3 whitespace-nowrap">{t.date}</td>
                 <td className="py-1.5 pr-3">
                   {label(t.ticker)} <span className="text-xs text-gray-400 font-mono">{t.ticker}</span>
@@ -278,6 +295,7 @@ export default function PortfolioDetailClient({
           </tbody>
         </table>
       </div>
+      <Pager page={tradesPage} total={tradesDesc.length} size={PAGE_SIZE} onPage={setTradesPage} />
 
       {/* 날짜별 포트폴리오 표 */}
       <h2 className="text-lg font-semibold mt-8 mb-3">날짜별 포트폴리오</h2>
@@ -293,7 +311,7 @@ export default function PortfolioDetailClient({
             </tr>
           </thead>
           <tbody>
-            {historyDesc.map((h) => (
+            {pageSlice(historyDesc, historyPage, PAGE_SIZE).map((h) => (
               <tr key={h.dateStr} className="border-b border-gray-100 dark:border-gray-800">
                 <td className="py-1.5 pr-3 whitespace-nowrap">{h.dateStr}</td>
                 <td className="py-1.5 pr-3 text-right font-medium">{formatMoney(h.totalValue, currency)}</td>
@@ -310,6 +328,7 @@ export default function PortfolioDetailClient({
           </tbody>
         </table>
       </div>
+      <Pager page={historyPage} total={historyDesc.length} size={PAGE_SIZE} onPage={setHistoryPage} />
     </main>
   );
 }
