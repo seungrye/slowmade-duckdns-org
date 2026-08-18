@@ -220,6 +220,13 @@ const MobileToolbarContent = ({
 )
 
 export interface RichWebEditorHandle {
+    /**
+     * 에디터가 준비됐나 (#201).
+     *
+     * `immediatelyRender: false` 라 첫 렌더에는 내부 editor 가 없다. 그때 `setContent` 를
+     * 부르면 **조용히 무시된다**(아래 early return). 부르는 쪽이 기다릴 수 있게 알려 준다.
+     */
+    isReady: () => boolean;
     getContent: () => {
         jsonContent: JSONContent | undefined,
         htmlContent: HTMLContent | undefined,
@@ -415,6 +422,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditor
     }, [autoResizeTextarea]);
 
     React.useImperativeHandle(ref, () => ({
+        isReady: () => !!editor,
         getContent: () => {
             if (isMarkdownModeRef.current && editor) {
                 if (markdownContentRef.current === savedMarkdownRef.current && savedJsonRef.current) {

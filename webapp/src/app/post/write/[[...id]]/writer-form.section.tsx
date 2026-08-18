@@ -7,6 +7,11 @@ import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
 import { draftKey, isEmptyDraft, parseDraft, serializeDraft, type PostDraft } from '@/lib/post-draft';
+
+/** localStorage 는 프라이빗 모드 등에서 통째로 막힐 수 있다 — 읽기 실패가 글쓰기를 막지 않게. */
+function safeGet(key: string): string | null {
+    try { return localStorage.getItem(key); } catch { return null; }
+}
 import TagInput from '@/app/post/write/[[...id]]/tag-input.section';
 import { showAchievementToasts } from '@/lib/show-achievement-toast';
 import { useMobile } from '@/hooks/use-mobile';
@@ -45,13 +50,27 @@ export default function PostWriterForm() {
     // 수정 글은 서버에서 불러온 **뒤에** 초안을 얹는다 — 초안이 더 최근 작업이다.
     const [serverLoaded, setServerLoaded] = useState(!_id);
     const restoredRef = useRef(false);
+    // 수정 글에서 '저장본으로 되돌리기' 를 누르면 다시 불러오게 하는 방아쇠.
+    const [reloadToken, setReloadToken] = useState(0);
 
     const saveDraft = useCallback(() => {
-        const content = editorRef.current?.getContent();
+        // **에디터가 아직 없으면 본문을 건드리지 않는다** (#201).
+        // `immediatelyRender: false` 라 첫 렌더에는 내부 editor 가 없고, 그때 `getContent()` 는
+        // 빈 값을 준다. 그대로 담으면 멀쩡히 저장돼 있던 본문을 `null` 로 덮어 **초안에서
+        // 본문만 사라진다** — 되살릴 방법이 없는 손실이다.
+        const ready = editorRef.current?.isReady() === true;
+        const content = ready ? editorRef.current?.getContent() : undefined;
+        let jsonContent = content?.jsonContent ?? null;
+        let uploadImageUrls = content?.uploadImageUrls ?? [];
+        if (!ready) {
+            const kept = parseDraft(safeGet(storageKey), Date.now());
+            jsonContent = kept?.jsonContent ?? null;
+            uploadImageUrls = kept?.uploadImageUrls ?? [];
+        }
         const draft: PostDraft = {
             title, tags, isPrivate, attachments,
-            jsonContent: content?.jsonContent ?? null,
-            uploadImageUrls: content?.uploadImageUrls ?? [],
+            jsonContent,
+            uploadImageUrls,
             savedAt: Date.now(),
         };
         try {
@@ -105,20 +124,45 @@ export default function PostWriterForm() {
         setTags(draft.tags);
         setIsPrivate(draft.isPrivate);
         setAttachments(draft.attachments as typeof attachments);
-        if (draft.jsonContent) {
-            editorRef.current?.setContent(draft.jsonContent as never, draft.uploadImageUrls as never);
-        }
         setRestoredAt(draft.savedAt);
+
+        // 본문은 **에디터가 생긴 뒤에** 넣는다 (#201). `immediatelyRender: false` 라 첫 렌더에는
+        // 내부 editor 가 없고, 그때 `setContent` 는 조용히 무시된다 — 제목만 되살아나고 본문은
+        // 사라진 것처럼 보였던 원인이다.
+        const body = draft.jsonContent;
+        if (!body) return;
+        let tries = 0;
+        const put = () => {
+            if (editorRef.current?.isReady()) {
+                editorRef.current.setContent(body as never, draft.uploadImageUrls as never);
+                return;
+            }
+            if (tries++ < 60) setTimeout(put, 50); // 최대 3초 — 그 이상이면 에디터가 안 뜬 것이다
+        };
+        put();
     }, [serverLoaded, storageKey]);
 
+    /**
+     * 초안을 버린다.
+     *
+     * 새 글이면 비우면 그만이다. **수정 글은 비우면 안 된다** — 서버에 저장된 글까지 날아간
+     * 것처럼 보인다. 그래서 수정 글에서는 저장본을 다시 불러온다 (#201).
+     */
     const discardDraft = () => {
         try { localStorage.removeItem(storageKey); } catch { /* 무시 */ }
+        setRestoredAt(null);
+        if (_id) {
+            // 서버 저장본으로 되돌린다 — 초안이 계속 되살아나 갇히는 일도 이걸로 풀린다.
+            setServerLoaded(false);
+            restoredRef.current = false;
+            setReloadToken((n) => n + 1);
+            return;
+        }
         setTitle('');
         setTags([]);
         setIsPrivate(false);
         setAttachments([]);
         editorRef.current?.setContent('' as never);
-        setRestoredAt(null);
     };
 
     useEffect(() => {
@@ -180,7 +224,7 @@ export default function PostWriterForm() {
         };
 
         fetchPost(_id as string).finally(() => setServerLoaded(true));
-    }, [_id]);
+    }, [_id, reloadToken]);
 
     const handleSubmit = async (e: React.FormEvent<HTMLButtonElement>) => {
         e.preventDefault();
@@ -260,7 +304,7 @@ export default function PostWriterForm() {
                         onClick={discardDraft}
                         className="shrink-0 rounded border border-amber-300 px-2 py-0.5 hover:bg-amber-100 dark:border-amber-800 dark:hover:bg-amber-900/40"
                     >
-                        새로 쓰기
+                        {_id ? '저장본으로 되돌리기' : '새로 쓰기'}
                     </button>
                 </div>
             )}
