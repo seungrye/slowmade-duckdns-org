@@ -1,0 +1,46 @@
+# 고전 게임 netplay 시그널링 서버 (#186).
+#
+# EmulatorJS 의 netplay 는 WebRTC 다. 실제 게임 데이터는 두 브라우저가 **직접** 주고받고,
+# 이 서버는 서로를 찾게 해 주는 **중개(시그널링)** 만 한다 — 방을 만들고, 상대의 접속 정보를
+# 전달할 뿐이다. 그래서 트래픽이 거의 없고, 죽어도 이미 붙은 대전은 이어진다.
+#
+# 소스: https://github.com/EmulatorJS/EmulatorJS-Netplay (Rust / axum + socketioxide)
+# 빌드: ~/.cargo/bin/cargo build --release   (배포판 rustc 1.85 로는 안 된다 — 의존성이 1.86+ 요구)
+#
+# **로컬 수정 한 줄이 있다**: 원본은 `0.0.0.0` 에 바인드해 랜·외부에 그대로 열린다.
+# `src/main.rs` 의 SocketAddr 를 `127.0.0.1` 로 바꿔 두었다. 밖에서 오는 길은 nginx 의
+# `/netplay/` 하나뿐이고, 거기서 소유자 인증을 건다. 저장소를 다시 클론하면 이 수정도 다시
+# 해야 한다(안 하면 서버가 그대로 노출되고 `/list` 로 방 목록까지 샌다).
+#
+# 설치:
+#   sudo install -m 0644 netplay.service /etc/systemd/system/netplay.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now netplay
+# 확인:
+#   ss -lptn 'sport = :3100'      # 127.0.0.1:3100 만 보여야 한다
+#   curl -s localhost:3100/list   # 방 목록(로컬에서만)
+
+[Unit]
+Description=EmulatorJS netplay signaling server (loopback only)
+After=network.target
+
+[Service]
+Type=simple
+User=seungrye
+WorkingDirectory=/opt/emulatorjs-netplay
+# 3000 은 흔한 포트라 다른 것과 부딪히기 쉽다. 웹앱(3010/3011) 과도 떨어뜨려 3100 을 쓴다.
+Environment=PORT=3100
+ExecStart=/opt/emulatorjs-netplay/target/release/rust-socket-server
+Restart=on-failure
+RestartSec=3
+
+# 시그널링만 하는 프로세스다 — 손댈 곳을 최대한 줄인다.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

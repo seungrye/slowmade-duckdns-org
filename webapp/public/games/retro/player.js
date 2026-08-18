@@ -57,6 +57,11 @@ const parentUrls = q.getAll('set');
 // 서버가 판단해 넘긴다 — 아무 게임이나 가져가면 남의 세이브를 끌어온다(entry.ts 참고).
 const legacySave = q.get('legacy') === '1';
 
+// netplay (#186). 방을 가르는 것은 `gid` — 두 PC 가 같은 수를 받아야 같은 방이 된다.
+// 서버가 게임 키로 계산해 실어 보낸다(`lib/retro/game-number.ts`).
+const netplay = q.get('np') === '1';
+const gameNumber = Number(q.get('gid') || 0);
+
 // 이 문서는 CSP 에서 'unsafe-eval' 이 열려 있다(코어 7z 해제에 필요 — middleware.ts 참고).
 // name 은 EmulatorJS UI 로 흘러 들어가는 **유일한 반사 입력**이므로, 그쪽이 어떻게 그리든
 // HTML 로 해석될 여지를 여기서 없앤다. 주소창으로 직접 열 수 있는 페이지라 더 그렇다.
@@ -180,6 +185,35 @@ async function start() {
   }
 
   if (fsFiles.length) installFsFiles(fsFiles);
+
+  // netplay 는 **켠 경우에만** 얹는다 — 평소 실행에 손대지 않는다.
+  //
+  // `EJS_gameID` 는 반드시 **숫자**여야 한다. EmulatorJS 가 `typeof !== "number"` 면 netplay 를
+  // 그대로 꺼 버리는데, 그 실패는 조용해서 원인을 찾기 어렵다.
+  //
+  // 시그널링 서버는 우리 오리진의 `/netplay/` 다. 같은 오리진이라 CSP `connect-src 'self'`
+  // 를 넓히지 않아도 되고, 세션 쿠키가 실려 가 nginx 가 소유자만 통과시킬 수 있다.
+  if (netplay && Number.isSafeInteger(gameNumber) && gameNumber > 0) {
+    window.EJS_gameID = gameNumber;
+    window.EJS_netplayServer = location.origin + '/netplay/';
+    // 비어 있으면 EmulatorJS 가 "같은 랜에서만 붙는다"고 콘솔에 경고한다(실측).
+    // 밖에서 접속하려면 STUN 이, 양쪽 다 symmetric NAT 면 TURN 이 필요하다.
+    // ICE 목록은 **인가된 API 로** 받는다. URL 에 실으면 TURN 자격증명이 브라우저 기록·
+    // 리퍼러·서버 로그에 남는다. 실패해도 대전을 막지 않는다 — 같은 랜에서는 여전히 붙는다.
+    try {
+      const res = await fetch('/api/games/retro/netplay-config', { credentials: 'same-origin' });
+      if (res.ok) {
+        const cfg = await res.json();
+        if (Array.isArray(cfg.iceServers) && cfg.iceServers.length) {
+          window.EJS_netplayICEServers = cfg.iceServers;
+        }
+      } else {
+        console.error('netplay 설정을 받지 못했습니다 (' + res.status + ') — 같은 랜에서만 붙습니다.');
+      }
+    } catch (err) {
+      console.error('netplay 설정 요청 실패 — 같은 랜에서만 붙습니다.', err);
+    }
+  }
 
   window.EJS_player = '#game';
   window.EJS_core = core;

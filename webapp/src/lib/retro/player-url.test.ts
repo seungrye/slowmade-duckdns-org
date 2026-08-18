@@ -83,3 +83,39 @@ describe('buildPlayerUrl — 옛 세이브 복원 플래그', () => {
     expect(buildPlayerUrl(base)).not.toContain('legacy');
   });
 });
+
+// #186 — netplay 로 열기. 방을 가르는 것은 게임 번호이므로, 두 PC 가 같은 수를 받아야 한다.
+describe('buildPlayerUrl — netplay', () => {
+  const base = { core: 'snes9x', rom: '/api/games/retro/roms/1/file/1.sfc' };
+
+  it('켜면 np=1 과 게임 번호를 싣는다', () => {
+    const url = buildPlayerUrl({ ...base, netplay: true, gameKeyForNetplay: 'rom:abc' });
+    expect(url).toContain('np=1');
+    expect(url).toMatch(/gid=\d+/);
+  });
+
+  it('같은 게임 키면 같은 번호 — 두 PC 가 같은 방에 들어간다', () => {
+    const a = buildPlayerUrl({ ...base, netplay: true, gameKeyForNetplay: 'rom:abc' });
+    const b = buildPlayerUrl({ ...base, netplay: true, gameKeyForNetplay: 'rom:abc' });
+    expect(a).toBe(b);
+  });
+
+  it('다른 게임이면 다른 번호', () => {
+    const a = buildPlayerUrl({ ...base, netplay: true, gameKeyForNetplay: 'rom:abc' });
+    const b = buildPlayerUrl({ ...base, netplay: true, gameKeyForNetplay: 'rom:xyz' });
+    expect(a).not.toBe(b);
+  });
+
+  it('게임 키가 없으면 세이브 키로 갈음한다 — 그래도 두 PC 가 일치한다', () => {
+    const a = buildPlayerUrl({ ...base, netplay: true, saveKey: 'rom:abc' });
+    const b = buildPlayerUrl({ ...base, netplay: true, gameKeyForNetplay: 'rom:abc' });
+    expect(new URL(a, 'http://x').searchParams.get('gid'))
+      .toBe(new URL(b, 'http://x').searchParams.get('gid'));
+  });
+
+  it('끄면 아무것도 싣지 않는다', () => {
+    const url = buildPlayerUrl(base);
+    expect(url).not.toContain('np=');
+    expect(url).not.toContain('gid=');
+  });
+});

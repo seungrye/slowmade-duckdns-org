@@ -6,6 +6,7 @@
 // 화면을 떠날 때 iframe 이 사라지면서 통째로 정리된다.
 
 import { SUPPORTED_CORES } from './platforms';
+import { gameNumberOf } from './game-number';
 
 export const PLAYER_PATH = '/games/retro/player.html';
 
@@ -39,6 +40,14 @@ export interface PlayerUrlOptions {
    * 공유하던 자리라, 아무 게임이나 가져가면 남의 세이브를 끌어오게 된다.
    */
   legacySave?: boolean;
+  /**
+   * netplay 로 열지 (#186). 켜면 플레이어가 `EJS_gameID`·`EJS_netplayServer` 를 세팅한다.
+   *
+   * 방을 가르는 것은 `gameID` 다 — 두 PC 가 **같은 게임 키**로 열어야 같은 방이 된다.
+   */
+  netplay?: boolean;
+  /** netplay 방을 가르는 게임 키(`rom:<id>` 등). netplay 를 켤 때만 쓴다. */
+  gameKeyForNetplay?: string;
 }
 
 /**
@@ -46,7 +55,7 @@ export interface PlayerUrlOptions {
  *   iframe 은 우리 오리진에서 도는 코드라, 여기로 임의 URL 이 새 나가면 남의 서버 파일을
  *   우리 플레이어로 트는 통로가 된다.
  */
-export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave }: PlayerUrlOptions): string {
+export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave, netplay, gameKeyForNetplay }: PlayerUrlOptions): string {
   if (!SUPPORTED_CORES.has(core)) throw new Error(`지원하지 않는 코어: ${core || '(빈 값)'}`);
   if (!rom) throw new Error('롬 주소가 비었습니다.');
   if (!isSameOriginRom(rom)) throw new Error(`외부 출처 롬은 실행하지 않습니다: ${rom}`);
@@ -62,6 +71,11 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, p
   }
   if (saveKey) params.set('save', saveKey);
   if (legacySave) params.set('legacy', '1');
+  if (netplay) {
+    params.set('np', '1');
+    // 게임 번호는 서버에서 계산해 싣는다 — 두 PC 가 같은 수를 봐야 같은 방이 된다.
+    params.set('gid', String(gameNumberOf(gameKeyForNetplay || saveKey || rom)));
+  }
   // 넘긴 순서를 그대로 지킨다 — URLSearchParams 는 넣은 순서를 보존한다.
   for (const p of parents ?? []) {
     if (!isSameOriginRom(p)) throw new Error(`외부 출처 롬셋은 쓰지 않습니다: ${p}`);

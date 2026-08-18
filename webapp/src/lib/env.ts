@@ -70,6 +70,26 @@ export const env = {
   // owner-only hidden 메뉴 접근 허용 이메일. 비어 있으면 모든 owner 가드 차단.
   ownerEmail: process.env.OWNER_EMAIL ?? '',
 
+  netplay: {
+    /**
+     * 고전 게임 netplay (#186). 켜면 플레이어에 "함께 하기" 진입이 생긴다.
+     *
+     * 시그널링 서버(`/netplay/`)가 떠 있어야 의미가 있으므로 기본은 꺼짐.
+     */
+    enabled: (process.env.RETRO_NETPLAY ?? '') === '1',
+    /**
+     * WebRTC ICE 서버 목록(JSON 배열 문자열).
+     *
+     * **비어 있으면 같은 랜에서만 붙는다** — EmulatorJS 가 콘솔에 그렇게 경고한다(실측).
+     * 밖에서 접속하려면 STUN 이 필요하고, 양쪽 다 symmetric NAT(모바일 CGNAT 등)면 STUN
+     * 으로도 안 돼 TURN(중계)을 넣어야 한다. 그때 **코드가 아니라 이 값만** 바꾸면 되게 뺐다.
+     *
+     * 예) [{"urls":"stun:stun.l.google.com:19302"},
+     *      {"urls":"turn:my.host:3478","username":"u","credential":"p"}]
+     */
+    iceServers: process.env.RETRO_NETPLAY_ICE_SERVERS ?? '',
+  },
+
   google: {
     // 로그인(GoogleProvider)과 토큰 갱신이 함께 쓴다.
     clientId: process.env.GOOGLE_CLIENT_ID ?? '',
