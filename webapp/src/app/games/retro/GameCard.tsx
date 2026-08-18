@@ -160,33 +160,41 @@ export default function GameCard({
                 </button>
               </div>
 
-              {/* 내려받기 (#194) — 링크 하나면 된다. 상태도 fetch 도 필요 없다.
-                  `download` 속성은 일부러 뺐다: 붙이면 브라우저가 URL 에서 이름을 짐작하는데,
-                  서버가 한글 이름을 헤더로 실어 보내기 때문이다. */}
-              <a
-                href={`/api/games/retro/roms/${game.id}/download`}
-                title={
-                  game.patch || (game.parentUrls?.length ?? 0) > 0
-                    ? "롬과 패치를 한 파일로 묶어 내려받기"
-                    : "롬 파일 내려받기"
-                }
-                aria-label={`${game.title} 내려받기`}
-                className={TOOL_ICON}
-              >
-                <Download size={13} aria-hidden />
-              </a>
+              {/* 오른쪽 묶음 (#196) — 부모가 `justify-between` 이라 자식이 셋이면 하나가
+                  가운데로 밀린다. 내려받기·커버를 한 묶음으로 두어 오른쪽에 붙인다. */}
+              <div className="flex items-center gap-1">
+                {/* 내려받기 (#194) — **버튼이어야 한다** (#196).
+                    이 영역은 `onClick={swallow}` 로 감싸여 있어(`preventDefault`+`stopPropagation`)
+                    앵커의 기본 동작인 다운로드가 취소된다. 게다가 카드 전체가 `<Link>` 라 `<a>` 를
+                    여기 두면 앵커 중첩이 되어 HTML 상으로도 잘못이다. 그래서 버튼으로 두고 우리가
+                    직접 주소로 보낸다 — `Content-Disposition: attachment` 라 화면은 그대로 있고
+                    파일만 내려온다. */}
+                <button
+                  type="button"
+                  onClick={() => { window.location.href = `/api/games/retro/roms/${game.id}/download`; }}
+                  title={
+                    game.patch || (game.parentUrls?.length ?? 0) > 0
+                      ? "롬과 패치를 한 파일로 묶어 내려받기"
+                      : "롬 파일 내려받기"
+                  }
+                  aria-label={`${game.title} 내려받기`}
+                  className={TOOL_ICON}
+                >
+                  <Download size={13} aria-hidden />
+                </button>
 
-              {/* 그림 아이콘은 그 자체로 뜻이 통한다 — 글자를 붙이지 않는다. */}
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => coverRef.current?.click()}
-                title={game.cover ? "카드 그림 바꾸기" : "카드 그림 넣기"}
-                aria-label={`${game.title} 카드 그림`}
-                className={TOOL_ICON}
-              >
-                {game.cover ? <ImageIcon size={13} aria-hidden /> : <ImagePlus size={13} aria-hidden />}
-              </button>
+                {/* 그림 아이콘은 그 자체로 뜻이 통한다 — 글자를 붙이지 않는다. */}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => coverRef.current?.click()}
+                  title={game.cover ? "카드 그림 바꾸기" : "카드 그림 넣기"}
+                  aria-label={`${game.title} 카드 그림`}
+                  className={TOOL_ICON}
+                >
+                  {game.cover ? <ImageIcon size={13} aria-hidden /> : <ImagePlus size={13} aria-hidden />}
+                </button>
+              </div>
             </div>
           )}
         </div>
