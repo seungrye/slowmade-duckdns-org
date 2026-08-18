@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/format";
 import ExportButtons from "./export-buttons";
+import Pager from "@/components/pager";
 
 /** 자동매매 모니터링 — 실행 이력·주문 로그(30초 자동 갱신, 계정 필터). */
 
@@ -22,22 +23,6 @@ const RUNS_SIZE = 15;
 const ORDERS_SIZE = 25;
 
 /** 섹션 페이지 네비게이터 — 이전/다음 + "n / m". 범위 밖이면 비활성. */
-function Pager({ page, total, size, onPage }: {
-  page: number; total: number; size: number; onPage: (p: number) => void;
-}) {
-  const pages = Math.max(1, Math.ceil(total / size));
-  const cur = Math.min(page, pages - 1);
-  if (total <= size) return null;
-  const btn = "px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700 text-xs disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-800";
-  return (
-    <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-      <button type="button" className={btn} disabled={cur <= 0} onClick={() => onPage(cur - 1)}>← 이전</button>
-      <span>{cur + 1} / {pages}<span className="text-gray-400"> · 총 {total.toLocaleString()}건</span></span>
-      <button type="button" className={btn} disabled={cur >= pages - 1} onClick={() => onPage(cur + 1)}>다음 →</button>
-    </div>
-  );
-}
-
 export default function TradingMonitorClient() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
