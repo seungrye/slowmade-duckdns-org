@@ -70,6 +70,20 @@ export const env = {
   // owner-only hidden 메뉴 접근 허용 이메일. 비어 있으면 모든 owner 가드 차단.
   ownerEmail: process.env.OWNER_EMAIL ?? '',
 
+  google: {
+    // 로그인(GoogleProvider)과 토큰 갱신이 함께 쓴다.
+    clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+    /**
+     * 매매기록 → 구글 시트 내보내기 (#181).
+     *
+     * **켜는 순간 로그인 동의 화면이 바뀐다**(`drive.file` 범위가 붙는다). GCP 에서 Sheets·
+     * Drive API 사용 설정과 동의 화면 범위 추가가 끝나기 전에 켜면 로그인이 막혀 관리자
+     * 화면에 못 들어간다. 그래서 기본은 꺼짐이고, 준비가 끝난 뒤에 켠다.
+     */
+    sheetsExport: (process.env.GOOGLE_SHEETS_EXPORT ?? '') === '1',
+  },
+
   // stock-automator 데몬이 /api/ingest/* 호출 시 X-Ingest-Key 헤더로 검증.
   // 빈 문자열이면 ingest 전부 차단 (Default secure).
   stockIngestKey: process.env.STOCK_INGEST_KEY ?? '',
