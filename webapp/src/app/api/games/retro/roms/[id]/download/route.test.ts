@@ -79,7 +79,8 @@ describe('GET /api/games/retro/roms/[id]/download', () => {
     expect(decodeURIComponent(res.headers.get('Content-Disposition') ?? '')).toContain('테일즈');
 
     const entries = await readZip(new Uint8Array(await res.arrayBuffer()));
-    expect(entries.map((e: { name: string }) => e.name)).toEqual(['game.sfc', '한글.ips']);
+    // 패치는 롬 이름 + `-patch` 로 들어간다 (#198) — 어느 게 패치인지 한눈에 보이게.
+    expect(entries.map((e: { name: string }) => e.name)).toEqual(['game.sfc', 'game-patch.ips']);
     expect(entries[0].data).toEqual(bytes(16, 1));
     expect(entries[1].data).toEqual(bytes(8, 2));
   });

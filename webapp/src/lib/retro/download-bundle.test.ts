@@ -11,9 +11,26 @@ describe('bundleEntryNames', () => {
     expect(bundleEntryNames({ romName: 'game.sfc' })).toEqual(['game.sfc']);
   });
 
-  it('패치가 있으면 함께 — 롬이 먼저', () => {
+  // 원래 패치 이름을 그대로 쓰면 어느 게 패치인지 알기 어렵다. 실제로 D&D 는 패치 이름이
+  // 롬과 똑같은 `ddsomu.zip` 이라 겹침 처리가 `ddsomu (2).zip` 을 만들었는데, 받은 사람은
+  // 둘 중 무엇이 패치인지 알 수 없다. **롬 이름 + `-patch`** 로 굳힌다 (#198).
+  it('패치는 롬 이름에 -patch 를 붙여 넣는다', () => {
     expect(bundleEntryNames({ romName: 'game.sfc', patchName: '한글.ips' }))
-      .toEqual(['game.sfc', '한글.ips']);
+      .toEqual(['game.sfc', 'game-patch.ips']);
+  });
+
+  it('패치 확장자는 살린다 — 형식이 보여야 한다', () => {
+    expect(bundleEntryNames({ romName: 'a.sfc', patchName: 'x.bps' })[1]).toBe('a-patch.bps');
+    expect(bundleEntryNames({ romName: 'a.sfc', patchName: 'x.zip' })[1]).toBe('a-patch.zip');
+  });
+
+  it('실제 사례 — 롬과 패치 이름이 같아도 한눈에 갈린다', () => {
+    expect(bundleEntryNames({ romName: 'ddsomu.zip', patchName: 'ddsomu.zip' }))
+      .toEqual(['ddsomu.zip', 'ddsomu-patch.zip']);
+  });
+
+  it('패치에 확장자가 없으면 그냥 -patch', () => {
+    expect(bundleEntryNames({ romName: 'a.sfc', patchName: 'noext' })[1]).toBe('a-patch');
   });
 
   it('부모셋도 넣는다 — 아케이드는 이게 없으면 실행이 안 된다', () => {
