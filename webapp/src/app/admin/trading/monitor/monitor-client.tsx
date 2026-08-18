@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatMoney } from "@/lib/format";
+import ExportButtons from "./export-buttons";
 
 /** 자동매매 모니터링 — 실행 이력·주문 로그(30초 자동 갱신, 계정 필터). */
 
@@ -119,6 +120,8 @@ export default function TradingMonitorClient() {
         <Pager page={runsPage} total={runsTotal} size={RUNS_SIZE}
                onPage={(p) => { setRunsPage(p); setOpenLog(null); }} />
       </section>
+
+      <ExportButtons />
 
       <section>
         <h2 className="text-lg font-semibold mb-2">주문 로그</h2>
