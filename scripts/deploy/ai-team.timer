@@ -1,0 +1,17 @@
+# AI 개발팀 야간 러너 타이머 (#207).
+#
+# 01:07 인 이유: 정각을 피한다. 이 호스트의 다른 타이머(dpkg-db-backup·exim4-base 가 00:00,
+# logrotate 가 00:20)와 겹치지 않고, 외부 API 도 정각에 몰린다.
+
+[Unit]
+Description=AI 개발팀 야간 러너 타이머
+
+[Timer]
+OnCalendar=*-*-* 01:07:00
+# 꺼져 있던 동안 놓친 실행을 부팅 직후에 몰아 돌리지 않는다 —
+# 낮에 갑자기 덧글이 달리는 것보다 하루 거르는 편이 낫다.
+Persistent=false
+Unit=ai-team.service
+
+[Install]
+WantedBy=timers.target
