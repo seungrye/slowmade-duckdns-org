@@ -126,6 +126,11 @@ export const env = {
   // 빈 문자열이면 app-end-run 비활성(default secure). STOCK_INGEST_KEY 재사용 가능.
   appKey: process.env.APP_KEY || process.env.STOCK_INGEST_KEY || '',
 
+  // AI 팀(Claude·MiniMax)이 /api/ai-team/* 호출 시 X-AI-Team-Key 헤더로 검증.
+  // **폴백을 두지 않는다** — 이 키는 주인의 비공개 글에 쓰기 권한을 주므로, 데몬·앱에 이미
+  // 뿌려진 STOCK_INGEST_KEY 로 열려서는 안 된다. 빈 문자열이면 전부 차단(Default secure).
+  aiTeamKey: process.env.AI_TEAM_KEY ?? '',
+
   // 서버 내부 self-call(/api/revalidate) 검증 토큰. 백그라운드 작업(AI 태그)이 request scope
   // 밖에서 revalidatePath 를 못 하므로, 라우트 핸들러를 self-fetch 해 캐시를 무효화할 때 쓴다.
   // 새 env 없이 STOCK_INGEST_KEY 를 재사용(프로덕션에 이미 존재 → 즉시 동작, 인스턴스 간 일관).
