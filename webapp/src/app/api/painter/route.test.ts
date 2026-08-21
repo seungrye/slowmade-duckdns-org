@@ -40,15 +40,12 @@ vi.mock('@/lib/painter/quota', () => ({
 
 const mockCommentSave = vi.fn();
 
+// 글 문서를 테스트마다 갈아 끼울 수 있게 hoisted 로 뺀다 (#205 비공개 글 케이스).
+const mockPostLean = vi.hoisted(() => vi.fn());
+
 vi.mock('@/models/post', () => ({
   default: {
-    findById: vi.fn().mockReturnValue({
-      lean: vi.fn().mockResolvedValue({
-        _id: 'post-id',
-        title: '테스트 게시글',
-        htmlContent: '<p>내용</p>',
-      }),
-    }),
+    findById: vi.fn().mockReturnValue({ lean: mockPostLean }),
   },
 }));
 
@@ -82,6 +79,12 @@ describe('/api/painter POST', () => {
     vi.clearAllMocks();
     mockCommentSave.mockResolvedValue(undefined);
     mockAuth.mockResolvedValue({ user: { name: 'Test', email: 'test@test.com' } });
+    // 기본은 공개 글(isPrivate·userEmail 이 없는 옛 문서 모양 — 스키마 기본값이 공개다).
+    mockPostLean.mockResolvedValue({
+      _id: 'post-id',
+      title: '테스트 게시글',
+      htmlContent: '<p>내용</p>',
+    });
     mockGenerateImage.mockResolvedValue({
       key: 'painter-images/test.jpg',
       url: 'https://cdn.example.com/public/painter-images/test.jpg',
@@ -111,6 +114,32 @@ describe('/api/painter POST', () => {
   it('postId 없으면 400 반환', async () => {
     const res = await POST(makeRequest({ content: '@painter-bot 안녕' }));
     expect(res.status).toBe(400);
+  });
+
+  // #205 — 로그인만 했으면 남의 비공개 글에 덧글을 넣을 수 있었다.
+  it('남의 비공개 글이면 404 — 덧글을 만들지 않는다', async () => {
+    mockPostLean.mockResolvedValueOnce({
+      _id: 'post-id',
+      title: '남의 비밀',
+      htmlContent: '<p>비밀</p>',
+      isPrivate: true,
+      userEmail: 'someone-else@test.com',
+    });
+    const res = await POST(makeRequest({ postId: 'post-id', content: '@painter-bot 그림' }));
+    expect(res.status).toBe(404);
+    expect(mockCommentSave).not.toHaveBeenCalled();
+  });
+
+  it('본인의 비공개 글에는 그대로 덧글을 달 수 있다', async () => {
+    mockPostLean.mockResolvedValueOnce({
+      _id: 'post-id',
+      title: '내 비밀',
+      htmlContent: '<p>비밀</p>',
+      isPrivate: true,
+      userEmail: 'test@test.com',
+    });
+    const res = await POST(makeRequest({ postId: 'post-id', content: '@painter-bot 그림' }));
+    expect(res.status).toBe(201);
   });
 
   it('허용되지 않은 origin이면 403 반환', async () => {

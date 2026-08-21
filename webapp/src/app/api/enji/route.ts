@@ -6,6 +6,7 @@ import Comment from '@/models/comment';
 import Post from '@/models/post';
 import User from '@/models/user';
 import { connectToDB } from '@/lib/db';
+import { canCommentOn } from '@/lib/post-access';
 import { env } from '@/lib/env';
 import { nanoid } from 'nanoid';
 import { parseImageCommand } from '@/lib/enji/imageGen';
@@ -136,8 +137,13 @@ export async function POST(req: NextRequest) {
 
   await connectToDB();
 
+  // #205 — 존재만 확인하고 통과시키면 남의 비공개 글에 덧글이 들어가고,
+  // 아래에서 그 본문 3000자가 남의 명령으로 Gemini 에 실려 나간다.
+  // 없을 때와 같은 404 로 답해 존재 여부를 알려 주지 않는다.
   const post = await Post.findById(postId).lean();
-  if (!post) return apiError('게시글을 찾을 수 없습니다.', 404);
+  if (!post || !canCommentOn(post, session.user.email)) {
+    return apiError('게시글을 찾을 수 없습니다.', 404);
+  }
 
   let author: string;
   let authorId = null;
