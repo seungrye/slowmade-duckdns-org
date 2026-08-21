@@ -1,0 +1,52 @@
+# 검수용 웹앱 인스턴스 (포트 %i, 보통 3012).
+#
+# AI 가 만든 브랜치를 **사람이 배포하기 전에 실제로 눌러 보는** 자리다. 이번 세션에서 CI 가
+# 초록인데도 실제로는 안 되던 것이 셋 있었다(넷플레이 방 생성·다운로드 버튼·임시저장 본문).
+# 셋 다 diff 를 읽어서는 안 잡히고 **돌려 봐야** 드러난다. 그 "돌려 볼 자리"가 여기다.
+#
+# 실서비스(webapp@3010/3011)와 다른 점은 **env 파일 하나가 더 붙는다**는 것뿐이다.
+# systemd 는 나중에 읽은 값이 이긴다 — `.env.local`(실서비스 설정) 뒤에 `.env.staging` 을
+# 두어 DB·메일·스토리지만 갈아 끼운다.
+#
+# ⚠ `.env.staging` 에 **반드시** 들어가야 하는 것:
+#
+#     TRADING_SCHEDULER_ENABLED=false
+#
+#   이게 없으면 이 인스턴스도 60초 틱으로 매매 스케줄러를 돌린다 — DB 를 갈라 놨어도
+#   **브로커 API 는 바깥에 있으므로 실제 주문이 중복으로 나간다.**
+#   (scheduler.ts 가 이 값을 보고 기동을 건너뛴다.)
+#
+# 설치:
+#   sudo install -m 0644 webapp-staging@.service /etc/systemd/system/webapp-staging@.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl start webapp-staging@3012      # enable 하지 않는다 — 검수할 때만 띄운다
+#
+# nginx 는 이 포트로 트래픽을 보내지 않는다. 확인은 127.0.0.1:%i 로 직접 붙는다.
+
+[Unit]
+Description=Slowmade webapp — 검수용 (port %i)
+After=network.target
+
+[Service]
+Type=simple
+User=seungrye
+Group=seungrye
+WorkingDirectory=/home/seungrye/site/webapp
+Environment=NODE_ENV=production
+Environment=PORT=%i
+Environment=NEXT_DISTDIR=.next-%i
+Environment=PATH=/home/seungrye/.nvm/versions/node/v20.19.0/bin:/usr/local/bin:/usr/bin:/bin
+# 순서가 전부다 — 아래 것이 위 것을 덮는다.
+EnvironmentFile=-/home/seungrye/site/webapp/.env.local
+EnvironmentFile=-/home/seungrye/site/webapp/.env.staging
+ExecStart=/usr/bin/env pnpm exec next start -p %i
+# 검수용이라 되살리지 않는다 — 죽었으면 죽은 이유를 봐야 한다.
+Restart=no
+KillSignal=SIGTERM
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=webapp-staging@%i
+
+[Install]
+WantedBy=multi-user.target
