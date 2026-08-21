@@ -35,11 +35,12 @@
     ".next-3011/types/**/*.ts",
     ".next-dev/types/**/*.ts",
     ".next-tmp/types/**/*.ts",
+    ".next-verify/types/**/*.ts",
     ".next/types/**/*.ts",
     "next-env.d.ts",
     "src/types/*.tsx",
     "vitest.d.ts",
-    ".next-verify/types/**/*.ts"
+    ".next-3012/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

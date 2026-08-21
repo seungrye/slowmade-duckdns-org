@@ -260,6 +260,42 @@ docker run --rm --network pt-outside redis:alpine nc -z -w4 192.168.0.11 27017  
 docker network rm pt-outside
 ```
 
+
+## 검수 인스턴스 (webapp-staging@3012)
+
+AI 가 만든 브랜치를 **사람이 배포하기 전에 실제로 눌러 보는** 자리다. CI 초록인데도 실제로는
+안 되던 것들이 있었다(넷플레이 방 생성·다운로드 버튼·임시저장 본문) — 셋 다 diff 로는 안
+잡히고 돌려 봐야 드러난다.
+
+```bash
+# 1) 검수용 DB 를 실서비스에서 새로 뜬다(주가·브로커 자격증명 제외, 약 50초)
+bash scripts/deploy/staging-db-refresh.sh
+
+# 2) 환경 파일 — 최초 1회
+cp scripts/deploy/env.staging.example webapp/.env.staging
+
+# 3) 유닛 설치 — 최초 1회
+sudo install -m 0644 scripts/deploy/webapp-staging@.service /etc/systemd/system/webapp-staging@.service
+sudo systemctl daemon-reload
+
+# 4) 검수할 브랜치를 빌드해 띄운다
+cd webapp && NEXT_DISTDIR=.next-3012 pnpm exec next build
+sudo systemctl start webapp-staging@3012      # enable 하지 않는다 — 검수할 때만
+curl -s localhost:3012/api/health
+sudo systemctl stop webapp-staging@3012       # 끝나면 내린다
+```
+
+**DB 를 갈랐다고 안전한 게 아니다.** 바깥으로 나가는 것을 따로 꺼야 한다 —
+`TRADING_SCHEDULER_ENABLED=false` 가 없으면 검수 인스턴스도 60초 틱으로 매매를 돌려
+**실제 주문이 중복으로 나간다**(브로커 API 는 DB 밖에 있다). 메일·MinIO 도 마찬가지다.
+
+격리 확인 방법(표식 심기):
+
+```bash
+# 검수 DB 에만 글을 하나 넣고 양쪽 /api/tags 를 비교한다 — 검수에만 보여야 한다
+docker exec mongodb mongosh --quiet --eval "db.getSiblingDB('handmade-site-staging')..."
+```
+
 ## 관련 파일
 
 - `scripts/deploy/webapp@.service` — systemd 템플릿 유닛
@@ -268,3 +304,5 @@ docker network rm pt-outside
 - `webapp/next.config.ts` — `distDir` 환경변수 인식
 - `webapp/src/app/api/health/route.ts` — liveness 엔드포인트
 - `scripts/deploy/mongo-firewall.sh` · `.service` — MongoDB 원격 접근 차단 (#179)
+- `scripts/deploy/staging-db-refresh.sh` — 검수용 DB 새로 뜨기
+- `scripts/deploy/webapp-staging@.service` · `env.staging.example` — 검수 인스턴스
