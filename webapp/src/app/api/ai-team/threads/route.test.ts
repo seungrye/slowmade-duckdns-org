@@ -67,14 +67,19 @@ describe('GET /api/ai-team/threads', () => {
   });
 
   // 이 필터가 AI 에게 열리는 범위 전부다.
-  it('조회 필터에 삼중 조건이 모두 들어간다', async () => {
+  // (태그 조건의 세부 의미는 thread-match.test.ts 가 본다 — 여기선 그대로 넘어가는지만.)
+  it('조회 필터에 조건이 모두 들어간다 — 주인·비공개·미삭제·태그', async () => {
     await GET(req('secret-key'));
     expect(mockPostFind).toHaveBeenCalledWith(
       expect.objectContaining({
         userEmail: 'owner@x.test',
         isPrivate: true,
         isDeleted: { $ne: true },
-        tags: expect.any(RegExp),
+        // ai-req 있음 + ai-done 없음 (#213)
+        $and: expect.arrayContaining([
+          expect.objectContaining({ tags: expect.any(RegExp) }),
+          expect.objectContaining({ tags: expect.objectContaining({ $not: expect.any(RegExp) }) }),
+        ]),
       }),
     );
   });
