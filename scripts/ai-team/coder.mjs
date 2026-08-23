@@ -1,26 +1,26 @@
 #!/usr/bin/env node
 // AI 코더 하네스 (#224).
 //
-// ── 왜 직접 만드나 ──────────────────────────────────────────────────────
+// ── 역할 분담 ───────────────────────────────────────────────────────────
 //
-// 이 호스트에 설치된 에이전트 CLI 는 `claude` 뿐인데, 남의 모델을 받지 않는다:
-//   claude --model stealth/ox-alpha        → 모델 이름 화이트리스트에 걸림
-//   ANTHROPIC_MODEL=stealth/ox-alpha       → 같은 이유로 거부
-// OpenRouter 의 엔드포인트는 멀쩡하다(Anthropic 호환 경로까지 있다). CLI 가 문제다.
+// **편집은 검증된 도구(opencode)가, TDD 강제는 이 스크립트가 한다.**
 //
-// ── 왜 도구 루프를 안 만드나 ─────────────────────────────────────────────
+// 처음엔 모델을 직접 불러 파일을 통째로 받는 방식으로 만들었다. 동작은 했지만 에이전트
+// 루프가 없어서, 모델이 첫 시도에 못 맞히면 그냥 실패했다. opencode 로 바꾸니 저장소를
+// 먼저 둘러보고(Glob·Read) **기존 테스트 관행을 학습한 뒤** 쓴다 — 손으로 만든 단발
+// 호출로는 안 되는 일이다.
 //
-// 컨텍스트가 1,048,576 이라 관련 파일을 통째로 실어 보낼 수 있다. 그리고 **통짜 파일이
-// 부분 diff 보다 훨씬 덜 깨진다** — diff 는 문맥이 한 줄만 어긋나도 적용에 실패한다.
-// 통짜로 부족한 것이 확인되면 그때 루프를 짓는다.
+// 반대로 **기성 도구 중 "테스트를 먼저 적용해 실패를 확인한 뒤 구현하라"를 강제하는 것은
+// 없다.** aider 의 --auto-test 도 "고친 다음 테스트"지 순서 강제가 아니다.
+// docs/development.md 가 요구하는 TDD 는 거기서 나오지 않는다. 그래서 게이트는 우리 것이다.
 //
-// ── TDD 를 약속이 아니라 기계로 강제한다 ─────────────────────────────────
+// ── 게이트 ──────────────────────────────────────────────────────────────
 //
-// 테스트 파일과 구현 파일을 한 번에 받되 **두 단계로 나눠 적용**한다:
-//   1) 테스트만 쓰고 돌린다 → 반드시 실패해야 한다. 통과하면 그 테스트는 아무것도 잡지
-//      못한다는 뜻이므로 배치를 거부한다.
-//   2) 구현을 쓰고 다시 돌린다 → 반드시 통과해야 한다.
-// 코더가 TDD 를 건너뛸 방법이 없다.
+//   1단계  테스트만 쓰게 한다 → 돌린다 → **반드시 실패해야 한다**
+//          (구현이 딸려 왔으면 되돌린 뒤 잰다. 그래야 "구현 없이 실패하는가"를 재는 것이 된다)
+//   2단계  --continue 로 구현하게 한다 → 전체를 돌린다 → **반드시 통과해야 한다**
+//
+// 코더가 TDD 를 건너뛸 방법이 없다. 빨강 출력은 RED.txt 로 남겨 PR 본문에 붙인다.
 //
 // ── 왜 워크트리인가 ─────────────────────────────────────────────────────
 //
@@ -29,136 +29,81 @@
 //
 // 사용:
 //   node coder.mjs --spec spec.md [--worktree <경로>] [--branch <이름>]
-//   node coder.mjs --spec spec.md --from-json canned.json   # 모델 호출 없이 검증용
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 
 const REPO = '/home/seungrye/site';
-const API = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_MODEL = 'openrouter/stealth/ox-alpha';
 
-// 429 는 실측 1/3 로 온다(무료 stealth 모델의 공용 풀). 재시도는 선택이 아니다.
-const MAX_ATTEMPTS = 6;
-const BACKOFF_MS = [2000, 5000, 10000, 20000, 30000];
-
-function die(msg) {
-  console.error(`[coder] ${msg}`);
-  process.exit(1);
-}
-function log(msg) {
-  console.log(`[coder] ${msg}`);
-}
+const die = (m) => { console.error(`[coder] ${m}`); process.exit(1); };
+const log = (m) => console.log(`[coder] ${m}`);
 
 function arg(name, fallback = null) {
   const i = process.argv.indexOf(`--${name}`);
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
-function sh(cmd, args, opts = {}) {
-  return execFileSync(cmd, args, { encoding: 'utf8', ...opts });
-}
+const sh = (cmd, args, opts = {}) =>
+  execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 
-/** 테스트를 돌리고 {ok, output} 을 준다. 실패해도 던지지 않는다 — 실패가 정상인 단계가 있다. */
+/** 테스트를 돌리고 {ok, output}. 실패해도 던지지 않는다 — 실패가 정상인 단계가 있다. */
 function runTests(worktree, paths) {
   try {
-    const out = sh('pnpm', ['vitest', 'run', ...paths], {
-      cwd: join(worktree, 'webapp'),
-      stdio: 'pipe',
-      maxBuffer: 32 * 1024 * 1024,
-    });
-    return { ok: true, output: out };
+    return { ok: true, output: sh('pnpm', ['vitest', 'run', ...paths], {
+      cwd: join(worktree, 'webapp'), stdio: 'pipe',
+    }) };
   } catch (e) {
     return { ok: false, output: `${e.stdout ?? ''}${e.stderr ?? ''}` };
   }
 }
 
+/** git status 로 바뀐 경로들. `??`(신규)과 수정 둘 다. */
+function changedPaths(worktree) {
+  return sh('git', ['status', '--porcelain'], { cwd: worktree })
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => ({ status: l.slice(0, 2).trim(), path: l.slice(3).trim() }));
+}
+
+const isTest = (p) => /\.test\.(ts|tsx)$/.test(p);
+
 /**
- * 쓸 수 있는 경로인가.
+ * 본체 저장소가 건드려졌는지 본다 — 뚫렸을 때 **그 자리에서** 알아야 한다.
  *
- * 워크트리 밖으로 나가는 것, git 내부, 비밀 파일은 막는다. 코더는 스펙에 적힌 일만 하면
- * 되고, 그 밖을 건드릴 이유가 없다.
+ * 실제로 뚫린 적이 있다. `cwd` 만 워크트리로 주고 돌렸더니 opencode 가 `~/site` 에 파일을
+ * 썼다. 워크트리의 `.git` 은 `gitdir: ~/site/.git/worktrees/...` 라고 적힌 **파일**이라,
+ * 프로젝트 루트를 찾아 거슬러 올라가면 본체가 나온다. `--dir` 로 고정해 막았지만,
+ * 도구가 바뀌면 또 그럴 수 있으므로 매번 확인한다.
  */
-function safePath(p) {
-  if (typeof p !== 'string' || !p.trim()) return false;
-  if (p.startsWith('/') || p.includes('..')) return false;
-  if (p.startsWith('.git/') || p.includes('/.git/')) return false;
-  if (/(^|\/)\.env/.test(p)) return false;
-  return true;
-}
-
-function writeFiles(worktree, files) {
-  for (const f of files) {
-    const abs = join(worktree, f.path);
-    mkdirSync(dirname(abs), { recursive: true });
-    writeFileSync(abs, f.content, 'utf8');
-    log(`  ${f.kind === 'test' ? '테스트' : '구현  '} ${f.path}`);
+function assertRepoClean(before) {
+  const now = sh('git', ['status', '--porcelain'], { cwd: REPO });
+  if (now !== before) {
+    console.error(`[coder] 이전:\n${before}\n[coder] 지금:\n${now}`);
+    die(`본체 저장소(${REPO})가 변경됐습니다. 격리가 뚫렸습니다 — 중단합니다.`);
   }
 }
 
-const SCHEMA = {
-  type: 'json_schema',
-  json_schema: {
-    name: 'code_change',
-    strict: true,
-    schema: {
-      type: 'object',
-      properties: {
-        summary: { type: 'string' },
-        files: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              path: { type: 'string' },
-              kind: { type: 'string', enum: ['test', 'impl'] },
-              content: { type: 'string' },
-            },
-            required: ['path', 'kind', 'content'],
-            additionalProperties: false,
-          },
-        },
-      },
-      required: ['summary', 'files'],
-      additionalProperties: false,
-    },
-  },
-};
-
-async function callModel({ key, model, prompt }) {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        max_tokens: 32000,
-        messages: [{ role: 'user', content: prompt }],
-        response_format: SCHEMA,
-      }),
-    });
-    const body = await res.json();
-
-    if (body.error) {
-      const code = body.error.code;
-      // 429 는 상위 제공자의 공용 풀 제한이다. 기다리면 대개 풀린다.
-      if (code === 429 && attempt < MAX_ATTEMPTS) {
-        const wait = BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)];
-        log(`429 — ${wait / 1000}초 뒤 재시도 (${attempt}/${MAX_ATTEMPTS})`);
-        await new Promise((r) => setTimeout(r, wait));
-        continue;
-      }
-      die(`모델 오류 ${code}: ${String(body.error.message).slice(0, 200)}`);
-    }
-
-    const text = body.choices?.[0]?.message?.content;
-    if (!text) die('모델이 빈 응답을 돌려줬습니다.');
-    try {
-      return JSON.parse(text);
-    } catch {
-      die(`모델 응답이 JSON 이 아닙니다: ${text.slice(0, 200)}`);
-    }
+/**
+ * opencode 를 워크트리 안에서 헤드리스로 한 번 돌린다.
+ *
+ * `--dir` 이 핵심이다. `cwd` 만으로는 워크트리 밖으로 나간다(위 주석 참고).
+ * 출력은 **반드시 보여 준다** — 삼켰더니 "테스트가 안 만들어졌다"는 결과만 남고
+ * 왜 그런지 알 길이 없었다.
+ */
+function opencode(worktree, model, message, cont) {
+  const args = ['run', '--dir', worktree, '-m', model, ...(cont ? ['-c'] : []), message];
+  const repoBefore = sh('git', ['status', '--porcelain'], { cwd: REPO });
+  let out;
+  try {
+    out = sh('opencode', args, { cwd: worktree, stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    console.error(`${e.stdout ?? ''}${e.stderr ?? ''}`.slice(-3000));
+    die('opencode 실행이 실패했습니다 (위 출력 참고).');
   }
-  die('재시도를 모두 소진했습니다.');
+  process.stdout.write(out.slice(-4000));
+  assertRepoClean(repoBefore);
+  return out;
 }
 
 // ── 본문 ────────────────────────────────────────────────────────────────
@@ -166,110 +111,92 @@ async function callModel({ key, model, prompt }) {
 const specPath = arg('spec') ?? die('--spec <파일> 이 필요합니다.');
 const worktree = resolve(arg('worktree', '/home/seungrye/site-coder'));
 const branch = arg('branch', `coder/${Date.now()}`);
-const fromJson = arg('from-json');
+const model = process.env.AI_CODER_MODEL?.trim() || DEFAULT_MODEL;
 
-if (resolve(worktree) === resolve(REPO)) {
-  die('워크트리가 실서비스 작업트리와 같습니다. 다른 경로를 쓰세요.');
-}
+if (worktree === resolve(REPO)) die('워크트리가 실서비스 작업트리와 같습니다.');
+if (!process.env.OPENROUTER_API_KEY?.trim()) die('OPENROUTER_API_KEY 가 환경에 없습니다.');
 
 const spec = readFileSync(specPath, 'utf8');
 
-// 1) 워크트리 준비 — 없으면 만든다.
+// 1) 워크트리 준비
 if (!existsSync(worktree)) {
   log(`워크트리 생성: ${worktree} (${branch})`);
   sh('git', ['worktree', 'add', '-b', branch, worktree, 'main'], { cwd: REPO, stdio: 'pipe' });
 } else {
   log(`워크트리 재사용: ${worktree}`);
 }
-
-// 갓 만든 워크트리에는 node_modules 가 없어 vitest 가 아예 못 돈다.
-// 다시 설치하지 않고 본체 것을 가리킨다 — 같은 커밋의 같은 package.json 이라 내용이 같고,
-// 설치는 수 분이 걸린다.
+// 갓 만든 워크트리에는 node_modules 가 없어 vitest 가 아예 못 돈다. 재설치는 수 분이라
+// 본체 것을 가리킨다 — 같은 커밋의 같은 package.json 이다.
 const wtModules = join(worktree, 'webapp/node_modules');
 if (!existsSync(wtModules)) {
   log('node_modules 를 본체로 연결합니다');
   sh('ln', ['-s', join(REPO, 'webapp/node_modules'), wtModules], { stdio: 'pipe' });
 }
 
-// 2) 모델 호출 (또는 검증용 캔 응답)
-let result;
-if (fromJson) {
-  log(`캔 응답 사용: ${fromJson} (모델 호출 없음)`);
-  result = JSON.parse(readFileSync(fromJson, 'utf8'));
-} else {
-  const key = process.env.OPENROUTER_API_KEY?.trim();
-  if (!key) die('OPENROUTER_API_KEY 가 환경에 없습니다.');
-  const model = process.env.AI_CODER_MODEL?.trim() || 'stealth/ox-alpha';
-
-  const rules = readFileSync(join(REPO, 'docs/development.md'), 'utf8');
-  const prompt = [
-    '당신은 이 저장소의 코더입니다. 아래 규칙과 스펙에 따라 코드를 작성하세요.',
-    '',
-    '## 저장소 작업 규칙',
-    rules,
-    '',
-    '## 반드시 지킬 것',
-    '- **테스트를 먼저** 쓰고, 그 테스트는 구현 없이 돌리면 **반드시 실패**해야 합니다.',
-    '  (이 하네스가 테스트만 먼저 적용해 실패를 확인합니다. 통과해 버리면 거부됩니다.)',
-    '- 각 파일의 kind 를 정확히 표시하세요: 테스트는 "test", 구현은 "impl".',
-    '- 파일 내용은 **전체**를 주세요. diff 나 일부만 주면 안 됩니다.',
-    '- 경로는 저장소 루트 기준 상대경로입니다.',
-    '',
-    '## 스펙',
-    spec,
-  ].join('\n');
-
-  log(`모델 호출: ${model}`);
-  result = await callModel({ key, model, prompt });
+if (changedPaths(worktree).length) {
+  die('워크트리가 깨끗하지 않습니다. 이전 작업을 정리하거나 커밋한 뒤 다시 실행하세요.');
 }
 
-const files = Array.isArray(result.files) ? result.files : [];
-const bad = files.filter((f) => !safePath(f.path));
-if (bad.length) die(`쓸 수 없는 경로: ${bad.map((f) => f.path).join(', ')}`);
+// 2) 1단계 — 테스트만.
+log(`1단계: 실패하는 테스트 작성 (${model})`);
+opencode(worktree, model,
+  [spec, '',
+   '## 지금 단계에서 할 일',
+   '**실패하는 테스트만** 작성하세요. 구현은 다음 단계입니다.',
+   '- 구현 파일을 만들거나 고치지 마세요. 이 단계에서 테스트는 반드시 실패해야 합니다.',
+   '- 기존 테스트의 관행(파일 위치·환경 지정·작성 방식)을 먼저 확인하고 따르세요.',
+  ].join('\n'), false);
 
-const tests = files.filter((f) => f.kind === 'test');
-const impls = files.filter((f) => f.kind === 'impl');
-if (!tests.length) die('테스트 파일이 없습니다. TDD 를 건너뛴 배치는 받지 않습니다.');
-if (!impls.length) die('구현 파일이 없습니다.');
+const afterRed = changedPaths(worktree);
+const testFiles = afterRed.filter((f) => isTest(f.path)).map((f) => f.path);
+const strays = afterRed.filter((f) => !isTest(f.path));
 
-log(`요약: ${String(result.summary ?? '').slice(0, 200)}`);
+if (!testFiles.length) die('테스트 파일이 만들어지지 않았습니다. TDD 를 건너뛴 배치는 받지 않습니다.');
+log(`   테스트 ${testFiles.length}건: ${testFiles.join(', ')}`);
 
-// 3) 빨강 — 테스트만 적용하고 돌린다. 여기서 통과하면 그 테스트는 아무것도 잡지 못한다.
-log('① 테스트만 적용하고 돌립니다 (실패해야 정상)');
-writeFiles(worktree, tests);
-const testPaths = tests.map((f) => f.path.replace(/^webapp\//, ''));
-const red = runTests(worktree, testPaths);
+// 구현이 딸려 왔으면 되돌린다. 그래야 "구현 없이도 실패하는가"를 재는 것이 된다.
+if (strays.length) {
+  log(`   구현이 함께 왔습니다 — 빨강을 재기 위해 되돌립니다: ${strays.map((f) => f.path).join(', ')}`);
+  for (const f of strays) {
+    if (f.status === '??') rmSync(join(worktree, f.path), { force: true, recursive: true });
+    else sh('git', ['checkout', '--', f.path], { cwd: worktree, stdio: 'pipe' });
+  }
+}
 
+// 3) 빨강 게이트
+const red = runTests(worktree, testFiles.map((p) => p.replace(/^webapp\//, '')));
 if (red.ok) {
   console.error(red.output.slice(-2000));
-  die('구현 없이도 테스트가 통과했습니다 — 아무것도 잡지 못하는 테스트입니다. 배치를 거부합니다.');
+  die('구현 없이도 테스트가 통과했습니다 — 아무것도 잡지 못하는 테스트입니다. 거부합니다.');
 }
 log('   빨강 확인 ✓');
-const redOut = red.output;
+writeFileSync(join(worktree, 'RED.txt'), red.output, 'utf8');
 
-// 4) 초록 — 구현을 적용하고 전체를 돌린다.
-log('② 구현을 적용하고 전체 스위트를 돌립니다 (통과해야 정상)');
-writeFiles(worktree, impls);
+// 4) 2단계 — 구현.
+log('2단계: 통과하도록 구현');
+opencode(worktree, model,
+  ['이제 방금 쓴 테스트가 통과하도록 구현하세요.',
+   '- **테스트 파일은 수정하지 마세요.** 구현으로 통과시켜야 합니다.',
+   '- 스펙 범위 밖의 파일은 건드리지 마세요.',
+  ].join('\n'), true);
+
+// 5) 초록 게이트 — 전체 스위트.
+log('   전체 스위트 확인');
 const green = runTests(worktree, []);
-
 if (!green.ok) {
   console.error(green.output.slice(-3000));
-  die('구현을 적용해도 테스트가 통과하지 않습니다. 워크트리를 남겨 두니 확인하세요.');
+  die('구현을 적용해도 전체가 통과하지 않습니다. 워크트리를 남겨 두니 확인하세요.');
 }
 log('   초록 확인 ✓');
 
-// 5) 커밋만 한다. 푸시·PR·머지는 사람 검수 뒤의 일이다.
+// 6) 커밋만. 푸시·PR·머지는 사람 검수 뒤의 일이다.
 sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
-sh('git', ['commit', '-q', '-m', `coder: ${String(result.summary ?? '변경').slice(0, 72)}`], {
-  cwd: worktree,
-  stdio: 'pipe',
+sh('git', ['commit', '-q', '-m', `coder: ${spec.split('\n')[0].slice(0, 72)}`], {
+  cwd: worktree, stdio: 'pipe',
 });
 const sha = sh('git', ['rev-parse', '--short', 'HEAD'], { cwd: worktree }).trim();
 
-const redPath = join(worktree, 'RED.txt');
-writeFileSync(redPath, redOut, 'utf8');
-
 log('');
 log(`완료 — ${worktree} 의 ${branch} 에 ${sha} 커밋`);
-log(`빨강 출력은 ${redPath} 에 남겼습니다 (PR 본문에 붙이세요).`);
+log(`빨강 출력은 ${join(worktree, 'RED.txt')} 에 남겼습니다 (PR 본문에 붙이세요).`);
 log('푸시·PR 은 하지 않았습니다.');
