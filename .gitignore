@@ -40,3 +40,4 @@ coverage/
 !/webapp/public/games/retro/player.js
 !/webapp/public/games/retro/core-log.js
 !/webapp/public/games/retro/legacy-save.js
+!/webapp/public/games/retro/volume.js
