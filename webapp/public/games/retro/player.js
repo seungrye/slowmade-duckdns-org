@@ -8,6 +8,7 @@ import { applyBundlePatchToSet, applyRomPatch, ensurePhoenixKey, isZip } from '.
 import { pickLoadErrors } from './core-log.js';
 import { patchedRomPath, romFileNameFromUrl } from './rom-name.js';
 import { baseFromGameUrl, planLegacySaveRestore } from './legacy-save.js';
+import { routeThroughGain, shouldLiftToFull } from './volume.js';
 
 const DATA_PATH = '/games/retro/data/';
 // src/lib/retro/platforms.ts 의 core 값과 같아야 한다. 양쪽을 함께 고칠 것.
@@ -16,6 +17,54 @@ const CORES = ['snes9x', 'mgba', 'fbneo'];
 function notice(html) {
   const el = document.getElementById('game');
   if (el) el.outerHTML = '<div class="notice"><div>' + html + '</div></div>';
+}
+
+// 음량 조절이 먹지 않던 것을 고친다 (#209). 코어는 소리를 destination 에 직접 꽂아
+// 게인 노드가 하나도 없었다 — 줄일 지점을 여기서 만들어 준다. **코어가 뜨기 전**에
+// 걸어야 하므로 모듈 최상단에서 설치한다(loader.js 를 붙이기 한참 전).
+const volumeRoute = typeof AudioNode !== 'undefined'
+  ? routeThroughGain({ audioNodeProto: AudioNode.prototype })
+  : null;
+
+/** 음량을 한 번 최대로 올려 줬는지 기억하는 자리 — volume.js 의 shouldLiftToFull 참고. */
+const VOLUME_LIFTED_KEY = 'retro-volume-lifted';
+
+function readMarker() {
+  try { return localStorage.getItem(VOLUME_LIFTED_KEY); } catch { return null; }
+}
+
+/**
+ * EmulatorJS 의 setVolume 을 감싸 우리 게인도 함께 움직이게 한다.
+ *
+ * 슬라이더·음소거 버튼·저장된 설정이 **전부 이 함수 하나**를 지나가므로 여기만 잡으면
+ * 세 경로가 한꺼번에 해결된다.
+ */
+function hookVolume(tries = 0) {
+  if (!volumeRoute) return;
+  const em = window.EJS_emulator;
+  // setVolume 은 하단바를 만들 때 인스턴스에 달린다. 그 전에 감싸면 곧바로 덮어써지므로
+  // 아직 없으면 잠깐 기다린다 (#201 에서 에디터가 아직 없을 때와 같은 모양).
+  if (!em || typeof em.setVolume !== 'function') {
+    if (tries < 20) setTimeout(() => hookVolume(tries + 1), 100);
+    return;
+  }
+
+  const orig = em.setVolume;
+  em.setVolume = (t) => {
+    volumeRoute.setGain(t);
+    return orig.call(em, t);
+  };
+
+  if (shouldLiftToFull(readMarker())) {
+    // 지금까지 음량 값이 무효라 게임이 100% 로 울렸다. 고친 순간 절반이 되면 사용자에겐
+    // 고장으로 보인다 — 딱 한 번 최대로 올려 표시와 소리를 맞춘다.
+    em.volume = 1;
+    em.setVolume(1);
+    try { localStorage.setItem(VOLUME_LIFTED_KEY, '1'); } catch { /* 못 남겨도 소리는 난다 */ }
+    return;
+  }
+  // loadSettings 가 우리보다 먼저 setVolume 을 부르고 지나갔을 수 있다 — 현재 값을 한 번 적용.
+  em.setVolume(em.muted ? 0 : (typeof em.volume === 'number' ? em.volume : 1));
 }
 
 // 방향키·스페이스가 **문서를 스크롤하지 않게** 막는다 (#123).
@@ -238,6 +287,7 @@ async function start() {
     const btn = window.EJS_emulator?.elements?.bottomBar?.contextMenu?.[0];
     if (btn) btn.style.setProperty('display', 'none', 'important');
     watchLoadFailure();
+    hookVolume();
   };
 
   if (legacySave) restoreLegacySaves();
