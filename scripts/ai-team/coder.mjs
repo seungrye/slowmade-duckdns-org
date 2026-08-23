@@ -20,15 +20,24 @@
 //          (구현이 딸려 왔으면 되돌린 뒤 잰다. 그래야 "구현 없이 실패하는가"를 재는 것이 된다)
 //   2단계  --continue 로 구현하게 한다 → 전체를 돌린다 → **반드시 통과해야 한다**
 //
-// 코더가 TDD 를 건너뛸 방법이 없다. 빨강 출력은 RED.txt 로 남겨 PR 본문에 붙인다.
+// 코더가 TDD 를 건너뛸 방법이 없다. 빨강 출력은 /tmp 에 남겨 PR 본문에 붙인다
+// (워크트리 밖이라 커밋되지 않고, 작업 공간을 지워도 남는다).
 //
 // ── 왜 워크트리인가 ─────────────────────────────────────────────────────
 //
 // `~/site` 의 작업트리는 **실서비스가 그대로 읽는다**(webapp/public/). 거기 쓰면 검증 전
 // 코드가 라이브가 된다 — 실제로 겪었다. 그래서 별도 워크트리에서만 쓴다.
 //
+// ── 작업 공간은 일회용이다 ──────────────────────────────────────────────
+//
+// 남길 가치가 있는 것은 **커밋**이지 체크아웃이 아니다. 그래서 `/tmp` 에 만들고, 초록까지
+// 끝나면 브랜치를 origin 에 push 한 뒤 폴더를 지운다 — push 했으므로 지워도 잃는 것이 없다.
+// **실패하면 남긴다.** 무엇을 시도했는지 봐야 한다.
+//
+// push 는 하되 PR·머지는 하지 않는다. 브랜치는 검수 대상이지 반영이 아니다.
+//
 // 사용:
-//   node coder.mjs --spec spec.md [--worktree <경로>] [--branch <이름>]
+//   node coder.mjs --spec spec.md [--worktree <경로>] [--branch <이름>] [--keep]
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -109,8 +118,11 @@ function opencode(worktree, model, message, cont) {
 // ── 본문 ────────────────────────────────────────────────────────────────
 
 const specPath = arg('spec') ?? die('--spec <파일> 이 필요합니다.');
-const worktree = resolve(arg('worktree', '/home/seungrye/site-coder'));
-const branch = arg('branch', `coder/${Date.now()}`);
+const stamp = Date.now();
+// /tmp 는 tmpfs 라 재부팅 시 알아서 비고, 홈에 체크아웃이 쌓이지 않는다.
+const worktree = resolve(arg('worktree', `/tmp/ai-coder-${stamp}`));
+const branch = arg('branch', `coder/${stamp}`);
+const keep = process.argv.includes('--keep');
 const model = process.env.AI_CODER_MODEL?.trim() || DEFAULT_MODEL;
 
 if (worktree === resolve(REPO)) die('워크트리가 실서비스 작업트리와 같습니다.');
@@ -167,10 +179,13 @@ if (strays.length) {
 const red = runTests(worktree, testFiles.map((p) => p.replace(/^webapp\//, '')));
 if (red.ok) {
   console.error(red.output.slice(-2000));
-  die('구현 없이도 테스트가 통과했습니다 — 아무것도 잡지 못하는 테스트입니다. 거부합니다.');
+  die(`구현 없이도 테스트가 통과했습니다 — 아무것도 잡지 못하는 테스트입니다. 거부합니다.\n[coder] 작업 공간을 남겼습니다: ${worktree}`);
 }
 log('   빨강 확인 ✓');
-writeFileSync(join(worktree, 'RED.txt'), red.output, 'utf8');
+// 워크트리 **밖**에 쓴다 — 검증 산출물이지 소스가 아니라 커밋되면 안 되고,
+// 작업 공간을 지운 뒤에도 남아 있어야 PR 본문에 붙일 수 있다.
+const redFile = `/tmp/ai-coder-${stamp}-RED.txt`;
+writeFileSync(redFile, red.output, 'utf8');
 
 // 4) 2단계 — 구현.
 log('2단계: 통과하도록 구현');
@@ -185,18 +200,31 @@ log('   전체 스위트 확인');
 const green = runTests(worktree, []);
 if (!green.ok) {
   console.error(green.output.slice(-3000));
-  die('구현을 적용해도 전체가 통과하지 않습니다. 워크트리를 남겨 두니 확인하세요.');
+  die(`구현을 적용해도 전체가 통과하지 않습니다.\n[coder] 작업 공간을 남겼습니다: ${worktree}`);
 }
 log('   초록 확인 ✓');
 
-// 6) 커밋만. 푸시·PR·머지는 사람 검수 뒤의 일이다.
+// 6) 커밋 → push → 작업 공간 정리.
 sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
 sh('git', ['commit', '-q', '-m', `coder: ${spec.split('\n')[0].slice(0, 72)}`], {
   cwd: worktree, stdio: 'pipe',
 });
 const sha = sh('git', ['rev-parse', '--short', 'HEAD'], { cwd: worktree }).trim();
 
+// push 해야 작업 공간을 지워도 잃는 것이 없다. PR·머지는 하지 않는다 —
+// 브랜치는 검수 대상이지 반영이 아니다.
+log(`push: origin/${branch}`);
+sh('git', ['push', '-q', '-u', 'origin', branch], { cwd: worktree, stdio: 'pipe' });
+
+if (keep) {
+  log(`작업 공간을 남깁니다(--keep): ${worktree}`);
+} else {
+  sh('git', ['worktree', 'remove', '--force', worktree], { cwd: REPO, stdio: 'pipe' });
+  sh('git', ['worktree', 'prune'], { cwd: REPO, stdio: 'pipe' });
+  log(`작업 공간 제거: ${worktree}`);
+}
+
 log('');
-log(`완료 — ${worktree} 의 ${branch} 에 ${sha} 커밋`);
-log(`빨강 출력은 ${join(worktree, 'RED.txt')} 에 남겼습니다 (PR 본문에 붙이세요).`);
-log('푸시·PR 은 하지 않았습니다.');
+log(`완료 — origin/${branch} 에 ${sha}`);
+log(`빨강 증거: ${redFile}  (PR 본문에 붙이세요)`);
+log('PR·머지는 하지 않았습니다.');
