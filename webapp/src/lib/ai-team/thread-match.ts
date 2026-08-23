@@ -15,6 +15,20 @@
 /** 요청 글임을 나타내는 태그. 제목 키워드보다 낫다 — 이미 인덱스가 있고 오타 위험이 적다. */
 export const AI_TEAM_TAG = 'ai-req';
 
+/**
+ * 끝난 요청 표시 (#213).
+ *
+ * 완료 개념이 없던 동안, 한 번 `ai-req` 를 단 글은 **영원히** 목록에 나왔다. 주인이
+ * "고마워" 한 마디만 달아도 마지막 덧글이 사람 것이 되어 다음 밤에 또 응답했다.
+ *
+ * **요청 태그를 떼는 게 아니라 이걸 더한다.** 떼면 그 글이 요청이었다는 흔적이 사라지고,
+ * 다시 열려면 뭘 붙여야 했는지 기억해야 한다. 더하는 방식이면 되돌리기는 이것만 빼면 된다.
+ *
+ * 닫는 주체는 **사람**이다. AI 가 스스로 닫으면 성급하게 닫을 위험이 있고, 자율성 (A) 상
+ * AI 는 덧글만 단다 — 대신 "닫으시려면 이 태그를 붙여주세요" 라고 안내한다.
+ */
+export const AI_DONE_TAG = 'ai-done';
+
 export interface AiTeamPostFields {
   userEmail?: string;
   isPrivate?: boolean;
@@ -22,9 +36,15 @@ export interface AiTeamPostFields {
   tags?: string[];
 }
 
-/** `^ai-req$` — `ai-req-2` 같은 이웃 태그에 걸리지 않게 양 끝을 묶는다. */
-function tagPattern(): RegExp {
-  return new RegExp(`^${AI_TEAM_TAG}$`, 'iu');
+/** `^<태그>$` — `ai-req-2` 같은 이웃 태그에 걸리지 않게 양 끝을 묶는다. */
+function tagPattern(tag: string): RegExp {
+  return new RegExp(`^${tag}$`, 'iu');
+}
+
+/** 문서가 이 태그를 달고 있나 — 대소문자·앞뒤 공백 무시. */
+function hasTag(post: AiTeamPostFields, tag: string): boolean {
+  const tags = Array.isArray(post.tags) ? post.tags : [];
+  return tags.some((t) => typeof t === 'string' && t.trim().toLowerCase() === tag);
 }
 
 /**
@@ -41,7 +61,13 @@ export function aiTeamPostFilter(ownerEmail: string): Record<string, unknown> {
     userEmail: ownerEmail,
     isPrivate: true,
     isDeleted: { $ne: true },
-    tags: tagPattern(),
+    // 한 키(`tags`)에 조건이 둘이라 `$and` 로 묶는다.
+    // 배열 필드에 `$not` + 정규식이면 "**어느 원소도** 맞지 않는 문서"가 걸린다.
+    // 이건 틀리면 조용히 전부 반환하거나 전부 막으므로 실제 mongo 로 확인했다(#213).
+    $and: [
+      { tags: tagPattern(AI_TEAM_TAG) },
+      { tags: { $not: tagPattern(AI_DONE_TAG) } },
+    ],
   };
 }
 
@@ -61,6 +87,7 @@ export function isAiTeamPost(
   // 빈 문자열끼리 맞아떨어져 주인으로 오인되지 않게 값이 있는지부터 본다.
   if (!post.userEmail || post.userEmail !== ownerEmail) return false;
 
-  const tags = Array.isArray(post.tags) ? post.tags : [];
-  return tags.some((t) => typeof t === 'string' && t.trim().toLowerCase() === AI_TEAM_TAG);
+  if (!hasTag(post, AI_TEAM_TAG)) return false;
+  // 끝난 요청은 다시 열지 않는다 (#213).
+  return !hasTag(post, AI_DONE_TAG);
 }
