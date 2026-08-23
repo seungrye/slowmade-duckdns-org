@@ -37,7 +37,31 @@ export default function CommentContent({ content }: { content: string }) {
           ),
           p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
           ul: ({ children }) => <ul className="list-disc ml-5 my-1">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal ml-5 my-1">{children}</ol>,
+          // `start` 를 넘겨야 한다 (#220). 마크다운에서 `4.` 로 시작하는 문단은
+          // <ol start="4"> 로 파싱되는데, 그걸 버리면 CSS 카운터가 매번 1부터 다시 센다
+          // — 항목이 전부 "1." 로 보였다.
+          ol: ({ children, start }) => (
+            <ol start={start} className="list-decimal ml-5 my-1">
+              {children}
+            </ol>
+          ),
+          // Tailwind v4 Preflight 가 제목의 크기·굵기를 지운다. 매핑이 없으면 본문과
+          // 똑같이 보인다 (globals.css 에 .comment-markdown 기본 스타일도 없다).
+          h1: ({ children }) => <h1 className="text-xl font-bold mt-3 mb-1">{children}</h1>,
+          h2: ({ children }) => <h2 className="text-lg font-bold mt-3 mb-1">{children}</h2>,
+          h3: ({ children }) => <h3 className="text-base font-semibold mt-2 mb-1">{children}</h3>,
+          h4: ({ children }) => <h4 className="text-sm font-semibold mt-2 mb-1">{children}</h4>,
+          h5: ({ children }) => <h5 className="text-sm font-semibold mt-2 mb-1">{children}</h5>,
+          h6: ({ children }) => <h6 className="text-sm font-semibold mt-2 mb-1">{children}</h6>,
+          // 코드블록. `pre` 매핑이 없으면 여러 줄 코드가 아래 인라인용 알약 스타일을
+          // 그대로 뒤집어써 뭉개진다. 블록 껍데기는 여기서 입히고, 안쪽 code 의 알약
+          // 배경·여백은 되돌린다 — inline 여부를 code 쪽에서 판별하는 것보다 확실하다
+          // (언어 표기가 없는 펜스는 className 이 비어 있어 구분이 안 된다).
+          pre: ({ children }) => (
+            <pre className="overflow-x-auto my-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit">
+              {children}
+            </pre>
+          ),
           code: ({ children }) => (
             <code className="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono">
               {children}
