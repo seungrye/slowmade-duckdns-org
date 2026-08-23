@@ -2,38 +2,16 @@ import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { connectToDB } from "@/lib/db";
 import UserModel from "@/models/user";
-import { saveGoogleRefreshToken } from "@/lib/google/refresh-token-store";
 import { env } from "@/lib/env";
 
-/**
- * 매매기록을 구글 시트로 내보내려면 구글 API 를 부를 수 있어야 한다 (#181).
- *
- * `drive.file` 은 **앱이 만든 파일만** 다루는 비민감 범위다 — 사용자의 기존 드라이브에는
- * 손대지 못하고, 그래서 구글 검증 심사도 없다.
- *
- * `prompt: consent` 를 강제하는 이유: 구글은 **첫 동의 때만** refresh token 을 준다.
- * 강제하지 않으면 이미 동의한 계정에서 토큰이 오지 않아 기능이 조용히 죽는다.
- *
- * **플래그가 꺼져 있으면 아무것도 얹지 않는다** — 로그인 동작이 종전과 완전히 같다.
- * GCP 쪽 준비(Sheets·Drive API 사용 설정, 동의 화면 범위 추가)가 끝나기 전에 켜면
- * 로그인이 막혀 관리자 화면에 못 들어간다.
- */
-const googleAuthorization = env.google.sheetsExport
-  ? {
-      params: {
-        scope: "openid email profile https://www.googleapis.com/auth/drive.file",
-        access_type: "offline",
-        prompt: "consent",
-      },
-    }
-  : undefined;
-
+// 구글 시트 내보내기(#181)가 제거되면서 `drive.file` 범위와 refresh token 저장도 함께
+// 걷어냈다 (#228). 그 분기는 `GOOGLE_SHEETS_EXPORT` 가 켜져야 동작했는데 한 번도 켜진 적이
+// 없어, 로그인은 처음부터 기본 범위로만 돌고 있었다 — 즉 동작이 바뀌지 않는다.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     GoogleProvider({
       clientId: env.google.clientId,
       clientSecret: env.google.clientSecret,
-      authorization: googleAuthorization,
     }),
   ],
   callbacks: {
@@ -61,7 +39,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       await existingUser.save();
-      await saveGoogleRefreshToken(user.email, account);
       return true;
     },
 
