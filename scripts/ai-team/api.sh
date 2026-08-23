@@ -25,6 +25,7 @@
 #   api.sh threads
 #   api.sh thread <postId>
 #   api.sh comment <postId> <persona> <내용> [parentId]
+#   api.sh done <postId>              ← 끝난 요청 닫기 (#222)
 set -euo pipefail
 
 BASE="${AI_TEAM_BASE_URL:-https://handmade.r-e.kr}"
@@ -69,7 +70,16 @@ print(json.dumps(d, ensure_ascii=False))
     call -X POST -H 'Content-Type: application/json' -d "$payload" "$BASE/api/ai-team/comment"
     ;;
 
+  done)
+    id="${1:-}"
+    [[ -n "$id" ]] || die "사용법: api.sh done <postId>"
+    # 태그를 실어 보내지 않는다 — 서버가 ai-done 하나만 더한다(close/route.ts 주석 참고).
+    # postId 형식 검사도 서버가 한다.
+    call -X POST -H 'Content-Type: application/json' \
+      -d "$(printf '{"postId":"%s"}' "$id")" "$BASE/api/ai-team/close"
+    ;;
+
   *)
-    die "알 수 없는 명령: '${cmd}'. threads | thread | comment 중 하나여야 합니다."
+    die "알 수 없는 명령: '${cmd}'. threads | thread | comment | done 중 하나여야 합니다."
     ;;
 esac
