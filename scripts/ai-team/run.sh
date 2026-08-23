@@ -36,6 +36,11 @@ AI_TEAM_KEY="${AI_TEAM_KEY%\'}"; AI_TEAM_KEY="${AI_TEAM_KEY#\'}"    # '값' 따�
 [[ -n "$AI_TEAM_KEY" ]] || die "AI_TEAM_KEY 가 $ENV_FILE 에 없습니다. 설정 전에는 API 가 404 로 닫혀 있습니다."
 export AI_TEAM_KEY AI_TEAM_BASE_URL="$BASE_URL"
 
+# 모델은 curl 을 직접 부르지 않는다 — 래퍼 하나만 쓴다 (#215). 이유는 api.sh 주석 참고:
+# 셸 변수가 든 명령은 권한 규칙을 통과하지 못하고, 키를 명령줄에 박으면 로그에 남는다.
+API="$SITE_DIR/scripts/ai-team/api.sh"
+[[ -x "$API" ]] || die "래퍼를 실행할 수 없습니다: $API"
+
 log "요청 스레드 확인 — $BASE_URL"
 
 PROMPT=$(cat <<'PROMPT_END'
@@ -43,16 +48,21 @@ PROMPT=$(cat <<'PROMPT_END'
 
 ## 오늘 할 일
 
-1. 열린 요청 스레드를 가져옵니다:
-   curl -sS -H "x-ai-team-key: $AI_TEAM_KEY" "$AI_TEAM_BASE_URL/api/ai-team/threads"
+사이트와는 **아래 세 명령으로만** 이야기합니다. 다른 방법으로 부르지 마세요 —
+셸 변수(달러 기호)가 들어간 명령은 권한 규칙에 막혀 실행되지 않습니다. 값은 **그대로**
+적으세요. 인증은 래퍼가 알아서 합니다.
 
-2. 각 스레드를 읽습니다:
-   curl -sS -H "x-ai-team-key: $AI_TEAM_KEY" "$AI_TEAM_BASE_URL/api/ai-team/thread?postId=<id>"
+1. 열린 요청 목록:
+   @API@ threads
 
-3. 응답이 필요한 스레드에 덧글을 답니다:
-   curl -sS -X POST -H "x-ai-team-key: $AI_TEAM_KEY" -H "Content-Type: application/json" \
-     -d '{"postId":"<id>","persona":"claude","content":"..."}' \
-     "$AI_TEAM_BASE_URL/api/ai-team/comment"
+2. 스레드 하나 읽기 (본문 + 지금까지의 덧글):
+   @API@ thread <postId>
+
+3. 덧글 달기 — 내용을 작은따옴표로 감싸면 여러 줄도 그대로 들어갑니다:
+   @API@ comment <postId> claude '내용을 여기에'
+
+   답글로 달려면 마지막에 parentId 를 하나 더 붙입니다:
+   @API@ comment <postId> claude '내용' <parentId>
 
 ## 응답 규칙
 
@@ -87,11 +97,14 @@ PROMPT=$(cat <<'PROMPT_END'
 - 사람의 결정이 필요한 것을 대신 결정하지 않습니다 — 선택지를 정리해 두고 물어보세요.
 PROMPT_END
 )
+# 프롬프트는 확장이 일어나지 않는 heredoc 으로 쓴다(달러 기호가 섞이면 안 되므로).
+# 래퍼 경로만 자리표시자로 끼워 넣는다 — 비밀이 아니라 경로다.
+PROMPT="${PROMPT//@API@/$API}"
 
 claude -p "$PROMPT" \
     --add-dir "$SITE_DIR" \
     --disallowedTools Edit Write NotebookEdit \
-    --allowedTools Read Grep Glob "Bash(curl *)" "Bash(git log*)" "Bash(git diff*)" "Bash(git status*)" \
+    --allowedTools Read Grep Glob "Bash($API *)" "Bash(git log*)" "Bash(git diff*)" "Bash(git status*)" \
     --permission-mode dontAsk
 
 log "완료"
