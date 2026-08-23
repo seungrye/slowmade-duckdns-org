@@ -13,8 +13,14 @@ import Post from '@/models/post';
 import { isObjectIdLike, requireAiTeam } from '@/lib/ai-team/guard';
 import { aiTeamPostFilter, isAiTeamPost, type AiTeamPostFields } from '@/lib/ai-team/thread-match';
 
-/** 쓸 수 있는 이름은 이 둘뿐 — 키를 쥐었다고 아무 이름으로나 글을 쓸 수 없다. */
-const PERSONAS = ['claude', 'minimax'] as const;
+/**
+ * 쓸 수 있는 이름은 이 둘뿐 — 키를 쥐었다고 아무 이름으로나 글을 쓸 수 없다.
+ *
+ * `minimax` 였던 자리를 `coder` 로 바꿨다 (#222). 코더 모델을 OpenRouter 의
+ * `stealth/ox-alpha` 로 정하면서 페르소나 이름이 특정 벤더에 묶여 있을 이유가 없어졌다.
+ * 모델은 언제든 갈릴 수 있지만 **역할은 그대로**다.
+ */
+const PERSONAS = ['claude', 'coder'] as const;
 
 /** 사람 덧글(`/api/comments`)과 같은 한도. */
 const MAX_CONTENT = 5000;

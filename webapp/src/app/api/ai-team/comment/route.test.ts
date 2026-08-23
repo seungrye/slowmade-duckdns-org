@@ -135,10 +135,17 @@ describe('POST /api/ai-team/comment', () => {
     );
   });
 
-  it('minimax 도 쓸 수 있다', async () => {
-    const res = await POST(req({ ...OK, persona: 'minimax' }));
+  it('coder 도 쓸 수 있다', async () => {
+    const res = await POST(req({ ...OK, persona: 'coder' }));
     expect(res.status).toBe(201);
-    expect(mockCommentCtor).toHaveBeenCalledWith(expect.objectContaining({ author: 'minimax' }));
+    expect(mockCommentCtor).toHaveBeenCalledWith(expect.objectContaining({ author: 'coder' }));
+  });
+
+  // 코더 모델을 Ox Alpha 로 정하면서 페르소나가 특정 벤더에 묶일 이유가 없어졌다 (#222).
+  it('minimax 는 더 이상 허용하지 않는다', async () => {
+    const res = await POST(req({ ...OK, persona: 'minimax' }));
+    expect(res.status).toBe(400);
+    expect(mockCommentSave).not.toHaveBeenCalled();
   });
 
   it('parentId 를 주면 답글로 달린다', async () => {
