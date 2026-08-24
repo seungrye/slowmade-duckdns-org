@@ -23,9 +23,12 @@ export default async function NotificationsPage() {
   const now = new Date();
 
   return (
-    // 루트 레이아웃(app/layout.tsx)이 이미 <main> 으로 감싼다 — 여기서 또 쓰면 main 이
-    // 중첩되고(HTML 위반), 안쪽 mx-auto 가 바깥 컨테이너 기준으로 정렬돼 왼쪽으로 쏠린다(#239).
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    // 루트 레이아웃이 이미 <main> 으로 감싸므로 여기선 div (main 중첩 금지, #239).
+    //
+    // 폭에 상한을 두되 **가운데로 몰지 않는다**(#241). mx-auto 를 주면 넓은 화면에서 혼자
+    // 안쪽으로 밀려 사이트의 좌측 라인과 어긋나고, 상한을 아예 빼면 한 항목이 1500px 를
+    // 가로질러 이름과 시각이 화면 양 끝으로 갈라진다. 좌측 정렬 + 읽기 폭이 맞다.
+    <div className="max-w-3xl px-4 py-8">
       {/* 목록을 그린 뒤에 읽음 처리 — 그래야 무엇이 새 것이었는지 보인다. */}
       <MarkSeen />
 
@@ -61,7 +64,8 @@ export default async function NotificationsPage() {
                       {n.author}
                       {n.isBot && <span className="ml-1 text-xs text-blue-500">✨</span>}
                     </span>
-                    <span className="ml-auto shrink-0 text-xs text-gray-500 dark:text-gray-400">
+                    {/* ml-auto 를 쓰면 넓은 화면에서 시각이 화면 끝까지 밀려 이름과 갈라진다(#241). */}
+                    <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400">
                       {n.createdAt ? relativeTime(n.createdAt, now) : ''}
                     </span>
                   </span>

@@ -7,6 +7,7 @@ import { buildArticleJsonLd } from './article-json-ld';
 import { buildPostMetadata } from './build-post-metadata';
 import { env } from '@/lib/env';
 import PrivatePostGate from './private-post-gate';
+import CommentAnchor from './comment-anchor.client';
 
 type Params = Promise<{ id: string[] }>
 
@@ -65,7 +66,8 @@ export default async function PostViewer(props: { params: Params }) {
 
     const post = await loadPublicPost(_id);
     // 공개로 못 찾으면 비공개일 수 있으니 클라 게이트로(작성자 본인만 인증 렌더). 없는 글도 게이트가 '찾을 수 없음'.
-    if (!post) return <PrivatePostGate id={_id} />;
+    // 비공개 글도 앵커로 스크롤돼야 한다 — 알림의 주 대상이 비공개(AI 팀) 글이다 (#241).
+    if (!post) return <><CommentAnchor /><PrivatePostGate id={_id} /></>;
 
     const url = `${siteUrl}/post/view/${_id}`;
     const description = post.htmlContent
@@ -85,6 +87,7 @@ export default async function PostViewer(props: { params: Params }) {
 
     return (
         <>
+            <CommentAnchor />
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026') }}
