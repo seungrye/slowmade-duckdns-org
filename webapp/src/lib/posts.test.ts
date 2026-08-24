@@ -127,3 +127,50 @@ describe('__getAllTags — 태그 클라우드 비공개 처리', () => {
     expect(firstMatch().isDeleted).toEqual({ $ne: true });
   });
 });
+
+// 메인 화면 제목 검색 (#232).
+//
+// __fetchPosts 는 원래부터 query 로 제목을 걸렀지만 밖으로 노출돼 있지 않았고,
+// **사용자 입력을 정규식으로 그대로** 썼다. 검색창을 붙이는 순간 `(` 하나로 500 이 난다.
+describe('getPaginatedPosts — 제목 검색', () => {
+  beforeEach(() => {
+    (Post.aggregate as Mock).mockClear();
+    (Post.aggregate as Mock).mockResolvedValue([{ posts: [], total: 0 }]);
+  });
+
+  function firstMatch(): Record<string, unknown> {
+    const pipeline = (Post.aggregate as Mock).mock.calls[0][0] as Record<string, unknown>[];
+    const stage = pipeline.find((s) => '$match' in s) as { $match: Record<string, unknown> };
+    return stage.$match;
+  }
+
+  it('검색어가 없으면 title 조건을 붙이지 않는다', async () => {
+    await getPaginatedPosts(1, 9, 'latest', null, true, null);
+    expect(firstMatch().title).toBeUndefined();
+  });
+
+  it('검색어를 주면 제목으로 거른다', async () => {
+    await getPaginatedPosts(1, 9, 'latest', null, true, null, '고양이');
+    expect(firstMatch().title).toEqual({ $regex: '고양이', $options: 'i' });
+  });
+
+  // 이스케이프가 없으면 `(` 하나로 잘못된 정규식이 되어 500 이 난다.
+  it('정규식 특수문자를 이스케이프한다', async () => {
+    await getPaginatedPosts(1, 9, 'latest', null, true, null, 'a(b');
+    expect((firstMatch().title as { $regex: string }).$regex).toBe('a\\(b');
+  });
+
+  it('와일드카드로 쓰이지 않게 .* 도 이스케이프한다', async () => {
+    await getPaginatedPosts(1, 9, 'latest', null, true, null, '.*');
+    expect((firstMatch().title as { $regex: string }).$regex).toBe('\\.\\*');
+  });
+
+  // 검색으로 남의 비공개 글이 새면 안 된다.
+  it('검색 중에도 비공개 규칙이 그대로 붙는다', async () => {
+    await getPaginatedPosts(1, 9, 'latest', null, true, 'me@x.test', '고양이');
+    expect(firstMatch().$or).toEqual([
+      { isPrivate: { $ne: true } },
+      { userEmail: 'me@x.test' },
+    ]);
+  });
+});

@@ -42,7 +42,9 @@ async function __fetchPosts(params: SetPostQuery): Promise<{
   }
 
   if (query) {
-    matchStage.$match.title = { $regex: query, $options: "i" };
+    // **반드시 이스케이프한다** (#232). 사용자가 친 글자를 정규식으로 그대로 쓰면
+    // `(` 하나로 잘못된 정규식이 되어 500 이 나고, `.*` 는 와일드카드로 동작한다.
+    matchStage.$match.title = { $regex: escapeRegex(query), $options: "i" };
   }
 
   const pipeline: PipelineStage[] = [matchStage];
@@ -204,7 +206,11 @@ export async function getAllTags(
   return __getAllTags(viewerEmail);
 }
 
-export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false, viewerEmail: string | null | undefined = null): Promise<{
+/**
+ * @param query 제목 검색어 (#232). **맨 뒤 선택 인자**라 기존 호출부는 그대로 둔다.
+ *   공백만이면 없는 것으로 친다 — 검색창을 비웠을 때 전체 목록으로 돌아와야 한다.
+ */
+export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false, viewerEmail: string | null | undefined = null, query: string | null | undefined = null): Promise<{
   total: number;
   posts: GetPostType[];
 }> {
@@ -216,22 +222,13 @@ export async function getPaginatedPosts(page: number, limit: number, sort: SortO
     withComments: withComments || false,
     userEmail: userEmail || undefined,
     viewerEmail: viewerEmail || undefined,
+    query: query?.trim() || undefined,
   });
 }
 
-export async function searchPosts(query: string, sort: SortOption = 'latest', withComments: boolean = false): Promise<{
-  total: number;
-  posts: GetPostType[];
-}> {
-  await connectToDB();
-  return __fetchPosts({
-    page: 1,
-    limit: 12,
-    query: query || '',
-    sort: sort || 'latest',
-    withComments: withComments || false,
-  });
-}
+// `searchPosts` 는 제거했다 (#232). 부르는 곳이 없는 죽은 코드였고, `getPaginatedPosts`
+// 와 같은 일을 하면서 **viewerEmail 을 받지 않아 작성자 본인의 비공개 글을 못 찾았다.**
+// 남겨 두면 나중에 검색을 붙일 때 이쪽이 배선될 위험이 있다.
 
 export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', page: number, limit: number, withComments: boolean = false): Promise<{
   total: number;
