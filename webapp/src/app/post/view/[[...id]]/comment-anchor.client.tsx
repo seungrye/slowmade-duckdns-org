@@ -8,7 +8,7 @@
 //
 // 못 찾아도 **섹션에는 이미 도착해 있다.** 예전처럼 아무 데도 못 가는 일이 없다.
 import { useEffect } from 'react';
-import { targetCommentId } from '@/lib/comment-anchor';
+import { targetCommentId, scrollTopFor } from '@/lib/comment-anchor';
 
 /** 덧글이 안 나타날 때 관찰을 접는 상한. 비공개 글은 클라이언트에서 늦게 그려진다. */
 const MAX_WAIT_MS = 5000;
@@ -23,7 +23,12 @@ export default function CommentAnchor() {
 
     let highlighted = false;
     const go = (el: HTMLElement) => {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      // 덧글 **상단**을 화면 2/5 지점에 (#255). scrollIntoView({block:'center'}) 는 요소
+      // 가운데를 맞추므로, 화면보다 긴 덧글이면 첫 줄이 화면 위로 밀려 올라간다.
+      window.scrollTo({
+        top: scrollTopFor(el.getBoundingClientRect().top, window.scrollY, window.innerHeight),
+        behavior: 'smooth',
+      });
       if (highlighted) return;
       highlighted = true;
       el.classList.add('ring-2', 'ring-blue-400', 'rounded-lg');
@@ -32,11 +37,11 @@ export default function CommentAnchor() {
 
     // 본문 렌더가 끝나면 이미지·리치 콘텐츠가 자리를 잡으면서 레이아웃이 밀린다. 그때 한 번
     // 더 맞춘다 — 안 그러면 먼저 맞춰 둔 위치가 어긋나 덧글이 화면 밖으로 나간다.
-    const recenter = () => {
+    const reposition = () => {
       const el = document.getElementById(targetId);
       if (el) go(el);
     };
-    window.addEventListener('richContentRendered', recenter);
+    window.addEventListener('richContentRendered', reposition);
 
     let observer: MutationObserver | undefined;
     const existing = document.getElementById(targetId);
@@ -54,7 +59,7 @@ export default function CommentAnchor() {
     return () => {
       observer?.disconnect();
       clearTimeout(timer);
-      window.removeEventListener('richContentRendered', recenter);
+      window.removeEventListener('richContentRendered', reposition);
     };
   }, []);
 
