@@ -21,26 +21,41 @@ export default function CommentAnchor() {
     const targetId = targetCommentId(window.location.search);
     if (!targetId) return;
 
-    let done = false;
+    let highlighted = false;
     const go = (el: HTMLElement) => {
-      if (done) return;
-      done = true;
       el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (highlighted) return;
+      highlighted = true;
       el.classList.add('ring-2', 'ring-blue-400', 'rounded-lg');
       setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'rounded-lg'), HIGHLIGHT_MS);
     };
 
-    const existing = document.getElementById(targetId);
-    if (existing) { go(existing); return; }
-
-    const observer = new MutationObserver(() => {
+    // 본문 렌더가 끝나면 이미지·리치 콘텐츠가 자리를 잡으면서 레이아웃이 밀린다. 그때 한 번
+    // 더 맞춘다 — 안 그러면 먼저 맞춰 둔 위치가 어긋나 덧글이 화면 밖으로 나간다.
+    const recenter = () => {
       const el = document.getElementById(targetId);
-      if (el) { observer.disconnect(); go(el); }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+      if (el) go(el);
+    };
+    window.addEventListener('richContentRendered', recenter);
 
-    const timer = setTimeout(() => observer.disconnect(), MAX_WAIT_MS);
-    return () => { observer.disconnect(); clearTimeout(timer); };
+    let observer: MutationObserver | undefined;
+    const existing = document.getElementById(targetId);
+    if (existing) {
+      go(existing);
+    } else {
+      observer = new MutationObserver(() => {
+        const el = document.getElementById(targetId);
+        if (el) { observer?.disconnect(); go(el); }
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    const timer = setTimeout(() => observer?.disconnect(), MAX_WAIT_MS);
+    return () => {
+      observer?.disconnect();
+      clearTimeout(timer);
+      window.removeEventListener('richContentRendered', recenter);
+    };
   }, []);
 
   return null;
