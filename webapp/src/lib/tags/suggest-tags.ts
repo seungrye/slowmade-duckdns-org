@@ -32,6 +32,46 @@ const GEMINI_VISION_CHAIN = [
 const MAX_IMAGES = 2;
 
 /**
+ * 기존 태그 목록에 쓸 글자 예산 (#251).
+ *
+ * 예전엔 `allTags.slice(0, 200)` 으로 **개수**를 잘랐다. 공개글 고유 태그가 396개라 196개는
+ * 모델이 아예 못 봤고, `__getAllTags` 에 `$sort` 가 없어 잘려 나가는 196개가 "덜 쓰이는 것"이
+ * 아니라 **임의로** 정해졌다 — 관련 있는 태그가 안 보이는 쪽에 있으면 재사용하고 싶어도 할 수
+ * 없다. (재사용 지시 자체는 잘 먹고 있었다: AI 태그 35개 중 32개가 사람도 쓰는 태그였다.)
+ *
+ * 전체 396개를 다 넣어도 3,336자다(실측). 그래서 지금은 **전부 싣는다.** 이 값은 태그가
+ * 수천 개로 늘어날 때를 위한 안전장치일 뿐이고, 잘릴 때는 적게 쓰인 것부터 잘린다.
+ */
+export const TAG_LIST_CHAR_BUDGET = 10_000;
+
+/** 목록을 이을 때 쓰는 구분자. 길이를 셀 때 이 길이도 함께 센다. */
+const TAG_SEPARATOR = ', ';
+
+/**
+ * 프롬프트에 실을 기존 태그 — 많이 쓰인 순으로, 예산 안에서 최대한 (#251).
+ *
+ * 예산을 넘겨 보내 봐야 모델 쪽에서 잘리므로 구분자까지 세어 여기서 맞춘다.
+ */
+export function fitTagsToBudget(
+  tags: { tag: string; count: number }[],
+  budget: number = TAG_LIST_CHAR_BUDGET,
+): string[] {
+  // 횟수가 같을 때 이름으로 한 번 더 가른다 — 집계 결과는 정렬돼 있지 않아서, 안 그러면
+  // 같은 데이터인데도 실행마다 프롬프트가 달라진다.
+  const sorted = [...tags].sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+
+  const out: string[] = [];
+  let used = 0;
+  for (const { tag } of sorted) {
+    const cost = out.length === 0 ? tag.length : TAG_SEPARATOR.length + tag.length;
+    if (used + cost > budget) break;
+    out.push(tag);
+    used += cost;
+  }
+  return out;
+}
+
+/**
  * 인라인으로 실어 보낼 상한. 넘으면 썸네일로 내려간다.
  *
  * 크기가 **비용을 좌우하지는 않는다** — 썸네일(16KB)과 원본(31KB)의 입력 토큰이 똑같이
@@ -162,7 +202,8 @@ async function callGeminiForTags(parts: TagPart[], chain: string[]): Promise<str
 export async function suggestTags(input: {
   title: string;
   htmlContent: string;
-  allTags: string[];
+  /** 기존 태그와 사용 횟수 (#251). 많이 쓰인 것부터 실어 재사용을 돕는다. */
+  allTags: { tag: string; count: number }[];
   userTags: string[];
   cap?: number;
   /** 글에 붙은 이미지 (#234). 제목·본문만으로는 안 나오는 태그가 여기서 나온다. */
@@ -171,7 +212,7 @@ export async function suggestTags(input: {
   if (!env.geminiApiKey) return [];
   const { title, htmlContent, allTags, userTags, cap = 5, imageUrls = [] } = input;
   const body = stripHtml(htmlContent).slice(0, 3000);
-  const existing = allTags.slice(0, 200).join(', ');
+  const existing = fitTagsToBudget(allTags).join(TAG_SEPARATOR);
 
   const inlineImages = (
     await Promise.all(imageUrls.slice(0, MAX_IMAGES).map(fetchInlineImage))
@@ -232,7 +273,8 @@ export async function generateAndUpdateTags(
   try {
     if (!env.geminiApiKey) return;
     await connectToDB();
-    const allTags = (await getAllTags()).map((t) => t.tag);
+    // 사용 횟수까지 그대로 넘긴다 (#251) — 많이 쓰인 태그를 앞에 실어야 재사용이 는다.
+    const allTags = await getAllTags();
     const newAi = await suggestTags({
       title: input.title,
       htmlContent: input.htmlContent,

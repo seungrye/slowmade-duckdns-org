@@ -13,7 +13,62 @@ vi.mock("@/models/post", () => ({ default: {} }));
 vi.mock("@/lib/db", () => ({ connectToDB: vi.fn() }));
 vi.mock("@/lib/posts", () => ({ getAllTags: vi.fn(async () => []) }));
 
-import { pickAiTags, suggestTags, triggerRevalidate } from "./suggest-tags";
+import {
+  pickAiTags,
+  suggestTags,
+  triggerRevalidate,
+  fitTagsToBudget,
+  TAG_LIST_CHAR_BUDGET,
+} from "./suggest-tags";
+
+// 기존 태그를 모델에 얼마나 보여줄 것인가 (#251).
+//
+// 예전엔 `allTags.slice(0, 200)` 이었다. 공개글 고유 태그가 396개라 **196개는 모델이 아예
+// 못 봤고**, __getAllTags 에 $sort 가 없어 잘려 나가는 196개가 "덜 쓰이는 것"이 아니라
+// 임의로 정해졌다. 관련 있는 태그가 안 보이는 쪽에 있으면 재사용하고 싶어도 할 수 없다.
+//
+// 전체 396개를 다 넣어도 3,336자다(실측) — 자를 이유가 없다. 예산은 태그가 수천 개로
+// 늘어날 때를 위한 안전장치일 뿐이고, 잘릴 때는 **적게 쓰인 것부터** 잘린다.
+describe("fitTagsToBudget — 프롬프트에 실을 기존 태그", () => {
+  const t = (tag: string, count: number) => ({ tag, count });
+
+  it("예산 안이면 하나도 안 버린다 — 지금 규모(396개·3.3천자)가 여기 해당한다", () => {
+    const many = Array.from({ length: 396 }, (_, i) => t(`태그${i}`, 1));
+    expect(fitTagsToBudget(many)).toHaveLength(396);
+  });
+
+  it("많이 쓰인 것부터 싣는다", () => {
+    expect(fitTagsToBudget([t("드묾", 1), t("흔함", 9), t("보통", 5)]))
+      .toEqual(["흔함", "보통", "드묾"]);
+  });
+
+  it("예산을 넘으면 적게 쓰인 것부터 버린다", () => {
+    expect(fitTagsToBudget([t("aaaa", 9), t("bbbb", 5), t("cccc", 1)], 10))
+      .toEqual(["aaaa", "bbbb"]); // "aaaa, bbbb" = 10자
+  });
+
+  it("구분자까지 세어 예산을 지킨다 — 넘겨 놓고 잘리면 의미가 없다", () => {
+    expect(fitTagsToBudget([t("aaaa", 9), t("bbbb", 5)], 9)).toEqual(["aaaa"]);
+  });
+
+  it("빈 목록은 빈 결과", () => {
+    expect(fitTagsToBudget([])).toEqual([]);
+  });
+
+  it("첫 태그 하나도 예산을 넘으면 빈 결과 — 반쪽 태그를 싣지 않는다", () => {
+    expect(fitTagsToBudget([t("아주긴태그", 9)], 3)).toEqual([]);
+  });
+
+  it("사용 횟수가 같으면 순서가 흔들리지 않는다", () => {
+    const a = fitTagsToBudget([t("나", 3), t("가", 3), t("다", 3)]);
+    const b = fitTagsToBudget([t("다", 3), t("가", 3), t("나", 3)]);
+    expect(a).toEqual(b);
+  });
+
+  it("기본 예산은 지금 태그 전체(3,336자)보다 넉넉하다", () => {
+    expect(TAG_LIST_CHAR_BUDGET).toBeGreaterThan(3336);
+  });
+});
 
 describe("pickAiTags — Gemini 응답 → 태그 배열", () => {
   it("JSON 배열 파싱 + 사용자중복 제외(사람 우선) + dedup", () => {
@@ -160,6 +215,24 @@ describe("suggestTags — 이미지까지 보기", () => {
     expect(parts().filter((p) => "inlineData" in p)).toHaveLength(0);
     // 이미지가 없는 셈이므로 기존 체인으로 돌아간다.
     expect(models()[0]).toBe("gemma-4-31b-it");
+  });
+
+  // #251 — 200개 상한 때문에 모델이 절반을 못 보던 것을 고쳤다.
+  it("기존 태그를 잘라내지 않고 전부 프롬프트에 싣는다", async () => {
+    const allTags = Array.from({ length: 396 }, (_, i) => ({ tag: `태그${i}`, count: 1 }));
+    await suggestTags({ title: "t", htmlContent: "<p>본문</p>", allTags, userTags: [] });
+    const text = (parts()[0] as { text: string }).text;
+    expect(text).toContain("태그0");
+    expect(text).toContain("태그395"); // 예전엔 200번째 이후가 통째로 빠졌다
+  });
+
+  it("많이 쓰인 태그를 앞에 싣는다", async () => {
+    await suggestTags({
+      title: "t", htmlContent: "<p>본문</p>", userTags: [],
+      allTags: [{ tag: "드묾", count: 1 }, { tag: "흔함", count: 9 }],
+    });
+    const text = (parts()[0] as { text: string }).text;
+    expect(text.indexOf("흔함")).toBeLessThan(text.indexOf("드묾"));
   });
 
   it("이미지는 최대 2장만 보낸다", async () => {
