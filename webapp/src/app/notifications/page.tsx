@@ -18,6 +18,7 @@ import { relativeTime } from '@/lib/relative-time';
 import { notificationHref } from '@/lib/comment-anchor';
 import NotificationLink from './notification-link';
 import MarkAllRead from './mark-all-read';
+import RefreshOnReturn from './refresh-on-return';
 
 export const metadata: Metadata = { title: '알림' };
 
@@ -35,6 +36,9 @@ export default async function NotificationsPage() {
     // 좁게 나온다. 예전에 상한을 빼자 항목이 화면을 가로지른 적이 있는데(#241) 그 원인은
     // 폭이 아니라 시각의 ml-auto 였고 이미 고쳤다.
     <div className="lg:container mx-auto px-4 py-8">
+      {/* 눌러서 읽은 뒤 돌아오면 목록을 다시 받아온다 (#259). */}
+      <RefreshOnReturn />
+
       <div className="mb-4 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
           알림
@@ -58,6 +62,7 @@ export default async function NotificationsPage() {
               <NotificationLink
                 href={notificationHref(n.postId, n.id)}
                 id={n.id}
+                isUnread={n.isUnread}
                 // 안 읽음은 배경 틴트 + 왼쪽 파란 띠로 구분한다 (#247). 점·굵은 글씨만으로는
                 // 훑을 때 눈에 안 들어왔다. 읽은 항목도 같은 두께의 투명 띠를 둬서 글이
                 // 좌우로 밀리지 않게 한다.
