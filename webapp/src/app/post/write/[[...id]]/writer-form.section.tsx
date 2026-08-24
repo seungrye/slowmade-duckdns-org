@@ -53,7 +53,15 @@ export default function PostWriterForm() {
     // 수정 글에서 '저장본으로 되돌리기' 를 누르면 다시 불러오게 하는 방아쇠.
     const [reloadToken, setReloadToken] = useState(0);
 
+    // 제출에 성공했으면 더는 담지 않는다 (#257).
+    //
+    // 삭제만으로는 부족하다 — 아래 정리 훅이 **화면을 벗어날 때** 초안을 담으므로, 지워도
+    // 홈으로 이동하는 순간 방금 제출한 내용이 다시 기록된다. 실제로 그랬다: 정상 제출 후
+    // 글쓰기에 들어가면 올린 글이 "작성 중이던 내용" 으로 되살아났다.
+    const submittedRef = useRef(false);
+
     const saveDraft = useCallback(() => {
+        if (submittedRef.current) return;
         // **에디터가 아직 없으면 본문을 건드리지 않는다** (#201).
         // `immediatelyRender: false` 라 첫 렌더에는 내부 editor 가 없고, 그때 `getContent()` 는
         // 빈 값을 준다. 그대로 담으면 멀쩡히 저장돼 있던 본문을 `null` 로 덮어 **초안에서
@@ -265,6 +273,10 @@ export default function PostWriterForm() {
 
             if (response.ok) {
                 const result = await response.json();
+                // 올라갔으니 초안은 역할이 끝났다 (#257). 담는 것부터 멈추고 지운다 —
+                // 순서가 중요하다. 먼저 지우면 이어지는 정리 훅이 다시 써 버린다.
+                submittedRef.current = true;
+                try { localStorage.removeItem(storageKey); } catch { /* 무시 */ }
                 toast.success(_id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
 
                 showAchievementToasts(result.data);
