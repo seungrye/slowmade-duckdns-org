@@ -23,9 +23,10 @@ export default async function NotificationsPage() {
   const now = new Date();
 
   return (
-    // 루트 레이아웃(app/layout.tsx)이 이미 <main> 으로 감싼다 — 여기서 또 쓰면 main 이
-    // 중첩되고(HTML 위반), 안쪽 mx-auto 가 바깥 컨테이너 기준으로 정렬돼 왼쪽으로 쏠린다(#239).
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    // 루트 레이아웃이 이미 <main> 으로 감싸므로 여기선 div (main 중첩 금지, #239).
+    // max-w-3xl 을 빼고 tags·홈과 같은 `mx-auto px-4` 로 — 그것만 있으면 넓은 화면에서
+    // 혼자 가운데로 몰려 다른 페이지와 좌측 정렬이 어긋난다(#241).
+    <div className="mx-auto px-4 py-8">
       {/* 목록을 그린 뒤에 읽음 처리 — 그래야 무엇이 새 것이었는지 보인다. */}
       <MarkSeen />
 
