@@ -133,4 +133,50 @@ describe('listNotifications', () => {
     expect(item.postId).toBe(String(POST_A));
     expect(item.id).toBe('507f1f77bcf86cd799439055');
   });
+
+  // ── 눌러서 처리한 것은 읽음 (#247) ────────────────────────────────
+  //
+  // 예전엔 페이지를 여는 것만으로 전부 읽음이 됐다. 이제 기준선보다 새 것이라도
+  // 개별로 눌렀으면 읽음이다.
+  describe('개별 읽음 (#247)', () => {
+    const ID = '507f1f77bcf86cd799439055';
+
+    it('눌러서 처리한 항목은 seenAt 이후여도 읽음', async () => {
+      mockUserFindOne.mockReturnValue(
+        chain({ _id: ME, notificationsSeenAt: SEEN, notificationsReadIds: [ID] }),
+      );
+      const [item] = (await listNotifications('me@x.test')).items;
+      expect(item.isUnread).toBe(false);
+    });
+
+    it('다른 항목을 눌렀다고 이게 읽음이 되지는 않는다', async () => {
+      mockUserFindOne.mockReturnValue(
+        chain({ _id: ME, notificationsSeenAt: SEEN, notificationsReadIds: ['다른id'] }),
+      );
+      const [item] = (await listNotifications('me@x.test')).items;
+      expect(item.isUnread).toBe(true);
+    });
+
+    // 뱃지가 목록 표식과 어긋나면 안 된다 — 누른 것은 세지 않는다.
+    it('안 읽은 수도 누른 것을 뺀다', async () => {
+      mockUserFindOne.mockReturnValue(
+        chain({ _id: ME, notificationsSeenAt: SEEN, notificationsReadIds: [ID] }),
+      );
+      await listNotifications('me@x.test');
+      const countArg = mockCommentCount.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+      expect(countArg._id).toEqual({ $nin: [ID] });
+    });
+
+    it('누른 것이 없으면 세는 조건에 _id 를 걸지 않는다', async () => {
+      await listNotifications('me@x.test');
+      const countArg = mockCommentCount.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+      expect(countArg._id).toBeUndefined();
+    });
+
+    it('readIds 필드가 아예 없는 기존 사용자도 동작한다', async () => {
+      mockUserFindOne.mockReturnValue(chain({ _id: ME, notificationsSeenAt: SEEN }));
+      const [item] = (await listNotifications('me@x.test')).items;
+      expect(item.isUnread).toBe(true);
+    });
+  });
 });

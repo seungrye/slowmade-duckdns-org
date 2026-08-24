@@ -7,6 +7,7 @@ import { useComments } from "@/hooks/use-comments";
 import CommentItem from "@/components/comment-item";
 import CommentInput from "@/components/comment-input";
 import type { Comment } from "@/types/comment.d";
+import { shouldScrollToSection } from "@/lib/comment-anchor";
 
 type Props = { postId: string };
 
@@ -45,7 +46,10 @@ export default function Comments({ postId }: Props) {
 
   useEffect(() => {
     const handleRenderComplete = () => {
-      if (window.location.hash !== '#comments-section') return;
+      // 알림에서 왔으면(`?c=<덧글id>`) 갈 곳이 이미 정해져 있다 — CommentAnchor 가 그 덧글
+      // 가운데로 보낸다. 여기서 섹션 맨 위로 다시 스크롤하면 **그걸 덮어써서** 늘 덧글
+      // 목록 처음으로 가 버린다 (#247).
+      if (!shouldScrollToSection(window.location.hash, window.location.search)) return;
       const element = document.getElementById('comments-section');
       if (element) {
         requestAnimationFrame(() => element.scrollIntoView({ behavior: 'smooth', block: 'start' }));

@@ -15,6 +15,7 @@ import Comment from '@/models/comment';
 import Post from '@/models/post';
 import User from '@/models/user';
 import { truncate } from '@/lib/truncate';
+import { isUnread } from '@/lib/notification-read';
 
 /** 목록에 보여 줄 개수. 사라지지 않게 항상 최근 것을 이만큼 준다. */
 const DEFAULT_LIMIT = 20;
@@ -84,8 +85,12 @@ export async function listNotifications(
   await connectToDB();
 
   const me = await User.findOne({ email })
-    .select('_id notificationsSeenAt')
-    .lean<{ _id: Types.ObjectId; notificationsSeenAt?: Date } | null>();
+    .select('_id notificationsSeenAt notificationsReadIds')
+    .lean<{
+      _id: Types.ObjectId;
+      notificationsSeenAt?: Date;
+      notificationsReadIds?: string[];
+    } | null>();
   if (!me) return { unreadCount: 0, items: [] };
 
   const myPosts = await Post.find({ userEmail: email, isDeleted: { $ne: true } })
@@ -102,6 +107,8 @@ export async function listNotifications(
   );
   // 한 번도 안 봤으면 전부 새 것이다.
   const seenAt = me.notificationsSeenAt ?? new Date(0);
+  // 기준선보다 새 것 중 눌러서 처리한 것 (#247).
+  const readIds = new Set(me.notificationsReadIds ?? []);
 
   const rows = (await Comment.find(filter)
     .sort({ createdAt: -1 })
@@ -109,7 +116,12 @@ export async function listNotifications(
     .lean<CommentRow[]>()) ?? [];
 
   // 안 읽은 수는 따로 센다 — 목록 20건 안에서 세면 그보다 많을 때 실제보다 적게 나온다.
-  const unreadCount = await Comment.countDocuments({ ...filter, createdAt: { $gt: seenAt } });
+  // 누른 것은 뺀다 (#247) — 뱃지 숫자가 목록의 표식과 어긋나면 안 된다.
+  const unreadCount = await Comment.countDocuments({
+    ...filter,
+    createdAt: { $gt: seenAt },
+    ...(readIds.size > 0 ? { _id: { $nin: [...readIds] } } : {}),
+  });
 
   // 제목은 **결과에 실제로 나온 글**로 다시 조회한다. 내 덧글의 답글은 남의 글에 달렸을
   // 수도 있어서 내 글 목록만으로는 제목이 비게 된다.
@@ -128,7 +140,7 @@ export async function listNotifications(
       author: r.author ?? '',
       excerpt: truncate(r.content ?? '', EXCERPT_LENGTH),
       createdAt: r.createdAt ?? null,
-      isUnread: !!r.createdAt && new Date(r.createdAt) > seenAt,
+      isUnread: isUnread(r.createdAt, seenAt, readIds, String(r._id)),
       isBot: r.isEnji === true,
     })),
   };

@@ -36,3 +36,15 @@ export function targetCommentId(search: string): string | null {
   if (!id) return null;
   return `comment-${id}`;
 }
+
+/**
+ * 덧글 섹션이 **맨 위로** 스크롤해도 되는지 (#247).
+ *
+ * 섹션은 본문 렌더가 끝나면(`richContentRendered`) 해시를 보고 자기 맨 위로 스크롤한다.
+ * 그게 CommentAnchor 의 "그 덧글 가운데로" 보다 **나중에** 실행돼 덮어썼다 — 알림을 눌러도
+ * 늘 덧글 목록 처음으로 갔던 이유다. 갈 곳이 정해져 있으면 비켜 준다.
+ */
+export function shouldScrollToSection(hash: string, search: string): boolean {
+  if (hash !== `#${COMMENTS_SECTION}`) return false;
+  return targetCommentId(search) === null;
+}

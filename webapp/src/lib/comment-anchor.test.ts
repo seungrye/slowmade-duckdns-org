@@ -7,7 +7,7 @@
 // 렌더 타이밍을 타지 않는다. 알림도 그 방식을 따르고, 덧글 id 는 쿼리로 실어 보내
 // 도착한 뒤 그 덧글까지 한 번 더 스크롤한다. 못 찾아도 섹션에는 이미 도착해 있다.
 import { describe, it, expect } from 'vitest';
-import { notificationHref, targetCommentId } from './comment-anchor';
+import { notificationHref, targetCommentId, shouldScrollToSection } from './comment-anchor';
 
 describe('notificationHref — 알림 항목이 가리키는 곳', () => {
   it('메인 말풍선과 같은 섹션 앵커로 간다', () => {
@@ -43,5 +43,29 @@ describe('targetCommentId — 쿼리에서 대상 덧글 뽑기', () => {
 
   it('인코딩된 값을 되돌린다', () => {
     expect(targetCommentId('?c=a%2Fb')).toBe('comment-a/b');
+  });
+});
+
+// 덧글 섹션은 본문 렌더가 끝나면(`richContentRendered`) 해시를 보고 **섹션 맨 위로**
+// 스크롤한다. 그게 CommentAnchor 의 "그 덧글 가운데로" 보다 **나중에** 실행돼 덮어썼다 —
+// 알림을 눌러도 늘 덧글 목록 처음으로 갔던 이유다 (#247).
+//
+// 갈 곳이 정해져 있으면(`?c=`) 섹션 스크롤은 비켜 준다.
+describe('shouldScrollToSection — 섹션 맨 위로 갈 것인가', () => {
+  it('메인 말풍선처럼 해시만 있으면 섹션으로 간다', () => {
+    expect(shouldScrollToSection('#comments-section', '')).toBe(true);
+  });
+
+  it('대상 덧글이 지정돼 있으면 비켜 준다 — 덮어쓰면 안 된다', () => {
+    expect(shouldScrollToSection('#comments-section', '?c=abc')).toBe(false);
+  });
+
+  it('해시가 없으면 아무것도 하지 않는다', () => {
+    expect(shouldScrollToSection('', '')).toBe(false);
+    expect(shouldScrollToSection('#other', '')).toBe(false);
+  });
+
+  it('c 가 비어 있으면 대상이 없는 것이니 섹션으로 간다', () => {
+    expect(shouldScrollToSection('#comments-section', '?c=')).toBe(true);
   });
 });
