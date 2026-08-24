@@ -19,8 +19,18 @@ import { truncate } from '@/lib/truncate';
 /** 목록에 보여 줄 개수. 사라지지 않게 항상 최근 것을 이만큼 준다. */
 const DEFAULT_LIMIT = 20;
 
-/** 발췌 길이. 한 줄로 보이면 된다. */
-const EXCERPT_LENGTH = 60;
+/**
+ * 발췌 상한 (#245).
+ *
+ * **표시 길이를 정하는 값이 아니다** — 화면 폭은 기기마다 다른데 서버는 그걸 모른다.
+ * 서버가 어떤 숫자를 고르든 어떤 폭에서는 어긋난다(60자로 잘랐더니 1504px 데스크톱에서
+ * 절반도 못 채우고 오른쪽이 텅 비었다).
+ *
+ * 실제로 자르는 것은 화면의 `truncate`(text-overflow: ellipsis)다 — 각 기기의 실제 폭에
+ * 맞춰 한 줄로 줄여 준다. 글 제목 줄이 이미 그 방식이다. 여기 값은 **응답 크기 상한**일
+ * 뿐이고, 넓은 화면 한 줄을 채우고도 남을 만큼만 넉넉하면 된다.
+ */
+const EXCERPT_LENGTH = 200;
 
 export interface NotificationItem {
   id: string;
