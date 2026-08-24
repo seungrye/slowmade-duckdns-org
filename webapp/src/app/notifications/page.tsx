@@ -23,7 +23,9 @@ export default async function NotificationsPage() {
   const now = new Date();
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
+    // 루트 레이아웃(app/layout.tsx)이 이미 <main> 으로 감싼다 — 여기서 또 쓰면 main 이
+    // 중첩되고(HTML 위반), 안쪽 mx-auto 가 바깥 컨테이너 기준으로 정렬돼 왼쪽으로 쏠린다(#239).
+    <div className="mx-auto max-w-3xl px-4 py-8">
       {/* 목록을 그린 뒤에 읽음 처리 — 그래야 무엇이 새 것이었는지 보인다. */}
       <MarkSeen />
 
@@ -75,6 +77,6 @@ export default async function NotificationsPage() {
           ))}
         </ul>
       )}
-    </main>
+    </div>
   );
 }
