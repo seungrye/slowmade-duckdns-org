@@ -27,6 +27,9 @@ const UserSchema = new mongoose.Schema(
     },
     points: { type: Number, default: 0 }, // 사용자 포인트
     likedPosts: { type: [String], default: [] }, // 좋아요한 게시글 ID 목록
+    // 덧글 알림을 마지막으로 확인한 시각 (#237). 이 시각 이후에 달린 것만 뱃지로 센다.
+    // 없으면(한 번도 안 봤으면) 전부 새 것으로 친다.
+    notificationsSeenAt: { type: Date },
     createdAt: { type: Date, default: Date.now }, // 가입일
   },
   { timestamps: true }
