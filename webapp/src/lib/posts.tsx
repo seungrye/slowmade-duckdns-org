@@ -153,13 +153,27 @@ export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> 
   }));
 }
 
-export async function __getAllTags(): Promise<{ tag: string; count: number }[]> {
+/**
+ * 태그와 그 개수 집계.
+ *
+ * `viewerEmail` 을 주면 **그 사람의 비공개 글 태그도 함께** 센다 (#230). 개별 태그
+ * 페이지(`/tags/[tag]`)는 처음부터 그렇게 동작했는데 클라우드만 무조건 제외해서, 주소를
+ * 직접 치면 글이 보이는데 거기로 데려다줄 태그는 클라우드에 없는 상태였다.
+ *
+ * **인자는 선택이다.** `lib/tags/suggest-tags.ts` 처럼 뷰어가 없는 배경 작업은 그냥 부르면
+ * 되고, 그러면 `privacyMatch(undefined)` = 공개만이라 종전 동작 그대로다.
+ *
+ * 남의 비공개 글은 어느 경우에도 걸리지 않는다 — `privacyMatch` 가 그렇게 생겼다.
+ */
+export async function __getAllTags(
+  viewerEmail?: string | null,
+): Promise<{ tag: string; count: number }[]> {
   const pipeline: PipelineStage[] = [
     {
       $match: {
         isDeleted: { $ne: true },
-        isPrivate: { $ne: true }, // 비공개 글의 태그는 클라우드/집계에 노출하지 않음
         tags: { $exists: true, $ne: [] },
+        ...privacyMatch(viewerEmail),
       },
     },
     { $unwind: '$tags' },
@@ -183,9 +197,11 @@ export async function __getAllTags(): Promise<{ tag: string; count: number }[]> 
   return result;
 }
 
-export async function getAllTags(): Promise<{ tag: string; count: number }[]> {
+export async function getAllTags(
+  viewerEmail?: string | null,
+): Promise<{ tag: string; count: number }[]> {
   await connectToDB();
-  return __getAllTags();
+  return __getAllTags(viewerEmail);
 }
 
 export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false, viewerEmail: string | null | undefined = null): Promise<{

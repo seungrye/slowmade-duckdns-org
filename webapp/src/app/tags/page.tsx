@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import type { Metadata } from 'next';
+import { auth } from '@/auth';
 import { getAllTags } from '@/lib/posts';
 import TagCloudSearch from './tag-cloud-search';
 
@@ -10,7 +11,11 @@ export const metadata: Metadata = {
 };
 
 export default async function TagsPage() {
-  const tags = await getAllTags();
+  // 로그인 작성자에게는 자기 비공개 글의 태그도 보여 준다 (#230) —
+  // 개별 태그 페이지(`/tags/[tag]`)가 이미 그렇게 동작하는데 여기만 빠져 있었다.
+  // 이 페이지는 force-dynamic 이라 세션을 읽어도 캐시 문제가 없다.
+  const session = await auth();
+  const tags = await getAllTags(session?.user?.email ?? null);
 
   return (
     <main className="mx-auto px-4 py-8">
