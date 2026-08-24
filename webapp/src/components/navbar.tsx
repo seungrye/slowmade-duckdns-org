@@ -203,6 +203,10 @@ export default function Navbar() {
                     Handmade Site
                 </Link>
 
+                {/* 메뉴 + 알림 종을 한 묶음으로 (#243).
+                    컨테이너가 justify-between 이라 자식이 넷이면 넷 다 균등하게 벌어져
+                    종이 메뉴에서 멀어진다. 묶으면 [로고] ——여백—— [메뉴][종] 이 된다. */}
+                <div className="flex items-center gap-4">
                 {/* 데스크탑 메뉴 */}
                 <ul className="hidden md:flex space-x-6 items-center">
                     {navLinks.map((link) => (
@@ -384,6 +388,7 @@ export default function Navbar() {
                 {/* 알림 종 (#237) — 데스크탑·모바일 마크업 밖이라 한 번만 넣으면 양쪽에서 보인다.
                     목록은 /notifications 페이지가 그린다(navbar 를 더 키우지 않는다). */}
                 <NotificationBell />
+                </div>
 
                 {/* 모바일 메뉴 버튼 */}
                 <button className="md:hidden text-gray-500" onClick={() => setIsOpen(!isOpen)}
