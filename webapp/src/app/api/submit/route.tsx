@@ -106,11 +106,13 @@ export async function POST(req: Request) {
         author: authorUser?.username ?? auth.email,
       });
 
-      // 신규 글: 본문 기반 AI 태그를 백그라운드로 추천·추가(리비전 없이). 응답을 막지 않는다(fire-and-forget).
+      // 신규 글: 제목·본문 **그리고 첨부 이미지**로 AI 태그를 백그라운드 추천·추가
+      // (리비전 없이). 응답을 막지 않는다(fire-and-forget).
       void generateAndUpdateTags(created._id.toString(), {
         title: payload.title,
         htmlContent: payload.htmlContent,
         userTags,
+        imageUrls: payload.urls,
       }).catch((e) => console.warn('[submit] AI 태그 트리거 실패:', e));
 
       // Grant points for new post

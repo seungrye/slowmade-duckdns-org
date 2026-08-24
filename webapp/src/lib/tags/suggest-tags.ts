@@ -15,6 +15,34 @@ const GEMINI_MODEL_CHAIN = [
   'gemini-2.5-flash-lite',
 ];
 
+/**
+ * 이미지가 붙은 요청 전용 체인 (#234).
+ *
+ * **Gemma 는 이미지가 붙으면 한국어 지시를 무시하고 영어로 답한다**(실측):
+ *   gemma-4-31b-it        → "A screenshot from a pixel art style game."
+ *   gemini-3.1-flash-lite → "블루 슬라임과 전투하는 게임 화면"
+ * 그대로 두면 영어 태그가 달린다. 텍스트만인 글은 기존 체인 그대로 — 바꿀 이유가 없다.
+ */
+const GEMINI_VISION_CHAIN = [
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite',
+];
+
+/** 태깅에 두 장이면 충분하다. 더 보내도 태그가 나아지지 않고 지연만 는다. */
+const MAX_IMAGES = 2;
+
+/**
+ * 인라인으로 실어 보낼 상한. 넘으면 썸네일로 내려간다.
+ *
+ * 크기가 **비용을 좌우하지는 않는다** — 썸네일(16KB)과 원본(31KB)의 입력 토큰이 똑같이
+ * 1125 였다(실측). Gemini 가 이미지를 내부적으로 정규화하기 때문이다. 그래서 평소에는
+ * 세부가 살아 있는 **원본**을 쓰고, 이 상한은 아주 큰 파일에 대한 안전장치일 뿐이다.
+ */
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+type InlinePart = { inlineData: { mimeType: string; data: string } };
+type TagPart = { text: string } | InlinePart;
+
 const TAG_SYSTEM_PROMPT = `당신은 블로그 글에 어울리는 한글 태그를 추천합니다.
 - 본문 내용에 맞는 핵심 태그 3~5개를 고릅니다.
 - 제공된 "기존 태그 목록"에 어울리는 게 있으면 우선 재사용합니다(새 태그 남발 금지).
@@ -77,15 +105,42 @@ export function pickAiTags(rawText: string, userTags: string[], cap = 5): string
   return out;
 }
 
-async function callGeminiForTags(contents: string): Promise<string> {
+/**
+ * 이미지를 받아 인라인 파트로 만든다.
+ *
+ * **실패하면 null 이다 — 태깅을 막지 않는다.** 이미지를 못 받았다고 태그가 아예 안 달리면
+ * 손해가 더 크다(이 파일의 기존 원칙: 실패를 삼키고 계속).
+ *
+ * 원본을 먼저 쓰고, 없거나 상한을 넘으면 썸네일로 내려간다.
+ */
+async function fetchInlineImage(
+  image: { url?: string | null; thumbnailUrl?: string | null },
+): Promise<InlinePart | null> {
+  for (const candidate of [image.url, image.thumbnailUrl]) {
+    if (!candidate) continue;
+    try {
+      const res = await fetch(candidate);
+      if (!res.ok) continue;
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (bytes.byteLength > MAX_IMAGE_BYTES) continue; // 다음 후보(썸네일)로
+      const mimeType = res.headers.get('content-type')?.split(';')[0]?.trim() || 'image/jpeg';
+      return { inlineData: { mimeType, data: bytes.toString('base64') } };
+    } catch {
+      // 이 후보는 포기하고 다음으로. 둘 다 실패하면 텍스트만으로 진행한다.
+    }
+  }
+  return null;
+}
+
+async function callGeminiForTags(parts: TagPart[], chain: string[]): Promise<string> {
   const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
   let lastError: unknown;
-  for (const model of GEMINI_MODEL_CHAIN) {
+  for (const model of chain) {
     try {
       const result = await ai.models.generateContent({
         model,
         config: { systemInstruction: TAG_SYSTEM_PROMPT },
-        contents,
+        contents: [{ role: 'user', parts }],
       });
       const text = result.text ?? '';
       if (!text.trim()) {
@@ -110,14 +165,26 @@ export async function suggestTags(input: {
   allTags: string[];
   userTags: string[];
   cap?: number;
+  /** 글에 붙은 이미지 (#234). 제목·본문만으로는 안 나오는 태그가 여기서 나온다. */
+  imageUrls?: { url?: string | null; thumbnailUrl?: string | null }[];
 }): Promise<string[]> {
   if (!env.geminiApiKey) return [];
-  const { title, htmlContent, allTags, userTags, cap = 5 } = input;
+  const { title, htmlContent, allTags, userTags, cap = 5, imageUrls = [] } = input;
   const body = stripHtml(htmlContent).slice(0, 3000);
   const existing = allTags.slice(0, 200).join(', ');
-  const contents = `제목: ${title}\n본문: ${body}\n기존 태그 목록(우선 재사용): ${existing}\n사용자가 이미 단 태그: ${userTags.join(', ')}`;
+
+  const inlineImages = (
+    await Promise.all(imageUrls.slice(0, MAX_IMAGES).map(fetchInlineImage))
+  ).filter((p): p is InlinePart => p !== null);
+
+  const contents = `제목: ${title}\n본문: ${body}\n기존 태그 목록(우선 재사용): ${existing}\n사용자가 이미 단 태그: ${userTags.join(', ')}`
+    + (inlineImages.length ? '\n첨부된 이미지도 함께 보고 고르세요.' : '');
+
+  // 체인은 **실제로 받아 온** 이미지가 있을 때만 바꾼다 — 이미지를 못 받았으면
+  // 텍스트 요청이므로 기존 체인이 맞다.
+  const chain = inlineImages.length ? GEMINI_VISION_CHAIN : GEMINI_MODEL_CHAIN;
   try {
-    const text = await callGeminiForTags(contents);
+    const text = await callGeminiForTags([{ text: contents }, ...inlineImages], chain);
     return pickAiTags(text, userTags, cap);
   } catch (e) {
     console.warn('[ai-tags] suggestTags failed:', e instanceof Error ? e.message : String(e));
@@ -154,7 +221,13 @@ export async function triggerRevalidate(paths: string[]): Promise<void> {
  */
 export async function generateAndUpdateTags(
   postId: string,
-  input: { title: string; htmlContent: string; userTags: string[] },
+  input: {
+    title: string;
+    htmlContent: string;
+    userTags: string[];
+    /** 글에 붙은 이미지 (#234). */
+    imageUrls?: { url?: string | null; thumbnailUrl?: string | null }[];
+  },
 ): Promise<void> {
   try {
     if (!env.geminiApiKey) return;
@@ -165,6 +238,7 @@ export async function generateAndUpdateTags(
       htmlContent: input.htmlContent,
       allTags,
       userTags: input.userTags,
+      imageUrls: input.imageUrls,
     });
     if (newAi.length === 0) return;
 
