@@ -74,7 +74,9 @@ export default async function NotificationsPage() {
                   <span className="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
                     {n.postTitle}
                   </span>
-                  <span className="mt-1 block text-sm text-gray-600 dark:text-gray-300">
+                  {/* 자르는 건 CSS 가 한다 (#245). 서버는 넉넉히 보내고 실제 폭에 맞춰
+                      여기서 한 줄로 줄인다 — 바로 위 제목 줄과 같은 방식. */}
+                  <span className="mt-1 block truncate text-sm text-gray-600 dark:text-gray-300">
                     {n.excerpt}
                   </span>
                 </span>
