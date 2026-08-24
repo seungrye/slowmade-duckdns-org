@@ -16,7 +16,18 @@ vi.mock('@/models/web-adventure-save', () => ({
   default: { findOne: vi.fn(), findOneAndUpdate: vi.fn() },
 }));
 vi.mock('@/models/web-adventure-past-run', () => ({
-  default: { create: vi.fn(), findOne: vi.fn(), findOneAndUpdate: vi.fn() },
+  default: {
+    create: vi.fn(),
+    findOne: vi.fn(),
+    findOneAndUpdate: vi.fn(),
+    countDocuments: vi.fn(),
+  },
+}));
+// 비로그인 제출은 공개 쓰기 경로다 (#253). 한도 자체는 rate-limit 자체 테스트가 본다.
+const mockRateLimit = vi.hoisted(() => vi.fn(() => true));
+vi.mock('@/lib/rate-limit', () => ({
+  rateLimit: mockRateLimit,
+  clientIp: () => '1.2.3.4',
 }));
 vi.mock('@/lib/env', () => ({ env: { ownerEmail: 'owner@x.com' } }));
 vi.mock('@/models/web-adventure-feedback-note', () => ({
@@ -64,10 +75,95 @@ describe('POST /api/web-adventure/end-run', () => {
     setupAutoEnqueueDefaults();
   });
 
-  it('비로그인 → 401', async () => {
-    (auth as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-    const res = await POST(makeRequest({ endingId: 'main', finalSceneId: 'x' }));
-    expect(res.status).toBe(401);
+  // ── 비로그인 플레이어의 엔딩 (#253) ─────────────────────────────────
+  //
+  // 예전엔 여기서 401 이었다. 클라이언트는 비로그인일 때도 이 API 를 부르는데 401 을
+  // 조용히 무시해서, 엔딩 로그가 전부 있는데도 버려졌다 — 피드백 노트가 안 생겼다.
+  //
+  // 로그인을 요구할 이유가 없다: 노트 **소유자는 작가**(ownerEmail)고 플레이어는
+  // sourceUserEmail 로 기록될 뿐이다. 오히려 남의 플레이 피드백이 이 기능의 목적이다.
+  // 앱(app-end-run)이 합성 사용자로 이미 그렇게 하고 있다.
+  describe('비로그인 플레이어 (#253)', () => {
+    const anonBody = {
+      endingId: 'revolution',
+      finalSceneId: 'end_revolution',
+      log: ['첫 문장', '두 번째 문장'],
+      scenePath: ['s1', 's2'],
+      voice: 'epic',
+      character: sampleCharacter,
+    };
+
+    beforeEach(() => {
+      asMock(auth).mockResolvedValue(null);
+      mockRateLimit.mockReturnValue(true);
+      asMock(WebAdventurePastRun.countDocuments).mockResolvedValue(7);
+      asMock(WebAdventurePastRun.create).mockResolvedValue({
+        _id: 'pr1', runIndex: 8, endingId: 'revolution', finalSceneId: 'end_revolution',
+      });
+    });
+
+    it('401 이 아니라 회차를 적치한다 — 이게 이번 수정의 핵심', async () => {
+      const res = await POST(makeRequest(anonBody));
+      expect(res.status).toBe(200);
+      expect(WebAdventurePastRun.create).toHaveBeenCalledTimes(1);
+    });
+
+    it('합성 사용자로 남긴다 — 계정이 없으니 붙일 곳이 필요하다', async () => {
+      await POST(makeRequest(anonBody));
+      const doc = asMock(WebAdventurePastRun.create).mock.calls[0][0];
+      expect(doc.userEmail).toBe('web@eternia');
+      expect(doc.runIndex).toBe(8); // count + 1
+      expect(doc.log).toEqual(['첫 문장', '두 번째 문장']);
+    });
+
+    it('보낸 캐릭터를 그대로 남긴다 — 기본값으로 채우면 노트 서사가 실제 플레이와 어긋난다', async () => {
+      await POST(makeRequest(anonBody));
+      const doc = asMock(WebAdventurePastRun.create).mock.calls[0][0];
+      expect(doc.character.ability).toBe('scholar');
+      expect(doc.character.hp).toBe(8);
+    });
+
+    it('피드백 노트를 작가 소유로 적재하고 출처를 web 으로 남긴다', async () => {
+      await POST(makeRequest(anonBody));
+      const note = asMock(WebAdventureFeedbackNote.create).mock.calls[0][0];
+      expect(note.ownerEmail).toBe('owner@x.com');
+      expect(note.sourceUserEmail).toBe('web');
+    });
+
+    // 비로그인은 서버 save 가 아예 없다. 진행도는 localStorage 가 관리한다.
+    it('서버 save 는 건드리지 않는다', async () => {
+      await POST(makeRequest(anonBody));
+      expect(WebAdventureSave.findOne).not.toHaveBeenCalled();
+      expect(WebAdventureSave.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('요청 1건이 LLM 큐를 채우므로 한도를 넘으면 429', async () => {
+      mockRateLimit.mockReturnValue(false);
+      const res = await POST(makeRequest(anonBody));
+      expect(res.status).toBe(429);
+      expect(WebAdventurePastRun.create).not.toHaveBeenCalled();
+    });
+
+    it('로그가 없으면 노트를 만들지 않는다 — 살 붙일 게 없다', async () => {
+      await POST(makeRequest({ ...anonBody, log: [] }));
+      expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
+    });
+
+    it('비로그인도 endingId 가 없으면 400', async () => {
+      const res = await POST(makeRequest({ finalSceneId: 'x' }));
+      expect(res.status).toBe(400);
+      expect(WebAdventurePastRun.create).not.toHaveBeenCalled();
+    });
+
+    // 합성 사용자 하나에 모든 익명 플레이가 모이므로 runIndex 가 부딪힌다.
+    it('runIndex 가 부딪히면 다시 세어 재시도한다', async () => {
+      asMock(WebAdventurePastRun.create)
+        .mockRejectedValueOnce(new Error('E11000 duplicate key'))
+        .mockResolvedValueOnce({ _id: 'pr2', runIndex: 9, endingId: 'r', finalSceneId: 'f' });
+      const res = await POST(makeRequest(anonBody));
+      expect(res.status).toBe(200);
+      expect(WebAdventurePastRun.create).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('payload endingId 누락 → 400', async () => {

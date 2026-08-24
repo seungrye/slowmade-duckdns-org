@@ -232,7 +232,9 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
   });
 
   // #239 — ended 진입 시 한 번만 end-run POST → save 의 runIndex+1 + past_run 적치.
-  //   서버 401(비로그인) 은 silent skip. 같은 runIndex 중복 전송 방지.
+  //   같은 runIndex 중복 전송 방지.
+  // #253 — 비로그인도 서버가 받는다(합성 계정 past-run + 피드백 노트). 예전엔 401 이라
+  //   조용히 버려져서, 로그인 안 한 플레이의 엔딩은 피드백 노트가 아예 안 생겼다.
   // #245 — adv_ending_reached 도 같이 발화.
   // #250 — 서버 응답과 무관하게 localStorage 에 *동기 append* (이슈 #250).
   //   비로그인이면 갤러리 fallback 만 의지. 로그인이면 race 보호 (end-run insert
@@ -320,6 +322,10 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         log: state.log,
         // #90 — 어떤 문체로 읽은 회차인지. 노트가 인용한 문장의 출처를 추적할 수 있다.
         voice: readRunVoice(),
+        // #253 — 비로그인은 서버 save 가 없어 캐릭터를 서버가 알 수 없다. 안 보내면
+        //   기본값(kael·hp10)으로 채워져 노트 서사가 실제 플레이와 어긋난다.
+        //   로그인 사용자는 서버가 save 의 캐릭터를 쓰므로 이 값은 무시된다.
+        character: state.character,
       }),
     })
       .then((res) => {
