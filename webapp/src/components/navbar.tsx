@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import NotificationBell from "@/components/notification-bell";
 import {
     Menu,
     X,
@@ -379,6 +380,10 @@ export default function Navbar() {
                         </li>
                     )}
                 </ul>
+
+                {/* 알림 종 (#237) — 데스크탑·모바일 마크업 밖이라 한 번만 넣으면 양쪽에서 보인다.
+                    목록은 /notifications 페이지가 그린다(navbar 를 더 키우지 않는다). */}
+                <NotificationBell />
 
                 {/* 모바일 메뉴 버튼 */}
                 <button className="md:hidden text-gray-500" onClick={() => setIsOpen(!isOpen)}
