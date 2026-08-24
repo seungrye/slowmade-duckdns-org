@@ -46,3 +46,38 @@ export function nextReadIds(current: string[], id: string, cap: number = READ_ID
   if (current.includes(id)) return current;
   return [...current, id].slice(-cap);
 }
+
+/** 정렬에만 쓰는 계산 필드 이름. 결과에서는 지운다. */
+export const UNREAD_FIELD = '_unread';
+
+/**
+ * 알림 목록 파이프라인 — **안 읽은 것 먼저, 그 다음 최신순** (#249).
+ *
+ * 정렬을 DB 에서 하는 이유: 목록은 최근 `limit` 건만 가져온다. **가져온 뒤** 코드에서
+ * 정렬하면 이미 잘린 그 안에서만 섞이므로, 시간순으로 `limit` 밖에 있는 안 읽은 알림은
+ * 애초에 딸려오지 않아 위로 올라올 기회조차 없다 — 벨 배지는 그걸 세는데 목록엔 없게 된다.
+ * (seenAt 이후 25건인데 최신 20건을 하나씩 눌러 읽으면 남은 5건이 딱 그 상태가 된다.)
+ * 그래서 **자르기 전에** 정렬한다.
+ *
+ * 안읽음 판정은 `isUnread` 와 같은 규칙이다 — 기준선보다 새롭고, 누르지 않은 것.
+ */
+export function notificationPipeline(
+  filter: Record<string, unknown>,
+  seenAt: Date,
+  readIds: string[],
+  limit: number,
+): Record<string, unknown>[] {
+  const isNew = { $gt: ['$createdAt', seenAt] };
+  // readIds 는 문자열, _id 는 ObjectId 라 그대로 비교하면 절대 안 맞는다 — 그러면 누른
+  // 알림이 계속 안읽음으로 남아 맨 위에 붙어 있게 된다.
+  const notClicked =
+    readIds.length > 0 ? { $not: { $in: [{ $toString: '$_id' }, readIds] } } : true;
+
+  return [
+    { $match: filter },
+    { $addFields: { [UNREAD_FIELD]: { $and: [isNew, notClicked] } } },
+    { $sort: { [UNREAD_FIELD]: -1, createdAt: -1 } },
+    { $limit: limit },
+    { $unset: UNREAD_FIELD },
+  ];
+}

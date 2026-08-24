@@ -18,8 +18,13 @@ vi.mock('@/models/post', () => ({ default: { find: mockPostFind } }));
 
 const mockCommentFind = vi.hoisted(() => vi.fn());
 const mockCommentCount = vi.hoisted(() => vi.fn());
+const mockCommentAggregate = vi.hoisted(() => vi.fn());
 vi.mock('@/models/comment', () => ({
-  default: { find: mockCommentFind, countDocuments: mockCommentCount },
+  default: {
+    find: mockCommentFind,
+    countDocuments: mockCommentCount,
+    aggregate: mockCommentAggregate,
+  },
 }));
 
 import { notificationFilter, listNotifications } from './notifications';
@@ -72,14 +77,16 @@ describe('listNotifications', () => {
     mockUserFindOne.mockReturnValue(chain({ _id: ME, notificationsSeenAt: SEEN }));
     mockPostFind.mockReturnValue(chain([{ _id: POST_A, title: '내 글' }]));
     mockCommentCount.mockResolvedValue(1);
-    mockCommentFind.mockReturnValue(chain([
+    // find 는 '내 덧글' 조회용, 목록 행은 aggregate 가 준다 (#249 — 정렬을 DB 로 내렸다).
+    mockCommentFind.mockReturnValue(chain([]));
+    mockCommentAggregate.mockResolvedValue([
       {
         _id: new Types.ObjectId('507f1f77bcf86cd799439055'),
         post: POST_A, parent: null, author: 'claude',
         content: '스펙 초안입니다.\n두 번째 줄', isEnji: true,
         createdAt: new Date('2026-08-24T01:00:00Z'),
       },
-    ]));
+    ]);
   });
 
   it('사용자가 없으면 빈 결과', async () => {
@@ -112,11 +119,11 @@ describe('listNotifications', () => {
   });
 
   it('seenAt 이전 것은 읽음으로 표시한다', async () => {
-    mockCommentFind.mockReturnValue(chain([{
+    mockCommentAggregate.mockResolvedValue([{
       _id: new Types.ObjectId('507f1f77bcf86cd799439066'),
       post: POST_A, parent: null, author: '홍길동', content: '옛 덧글',
       createdAt: new Date('2026-08-23T00:00:00Z'),
-    }]));
+    }]);
     const [item] = (await listNotifications('me@x.test')).items;
     expect(item.isUnread).toBe(false);
   });
@@ -177,6 +184,33 @@ describe('listNotifications', () => {
       mockUserFindOne.mockReturnValue(chain({ _id: ME, notificationsSeenAt: SEEN }));
       const [item] = (await listNotifications('me@x.test')).items;
       expect(item.isUnread).toBe(true);
+    });
+  });
+
+  // 안 읽은 것을 위로 (#249). 순서 자체는 DB 가 정한다 — 여기서는 **그 일을 DB 에
+  // 시켰는지**만 본다. 파이프라인의 모양은 notification-read.test 가 검증한다.
+  describe('안읽음 먼저 정렬 (#249)', () => {
+    it('목록을 aggregate 로 가져온다 — 자르기 전에 정렬하려고', async () => {
+      await listNotifications('me@x.test');
+      expect(mockCommentAggregate).toHaveBeenCalledTimes(1);
+    });
+
+    it('안읽음·시간 순으로 정렬한 뒤 자르는 파이프라인을 넘긴다', async () => {
+      await listNotifications('me@x.test', 20);
+      const pipeline = mockCommentAggregate.mock.calls[0][0] as Record<string, unknown>[];
+      const sortAt = pipeline.findIndex((s) => '$sort' in s);
+      const limitAt = pipeline.findIndex((s) => '$limit' in s);
+      expect(pipeline[sortAt].$sort).toEqual({ _unread: -1, createdAt: -1 });
+      expect(limitAt).toBeGreaterThan(sortAt);
+      expect(pipeline[limitAt]).toEqual({ $limit: 20 });
+    });
+
+    it('누른 id 를 파이프라인에 실어 보낸다 — 안 그러면 계속 맨 위에 남는다', async () => {
+      mockUserFindOne.mockReturnValue(
+        chain({ _id: ME, notificationsSeenAt: SEEN, notificationsReadIds: ['눌렀음'] }),
+      );
+      await listNotifications('me@x.test');
+      expect(JSON.stringify(mockCommentAggregate.mock.calls[0][0])).toContain('눌렀음');
     });
   });
 });
