@@ -8,6 +8,7 @@
 // 안 읽은 것이 없으면 아예 그리지 않는다. 누를 이유가 없는 버튼을 둘 필요가 없다.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { emitNotificationsAllRead } from '@/lib/notification-events';
 
 export default function MarkAllRead({ unreadCount }: { unreadCount: number }) {
   const router = useRouter();
@@ -19,6 +20,9 @@ export default function MarkAllRead({ unreadCount }: { unreadCount: number }) {
     setBusy(true);
     try {
       await fetch('/api/notifications/seen', { method: 'POST' });
+      // 목록은 refresh 로 다시 그려지지만 벨은 navbar 에 있어 그대로다 (#259).
+      // 실측: 목록이 0 이 됐는데 뱃지는 3 이 남아 있었다.
+      emitNotificationsAllRead();
       router.refresh();
     } catch {
       // 실패해도 목록은 그대로다. 다시 누르면 된다.

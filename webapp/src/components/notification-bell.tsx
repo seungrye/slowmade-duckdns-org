@@ -10,6 +10,11 @@ import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import {
+  NOTIFICATION_READ,
+  NOTIFICATIONS_ALL_READ,
+  decrementUnread,
+} from '@/lib/notification-events';
 
 export default function NotificationBell() {
   const { data: session } = useSession();
@@ -25,6 +30,22 @@ export default function NotificationBell() {
       .catch(() => { /* 알림 때문에 화면이 깨지면 안 된다 */ });
     return () => { cancelled = true; };
   }, [session]);
+
+  // 읽음 처리를 바로 따라간다 (#259).
+  //
+  // 이 컴포넌트는 navbar 에 있어 화면을 옮겨도 **다시 마운트되지 않는다.** 그래서 위 조회만
+  // 있을 때는 알림을 눌러 읽어도 숫자가 그대로였다 — 새로고침해야 바뀌었다. 목록 쪽이 보내는
+  // 신호를 듣고 즉시 줄인다. 어긋나더라도 다음 조회에서 서버 값으로 맞춰진다.
+  useEffect(() => {
+    const onOne = () => setCount(decrementUnread);
+    const onAll = () => setCount(0);
+    window.addEventListener(NOTIFICATION_READ, onOne);
+    window.addEventListener(NOTIFICATIONS_ALL_READ, onAll);
+    return () => {
+      window.removeEventListener(NOTIFICATION_READ, onOne);
+      window.removeEventListener(NOTIFICATIONS_ALL_READ, onAll);
+    };
+  }, []);
 
   if (!session) return null;
 

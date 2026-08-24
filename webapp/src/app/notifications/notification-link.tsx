@@ -9,19 +9,26 @@
 // 요청을 끊어 버려 읽음 처리가 조용히 누락된다.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { emitNotificationRead } from '@/lib/notification-events';
 
 export default function NotificationLink({
   href,
   id,
+  isUnread,
   className,
   children,
 }: {
   href: string;
   id: string;
+  isUnread: boolean;
   className?: string;
   children: ReactNode;
 }) {
   const markRead = () => {
+    // 서버 응답을 기다리지 않고 **누르는 즉시** 알린다 (#259) — 벨은 navbar 에 있어 화면을
+    // 옮겨도 다시 마운트되지 않으므로, 알려 주지 않으면 새로고침 전까지 숫자가 그대로다.
+    // 이미 읽은 항목을 다시 눌렀을 때 빼면 안 되니 안 읽은 것만 센다.
+    if (isUnread) emitNotificationRead();
     fetch('/api/notifications/read', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
