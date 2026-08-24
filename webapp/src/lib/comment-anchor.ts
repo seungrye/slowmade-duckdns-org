@@ -48,3 +48,35 @@ export function shouldScrollToSection(hash: string, search: string): boolean {
   if (hash !== `#${COMMENTS_SECTION}`) return false;
   return targetCommentId(search) === null;
 }
+
+/**
+ * 덧글 상단을 화면 어디에 놓을지 (#255).
+ *
+ * 2/5 지점. 위쪽 40% 로 앞 맥락(무엇에 달린 답글인지)이 보이고, 덧글은 첫 줄부터 읽힌다.
+ */
+export const ANCHOR_VIEWPORT_RATIO = 0.4;
+
+/**
+ * 그 덧글로 갈 때 멈출 스크롤 위치 (#255).
+ *
+ * 예전엔 `scrollIntoView({ block: 'center' })` 로 **덧글의 가운데**를 화면 중앙에 맞췄다.
+ * 덧글이 화면보다 길면 상단이 화면 밖으로 밀린다 — 실측(1680×1000)에서 덧글 높이 1154,
+ * 덧글 top −77 이었다. 가운데는 정확히 맞았는데 정작 첫 줄이 화면 위에 있었다.
+ *
+ * **요소 높이를 아예 보지 않는다** — 상단만 기준이라 아무리 긴 덧글이어도 첫 줄이 밀리지 않는다.
+ *
+ * @param rectTop  화면 기준 요소 상단 (`getBoundingClientRect().top`)
+ * @param scrollY  현재 스크롤 위치
+ * @param viewportHeight 화면 높이
+ */
+export function scrollTopFor(
+  rectTop: number,
+  scrollY: number,
+  viewportHeight: number,
+  ratio: number = ANCHOR_VIEWPORT_RATIO,
+): number {
+  const documentTop = rectTop + scrollY;
+  // 문서 맨 위 근처면 더 올라갈 곳이 없다 — 음수로 요청하면 브라우저가 0 으로 처리하지만
+  // 계산 결과 자체를 0 으로 맞춰 둬야 테스트로 의도를 고정할 수 있다.
+  return Math.max(0, documentTop - viewportHeight * ratio);
+}

@@ -7,7 +7,13 @@
 // 렌더 타이밍을 타지 않는다. 알림도 그 방식을 따르고, 덧글 id 는 쿼리로 실어 보내
 // 도착한 뒤 그 덧글까지 한 번 더 스크롤한다. 못 찾아도 섹션에는 이미 도착해 있다.
 import { describe, it, expect } from 'vitest';
-import { notificationHref, targetCommentId, shouldScrollToSection } from './comment-anchor';
+import {
+  notificationHref,
+  targetCommentId,
+  shouldScrollToSection,
+  scrollTopFor,
+  ANCHOR_VIEWPORT_RATIO,
+} from './comment-anchor';
 
 describe('notificationHref — 알림 항목이 가리키는 곳', () => {
   it('메인 말풍선과 같은 섹션 앵커로 간다', () => {
@@ -67,5 +73,43 @@ describe('shouldScrollToSection — 섹션 맨 위로 갈 것인가', () => {
 
   it('c 가 비어 있으면 대상이 없는 것이니 섹션으로 간다', () => {
     expect(shouldScrollToSection('#comments-section', '?c=')).toBe(true);
+  });
+});
+
+// 어디에 멈출 것인가 (#255).
+//
+// 예전엔 scrollIntoView({ block: 'center' }) 로 **덧글의 가운데**를 화면 중앙에 맞췄다.
+// 덧글이 화면보다 길면 상단이 화면 밖으로 밀린다 — 실측(1680×1000)에서 덧글 높이 1154,
+// 덧글 top -77 이었다. 가운데는 정확히 맞았는데 정작 첫 줄이 화면 위에 있었다.
+//
+// 이제 **박스 상단**을 화면 높이의 2/5 지점에 놓는다. 위쪽 40% 로 앞 맥락이 보이고,
+// 덧글은 첫 줄부터 읽힌다.
+describe('scrollTopFor — 덧글 상단을 화면 2/5 지점에', () => {
+  it('요소 상단이 화면 높이의 40% 지점에 오도록 계산한다', () => {
+    // 화면 안 300px 지점에 있는 요소, 현재 500 스크롤, 화면 1000 →
+    // 문서상 top 800, 목표는 800 - 400 = 400.
+    expect(scrollTopFor(300, 500, 1000)).toBe(400);
+  });
+
+  it('이미 원하는 위치면 움직이지 않는다', () => {
+    expect(scrollTopFor(400, 500, 1000)).toBe(500);
+  });
+
+  // 요소 높이는 인자에 아예 없다 — center 방식이 깨졌던 지점이 바로 높이 의존이었다.
+  it('덧글이 아무리 길어도 결과가 달라지지 않는다 (높이를 안 본다)', () => {
+    expect(scrollTopFor(600, 1000, 1000)).toBe(1200);
+  });
+
+  it('문서 맨 위 근처면 0 아래로 내려가지 않는다', () => {
+    // 문서상 top 300, 목표 -100 → 더 올라갈 곳이 없으니 0.
+    expect(scrollTopFor(300, 0, 1000)).toBe(0);
+  });
+
+  it('화면 높이에 비례한다 — 작은 화면에서도 같은 비율', () => {
+    expect(scrollTopFor(0, 1000, 500)).toBe(800); // 1000 - 500*0.4
+  });
+
+  it('비율은 2/5', () => {
+    expect(ANCHOR_VIEWPORT_RATIO).toBe(0.4);
   });
 });
