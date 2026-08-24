@@ -9,13 +9,13 @@
 // /api/ai-team/comment. 거기에 "알림 문서도 하나 만들어라"를 넣으면 **다섯 번째 경로가
 // 생길 때 조용히 빠진다** — 비공개 규칙이 8곳에 흩어져 있다가 샜던 것(#168)과 같은 모양이다.
 // 조회로 계산하면 그 위험이 0 이고, 글 172건 규모면 성능도 충분하다.
-import { Types } from 'mongoose';
+import { Types, type PipelineStage } from 'mongoose';
 import { connectToDB } from '@/lib/db';
 import Comment from '@/models/comment';
 import Post from '@/models/post';
 import User from '@/models/user';
 import { truncate } from '@/lib/truncate';
-import { isUnread } from '@/lib/notification-read';
+import { isUnread, notificationPipeline } from '@/lib/notification-read';
 
 /** 목록에 보여 줄 개수. 사라지지 않게 항상 최근 것을 이만큼 준다. */
 const DEFAULT_LIMIT = 20;
@@ -110,10 +110,14 @@ export async function listNotifications(
   // 기준선보다 새 것 중 눌러서 처리한 것 (#247).
   const readIds = new Set(me.notificationsReadIds ?? []);
 
-  const rows = (await Comment.find(filter)
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .lean<CommentRow[]>()) ?? [];
+  // 안 읽은 것을 위로, 그 다음 최신순 (#249). 정렬을 DB 에서 하는 이유는
+  // `notificationPipeline` 주석 참조 — **자르기 전에** 정렬해야 안 읽은 것이 상한 밖으로
+  // 밀려 사라지지 않는다.
+  const rows =
+    ((await Comment.aggregate(
+      // 파이프라인은 순수 함수라 mongoose 타입을 모른다(그래야 테스트에서 모양만 본다).
+      notificationPipeline(filter, seenAt, [...readIds], limit) as unknown as PipelineStage[],
+    )) as CommentRow[]) ?? [];
 
   // 안 읽은 수는 따로 센다 — 목록 20건 안에서 세면 그보다 많을 때 실제보다 적게 나온다.
   // 누른 것은 뺀다 (#247) — 뱃지 숫자가 목록의 표식과 어긋나면 안 된다.

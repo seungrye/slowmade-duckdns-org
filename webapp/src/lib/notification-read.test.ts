@@ -12,7 +12,13 @@
 // 기준선이 있어야 [모두 읽음] 한 번으로 정리되고, 기존 122건이 되살아나 뱃지가 99+ 로
 // 돌아가지 않는다.
 import { describe, it, expect } from 'vitest';
-import { isUnread, nextReadIds, READ_IDS_CAP } from './notification-read';
+import {
+  isUnread,
+  nextReadIds,
+  READ_IDS_CAP,
+  UNREAD_FIELD,
+  notificationPipeline,
+} from './notification-read';
 
 const SEEN = new Date('2026-08-24T00:00:00Z');
 const NEWER = new Date('2026-08-24T01:00:00Z');
@@ -74,5 +80,64 @@ describe('nextReadIds — 읽음 목록에 하나 더하기', () => {
   it('상한 안에서는 아무것도 버리지 않는다', () => {
     const some = Array.from({ length: 10 }, (_, i) => `c${i}`);
     expect(nextReadIds(some, 'new')).toHaveLength(11);
+  });
+});
+
+// 안 읽은 것을 위로 (#249).
+//
+// 코드에서 정렬하면 **이미 잘라 온 20건 안에서만** 섞인다 — 21번째의 안 읽은 알림은
+// 여전히 안 보이고, 벨 배지는 그걸 세고 있으니 숫자와 목록이 어긋난다.
+// 그래서 정렬 키를 DB 로 내려 **자르기 전에** 띄운다.
+describe('notificationPipeline — 안읽음 먼저, 그 다음 시간순', () => {
+  const SEEN_AT = new Date('2026-08-24T00:00:00Z');
+  const FILTER = { isDeleted: { $ne: true } };
+  const stage = (p: Record<string, unknown>[], key: string) =>
+    p.find((s) => key in s) as Record<string, unknown> | undefined;
+
+  it('주어진 조건으로 먼저 거른다 — 남의 알림이 파이프라인에 들어오면 안 된다', () => {
+    const p = notificationPipeline(FILTER, SEEN_AT, [], 20);
+    expect(p[0]).toEqual({ $match: FILTER });
+  });
+
+  it('안읽음을 먼저, 같은 그룹 안에서는 최신순', () => {
+    const sort = stage(notificationPipeline(FILTER, SEEN_AT, [], 20), '$sort');
+    expect(sort?.$sort).toEqual({ [UNREAD_FIELD]: -1, createdAt: -1 });
+  });
+
+  // 자른 뒤에 정렬하면 21번째의 안 읽은 알림이 영영 안 보인다.
+  it('정렬한 다음에 자른다 — 순서가 뒤바뀌면 안 된다', () => {
+    const p = notificationPipeline(FILTER, SEEN_AT, [], 20);
+    const sortAt = p.findIndex((s) => '$sort' in s);
+    const limitAt = p.findIndex((s) => '$limit' in s);
+    expect(sortAt).toBeGreaterThan(-1);
+    expect(limitAt).toBeGreaterThan(sortAt);
+    expect(p[limitAt]).toEqual({ $limit: 20 });
+  });
+
+  it('안읽음 판정은 화면과 같은 규칙 — 기준선보다 새롭고 누르지 않은 것', () => {
+    const add = stage(notificationPipeline(FILTER, SEEN_AT, [], 20), '$addFields');
+    const expr = (add?.$addFields as Record<string, unknown>)[UNREAD_FIELD];
+    expect(JSON.stringify(expr)).toContain('$gt');
+    expect(JSON.stringify(expr)).toContain(SEEN_AT.toISOString());
+  });
+
+  // readIds 는 문자열, _id 는 ObjectId 라 그냥 비교하면 절대 안 맞는다.
+  // 그러면 누른 알림이 계속 안읽음으로 남아 맨 위에 붙어 있게 된다.
+  it('누른 id 는 문자열로 바꿔 비교한다', () => {
+    const add = stage(notificationPipeline(FILTER, SEEN_AT, ['c1'], 20), '$addFields');
+    const expr = JSON.stringify((add?.$addFields as Record<string, unknown>)[UNREAD_FIELD]);
+    expect(expr).toContain('$toString');
+    expect(expr).toContain('c1');
+  });
+
+  it('누른 것이 없으면 id 비교를 아예 넣지 않는다', () => {
+    const add = stage(notificationPipeline(FILTER, SEEN_AT, [], 20), '$addFields');
+    const expr = JSON.stringify((add?.$addFields as Record<string, unknown>)[UNREAD_FIELD]);
+    expect(expr).not.toContain('$toString');
+  });
+
+  it('계산에 쓴 필드는 결과에서 지운다 — 응답에 새어 나갈 이유가 없다', () => {
+    const p = notificationPipeline(FILTER, SEEN_AT, [], 20);
+    expect(stage(p, '$unset')?.$unset).toBe(UNREAD_FIELD);
   });
 });
