@@ -15,10 +15,17 @@ interface InfinitPostListProps {
   onTopmostVisiblePostChange?: (postId: string | null) => void;
   // 서버(page.tsx)에서 SSR 로드한 첫 페이지. 있으면 초기 CSR fetch 를 건너뛴다.
   initialPosts?: GetPostType[];
+  /**
+   * 제목 검색어 (#232). 값이 바뀌면 목록을 처음부터 다시 받는다.
+   *
+   * **불러온 것만 거르지 않는다** — 9건씩 무한스크롤이라 그러면 "검색했는데 없다"가
+   * 거짓이 된다. 서버가 전체에서 찾는다.
+   */
+  query?: string;
 }
 
 // The component is wrapped in forwardRef to receive a ref from its parent.
-const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange, initialPosts = [] }, ref) => {
+const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange, initialPosts = [], query = '' }, ref) => {
   const [posts, setPosts] = useState<GetPostType[]>(initialPosts);
   // 각 PostItem 엘리먼트에 대한 ref를 저장합니다.
   const postItemRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -39,7 +46,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     if (isLoading || !hasMore) return;
 
     setIsLoading(true);
-    const res = await fetch(`/api/posts?page=${page}&limit=9`);
+    const res = await fetch(`/api/posts?page=${page}&limit=9${query ? `&q=${encodeURIComponent(query)}` : ''}`);
     const { data: { posts: newPosts } } = await res.json();
     setIsLoading(false);
 
@@ -68,7 +75,37 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
       });
     }
     setPage(page + 1);
-  }, [hasMore, isLoading, expansionMode]);
+  }, [hasMore, isLoading, expansionMode, query]);
+
+  // 검색어가 바뀌면 목록을 **통째로 갈아 끼운다** (#232).
+  //
+  // fetchPosts 를 재사용하지 않는 이유: 그쪽은 isLoading/hasMore 로 중복을 막고 결과를
+  // 기존 목록에 **합친다**. 새 검색은 합치면 안 되고, 상태 초기화 직후엔 그 가드가 아직
+  // 옛 값을 보고 있어 호출이 삼켜진다.
+  //
+  // `cancelled` 는 빠르게 타이핑할 때 **늦게 온 옛 응답이 새 결과를 덮는 것**을 막는다.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setIsLoading(true);
+      try {
+        const res = await fetch(`/api/posts?page=1&limit=9${query ? `&q=${encodeURIComponent(query)}` : ''}`);
+        const { data: { posts: found } } = await res.json();
+        if (cancelled) return;
+        setPosts(found);
+        setPage(2);
+        setHasMore(found.length >= 9);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [query]);
 
   // 2. 초기 데이터 로딩을 위한 useEffect
   useEffect(() => {
@@ -212,6 +249,11 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
           })
         )}
       </div>
+      {!isLoading && posts.length === 0 && query && (
+        <div className="mt-6 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+          제목에 &lsquo;{query}&rsquo; 가 들어간 글이 없습니다.
+        </div>
+      )}
       {/* 4. 로딩 및 더보기 상태에 따른 UI 개선 */}
       {isLoading && !isInitialLoading && <div className="text-center mt-6 text-gray-400">로딩 중...</div>}
       {hasMore && !isLoading && <div ref={loaderRef} className="h-10" />}
