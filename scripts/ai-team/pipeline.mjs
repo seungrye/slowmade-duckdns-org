@@ -80,14 +80,23 @@ function runTests(worktree, paths) {
     output = `${e.stdout ?? ''}${e.stderr ?? ''}`;
   }
   let counts = null;
+  let detail = '';
   try {
-    const j = JSON.parse(readFileSync(out, 'utf8'));
+    const raw = readFileSync(out, 'utf8');
+    const j = JSON.parse(raw);
     counts = { numTotalTests: j.numTotalTests ?? 0, numPassedTests: j.numPassedTests ?? 0 };
+    // **실패 내역을 건져 둔다.** json 리포터를 쓰면 stdout 엔 "JSON report written to …"
+    // 한 줄만 남아, 증거 파일이 63바이트짜리 안내문이 됐다(첫 실행에서 확인).
+    detail = (j.testResults ?? [])
+      .flatMap((f) => (f.assertionResults ?? [])
+        .filter((a) => a.status === 'failed')
+        .map((a) => `✗ ${a.fullName}\n  ${(a.failureMessages ?? []).join('\n  ').slice(0, 500)}`))
+      .join('\n');
   } catch {
     // 리포터를 못 읽었다. 게이트가 "못 읽으면 통과시키지 않는다" 로 처리한다.
   }
   rmSync(out, { force: true });
-  return { counts, output };
+  return { counts, output: detail || output };
 }
 
 /**
@@ -198,6 +207,20 @@ log(`   테스트 ${testFiles.length}건: ${testFiles.join(', ')}`);
 
 const specTests = testFiles.map((p) => p.replace(/^webapp\//, ''));
 
+// **테스트를 커밋한다.** 이게 "테스트는 코더 것이 아니다" 를 강제하는 유일한 방법이다.
+//
+// 커밋하지 않으면 테스트 파일이 끝까지 untracked(`??`) 로 남는다. 그러면
+//   - 코더가 통째로 덮어써도 status 가 여전히 `??` 라 **바뀐 것을 못 알아채고**
+//   - `git checkout --` 는 추적 중인 파일만 되돌리므로 **되돌리지도 못한다**(실측 확인)
+// 첫 성공 실행에서 이 규칙이 실제로는 걸리지 않고 있었다.
+//
+// 덤으로 "이 테스트는 클로드가 썼다" 가 히스토리에 남는다.
+sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
+sh('git', ['commit', '-q', '-m', `test: ${spec.split('\n')[0].replace(/^#\s*/, '').slice(0, 60)}`], {
+  cwd: worktree, stdio: 'pipe',
+});
+log('   테스트 커밋 — 이제부터 코더가 만지면 잡힌다');
+
 // 3) 빨강 게이트 — 구현 없이 **정말** 실패하는가.
 const red = runTests(worktree, specTests);
 const redVerdict = redGate(red.counts);
@@ -231,12 +254,18 @@ while (round < MAX_ROUNDS) {
     ].join('\n'), round > 1);
 
   // 코더가 테스트를 고쳤으면 되돌린다. **조용히 넘어가지 않는다.**
+  // 커밋해 뒀으므로 코더가 만지면 ` M` 으로 온다. 새로 만든 테스트(`??`)도 잡는다 —
+  // 코더는 테스트를 **고치지도 만들지도** 못한다.
   const touched = changedPaths(worktree)
-    .filter((f) => isTest(f.path) && f.status !== '??')
+    .filter((f) => isTest(f.path))
     .map((f) => f.path);
   if (touched.length) {
     log(`   코더가 테스트를 고쳤습니다 — 되돌립니다: ${touched.join(', ')}`);
-    for (const p of touched) sh('git', ['checkout', '--', p], { cwd: worktree, stdio: 'pipe' });
+    for (const f of changedPaths(worktree).filter((x) => isTest(x.path))) {
+      // 새로 만든 것은 checkout 으로 못 지운다 — 지워야 한다.
+      if (f.status === '??') rmSync(join(worktree, f.path), { force: true, recursive: true });
+      else sh('git', ['checkout', '--', f.path], { cwd: worktree, stdio: 'pipe' });
+    }
   }
 
   // 루프 중에는 **해당 스펙 테스트만** 돈다. 전체는 265개 파일이라 12회를 못 버틴다.
