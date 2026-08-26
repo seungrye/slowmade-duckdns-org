@@ -150,6 +150,49 @@ function restoreTests(worktree, baseSha) {
   }
 }
 
+/** 지금 테스트 파일들의 내용을 한 덩어리로 — 클로드가 고쳤는지 보려고. */
+function readTests(worktree) {
+  return sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
+    .split('\n').filter(Boolean).filter(isTest).sort()
+    .map((p) => { try { return `${p}\n${readFileSync(join(worktree, p), 'utf8')}`; } catch { return p; } })
+    .join('\n---\n');
+}
+
+/**
+ * 초록 뒤 클로드가 구현을 읽고 판단한다.
+ *
+ * **테스트가 통과했다고 좋은 코드는 아니다.** 테스트만 겨우 통과하는 껍데기, 스펙에 없는
+ * 짓, 남의 자리를 건드린 것은 게이트가 못 잡는다. 사람이 아침에 보기 전에 한 번 거른다.
+ *
+ * @returns 문제가 있으면 그 내용, 괜찮으면 null.
+ */
+function review(worktree, spec) {
+  const out = join(tmpdir(), `pipeline-review-${Date.now()}.txt`);
+  claude(worktree, [
+    '코더가 구현을 마쳤고 테스트가 통과했습니다. **구현을 읽고 검수하세요.**',
+    '',
+    '## 무엇을 보나',
+    '- 스펙대로인가 — 빠뜨린 것, 스펙에 없는데 넣은 것',
+    '- **테스트만 겨우 통과하는 코드가 아닌가** (특정 입력에만 맞춘 분기 등)',
+    '- 스펙 범위 밖 파일을 건드리지 않았나',
+    '- 경계·예외에서 실제로 옳은가 — 테스트가 놓친 자리',
+    '',
+    '## 어떻게 답하나',
+    `문제가 **없으면** \`${out}\` 파일에 \`OK\` 한 줄만 쓰세요.`,
+    `문제가 **있으면** 같은 파일에 무엇이 왜 문제인지, 어떻게 고쳐야 하는지 적으세요.`,
+    '코더가 그 글을 그대로 받아 고칩니다 — 코더에게 말하듯 쓰세요.',
+    '',
+    '**구현을 직접 고치지 마세요.** 고치는 것은 코더 몫입니다.',
+    '',
+    '## 스펙',
+    spec,
+  ].join('\n'));
+  let text = '';
+  try { text = readFileSync(out, 'utf8').trim(); } catch { /* 안 썼으면 통과로 본다 */ }
+  rmSync(out, { force: true });
+  return !text || /^OK$/im.test(text.split('\n')[0]) ? null : text;
+}
+
 /**
  * 본체가 건드려졌는지 본다 — 뚫렸으면 **그 자리에서** 멈춘다.
  *
@@ -188,7 +231,9 @@ function claude(worktree, message) {
   runAgent('claude', [
     '-p', message,
     '--add-dir', worktree,
-    '--allowedTools', 'Read', 'Grep', 'Glob', 'Write', 'Edit',
+    // 검수 결과를 /tmp 에 적어야 해서 워크트리 밖 쓰기도 필요하다. 본체를 건드렸는지는
+    // 매 호출 뒤 assertRepoClean 이 확인하므로 격리는 그대로다.
+    '--allowedTools', 'Read', 'Grep', 'Glob', 'Write', 'Edit', 'Bash',
     '--permission-mode', 'acceptEdits',
   ], '클로드', worktree);
 }
@@ -203,9 +248,13 @@ function coder(worktree, message, cont) {
 // ── 시작 ────────────────────────────────────────────────────────────────
 
 const specPath = arg('spec', null);
-if (!specPath || !existsSync(specPath)) die('사용법: pipeline.mjs --spec <스펙파일> [--keep]');
+if (!specPath || !existsSync(specPath)) {
+  die('사용법: pipeline.mjs --spec <스펙파일> [--post <postId>] [--keep]');
+}
 const spec = readFileSync(specPath, 'utf8');
 const keep = process.argv.includes('--keep');
+// 막혔을 때 알릴 스레드. 없으면 알리지 않는다(손으로 돌릴 때).
+const POST_ID = arg('post', '');
 
 const stamp = Date.now();
 const worktree = resolve(arg('worktree', mkdtempSync(join(tmpdir(), `ai-pipeline-${stamp}-`))));
@@ -270,7 +319,7 @@ sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
 sh('git', ['commit', '-q', '-m', `test: ${spec.split('\n')[0].replace(/^#\s*/, '').slice(0, 60)}`], {
   cwd: worktree, stdio: 'pipe',
 });
-const TEST_SHA = sh('git', ['rev-parse', 'HEAD'], { cwd: worktree }).trim();
+let TEST_SHA = sh('git', ['rev-parse', 'HEAD'], { cwd: worktree }).trim();
 log('   테스트 커밋 — 이제부터 코더가 만지면 잡힌다');
 
 // 3) 빨강 게이트 — 구현 없이 **정말** 실패하는가.
@@ -288,6 +337,7 @@ writeFileSync(redFile, red.output, 'utf8');
 let round = 0;
 let green = null;
 let verdict = null;
+let 검수 = null;
 
 while (round < MAX_ROUNDS) {
   round++;
@@ -299,24 +349,65 @@ while (round < MAX_ROUNDS) {
       '- 스펙 범위 밖의 파일은 건드리지 마세요.',
     ].join('\n')
     : [
-      '아직 통과하지 않습니다. 아래를 보고 **구현만** 고치세요.',
+      round === 2 || !검수 ? '아직 통과하지 않습니다. 아래를 보고 **구현만** 고치세요.'
+        : '테스트는 통과했지만 검수에서 걸렸습니다. 아래를 보고 **구현만** 고치세요.',
       '- **테스트 파일은 절대 수정하지 마세요.**',
       '',
-      green.output.slice(-3000),
+      (검수 || green.output).slice(-3000),
     ].join('\n'), round > 1);
 
-  // 코더가 테스트를 고쳤으면 되돌린다. **조용히 넘어가지 않는다.**
+  // 코더가 테스트를 만졌으면 되돌린다. **조용히 넘어가지 않는다.**
   const touched = touchedTests(worktree, TEST_SHA);
   if (touched.length) {
     log(`   코더가 테스트를 만졌습니다 — 되돌립니다: ${touched.join(', ')}`);
     restoreTests(worktree, TEST_SHA);
   }
 
-  // 루프 중에는 **해당 스펙 테스트만** 돈다. 전체는 265개 파일이라 12회를 못 버틴다.
+  // 루프 중에는 **해당 스펙 테스트만** 돈다. 전체는 수백 개라 12회를 못 버틴다.
   green = runTests(worktree, specTests);
   verdict = greenGate(green.counts, touched);
-  if (verdict === GateVerdict.PASS) break;
-  log(`   아직입니다 (${verdict})`);
+  검수 = null;
+
+  if (verdict !== GateVerdict.PASS) {
+    // **클로드가 판단한다** — 구현이 틀렸나, 테스트가 틀렸나.
+    //
+    // 테스트는 클로드 것이고 책임도 클로드에게 있다. 코더에게 "테스트가 틀렸다" 고
+    // 넘기면 코더가 테스트를 고치려 들고, 그건 이 프로세스가 막는 바로 그 일이다.
+    log('   실패 — 클로드가 원인을 봅니다');
+    const before = readTests(worktree);
+    claude(worktree, [
+      '구현이 테스트를 통과하지 못합니다. 실패 출력을 보고 **원인이 어디인지** 판단하세요.',
+      '',
+      '- **테스트가 틀렸다면 당신이 고치세요.** 테스트는 당신 것이고 책임도 당신입니다.',
+      '  스펙을 잘못 읽었거나, 단언이 스펙과 다르거나, 경계를 잘못 잡은 경우입니다.',
+      '- **구현이 틀렸다면 아무것도 고치지 마세요.** 다음 회차에 코더가 고칩니다.',
+      '  구현 파일은 건드리지 마세요 — 그건 코더 몫입니다.',
+      '',
+      '판단이 서지 않으면 **고치지 마세요.** 멀쩡한 테스트를 구현에 맞춰 무르는 것이',
+      '가장 나쁜 결과입니다.',
+      '',
+      green.output.slice(-3000),
+    ].join('\n'));
+
+    // 클로드가 테스트를 고쳤으면 그 시점을 새 기준으로 삼는다 — 안 그러면 다음 회차에
+    // 그 수정이 "코더가 만진 것" 으로 잡혀 되돌아간다.
+    if (readTests(worktree) !== before) {
+      sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
+      sh('git', ['commit', '-q', '-m', `test: ${round}회차 — 클로드가 테스트를 고침`], {
+        cwd: worktree, stdio: 'pipe',
+      });
+      TEST_SHA = sh('git', ['rev-parse', 'HEAD'], { cwd: worktree }).trim();
+      log('   클로드가 테스트를 고쳤습니다 — 기준을 새로 잡습니다');
+    }
+    continue;
+  }
+
+  // 초록이다. 그런데 **테스트만 통과하는 코드일 수 있다** — 클로드가 읽고 판단한다.
+  log('   초록 — 클로드가 구현을 검수합니다');
+  검수 = review(worktree, spec);
+  if (검수 === null) { log(`   검수 통과 ✓ (${round}회차)`); break; }
+  log('   검수에서 걸렸습니다');
+  verdict = 'REVIEW_REJECTED';
 }
 
 if (verdict !== GateVerdict.PASS) {
@@ -341,6 +432,25 @@ if (verdict !== GateVerdict.PASS) {
     `\`git fetch && git checkout ${branch}\` 로 이어받으면 됩니다.`,
     '테스트는 그대로 두고 구현만 고치는 것이 이 프로세스의 규칙입니다.',
   ].join('\n');
+  // **스레드에 알린다** (#279). 이슈만 만들면 사람이 아침에 그걸 볼 이유가 없다.
+  // 여기서 막혔다고 덧글로 올려야 코더·사람이 이어받고, 필요하면 스펙부터 다시 짠다.
+  if (POST_ID) {
+    const 요약 = [
+      `파이프라인이 ${MAX_ROUNDS}회를 다 쓰고 막혔습니다 (${verdict}).`, '',
+      `- 브랜치 \`${branch}\` 에 올려 뒀습니다`,
+      `- 테스트 ${testFiles.length}건은 빨강을 통과했습니다(구현 없이 ${red.counts.numTotalTests}건 실패)`,
+      '', '마지막 실패:', '```', (검수 || green.output).slice(-1200), '```', '',
+      '**스펙 자체를 다시 봐야 할 수도 있습니다.** 구현이 계속 어긋나면 스펙이 애매하다는',
+      '뜻일 때가 많습니다 — 그렇게 보이면 스펙부터 고쳐 주세요.',
+    ].join('\n');
+    try {
+      sh(join(REPO, 'scripts/ai-team/api.sh'), ['comment', POST_ID, 'claude', 요약], { stdio: 'pipe' });
+      log('   스레드에 알렸습니다');
+    } catch {
+      log('   스레드 알림에 실패했습니다 — 이슈는 남습니다.');
+    }
+  }
+
   const title = `pipeline 미완: ${spec.split('\n')[0].slice(0, 60)}`;
   try {
     const url = sh('gh', ['issue', 'create', '--title', title, '--body', body], { cwd: REPO }).trim();
