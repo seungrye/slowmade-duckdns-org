@@ -132,15 +132,21 @@ systemctl list-timers ai-team.timer       # 다음 실행 시각
 
 ### 코더 러너 (#266)
 
-30분 뒤 **00:35** 에 코더가 돈다. 클로드가 남긴 덧글에 답하면서 **스레드 안에서 둘이
+**클로드가 끝나면 이어서** 코더가 돈다. 클로드가 남긴 덧글에 답하면서 **스레드 안에서 둘이
 주고받는다.** 사람은 아침에 그 오간 것을 본다.
 
 ```bash
 sudo install -m 0644 scripts/deploy/ai-team-coder.service /etc/systemd/system/
-sudo install -m 0644 scripts/deploy/ai-team-coder.timer   /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now ai-team-coder.timer
 ```
+
+**코더 타이머는 없다.** `ai-team.service` 가 `Wants=`·`Before=` 로 코더를 끌어오고
+`After=` 로 순서를 잡는다. `Type=oneshot` 이라 클로드의 `ExecStart` 가 빠져나가야 코더가
+시작한다.
+
+시각으로 간격을 두지 않는 이유: **클로드 실행 시간이 들쭉날쭉하다.** 실측 6~20분이고
+`TimeoutStartSec` 이 30분이라, 30분 간격을 두면 여유가 0 이다 — 스레드가 늘면 클로드가
+아직 도는 중에 코더가 시작해 옛 덧글을 보고 답한다.
 
 **차례는 이름(author)으로 본다. `isBot` 으로 보면 안 된다.** 덧글 라우트가 페르소나와
 무관하게 `isEnji: true` 로 저장하므로(`comment/route.ts:71`) 코더도 클로드도 똑같이 봇으로

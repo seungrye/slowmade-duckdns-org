@@ -1,7 +1,11 @@
 # 코더 야간 러너 (#266) — ai-team-coder.timer 가 하루 한 번 부른다.
 #
-# 클로드 러너(ai-team.service, 00:05) 30분 뒤에 돈다. 클로드가 남긴 덧글에 코더가 답하면서
-# 스레드 안에서 둘이 주고받는다. 사람은 아침에 그 오간 것을 본다.
+# **클로드 러너가 끝나면 이어서 돈다.** 타이머가 따로 없다 — ai-team.service 가 이 유닛을
+# 끌어오고(Wants), After 로 순서를 잡는다.
+#
+# 시각으로 간격을 두지 않는 이유: 클로드 실행 시간이 들쭉날쭉하다. 실측 6~20분이고
+# TimeoutStartSec 이 30분이라, 30분 간격을 두면 여유가 0 이다. 스레드가 늘면 클로드가
+# 아직 도는 중에 코더가 시작해 옛 덧글을 보고 답한다. systemd 에 맡기면 그 추측이 사라진다.
 #
 # 자율성은 클로드 러너와 같다 — **의견만** 낸다. coder-run.sh 가 opencode 에 편집 도구를
 # 주지 않으므로 프롬프트가 잘못 읽혀도 코드를 못 고친다. 실제 편집·PR 은 coder.mjs 가
@@ -9,9 +13,8 @@
 #
 # 설치:
 #   sudo install -m 0644 ai-team-coder.service /etc/systemd/system/ai-team-coder.service
-#   sudo install -m 0644 ai-team-coder.timer   /etc/systemd/system/ai-team-coder.timer
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now ai-team-coder.timer
+#   (타이머 없음 — ai-team.service 가 끝나면 systemd 가 이어서 돌린다)
 #
 # 한 번 돌려 보기(타이머 무시):  sudo systemctl start ai-team-coder.service
 # 무슨 일이 있었나:              journalctl -u ai-team-coder.service -n 200
@@ -20,6 +23,8 @@
 Description=AI 개발팀 코더 러너 (클로드 덧글에 응답)
 After=network-online.target
 Wants=network-online.target
+# 클로드가 **끝난 뒤에** 돈다. Type=oneshot 이라 ExecStart 가 빠져나가야 다음이 시작된다.
+After=ai-team.service
 
 [Service]
 Type=oneshot

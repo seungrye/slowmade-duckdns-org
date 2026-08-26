@@ -14,6 +14,10 @@
 
 [Unit]
 Description=AI 개발팀 야간 러너 (요청 스레드 확인 → 덧글)
+# 내가 끝나면 코더가 이어 돈다 (#266). Requires 가 아니라 Wants 인 이유: 내가 실패해도
+# 코더는 돌아도 된다 — 마지막 덧글이 사람이면 코더는 어차피 아무것도 안 한다.
+Wants=ai-team-coder.service
+Before=ai-team-coder.service
 # 새벽에 네트워크가 아직 안 올라와 있으면 API 호출이 통째로 실패한다.
 After=network-online.target
 Wants=network-online.target
