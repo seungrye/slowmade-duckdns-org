@@ -117,8 +117,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now ai-team.timer
 ```
 
-매일 **01:07**. 정각을 피한 건 이 호스트의 다른 타이머(00:00 dpkg-db-backup·exim4-base,
-00:20 logrotate)와 겹치지 않게 하려는 것이다.
+매일 **00:05**(KST). 날이 바뀐 직후에 한 바퀴 돌고 아침에 결과를 본다. 이 호스트는
+타임존이 `Asia/Seoul` 이라 `OnCalendar` 이 곧 한국시간이다. 정각을 피한 건 다른 타이머
+(00:00 dpkg-db-backup·exim4-base, 00:20 logrotate)와 겹치지 않게 하려는 것이다.
 
 ```bash
 sudo systemctl start ai-team.service      # 타이머 무시하고 한 번
@@ -131,7 +132,7 @@ systemctl list-timers ai-team.timer       # 다음 실행 시각
 
 ### 코더 러너 (#266)
 
-30분 뒤 **01:37** 에 코더가 돈다. 클로드가 남긴 덧글에 답하면서 **스레드 안에서 둘이
+30분 뒤 **00:35** 에 코더가 돈다. 클로드가 남긴 덧글에 답하면서 **스레드 안에서 둘이
 주고받는다.** 사람은 아침에 그 오간 것을 본다.
 
 ```bash
