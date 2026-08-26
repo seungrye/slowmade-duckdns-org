@@ -10,6 +10,7 @@ import Comment from '@/models/comment';
 import Post from '@/models/post';
 import { isObjectIdLike, requireAiTeam } from '@/lib/ai-team/guard';
 import { aiTeamPostFilter, isAiTeamPost, type AiTeamPostFields } from '@/lib/ai-team/thread-match';
+import { aiTurnsLeft } from '@/lib/ai-team/pingpong-limit';
 
 /** 스레드가 길어져도 이만큼만. 러너의 프롬프트가 무한정 늘어나지 않게. */
 const MAX_COMMENTS = 200;
@@ -67,6 +68,9 @@ export async function GET(req: NextRequest) {
     tags: post!.tags ?? [],
     createdAt: post!.createdAt ?? null,
     updatedAt: post!.updatedAt ?? null,
+    // 앞으로 몇 번 더 말할 수 있나 (#268). **막는 쪽과 같은 함수를 쓴다** — 어긋나면
+    // "한 번 남았다" 고 알려 놓고 거절하게 된다. 러너는 이 숫자를 보고 마무리를 짓는다.
+    aiTurnsLeft: aiTurnsLeft((comments ?? []).map((c) => ({ isBot: c.isEnji === true }))),
     comments: (comments ?? []).map((c) => ({
       id: String(c._id),
       parentId: c.parent ? String(c.parent) : null,

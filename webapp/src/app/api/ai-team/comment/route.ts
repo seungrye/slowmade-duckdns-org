@@ -12,6 +12,7 @@ import Comment from '@/models/comment';
 import Post from '@/models/post';
 import { isObjectIdLike, requireAiTeam } from '@/lib/ai-team/guard';
 import { aiTeamPostFilter, isAiTeamPost, type AiTeamPostFields } from '@/lib/ai-team/thread-match';
+import { isAiPingPongExhausted, AI_PINGPONG_LIMIT } from '@/lib/ai-team/pingpong-limit';
 
 /**
  * 쓸 수 있는 이름은 이 둘뿐 — 키를 쥐었다고 아무 이름으로나 글을 쓸 수 없다.
@@ -60,6 +61,25 @@ export async function POST(req: NextRequest) {
   // 마지막 방어선 — 여기서 막히면 키가 새도 요청 스레드 밖은 건드리지 못한다.
   if (!isAiTeamPost(post, gate.ownerEmail)) {
     return apiError('요청 스레드를 찾을 수 없습니다.', 404);
+  }
+
+  // 사람 없이 AI 끼리 영원히 주고받는 것을 여기서 끊는다 (#268).
+  //
+  // 클로드는 마지막이 coder 면 답하고 코더는 마지막이 claude 면 답한다 — 서로 상대를
+  // 깨우므로 사람이 다시 안 와도 멈추지 않는다. **프롬프트로 세게 하면 모델이 세다가
+  // 틀린다.** 이 저장소의 자율성 잠금이 전부 구조인 것과 같은 이유로 서버가 막는다.
+  //
+  // 사람이 한 마디 하면 셈이 0 으로 돌아가 다시 열린다 — 막는 것은 대화가 아니라
+  // "사람 없이 계속 도는 것" 이다.
+  const 지난덧글 = await Comment.find({ post: postId, isDeleted: { $ne: true } })
+    .sort({ createdAt: 1 })
+    .select('isEnji')
+    .lean<{ isEnji?: boolean }[]>();
+  if (isAiPingPongExhausted((지난덧글 ?? []).map((c) => ({ isBot: c.isEnji === true })))) {
+    return apiError(
+      `사람 없이 AI 끼리 ${AI_PINGPONG_LIMIT}번 오갔습니다. 사람이 한 마디 할 때까지 멈춥니다.`,
+      409,
+    );
   }
 
   const comment = new Comment({
