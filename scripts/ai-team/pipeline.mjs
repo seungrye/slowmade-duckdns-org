@@ -55,12 +55,25 @@ function arg(name, fallback) {
   return i !== -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 }
 
-/** git status 로 바뀐 경로들. `??`(신규)과 수정 둘 다. */
+/**
+ * git status 로 바뀐 경로들. `??`(신규)과 수정 둘 다.
+ *
+ * 테스트 감시에는 쓰지 않는다 — 코더가 커밋해 버리면 여기서 아무것도 안 잡힌다(#277).
+ * 그쪽은 [touchedTests] 가 커밋 시점과 견준다. 여기는 "클로드가 무엇을 만들었나" 처럼
+ * 커밋 전 상태를 볼 때만 쓴다.
+ *
+ * rename(`R  a -> b`)은 뒤쪽 경로를 취한다. 그게 지금 존재하는 파일이다.
+ */
 function changedPaths(worktree) {
   return sh('git', ['status', '--porcelain'], { cwd: worktree })
     .split('\n')
     .filter(Boolean)
-    .map((l) => ({ status: l.slice(0, 2).trim(), path: l.slice(3).trim() }));
+    .map((l) => {
+      const status = l.slice(0, 2).trim();
+      const rest = l.slice(3).trim();
+      const arrow = rest.indexOf(' -> ');
+      return { status, path: arrow === -1 ? rest : rest.slice(arrow + 4) };
+    });
 }
 
 /**
@@ -97,6 +110,44 @@ function runTests(worktree, paths) {
   }
   rmSync(out, { force: true });
   return { counts, output: detail || output };
+}
+
+/**
+ * 코더가 테스트를 만졌나 — **작업트리가 아니라 테스트 커밋 시점과 견준다.**
+ *
+ * `git status` 만 보면 **코더가 자기 수정을 커밋해 버리는 순간 통째로 뚫린다** — 작업트리가
+ * 깨끗해져 아무것도 안 잡힌다. 실제로 재현됐다. 코더는 워크트리에서 도는 일반 에이전트라
+ * git 을 쓸 수 있고, 프롬프트가 커밋을 시키진 않지만 막지도 않는다.
+ *
+ * `git diff <sha>` 는 커밋됐든 안 됐든 **그 시점과 지금 작업트리의 차이**를 준다.
+ */
+function touchedTests(worktree, baseSha) {
+  const changed = sh('git', ['diff', '--name-only', baseSha], { cwd: worktree })
+    .split('\n').filter(Boolean).filter(isTest);
+  const created = sh('git', ['ls-files', '--others', '--exclude-standard'], { cwd: worktree })
+    .split('\n').filter(Boolean).filter(isTest);
+  return [...new Set([...changed, ...created])];
+}
+
+/**
+ * 테스트를 클로드가 쓴 그 시점으로 되돌린다.
+ *
+ * 원래 있던 것은 그 시점 내용으로, 그 시점에 없던 것은 지운다. 코더가 커밋해 뒀더라도
+ * 파일 내용이 되돌아가므로 다음 판정은 되돌린 상태로 이뤄진다.
+ */
+function restoreTests(worktree, baseSha) {
+  const base = sh('git', ['ls-tree', '-r', '--name-only', baseSha], { cwd: worktree })
+    .split('\n').filter(Boolean).filter(isTest);
+  for (const p of base) {
+    sh('git', ['checkout', baseSha, '--', p], { cwd: worktree, stdio: 'pipe' });
+  }
+  const now = sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
+    .split('\n').filter(Boolean).filter(isTest);
+  for (const p of now.filter((x) => !base.includes(x))) {
+    rmSync(join(worktree, p), { force: true, recursive: true });
+    // 코더가 커밋해 색인에 올라가 있을 수 있다.
+    try { sh('git', ['rm', '--cached', '-q', '-f', p], { cwd: worktree, stdio: 'pipe' }); } catch { /* 색인에 없으면 그만 */ }
+  }
 }
 
 /**
@@ -219,6 +270,7 @@ sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
 sh('git', ['commit', '-q', '-m', `test: ${spec.split('\n')[0].replace(/^#\s*/, '').slice(0, 60)}`], {
   cwd: worktree, stdio: 'pipe',
 });
+const TEST_SHA = sh('git', ['rev-parse', 'HEAD'], { cwd: worktree }).trim();
 log('   테스트 커밋 — 이제부터 코더가 만지면 잡힌다');
 
 // 3) 빨강 게이트 — 구현 없이 **정말** 실패하는가.
@@ -254,18 +306,10 @@ while (round < MAX_ROUNDS) {
     ].join('\n'), round > 1);
 
   // 코더가 테스트를 고쳤으면 되돌린다. **조용히 넘어가지 않는다.**
-  // 커밋해 뒀으므로 코더가 만지면 ` M` 으로 온다. 새로 만든 테스트(`??`)도 잡는다 —
-  // 코더는 테스트를 **고치지도 만들지도** 못한다.
-  const touched = changedPaths(worktree)
-    .filter((f) => isTest(f.path))
-    .map((f) => f.path);
+  const touched = touchedTests(worktree, TEST_SHA);
   if (touched.length) {
-    log(`   코더가 테스트를 고쳤습니다 — 되돌립니다: ${touched.join(', ')}`);
-    for (const f of changedPaths(worktree).filter((x) => isTest(x.path))) {
-      // 새로 만든 것은 checkout 으로 못 지운다 — 지워야 한다.
-      if (f.status === '??') rmSync(join(worktree, f.path), { force: true, recursive: true });
-      else sh('git', ['checkout', '--', f.path], { cwd: worktree, stdio: 'pipe' });
-    }
+    log(`   코더가 테스트를 만졌습니다 — 되돌립니다: ${touched.join(', ')}`);
+    restoreTests(worktree, TEST_SHA);
   }
 
   // 루프 중에는 **해당 스펙 테스트만** 돈다. 전체는 265개 파일이라 12회를 못 버틴다.
