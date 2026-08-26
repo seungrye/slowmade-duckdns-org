@@ -35,6 +35,8 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 // 게이트 판정은 **테스트와 같은 파일**을 쓴다 — 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 import { redGate, greenGate, GateVerdict } from './gate.mjs';
+// 누가 무엇을 고쳤는지 가리는 규칙 — vitest 테스트가 같은 파일을 시험한다.
+import { isTest, isImpl, changedBetween } from './snapshot.mjs';
 
 const REPO = '/home/seungrye/site';
 const CODER_MODEL = process.env.AI_CODER_MODEL?.trim() || 'openrouter/stealth/ox-alpha';
@@ -48,7 +50,6 @@ const die = (m) => { console.error(`\x1b[1;31m[pipeline]\x1b[0m ${m}`); process.
 const sh = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 
-const isTest = (p) => /\.test\.(ts|tsx)$/.test(p);
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(`--${name}`);
@@ -150,12 +151,19 @@ function restoreTests(worktree, baseSha) {
   }
 }
 
-/** 지금 테스트 파일들의 내용을 한 덩어리로 — 클로드가 고쳤는지 보려고. */
-function readTests(worktree) {
-  return sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
-    .split('\n').filter(Boolean).filter(isTest).sort()
-    .map((p) => { try { return `${p}\n${readFileSync(join(worktree, p), 'utf8')}`; } catch { return p; } })
-    .join('\n---\n');
+/**
+ * 지금 파일들의 **내용**을 경로별로 — 누가 무엇을 고쳤는지 보려고.
+ *
+ * 이름만 비교하면 **기존 파일을 고친 것을 놓친다.** 새로 만든 것만 잡히고, 이미 있던
+ * 파일의 내용이 바뀐 것은 그대로 지나간다.
+ */
+function snapshot(worktree, pick) {
+  const out = new Map();
+  for (const p of sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
+    .split('\n').filter(Boolean).filter(pick)) {
+    try { out.set(p, readFileSync(join(worktree, p), 'utf8')); } catch { out.set(p, ''); }
+  }
+  return out;
 }
 
 /**
@@ -374,7 +382,10 @@ while (round < MAX_ROUNDS) {
     // 테스트는 클로드 것이고 책임도 클로드에게 있다. 코더에게 "테스트가 틀렸다" 고
     // 넘기면 코더가 테스트를 고치려 들고, 그건 이 프로세스가 막는 바로 그 일이다.
     log('   실패 — 클로드가 원인을 봅니다');
-    const before = readTests(worktree);
+    // 클로드 턴 **전**의 내용을 담아 둔다. 이름이 아니라 내용이어야 기존 파일을 고친
+    // 것까지 잡힌다.
+    const 테스트전 = snapshot(worktree, isTest);
+    const 구현전 = snapshot(worktree, isImpl);
     claude(worktree, [
       '구현이 테스트를 통과하지 못합니다. 실패 출력을 보고 **원인이 어디인지** 판단하세요.',
       '',
@@ -389,10 +400,28 @@ while (round < MAX_ROUNDS) {
       green.output.slice(-3000),
     ].join('\n'));
 
+    // **클로드가 구현을 만졌으면 되돌린다.**
+    //
+    // 코더가 테스트를 만지는 것은 기계로 막으면서 이쪽은 프롬프트로만 막으면 비대칭이다.
+    // 구현은 코더 몫이고, 클로드가 손대면 "코더가 스펙대로 만들었나" 를 잴 수 없게 된다.
+    const 만진구현 = changedBetween(구현전, snapshot(worktree, isImpl));
+    if (만진구현.length) {
+      log(`   클로드가 구현을 만졌습니다 — 되돌립니다: ${만진구현.join(', ')}`);
+      for (const x of 만진구현) {
+        if (구현전.has(x)) writeFileSync(join(worktree, x), 구현전.get(x), 'utf8');
+        else rmSync(join(worktree, x), { force: true, recursive: true });
+      }
+    }
+
     // 클로드가 테스트를 고쳤으면 그 시점을 새 기준으로 삼는다 — 안 그러면 다음 회차에
     // 그 수정이 "코더가 만진 것" 으로 잡혀 되돌아간다.
-    if (readTests(worktree) !== before) {
-      sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
+    //
+    // **테스트만 담는다.** `-A` 로 쓸어 담으면 코더가 만들던 구현까지 들어가, 커밋
+    // 메시지는 "테스트를 고침" 인데 내용은 다른 것이 된다.
+    if (changedBetween(테스트전, snapshot(worktree, isTest)).length) {
+      const 지금테스트 = sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
+        .split('\n').filter(Boolean).filter(isTest);
+      sh('git', ['add', '--', ...지금테스트], { cwd: worktree, stdio: 'pipe' });
       sh('git', ['commit', '-q', '-m', `test: ${round}회차 — 클로드가 테스트를 고침`], {
         cwd: worktree, stdio: 'pipe',
       });
