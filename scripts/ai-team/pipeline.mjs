@@ -115,12 +115,21 @@ function runAgent(cmd, args, who, worktree) {
   assertRepoClean(before, who);
 }
 
-/** 클로드 — 워크트리 안에서만 쓴다. */
+/**
+ * 클로드 — 워크트리 안에서만 쓴다.
+ *
+ * **`--permission-mode dontAsk` 만으로는 못 쓴다.** "묻지 않는다" 일 뿐 "허용한다" 가
+ * 아니라서, 허용 목록에 없는 도구는 묻지 않고 **거부**된다. 첫 시험에서 클로드가 테스트를
+ * 다 써 놓고도 파일로 저장하지 못해 채팅 출력만 남기고 끝났다 — 쓰기 도구를 명시한다.
+ *
+ * `--add-dir` 로 워크트리만 준다. 본체는 주지 않고, 끝난 뒤 `assertRepoClean` 이 확인한다.
+ */
 function claude(worktree, message) {
   runAgent('claude', [
     '-p', message,
     '--add-dir', worktree,
-    '--permission-mode', 'dontAsk',
+    '--allowedTools', 'Read', 'Grep', 'Glob', 'Write', 'Edit',
+    '--permission-mode', 'acceptEdits',
   ], '클로드', worktree);
 }
 
@@ -156,6 +165,19 @@ const wtModules = join(worktree, 'webapp/node_modules');
 if (!existsSync(wtModules)) {
   sh('ln', ['-s', join(REPO, 'webapp/node_modules'), wtModules], { stdio: 'pipe' });
 }
+
+// 저장소 훅(.claude/hooks/check-src-edit.sh)이 **마지막 워크플로 커밋이 `spec:` 이 아니면**
+// webapp/ 편집을 거부한다. 워크트리에도 .claude/settings.json 이 그대로 체크아웃되므로 훅이
+// 살아 있다. 첫 시험에서 클로드가 스스로 우회를 찾아냈는데, 그걸 매번 알아서 하기를 기대할
+// 수는 없다 — **파이프라인이 직접 스펙 커밋을 남긴다.**
+const specDir = join(worktree, 'docs/spec');
+sh('mkdir', ['-p', specDir], { stdio: 'pipe' });
+writeFileSync(join(specDir, `pipeline-${stamp}.md`), spec, 'utf8');
+sh('git', ['add', 'docs/spec'], { cwd: worktree, stdio: 'pipe' });
+sh('git', ['commit', '-q', '-m', `spec: ${spec.split('\n')[0].replace(/^#\s*/, '').slice(0, 60)}`], {
+  cwd: worktree, stdio: 'pipe',
+});
+log('   스펙 커밋 남김 (편집 훅 통과용)');
 
 // 2) 클로드 — 껍데기와 테스트. **구현은 쓰지 않는다.**
 log('1단계: 클로드가 테스트를 씁니다');
