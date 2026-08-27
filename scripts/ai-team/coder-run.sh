@@ -24,7 +24,7 @@ set -euo pipefail
 SITE_DIR="${SITE_DIR:-/home/seungrye/site}"
 ENV_FILE="${ENV_FILE:-$SITE_DIR/webapp/.env.local}"
 BASE_URL="${AI_TEAM_BASE_URL:-https://handmade.r-e.kr}"
-MODEL="${CODER_MODEL:-openrouter/z-ai/glm-5.3-flash}"
+MODEL="${CODER_MODEL:-openrouter/minimax/minimax-m3:free}"
 
 log() { printf '\033[1;35m[coder]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[coder]\033[0m %s\n' "$*" >&2; exit 1; }

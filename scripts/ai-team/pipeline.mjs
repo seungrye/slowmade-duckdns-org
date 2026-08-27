@@ -39,10 +39,18 @@ import { redGate, greenGate, GateVerdict } from './gate.mjs';
 import { isTest, isImpl, changedBetween } from './snapshot.mjs';
 
 const REPO = '/home/seungrye/site';
-// 코더 모델. `stealth/ox-alpha` 는 2026-08 에 **은퇴**했다 — OpenRouter 가 404 와 함께
-// "This model was ZAI's GLM-5.3 Flash" 를 돌려준다. 같은 모델의 정식 이름으로 바꾼 것이라
-// 동작은 그대로다. 또 죽으면 여기와 coder.mjs·coder-run.sh·.env.local 넷을 함께 고칠 것.
-const CODER_MODEL = process.env.AI_CODER_MODEL?.trim() || 'openrouter/z-ai/glm-5.3-flash';
+// 코더 모델 — **무료 모델을 못박아 쓴다.**
+//
+// `stealth/ox-alpha` 는 2026-08 에 은퇴했다(404). 후계인 `z-ai/glm-5.3-flash` 는 유료라
+// 무료로 돌렸다.
+//
+// **`openrouter/free` 를 쓰지 말 것.** 그건 무료 모델들 사이의 무작위 라우터라 호출마다
+// 어디로 갈지 모른다 — 실제로 `nvidia/nemotron-3.5-content-safety`(콘텐츠 분류기)로 가서
+// "PONG" 대신 "User Safety: safe" 를 돌려준 적이 있다. 코더로는 못 쓴다.
+//
+// 바꾸려면 `AI_CODER_MODEL` 만 주면 된다. 이 값을 손댈 땐 coder.mjs·coder-run.sh·
+// .env.local 넷을 함께 고칠 것.
+const CODER_MODEL = process.env.AI_CODER_MODEL?.trim() || 'openrouter/minimax/minimax-m3:free';
 
 /** 논의 루프 상한. 넘으면 브랜치를 올리고 이슈를 만든 뒤 덧글로 넘긴다. */
 const MAX_ROUNDS = 12;
