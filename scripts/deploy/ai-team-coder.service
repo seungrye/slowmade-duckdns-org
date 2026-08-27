@@ -7,9 +7,13 @@
 # 정해 두면 스레드가 늘었을 때 클로드가 아직 도는 중에 코더가 시작해 옛 덧글을 보고 답한다.
 # systemd 에 맡기면 그 추측이 사라진다.
 #
-# 자율성은 클로드 러너와 같다 — **의견만** 낸다. coder-run.sh 가 opencode 에 편집 도구를
-# 주지 않으므로 프롬프트가 잘못 읽혀도 코드를 못 고친다. 실제 편집·PR 은 coder.mjs 가
-# 사람이 부를 때 따로 한다.
+# 자율성은 클로드 러너와 같다 — **의견만** 낸다. coder-run.sh 가 `--agent commenter` 로
+# 띄우고 opencode.json 이 그 에이전트에게서 편집 도구를 빼므로, 프롬프트가 잘못 읽혀도
+# 코드를 못 고친다. 실제 편집·PR 은 coder.mjs 가 사람이 부를 때 따로 한다.
+#
+# 이 문단은 오래 "편집 도구를 주지 않으므로" 라고만 적혀 있었는데 **그때는 사실이 아니었다** —
+# opencode 에 아무 제한도 안 걸려 있었고 --dir 가 라이브 작업트리였다. 실측으로 확인하고
+# 고쳤다(#286).
 #
 # 설치:
 #   sudo install -m 0644 ai-team-coder.service /etc/systemd/system/ai-team-coder.service
