@@ -17,8 +17,20 @@
 #
 # ── 코드를 고치지 않는다 ────────────────────────────────────────────────
 #
-# 여기서는 **의견만** 낸다. 실제 편집·PR 은 coder.mjs 가 따로 한다. 그래서 편집 도구를
-# 아예 주지 않는다 — 프롬프트가 잘못 읽혀도 파일을 못 고친다. 클로드 러너와 같은 원칙이다.
+# 여기서는 **의견만** 낸다. 실제 편집·PR 은 coder.mjs 가 따로 한다.
+#
+# 이 문단은 오랫동안 "편집 도구를 아예 주지 않는다" 고 적혀 있었는데 **사실이 아니었다.**
+# 클로드 러너는 `--disallowedTools Edit Write NotebookEdit` 로 실제로 막지만(run.sh:232),
+# 이쪽은 `opencode run` 에 아무 제한도 걸지 않았고 전역 설정도 비어 있었다. 재 봤다 —
+# 격리 디렉터리에서 시키니 그냥 `Write` 로 파일을 고쳤다. 게다가 `--dir` 가 **라이브
+# 작업트리**(~/site)라 그대로 실서비스 트리를 건드릴 수 있었다.
+#
+# 이제 `--agent commenter` 로 돈다. `opencode.json` 이 그 에이전트에게서 `edit` 를 빼고
+# bash 를 화이트리스트로 좁힌다 — api.sh 와 읽기 전용 git 만. 실측으로 확인했다:
+# `write`·`edit` 도구가 목록에서 사라지고, `printf > 파일`·`cat > 파일` 은 규칙에 막힌다.
+#
+# **파이프라인의 코더는 이 제한을 받지 않는다.** 그쪽은 `--agent` 를 안 주므로 기본
+# 에이전트로 돌고, 격리된 /tmp 워크트리에서 실제로 구현을 써야 하기 때문이다.
 set -euo pipefail
 
 SITE_DIR="${SITE_DIR:-/home/seungrye/site}"
@@ -31,6 +43,22 @@ die() { printf '\033[1;31m[coder]\033[0m %s\n' "$*" >&2; exit 1; }
 
 command -v opencode >/dev/null 2>&1 || die "opencode 를 찾을 수 없습니다 (PATH: $PATH)"
 [[ -r "$ENV_FILE" ]] || die "env 파일을 읽을 수 없습니다: $ENV_FILE"
+
+# 제한이 **실제로 걸리는지** 먼저 본다.
+#
+# `--agent` 는 못 찾으면 오류를 내지 않는다 — 경고 한 줄 뒤 **기본 에이전트로 조용히
+# 떨어진다.** 실측:
+#
+#   ! agent "commenter" not found. Falling back to default agent
+#   > build · minimax/minimax-m3:free      ← 그대로 진행됐다
+#
+# 기본 에이전트는 아무 제한이 없고 `--dir` 는 라이브 작업트리다. 설정이 없으면 무방비로
+# 도는 것이므로 여기서 멈춘다.
+AGENT_CONFIG="${AGENT_CONFIG:-$SITE_DIR/opencode.json}"
+[[ -r "$AGENT_CONFIG" ]] \
+  || die "opencode.json 을 읽을 수 없습니다: $AGENT_CONFIG — 편집 도구 제한이 안 걸립니다."
+grep -q '"commenter"' "$AGENT_CONFIG" \
+  || die "$AGENT_CONFIG 에 commenter 에이전트가 없습니다 — 제한 없이 돌게 됩니다." 
 
 # 파일 전체를 source 하지 않는다 — 다른 비밀까지 환경에 올릴 이유가 없다. 값만 꺼낸다.
 pick() {
@@ -95,6 +123,10 @@ PROMPT=$(cat <<'PROMPT_END'
 | 1~2 | **마무리를 지으세요** — 결론을 이번에 적습니다 |
 | 0 | 서버가 거절합니다(409). 쓰지 마세요 |
 
+남은 횟수가 **1~2 면 그 덧글에 "이 스레드가 곧 멈춘다" 고 한 줄 적으세요** (#281).
+한도에 닿으면 그 뒤로는 아무도 아무 말을 못 남깁니다. 사람 쪽에서 보면 할 말이 없어서
+조용한 것인지 막혀서 조용한 것인지 구분이 안 됩니다.
+
 사람이 한 마디 하면 다시 가득 찹니다.
 
 ## 어떻게 쓰나
@@ -128,6 +160,6 @@ PROMPT_END
 # 프롬프트는 확장이 일어나지 않는 heredoc 으로 쓴다(달러 기호가 섞이면 안 되므로).
 PROMPT="${PROMPT//@API@/$API}"
 
-opencode run --dir "$SITE_DIR" -m "$MODEL" "$PROMPT"
+opencode run --dir "$SITE_DIR" --agent commenter -m "$MODEL" "$PROMPT"
 
 log "완료"

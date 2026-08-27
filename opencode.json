@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "commenter": {
+      "description": "야간 러너 — 요청 스레드에 덧글만 단다. 코드는 고치지 않는다.",
+      "mode": "primary",
+      "permission": {
+        "edit": "deny",
+        "task": "deny",
+        "webfetch": "deny",
+        "websearch": "deny",
+        "bash": {
+          "*": "deny",
+          "*scripts/ai-team/api.sh *": "allow",
+          "git log*": "allow",
+          "git diff*": "allow",
+          "git status*": "allow",
+          "ls*": "allow"
+        }
+      }
+    }
+  }
+}
