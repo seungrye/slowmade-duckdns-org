@@ -89,6 +89,18 @@ health_check() {
     return 1
 }
 
+# 인스턴스의 현재 MainPID. 멈춰 있으면 0, 유닛이 없으면 빈 문자열.
+#
+# 재시작이 **실제로 일어났는지** 재는 데 쓴다. 살아 있나만 보는 health check 로는
+# "옛 프로세스가 새 빌드 디렉터리를 들고 서빙" 하는 상태를 구분하지 못한다(#263).
+instance_pid() {
+    # `set -euo pipefail` 아래다 — 유닛이 없어 systemctl 이 실패해도 **배포를 죽이면 안 된다.**
+    # 못 읽으면 빈 문자열로 두고, 판정은 호출측이 한다.
+    local out=""
+    out=$(systemctl show "webapp@$1" --property=MainPID --value 2>/dev/null) || out=""
+    printf '%s' "${out//[[:space:]]/}"
+}
+
 ensure_bevy_wasm() {
     # bevy-rogue WASM 번들이 public/games/bevy-rogue/ 에 있는지 검사.
     # 핵심 파일(bevy_rogue.js + bevy_rogue_bg.wasm) 둘 다 있어야 OK.
@@ -161,9 +173,32 @@ main() {
     NEXT_DISTDIR=".next-${inactive}" pnpm install --frozen-lockfile
     NEXT_DISTDIR=".next-${inactive}" pnpm build
 
-    log "systemctl enable --now webapp@${inactive}"
-    # enable 도 함께 — 첫 배포에서 인스턴스를 부팅 자동 시작 대상에 등록.
-    sudo systemctl enable --now "webapp@${inactive}"
+    # **`--now` 로는 부족하다** (#263). `--now` 는 **꺼져 있을 때만 켠다** — 이미 떠 있으면
+    # 아무 일도 하지 않는다. 그래서 그 인스턴스가 어떤 이유로든 계속 떠 있었으면 **옛
+    # 프로세스가 새 빌드 디렉터리를 그대로 들고 서빙한다.**
+    #
+    # #261 을 머지하고 배포했을 때 실제로 그랬다. "✓ deploy complete" 가 찍혔는데 새로
+    # 넣은 라우트가 404 였다 — 빌드 산출물엔 route.js 가 있었고(13:42), webapp@3010 은
+    # 어제(23:45) 뜬 프로세스 그대로였다. 빌드 ID 가 같아 겉으로 구분도 안 되고, health
+    # check 도 통과한다(프로세스는 멀쩡히 살아 있으니).
+    #
+    # `restart` 는 꺼져 있으면 켜고 떠 있으면 다시 띄우므로 두 경우 모두 새 코드가 나간다.
+    log "systemctl enable + restart webapp@${inactive}"
+    # enable — 첫 배포에서 인스턴스를 부팅 자동 시작 대상에 등록.
+    sudo systemctl enable "webapp@${inactive}"
+    local pid_before pid_after
+    pid_before=$(instance_pid "$inactive")
+    sudo systemctl restart "webapp@${inactive}"
+    pid_after=$(instance_pid "$inactive")
+
+    # 재시작이 **실제로** 일어났는지 본다. 조용한 실패를 다시 겪지 않으려는 것이다.
+    if [[ -z "$pid_after" || "$pid_after" == "0" ]]; then
+        die "deploy aborted: webapp@${inactive} 가 뜨지 않았습니다 (MainPID=${pid_after:-none})."
+    fi
+    if [[ "$pid_before" == "$pid_after" ]]; then
+        die "deploy aborted: webapp@${inactive} 가 재시작되지 않았습니다 (PID ${pid_before} 그대로) — 새 빌드가 안 나갑니다."
+    fi
+    log "restarted webapp@${inactive} (pid ${pid_before:-none} → ${pid_after})"
 
     log "health check http://127.0.0.1:${inactive}${HEALTH_PATH} (timeout=${HEALTH_TIMEOUT_SEC}s)"
     if ! health_check "$inactive"; then
