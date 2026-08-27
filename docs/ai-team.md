@@ -8,8 +8,10 @@
 페르소나 이름은 `claude` 와 `coder` 둘이다. 코더를 어느 모델로 돌리는지는
 `AI_CODER_MODEL` 이 정한다 — **모델은 갈려도 역할은 그대로**라 이름을 벤더에 묶지 않는다.
 
-지금 구현된 것은 **1단계**(#207): AI 둘이 요청 스레드를 읽고 쓸 통로와, 매일 새벽 한 번
-깨어나는 장치. MiniMax 코더 하네스는 2단계다.
+통로와 매일 새벽 한 번 깨어나는 장치가 #207 에서 섰고, 코더 하네스(#224)·코더 전용
+러너(#266)·업무 프로세스 파이프라인(#269)이 그 위에 얹혔다. 코더 모델은 지금
+`openrouter/minimax/minimax-m3:free` 로 못박혀 있다 — `openrouter/free` 는 무료 모델
+사이의 무작위 라우터라 콘텐츠 분류기로 새는 것을 확인해 쓰지 않는다.
 
 ## 자율성 수준 — (A) 제안만
 
@@ -23,7 +25,7 @@
 
 ```
 --disallowedTools Edit Write NotebookEdit
---allowedTools Read Grep Glob "Bash(curl *)" "Bash(git log*)" ...
+--allowedTools Read Grep Glob "Bash(<api.sh 경로> *)" "Bash(git log*)" ...
 ```
 
 파일 수정 도구가 아예 없으므로, 프롬프트가 잘못 읽혀도 코드를 못 고친다.
@@ -88,7 +90,7 @@ userEmail === OWNER_EMAIL   AND   isPrivate === true   AND   tags 에 ai-req
 
 ## API
 
-셋 다 헤더 `x-ai-team-key` 로만 인증한다. 불일치·미설정이면 **404**(존재 비노출).
+넷 다 헤더 `x-ai-team-key` 로만 인증한다. 불일치·미설정이면 **404**(존재 비노출).
 
 | 라우트 | 하는 일 |
 |---|---|
@@ -157,7 +159,7 @@ sudo systemctl daemon-reload
 코더가 고치고, 테스트를 고쳐야 한다면 그건 클로드가 한다. 책임이 클로드에게 있기 때문이다.
 
 ```bash
-scripts/ai-team/pipeline.mjs --spec <스펙파일> [--keep]
+scripts/ai-team/pipeline.mjs --spec <스펙파일> [--post <postId>] [--keep]
 ```
 
 **야간 러너가 판단해서 부른다 (#279).** 스펙이 분명해졌고 만들 차례라고 보이면 클로드가
@@ -257,7 +259,6 @@ AI 끼리(클로드↔코더) 주고받을 때는 **평소 대화체**로 쓴다
 
 ## 아직 없는 것
 
-- **MiniMax 코더 하네스** — 2단계. 계정 결제 후.
 - **자율 코드 수정·PR·머지·배포** — (A) 라서 하지 않는다. 루프가 어떻게 도는지 몇 번 보고
   넓힐지 정한다.
 - **덧글 수 표시** — 목록에는 없다. 상세를 부르면 나온다.
