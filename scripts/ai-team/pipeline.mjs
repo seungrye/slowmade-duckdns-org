@@ -36,7 +36,13 @@ import { tmpdir } from 'node:os';
 // 게이트 판정은 **테스트와 같은 파일**을 쓴다 — 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 import { redGate, greenGate, GateVerdict } from './gate.mjs';
 // 누가 무엇을 고쳤는지 가리는 규칙 — vitest 테스트가 같은 파일을 시험한다.
-import { isTest, isImpl, changedBetween } from './snapshot.mjs';
+import { isTest, isImpl } from './snapshot.mjs';
+// 워크트리를 어디서 갈라낼지 (#284).
+import { resolveBase } from './base.mjs';
+// 막혔을 때 무엇을 남길지 — 되돌리기 계획과 보고 문구 (#282, #283).
+import {
+  StuckKind, revertPlan, needsRebaseline, stuckTitle, stuckIssueBody, stuckComment,
+} from './rescue.mjs';
 
 const REPO = '/home/seungrye/site';
 // 코더 모델 — **무료 모델을 못박아 쓴다.**
@@ -231,8 +237,11 @@ function runAgent(cmd, args, who, worktree) {
     // 출력을 삼키지 않는다 — 삼켰더니 "아무것도 안 만들어졌다" 는 결과만 남고 왜인지
     // 알 수 없었다(coder.mjs 의 교훈).
     sh(cmd, args, { cwd: worktree, stdio: ['ignore', 'inherit', 'inherit'] });
-  } catch {
-    die(`${who} 실행이 실패했습니다 (위 출력 참고).`);
+  } catch (e) {
+    // **아무것도 안 남기고 죽지 않는다** (#283). 예전엔 여기서 die() 로 끝나 이슈도
+    // 덧글도 push 도 없었다 — 코더 모델이 은퇴한 동안 야간 러너가 매일 밤 1회차에서
+    // 죽었고 흔적은 systemd 로그뿐이었다. 12회 소진 경로가 하는 것을 똑같이 한다.
+    salvage({ kind: StuckKind.AGENT_FAILED, who, output: `${e?.message ?? e}` });
   }
   assertRepoClean(before, who);
 }
@@ -264,6 +273,75 @@ function coder(worktree, message, cont) {
   ], '코더', worktree);
 }
 
+/**
+ * 지금까지 잰 것. 막히면 그대로 보고에 실린다.
+ *
+ * 아직 못 잰 것은 `null` 로 둔다 — 1회차에서 에이전트가 죽으면 빨강도 테스트도 없다.
+ * 예전 보고 코드는 `red.counts.numTotalTests` 를 그대로 읽어 **바로 그 자리에서 다시
+ * 터졌다**(#283).
+ */
+const 상황 = { testFiles: [], redCount: null, round: 0, verdict: null, output: '' };
+
+/**
+ * 막혔을 때 남길 것을 **한 곳에서** (#283).
+ *
+ * 브랜치 push → 스레드 덧글 → 이슈 생성. 예전엔 이 셋이 12회 소진 경로에만 있었고,
+ * 에이전트 호출이 실패하는 경우엔 안 붙어 있었다. 이제 둘 다 여기를 부른다.
+ *
+ * 문구는 `rescue.mjs` 가 만든다 — 부수효과와 섞여 있으면 시험할 수 없다.
+ * **여기서 프로세스가 끝난다**(exit 2).
+ */
+function salvage({ kind, who, output }) {
+  log(kind === StuckKind.AGENT_FAILED
+    ? `${who} 실행이 실패했습니다 — 브랜치를 올리고 이슈를 만듭니다`
+    : `${MAX_ROUNDS}회를 다 썼습니다 — 브랜치를 올리고 이슈를 만듭니다`);
+
+  // 1) 지금까지의 작업을 브랜치로. **버리지 않는다.** 담을 것이 없어도 계속 간다.
+  try {
+    sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
+    sh('git', ['commit', '-q', '-m', `pipeline(미완): ${spec.split('\n')[0].slice(0, 60)}`], {
+      cwd: worktree, stdio: 'pipe',
+    });
+  } catch { /* 담을 것이 없다 — 스펙 커밋만 있는 상태일 수 있다 */ }
+  let pushed = false;
+  try {
+    sh('git', ['push', '-q', '-u', 'origin', branch], { cwd: worktree, stdio: 'pipe' });
+    pushed = true;
+  } catch { log('   브랜치 push 에 실패했습니다.'); }
+
+  const info = {
+    kind, who, spec, maxRounds: MAX_ROUNDS, ...상황,
+    branch: pushed ? branch : null,
+    // 지울 워크트리 경로를 적어 봐야 이어받을 수 없다.
+    worktree: keep ? worktree : null,
+    output: output || 상황.output,
+  };
+
+  // 2) **스레드에 알린다** (#279). 이슈만 만들면 사람이 아침에 그걸 볼 이유가 없다.
+  if (POST_ID) {
+    try {
+      sh(join(REPO, 'scripts/ai-team/api.sh'), ['comment', POST_ID, 'claude', stuckComment(info)], { stdio: 'pipe' });
+      log('   스레드에 알렸습니다');
+    } catch {
+      log('   스레드 알림에 실패했습니다 — 이슈는 남습니다.');
+    }
+  }
+
+  // 3) 이슈 — 나중에 이어받을 사람이 읽는다.
+  try {
+    const url = sh('gh', ['issue', 'create',
+      '--title', stuckTitle(kind, spec), '--body', stuckIssueBody(info)], { cwd: REPO }).trim();
+    log(`   이슈: ${url}`);
+  } catch {
+    log('   이슈 생성에 실패했습니다 — 브랜치는 올라가 있습니다.');
+  }
+
+  if (!keep) {
+    try { sh('git', ['worktree', 'remove', '--force', worktree], { cwd: REPO, stdio: 'pipe' }); } catch { /* 이미 없다 */ }
+  }
+  process.exit(2);
+}
+
 // ── 시작 ────────────────────────────────────────────────────────────────
 
 const specPath = arg('spec', null);
@@ -284,8 +362,14 @@ if (!process.env.OPENROUTER_API_KEY?.trim()) die('OPENROUTER_API_KEY 가 환경�
 
 // 1) 워크트리
 rmSync(worktree, { recursive: true, force: true });
-log(`워크트리 ${worktree} (${branch})`);
-sh('git', ['worktree', 'add', '-b', branch, worktree, 'main'], { cwd: REPO, stdio: 'pipe' });
+// **지금 HEAD 에서 갈라낸다** (#284). 'main' 을 못박아 두면 어느 브랜치에서 돌리든 워크트리
+// 내용이 main 이라 그 브랜치가 새로 넣은 테스트가 워크트리에 없다 — 자기 자신을 검증하지
+// 못한다. 못박고 싶으면 `PIPELINE_BASE=main`.
+let headRef = '';
+try { headRef = sh('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: REPO }).trim(); } catch { /* 못 읽으면 main */ }
+const base = resolveBase({ envBase: process.env.PIPELINE_BASE, headRef });
+log(`워크트리 ${worktree} (${branch}) — ${base} 에서 갈라냅니다`);
+sh('git', ['worktree', 'add', '-b', branch, worktree, base], { cwd: REPO, stdio: 'pipe' });
 
 // 갓 만든 워크트리엔 node_modules 가 없어 vitest 가 아예 못 돈다. 재설치는 수 분이라
 // 본체 것을 가리킨다 — 같은 커밋의 같은 package.json 이다.
@@ -323,6 +407,7 @@ const afterWrite = changedPaths(worktree);
 const testFiles = afterWrite.filter((f) => isTest(f.path)).map((f) => f.path);
 if (!testFiles.length) die('테스트 파일이 만들어지지 않았습니다.');
 log(`   테스트 ${testFiles.length}건: ${testFiles.join(', ')}`);
+상황.testFiles = testFiles;
 
 const specTests = testFiles.map((p) => p.replace(/^webapp\//, ''));
 
@@ -349,6 +434,7 @@ if (redVerdict !== GateVerdict.PASS) {
   die(`빨강 게이트 실패(${redVerdict}). 작업 공간을 남깁니다: ${worktree}`);
 }
 log(`   빨강 확인 ✓ (${red.counts.numTotalTests}건 모두 실패)`);
+상황.redCount = red.counts.numTotalTests;
 const redFile = `/tmp/ai-pipeline-${stamp}-RED.txt`;
 writeFileSync(redFile, red.output, 'utf8');
 
@@ -360,6 +446,7 @@ let 검수 = null;
 
 while (round < MAX_ROUNDS) {
   round++;
+  상황.round = round;
   log(`${round}회차: 코더가 구현합니다`);
   coder(worktree, round === 1
     ? [
@@ -386,6 +473,8 @@ while (round < MAX_ROUNDS) {
   green = runTests(worktree, specTests);
   verdict = greenGate(green.counts, touched);
   검수 = null;
+  상황.verdict = verdict;
+  상황.output = green.output;
 
   if (verdict !== GateVerdict.PASS) {
     // **클로드가 판단한다** — 구현이 틀렸나, 테스트가 틀렸나.
@@ -415,12 +504,12 @@ while (round < MAX_ROUNDS) {
     //
     // 코더가 테스트를 만지는 것은 기계로 막으면서 이쪽은 프롬프트로만 막으면 비대칭이다.
     // 구현은 코더 몫이고, 클로드가 손대면 "코더가 스펙대로 만들었나" 를 잴 수 없게 된다.
-    const 만진구현 = changedBetween(구현전, snapshot(worktree, isImpl));
-    if (만진구현.length) {
-      log(`   클로드가 구현을 만졌습니다 — 되돌립니다: ${만진구현.join(', ')}`);
-      for (const x of 만진구현) {
-        if (구현전.has(x)) writeFileSync(join(worktree, x), 구현전.get(x), 'utf8');
-        else rmSync(join(worktree, x), { force: true, recursive: true });
+    const 되돌릴것 = revertPlan(구현전, snapshot(worktree, isImpl));
+    if (되돌릴것.length) {
+      log(`   클로드가 구현을 만졌습니다 — 되돌립니다: ${되돌릴것.map((x) => x.path).join(', ')}`);
+      for (const { path, content } of 되돌릴것) {
+        if (content === null) rmSync(join(worktree, path), { force: true, recursive: true });
+        else writeFileSync(join(worktree, path), content, 'utf8');
       }
     }
 
@@ -429,7 +518,7 @@ while (round < MAX_ROUNDS) {
     //
     // **테스트만 담는다.** `-A` 로 쓸어 담으면 코더가 만들던 구현까지 들어가, 커밋
     // 메시지는 "테스트를 고침" 인데 내용은 다른 것이 된다.
-    if (changedBetween(테스트전, snapshot(worktree, isTest)).length) {
+    if (needsRebaseline(테스트전, snapshot(worktree, isTest))) {
       const 지금테스트 = sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
         .split('\n').filter(Boolean).filter(isTest);
       sh('git', ['add', '--', ...지금테스트], { cwd: worktree, stdio: 'pipe' });
@@ -448,58 +537,16 @@ while (round < MAX_ROUNDS) {
   if (검수 === null) { log(`   검수 통과 ✓ (${round}회차)`); break; }
   log('   검수에서 걸렸습니다');
   verdict = 'REVIEW_REJECTED';
+  상황.verdict = verdict;
+  상황.output = 검수;
 }
 
 if (verdict !== GateVerdict.PASS) {
   // 7) 12회를 다 썼다. **버리지 않는다** — 브랜치를 올리고 이슈를 만들어 이어받게 한다.
-  log(`${MAX_ROUNDS}회를 다 썼습니다. 브랜치를 올리고 이슈를 만듭니다`);
-  sh('git', ['add', '-A'], { cwd: worktree, stdio: 'pipe' });
-  sh('git', ['commit', '-q', '-m', `pipeline(미완): ${spec.split('\n')[0].slice(0, 60)}`], {
-    cwd: worktree, stdio: 'pipe',
-  });
-  sh('git', ['push', '-q', '-u', 'origin', branch], { cwd: worktree, stdio: 'pipe' });
-
-  const body = [
-    '## 목적', spec.split('\n').slice(0, 12).join('\n'), '',
-    '## 어디까지 갔나',
-    `- 브랜치 \`${branch}\` 에 올려 뒀습니다`,
-    `- 테스트 ${testFiles.length}건: ${testFiles.join(', ')}`,
-    `- 빨강은 통과했습니다(구현 없이 ${red.counts.numTotalTests}건 실패)`,
-    `- 구현을 ${MAX_ROUNDS}회 고쳤지만 초록에 못 갔습니다 (${verdict})`, '',
-    '## 마지막 실패',
-    '```', green.output.slice(-2000), '```', '',
-    '## 이어서 하려면',
-    `\`git fetch && git checkout ${branch}\` 로 이어받으면 됩니다.`,
-    '테스트는 그대로 두고 구현만 고치는 것이 이 프로세스의 규칙입니다.',
-  ].join('\n');
-  // **스레드에 알린다** (#279). 이슈만 만들면 사람이 아침에 그걸 볼 이유가 없다.
-  // 여기서 막혔다고 덧글로 올려야 코더·사람이 이어받고, 필요하면 스펙부터 다시 짠다.
-  if (POST_ID) {
-    const 요약 = [
-      `파이프라인이 ${MAX_ROUNDS}회를 다 쓰고 막혔습니다 (${verdict}).`, '',
-      `- 브랜치 \`${branch}\` 에 올려 뒀습니다`,
-      `- 테스트 ${testFiles.length}건은 빨강을 통과했습니다(구현 없이 ${red.counts.numTotalTests}건 실패)`,
-      '', '마지막 실패:', '```', (검수 || green.output).slice(-1200), '```', '',
-      '**스펙 자체를 다시 봐야 할 수도 있습니다.** 구현이 계속 어긋나면 스펙이 애매하다는',
-      '뜻일 때가 많습니다 — 그렇게 보이면 스펙부터 고쳐 주세요.',
-    ].join('\n');
-    try {
-      sh(join(REPO, 'scripts/ai-team/api.sh'), ['comment', POST_ID, 'claude', 요약], { stdio: 'pipe' });
-      log('   스레드에 알렸습니다');
-    } catch {
-      log('   스레드 알림에 실패했습니다 — 이슈는 남습니다.');
-    }
-  }
-
-  const title = `pipeline 미완: ${spec.split('\n')[0].slice(0, 60)}`;
-  try {
-    const url = sh('gh', ['issue', 'create', '--title', title, '--body', body], { cwd: REPO }).trim();
-    log(`   이슈: ${url}`);
-  } catch {
-    log('   이슈 생성에 실패했습니다 — 브랜치는 올라가 있습니다.');
-  }
-  if (!keep) sh('git', ['worktree', 'remove', '--force', worktree], { cwd: REPO, stdio: 'pipe' });
-  process.exit(2);
+  //
+  //    에이전트 호출이 실패한 경우와 **같은 경로**를 쓴다 (#283). 예전엔 이쪽에만 안전망이
+  //    붙어 있어서, 호출 자체가 실패하면 아무것도 안 남고 끝났다.
+  salvage({ kind: StuckKind.ROUNDS_EXHAUSTED, output: 검수 || green.output });
 }
 
 log(`   초록 확인 ✓ (${round}회차)`);
