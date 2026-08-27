@@ -62,3 +62,21 @@ systemd 로그뿐이었다.
 - `stuckComment` — `POST_ID` 없이도 만들어지고, 출력이 길면 잘린다
 - `resolveBase` — env 우선, 없으면 HEAD, detached 면 main
 - 위 전부 네트워크·파일 없이 도는 vitest 테스트로 덮인다
+
+---
+
+## ✅ 완료 (2026-08-27)
+
+| 수용 기준 | 결과 |
+|---|---|
+| `revertPlan` — 생성/수정/무변경 | ✅ 삭제된 것을 되살리는 경우까지 덮음 |
+| `needsRebaseline` — 내용 기준 | ✅ 생성·수정·삭제 모두 참, 동일이면 거짓 |
+| `stuckIssueBody` — 네 가지 | ✅ 목적·목표·진행·현재 상황 |
+| `stuckComment` — 잘림 | ✅ 5000자 상한 아래로 |
+| `resolveBase` — env/HEAD/detached | ✅ |
+| 네트워크·파일 없이 도는 테스트 | ✅ 33건 |
+
+전체 스위트 2675건 초록(268파일). typecheck·lint 통과.
+
+`changedBetween` 은 `pipeline.mjs` 에서 쓰지 않게 됐다 — 되돌리기가 삭제를 못 보는
+구멍이 있어 `revertPlan` 으로 갈았다. `snapshot.mjs` 에는 남겨 둔다(다른 자리에서 쓴다).
