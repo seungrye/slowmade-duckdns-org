@@ -34,11 +34,18 @@ AI_TEAM_KEY="${AI_TEAM_KEY%$'\r'}"                                  # CRLF 로 �
 AI_TEAM_KEY="${AI_TEAM_KEY%\"}"; AI_TEAM_KEY="${AI_TEAM_KEY#\"}"    # "값" 따옴표 벗기기
 AI_TEAM_KEY="${AI_TEAM_KEY%\'}"; AI_TEAM_KEY="${AI_TEAM_KEY#\'}"    # '값' 따옴표 벗기기
 [[ -n "$AI_TEAM_KEY" ]] || die "AI_TEAM_KEY 가 $ENV_FILE 에 없습니다. 설정 전에는 API 가 404 로 닫혀 있습니다."
-export AI_TEAM_KEY AI_TEAM_BASE_URL="$BASE_URL"
+# 파이프라인 안의 코더(opencode)가 쓴다.
+OPENROUTER_API_KEY="$(grep -E '^OPENROUTER_API_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+OPENROUTER_API_KEY="${OPENROUTER_API_KEY%$'\r'}"
+OPENROUTER_API_KEY="${OPENROUTER_API_KEY%\"}"; OPENROUTER_API_KEY="${OPENROUTER_API_KEY#\"}"
+export AI_TEAM_KEY AI_TEAM_BASE_URL="$BASE_URL" OPENROUTER_API_KEY
 
 # 모델은 curl 을 직접 부르지 않는다 — 래퍼 하나만 쓴다 (#215). 이유는 api.sh 주석 참고:
 # 셸 변수가 든 명령은 권한 규칙을 통과하지 못하고, 키를 명령줄에 박으면 로그에 남는다.
 API="$SITE_DIR/scripts/ai-team/api.sh"
+# 파이프라인 (#279). 클로드가 판단해 하루 한 건 돌린다 — 파일을 바꾸는 일은 이 안에서
+# 워크트리에 갇힌 채 일어나므로, 러너 자신은 여전히 Edit/Write 가 없다.
+PIPELINE="$SITE_DIR/scripts/ai-team/pipeline.mjs"
 [[ -x "$API" ]] || die "래퍼를 실행할 수 없습니다: $API"
 
 log "요청 스레드 확인 — $BASE_URL"
@@ -167,9 +174,49 @@ PROMPT=$(cat <<'PROMPT_END'
 이 규칙은 **사람에게 답할 때만** 입니다. 코더에게 답할 때 표로 각을 잡으면 오히려
 말이 겉돕니다.
 
+## 만들 때가 됐으면 파이프라인을 돌립니다
+
+스펙이 분명해졌고 이제 실제로 만들 차례라고 보이면, **하루 한 건**에 한해 파이프라인을
+돌릴 수 있습니다.
+
+    @PIPELINE@ --spec /tmp/spec-<이름>.md --post <postId>
+
+`--post` 를 주면 막혔을 때 파이프라인이 그 스레드에 스스로 알립니다.
+
+스펙 파일은 `Bash` 로 `/tmp` 에 적으세요(저장소가 아닙니다). 스펙에는 **무엇을 만들지,
+경계에서 어떻게 동작해야 하는지**를 적습니다 — 그게 곧 테스트가 됩니다.
+
+**돌리는 조건**
+
+| | |
+|---|---|
+| 스펙이 분명하다 | 무엇을 만들지, 경계값이 어떻게 되는지 적을 수 있다 |
+| 사람 결정이 끝났다 | 아직 물어볼 것이 남았으면 덧글로 묻고 맙니다 |
+| 오늘 아직 안 돌렸다 | 한 번에 최대 3시간이라 하루 한 건입니다 |
+
+**애매하면 돌리지 마세요.** 무엇을 만들지 흐릿한 채로 돌리면 3시간을 쓰고 엉뚱한 것이
+나옵니다. 그럴 땐 덧글로 물어보는 편이 훨씬 쌉니다.
+
+**결과를 덧글에 남기세요** — 성공하면 브랜치 이름을, 실패하면 어디서 막혔는지.
+
+## 파이프라인 안에서 무슨 일이 일어나나
+
+    스펙·테스트     다른 클로드가 씁니다 (테스트는 그 클로드 책임)
+    구현            코더가 합니다
+    실패하면        클로드가 원인을 봅니다 — 테스트가 틀렸으면 클로드가 고치고,
+                    구현이 틀렸으면 코더에게 넘깁니다
+    초록이면        클로드가 구현을 **검수**합니다. 테스트만 겨우 통과하는 코드를 거릅니다
+    12회를 다 쓰면  브랜치를 올리고 이슈를 만든 뒤 **스레드에 알립니다**
+
+당신은 부르고 결과를 전할 뿐입니다.
+
+**막혔다고 알려 오면 스펙부터 다시 보세요.** 구현이 계속 어긋나는 것은 스펙이 애매하다는
+뜻일 때가 많습니다. 그럴 땐 코더와 덧글로 스펙을 다시 짜고, 정해지면 다시 돌리면 됩니다.
+
 ## 하지 않는 것
 
-- **코드를 고치지 않습니다.** (도구 자체가 없습니다)
+- **코드를 고치지 않습니다.** (도구 자체가 없습니다) 파일을 바꾸는 일은 파이프라인
+  **안에서** 워크트리에 갇힌 채 일어납니다.
 - 커밋·푸시·PR·배포를 하지 않습니다.
 - 덧글 외에 사이트 상태를 바꾸지 않습니다.
 - 사람의 결정이 필요한 것을 대신 결정하지 않습니다 — 선택지를 정리해 두고 물어보세요.
@@ -178,11 +225,13 @@ PROMPT_END
 # 프롬프트는 확장이 일어나지 않는 heredoc 으로 쓴다(달러 기호가 섞이면 안 되므로).
 # 래퍼 경로만 자리표시자로 끼워 넣는다 — 비밀이 아니라 경로다.
 PROMPT="${PROMPT//@API@/$API}"
+PROMPT="${PROMPT//@PIPELINE@/$PIPELINE}"
 
 claude -p "$PROMPT" \
     --add-dir "$SITE_DIR" \
     --disallowedTools Edit Write NotebookEdit \
     --allowedTools Read Grep Glob "Bash($API *)" "Bash(git log*)" "Bash(git diff*)" "Bash(git status*)" \
+    "Bash($PIPELINE *)" "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
     --permission-mode dontAsk
 
 log "완료"

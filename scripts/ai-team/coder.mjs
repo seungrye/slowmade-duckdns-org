@@ -43,7 +43,7 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const REPO = '/home/seungrye/site';
-const DEFAULT_MODEL = 'openrouter/stealth/ox-alpha';
+const DEFAULT_MODEL = 'openrouter/minimax/minimax-m3:free';
 
 const die = (m) => { console.error(`[coder] ${m}`); process.exit(1); };
 const log = (m) => console.log(`[coder] ${m}`);
