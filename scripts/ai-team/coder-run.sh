@@ -44,6 +44,22 @@ die() { printf '\033[1;31m[coder]\033[0m %s\n' "$*" >&2; exit 1; }
 command -v opencode >/dev/null 2>&1 || die "opencode 를 찾을 수 없습니다 (PATH: $PATH)"
 [[ -r "$ENV_FILE" ]] || die "env 파일을 읽을 수 없습니다: $ENV_FILE"
 
+# 제한이 **실제로 걸리는지** 먼저 본다.
+#
+# `--agent` 는 못 찾으면 오류를 내지 않는다 — 경고 한 줄 뒤 **기본 에이전트로 조용히
+# 떨어진다.** 실측:
+#
+#   ! agent "commenter" not found. Falling back to default agent
+#   > build · minimax/minimax-m3:free      ← 그대로 진행됐다
+#
+# 기본 에이전트는 아무 제한이 없고 `--dir` 는 라이브 작업트리다. 설정이 없으면 무방비로
+# 도는 것이므로 여기서 멈춘다.
+AGENT_CONFIG="${AGENT_CONFIG:-$SITE_DIR/opencode.json}"
+[[ -r "$AGENT_CONFIG" ]] \
+  || die "opencode.json 을 읽을 수 없습니다: $AGENT_CONFIG — 편집 도구 제한이 안 걸립니다."
+grep -q '"commenter"' "$AGENT_CONFIG" \
+  || die "$AGENT_CONFIG 에 commenter 에이전트가 없습니다 — 제한 없이 돌게 됩니다." 
+
 # 파일 전체를 source 하지 않는다 — 다른 비밀까지 환경에 올릴 이유가 없다. 값만 꺼낸다.
 pick() {
   local v
@@ -144,9 +160,6 @@ PROMPT_END
 # 프롬프트는 확장이 일어나지 않는 heredoc 으로 쓴다(달러 기호가 섞이면 안 되므로).
 PROMPT="${PROMPT//@API@/$API}"
 
-# --agent commenter — 편집 도구를 빼고 bash 를 좁힌다(opencode.json). 없으면 그냥
-# 기본 에이전트로 도는 것이 아니라 opencode 가 오류를 내므로, 설정 누락이 조용히
-# 넘어가지 않는다.
 opencode run --dir "$SITE_DIR" --agent commenter -m "$MODEL" "$PROMPT"
 
 log "완료"
