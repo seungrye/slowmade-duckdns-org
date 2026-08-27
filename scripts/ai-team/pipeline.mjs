@@ -39,7 +39,10 @@ import { redGate, greenGate, GateVerdict } from './gate.mjs';
 import { isTest, isImpl, changedBetween } from './snapshot.mjs';
 
 const REPO = '/home/seungrye/site';
-const CODER_MODEL = process.env.AI_CODER_MODEL?.trim() || 'openrouter/stealth/ox-alpha';
+// 코더 모델. `stealth/ox-alpha` 는 2026-08 에 **은퇴**했다 — OpenRouter 가 404 와 함께
+// "This model was ZAI's GLM-5.3 Flash" 를 돌려준다. 같은 모델의 정식 이름으로 바꾼 것이라
+// 동작은 그대로다. 또 죽으면 여기와 coder.mjs·coder-run.sh·.env.local 넷을 함께 고칠 것.
+const CODER_MODEL = process.env.AI_CODER_MODEL?.trim() || 'openrouter/z-ai/glm-5.3-flash';
 
 /** 논의 루프 상한. 넘으면 브랜치를 올리고 이슈를 만든 뒤 덧글로 넘긴다. */
 const MAX_ROUNDS = 12;
