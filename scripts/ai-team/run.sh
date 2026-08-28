@@ -103,8 +103,19 @@ PROMPT=$(cat <<'PROMPT_END'
 2. 스레드 하나 읽기 (본문 + 지금까지의 덧글):
    @API@ thread <postId>
 
-3. 덧글 달기 — 내용을 작은따옴표로 감싸면 여러 줄도 그대로 들어갑니다:
-   @API@ comment <postId> claude '내용을 여기에'
+3. 덧글 달기 — **본문은 파일로 넘기세요.**
+
+   cat > /tmp/spec-덧글.md      (본문을 여기에 씁니다)
+   @API@ comment <postId> claude --file /tmp/spec-덧글.md
+
+   짧고 소제목이 없는 본문은 그대로 넣어도 됩니다:
+   @API@ comment <postId> claude '한 줄짜리 내용'
+
+   **왜 파일인가**: 명령 해석기가 줄 첫머리 우물정자를 주석 시작으로 봅니다. 따옴표
+   안이라도 그렇습니다. 그래서 `## 소제목` 이 둘째 줄부터 들어간 본문은 통째로 거부됩니다.
+   파일로 넘기면 본문이 명령줄에서 사라져 그 문제가 없습니다.
+
+   본문은 여전히 **5000자**까지입니다 — 서버가 보는 값이라 파일로 넘겨도 같습니다.
 
    답글로 달려면 마지막에 parentId 를 하나 더 붙입니다:
    @API@ comment <postId> claude '내용' <parentId>
