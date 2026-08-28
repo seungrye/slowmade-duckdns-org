@@ -46,6 +46,7 @@ import {
 } from './rescue.mjs';
 // 모델은 순위표에서 고른다 — 은퇴하면 다음으로 (#301).
 import { resolveModel, resolveModels } from './model-pick.mjs';
+import { retryPlan, failureTail } from './agent-retry.mjs';
 
 const REPO = '/home/seungrye/site';
 // 코더 모델 — **무료 모델을 못박아 쓴다.**
@@ -264,17 +265,30 @@ function assertRepoClean(before, who) {
 }
 
 /** 워크트리 안에서만 돌게 하고, 끝나면 본체가 깨끗한지 본다. */
-function runAgent(cmd, args, who, worktree) {
+function runAgent(cmd, argsFor, who, worktree, models = [null]) {
   const before = sh('git', ['status', '--porcelain'], { cwd: REPO });
-  try {
-    // 출력을 삼키지 않는다 — 삼켰더니 "아무것도 안 만들어졌다" 는 결과만 남고 왜인지
-    // 알 수 없었다(coder.mjs 의 교훈).
-    sh(cmd, args, { cwd: worktree, stdio: ['ignore', 'inherit', 'inherit'] });
-  } catch (e) {
-    // **아무것도 안 남기고 죽지 않는다** (#283). 예전엔 여기서 die() 로 끝나 이슈도
-    // 덧글도 push 도 없었다 — 코더 모델이 은퇴한 동안 야간 러너가 매일 밤 1회차에서
-    // 죽었고 흔적은 systemd 로그뿐이었다. 12회 소진 경로가 하는 것을 똑같이 한다.
-    salvage({ kind: StuckKind.AGENT_FAILED, who, output: `${e?.message ?? e}` });
+  let attempt = 1;
+  let 마지막출력 = '';
+  while (true) {
+    const plan = retryPlan({ attempt, models });
+    if (plan === null) {
+      salvage({ kind: StuckKind.AGENT_FAILED, who, output: 마지막출력 });
+    }
+    if (plan.waitMs > 0) {
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, plan.waitMs);
+      log(`   ${plan.waitMs}ms 대기 후 ${plan.model ? plan.model : '클로드'} 로 다시 부릅니다`);
+    }
+    try {
+      const args = argsFor(plan.model, attempt);
+      const output = sh(cmd, args, { cwd: worktree, stdio: ['ignore', 'pipe', 'pipe'] });
+      process.stdout.write(output);
+      break;
+    } catch (e) {
+      const tail = failureTail([e?.stdout, e?.stderr, e?.message]);
+      process.stdout.write(tail + '\n');
+      마지막출력 = tail;
+      attempt++;
+    }
   }
   assertRepoClean(before, who);
 }
@@ -289,11 +303,9 @@ function runAgent(cmd, args, who, worktree) {
  * `--add-dir` 로 워크트리만 준다. 본체는 주지 않고, 끝난 뒤 `assertRepoClean` 이 확인한다.
  */
 function claude(worktree, message) {
-  runAgent('claude', [
+  runAgent('claude', (model, attempt) => [
     '-p', message,
     '--add-dir', worktree,
-    // 검수 결과를 /tmp 에 적어야 해서 워크트리 밖 쓰기도 필요하다. 본체를 건드렸는지는
-    // 매 호출 뒤 assertRepoClean 이 확인하므로 격리는 그대로다.
     '--allowedTools', 'Read', 'Grep', 'Glob', 'Write', 'Edit', 'Bash',
     '--permission-mode', 'acceptEdits',
   ], '클로드', worktree);
@@ -307,11 +319,12 @@ function claude(worktree, message) {
  * 대신 실패 출력을 프롬프트에 실어 보낸다(호출측이 이미 그렇게 한다).
  */
 function coder(worktree, message, round) {
-  const model = DEV_MODELS[(round - 1) % DEV_MODELS.length];
-  const 이어가기 = DEV_MODELS.length === 1 && round > 1;
-  runAgent('opencode', [
-    'run', '--dir', worktree, '-m', model, ...(이어가기 ? ['-c'] : []), message,
-  ], `개발(${model.split('/').pop()})`, worktree);
+  const i = (round - 1) % DEV_MODELS.length;
+  const models = [...DEV_MODELS.slice(i), ...DEV_MODELS.slice(0, i)];
+  runAgent('opencode', (model, attempt) => {
+    const 이어가기 = attempt === 1 && DEV_MODELS.length === 1 && round > 1;
+    return ['run', '--dir', worktree, '-m', model, ...(이어가기 ? ['-c'] : []), message];
+  }, `개발(${models[0].split('/').pop()})`, worktree, models);
 }
 
 /**
@@ -324,9 +337,9 @@ function coder(worktree, message, round) {
  * **`--agent` 를 주지 않는다** — `commenter` 는 야간 러너용이라 편집이 막혀 있다.
  */
 function manager(worktree, message) {
-  runAgent('opencode', [
-    'run', '--dir', worktree, '-m', MANAGER_MODEL, message,
-  ], '관리', worktree);
+  runAgent('opencode', (model, attempt) => [
+    'run', '--dir', worktree, '-m', model, message,
+  ], '관리', worktree, [MANAGER_MODEL]);
 }
 
 /**

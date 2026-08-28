@@ -15,6 +15,20 @@
 // 판정만 순수 함수로 둔다 — 잠자기도 프로세스 실행도 pipeline.mjs 쪽이 맡는다.
 // 그래야 시험할 수 있다.
 
+const MAX_WAIT_MS = 300000;
+const BASE_WAIT_MS = 30000;
+const DEFAULT_MAX_ATTEMPTS = 3;
+const DEFAULT_TAIL_LIMIT = 4000;
+const TAIL_OMIT_PREFIX = '…(앞부분 생략)\n';
+
+function isPositiveInteger(value) {
+  return typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0;
+}
+
+function isValidMaxAttempts(value) {
+  return isPositiveInteger(value);
+}
+
 /**
  * 이번 시도에 무엇을 어떻게 부를지. 그만둘 때가 됐으면 `null`.
  *
@@ -29,7 +43,24 @@
  * @returns {{model:string|null, waitMs:number}|null}
  */
 export function retryPlan(입력) {
-  throw new Error(`retryPlan: 아직 구현되지 않았습니다 (${typeof 입력})`);
+  if (입력 === undefined || 입력 === null) return null;
+  if (typeof 입력 !== 'object') return null;
+
+  const { attempt, models, maxAttempts } = 입력;
+
+  if (!isPositiveInteger(attempt)) return null;
+  if (!Array.isArray(models)) return null;
+  if (models.length === 0) return null;
+
+  const 상한 = maxAttempts === undefined ? DEFAULT_MAX_ATTEMPTS : maxAttempts;
+  if (!isValidMaxAttempts(상한)) return null;
+
+  if (attempt > 상한) return null;
+
+  const model = models[(attempt - 1) % models.length];
+  const waitMs = attempt <= 1 ? 0 : Math.min(BASE_WAIT_MS * 2 ** (attempt - 2), MAX_WAIT_MS);
+
+  return { model, waitMs };
 }
 
 /**
@@ -43,5 +74,13 @@ export function retryPlan(입력) {
  * @returns {string}
  */
 export function failureTail(chunks, limit) {
-  throw new Error(`failureTail: 아직 구현되지 않았습니다 (${typeof chunks}, ${typeof limit})`);
+  if (!Array.isArray(chunks)) return '';
+
+  const 한도 = limit === undefined ? DEFAULT_TAIL_LIMIT : limit;
+  if (typeof 한도 !== 'number' || !Number.isFinite(한도) || 한도 <= 0 || !Number.isInteger(한도)) return '';
+
+  const 이어붙인것 = chunks.filter((조각) => typeof 조각 === 'string').join('');
+
+  if (이어붙인것.length <= 한도) return 이어붙인것;
+  return TAIL_OMIT_PREFIX + 이어붙인것.slice(-한도);
 }
