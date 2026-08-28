@@ -21,6 +21,44 @@ export const isTest = (p) => /\.test\.(ts|tsx)$/.test(p);
 export const isImpl = (p) => p.startsWith('webapp/') && !isTest(p);
 
 /**
+ * `changedPaths` 가 git 에 넘길 인자.
+ *
+ * git 은 **통째로 추적되지 않는 디렉터리를 한 줄로 접는다** — 안에 파일이 몇 개든
+ * `?? webapp/src/lib/eternia-deck/` 한 줄이다. 그러면 그 안의 테스트 파일이 [isTest] 에
+ * 안 걸려 "테스트가 하나도 만들어지지 않았습니다" 로 끝난다. 실제로 만들어졌는데도.
+ * `--untracked-files=all` 이 그 접힘을 푼다.
+ *
+ * 상수로 꺼내 두는 이유는 이 인자를 네트워크·파일 없이 시험하기 위해서다 —
+ * `rescue.mjs` 가 판정과 문구를 꺼내 둔 것과 같은 이유다.
+ */
+export const STATUS_ARGS = ['status', '--porcelain'];
+
+/**
+ * `git status --porcelain` 출력 한 덩이를 항목으로 나눈다.
+ *
+ * 앞 두 글자가 status, 세 번째 칸부터가 경로다. rename(`R  a -> b`)은 화살표 뒤를 취한다 —
+ * 그게 지금 존재하는 파일이다. 빈 줄은 버린다.
+ *
+ * **디렉터리인지 아닌지는 여기서 판단하지 않는다** — 온 그대로 낸다. 그 판단은
+ * [directoryEntries] 한 곳에만 둔다.
+ *
+ * @param {string} text `git status --porcelain` 의 표준출력
+ * @returns {{status: string, path: string}[]} 온 순서 그대로
+ */
+export function parsePorcelain(text) {}
+
+/**
+ * 접힌 디렉터리 항목만 — 경로가 `/` 로 끝나는 것.
+ *
+ * git 이 "여기 안은 안 펼쳤다" 고 말하는 신호다. 이게 비어 있지 않은데 테스트가 하나도
+ * 안 잡혔다면, 테스트가 없는 것이 아니라 **안 보이는 것**이다.
+ *
+ * @param {{status: string, path: string}[]} entries [parsePorcelain] 의 결과
+ * @returns {{status: string, path: string}[]} 온 순서 그대로
+ */
+export function directoryEntries(entries) {}
+
+/**
  * 두 스냅샷 사이에 바뀌거나 생긴 경로들.
  *
  * 지워진 것은 세지 않는다 — 되돌릴 때 원본이 남아 있으므로 문제가 되지 않는다.
