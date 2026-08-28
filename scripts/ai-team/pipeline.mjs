@@ -36,7 +36,7 @@ import { tmpdir } from 'node:os';
 // 게이트 판정은 **테스트와 같은 파일**을 쓴다 — 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
 import { redGate, greenGate, GateVerdict } from './gate.mjs';
 // 누가 무엇을 고쳤는지 가리는 규칙 — vitest 테스트가 같은 파일을 시험한다.
-import { isTest, isImpl } from './snapshot.mjs';
+import { isTest, isImpl, STATUS_ARGS, parsePorcelain, directoryEntries } from './snapshot.mjs';
 // 워크트리를 어디서 갈라낼지 (#284).
 import { resolveBase } from './base.mjs';
 // 막혔을 때 무엇을 남길지 — 되돌리기 계획과 보고 문구 (#282, #283).
@@ -112,15 +112,7 @@ function arg(name, fallback) {
  * rename(`R  a -> b`)은 뒤쪽 경로를 취한다. 그게 지금 존재하는 파일이다.
  */
 function changedPaths(worktree) {
-  return sh('git', ['status', '--porcelain'], { cwd: worktree })
-    .split('\n')
-    .filter(Boolean)
-    .map((l) => {
-      const status = l.slice(0, 2).trim();
-      const rest = l.slice(3).trim();
-      const arrow = rest.indexOf(' -> ');
-      return { status, path: arrow === -1 ? rest : rest.slice(arrow + 4) };
-    });
+  return parsePorcelain(sh('git', STATUS_ARGS, { cwd: worktree }));
 }
 
 /**
@@ -463,13 +455,18 @@ claude(worktree, [
 ].join('\n'));
 
 const afterWrite = changedPaths(worktree);
+const collapsed = directoryEntries(afterWrite);
 const testFiles = afterWrite.filter((f) => isTest(f.path)).map((f) => f.path);
 // **흔적을 남긴다** (#319). 여기도 die() 라 브랜치도 이슈도 덧글도 없었고, 그래서 다음
 // 회차의 클로드가 같은 스펙을 또 넘겼다 — #312 와 같은 고리다.
 if (!testFiles.length) {
   salvage({
-    kind: StuckKind.GATE_FAILED, gate: '테스트 작성', verdict: 'NO_TESTS',
-    output: afterWrite.map((f) => `${f.status} ${f.path}`).join('\n') || '(바뀐 파일 없음)',
+    kind: StuckKind.GATE_FAILED,
+    gate: '테스트 작성',
+    verdict: collapsed.length ? 'COLLAPSED_DIR' : 'NO_TESTS',
+    output: collapsed.length
+      ? collapsed.map((d) => `${d.status} ${d.path}`).join('\n')
+      : (afterWrite.map((f) => `${f.status} ${f.path}`).join('\n') || '(바뀐 파일 없음)'),
   });
 }
 log(`   테스트 ${testFiles.length}건: ${testFiles.join(', ')}`);

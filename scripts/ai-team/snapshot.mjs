@@ -31,7 +31,7 @@ export const isImpl = (p) => p.startsWith('webapp/') && !isTest(p);
  * 상수로 꺼내 두는 이유는 이 인자를 네트워크·파일 없이 시험하기 위해서다 —
  * `rescue.mjs` 가 판정과 문구를 꺼내 둔 것과 같은 이유다.
  */
-export const STATUS_ARGS = ['status', '--porcelain'];
+export const STATUS_ARGS = ['status', '--porcelain', '--untracked-files=all'];
 
 /**
  * `git status --porcelain` 출력 한 덩이를 항목으로 나눈다.
@@ -45,7 +45,17 @@ export const STATUS_ARGS = ['status', '--porcelain'];
  * @param {string} text `git status --porcelain` 의 표준출력
  * @returns {{status: string, path: string}[]} 온 순서 그대로
  */
-export function parsePorcelain(text) {}
+export function parsePorcelain(text) {
+  return (text ?? '')
+    .split('\n')
+    .filter((l) => l.length > 0)
+    .map((l) => {
+      const status = l.slice(0, 2).trim();
+      const rest = l.slice(3).replace(/\s+$/, '');
+      const arrow = rest.indexOf(' -> ');
+      return { status, path: arrow === -1 ? rest : rest.slice(arrow + 4) };
+    });
+}
 
 /**
  * 접힌 디렉터리 항목만 — 경로가 `/` 로 끝나는 것.
@@ -56,7 +66,9 @@ export function parsePorcelain(text) {}
  * @param {{status: string, path: string}[]} entries [parsePorcelain] 의 결과
  * @returns {{status: string, path: string}[]} 온 순서 그대로
  */
-export function directoryEntries(entries) {}
+export function directoryEntries(entries) {
+  return (entries ?? []).filter((e) => e.path.endsWith('/'));
+}
 
 /**
  * 두 스냅샷 사이에 바뀌거나 생긴 경로들.
