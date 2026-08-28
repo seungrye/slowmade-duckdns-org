@@ -79,6 +79,14 @@ export AI_TEAM_KEY OPENROUTER_API_KEY AI_TEAM_BASE_URL="$BASE_URL"
 API="$SITE_DIR/scripts/ai-team/api.sh"
 [[ -x "$API" ]] || die "래퍼를 실행할 수 없습니다: $API"
 
+# **작업 디렉터리를 저장소로 옮긴다.**
+#
+# opencode 는 cwd 를 stat 한다. 읽을 수 없는 디렉터리에서 부르면 `--dir` 를 줬는데도
+# `EACCES: permission denied, lstat '<cwd>'` 로 죽는다(실측 — 전용 계정으로 옮기다 겪었다).
+# systemd 는 WorkingDirectory 로 해결되지만 손으로 돌릴 때가 문제다.
+cd "$SITE_DIR" || die "저장소로 이동할 수 없습니다: $SITE_DIR"
+
+
 log "요청 스레드 확인 — $BASE_URL (모델 $MODEL)"
 
 PROMPT=$(cat <<'PROMPT_END'
