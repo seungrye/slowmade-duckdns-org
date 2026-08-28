@@ -1,0 +1,121 @@
+#!/usr/bin/env node
+// 모델을 못박지 말고 순위표에서 고른다 (#301).
+//
+// ── 왜 ──────────────────────────────────────────────────────────────────
+//
+// 모델 이름이 네 곳에 못박혀 있었다 — coder.mjs·coder-run.sh·pipeline.mjs·.env.local.
+// 그리고 이미 두 번 당했다. `stealth/ox-alpha` 가 은퇴해 404 를 돌려주는 동안 야간 러너가
+// **매일 밤 조용히 죽었고**(#283), 새 계정에서 난 `Model not found` 가 은퇴인지 캐시
+// 문제인지 가리는 데 시간이 들었다(#294).
+//
+// 무료 목록은 자주 갈린다 — 최근 몇 주에 20 → 15 → 14 → 18 개로 바뀌었고 Llama·Qwen
+// 무료 티어는 통째로 사라졌다. 못박아 두면 그때마다 밤에 죽는다.
+//
+// ── 후보를 어떻게 골랐나 ────────────────────────────────────────────────
+//
+// **오픈 웨이트만 담는다.** `:free` 변형은 전부 제공자가 1개(후원자)라 그 자체로는 신호가
+// 안 되고, **기반 모델의 제공자 수**가 지표다 — 여럿이 호스팅하면 무료판이 사라져도
+// 갈아탈 곳이 있다. 실측한 기반 제공자 수:
+//
+//   z-ai/glm-5.2 29 · google/gemma-4-31b-it 15 · minimax/minimax-m3 11
+//   thinkingmachines/inkling 3 · nvidia/nemotron-3-super-120b-a12b 2
+//   poolside/* · cohere/north-mini-code · dots-studio/*-preview ·
+//   inclusionai/* · liquid/*  → 1(자기 자신뿐), 제외
+//
+// 판정은 순수 함수로 둔다 — 네트워크는 CLI 쪽이 맡는다. 그래야 시험할 수 있다.
+
+/** 구현(코더) 순위. 측정으로 정한다 — docs/spec/model-fallback.md 참고. */
+export const CODER_PREFERENCE = Object.freeze([
+  'minimax/minimax-m3:free',
+  'z-ai/glm-5.2:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'thinkingmachines/inkling:free',
+  'google/gemma-4-31b-it:free',
+]);
+
+/** 관리(진단·검수·야간 러너) 순위. */
+export const MANAGER_PREFERENCE = Object.freeze([
+  'z-ai/glm-5.2:free',
+  'minimax/minimax-m3:free',
+  'thinkingmachines/inkling:free',
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'google/gemma-4-31b-it:free',
+]);
+
+/**
+ * `/api/v1/models` 응답 → **도구 호출이 되는** 모델 id 목록.
+ *
+ * opencode 는 도구를 쓰는 에이전트라 `tools` 미지원 모델은 후보가 못 된다.
+ * **모르는 것을 된다고 치지 않는다** — `supported_parameters` 가 없으면 뺀다.
+ *
+ * 응답이 깨져도 터지지 않고 빈 목록을 준다. 조회가 깨졌다고 러너가 멈추면 안 된다.
+ */
+export function toolCapableIds(json) {
+  const list = json?.data;
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((m) => Array.isArray(m?.supported_parameters) && m.supported_parameters.includes('tools'))
+    .map((m) => m?.id)
+    .filter((id) => typeof id === 'string' && id);
+}
+
+/**
+ * 순위표에서 **살아 있는 첫 번째**.
+ *
+ * @returns {{id:string, index:number}|null} `index` 가 0 이 아니면 위 순위가 죽은 것이다 —
+ *   호출측이 그걸 로그에 남겨야 사람이 안다. 하나도 없으면 `null`.
+ */
+export function pickModel({ preferred, available } = {}) {
+  if (!Array.isArray(preferred) || !Array.isArray(available)) return null;
+  const 살아있음 = new Set(available);
+  for (const [index, id] of preferred.entries()) {
+    if (살아있음.has(id)) return { id, index };
+  }
+  return null;
+}
+
+/**
+ * 지금 쓸 모델 하나를 정한다 — 목록을 받아 순위표와 맞춘다.
+ *
+ * **조회가 실패하면 1순위를 그대로 쓴다.** 목록을 못 받았다고 러너가 멈추는 것이 더 나쁘다.
+ * 1순위가 아닌 것이 골라지면 `warn` 으로 알린다 — 위가 죽었다는 뜻이라 사람이 알아야 한다.
+ *
+ * @param {'coder'|'manager'} role
+ * @param {(m:string)=>void} [warn]
+ */
+export async function resolveModel(role, warn = () => {}) {
+  const preferred = role === 'manager' ? MANAGER_PREFERENCE : CODER_PREFERENCE;
+  let available = [];
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      signal: AbortSignal.timeout(15_000),
+    });
+    available = toolCapableIds(await res.json());
+  } catch (e) {
+    warn(`모델 목록을 못 받았습니다(1순위로 진행): ${e?.message ?? e}`);
+    return preferred[0];
+  }
+
+  const 고름 = pickModel({ preferred, available });
+  if (!고름) {
+    warn('순위표에 살아 있는 모델이 없습니다 — 1순위로 진행합니다.');
+    return preferred[0];
+  }
+  if (고름.index > 0) {
+    warn(`${preferred.slice(0, 고름.index).join(', ')} 가 목록에 없습니다 → ${고름.id}`);
+  }
+  return 고름.id;
+}
+
+// ── CLI ─────────────────────────────────────────────────────────────────
+//
+// `model-pick.mjs --role coder|manager` → 고른 id 를 표준출력에.
+// 셸(coder-run.sh)이 쓴다. 알림은 표준에러로 나가므로 값과 안 섞인다.
+if (process.argv[2] === '--role') {
+  const role = process.argv[3];
+  if (role !== 'coder' && role !== 'manager') {
+    console.error('사용법: model-pick.mjs --role <coder|manager>');
+    process.exit(2);
+  }
+  console.log(await resolveModel(role, (m) => console.error(`\x1b[1;33m[model-pick]\x1b[0m ${m}`)));
+}

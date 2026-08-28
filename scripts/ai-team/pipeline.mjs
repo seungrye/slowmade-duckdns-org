@@ -44,6 +44,8 @@ import {
   StuckKind, revertPlan, needsRebaseline, stuckTitle, stuckIssueBody, stuckComment,
   successComment,
 } from './rescue.mjs';
+// 모델은 순위표에서 고른다 — 은퇴하면 다음으로 (#301).
+import { resolveModel } from './model-pick.mjs';
 
 const REPO = '/home/seungrye/site';
 // 코더 모델 — **무료 모델을 못박아 쓴다.**
@@ -55,9 +57,9 @@ const REPO = '/home/seungrye/site';
 // 어디로 갈지 모른다 — 실제로 `nvidia/nemotron-3.5-content-safety`(콘텐츠 분류기)로 가서
 // "PONG" 대신 "User Safety: safe" 를 돌려준 적이 있다. 코더로는 못 쓴다.
 //
-// 바꾸려면 `AI_CODER_MODEL` 만 주면 된다. 이 값을 손댈 땐 coder.mjs·coder-run.sh·
-// .env.local 넷을 함께 고칠 것.
-const CODER_MODEL = process.env.AI_CODER_MODEL?.trim() || 'openrouter/minimax/minimax-m3:free';
+// **더는 못박지 않는다** (#301). 순위표에서 살아 있는 것 중 제일 위를 고른다 — 은퇴하면
+// 다음으로 넘어간다. `AI_CODER_MODEL` 로 덮어쓸 수 있다. (실제 결정은 log 선언 뒤에서 —
+// 고르는 과정을 로그에 남겨야 하는데 log 가 아래에 있다.)
 
 /** 논의 루프 상한. 넘으면 브랜치를 올리고 이슈를 만든 뒤 덧글로 넘긴다. */
 const MAX_ROUNDS = 12;
@@ -67,6 +69,9 @@ const die = (m) => { console.error(`\x1b[1;31m[pipeline]\x1b[0m ${m}`); process.
 
 const sh = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
+
+const CODER_MODEL = process.env.AI_CODER_MODEL?.trim()
+  || `openrouter/${await resolveModel('coder', (m) => log(`모델 — ${m}`))}`;
 
 
 function arg(name, fallback) {

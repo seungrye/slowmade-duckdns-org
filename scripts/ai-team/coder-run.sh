@@ -65,7 +65,10 @@ set -euo pipefail
 SITE_DIR="${SITE_DIR:-/home/seungrye/site}"
 ENV_FILE="${ENV_FILE:-$SITE_DIR/webapp/.env.local}"
 BASE_URL="${AI_TEAM_BASE_URL:-https://handmade.r-e.kr}"
-MODEL="${CODER_MODEL:-openrouter/minimax/minimax-m3:free}"
+# 모델은 **순위표에서 고른다** (#301). 못박아 두면 그것이 은퇴하는 날 밤에 조용히 죽는다 —
+# `stealth/ox-alpha` 때 실제로 그랬다(#283). 무료 목록은 자주 갈린다.
+# `CODER_MODEL` 로 덮어쓸 수 있다. 고르기가 실패해도 1순위로 진행하므로 여기서 안 멈춘다.
+MODEL="${CODER_MODEL:-openrouter/$(node "$SITE_DIR/scripts/ai-team/model-pick.mjs" --role coder)}"
 
 log() { printf '\033[1;35m[coder]\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31m[coder]\033[0m %s\n' "$*" >&2; exit 1; }
