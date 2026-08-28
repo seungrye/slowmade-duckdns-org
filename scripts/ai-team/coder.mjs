@@ -41,9 +41,14 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+// 모델은 순위표에서 고른다 — 은퇴하면 다음으로 (#301).
+import { resolveModel } from './model-pick.mjs';
 
 const REPO = '/home/seungrye/site';
-const DEFAULT_MODEL = 'openrouter/minimax/minimax-m3:free';
+// 못박지 않는다 (#301) — 순위표에서 살아 있는 것 중 제일 위를 고른다.
+// 조회가 실패하면 순위표 1순위로 떨어지므로 여기서 멈추지 않는다.
+const DEFAULT_MODEL = `openrouter/${await resolveModel('coder',
+  (m) => console.warn(`\x1b[1;33m[coder]\x1b[0m 모델 — ${m}`))}`;
 
 const die = (m) => { console.error(`[coder] ${m}`); process.exit(1); };
 const log = (m) => console.log(`[coder] ${m}`);
