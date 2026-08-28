@@ -22,14 +22,14 @@
 // (`scheduler.ts:157`) — 안 그러면 매매 스케줄러가 하나 더 돈다.
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
-import { parseShotArgs, targetUrl, SIZES } from './shot-args.mjs';
+import { parseShotArgs, targetUrl, SIZES, clickPlan } from './shot-args.mjs';
 
 const SITE = process.env.SITE_DIR?.trim() || '/home/seungrye/site';
 const ENV_FILE = process.env.ENV_FILE?.trim() || `${SITE}/webapp/.env.local`;
 const die = (m) => { console.error(`\x1b[1;31m[shot]\x1b[0m ${m}`); process.exit(1); };
 
 const opts = parseShotArgs(process.argv.slice(2));
-if (!opts) die('사용법: shot.mjs <경로> [--owner] [--port <n>]   (경로만 받습니다)');
+if (!opts) die('사용법: shot.mjs <경로> [--owner] [--port <n>] [--menu <이름>]   (경로만 받습니다)');
 
 let env = {};
 try {
@@ -98,6 +98,13 @@ try {
         await ctx.close();
         die('주인 세션이 안 붙었습니다(로그인 링크가 보임). 쿠키 이름·시크릿을 확인하세요.');
       }
+    }
+    const plan = clickPlan(opts.menu, size.name);
+    for (const 라벨 of plan) {
+      const 후보 = page.getByLabel(라벨);
+      if (await 후보.count() === 0) { await ctx.close(); die('메뉴 라벨을 못 찾았습니다: ' + 라벨); }
+      await 후보.first().click();
+      await page.waitForTimeout(300);
     }
     const buf = await page.screenshot({ fullPage: false });
     await ctx.close();

@@ -28,7 +28,16 @@ const DEFAULT_PORT = 0;
  * 배포되면 **게임 바로 아래**로 온다. 두 자리를 다 찍을 수 있어야 "고치기 전" 과
  * "고친 뒤" 를 같은 도구로 낼 수 있다.
  */
-export const MENUS = Object.freeze({});
+export const MENUS = Object.freeze({
+  게임: Object.freeze({
+    desktop: Object.freeze(['게임 메뉴']),
+    mobile: Object.freeze(['모바일 메뉴 열기', '모바일 게임 섹션 토글']),
+  }),
+  에테르니아: Object.freeze({
+    desktop: Object.freeze(['게임 메뉴', '에테르니아의 추락 하위 메뉴']),
+    mobile: Object.freeze(['모바일 메뉴 열기', '모바일 게임 섹션 토글', '모바일 에테르니아의 추락 토글']),
+  }),
+});
 
 /**
  * 그 뷰포트에서 메뉴를 펼치려면 무엇을 어떤 순서로 누르는지.
@@ -36,12 +45,21 @@ export const MENUS = Object.freeze({});
  * 메뉴를 안 줬거나·모르는 이름이거나·없는 뷰포트면 **빈 배열**이다 — 던지지 않는다.
  * 부르는 쪽이 고쳐 써도 `MENUS` 가 안 바뀌게 **매번 새 배열**을 낸다.
  *
+ * `Object.create(null)` 대신 평범한 객체로 두고 `Object.prototype` 의 `hasOwnProperty`/
+ * `toString` 같은 키가 **그대로** 빈 계획을 받게 한다. (테스트가 명시적으로 재고 있다.)
+ *
  * @param {string} [menu] 논리 이름
  * @param {string} [sizeName] `SIZES` 의 뷰포트 이름
  * @returns {string[]}
  */
 export function clickPlan(menu, sizeName) {
-  throw new Error('아직');
+  if (typeof menu !== 'string' || typeof sizeName !== 'string') return [];
+  if (!menu || !sizeName) return [];
+  const 뷰포트 = Object.prototype.hasOwnProperty.call(MENUS, menu) ? MENUS[menu] : undefined;
+  if (!뷰포트) return [];
+  const 순서 = Object.prototype.hasOwnProperty.call(뷰포트, sizeName) ? 뷰포트[sizeName] : undefined;
+  if (!순서) return [];
+  return [...순서];
 }
 
 /**
@@ -55,6 +73,8 @@ export function parseShotArgs(argv) {
   let path = '';
   let owner = false;
   let port = DEFAULT_PORT;
+  let menu;
+  let menuSeen = false;
 
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -63,6 +83,16 @@ export function parseShotArgs(argv) {
       const n = Number(argv[i + 1]);
       if (!Number.isInteger(n) || n < 1 || n > 65535) return null;
       port = n; i += 1; continue;
+    }
+    if (a === '--menu') {
+      // 다음 인자를 **삼키지 않는다** — 플래그나 경로 자리를 가로채면 안 된다.
+      const v = argv[i + 1];
+      if (typeof v !== 'string' || v === '' || !Object.prototype.hasOwnProperty.call(MENUS, v) || v.startsWith('--')) return null;
+      if (menuSeen) return null;
+      menuSeen = true;
+      menu = v;
+      i += 1;
+      continue;
     }
     if (a.startsWith('--')) return null;
     if (path) return null;
@@ -77,7 +107,9 @@ export function parseShotArgs(argv) {
 
   // 주인 세션은 공개 주소로만 붙는다 — 로컬 http 로는 Secure 쿠키가 안 간다.
   if (owner && port) return null;
-  return { path, owner, port };
+  const out = { path, owner, port };
+  if (menuSeen) out.menu = menu;
+  return out;
 }
 
 /**
