@@ -42,6 +42,21 @@ if ! node "$SITE_DIR/scripts/ai-team/interval.mjs" --check "$STAMP" "$INTERVAL_S
   exit 0
 fi
 
+# **코더에게 "이번엔 내가 돈다" 를 알린다** (#303).
+#
+# 타이머가 10분마다 깨우는데 유닛은 `Wants=ai-team-coder.service` 로 코더를 끌어온다.
+# 그래서 클로드가 주기 때문에 건너뛴 깨움에도 **코더는 그대로 돌았다** — 1회 41초씩
+# 하루 144회. 무료 모델 호출을 헛되이 쓰고 일일 한도에 걸린다.
+#
+# 코더에 따로 주기를 두는 방법은 안 된다. 코더의 역할이 "클로드가 말한 뒤에 답한다" 라서,
+# 독립된 시계를 붙이면 두 시계가 어긋날 때 **답할 것이 있는데 건너뛴다.**
+#
+# 표식을 못 남기면 코더가 영영 안 돌므로 조용히 넘기지 않고 경고한다.
+MARK="${AI_TEAM_MARK:-/var/lib/ai-team/claude-ran}"
+if ! { mkdir -p "$(dirname "$MARK")" 2>/dev/null && : > "$MARK"; }; then
+  log "경고: 코더 표식을 못 남겼습니다($MARK) — 코더가 이번 차례를 건너뜁니다."
+fi
+
 # 파일 전체를 source 하지 않는다 — 다른 비밀까지 환경에 올릴 이유가 없다. 값 하나만 꺼낸다.
 AI_TEAM_KEY="$(grep -E '^AI_TEAM_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
 AI_TEAM_KEY="${AI_TEAM_KEY%$'\r'}"                                  # CRLF 로 저장된 경우
