@@ -7,16 +7,26 @@
       "permission": {
         "edit": "deny",
         "task": "deny",
-        "webfetch": "deny",
-        "websearch": "deny",
         "bash": {
           "*": "deny",
           "*scripts/ai-team/api.sh *": "allow",
           "git log*": "allow",
           "git diff*": "allow",
           "git status*": "allow",
-          "ls*": "allow"
-        }
+          "git show*": "allow",
+          "git -C * log*": "allow",
+          "git -C * diff*": "allow",
+          "git -C * status*": "allow",
+          "git -C * show*": "allow",
+          "ls*": "allow",
+          "tail*": "allow",
+          "head*": "allow",
+          "wc*": "allow",
+          "grep*": "allow",
+          "echo*": "allow"
+        },
+        "webfetch": "allow",
+        "websearch": "allow"
       }
     }
   }
