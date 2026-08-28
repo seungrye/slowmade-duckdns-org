@@ -5,7 +5,7 @@
 // 있는 것 중 제일 위를 고른다.
 import { describe, it, expect } from 'vitest';
 import {
-  CODER_PREFERENCE, MANAGER_PREFERENCE, toolCapableIds, pickModel,
+  CODER_PREFERENCE, MANAGER_PREFERENCE, toolCapableIds, pickModel, pickModels,
 } from '../../../../scripts/ai-team/model-pick.mjs';
 
 /** `/api/v1/models` 응답 중 우리가 보는 것만. */
@@ -120,4 +120,41 @@ describe('순위표 — 오픈 웨이트만 담는다', () => {
       }
     });
   }
+});
+
+// 개발자를 둘로 두려면 **서로 다른** 모델이 필요하다 (#307). 하나만 뽑으면 둘 다 1순위가 된다.
+describe('pickModels — 살아 있는 것 여럿', () => {
+  it('위에서부터 요청한 수만큼', () => {
+    expect(pickModels({ preferred: ['a', 'b', 'c'], available: ['a', 'b', 'c'], count: 2 }))
+      .toEqual([{ id: 'a', index: 0 }, { id: 'b', index: 1 }]);
+  });
+
+  it('죽은 것은 건너뛴다', () => {
+    expect(pickModels({ preferred: ['a', 'b', 'c'], available: ['c', 'a'], count: 2 }))
+      .toEqual([{ id: 'a', index: 0 }, { id: 'c', index: 2 }]);
+  });
+
+  it('살아 있는 것이 모자라면 있는 만큼만 — 하나뿐이면 개발자도 하나', () => {
+    expect(pickModels({ preferred: ['a', 'b'], available: ['b'], count: 2 }))
+      .toEqual([{ id: 'b', index: 1 }]);
+  });
+
+  it('하나도 없으면 빈 목록', () => {
+    expect(pickModels({ preferred: ['a'], available: ['x'], count: 2 })).toEqual([]);
+  });
+
+  it('순위표에 중복이 있어도 같은 모델을 두 번 담지 않는다', () => {
+    expect(pickModels({ preferred: ['a', 'a', 'b'], available: ['a', 'b'], count: 2 }))
+      .toEqual([{ id: 'a', index: 0 }, { id: 'b', index: 2 }]);
+  });
+
+  it('수가 0 이하거나 숫자가 아니면 빈 목록', () => {
+    for (const c of [0, -1, NaN, undefined, 'x']) {
+      expect(pickModels({ preferred: ['a'], available: ['a'], count: c as never })).toEqual([]);
+    }
+  });
+
+  it('인자가 없어도 터지지 않는다', () => {
+    expect(pickModels()).toEqual([]);
+  });
 });

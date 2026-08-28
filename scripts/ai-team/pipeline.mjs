@@ -45,7 +45,7 @@ import {
   successComment,
 } from './rescue.mjs';
 // 모델은 순위표에서 고른다 — 은퇴하면 다음으로 (#301).
-import { resolveModel } from './model-pick.mjs';
+import { resolveModel, resolveModels } from './model-pick.mjs';
 
 const REPO = '/home/seungrye/site';
 // 코더 모델 — **무료 모델을 못박아 쓴다.**
@@ -70,8 +70,31 @@ const die = (m) => { console.error(`\x1b[1;31m[pipeline]\x1b[0m ${m}`); process.
 const sh = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 
-const CODER_MODEL = process.env.AI_CODER_MODEL?.trim()
-  || `openrouter/${await resolveModel('coder', (m) => log(`모델 — ${m}`))}`;
+// **개발자 둘** (#307). 회차마다 번갈아 맡는다.
+//
+// 왜 병렬 경쟁이 아니라 교대인가 — 병렬은 회차마다 호출이 두 배인데, 무료 한도가 계정
+// 전체 공유(하루 50회)라는 것을 실측으로 확인했다. 게다가 워크트리를 둘로 갈라 어느
+// 쪽을 채택할지 고르는 코드가 새로 필요하다. 교대는 게이트·워크트리를 그대로 쓰면서
+// **막힌 회차에 다른 시각**을 넣는다. 한쪽이 죽어도 다른 쪽이 이어받는 이득도 같다.
+//
+// `AI_CODER_MODEL` 로 하나를 못박으면 그것만 쓴다.
+const DEV_MODELS = process.env.AI_CODER_MODEL?.trim()
+  ? [process.env.AI_CODER_MODEL.trim()]
+  : (await resolveModels('coder', 2, (m) => log(`개발 모델 — ${m}`)))
+    .map((m) => `openrouter/${m}`);
+log(`개발자 ${DEV_MODELS.length}명: ${DEV_MODELS.join(', ')}`);
+
+// **관리 모델** — 실패 진단과 검수 (#307).
+//
+// 이 둘은 회차마다 돌아서 호출 수의 대부분을 차지한다. 반면 테스트 작성은 한 번뿐이고
+// 파이프라인의 보장이 전부 거기 걸려 있다. 그래서 **진단·검수만 무료 모델로 내리고 테스트
+// 작성은 클로드로 남긴다.**
+//
+// 검수 역량은 실측했다 — `review()` 프롬프트 그대로 주고, 테스트 입력만 하드코딩한 가짜
+// 구현을 잡아내는지와 제대로 된 구현을 통과시키는지(거짓 양성)를 함께 봤다. 후보 셋 다
+// 만점이었고 구현을 건드리지도 않았다.
+const MANAGER_MODEL = process.env.AI_MANAGER_MODEL?.trim()
+  || `openrouter/${await resolveModel('manager', (m) => log(`관리 모델 — ${m}`))}`;
 
 
 function arg(name, fallback) {
@@ -198,8 +221,12 @@ function snapshot(worktree, pick) {
  * @returns 문제가 있으면 그 내용, 괜찮으면 null.
  */
 function review(worktree, spec) {
-  const out = join(tmpdir(), `pipeline-review-${Date.now()}.txt`);
-  claude(worktree, [
+  // **워크트리 안**에 쓰게 한다 (#307). opencode 는 `--dir` 밖 쓰기가 막혀서, /tmp 에
+  // 적으라고 하면 아무것도 안 쓰고 끝난다(실측). 파일이 없으면 `review()` 가 통과로
+  // 치므로, 그대로 뒀으면 **나쁜 코드가 조용히 통과**했다.
+  const REVIEW_FILE = 'review-verdict.txt';
+  const out = join(worktree, REVIEW_FILE);
+  manager(worktree, [
     '코더가 구현을 마쳤고 테스트가 통과했습니다. **구현을 읽고 검수하세요.**',
     '',
     '## 무엇을 보나',
@@ -209,7 +236,7 @@ function review(worktree, spec) {
     '- 경계·예외에서 실제로 옳은가 — 테스트가 놓친 자리',
     '',
     '## 어떻게 답하나',
-    `문제가 **없으면** \`${out}\` 파일에 \`OK\` 한 줄만 쓰세요.`,
+    `문제가 **없으면** \`${REVIEW_FILE}\` 파일에 \`OK\` 한 줄만 쓰세요.`,
     `문제가 **있으면** 같은 파일에 무엇이 왜 문제인지, 어떻게 고쳐야 하는지 적으세요.`,
     '코더가 그 글을 그대로 받아 고칩니다 — 코더에게 말하듯 쓰세요.',
     '',
@@ -272,11 +299,34 @@ function claude(worktree, message) {
   ], '클로드', worktree);
 }
 
-/** 코더 — opencode. `--dir` 를 반드시 준다(cwd 만으로는 탈출한다). */
-function coder(worktree, message, cont) {
+/**
+ * 코더 — opencode. `--dir` 를 반드시 준다(cwd 만으로는 탈출한다).
+ *
+ * 개발자가 둘이면 회차마다 번갈아 맡는다. **그때는 `-c`(이어가기)를 주지 않는다** —
+ * opencode 의 이어가기는 마지막 세션을 잇는데, 교대하면 그건 **다른 모델의 세션**이다.
+ * 대신 실패 출력을 프롬프트에 실어 보낸다(호출측이 이미 그렇게 한다).
+ */
+function coder(worktree, message, round) {
+  const model = DEV_MODELS[(round - 1) % DEV_MODELS.length];
+  const 이어가기 = DEV_MODELS.length === 1 && round > 1;
   runAgent('opencode', [
-    'run', '--dir', worktree, '-m', CODER_MODEL, ...(cont ? ['-c'] : []), message,
-  ], '코더', worktree);
+    'run', '--dir', worktree, '-m', model, ...(이어가기 ? ['-c'] : []), message,
+  ], `개발(${model.split('/').pop()})`, worktree);
+}
+
+/**
+ * 관리 — 실패 진단과 검수 (#307). 코더와 같은 opencode 이고 모델만 다르다.
+ *
+ * 쓰기가 필요하다 — 진단에서 테스트를 고치고, 검수 결과를 파일로 남긴다. 그래서 기본
+ * 에이전트로 돌린다. 선을 넘으면 게이트가 잡는다: 구현을 만지면 `revertPlan` 이 되돌리고,
+ * 테스트를 고치면 `needsRebaseline` 이 새 기준으로 커밋한다.
+ *
+ * **`--agent` 를 주지 않는다** — `commenter` 는 야간 러너용이라 편집이 막혀 있다.
+ */
+function manager(worktree, message) {
+  runAgent('opencode', [
+    'run', '--dir', worktree, '-m', MANAGER_MODEL, message,
+  ], '관리', worktree);
 }
 
 /**
@@ -466,7 +516,7 @@ while (round < MAX_ROUNDS) {
       '- **테스트 파일은 절대 수정하지 마세요.**',
       '',
       (검수 || green.output).slice(-3000),
-    ].join('\n'), round > 1);
+    ].join('\n'), round);
 
   // 코더가 테스트를 만졌으면 되돌린다. **조용히 넘어가지 않는다.**
   const touched = touchedTests(worktree, TEST_SHA);
@@ -485,14 +535,15 @@ while (round < MAX_ROUNDS) {
   if (verdict !== GateVerdict.PASS) {
     // **클로드가 판단한다** — 구현이 틀렸나, 테스트가 틀렸나.
     //
-    // 테스트는 클로드 것이고 책임도 클로드에게 있다. 코더에게 "테스트가 틀렸다" 고
+    // 테스트는 **테스트를 쓴 쪽**(클로드) 것이고 책임도 거기 있다. 진단은 관리 모델이
+    // 하지만 고칠 권한은 같다 — 코더에게 "테스트가 틀렸다" 고
     // 넘기면 코더가 테스트를 고치려 들고, 그건 이 프로세스가 막는 바로 그 일이다.
-    log('   실패 — 클로드가 원인을 봅니다');
-    // 클로드 턴 **전**의 내용을 담아 둔다. 이름이 아니라 내용이어야 기존 파일을 고친
+    log('   실패 — 관리가 원인을 봅니다');
+    // 관리 턴 **전**의 내용을 담아 둔다. 이름이 아니라 내용이어야 기존 파일을 고친
     // 것까지 잡힌다.
     const 테스트전 = snapshot(worktree, isTest);
     const 구현전 = snapshot(worktree, isImpl);
-    claude(worktree, [
+    manager(worktree, [
       '구현이 테스트를 통과하지 못합니다. 실패 출력을 보고 **원인이 어디인지** 판단하세요.',
       '',
       '- **테스트가 틀렸다면 당신이 고치세요.** 테스트는 당신 것이고 책임도 당신입니다.',
@@ -506,20 +557,20 @@ while (round < MAX_ROUNDS) {
       green.output.slice(-3000),
     ].join('\n'));
 
-    // **클로드가 구현을 만졌으면 되돌린다.**
+    // **관리가 구현을 만졌으면 되돌린다.**
     //
     // 코더가 테스트를 만지는 것은 기계로 막으면서 이쪽은 프롬프트로만 막으면 비대칭이다.
     // 구현은 코더 몫이고, 클로드가 손대면 "코더가 스펙대로 만들었나" 를 잴 수 없게 된다.
     const 되돌릴것 = revertPlan(구현전, snapshot(worktree, isImpl));
     if (되돌릴것.length) {
-      log(`   클로드가 구현을 만졌습니다 — 되돌립니다: ${되돌릴것.map((x) => x.path).join(', ')}`);
+      log(`   관리가 구현을 만졌습니다 — 되돌립니다: ${되돌릴것.map((x) => x.path).join(', ')}`);
       for (const { path, content } of 되돌릴것) {
         if (content === null) rmSync(join(worktree, path), { force: true, recursive: true });
         else writeFileSync(join(worktree, path), content, 'utf8');
       }
     }
 
-    // 클로드가 테스트를 고쳤으면 그 시점을 새 기준으로 삼는다 — 안 그러면 다음 회차에
+    // 관리가 테스트를 고쳤으면 그 시점을 새 기준으로 삼는다 — 안 그러면 다음 회차에
     // 그 수정이 "코더가 만진 것" 으로 잡혀 되돌아간다.
     //
     // **테스트만 담는다.** `-A` 로 쓸어 담으면 코더가 만들던 구현까지 들어가, 커밋
@@ -528,11 +579,11 @@ while (round < MAX_ROUNDS) {
       const 지금테스트 = sh('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: worktree })
         .split('\n').filter(Boolean).filter(isTest);
       sh('git', ['add', '--', ...지금테스트], { cwd: worktree, stdio: 'pipe' });
-      sh('git', ['commit', '-q', '-m', `test: ${round}회차 — 클로드가 테스트를 고침`], {
+      sh('git', ['commit', '-q', '-m', `test: ${round}회차 — 관리가 테스트를 고침`], {
         cwd: worktree, stdio: 'pipe',
       });
       TEST_SHA = sh('git', ['rev-parse', 'HEAD'], { cwd: worktree }).trim();
-      log('   클로드가 테스트를 고쳤습니다 — 기준을 새로 잡습니다');
+      log('   관리가 테스트를 고쳤습니다 — 기준을 새로 잡습니다');
     }
     continue;
   }

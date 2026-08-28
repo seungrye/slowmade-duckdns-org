@@ -104,6 +104,27 @@ export function pickModel({ preferred, available } = {}) {
 }
 
 /**
+ * 순위표에서 **살아 있는 것 여럿**을 위에서부터 (#307).
+ *
+ * 개발자를 둘로 두려면 **서로 다른** 모델이 필요하다. 하나만 뽑으면 둘 다 1순위가 된다.
+ *
+ * @returns {{id:string, index:number}[]} 살아 있는 것이 모자라면 그만큼만
+ */
+export function pickModels({ preferred, available, count } = {}) {
+  if (!Array.isArray(preferred) || !Array.isArray(available)) return [];
+  const n = Number(count);
+  if (!Number.isFinite(n) || n <= 0) return [];
+  const 살아있음 = new Set(available);
+  const out = [];
+  for (const [index, id] of preferred.entries()) {
+    if (!살아있음.has(id) || out.some((x) => x.id === id)) continue;
+    out.push({ id, index });
+    if (out.length >= n) break;
+  }
+  return out;
+}
+
+/**
  * 이 역할의 순위표. **주 1회 측정 결과가 있으면 그것을 쓴다** (#305).
  *
  * 측정 파일이 없거나 낡았으면 코드에 박힌 기본 순서로 떨어진다 — 측정이 멈춰도 러너는
@@ -154,6 +175,32 @@ export async function resolveModel(role, warn = () => {}) {
     warn(`${preferred.slice(0, 고름.index).join(', ')} 가 목록에 없습니다 → ${고름.id}`);
   }
   return 고름.id;
+}
+
+/**
+ * 이 역할에서 쓸 모델을 **여럿** 정한다 (#307) — 개발자 둘처럼.
+ *
+ * 목록 조회가 실패하면 순위표 위에서부터 그대로 쓴다. 살아 있는 것이 요청한 수보다
+ * 적으면 있는 만큼만 준다 — 하나뿐이면 개발자도 하나다.
+ */
+export async function resolveModels(role, count, warn = () => {}) {
+  const preferred = preferenceFor(role, warn);
+  let available = [];
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/models', {
+      signal: AbortSignal.timeout(15_000),
+    });
+    available = toolCapableIds(await res.json());
+  } catch (e) {
+    warn(`모델 목록을 못 받았습니다(순위표 위에서부터): ${e?.message ?? e}`);
+    return preferred.slice(0, Math.max(0, Number(count) || 0));
+  }
+  const 고름 = pickModels({ preferred, available, count });
+  if (!고름.length) {
+    warn('순위표에 살아 있는 모델이 없습니다 — 1순위로 진행합니다.');
+    return preferred.slice(0, 1);
+  }
+  return 고름.map((x) => x.id);
 }
 
 // ── CLI ─────────────────────────────────────────────────────────────────
