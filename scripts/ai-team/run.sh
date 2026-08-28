@@ -72,6 +72,10 @@ export AI_TEAM_KEY AI_TEAM_BASE_URL="$BASE_URL" OPENROUTER_API_KEY
 # 모델은 curl 을 직접 부르지 않는다 — 래퍼 하나만 쓴다 (#215). 이유는 api.sh 주석 참고:
 # 셸 변수가 든 명령은 권한 규칙을 통과하지 못하고, 키를 명령줄에 박으면 로그에 남는다.
 API="$SITE_DIR/scripts/ai-team/api.sh"
+# 씬 조회 통로 (#310). 웹어드벤처 씬만 **읽는다** — posts·users 는 통로가 없다.
+# 원시 접속을 주지 않는 이유는 api.sh 와 같다: 할 수 있는 일을 못박아 두면 잘못
+# 판단해도 그 밖으로 못 나간다. 이 DB 는 인증이 없고 사용자 데이터가 같이 있다.
+DB="$SITE_DIR/scripts/ai-team/db.mjs"
 # 파이프라인 요청 (#279, #292). 클로드는 **요청만** 남기고 직접 띄우지 않는다 — 아래
 # "전경 실행" 주석 참고. 파일을 바꾸는 일은 파이프라인 안에서 워크트리에 갇힌 채
 # 일어나므로, 러너 자신은 여전히 Edit/Write 가 없다.
@@ -104,6 +108,19 @@ PROMPT=$(cat <<'PROMPT_END'
 
    답글로 달려면 마지막에 parentId 를 하나 더 붙입니다:
    @API@ comment <postId> claude '내용' <parentId>
+
+## 씬 본문은 DB 에서 직접 봅니다
+
+웹어드벤처 씬 본문은 저장소가 아니라 DB 에 있습니다. **사람에게 묻지 말고 직접 보세요.**
+
+    @DB@ scenes              씬 목록 (제목·id)
+    @DB@ scene <id>          씬 하나의 본문
+    @DB@ search <문구>        제목·본문에 그 말이 든 씬
+
+읽기 전용이고 씬 계열만 봅니다 — 글·계정은 통로가 없습니다.
+
+세계가 쓰는 낱말이 당신 짐작과 다를 수 있습니다. 안 나오면 **비슷한 말로 다시 찾아보세요**
+— 예를 들어 "공중도시" 는 한 건도 없지만 "부유도시" 로는 나옵니다.
 
 ## 남은 횟수 — `aiTurnsLeft`
 
@@ -283,12 +300,13 @@ PROMPT_END
 # 래퍼 경로만 자리표시자로 끼워 넣는다 — 비밀이 아니라 경로다.
 PROMPT="${PROMPT//@API@/$API}"
 PROMPT="${PROMPT//@REQUEST@/$REQUEST}"
+PROMPT="${PROMPT//@DB@/$DB}"
 
 claude -p "$PROMPT" \
     --add-dir "$SITE_DIR" \
     --disallowedTools Edit Write NotebookEdit \
     --allowedTools Read Grep Glob "Bash($API *)" "Bash(git log*)" "Bash(git diff*)" "Bash(git status*)" \
-    "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
+    "Bash($DB *)" "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
     --permission-mode dontAsk
 
 # ── 파이프라인은 **여기서 전경으로** 돈다 (#292) ────────────────────────────
