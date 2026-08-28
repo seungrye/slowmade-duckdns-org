@@ -28,6 +28,20 @@ die() { printf '\033[1;31m[ai-team]\033[0m %s\n' "$*" >&2; exit 1; }
 command -v claude >/dev/null 2>&1 || die "claude CLI 를 찾을 수 없습니다 (PATH: $PATH)"
 [[ -r "$ENV_FILE" ]] || die "env 파일을 읽을 수 없습니다: $ENV_FILE"
 
+# ── 주기 판정 (#299) ────────────────────────────────────────────────────
+#
+# 타이머는 10분마다 깨우고 **여기서 경과만 본다.** `OnCalendar=hourly` 로는 안 되는데,
+# 유닛이 아직 activating 인 동안 타이머가 elapse 하면 systemd 가 start job 을 기존 job 에
+# 합쳐 버려 **그 트리거가 사라지기** 때문이다(90분 실행이면 01:00 이 없어지고 02:00 에야 돈다).
+#
+# 경과로 보면 긴 실행이 끝난 뒤 첫 깨움에서 바로 돈다. 밀린 횟수 개념이 없어서
+# 3시간이 걸렸어도 다음은 1회뿐이다. 기준은 **시작 시점**에 찍힌다.
+STAMP="${AI_TEAM_STAMP:-$HOME/.local/state/ai-team/last-start}"
+INTERVAL_SEC="${AI_TEAM_INTERVAL_SEC:-3600}"
+if ! node "$SITE_DIR/scripts/ai-team/interval.mjs" --check "$STAMP" "$INTERVAL_SEC"; then
+  exit 0
+fi
+
 # 파일 전체를 source 하지 않는다 — 다른 비밀까지 환경에 올릴 이유가 없다. 값 하나만 꺼낸다.
 AI_TEAM_KEY="$(grep -E '^AI_TEAM_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
 AI_TEAM_KEY="${AI_TEAM_KEY%$'\r'}"                                  # CRLF 로 저장된 경우
