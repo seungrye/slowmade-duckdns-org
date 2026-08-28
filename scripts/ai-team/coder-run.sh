@@ -118,6 +118,20 @@ API="$SITE_DIR/scripts/ai-team/api.sh"
 # systemd 는 WorkingDirectory 로 해결되지만 손으로 돌릴 때가 문제다.
 cd "$SITE_DIR" || die "저장소로 이동할 수 없습니다: $SITE_DIR"
 
+# **클로드가 돈 뒤에만 답한다** (#303).
+#
+# 타이머는 10분마다 깨우지만 클로드는 1시간에 한 번만 실제로 돈다(#299). 유닛이
+# `Wants=` 로 코더를 끌어오므로, 표식이 없으면 클로드가 건너뛴 깨움이라는 뜻이다.
+#
+# 못 지우면 다음 깨움에도 돌게 되는데, 그건 이 변경 전과 같은 상태일 뿐이라 멈추지 않고
+# 경고만 남긴다.
+MARK="${AI_TEAM_MARK:-/var/lib/ai-team/claude-ran}"
+if [[ ! -f "$MARK" ]]; then
+  log "클로드가 이번 깨움에 안 돌았습니다 — 넘어갑니다"
+  exit 0
+fi
+rm -f "$MARK" || log "경고: 표식을 못 지웠습니다($MARK) — 다음 깨움에도 돌게 됩니다."
+
 
 log "요청 스레드 확인 — $BASE_URL (모델 $MODEL)"
 
