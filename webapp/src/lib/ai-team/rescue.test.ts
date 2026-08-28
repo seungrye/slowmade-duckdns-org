@@ -289,6 +289,13 @@ describe('게이트 실패 (#312)', () => {
     expect(c).toContain('UNEXPECTED_PASS');
   });
 
+  // 1단계에서 테스트가 하나도 안 나오는 경우 (#319). 이것도 die() 라 흔적이 없었다.
+  it('테스트가 안 만들어진 경우도 풀이가 붙는다', () => {
+    const b = stuckIssueBody({ ...게이트, gate: '테스트 작성', verdict: 'NO_TESTS', testFiles: [] });
+    expect(b).toContain('NO_TESTS');
+    expect(b).toMatch(/스펙|모호|넓/);
+  });
+
   it('전체 스위트 실패도 같은 틀로 담긴다', () => {
     const c = stuckComment({ ...게이트, gate: '전체', verdict: 'FAILING' });
     expect(c).toContain('전체');

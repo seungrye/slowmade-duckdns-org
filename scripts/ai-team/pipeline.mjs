@@ -464,7 +464,14 @@ claude(worktree, [
 
 const afterWrite = changedPaths(worktree);
 const testFiles = afterWrite.filter((f) => isTest(f.path)).map((f) => f.path);
-if (!testFiles.length) die('테스트 파일이 만들어지지 않았습니다.');
+// **흔적을 남긴다** (#319). 여기도 die() 라 브랜치도 이슈도 덧글도 없었고, 그래서 다음
+// 회차의 클로드가 같은 스펙을 또 넘겼다 — #312 와 같은 고리다.
+if (!testFiles.length) {
+  salvage({
+    kind: StuckKind.GATE_FAILED, gate: '테스트 작성', verdict: 'NO_TESTS',
+    output: afterWrite.map((f) => `${f.status} ${f.path}`).join('\n') || '(바뀐 파일 없음)',
+  });
+}
 log(`   테스트 ${testFiles.length}건: ${testFiles.join(', ')}`);
 상황.testFiles = testFiles;
 
