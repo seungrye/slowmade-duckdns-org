@@ -19,6 +19,28 @@ export const SIZES = Object.freeze([
 const DEFAULT_PORT = 0;
 
 /**
+ * 논리 메뉴 이름 → 뷰포트별로 눌러야 할 aria-label 순서 (#321).
+ *
+ * 네비바 드롭다운은 hover 가 아니라 클릭으로 열린다. 누를 것이 뷰포트마다 달라서
+ * (데스크톱은 버튼 하나, 모바일은 햄버거 → 섹션 토글) 논리 이름으로 받아 여기서 번역한다.
+ *
+ * @type {Readonly<Record<string, { desktop: string[], mobile: string[] }>>}
+ */
+export const MENUS = Object.freeze({});
+
+/**
+ * 그 뷰포트에서 메뉴를 펼치려면 무엇을 어떤 순서로 누르는지.
+ *
+ * 모르는 이름이거나 메뉴를 안 줬으면 빈 목록 — 던지지 않는다. 부르는 쪽이 고쳐 쓸 수
+ * 있게 **매번 새 배열**을 낸다.
+ *
+ * @param {string|undefined} menu 논리 메뉴 이름
+ * @param {string} sizeName `SIZES` 의 뷰포트 이름
+ * @returns {string[]}
+ */
+export function clickPlan(menu, sizeName) {}
+
+/**
  * 인자 → `{path, owner, port}`. 받아들일 수 없으면 `null`.
  *
  * **경로만 받는다.** 스킴이나 `//` 로 시작하면 밖을 겨누는 것이라 거절한다.
