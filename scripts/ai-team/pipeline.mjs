@@ -347,10 +347,12 @@ const 상황 = { testFiles: [], redCount: null, round: 0, verdict: null, output:
  * 문구는 `rescue.mjs` 가 만든다 — 부수효과와 섞여 있으면 시험할 수 없다.
  * **여기서 프로세스가 끝난다**(exit 2).
  */
-function salvage({ kind, who, output }) {
+function salvage({ kind, who, output, gate, verdict }) {
   log(kind === StuckKind.AGENT_FAILED
     ? `${who} 실행이 실패했습니다 — 브랜치를 올리고 이슈를 만듭니다`
-    : `${MAX_ROUNDS}회를 다 썼습니다 — 브랜치를 올리고 이슈를 만듭니다`);
+    : kind === StuckKind.GATE_FAILED
+      ? `${gate} 게이트에서 걸렸습니다(${verdict}) — 브랜치를 올리고 이슈를 만듭니다`
+      : `${MAX_ROUNDS}회를 다 썼습니다 — 브랜치를 올리고 이슈를 만듭니다`);
 
   // 1) 지금까지의 작업을 브랜치로. **버리지 않는다.** 담을 것이 없어도 계속 간다.
   try {
@@ -366,7 +368,8 @@ function salvage({ kind, who, output }) {
   } catch { log('   브랜치 push 에 실패했습니다.'); }
 
   const info = {
-    kind, who, spec, maxRounds: MAX_ROUNDS, ...상황,
+    kind, who, gate, spec, maxRounds: MAX_ROUNDS, ...상황,
+    verdict: verdict ?? 상황.verdict,
     branch: pushed ? branch : null,
     // 지울 워크트리 경로를 적어 봐야 이어받을 수 없다.
     worktree: keep ? worktree : null,
@@ -487,7 +490,11 @@ const red = runTests(worktree, specTests);
 const redVerdict = redGate(red.counts);
 if (redVerdict !== GateVerdict.PASS) {
   console.error(red.output.slice(-2000));
-  die(`빨강 게이트 실패(${redVerdict}). 작업 공간을 남깁니다: ${worktree}`);
+  // **흔적을 남긴다** (#312). 예전엔 die() 라 브랜치도 이슈도 덧글도 없었고, 야간
+  // 클로드는 그걸 SIGKILL 로 오진한 뒤 자기가 이미 시도한 줄 몰라 **다음 시간에 같은
+  // 스펙을 또 요청했다.** 문에서 걸린 것은 고장이 아니라 파이프라인이 제대로 일한 것이니,
+  // 무엇을 고쳐야 하는지까지 적어 보내야 고리가 끊긴다.
+  salvage({ kind: StuckKind.GATE_FAILED, gate: '빨강', verdict: redVerdict, output: red.output });
 }
 log(`   빨강 확인 ✓ (${red.counts.numTotalTests}건 모두 실패)`);
 상황.redCount = red.counts.numTotalTests;
@@ -614,7 +621,7 @@ const whole = runTests(worktree, []);
 const wholeVerdict = greenGate(whole.counts, []);
 if (wholeVerdict !== GateVerdict.PASS) {
   console.error(whole.output.slice(-3000));
-  die(`전체가 통과하지 않습니다(${wholeVerdict}). 작업 공간을 남깁니다: ${worktree}`);
+  salvage({ kind: StuckKind.GATE_FAILED, gate: '전체', verdict: wholeVerdict, output: whole.output });
 }
 log(`   전체 확인 ✓ (${whole.counts.numTotalTests}건)`);
 
