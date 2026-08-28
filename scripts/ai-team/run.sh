@@ -76,6 +76,8 @@ API="$SITE_DIR/scripts/ai-team/api.sh"
 # 원시 접속을 주지 않는 이유는 api.sh 와 같다: 할 수 있는 일을 못박아 두면 잘못
 # 판단해도 그 밖으로 못 나간다. 이 DB 는 인증이 없고 사용자 데이터가 같이 있다.
 DB="$SITE_DIR/scripts/ai-team/db.mjs"
+# 화면 촬영 통로 (#317). 경로만 받고 호스트는 도구가 조립한다.
+SHOT="$SITE_DIR/scripts/ai-team/shot.mjs"
 # 파이프라인 요청 (#279, #292). 클로드는 **요청만** 남기고 직접 띄우지 않는다 — 아래
 # "전경 실행" 주석 참고. 파일을 바꾸는 일은 파이프라인 안에서 워크트리에 갇힌 채
 # 일어나므로, 러너 자신은 여전히 Edit/Write 가 없다.
@@ -132,6 +134,20 @@ PROMPT=$(cat <<'PROMPT_END'
 
 세계가 쓰는 낱말이 당신 짐작과 다를 수 있습니다. 안 나오면 **비슷한 말로 다시 찾아보세요**
 — 예를 들어 "공중도시" 는 한 건도 없지만 "부유도시" 로는 나옵니다.
+
+## 화면은 직접 찍어서 보여줍니다
+
+"수정 결과를 보여 달라" 는 요청에 **못 찍는다고 답하지 마세요.** 찍을 수 있습니다.
+
+    @SHOT@ <경로> [--owner]
+
+데스크톱·모바일 두 크기로 찍어 올리고, 덧글에 붙일 마크다운을 그대로 돌려줍니다.
+그 줄을 덧글 본문에 넣으면 그림이 보입니다.
+
+- `--owner` 를 주면 **주인 화면**으로 찍습니다. `ownerOnly` 메뉴(서버 상태 등)는 이게
+  없으면 화면에 아예 안 나옵니다
+- 경로만 받습니다. 바깥 주소는 못 겨눕니다
+- 아직 배포 안 된 변경은 못 찍습니다 — 지금 떠 있는 화면을 찍습니다
 
 ## 남은 횟수 — `aiTurnsLeft`
 
@@ -312,12 +328,13 @@ PROMPT_END
 PROMPT="${PROMPT//@API@/$API}"
 PROMPT="${PROMPT//@REQUEST@/$REQUEST}"
 PROMPT="${PROMPT//@DB@/$DB}"
+PROMPT="${PROMPT//@SHOT@/$SHOT}"
 
 claude -p "$PROMPT" \
     --add-dir "$SITE_DIR" \
     --disallowedTools Edit Write NotebookEdit \
     --allowedTools Read Grep Glob "Bash($API *)" "Bash(git log*)" "Bash(git diff*)" "Bash(git status*)" \
-    "Bash($DB *)" "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
+    "Bash($DB *)" "Bash($SHOT *)" "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
     --permission-mode dontAsk
 
 # ── 파이프라인은 **여기서 전경으로** 돈다 (#292) ────────────────────────────
