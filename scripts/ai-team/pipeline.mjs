@@ -42,6 +42,7 @@ import { resolveBase } from './base.mjs';
 // 막혔을 때 무엇을 남길지 — 되돌리기 계획과 보고 문구 (#282, #283).
 import {
   StuckKind, revertPlan, needsRebaseline, stuckTitle, stuckIssueBody, stuckComment,
+  successComment,
 } from './rescue.mjs';
 
 const REPO = '/home/seungrye/site';
@@ -568,6 +569,22 @@ sh('git', ['commit', '-q', '-m', `pipeline: ${spec.split('\n')[0].slice(0, 72)}`
 });
 sh('git', ['push', '-q', '-u', 'origin', branch], { cwd: worktree, stdio: 'pipe' });
 const sha = sh('git', ['rev-parse', '--short', 'HEAD'], { cwd: worktree }).trim();
+
+// **성공도 스레드에 알린다** (#292). 야간 클로드는 이제 요청만 남기고 먼저 끝나므로
+// 결과를 볼 수 없다 — 파이프라인이 직접 알리지 않으면 아침에 아무도 모른다.
+if (POST_ID) {
+  try {
+    sh(join(REPO, 'scripts/ai-team/api.sh'), ['comment', POST_ID, 'claude', successComment({
+      branch, sha, testFiles,
+      redCount: red.counts?.numTotalTests ?? null,
+      round,
+      wholeCount: whole.counts?.numTotalTests ?? null,
+    })], { stdio: 'pipe' });
+    log('   스레드에 알렸습니다');
+  } catch {
+    log('   스레드 알림에 실패했습니다 — 브랜치는 올라가 있습니다.');
+  }
+}
 
 log(`완료 — ${branch} (${sha}) · 빨강 증거 ${redFile}`);
 if (!keep) sh('git', ['worktree', 'remove', '--force', worktree], { cwd: REPO, stdio: 'pipe' });

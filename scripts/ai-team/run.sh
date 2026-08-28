@@ -43,9 +43,13 @@ export AI_TEAM_KEY AI_TEAM_BASE_URL="$BASE_URL" OPENROUTER_API_KEY
 # 모델은 curl 을 직접 부르지 않는다 — 래퍼 하나만 쓴다 (#215). 이유는 api.sh 주석 참고:
 # 셸 변수가 든 명령은 권한 규칙을 통과하지 못하고, 키를 명령줄에 박으면 로그에 남는다.
 API="$SITE_DIR/scripts/ai-team/api.sh"
-# 파이프라인 (#279). 클로드가 판단해 하루 한 건 돌린다 — 파일을 바꾸는 일은 이 안에서
-# 워크트리에 갇힌 채 일어나므로, 러너 자신은 여전히 Edit/Write 가 없다.
-PIPELINE="$SITE_DIR/scripts/ai-team/pipeline.mjs"
+# 파이프라인 요청 (#279, #292). 클로드는 **요청만** 남기고 직접 띄우지 않는다 — 아래
+# "전경 실행" 주석 참고. 파일을 바꾸는 일은 파이프라인 안에서 워크트리에 갇힌 채
+# 일어나므로, 러너 자신은 여전히 Edit/Write 가 없다.
+#
+# 경로가 `/tmp/spec-` 으로 시작하는 것이 중요하다 — 허용 목록의 `Bash(cat > /tmp/spec-*)`
+# 가 그대로 덮으므로 이 변경으로 **권한이 새로 늘지 않는다**. request.mjs 와 같은 값이다.
+REQUEST="${PIPELINE_REQUEST:-/tmp/spec-pipeline-request}"
 [[ -x "$API" ]] || die "래퍼를 실행할 수 없습니다: $API"
 
 log "요청 스레드 확인 — $BASE_URL"
@@ -181,17 +185,33 @@ PROMPT=$(cat <<'PROMPT_END'
 이 규칙은 **사람에게 답할 때만** 입니다. 코더에게 답할 때 표로 각을 잡으면 오히려
 말이 겉돕니다.
 
-## 만들 때가 됐으면 파이프라인을 돌립니다
+## 만들 때가 됐으면 파이프라인을 **요청**합니다
 
 스펙이 분명해졌고 이제 실제로 만들 차례라고 보이면, **하루 한 건**에 한해 파이프라인을
-돌릴 수 있습니다.
+요청할 수 있습니다.
 
-    @PIPELINE@ --spec /tmp/spec-<이름>.md --post <postId>
+**직접 돌리지 마세요. 돌릴 수도 없습니다.** 파이프라인은 20분에서 3시간이 걸리는데,
+당신의 실행 시간이 그보다 먼저 끝납니다. 예전에는 당신이 직접 띄웠고, 그때마다 당신이
+끝나는 순간 파이프라인이 통째로 죽었습니다 — 브랜치도 이슈도 안 남은 채로. 그래서 지금은
+**요청만 남기고 러너가 당신이 끝난 뒤에 대신 돌립니다.**
 
-`--post` 를 주면 막혔을 때 파이프라인이 그 스레드에 스스로 알립니다.
+두 파일을 적으면 됩니다.
 
-스펙 파일은 `Bash` 로 `/tmp` 에 적으세요(저장소가 아닙니다). 스펙에는 **무엇을 만들지,
-경계에서 어떻게 동작해야 하는지**를 적습니다 — 그게 곧 테스트가 됩니다.
+1. 스펙 — 무엇을 만들지, 경계에서 어떻게 동작해야 하는지. 그게 곧 테스트가 됩니다.
+
+   cat > /tmp/spec-<이름>.md
+
+2. 요청 — 두 줄입니다.
+
+   cat > @REQUEST@
+
+   내용:
+
+       spec=/tmp/spec-<이름>.md
+       post=<postId>
+
+`post` 를 주면 파이프라인이 끝났을 때 **성공이든 막혔든 그 스레드에 스스로 알립니다.**
+당신은 결과를 못 봅니다 — 당신이 끝난 뒤에 돌기 때문입니다.
 
 **돌리는 조건**
 
@@ -204,7 +224,8 @@ PROMPT=$(cat <<'PROMPT_END'
 **애매하면 돌리지 마세요.** 무엇을 만들지 흐릿한 채로 돌리면 3시간을 쓰고 엉뚱한 것이
 나옵니다. 그럴 땐 덧글로 물어보는 편이 훨씬 쌉니다.
 
-**결과를 덧글에 남기세요** — 성공하면 브랜치 이름을, 실패하면 어디서 막혔는지.
+덧글에는 **"요청했다" 까지만** 적으세요. 결과는 파이프라인이 직접 남깁니다 — 당신이
+브랜치 이름을 적으려고 기다리면 그게 바로 예전에 파이프라인을 죽이던 행동입니다.
 
 ## 파이프라인 안에서 무슨 일이 일어나나
 
@@ -232,13 +253,30 @@ PROMPT_END
 # 프롬프트는 확장이 일어나지 않는 heredoc 으로 쓴다(달러 기호가 섞이면 안 되므로).
 # 래퍼 경로만 자리표시자로 끼워 넣는다 — 비밀이 아니라 경로다.
 PROMPT="${PROMPT//@API@/$API}"
-PROMPT="${PROMPT//@PIPELINE@/$PIPELINE}"
+PROMPT="${PROMPT//@REQUEST@/$REQUEST}"
 
 claude -p "$PROMPT" \
     --add-dir "$SITE_DIR" \
     --disallowedTools Edit Write NotebookEdit \
     --allowedTools Read Grep Glob "Bash($API *)" "Bash(git log*)" "Bash(git diff*)" "Bash(git status*)" \
-    "Bash($PIPELINE *)" "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
+    "Bash(cat > /tmp/spec-*)" "Bash(tee /tmp/spec-*)" \
     --permission-mode dontAsk
+
+# ── 파이프라인은 **여기서 전경으로** 돈다 (#292) ────────────────────────────
+#
+# 클로드가 직접 띄우면 `Bash` 도구 타임아웃(수 분)을 넘겨 백그라운드로 가고, 클로드가
+# 먼저 턴을 끝내는 순간 `claude -p` 가 종료된다. `Type=oneshot` 유닛이라 systemd 가
+# cgroup 의 남은 프로세스를 **SIGKILL** 한다 — 매일 밤 그렇게 죽었다. SIGKILL 이라
+# salvage 도 안 돌아 아무 흔적이 안 남았다.
+#
+# 여기서 돌리면 `ExecStart` 안이라 cgroup 정리에 안 걸리고 `TimeoutStartSec`(3시간)이
+# 실제로 적용된다.
+#
+# 클로드가 비정상 종료해도 요청이 있으면 돌린다 — 스펙까지 써 놓고 죽은 것을 버릴 이유가 없다.
+if [[ -f "$REQUEST" ]]; then
+  log "파이프라인 요청 발견 — 전경으로 돌립니다"
+  node "$SITE_DIR/scripts/ai-team/run-pipeline.mjs" "$REQUEST" \
+    || log "파이프라인이 실패했습니다 (위 출력 참고)"
+fi
 
 log "완료"

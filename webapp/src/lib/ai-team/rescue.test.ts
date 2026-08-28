@@ -6,6 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   StuckKind, revertPlan, needsRebaseline, stuckTitle, stuckIssueBody, stuckComment,
+  successComment,
 } from '../../../../scripts/ai-team/rescue.mjs';
 
 /** `snapshot()` 이 만드는 모양 — 경로 → 내용. */
@@ -196,5 +197,53 @@ describe('stuckComment — 스레드 덧글', () => {
     const c = stuckComment({ ...기본, kind: StuckKind.AGENT_FAILED, who: '클로드', redCount: null });
     expect(c).toContain('클로드');
     expect(c).not.toContain('12회를 다');
+  });
+});
+
+// 초록으로 끝났을 때도 스레드에 알린다 (#292).
+//
+// 야간 클로드는 이제 파이프라인을 직접 띄우지 않는다 — 요청만 남기고 러너가 그가 끝난 뒤에
+// 돌린다. 그래서 **클로드는 결과를 못 본다.** 예전엔 "결과를 덧글에 남기세요" 라고 시켰는데,
+// 기다리는 그 행동이 바로 파이프라인을 죽이던 것이었다. 이제 파이프라인이 직접 알린다.
+describe('successComment — 초록으로 끝났을 때', () => {
+  const 성공 = {
+    branch: 'pipeline/1787',
+    sha: 'abc1234',
+    testFiles: ['webapp/src/lib/format-bytes.test.ts'],
+    redCount: 61,
+    round: 2,
+    wholeCount: 2712,
+  };
+
+  it('이어받을 브랜치와 커밋을 적는다', () => {
+    const c = successComment(성공);
+    expect(c).toContain('pipeline/1787');
+    expect(c).toContain('abc1234');
+  });
+
+  it('무엇을 근거로 초록이라 하는지 적는다 — 빨강 건수·회차·전체 스위트', () => {
+    const c = successComment(성공);
+    expect(c).toContain('61');
+    expect(c).toContain('2712');
+    expect(c).toContain('2회차');
+  });
+
+  it('머지는 사람 몫이라고 적는다 — 파이프라인은 PR·머지를 하지 않는다', () => {
+    expect(successComment(성공)).toMatch(/머지|검수/);
+  });
+
+  it('전체 스위트 수를 모를 때도 터지지 않는다', () => {
+    expect(() => successComment({ ...성공, wholeCount: null })).not.toThrow();
+  });
+
+  it('테스트 파일이 여러 건이면 다 적는다', () => {
+    const c = successComment({ ...성공, testFiles: ['a.test.ts', 'b.test.ts'] });
+    expect(c).toContain('a.test.ts');
+    expect(c).toContain('b.test.ts');
+  });
+
+  it('덧글 상한 아래로 유지한다', () => {
+    const many = Array.from({ length: 200 }, (_, i) => `webapp/src/lib/아주긴이름${i}.test.ts`);
+    expect(successComment({ ...성공, testFiles: many }).length).toBeLessThan(5000);
   });
 });

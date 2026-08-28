@@ -158,3 +158,35 @@ export function stuckComment(info) {
     '뜻일 때가 많습니다 — 그렇게 보이면 스펙부터 고쳐 주세요.',
   ].filter((l) => l !== '').join('\n');
 }
+
+/** 덧글에 나열할 테스트 파일 최대 건수. 넘으면 나머지는 수로만 적는다. */
+const COMMENT_TEST_FILES = 10;
+
+/**
+ * 초록으로 끝났을 때 스레드에 남길 덧글 (#292).
+ *
+ * 야간 클로드는 이제 파이프라인을 직접 띄우지 않는다 — 요청만 남기고 러너가 그가 끝난
+ * 뒤에 돌린다. 그래서 **클로드는 결과를 못 본다.** 예전 프롬프트는 "결과를 덧글에 남기세요"
+ * 라고 시켰는데, 결과를 보려고 기다리는 그 행동이 바로 파이프라인을 SIGKILL 로 죽이던
+ * 것이었다. 이제 파이프라인이 스스로 알린다.
+ *
+ * **PR·머지는 하지 않는다** — 브랜치는 검수 대상이지 반영이 아니다. 그 사실을 덧글에 적어
+ * 아침에 사람이 무엇을 해야 하는지 알게 한다.
+ */
+export function successComment(info) {
+  const { branch, sha, testFiles = [], redCount = null, round = 0, wholeCount = null } = info;
+  const 보일것 = testFiles.slice(0, COMMENT_TEST_FILES);
+  const 나머지 = testFiles.length - 보일것.length;
+
+  return [
+    `파이프라인이 **초록으로 끝났습니다** — \`${branch}\` (${sha}).`, '',
+    `- ${round}회차에 통과했습니다`,
+    redCount === null ? '' : `- 빨강 ${redCount}건을 구현 없이 확인한 뒤 시작했습니다`,
+    wholeCount === null ? '' : `- 전체 스위트 ${wholeCount}건 초록`,
+    '', '테스트:',
+    ...보일것.map((f) => `- \`${f}\``),
+    나머지 > 0 ? `- …외 ${나머지}건` : '', '',
+    '**PR·머지는 하지 않았습니다** — 브랜치는 검수 대상이지 반영이 아닙니다.',
+    `\`git fetch && git checkout ${branch}\` 로 보시면 됩니다.`,
+  ].filter((l) => l !== '').join('\n');
+}
