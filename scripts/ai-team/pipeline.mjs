@@ -34,7 +34,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 // 게이트 판정은 **테스트와 같은 파일**을 쓴다 — 두 벌로 두면 한쪽만 고쳐지는 날이 온다.
-import { redGate, greenGate, GateVerdict } from './gate.mjs';
+import { redGate, greenGate, GateVerdict, redDiscriminationWarning } from './gate.mjs';
 // 누가 무엇을 고쳤는지 가리는 규칙 — vitest 테스트가 같은 파일을 시험한다.
 import { isTest, isImpl } from './snapshot.mjs';
 // 워크트리를 어디서 갈라낼지 (#284).
@@ -113,6 +113,7 @@ function runTests(worktree, paths) {
   }
   let counts = null;
   let detail = '';
+  let failures = [];
   try {
     const raw = readFileSync(out, 'utf8');
     const j = JSON.parse(raw);
@@ -124,11 +125,15 @@ function runTests(worktree, paths) {
         .filter((a) => a.status === 'failed')
         .map((a) => `✗ ${a.fullName}\n  ${(a.failureMessages ?? []).join('\n  ').slice(0, 500)}`))
       .join('\n');
+    failures = (j.testResults ?? [])
+      .flatMap((f) => (f.assertionResults ?? [])
+        .filter((a) => a.status === 'failed')
+        .flatMap((a) => a.failureMessages ?? []));
   } catch {
     // 리포터를 못 읽었다. 게이트가 "못 읽으면 통과시키지 않는다" 로 처리한다.
   }
   rmSync(out, { force: true });
-  return { counts, output: detail || output };
+  return { counts, output: detail || output, failures };
 }
 
 /**
@@ -435,6 +440,8 @@ if (redVerdict !== GateVerdict.PASS) {
   die(`빨강 게이트 실패(${redVerdict}). 작업 공간을 남깁니다: ${worktree}`);
 }
 log(`   빨강 확인 ✓ (${red.counts.numTotalTests}건 모두 실패)`);
+const 빨강경고 = redDiscriminationWarning(red.counts, red.failures);
+if (빨강경고) log(`   ⚠ ${빨강경고}`);
 상황.redCount = red.counts.numTotalTests;
 const redFile = `/tmp/ai-pipeline-${stamp}-RED.txt`;
 writeFileSync(redFile, red.output, 'utf8');

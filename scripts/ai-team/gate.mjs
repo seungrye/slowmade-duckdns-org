@@ -58,7 +58,22 @@ export function redGate(counts) {
  * @returns {string[]} 처음 나온 순서를 지킨, 서로 다른 사유들.
  */
 export function failureKinds(messages) {
-  throw new Error(`failureKinds 미구현: ${messages}`);
+  if (messages == null) return [];
+  if (!Array.isArray(messages)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const m of messages) {
+    if (typeof m !== 'string') continue;
+    const head = m.split('\n', 1)[0];
+    const trimmed = head.trim();
+    if (trimmed === '') continue;
+    const normalized = trimmed.replace(/(\s|^)(\/[^ \t\n]+)/g, '$1<경로>');
+    if (normalized === '') continue;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    out.push(normalized);
+  }
+  return out;
 }
 
 /**
@@ -73,7 +88,13 @@ export function failureKinds(messages) {
  * @returns {string|null} 경고 문구, 또는 경고할 것이 없으면 null.
  */
 export function redDiscriminationWarning(counts, messages) {
-  throw new Error(`redDiscriminationWarning 미구현: ${counts} ${messages}`);
+  if (counts == null) return null;
+  if (counts.numTotalTests < 2) return null;
+  const kinds = failureKinds(messages);
+  if (kinds.length !== 1) return null;
+  const reason = kinds[0];
+  const reasonForMessage = reason.length > 200 ? `${reason.slice(0, 200)}…` : reason;
+  return `빨강 ${counts.numTotalTests}건이 전부 같은 사유입니다 — 테스트가 스펙을 구별하는지 아직 증명되지 않았습니다: ${reasonForMessage}`;
 }
 
 /**
