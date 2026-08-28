@@ -75,14 +75,6 @@ const gameLinks = [
                 authOnly: true,
                 ownerOnly: true,
             },
-            {
-                href: "/scenes/status",
-                label: "서버 상태",
-                description: "로컬 LLM/서버 상태 (읽기 전용)",
-                icon: <Server size={20} />,
-                authOnly: true,
-                ownerOnly: true,
-            },
         ],
     },
     {
@@ -99,6 +91,26 @@ const gameLinks = [
                 icon: <Joystick size={20} />,
                 authOnly: true,
                 ownerOnly: false,
+            },
+        ],
+    },
+    {
+        // 서버 상태는 게임 메뉴의 평탄한 항목으로 분리. owner 전용. 하위가 하나뿐이라
+        // 게임 이름("서버 상태") 자체가 그 링크로 그려진다(#51 only 패턴). 맨 끝에 둔다
+        // — 앞에 끼우면 mobileOpenGameKey 초기값이 gameLinks[0]?.key 라 모바일 기본
+        // 펼침 대상이 바뀐다(navbar.tsx:167).
+        key: "server-status",
+        label: "서버 상태",
+        description: "로컬 LLM/서버 상태 (읽기 전용)",
+        icon: <Server size={20} />,
+        children: [
+            {
+                href: "/scenes/status",
+                label: "서버 상태",
+                description: "로컬 LLM/서버 상태 (읽기 전용)",
+                icon: <Server size={20} />,
+                authOnly: true,
+                ownerOnly: true,
             },
         ],
     },
