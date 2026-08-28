@@ -28,7 +28,25 @@ export const StuckKind = Object.freeze({
 
   /** 논의 회차를 다 썼는데 초록에 못 갔다. */
   ROUNDS_EXHAUSTED: 'ROUNDS_EXHAUSTED',
+
+  /**
+   * 문에서 걸렸다 — 빨강이나 전체 스위트 (#312).
+   *
+   * 이건 **파이프라인이 제대로 일한 것**이지 고장이 아니다. 그런데 예전엔 `die()` 로
+   * 끝나 흔적이 하나도 안 남았고, 야간 클로드는 그걸 SIGKILL 로 오진한 뒤 **자기가 이미
+   * 시도한 줄 몰라 다음 시간에 같은 스펙을 또 요청했다.** 흔적이 없으면 무한히 반복한다.
+   */
+  GATE_FAILED: 'GATE_FAILED',
 });
+
+/** 게이트 판정이 뜻하는 것 — 사람이 무엇을 고쳐야 하는지가 여기서 갈린다. */
+const 판정풀이 = {
+  UNEXPECTED_PASS: '**구현 없이 통과했습니다.** 그 테스트는 아무것도 안 잡습니다 — '
+    + '스펙이 이미 되어 있는 것을 적었거나, 테스트가 실제 동작을 건드리지 않습니다.',
+  NOTHING_COLLECTED: '**테스트가 한 건도 모이지 않았습니다.** 파일 위치나 import 를 보세요.',
+  FAILING: '**아직 실패가 남았습니다.**',
+  TEST_TOUCHED: '**테스트 파일이 바뀌었습니다.** 구현이 아니라 테스트를 고쳐 통과시킨 것입니다.',
+};
 
 /** 이슈 제목에 실을 스펙 첫 줄 길이. */
 const TITLE_CHARS = 60;
@@ -83,7 +101,8 @@ export function needsRebaseline(before, after) {
 
 /** 이슈 제목 — 12회를 다 쓴 것(미완)과 에이전트가 죽은 것(중단)을 구분한다. */
 export function stuckTitle(kind, spec) {
-  const 말머리 = kind === StuckKind.AGENT_FAILED ? 'pipeline 중단' : 'pipeline 미완';
+  const 말머리 = kind === StuckKind.AGENT_FAILED ? 'pipeline 중단'
+    : kind === StuckKind.GATE_FAILED ? 'pipeline 게이트' : 'pipeline 미완';
   return `${말머리}: ${첫줄(spec).slice(0, TITLE_CHARS) || '(제목 없음)'}`;
 }
 
@@ -104,10 +123,16 @@ export function stuckIssueBody(info) {
       `- ${who ?? '에이전트'} 실행이 실패해 ${round}회차에서 멈췄습니다.`,
       '- 회차를 쓴 것이 아니라 **호출 자체가 실패**했습니다 — 모델·자격증명·네트워크를 먼저 보세요.',
     ]
-    : [
-      `- 구현을 ${maxRounds}회 고쳤지만 초록에 못 갔습니다 (${verdict ?? '판정 없음'}).`,
-      `- 마지막은 ${round}회차입니다.`,
-    ];
+    : kind === StuckKind.GATE_FAILED
+      ? [
+        `- **${info.gate ?? ''} 게이트**에서 걸렸습니다 (${verdict ?? '판정 없음'}).`,
+        `- ${판정풀이[verdict] ?? '판정을 확인하세요.'}`,
+        '- 파이프라인이 **제대로 일한 것**입니다. 고칠 것은 스펙이나 테스트 쪽입니다.',
+      ]
+      : [
+        `- 구현을 ${maxRounds}회 고쳤지만 초록에 못 갔습니다 (${verdict ?? '판정 없음'}).`,
+        `- 마지막은 ${round}회차입니다.`,
+      ];
 
   return [
     '## 목적', (spec ?? '').split('\n').slice(0, SPEC_LINES).join('\n'), '',
@@ -137,6 +162,18 @@ export function stuckComment(info) {
     kind, branch, who, testFiles = [], redCount = null,
     round = 0, maxRounds = 0, verdict = null, output = '',
   } = info;
+
+  if (kind === StuckKind.GATE_FAILED) {
+    return [
+      `파이프라인이 **${info.gate ?? ''} 게이트**에서 멈췄습니다 (${verdict ?? '판정 없음'}).`, '',
+      판정풀이[verdict] ?? '',
+      '', '파이프라인이 제대로 일한 것입니다 — **고칠 것은 스펙이나 테스트 쪽**입니다.',
+      '같은 스펙으로 다시 요청하면 같은 자리에서 또 멈춥니다.', '',
+      branch ? `- 브랜치 \`${branch}\` 에 올려 뒀습니다` : '- 브랜치를 올리지 못했습니다',
+      testFiles.length ? `- 테스트 ${testFiles.length}건: ${testFiles.join(', ')}` : '',
+      '', '출력:', '```', 뒤에서(output, COMMENT_OUTPUT_CHARS) || '(출력 없음)', '```',
+    ].filter((l) => l !== '').join('\n');
+  }
 
   if (kind === StuckKind.AGENT_FAILED) {
     return [

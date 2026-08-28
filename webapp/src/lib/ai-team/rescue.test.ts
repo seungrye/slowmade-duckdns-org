@@ -247,3 +247,56 @@ describe('successComment — 초록으로 끝났을 때', () => {
     expect(successComment({ ...성공, testFiles: many }).length).toBeLessThan(5000);
   });
 });
+
+// 게이트 실패도 흔적을 남긴다 (#312).
+//
+// 2026-08-28 21:37 실행이 `빨강 게이트 실패(UNEXPECTED_PASS)` 로 끝났는데 die() 라서
+// 브랜치도 이슈도 덧글도 안 남았다. 야간 클로드는 그것을 보고 SIGKILL 로 오진했고,
+// 자기가 이미 시도한 줄 몰라 **다음 시간에 같은 스펙을 또 요청했다.** 흔적이 없으면
+// 같은 실패를 무한히 반복한다.
+describe('게이트 실패 (#312)', () => {
+  const 게이트 = {
+    kind: StuckKind.GATE_FAILED,
+    gate: '빨강',
+    verdict: 'UNEXPECTED_PASS',
+    spec: '# 서버 상태 메뉴',
+    branch: 'pipeline/1787',
+    testFiles: ['webapp/src/components/navbar.test.tsx'],
+    output: '2 passed',
+  };
+
+  it('제목이 다른 두 경우와 구분된다', () => {
+    const t = stuckTitle(StuckKind.GATE_FAILED, '# 제목');
+    expect(t).not.toContain('미완');
+    expect(t).not.toContain('중단');
+  });
+
+  it('어느 문에서 어떤 판정으로 걸렸는지 본문에 적는다', () => {
+    const b = stuckIssueBody(게이트);
+    expect(b).toContain('빨강');
+    expect(b).toContain('UNEXPECTED_PASS');
+  });
+
+  // 이게 재시도 고리를 끊는 부분이다 — 무엇을 고쳐야 하는지 없으면 또 같은 걸 요청한다.
+  it('UNEXPECTED_PASS 는 무슨 뜻인지 풀어 준다', () => {
+    const b = stuckIssueBody(게이트);
+    expect(b).toMatch(/구현 없이|아무것도 안 잡/);
+  });
+
+  it('덧글 첫 줄에 게이트 실패임이 드러난다', () => {
+    const c = stuckComment(게이트);
+    expect(c.split('\n')[0]).toMatch(/게이트/);
+    expect(c).toContain('UNEXPECTED_PASS');
+  });
+
+  it('전체 스위트 실패도 같은 틀로 담긴다', () => {
+    const c = stuckComment({ ...게이트, gate: '전체', verdict: 'FAILING' });
+    expect(c).toContain('전체');
+    expect(c).toContain('FAILING');
+  });
+
+  it('브랜치를 못 올렸어도 터지지 않는다', () => {
+    expect(() => stuckIssueBody({ ...게이트, branch: null })).not.toThrow();
+    expect(() => stuckComment({ ...게이트, branch: null })).not.toThrow();
+  });
+});
