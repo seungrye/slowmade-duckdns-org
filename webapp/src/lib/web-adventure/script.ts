@@ -54,3 +54,32 @@ export function parseScript(paragraph: string, vars?: Record<string, string | nu
   pushText(paragraph.slice(last));
   return out;
 }
+
+/**
+ * 문단 i 가 보간에 쓸 변수 묶음을 문단마다 하나씩 돌려준다.
+ *
+ * - 문단 i 의 값 = `base` 에 문단 0..i 의 `<<set …>>` 를 순서대로 얹은 것.
+ * - `set` 이 든 문단 **자신부터** 새 값이다(문단 안 어디에 적혀 있든 문단 전체가 새 값을 본다).
+ * - 반환 길이는 `body.length`. 각 원소는 서로 독립된 객체이며 `base` 를 변형하지 않는다.
+ * - `<<set 키 값…>>` — 남은 인자를 공백 하나로 이어 **문자열로** 담는다(숫자로 바꾸지 않는다:
+ *   `interpolate` 가 `String()` 으로 찍으므로 결과가 같고, 바꾸면 `"007"` 이 `7` 이 된다).
+ *   값이 없는 `<<set 키>>`·`<<set>>` 은 무시. 같은 키는 뒤엣것이 이긴다.
+ */
+export function varsByParagraph(
+  body: string[],
+  base?: Record<string, string | number>,
+): Array<Record<string, string | number>> {
+  throw new Error("varsByParagraph: 미구현");
+}
+
+/**
+ * 문단 i 가 열릴 시각(씬 진입 기준 ms)을 문단마다 하나씩 돌려준다.
+ *
+ * - 문단 0 은 항상 `0`, 문단 i = `i * stepMs + (문단 0..i-1 의 wait 합)`.
+ * - 반환 길이는 `body.length`.
+ * - `<<wait 값>>` — 유한한 양수만 더한다(인자 없음·비수치·음수·Infinity 는 0). 한 문단에
+ *   여럿이면 전부 더한다. 마지막 문단의 wait 은 뒤에 열릴 문단이 없어 쓰이지 않는다(오류 아님).
+ */
+export function revealSchedule(body: string[], stepMs: number): number[] {
+  throw new Error("revealSchedule: 미구현");
+}
