@@ -19,6 +19,32 @@ export const SIZES = Object.freeze([
 const DEFAULT_PORT = 0;
 
 /**
+ * 논리 이름 → 뷰포트별로 **눌러야 할 `aria-label` 순서** (#321).
+ *
+ * 네비바 드롭다운은 hover 가 아니라 클릭으로 열린다(`navbar.tsx:232`, `:395`, `:426`).
+ * 라벨은 마크업에 이미 있는 것 그대로다 — `navbar.tsx:233`, `:263`, `:395`, `:426`, `:463`.
+ *
+ * 서버 상태는 지금 **에테르니아 하위**에 있고(`navbar.tsx:79`), 메뉴 이동 브랜치가
+ * 배포되면 **게임 바로 아래**로 온다. 두 자리를 다 찍을 수 있어야 "고치기 전" 과
+ * "고친 뒤" 를 같은 도구로 낼 수 있다.
+ */
+export const MENUS = Object.freeze({});
+
+/**
+ * 그 뷰포트에서 메뉴를 펼치려면 무엇을 어떤 순서로 누르는지.
+ *
+ * 메뉴를 안 줬거나·모르는 이름이거나·없는 뷰포트면 **빈 배열**이다 — 던지지 않는다.
+ * 부르는 쪽이 고쳐 써도 `MENUS` 가 안 바뀌게 **매번 새 배열**을 낸다.
+ *
+ * @param {string} [menu] 논리 이름
+ * @param {string} [sizeName] `SIZES` 의 뷰포트 이름
+ * @returns {string[]}
+ */
+export function clickPlan(menu, sizeName) {
+  throw new Error('아직');
+}
+
+/**
  * 인자 → `{path, owner, port}`. 받아들일 수 없으면 `null`.
  *
  * **경로만 받는다.** 스킴이나 `//` 로 시작하면 밖을 겨누는 것이라 거절한다.
