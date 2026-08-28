@@ -72,6 +72,30 @@ describe('pickModel — 살아 있는 첫 번째', () => {
   });
 });
 
+describe('순위표 — 실측한 것을 위에 둔다 (#307)', () => {
+  // 실제로 돌려 통과한 것들. 나머지는 공유 풀 소진으로 못 쟀거나 풀에 묶여 있다.
+  const 측정통과 = [
+    'minimax/minimax-m3:free',
+    'minimax/minimax-m2.7:free',
+    'thinkingmachines/inkling:free',
+  ];
+
+  it('코더 1순위는 실측 통과한 것이다', () => {
+    expect(측정통과).toContain(CODER_PREFERENCE[0]);
+  });
+
+  it('관리 1순위는 실측 통과한 것이다', () => {
+    expect(측정통과).toContain(MANAGER_PREFERENCE[0]);
+  });
+
+  // 공유 풀(하루 50회)에 묶인 것을 위에 두면 금방 막힌다. 마지막 수단으로만 둔다.
+  it('실측 통과한 셋이 두 순위표 모두 앞쪽에 있다', () => {
+    for (const 표 of [CODER_PREFERENCE, MANAGER_PREFERENCE]) {
+      expect(표.slice(0, 3).every((m) => 측정통과.includes(m))).toBe(true);
+    }
+  });
+});
+
 describe('순위표 — 오픈 웨이트만 담는다', () => {
   // :free 변형은 전부 제공자가 1개(후원자)라 신호가 안 된다. 기반 모델을 여럿이
   // 호스팅하는 것만 담는다 — 무료판이 사라져도 갈아탈 곳이 있다.
