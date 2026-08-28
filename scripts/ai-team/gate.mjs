@@ -47,6 +47,36 @@ export function redGate(counts) {
 }
 
 /**
+ * 실패 메시지들에서 **서로 다른 사유**만 골라낸다.
+ *
+ * 빨강 게이트는 "수집 ≥ 1 && 통과 0" 만 본다 — "테스트가 돌긴 한다" 는 증명이지 "테스트가
+ * 스펙을 구별한다" 는 증명이 아니다. 사유의 종수를 세려면 먼저 메시지를 정규화해야 한다:
+ * 첫 줄만 취하고(스택은 버린다), 양끝 공백을 떼고, 절대 경로는 `<경로>` 로 바꾼다
+ * (워크트리 경로에 실행 시각이 박혀 있어 그대로 두면 실행마다 사유가 달라진다).
+ *
+ * @param {readonly unknown[]|null|undefined} messages 실패 메시지들.
+ * @returns {string[]} 처음 나온 순서를 지킨, 서로 다른 사유들.
+ */
+export function failureKinds(messages) {
+  throw new Error(`failureKinds 미구현: ${messages}`);
+}
+
+/**
+ * 빨강이 스펙을 구별하는지에 대한 **경고 한 줄**. 경고할 것이 없으면 null.
+ *
+ * 게이트가 아니라 경고다 — **막지 않는다.** 껍데기 throw 하나로 전부 실패하는 것은 정상
+ * 패턴이라 진행을 멈출 근거가 못 된다. 아침에 사람이 로그에서 보고 판단할 한 줄이면 된다.
+ * 그래서 태도도 게이트와 반대다: **모르면(사유를 못 셌으면) 잠자코 있는다.**
+ *
+ * @param {{numTotalTests:number,numPassedTests:number}|null|undefined} counts redGate 가 받는 것과 같은 모양.
+ * @param {readonly unknown[]|null|undefined} messages 실패 메시지들.
+ * @returns {string|null} 경고 문구, 또는 경고할 것이 없으면 null.
+ */
+export function redDiscriminationWarning(counts, messages) {
+  throw new Error(`redDiscriminationWarning 미구현: ${counts} ${messages}`);
+}
+
+/**
  * 초록 문 — 구현으로 **정말** 통과했는가.
  *
  * **테스트 파일이 바뀌었으면 통과로 치지 않는다.** 코더가 테스트를 고쳐 초록을 만드는 것을
