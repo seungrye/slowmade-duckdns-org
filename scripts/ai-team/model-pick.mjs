@@ -23,6 +23,9 @@
 //   inclusionai/* · liquid/*  → 1(자기 자신뿐), 제외
 //
 // 판정은 순수 함수로 둔다 — 네트워크는 CLI 쪽이 맡는다. 그래야 시험할 수 있다.
+import { readFileSync } from 'node:fs';
+// 주 1회 측정 결과가 있으면 그 순서를 쓴다 (#305).
+import { readRanking, RANKING_PATH } from './ranking.mjs';
 
 /** 구현(코더) 순위. 측정으로 정한다 — docs/spec/model-fallback.md 참고. */
 export const CODER_PREFERENCE = Object.freeze([
@@ -75,6 +78,26 @@ export function pickModel({ preferred, available } = {}) {
 }
 
 /**
+ * 이 역할의 순위표. **주 1회 측정 결과가 있으면 그것을 쓴다** (#305).
+ *
+ * 측정 파일이 없거나 낡았으면 코드에 박힌 기본 순서로 떨어진다 — 측정이 멈춰도 러너는
+ * 계속 돈다. 측정에 없던 후보는 뒤에 붙여 새로 추가한 모델이 사라지지 않게 한다.
+ */
+function preferenceFor(role, warn = () => {}) {
+  const 기본 = role === 'manager' ? MANAGER_PREFERENCE : CODER_PREFERENCE;
+  let 잰것 = null;
+  try {
+    잰것 = readRanking(readFileSync(RANKING_PATH, 'utf8'), { now: Math.floor(Date.now() / 1000) });
+  } catch { /* 없으면 기본 */ }
+  const 순서 = 잰것?.[role];
+  if (!순서?.length) return 기본;
+  // 측정에 없던 기본 후보를 뒤에 붙인다.
+  const 남은 = 기본.filter((m) => !순서.includes(m));
+  if (순서[0] !== 기본[0]) warn(`측정 순위를 씁니다 — 1순위 ${순서[0]}`);
+  return [...순서, ...남은];
+}
+
+/**
  * 지금 쓸 모델 하나를 정한다 — 목록을 받아 순위표와 맞춘다.
  *
  * **조회가 실패하면 1순위를 그대로 쓴다.** 목록을 못 받았다고 러너가 멈추는 것이 더 나쁘다.
@@ -84,7 +107,7 @@ export function pickModel({ preferred, available } = {}) {
  * @param {(m:string)=>void} [warn]
  */
 export async function resolveModel(role, warn = () => {}) {
-  const preferred = role === 'manager' ? MANAGER_PREFERENCE : CODER_PREFERENCE;
+  const preferred = preferenceFor(role, warn);
   let available = [];
   try {
     const res = await fetch('https://openrouter.ai/api/v1/models', {
