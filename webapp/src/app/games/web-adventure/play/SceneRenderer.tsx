@@ -6,7 +6,7 @@ import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
 import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
-import { parseScript } from "@/lib/web-adventure/script";
+import { parseScript, revealSchedule, varsByParagraph } from "@/lib/web-adventure/script";
 import { stigmaVars } from "@/lib/web-adventure/stigma-sense";
 import { AudioBus } from "./audio-bus";
 import {
@@ -173,6 +173,13 @@ export default function SceneRenderer({
     [character.stigmaErosion, character.variables],
   );
 
+  // 문단별 변수 묶음 — bodyVars 를 base 로, 본문 안 <<set>> 을 문단마다 누적. set 이 든
+  // 문단 *자신부터* 새 값이 적용된다(#371). 씬이 바뀌면 본문도 바뀌므로 scene.body 의존.
+  const varsByPara = useMemo(
+    () => varsByParagraph(scene.body, bodyVars),
+    [scene.body, bodyVars],
+  );
+
   useEffect(() => {
     if (fxSceneRef.current !== scene.id) {
       fxSceneRef.current = scene.id;
@@ -258,7 +265,8 @@ export default function SceneRenderer({
         {scene.body.slice(0, revealCount).map((p, i) => {
           // {{변수}} 치환 + << 디렉티브 >> 분리. 표시 텍스트는 <p>, <<img>> 는 블록 삽화로.
           // (오디오/화면효과 디렉티브 재생은 후속 태스크 — 여기선 표시에 영향 없음.)
-          const segs = parseScript(p, bodyVars);
+          // #371 — 문단별 varsByPara[i] 로 본문 <<set>> 이 그 문단부터 보이게.
+          const segs = parseScript(p, varsByPara[i]);
           const texts = segs.filter((s) => s.kind === "text");
           const imgs = segs.filter((s) => s.kind === "directive" && s.cmd === "img");
           return (

@@ -5,6 +5,9 @@
 //   1) {{변수}}  → interpolate() 로 표시 텍스트에 값 보간.
 //   2) << 디렉티브 >> → parseScript() 가 "표시 텍스트 런"과 "디렉티브"의 순서열로 분해.
 //      렌더러가 리빌 중 디렉티브를 제자리에서 실행한다(sfx/bgm/fx/img/wait/set).
+//      단, set 과 wait 는 본문 한정이다 — set 은 그 씬 안에서만 살고 character.variables 를
+//      건드리지 않는다(회차를 넘기는 값은 Scene.onEnter.setVars 로). wait 는 varsByParagraph
+//      가 함께 본 문단의 예약 시각에 흡수된다.
 //
 // 디렉티브 문법(공백 구분): <<cmd arg1 arg2 …>>  예) <<sfx 문소리>> <<bgm play harbor 500>>
 //                                           <<fx fadeout 800>> <<img 매복 impact>> <<wait 600>>
@@ -69,7 +72,22 @@ export function varsByParagraph(
   body: string[],
   base?: Record<string, string | number>,
 ): Array<Record<string, string | number>> {
-  throw new Error("varsByParagraph: 미구현");
+  const out: Array<Record<string, string | number>> = [];
+  const acc: Record<string, string | number> = { ...(base ?? {}) };
+  for (const paragraph of body) {
+    const here: Record<string, string | number> = { ...acc };
+    for (const seg of parseScript(paragraph)) {
+      if (seg.kind !== "directive") continue;
+      if (seg.cmd !== "set") continue;
+      const key = seg.args[0];
+      if (key === undefined) continue;
+      if (seg.args.length < 2) continue;
+      here[key] = seg.args.slice(1).join(" ");
+    }
+    out.push(here);
+    Object.assign(acc, here);
+  }
+  return out;
 }
 
 /**
@@ -81,5 +99,18 @@ export function varsByParagraph(
  *   여럿이면 전부 더한다. 마지막 문단의 wait 은 뒤에 열릴 문단이 없어 쓰이지 않는다(오류 아님).
  */
 export function revealSchedule(body: string[], stepMs: number): number[] {
-  throw new Error("revealSchedule: 미구현");
+  const out: number[] = [];
+  let wait = 0;
+  for (let i = 0; i < body.length; i++) {
+    const t = i * stepMs + wait;
+    out.push(t);
+    let add = 0;
+    for (const seg of parseScript(body[i])) {
+      if (seg.kind !== "directive" || seg.cmd !== "wait") continue;
+      const v = Number(seg.args[0]);
+      if (Number.isFinite(v) && v > 0) add += v;
+    }
+    wait += add;
+  }
+  return out;
 }
