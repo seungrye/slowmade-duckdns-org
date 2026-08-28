@@ -31,6 +31,45 @@
 파일 수정 도구가 아예 없으므로, 프롬프트가 잘못 읽혀도 코드를 못 고친다.
 밖으로 나가는 쓰기 경로는 `/api/ai-team/comment` 하나뿐이고 그건 덧글만 만든다.
 
+## 러너 계정 — 전용 계정으로 돈다 (#294)
+
+예전엔 두 러너 다 `User=seungrye` 로 돌았다. 그러면 그 계정이 가진 것을 전부 물려받는다.
+
+| 물려받던 것 | 크기 |
+|---|---|
+| sudo | `seungrye ALL=(ALL) NOPASSWD: ALL` — 셸 한 줄이면 root |
+| GitHub | `gh` 토큰 scopes `admin:org, repo, workflow` |
+| 비밀 | `webapp/.env.local` **49개 평문** — `MONGO_URI`·`NEXTAUTH_SECRET`·OAuth secret·MINIO 키… |
+
+`--dir`/`--add-dir` 안에 `.env.local` 이 있으니 **읽기 도구만으로 전부 읽혔다.** 러너가
+실제로 필요한 것은 `AI_TEAM_KEY` 와 `OPENROUTER_API_KEY` 둘뿐이다.
+
+지금 코더는 `ai-coder` 전용 계정으로 돈다.
+
+| | 값 |
+|---|---|
+| 계정 | `ai-coder` — sudo 없음, `passwd -l` 로 잠금 |
+| 저장소 | `/home/ai-coder/site` — **자기 클론**(공개 저장소라 익명 클론). 매 실행 전 `origin/main` 으로 맞춘다 |
+| 비밀 | `/home/ai-coder/ai-team.env` (0600) — 두 줄뿐 |
+| 도구 | `/usr/local/bin/opencode` — libc 만 쓰는 독립 바이너리라 node 가 필요 없다 |
+
+실측으로 확인한 격리: `.env.local` 못 읽음 · `/home/seungrye`(710) 진입 불가 · 자기
+클론에는 `.env.local` 이 아예 없음(gitignore) · `gh` 토큰 못 읽음.
+
+**옮기면서 걸린 것 셋** — 다 실측으로 잡았다.
+
+| 증상 | 원인 |
+|---|---|
+| `EACCES … lstat '<cwd>'` | opencode 가 cwd 를 stat 한다. 읽을 수 없는 곳에서 부르면 `--dir` 를 줘도 죽는다 → `coder-run.sh` 가 스스로 `cd "$SITE_DIR"` 한다 |
+| `This account is currently not available.` | 셸이 `nologin` 이면 opencode 의 bash 도구가 통째로 막힌다 → `/bin/bash` 를 주고 `passwd -l` 로 잠근다 |
+| `Model not found: …:free` | 새 계정 첫 실행은 `~/.cache/opencode/models.json` 이 없어 죽는다. 두 번째부터 정상 — 설치 때 한 번 데운다 |
+
+**클로드 러너는 아직 `seungrye` 다.** `claude` CLI 가 OAuth 로그인을 요구해서, 그 계정으로
+한 번 로그인하거나 `ANTHROPIC_API_KEY` 를 주기 전에는 옮길 수 없다.
+
+**계정을 갈라도 파이프라인 안의 코더는 여전히 기본 에이전트**라 워크트리 안에서는 무엇이든
+쓴다. 그건 의도된 것이다(구현을 해야 하므로). 계정 분리가 막는 것은 워크트리 밖이다.
+
 ## 요청하는 법
 
 `ai-req` 태그를 단 **비공개** 포스트를 쓰면 된다. 그게 전부다.
