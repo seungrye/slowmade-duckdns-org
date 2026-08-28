@@ -27,20 +27,46 @@ import { readFileSync } from 'node:fs';
 // 주 1회 측정 결과가 있으면 그 순서를 쓴다 (#305).
 import { readRanking, RANKING_PATH } from './ranking.mjs';
 
-/** 구현(코더) 순위. 측정으로 정한다 — docs/spec/model-fallback.md 참고. */
+// ── 순위는 실측이다 (#307) ──────────────────────────────────────────────
+//
+// 위 넷은 **공유 풀 밖**이다. OpenRouter 무료 한도는 계정 전체 공유이고(하루 50회,
+// 크레딧 0 기준) 오류 메타데이터가 그렇게 말한다:
+//
+//   limit_source: openrouter_free_tier_daily   X-RateLimit-Limit: 50   Remaining: 0
+//
+// 그런데 풀이 0 인데도 되는 모델이 있다 — minimax 계열과 inkling 이 그렇다. 코더가
+// 하루 144회 헛돌고도(#303) 멀쩡했던 이유가 이것이다. 그래서 **풀 밖을 위에 둔다.**
+// 아래 셋은 풀 소속이라 하루 50회에 묶이지만, 위가 전부 죽었을 때의 마지막 수단으로 남긴다.
+//
+// "풀 밖" 은 문서로 보장된 것이 아니라 실측이다. 주 1회 측정(#305)이 변화를 잡는다.
+
+/**
+ * 구현(코더) 순위.
+ *
+ * 파이프라인 코더 1회차와 같은 조건(실패 테스트 7건 + 껍데기)으로 재서 게이트 초록까지
+ * 걸린 시간 — m3 16초, inkling 18초. m2.7 은 구현으로 재지 않아 셋째에 둔다.
+ */
 export const CODER_PREFERENCE = Object.freeze([
   'minimax/minimax-m3:free',
+  'thinkingmachines/inkling:free',
+  'minimax/minimax-m2.7:free',
   'z-ai/glm-5.2:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
-  'thinkingmachines/inkling:free',
   'google/gemma-4-31b-it:free',
 ]);
 
-/** 관리(진단·검수·야간 러너) 순위. */
+/**
+ * 관리(진단·검수·야간 러너) 순위.
+ *
+ * `review()` 프롬프트를 그대로 써서 **테스트만 겨우 통과하는 하드코딩 구현을 잡아내는지**와
+ * **제대로 된 구현을 통과시키는지**(거짓 양성)를 함께 쟀다. 셋 다 만점이었고 구현을
+ * 건드리지도 않았다. 순서는 두 경우 합계 시간 — m3 41초 < m2.7 65초 < inkling 123초.
+ */
 export const MANAGER_PREFERENCE = Object.freeze([
-  'z-ai/glm-5.2:free',
   'minimax/minimax-m3:free',
+  'minimax/minimax-m2.7:free',
   'thinkingmachines/inkling:free',
+  'z-ai/glm-5.2:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
   'google/gemma-4-31b-it:free',
 ]);
