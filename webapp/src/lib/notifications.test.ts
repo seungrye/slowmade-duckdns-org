@@ -3,8 +3,8 @@
 // 내 글에 덧글이 달리거나 내 덧글에 답글이 달려도 알 방법이 없었다. AI 팀 스레드가 전부
 // 덧글로 오가면서 실질적으로 걸렸다.
 //
-// **쓸 때 만들지 않고 읽을 때 계산한다** — 덧글 생성 경로가 넷이라(comments·enji·painter·
-// ai-team) 거기에 알림 생성을 심으면 다섯 번째가 생길 때 조용히 빠진다.
+// **쓸 때 만들지 않고 읽을 때 계산한다** — 덧글 생성 경로가 셋이라(comments·enji·
+// painter) 거기에 알림 생성을 심으면 네 번째가 생길 때 조용히 빠진다.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Types } from 'mongoose';
 
