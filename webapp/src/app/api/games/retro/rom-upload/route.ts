@@ -22,6 +22,7 @@ import { validateRomUpload } from '@/lib/retro/rom-upload';
 import { classifyRomSet } from '@/lib/retro/romset';
 import { isArcade } from '@/lib/retro/platforms';
 import { toRomDto, type LeanRom } from '@/lib/retro/rom-dto';
+import { evaluateAndGrant } from '@/lib/achievements';
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
     // 같은 롬을 이미 올린 사람이 있고 거기 패치가 붙어 있으면 물려준다 (#190).
     // **문서를 만든 뒤에** 한다 — 편의 기능이 업로드 자체를 실패시키면 안 된다.
     const inherited = await inheritPatchIfAny(romSha, authed.email, String(doc._id));
+    await evaluateAndGrant(authed.email);
     return apiSuccess(toRomDto((inherited ?? doc) as unknown as LeanRom), 201);
   } catch (err) {
     // 기록이 안 됐으면 파일만 남아 아무도 못 찾는 고아가 된다 — 되돌린다.

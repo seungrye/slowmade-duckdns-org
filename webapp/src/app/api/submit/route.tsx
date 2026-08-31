@@ -2,10 +2,8 @@ import { NextResponse } from "next/server";
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
-import { checkAndGrantPostCountAchievements } from "@/lib/achievements";
-import { HydratedDocument } from "mongoose";
+import { evaluateAndGrant, type GrantedAchievement } from "@/lib/achievements";
 import User from "@/models/user";
-import { AchievementType } from "@/models/achievement";
 import { HttpStatusCode } from "axios";
 import PostRevision from "@/models/post-revision";
 import { generateAndUpdateTags } from "@/lib/tags/suggest-tags";
@@ -56,7 +54,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    let unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+    let unlockedAchievements: GrantedAchievement[] = [];
     let pointsGained = 0;
 
     if (payload._id) {
@@ -120,8 +118,8 @@ export async function POST(req: Request) {
       pointsGained = POINTS_FOR_NEW_POST;
       console.log(`+${pointsGained} points granted for new post.`);
 
-      // 새 글 작성 후, 글 개수 관련 업적 확인
-      unlockedAchievements = await checkAndGrantPostCountAchievements(payload.userEmail);
+      // 전부 다시 판정한다 — 글 업적뿐 아니라 연속일수·탐험처럼 글쓰기로 바뀌는 것이 여럿이다.
+      unlockedAchievements = await evaluateAndGrant(payload.userEmail);
     }
 
     return apiSuccess({ unlockedAchievements, pointsGained }, HttpStatusCode.Created, "게시글 저장 완료");

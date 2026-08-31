@@ -15,6 +15,7 @@ vi.hoisted(() => {
   process.env.MINIO_BUCKET = 'test-bucket';
 });
 
+vi.mock('@/lib/achievements', () => ({ evaluateAndGrant: vi.fn().mockResolvedValue([]) }));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('minio', () => ({

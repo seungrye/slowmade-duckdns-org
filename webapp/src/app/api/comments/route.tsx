@@ -4,10 +4,9 @@ import { apiSuccess, apiError } from '@/lib/api-response';
 import Comment from '@/models/comment';
 import Post from '@/models/post';
 import { connectToDB } from '@/lib/db';
-import mongoose, { HydratedDocument } from 'mongoose';
 import User from '@/models/user';
-import { checkAndGrantCommentCountAchievements } from '@/lib/achievements';
-import { AchievementType } from '@/models/achievement';
+import mongoose from 'mongoose';
+import { evaluateAndGrant, type GrantedAchievement } from '@/lib/achievements';
 import { env } from '@/lib/env';
 import { requireAuth } from '@/lib/require-auth';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
@@ -90,7 +89,7 @@ export async function POST(req: NextRequest) {
 
         await newComment.save();
 
-        let unlockedAchievements: HydratedDocument<AchievementType>[] = [];
+        let unlockedAchievements: GrantedAchievement[] = [];
         let pointsGained = 0;
 
         if (userEmail) {
@@ -99,7 +98,7 @@ export async function POST(req: NextRequest) {
             pointsGained = POINTS_FOR_NEW_COMMENT;
             console.log(`+${pointsGained} point granted for new comment.`);
             
-            unlockedAchievements = await checkAndGrantCommentCountAchievements(userEmail);
+            unlockedAchievements = await evaluateAndGrant(userEmail);
         }
 
         return apiSuccess({ newComment, unlockedAchievements, pointsGained }, 201);

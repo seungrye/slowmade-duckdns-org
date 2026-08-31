@@ -4,7 +4,7 @@ import { connectToDB } from "@/lib/db";
 import Post from "@/models/post";
 import User from "@/models/user";
 import { HttpStatusCode } from "axios";
-import { checkAndGrantPostInteractionAchievements } from "@/lib/achievements";
+import { evaluateAndGrantForPost } from "@/lib/achievements";
 import { requireAuth } from "@/lib/require-auth";
 
 export async function GET(req: NextRequest) {
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       return apiError("게시글을 찾을 수 없습니다.", HttpStatusCode.NotFound);
     }
 
-    await checkAndGrantPostInteractionAchievements(payload._id);
+    await evaluateAndGrantForPost(payload._id);
 
     if (payload.likeChecked) {
       await User.findOneAndUpdate(
