@@ -374,12 +374,19 @@ export async function runPortfolioCycle(
     const { runCloseSync } = await import("./close-sync");
     return runCloseSync(account as never, portfolio as never, runId, log);
   }
+  // 이 블록이 쓸 수 있는 현금 (#339). 계정·시장에 블록이 여럿이면 앞에서부터 선점한 몫만
+  // 보게 한다. 블록이 하나뿐이거나 예약을 안 적었으면 null — 브로커를 감싸지 않아 예전과
+  // 코드 경로가 같다.
+  const { grantedCashFor } = await import("./reservation-live");
+  const { capLiveBroker, capV4Broker } = await import("./cap-cash");
+  const granted = await grantedCashFor(account, portfolio, log);
+
   if (portfolio.strategy === "infinite_v4") {
     const { runInfiniteV4, makeV4KisBroker, makeV4TossBroker } = await import("./infinite-v4-engine");
     const market = portfolio.market as "kr" | "us";
-    const v4Broker = account.broker === "toss"
+    const v4Broker = capV4Broker(account.broker === "toss"
       ? makeV4TossBroker(makeTossClient(account), market, account._id)
-      : makeV4KisBroker(makeKisClient(account), market);
+      : makeV4KisBroker(makeKisClient(account), market), granted);
     const v4Phase = phase === "main" ? "both" : phase;
     return runInfiniteV4(account, portfolio, runId, v4Broker, v4Phase, log);
   }
@@ -388,12 +395,12 @@ export async function runPortfolioCycle(
     const { makeV4KisBroker, makeV4TossBroker } = await import("./infinite-v4-engine");
     const { runValueRebalancing } = await import("./value-rebalancing-engine");
     const market = portfolio.market as "kr" | "us";
-    const vrBroker = account.broker === "toss"
+    const vrBroker = capV4Broker(account.broker === "toss"
       ? makeV4TossBroker(makeTossClient(account), market, account._id)
-      : makeV4KisBroker(makeKisClient(account), market);
+      : makeV4KisBroker(makeKisClient(account), market), granted);
     return runValueRebalancing(account, portfolio, runId, vrBroker, log);
   }
-  const broker = makeBroker(account, portfolio.market as "kr" | "us");
+  const broker = capLiveBroker(makeBroker(account, portfolio.market as "kr" | "us"), granted);
   switch (portfolio.strategy) {
     case "lrs_v1":
       return runLrs(account, portfolio, runId, broker, log);
