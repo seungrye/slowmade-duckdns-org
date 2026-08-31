@@ -14,6 +14,7 @@ import { requireAuth } from '@/lib/require-auth';
 import { connectToDB } from '@/lib/db';
 import RetroSaveState from '@/models/retro-save-state';
 import { MAX_STATE_BYTES, canUseGameKey } from '@/lib/retro/save-state-access';
+import { evaluateAndGrant } from '@/lib/achievements';
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -94,6 +95,7 @@ export async function PUT(req: NextRequest) {
       },
       { upsert: true },
     );
+    await evaluateAndGrant(authed.email);
     return apiSuccess({ size: state.size });
   } catch (err) {
     console.error('save state record failed, rolling back object:', err);

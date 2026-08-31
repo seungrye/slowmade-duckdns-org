@@ -7,7 +7,7 @@ vi.mock('@/lib/env', () => ({ env: { points: { newPost: 5 } } }));
 vi.mock('@/models/post', () => ({ default: { create: vi.fn(), findById: vi.fn() } }));
 vi.mock('@/models/user', () => ({ default: { findOneAndUpdate: vi.fn(), findOne: vi.fn() } }));
 vi.mock('@/models/post-revision', () => ({ default: { create: vi.fn() } }));
-vi.mock('@/lib/achievements', () => ({ checkAndGrantPostCountAchievements: vi.fn().mockResolvedValue([]) }));
+vi.mock('@/lib/achievements', () => ({ evaluateAndGrant: vi.fn().mockResolvedValue([]) }));
 // 신규 글 후 백그라운드 AI 태그 호출(fire-and-forget) — 라우트 단위 테스트에선 목킹.
 vi.mock('@/lib/tags/suggest-tags', () => ({ generateAndUpdateTags: vi.fn().mockResolvedValue(undefined) }));
 

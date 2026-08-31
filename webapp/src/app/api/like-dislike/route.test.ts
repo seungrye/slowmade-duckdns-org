@@ -4,7 +4,7 @@ vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/post', () => ({ default: { findByIdAndUpdate: vi.fn(), findById: vi.fn() } }));
 vi.mock('@/models/user', () => ({ default: { findOne: vi.fn(), findOneAndUpdate: vi.fn() } }));
-vi.mock('@/lib/achievements', () => ({ checkAndGrantPostInteractionAchievements: vi.fn() }));
+vi.mock('@/lib/achievements', () => ({ evaluateAndGrantForPost: vi.fn() }));
 
 import { GET, POST } from './route';
 import { auth } from '@/auth';

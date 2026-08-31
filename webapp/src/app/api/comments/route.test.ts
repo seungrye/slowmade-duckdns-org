@@ -15,7 +15,7 @@ vi.mock('@/models/user', () => ({
 }));
 vi.mock('@/models/post', () => ({ default: { findById: vi.fn() } }));
 vi.mock('@/lib/achievements', () => ({
-  checkAndGrantCommentCountAchievements: vi.fn().mockResolvedValue([]),
+  evaluateAndGrant: vi.fn().mockResolvedValue([]),
 }));
 
 import { POST, GET, DELETE } from './route';

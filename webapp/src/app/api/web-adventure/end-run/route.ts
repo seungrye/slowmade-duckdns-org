@@ -17,6 +17,7 @@ import { hydrateCharacterSnapshot } from '@/lib/web-adventure/hydrate-character'
 import { enqueueFeedbackNote, capScenePath, capLog } from '@/lib/web-adventure/enqueue-feedback-note';
 import { enqueueSceneImage } from '@/lib/web-adventure/enqueue-scene-image';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
+import { evaluateAndGrant } from '@/lib/achievements';
 
 /**
  * 비로그인 웹 플레이어의 합성 계정 (#253).
@@ -88,6 +89,10 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : '회차 적치 실패';
     return apiError(message, 400);
   }
+
+  // 완주는 업적의 큰 축이다(완주 횟수·엔딩 수집·주인공 수집). 실패해도 삼키므로
+  // 업적 때문에 완주 저장이 막히지 않는다.
+  await evaluateAndGrant(session.user.email);
 
   // 2. save 의 runIndex+1 — 캐릭터/씬은 reset (다음 회차는 creating 부터).
   await WebAdventureSave.findOneAndUpdate(

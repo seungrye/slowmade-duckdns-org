@@ -26,26 +26,6 @@ export const env = {
     deletePostCost: intEnv('DELETE_POST_COST', 7),
   },
 
-  achievements: {
-    firstPost: intEnv('ACHIEVEMENT_FIRST_POST_POINTS', 10),
-    postCount10: intEnv('ACHIEVEMENT_POST_COUNT_10_POINTS', 20),
-    postCount50: intEnv('ACHIEVEMENT_POST_COUNT_50_POINTS', 50),
-    postCount100: intEnv('ACHIEVEMENT_POST_COUNT_100_POINTS', 100),
-    postCount250: intEnv('ACHIEVEMENT_POST_COUNT_250_POINTS', 250),
-    postCount500: intEnv('ACHIEVEMENT_POST_COUNT_500_POINTS', 500),
-    postCount1000: intEnv('ACHIEVEMENT_POST_COUNT_1000_POINTS', 1000),
-    postCount2500: intEnv('ACHIEVEMENT_POST_COUNT_2500_POINTS', 2500),
-    postCount5000: intEnv('ACHIEVEMENT_POST_COUNT_5000_POINTS', 5000),
-    postCount10000: intEnv('ACHIEVEMENT_POST_COUNT_10000_POINTS', 10000),
-    post10Likes: intEnv('ACHIEVEMENT_POST_10_LIKES_POINTS', 50),
-    firstComment: intEnv('ACHIEVEMENT_FIRST_COMMENT_POINTS', 5),
-    commentCount10: intEnv('ACHIEVEMENT_COMMENT_COUNT_10_POINTS', 10),
-    commentCount50: intEnv('ACHIEVEMENT_COMMENT_COUNT_50_POINTS', 25),
-    commentCount100: intEnv('ACHIEVEMENT_COMMENT_COUNT_100_POINTS', 50),
-    commentCount250: intEnv('ACHIEVEMENT_COMMENT_COUNT_250_POINTS', 100),
-    commentCount500: intEnv('ACHIEVEMENT_COMMENT_COUNT_500_POINTS', 250),
-    commentCount1000: intEnv('ACHIEVEMENT_COMMENT_COUNT_1000_POINTS', 500),
-  },
 
   // canonical/OG/sitemap/metadata 용 사이트 URL. SITE_URL(메인 도메인)을 우선하고,
   // 없으면 NEXTAUTH_URL 로 fallback(하위호환). 로그인 콜백은 NEXTAUTH_URL 이 그대로 담당.
