@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   updateVBasic, bandOf, rebalanceShares, runValueRebalancingBacktest,
   seedVR, cycleCoverSellQty, advanceCycleVR, applyVRFill,
+  vrFormOf, defaultsForForm, effectiveAvgPrice,
 } from "./value-rebalancing";
 import type { Bar, ValueRebalancingConfig } from "./types";
 import type { RotationCandidate } from "./rotation";
@@ -207,5 +208,74 @@ describe("vrBand — 왜 사고팔았는지 그리려면", () => {
 
   it("바가 없으면 빈 배열", () => {
     expect(runValueRebalancingBacktest(cand([]), CFG).vrBand).toEqual([]);
+  });
+});
+
+// ── 운용 형태에서 기본값 유도 (#345) ──
+describe("vrFormOf — CF 부호가 운용 형태를 정한다", () => {
+  it("양수는 적립식, 0·미지정은 거치식, 음수는 인출식", () => {
+    expect(vrFormOf(250)).toBe("적립식");
+    expect(vrFormOf(0)).toBe("거치식");
+    expect(vrFormOf(undefined)).toBe("거치식");
+    expect(vrFormOf(-200)).toBe("인출식");
+  });
+});
+
+describe("defaultsForForm — 원문 7.1 표 그대로", () => {
+  it("Pool 한도: 적립 75% · 거치 50% · 인출 25%", () => {
+    expect(defaultsForForm(250).poolLimitPct).toBe(0.75);
+    expect(defaultsForForm(0).poolLimitPct).toBe(0.5);
+    expect(defaultsForForm(-200).poolLimitPct).toBe(0.25);
+  });
+
+  it("G 시작값: 적립·거치 10 · 인출 20", () => {
+    expect(defaultsForForm(250).gradient).toBe(10);
+    expect(defaultsForForm(0).gradient).toBe(10);
+    expect(defaultsForForm(-200).gradient).toBe(20);
+  });
+});
+
+describe("설정이 기본값을 이긴다 — 원문도 \"가이드일 뿐 선택 가능\"", () => {
+  const bars = cand(Array(30).fill(100));
+
+  it("적으면 그 값을 쓴다", () => {
+    // 적립식이지만 한도를 0.3 으로 적었으면 0.3 이다.
+    const r = runValueRebalancingBacktest(bars, { ...CFG, cashflow: 250, poolLimitPct: 0.3 });
+    expect(r.trades.length).toBeGreaterThan(0); // 돌기만 하면 된다 — 값 확인은 아래 seedVR 로
+    expect(seedVR({ ...CFG, cashflow: 250, poolLimitPct: 0.3 }, 100).buyBudget)
+      .toBeCloseTo(0.3 * seedVR({ ...CFG, cashflow: 250, poolLimitPct: 0.3 }, 100).pool, 6);
+  });
+
+  it("안 적으면 형태에서 유도한다 — 적립식은 75%", () => {
+    const cfg = { ...CFG, cashflow: 250, poolLimitPct: undefined };
+    const s = seedVR(cfg, 100);
+    expect(s.buyBudget).toBeCloseTo(0.75 * s.pool, 6);
+  });
+
+  it("안 적은 거치식은 50%", () => {
+    const s = seedVR({ ...CFG, poolLimitPct: undefined }, 100);
+    expect(s.buyBudget).toBeCloseTo(0.5 * s.pool, 6);
+  });
+});
+
+// ── 실효평단 (#345) ──
+describe("effectiveAvgPrice — (누적매수 − 누적매도) / 보유수량", () => {
+  it("원문 예시: 100만원에 50개 → 30만원어치 10개 매도 → 40개, 1.75만원", () => {
+    // 원문 4.2 그대로. 매도해도 명목평단(2만원)은 안 변하지만 실효평단은 내려간다.
+    expect(effectiveAvgPrice({ cumBuy: 1_000_000, cumSell: 300_000, qty: 40 })).toBeCloseTo(17_500, 6);
+  });
+
+  it("수익 매도가 쌓이면 마이너스로 넘어간다 — 원금 ZERO 상태", () => {
+    expect(effectiveAvgPrice({ cumBuy: 100, cumSell: 150, qty: 10 })).toBeLessThan(0);
+  });
+
+  it("보유가 0 이면 낼 수 없다", () => {
+    expect(effectiveAvgPrice({ cumBuy: 100, cumSell: 50, qty: 0 })).toBeNull();
+  });
+
+  it("백테스트 결과에 실린다", () => {
+    const r = runValueRebalancingBacktest(cand(Array(30).fill(100)), CFG);
+    expect(r.effectiveAvg).not.toBeNull();
+    expect(typeof r.effectiveAvg).toBe("number");
   });
 });

@@ -16,8 +16,7 @@ import TradingPortfolio from "@/models/trading-portfolio";
 import type { Types } from "mongoose";
 import type { ValueRebalancingConfig } from "@/lib/backtest/types";
 import {
-  advanceCycleVR, applyVRFill, bandOf, rebalanceShares, seedVR, type VRState,
-} from "@/lib/backtest/value-rebalancing";
+  advanceCycleVR, applyVRFill, bandOf, rebalanceShares, seedVR, type VRState, resolveVR } from "@/lib/backtest/value-rebalancing";
 import { prevMarketDay, type V4Broker } from "./infinite-v4-engine";
 import { marketToday, type CycleLogger } from "./engines";
 import { formatMoney } from "@/lib/format";
@@ -36,12 +35,15 @@ export function parseVRCfg(config: Json): VRLiveConfig {
   if (!symbol) throw new Error("value_rebalancing config 에 symbol 필요");
   const principal = Number(config.principal ?? 0);
   if (!(principal > 0)) throw new Error("value_rebalancing config 에 principal(양수) 필요");
+  // G·Pool 한도는 **안 적으면 운용 형태에서 유도**한다 (원문 7.1 — 적립 10/75%, 거치 10/50%,
+  // 인출 20/25%). 예전엔 gradient 를 필수로 받고 한도를 늘 0.5 로 둬서, 적립식인데 거치식
+  // 한도로 도는 일이 있었다 (#345).
   const gradient = Number(config.gradient ?? 0);
-  if (!(gradient > 0)) throw new Error("value_rebalancing config 에 gradient(양수) 필요");
   return {
-    symbol, principal, gradient,
+    symbol, principal,
+    ...(gradient > 0 ? { gradient } : {}),
     bandPct: Number(config.bandPct ?? 0.15),
-    poolLimitPct: Number(config.poolLimitPct ?? 0.5),
+    ...(Number(config.poolLimitPct) > 0 ? { poolLimitPct: Number(config.poolLimitPct) } : {}),
     cycleDays: Math.max(1, Math.floor(Number(config.cycleDays ?? 10))),
     ...(config.initStockRatio != null ? { initStockRatio: Number(config.initStockRatio) } : {}),
     ...(config.cashflow != null ? { cashflow: Number(config.cashflow) } : {}),
@@ -84,7 +86,7 @@ export async function runValueRebalancing(
       const stockVal = holding * price;
       const pool = Math.max(0, cfg.principal - stockVal);
       const st: VRState = {
-        qty: holding, pool, V: stockVal, buyBudget: cfg.poolLimitPct * pool,
+        qty: holding, pool, V: stockVal, buyBudget: resolveVR(cfg).poolLimitPct * pool,
         sinceCycle: 0, cumBuy: stockVal, cumSell: 0,
       };
       persisted = { ...st, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };

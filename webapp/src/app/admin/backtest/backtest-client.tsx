@@ -858,6 +858,9 @@ function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, 
   );
 }
 
+/** totalPnl 이 "최종자산 − 투입원금"(평가손익 포함)인 전략 — 나머지는 매도 실현손익 합계. */
+const TOTAL_PNL_STRATEGIES = new Set(["value_rebalancing", "vol_target_v1"]);
+
 function Result({ result }: { result: FullResult }) {
   const buys = result.trades.filter((t) => t.side === "buy");
   const sells = result.trades.filter((t) => t.side === "sell");
@@ -949,7 +952,16 @@ function Result({ result }: { result: FullResult }) {
   return (
     <div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <Metric label="실현손익" value={fmt(result.totalPnl)} accent={result.totalPnl >= 0 ? "pos" : "neg"} />
+        {/* VR·변동성타깃은 totalPnl 이 "최종자산 − 투입원금"(평가손익 포함)이고, 나머지는 매도
+            실현손익 합계다. 같은 이름으로 부르면 전략끼리 비교가 어긋난다 (#345). */}
+        <Metric
+          label={TOTAL_PNL_STRATEGIES.has(result.strategy) ? "총손익 (평가포함)" : "실현손익"}
+          value={fmt(result.totalPnl)} accent={result.totalPnl >= 0 ? "pos" : "neg"} />
+        {result.effectiveAvg != null && (
+          // 원문 4.2 — 명목평단과 달리 매도가 쌓이면 내려간다. 마이너스면 "원금 ZERO 상태".
+          <Metric label="실효평단" value={fmt(result.effectiveAvg)}
+                  accent={result.effectiveAvg < 0 ? "pos" : undefined} />
+        )}
         {twr ? (
           <Metric label="수익률 (TWR)" value={`${twr.totalReturnPct >= 0 ? "+" : ""}${twr.totalReturnPct.toFixed(2)}%`} accent={twr.totalReturnPct >= 0 ? "pos" : "neg"} />
         ) : (
