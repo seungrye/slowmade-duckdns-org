@@ -5,8 +5,10 @@ import { InferSchemaType, Schema, model, models, Model } from "mongoose";
  *
  * ticker:
  *   - KR: 6자리 코드 (005930 등)
- *   - US: 영문 심볼 (AAPL, BRK.B 등). KIS API 표기는 점 — Wikipedia 와 다를 수
- *     있어 보관 시 KIS 표기 (BRK.B) 로 통일.
+ *   - US: 영문 심볼 (AAPL, BRKB 등). **점을 넣지 않는다** — `BRK.B` 가 아니라 `BRKB`.
+ *     라이브 매매 유니버스(lib/trading/universes.ts)와 가격(stockdailyprices)이 전부 점
+ *     없는 표기다. 예전 주석은 "점으로 통일" 이라 적혀 있었는데 실제와 반대였고, 그 탓에
+ *     BRK.B·BF.B 는 가격을 못 찾아 차트가 비었다 (#335).
  *
  * market:
  *   - "KR" / "US" 만. 다른 시장은 추후 추가.
