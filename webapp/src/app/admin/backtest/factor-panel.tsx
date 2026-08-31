@@ -15,6 +15,7 @@ interface Metrics {
   totalReturnPct: number;
   cagr: number;
   mdd: number;
+  volatility: number;
   calmar: number;
   sharpe: number;
   totalContributed?: number; // 적립식일 때 원금 + Σ적립
@@ -211,6 +212,7 @@ export default function FactorPanel({
                   <th className="py-2 pr-4">전략</th>
                   <th className="py-2 pr-4 text-right">총수익%</th>
                   <th className="py-2 pr-4 text-right">CAGR%</th>
+                  <th className="py-2 pr-4 text-right">변동성%</th>
                   <th className="py-2 pr-4 text-right">MDD%</th>
                   <th className="py-2 pr-4 text-right">Sharpe</th>
                   <th className="py-2 pr-4 text-right">Calmar</th>
@@ -225,6 +227,7 @@ export default function FactorPanel({
                     </td>
                     <td className="py-2 pr-4 text-right">{s.metrics.totalReturnPct.toFixed(1)}</td>
                     <td className="py-2 pr-4 text-right">{s.metrics.cagr.toFixed(1)}</td>
+                    <td className="py-2 pr-4 text-right">{s.metrics.volatility.toFixed(1)}</td>
                     <td className="py-2 pr-4 text-right">{s.metrics.mdd.toFixed(1)}</td>
                     <td className="py-2 pr-4 text-right">{s.metrics.sharpe.toFixed(2)}</td>
                     <td className="py-2 pr-4 text-right">{s.metrics.calmar.toFixed(2)}</td>

@@ -11,6 +11,14 @@ export interface BacktestMetrics {
   mdd: number; // 최대낙폭 % (음수, peak 대비 최저; 적립식이면 TWR 지수 기준)
   calmar: number; // cagr / |mdd| (방어 대비 수익)
   sharpe: number; // 일간수익 기반 연율화 샤프(무위험 0)
+  /**
+   * 연환산 변동성 % — 일간수익률 표준편차 × √252.
+   *
+   * 수익만 보면 "얼마나 흔들리며 벌었나" 를 알 수 없다. 같은 CAGR 이라도 변동성이 두 배면
+   * 실제로 들고 있기가 훨씬 어렵다. Sharpe 는 둘을 한 숫자로 눌러 버리므로, 위험 자체를
+   * 따로 보여 준다. 늘 0 이상이다.
+   */
+  volatility: number;
   totalContributed?: number; // 적립식: 초기원금 + Σ입금 (수익률 분모와 별개로 참고 표시)
 }
 
@@ -32,7 +40,7 @@ export function computeMetrics(
   // 곡선이 비었거나, 목돈 원금 ≤0 이고 적립도 없으면(자본 없음) 0 지표. 적립식(순수 적립, 원금 0)은
   // TWR 지수(1 시작, 원금 불필요)로 계산 가능하므로 여기서 걸러 0 을 반환하면 안 된다.
   if (n === 0 || (principal <= 0 && !hasContrib)) {
-    return { final: n ? equityCurve[n - 1].equity : principal, totalReturnPct: 0, cagr: 0, mdd: 0, calmar: 0, sharpe: 0 };
+    return { final: n ? equityCurve[n - 1].equity : principal, totalReturnPct: 0, cagr: 0, mdd: 0, calmar: 0, sharpe: 0, volatility: 0 };
   }
   const final = equityCurve[n - 1].equity;
   const flowByDate = new Map<string, number>();
@@ -79,15 +87,18 @@ export function computeMetrics(
   const years = n / TRADING_DAYS;
   const cagr = years > 0 && idxEnd > 0 ? (Math.pow(idxEnd / idxStart, 1 / years) - 1) * 100 : 0;
 
-  // Sharpe — 일간수익률 평균/표준편차 × √252 (무위험수익 0)
+  // Sharpe·변동성 — 둘 다 일간수익률의 표준편차에서 나오므로 한 번만 잰다.
+  // 표본이 하루치뿐이면(rets.length <= 1) 표준편차를 낼 수 없어 0 으로 둔다.
   let sharpe = 0;
+  let volatility = 0;
   if (rets.length > 1) {
     const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
     const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length - 1);
     const sd = Math.sqrt(variance);
     sharpe = sd > 0 ? (mean / sd) * Math.sqrt(TRADING_DAYS) : 0;
+    volatility = sd * Math.sqrt(TRADING_DAYS) * 100;
   }
 
   const calmar = mdd < 0 ? cagr / Math.abs(mdd) : 0;
-  return { final, totalReturnPct, cagr, mdd, calmar, sharpe, ...(totalContributed !== undefined ? { totalContributed } : {}) };
+  return { final, totalReturnPct, cagr, mdd, calmar, sharpe, volatility, ...(totalContributed !== undefined ? { totalContributed } : {}) };
 }
