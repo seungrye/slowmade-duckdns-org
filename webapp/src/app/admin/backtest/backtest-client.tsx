@@ -822,6 +822,7 @@ function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, 
               <th className="py-2 pr-3">기간/종목</th>
               <th className="py-2 pr-3 text-right">총수익%</th>
               <th className="py-2 pr-3 text-right">CAGR%</th>
+              <th className="py-2 pr-3 text-right">변동성%</th>
               <th className="py-2 pr-3 text-right">MDD%</th>
               <th className="py-2 pr-3 text-right">Sharpe</th>
               <th className="py-2 pr-3 text-right">Calmar</th>
@@ -835,6 +836,7 @@ function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, 
                 <td className="py-2 pr-3 text-gray-500 text-xs">{e.sub}</td>
                 <td className="py-2 pr-3 text-right">{e.metrics.totalReturnPct.toFixed(1)}</td>
                 <td className="py-2 pr-3 text-right">{e.metrics.cagr.toFixed(1)}</td>
+                <td className="py-2 pr-3 text-right">{e.metrics.volatility.toFixed(1)}</td>
                 <td className="py-2 pr-3 text-right">{e.metrics.mdd.toFixed(1)}</td>
                 <td className="py-2 pr-3 text-right">{e.metrics.sharpe.toFixed(2)}</td>
                 <td className="py-2 pr-3 text-right">{e.metrics.calmar.toFixed(2)}</td>
@@ -863,7 +865,10 @@ function Result({ result }: { result: FullResult }) {
   const returnPct = result.principal > 0 ? (result.totalPnl / result.principal) * 100 : 0;
   const finalEquity = result.equityCurve.at(-1)?.equity ?? 0;
   // 적립식이면 유입 자본을 제거한 시간가중수익(TWR)로 수익률 표기(원금 대비 %는 왜곡되므로).
-  const twr = result.totalContributed ? computeMetrics(result.equityCurve, result.principal, result.contributions) : null;
+  // 지표는 늘 계산한다 — 적립식이 아니어도 CAGR·변동성·MDD 는 보여 줘야 한다.
+  // (예전엔 적립식일 때만 계산해, 목돈 백테스트는 위험 지표가 아예 안 보였다.)
+  const perf = computeMetrics(result.equityCurve, result.principal, result.contributions);
+  const twr = result.totalContributed ? perf : null;
   const wins = sells.filter((t) => t.pnl > 0).length;
   const winRate = sells.length > 0 ? (wins / sells.length) * 100 : 0;
   const maxRound = result.trades.reduce((m, t) => Math.max(m, t.roundNo), 0);
@@ -909,6 +914,10 @@ function Result({ result }: { result: FullResult }) {
         ) : (
           <Metric label="수익률 (원금 대비)" value={`${returnPct >= 0 ? "+" : ""}${returnPct.toFixed(2)}%`} accent={returnPct >= 0 ? "pos" : "neg"} />
         )}
+        {/* 수익만 보면 얼마나 흔들리며 벌었는지 알 수 없다. 위험을 나란히 놓는다. */}
+        <Metric label="연환산 수익률 (CAGR)" value={`${perf.cagr >= 0 ? "+" : ""}${perf.cagr.toFixed(2)}%`} accent={perf.cagr >= 0 ? "pos" : "neg"} />
+        <Metric label="연환산 변동성" value={`${perf.volatility.toFixed(2)}%`} />
+        <Metric label="최대 낙폭 (MDD)" value={`${perf.mdd.toFixed(2)}%`} accent={perf.mdd < 0 ? "neg" : undefined} />
         {result.strategy.startsWith("infinite") ? (
           <>
             <Metric label="사이클 (익절 횟수)" value={`${sells.length}회`} />
