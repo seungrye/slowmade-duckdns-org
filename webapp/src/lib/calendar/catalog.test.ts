@@ -29,6 +29,32 @@ describe('decorate', () => {
     expect(unknown.description).toBe('');
   });
 
+  it('엔드포인트마다 띄어쓰기가 달라도 찾는다', () => {
+    // 실측: 기념일은 '어버이 날'·'스승의 날'·'국군의 날' 처럼 띄어 쓴다.
+    for (const [spaced, joined] of [
+      ['어버이 날', '어버이날'],
+      ['스승의 날', '스승의날'],
+      ['국군의 날', '국군의날'],
+      ['근로자의 날', '근로자의날'],
+    ]) {
+      const got = decorate(spaced, 'anniversary');
+      expect(got.name, spaced).toBe(joined);
+      expect(got.description, spaced).not.toBe('');
+    }
+  });
+
+  it('대체공휴일은 괄호가 붙어 오는데, 아이콘은 찾고 이름은 원문을 살린다', () => {
+    // 어느 공휴일의 대체인지가 정보라 이름을 뭉개면 안 된다.
+    const got = decorate('대체공휴일(개천절)', 'holiday');
+    expect(got.icon).toBe(decorate('대체공휴일', 'holiday').icon);
+    expect(got.name).toBe('대체공휴일(개천절)');
+    expect(got.description).not.toBe('');
+  });
+
+  it('같은 날을 엔드포인트마다 달리 불러도 하나로 모은다 — 노동절 = 근로자의 날', () => {
+    expect(decorate('노동절', 'holiday').icon).toBe(decorate('근로자의 날', 'anniversary').icon);
+  });
+
   it('종류를 그대로 실어 보낸다 — 화면이 무게를 나눌 때 쓴다', () => {
     expect(decorate('동지', 'season').kind).toBe('season');
     expect(decorate('처음 보는 날', 'anniversary').kind).toBe('anniversary');
