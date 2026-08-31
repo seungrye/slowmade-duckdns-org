@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import NotificationBell from "@/components/notification-bell";
+import CalendarBadge from "@/components/calendar-badge";
 import {
     Menu,
     X,
@@ -384,6 +385,10 @@ export default function Navbar() {
                         </li>
                     )}
                 </ul>
+
+                {/* 오늘이 공휴일·기념일·절기면 아이콘 (#328). 해당 없는 날엔 아무것도 안 그린다.
+                    로그인 없이도 보인다 — 공휴일은 누구에게나 공휴일이다. */}
+                <CalendarBadge />
 
                 {/* 알림 종 (#237) — 데스크탑·모바일 마크업 밖이라 한 번만 넣으면 양쪽에서 보인다.
                     목록은 /notifications 페이지가 그린다(navbar 를 더 키우지 않는다). */}

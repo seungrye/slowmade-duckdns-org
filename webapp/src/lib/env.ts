@@ -123,6 +123,11 @@ export const env = {
   // 새 env 없이 STOCK_INGEST_KEY 를 재사용(프로덕션에 이미 존재 → 즉시 동작, 인스턴스 간 일관).
   // 빈 문자열이면 엔드포인트·트리거 모두 비활성(Default secure).
   revalidateToken: process.env.REVALIDATE_TOKEN || process.env.STOCK_INGEST_KEY || '',
+
+  // 공공데이터포털 한국천문연구원 특일 정보 (#328). 헤더 달력 배지가 쓴다.
+  // **비면 기능이 조용히 꺼진다** — 배지도 오류도 안 뜬다. 키를 넣으면 켜진다.
+  // 다른 키와 폴백을 공유하지 않는다: 이건 외부로 나가는 신분증이지 우리 자물쇠가 아니다.
+  holidayApiKey: process.env.HOLIDAY_API_KEY ?? '',
 } as const;
 
 export function validateEnv(): void {
