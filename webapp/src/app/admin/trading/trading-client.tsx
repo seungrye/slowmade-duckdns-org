@@ -14,7 +14,7 @@ type Account = {
 type Portfolio = {
   id: string; accountId: string; market: "kr" | "us"; strategy: string; runAt: string;
   weekdaysOnly: boolean; enabled: boolean; config: Record<string, unknown>;
-  state: Record<string, unknown>;
+  state: Record<string, unknown>; reservedCash?: number;
 };
 const inputCls =
   "w-full rounded border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1.5 text-sm";
@@ -121,6 +121,27 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     await reload();
   };
 
+  // 편집 중인 블록 (#339). null 이면 "새로 추가" — 예전엔 이 구분이 없어 저장이 곧 교체였다.
+  const [pEditing, setPEditing] = useState<string | null>(null);
+  const [pReserved, setPReserved] = useState("");
+
+  const editPortfolio = (p: Portfolio) => {
+    setPEditing(p.id);
+    setPAccount(p.accountId);
+    setPMarket(p.market);
+    setPStrategy(p.strategy);
+    setPRunAt(p.runAt);
+    setPConfig(JSON.stringify(p.config, null, 2));
+    setPReserved(p.reservedCash ? String(p.reservedCash) : "");
+    setMsg(`편집 중: ${p.market.toUpperCase()} · ${p.strategy}`);
+  };
+
+  const newPortfolio = () => {
+    setPEditing(null);
+    setPReserved("");
+    setMsg("");
+  };
+
   const savePortfolio = async () => {
     setBusy(true);
     setMsg("");
@@ -134,12 +155,17 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
       const res = await fetch("/api/my/trading/portfolios", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ accountId: pAccount, market: pMarket, strategy: pStrategy,
-                               runAt: pRunAt, config }),
+        body: JSON.stringify({
+          ...(pEditing ? { portfolioId: pEditing } : {}),
+          accountId: pAccount, market: pMarket, strategy: pStrategy,
+          runAt: pRunAt, config,
+          reservedCash: Number(pReserved) || 0,
+        }),
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? "실패");
-      setMsg("포트폴리오 저장됨");
+      setMsg(pEditing ? "포트폴리오 수정됨" : "포트폴리오 추가됨");
+      setPEditing(null);
       await reload();
     } catch (e) {
       setMsg(`저장 실패: ${e instanceof Error ? e.message : e}`);
@@ -255,9 +281,16 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                     }`}>{effectiveLive ? "실주문" : "dry"}</span>
                     <b>{acct?.envKey ?? "?"}</b> · {p.market.toUpperCase()} · {p.strategy}
                     <span className="text-gray-500 ml-2">매일 {p.runAt} {p.market === "kr" ? "KST" : "ET"}</span>
+                    <span className="text-gray-500 ml-2">
+                      {p.reservedCash ? `예약 ${p.reservedCash.toLocaleString()}` : "예약 없음(전액)"}
+                    </span>
                     {!p.enabled && <span className="text-red-500 ml-2">(비활성)</span>}
                   </div>
                   <div className="flex gap-2">
+                    <button onClick={() => editPortfolio(p)}
+                            className="text-xs px-2.5 py-1 rounded border border-gray-400 text-gray-600 dark:text-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white active:scale-95 transition">
+                      편집
+                    </button>
                     <button onClick={() => runNow(p.id)} disabled={busy}
                             title="설정 검증용 수동 1회 실행 — 계정 모드와 무관하게 항상 dry"
                             className="text-xs px-2.5 py-1 rounded border border-blue-500 text-blue-600 cursor-pointer hover:bg-blue-600 hover:text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-wait">
@@ -304,6 +337,11 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
               <option value="infinite_v4">무한매수 V4</option>
               <option value="value_rebalancing">밸류리밸런싱 VR</option>
             </select>
+            {/* 이 블록이 쓸 현금 (#339). 비우면 전액 — 블록이 하나뿐이면 예전과 같다. */}
+            <input value={pReserved} onChange={(e) => setPReserved(e.target.value)}
+                   inputMode="numeric" placeholder="예약금(비우면 전액)"
+                   title="이 블록이 쓸 현금. 같은 계정·시장에 블록이 여럿이면 만든 순서대로 선점한다."
+                   className={inputCls + " !w-40"} />
             <div className="flex items-center gap-1">
               <input value={pRunAt} onChange={(e) => setPRunAt(e.target.value)}
                      placeholder="HH:MM" className={inputCls + " !w-24"} />
@@ -405,8 +443,14 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
             </div>
           </details>
           <button onClick={savePortfolio} disabled={busy || !pAccount} className={btnCls}>
-            포트폴리오 저장(계정×시장 upsert)
+            {pEditing ? "이 블록 수정" : "포트폴리오 추가"}
           </button>
+          {pEditing && (
+            <button onClick={newPortfolio} disabled={busy}
+                    className="ml-2 text-sm px-3 py-1.5 rounded border border-gray-400 text-gray-600 dark:text-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white transition">
+              새로 추가로 전환
+            </button>
+          )}
         </div>
       </section>
 

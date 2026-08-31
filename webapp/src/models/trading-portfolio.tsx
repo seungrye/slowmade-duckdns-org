@@ -41,6 +41,13 @@ const TradingPortfolioSchema = new Schema(
       }, { _id: false })],
       default: [],
     },
+    /**
+     * 이 블록이 쓸 현금 (#339). **비우면(0/없음) 전액** — 블록이 하나뿐이면 예전과 똑같이 돈다.
+     *
+     * 한 계정·한 시장에 블록을 여럿 두게 되면서 필요해졌다. 엔진들이 계좌 예수금을 통째로
+     * 읽으므로, 나눠 주지 않으면 블록마다 "이 돈이 다 내 것" 이라 믿고 잔고의 몇 배를 쓰려 든다.
+     */
+    reservedCash: { type: Number, default: 0 },
     config: { type: Schema.Types.Mixed, default: {} },
     state: { type: Schema.Types.Mixed, default: {} },
     // 소프트 삭제 — 삭제해도 문서를 지우지 않고 숨긴다(재생성 시 같은 (accountId,market)
@@ -51,7 +58,11 @@ const TradingPortfolioSchema = new Schema(
   { timestamps: true },
 );
 
-TradingPortfolioSchema.index({ accountId: 1, market: 1 }, { unique: true }); // 계정당 시장 1블록
+// 계정·시장당 **여러 블록**을 둘 수 있다 (#339). 예전엔 (accountId, market) 이 unique 라
+// 포트폴리오를 "추가" 하면 기존 것이 조용히 교체됐다. 조회용 인덱스만 남긴다.
+// ⚠ mongoose 는 스키마에서 뺀다고 DB 인덱스를 지우지 않는다 —
+//   scripts/drop-portfolio-unique-index.mjs 를 한 번 돌려야 한다.
+TradingPortfolioSchema.index({ accountId: 1, market: 1 });
 
 export type TradingPortfolioType = InferSchemaType<typeof TradingPortfolioSchema>;
 
