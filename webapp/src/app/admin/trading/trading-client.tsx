@@ -16,6 +16,12 @@ type Portfolio = {
   weekdaysOnly: boolean; enabled: boolean; config: Record<string, unknown>;
   state: Record<string, unknown>; reservedCash?: number;
 };
+// 설정 이력 한 줄 (#350) — 보기 전용.
+type Revision = {
+  version: number; action: "create" | "update" | "delete";
+  changed: string[]; snapshot: Record<string, unknown>; createdAt: string;
+};
+const ACTION_LABEL: Record<string, string> = { create: "추가", update: "수정", delete: "삭제" };
 const inputCls =
   "w-full rounded border border-gray-300 dark:border-gray-700 bg-transparent px-2 py-1.5 text-sm";
 const btnCls =
@@ -142,6 +148,36 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     setMsg("");
   };
 
+  // 설정 이력 (#350) — 블록별로 접었다 편다. 열 때만 불러온다.
+  const [openHistory, setOpenHistory] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<string, Revision[]>>({});
+  const [openSnapshot, setOpenSnapshot] = useState<string | null>(null);
+
+  const showHistory = async (id: string) => {
+    if (openHistory === id) { setOpenHistory(null); return; }
+    setOpenHistory(id);
+    if (history[id]) return;
+    const d = await (await fetch(`/api/my/trading/portfolios/${id}/revisions`)).json();
+    setHistory((h) => ({ ...h, [id]: d.revisions ?? [] }));
+  };
+
+  /** 활성/비활성 토글. 저장과 같은 길목을 지나므로 이 변경도 이력에 한 줄 남는다. */
+  const toggleEnabled = async (p: Portfolio) => {
+    setBusy(true);
+    await fetch("/api/my/trading/portfolios", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        portfolioId: p.id, accountId: p.accountId, market: p.market, strategy: p.strategy,
+        runAt: p.runAt, config: p.config, reservedCash: p.reservedCash ?? 0,
+        enabled: !p.enabled,
+      }),
+    });
+    setHistory((h) => { const n = { ...h }; delete n[p.id]; return n; }); // 이력 다시 불러오게
+    await reload();
+    setBusy(false);
+  };
+
   const savePortfolio = async () => {
     setBusy(true);
     setMsg("");
@@ -160,6 +196,9 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
           accountId: pAccount, market: pMarket, strategy: pStrategy,
           runAt: pRunAt, config,
           reservedCash: Number(pReserved) || 0,
+          // 지금 상태를 그대로 실어 보낸다. 안 보내면 API 기본값(true)이 먹어서
+          // **값만 고치려고 저장해도 비활성이 몰래 켜졌다.** 켜고 끄는 건 토글 버튼만 한다.
+          enabled: pEditing ? (portfolios.find((x) => x.id === pEditing)?.enabled ?? true) : true,
         }),
       });
       const d = await res.json();
@@ -284,7 +323,13 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                     <span className="text-gray-500 ml-2">
                       {p.reservedCash ? `예약 ${p.reservedCash.toLocaleString()}` : "예약 없음(전액)"}
                     </span>
-                    {!p.enabled && <span className="text-red-500 ml-2">(비활성)</span>}
+                    {/* 예전엔 (비활성) 표시만 있고 켜는 방법이 없었다. 게다가 저장 페이로드에
+                        enabled 가 없어 **저장만 눌러도 몰래 켜졌다** — 그래서 토글로 바꿨다. */}
+                    <button onClick={() => toggleEnabled(p)} disabled={busy}
+                            title="이 블록의 스케줄 실행을 켜고 끈다"
+                            className={`text-xs px-1.5 py-0.5 rounded ml-2 font-semibold cursor-pointer active:scale-95 transition disabled:opacity-50 ${
+                              p.enabled ? "bg-green-600 text-white" : "bg-red-500 text-white"
+                            }`}>{p.enabled ? "활성" : "비활성"}</button>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => editPortfolio(p)}
@@ -296,6 +341,11 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                             className="text-xs px-2.5 py-1 rounded border border-blue-500 text-blue-600 cursor-pointer hover:bg-blue-600 hover:text-white active:scale-95 transition disabled:opacity-50 disabled:cursor-wait">
                       dry-run 실행
                     </button>
+                    <button onClick={() => showHistory(p.id)}
+                            title="설정을 바꾸거나 추가·삭제한 시점의 값"
+                            className="text-xs px-2.5 py-1 rounded border border-gray-400 text-gray-600 dark:text-gray-300 cursor-pointer hover:bg-gray-600 hover:text-white active:scale-95 transition">
+                      이력
+                    </button>
                     <button
                       onClick={async () => {
                         await fetch(`/api/my/trading/portfolios?id=${p.id}`, { method: "DELETE" });
@@ -306,6 +356,36 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                   </div>
                 </div>
                 <pre className="text-xs text-gray-500 mt-1 overflow-x-auto">{JSON.stringify(p.config)}</pre>
+                {openHistory === p.id && (
+                  <div className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-2 text-xs">
+                    {!history[p.id] && <div className="text-gray-500">불러오는 중…</div>}
+                    {history[p.id]?.length === 0 && (
+                      <div className="text-gray-500">아직 이력이 없다 — 다음 저장부터 쌓인다.</div>
+                    )}
+                    {history[p.id]?.map((r) => {
+                      const key = `${p.id}:${r.version}`;
+                      return (
+                        <div key={key} className="py-1 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-gray-400 w-8">v{r.version}</span>
+                            <span className="text-gray-500 w-32">
+                              {new Date(r.createdAt).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" })}
+                            </span>
+                            <span className="font-semibold">{ACTION_LABEL[r.action] ?? r.action}</span>
+                            <span className="text-gray-500 flex-1">{r.changed.length ? r.changed.join(", ") : "—"}</span>
+                            <button onClick={() => setOpenSnapshot(openSnapshot === key ? null : key)}
+                                    className="text-blue-600 cursor-pointer hover:underline">값 보기</button>
+                          </div>
+                          {openSnapshot === key && (
+                            <pre className="mt-1 p-2 rounded bg-gray-50 dark:bg-gray-800 overflow-x-auto">
+                              {JSON.stringify(r.snapshot, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </li>
             );
           })}
