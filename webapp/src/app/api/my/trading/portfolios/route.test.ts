@@ -14,6 +14,9 @@ vi.mock("@/models/trading-portfolio", () => ({
   },
 }));
 vi.mock("@/models/trading-account", () => ({ default: { findById: vi.fn() } }));
+vi.mock("@/models/trading-portfolio-revision", () => ({
+  default: { findOne: vi.fn(), create: vi.fn() },
+}));
 vi.mock("@/models/stock-trade", () => ({ default: { updateMany: vi.fn() } }));
 vi.mock("@/models/portfolio-history", () => ({ default: { updateMany: vi.fn() } }));
 
@@ -21,10 +24,16 @@ import { POST, DELETE } from "./route";
 import { requireOwner } from "@/lib/require-owner";
 import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
+import TradingPortfolioRevision from "@/models/trading-portfolio-revision";
 
 const mockOwner = requireOwner as unknown as ReturnType<typeof vi.fn>;
 const P = TradingPortfolio as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const A = TradingAccount as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const R = TradingPortfolioRevision as unknown as Record<string, ReturnType<typeof vi.fn>>;
+/** revision 모델의 findOne().sort().select().lean() 체인 */
+const revLean = (v: unknown) => ({
+  sort: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(v) }) }),
+});
 
 const ACCOUNT = "acc-1";
 const body = (over: Record<string, unknown> = {}) => ({
@@ -51,6 +60,8 @@ beforeEach(() => {
   P.updateOne.mockResolvedValue({});
   P.countDocuments.mockResolvedValue(0);
   A.findById.mockReturnValue(lean({ envKey: "paper-50194613" }));
+  R.findOne.mockReturnValue(revLean(null));
+  R.create.mockResolvedValue({});
 });
 
 describe("POST — 추가와 수정을 가른다 (#339)", () => {
@@ -132,5 +143,86 @@ describe("DELETE — 숨김은 마지막 블록일 때만 (#339)", () => {
 
     const [, update] = P.updateOne.mock.calls[0];
     expect(update.$set.isDeleted).toBe(true);
+  });
+});
+
+describe("설정 리비전 (#350) — 값이 사라지지 않게", () => {
+  // #348: 전략을 갈아타자 예전 config 가 통째로 덮여 사라졌고, 주문로그에서 역산해야 했다.
+  const prevSame = {
+    _id: "edit-1", isDeleted: false, market: "us", strategy: "infinite_v4", runAt: "09:35",
+    weekdaysOnly: true, enabled: true, reservedCash: 0,
+    config: { symbol: "TQQQ", principal: 1000 },
+  };
+
+  it("새로 만들면 추가 리비전 한 줄", async () => {
+    await post(body());
+
+    expect(R.create).toHaveBeenCalledOnce();
+    const rev = R.create.mock.calls[0][0];
+    expect(rev.action).toBe("create");
+    expect(rev.version).toBe(1);
+    expect(rev.changed).toEqual([]);
+    expect(rev.snapshot.config).toEqual({ symbol: "TQQQ", principal: 1000 });
+  });
+
+  it("값을 바꿔 저장하면 바뀐 키와 그 시점 값이 남는다", async () => {
+    P.findOne.mockReturnValue(lean(prevSame));
+
+    await post(body({ portfolioId: "edit-1", runAt: "10:50", config: { symbol: "TQQQ", principal: 93300 } }));
+
+    const rev = R.create.mock.calls[0][0];
+    expect(rev.action).toBe("update");
+    expect(rev.changed.sort()).toEqual(["config", "runAt"]);
+    // 이 값이 남아 있었다면 #348 에서 역산할 필요가 없었다.
+    expect(rev.snapshot.config).toEqual({ symbol: "TQQQ", principal: 93300 });
+  });
+
+  it("아무것도 안 바꾸고 저장하면 리비전을 안 만든다", async () => {
+    // 저장 버튼만 눌러도 upsert 가 도므로, 이게 무너지면 이력이 같은 줄로 도배된다.
+    P.findOne.mockReturnValue(lean(prevSame));
+
+    const res = await post(body({ portfolioId: "edit-1" }));
+
+    expect(res.status).toBe(200);
+    expect(P.findOneAndUpdate).toHaveBeenCalledOnce(); // 저장 자체는 된다
+    expect(R.create).not.toHaveBeenCalled();
+  });
+
+  it("version 은 마지막 다음 번호", async () => {
+    R.findOne.mockReturnValue(revLean({ version: 4 }));
+    P.findOne.mockReturnValue(lean(prevSame));
+
+    await post(body({ portfolioId: "edit-1", runAt: "10:50" }));
+
+    expect(R.create.mock.calls[0][0].version).toBe(5);
+  });
+
+  it("스냅샷에 state 가 절대 안 들어간다", async () => {
+    // 엔진이 매 실행마다 고치는 값이라(T·cycleCash) 담으면 이력이 도배돼 쓸모없어진다.
+    P.findOne.mockReturnValue(lean({ ...prevSame, state: { v4: { t: 9.28 } } }));
+
+    await post(body({ portfolioId: "edit-1", runAt: "10:50" }));
+
+    expect(R.create.mock.calls[0][0].snapshot).not.toHaveProperty("state");
+  });
+
+  it("리비전 기록이 터져도 설정 저장은 성공한다", async () => {
+    // 이력 때문에 매매 설정을 못 바꾸면 안 된다 — 원장·메일과 같은 원칙.
+    R.create.mockRejectedValue(new Error("DB 다운"));
+
+    const res = await post(body());
+
+    expect(res.status).toBe(200);
+  });
+
+  it("삭제하면 지워질 때의 값이 남는다", async () => {
+    P.findById.mockReturnValue(lean({ ...prevSame, accountId: ACCOUNT }));
+
+    await DELETE(new Request("http://localhost/api/my/trading/portfolios?id=p1", { method: "DELETE" }) as never);
+
+    const rev = R.create.mock.calls[0][0];
+    expect(rev.action).toBe("delete");
+    // 지운 블록의 설정을 나중에 다시 볼 수 있어야 한다.
+    expect(rev.snapshot.config).toEqual({ symbol: "TQQQ", principal: 1000 });
   });
 });

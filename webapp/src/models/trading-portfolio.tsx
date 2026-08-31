@@ -31,16 +31,9 @@ const TradingPortfolioSchema = new Schema(
     runAt: { type: String, required: true, default: "09:05" }, // kr=KST, us=ET
     weekdaysOnly: { type: Boolean, default: true },
     enabled: { type: Boolean, default: true },
-    // #83 전략 변경 이력(오래된 것부터). 전략을 갈아탈 때 strategy 필드를 덮어쓰므로
-    // 그것만으로는 "언제 무엇에서 무엇으로 바뀌었는지" 를 알 수 없다. #77 에서 매매기록의
-    // 전략 태그를 되돌릴 때 이 기록이 없어 매매 패턴으로 추론해야 했다.
-    strategyHistory: {
-      type: [new Schema({
-        strategy: { type: String, required: true },
-        changedAt: { type: Date, required: true },
-      }, { _id: false })],
-      default: [],
-    },
+    // 설정 변경 이력은 **TradingPortfolioRevision** 이 들고 있다 (#350).
+    // 여기 있던 strategyHistory(#83)는 전략 이름만 남기고 값을 안 남겨, #348 에서 config 가
+    // 덮였을 때 아무 도움이 못 됐다. 리비전이 그 상위집합이라 걷어냈다(값 전체를 남긴다).
     /**
      * 이 블록이 쓸 현금 (#339). **비우면(0/없음) 전액** — 블록이 하나뿐이면 예전과 똑같이 돈다.
      *

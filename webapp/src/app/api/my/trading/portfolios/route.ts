@@ -5,7 +5,34 @@ import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
 import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
-import { appendStrategyChange, type StrategyChange } from "@/lib/trading/strategy-history";
+import TradingPortfolioRevision from "@/models/trading-portfolio-revision";
+import { snapshotOf, changedKeys } from "@/lib/trading/portfolio-revision";
+
+/**
+ * 설정이 바뀐 순간의 값을 한 줄 남긴다 (#350).
+ *
+ * #348 에서 전략을 갈아타자 예전 config 가 통째로 덮여 사라졌다. 백업도 oplog 도 없어
+ * 주문로그·체결에서 역산해야 했고, 그러고도 원금은 구간까지만 좁혀졌다.
+ *
+ * **기록 실패는 삼킨다** — 이력 때문에 설정 저장이 실패하면 안 된다(원장·메일과 같은 원칙).
+ */
+async function recordRevision(
+  portfolioId: unknown, accountId: unknown,
+  action: "create" | "update" | "delete",
+  snapshot: unknown, changed: string[],
+): Promise<void> {
+  try {
+    const last = await TradingPortfolioRevision.findOne({ portfolioId })
+      .sort({ version: -1 }).select({ version: 1 }).lean();
+    await TradingPortfolioRevision.create({
+      portfolioId, accountId, action, snapshot, changed,
+      version: ((last as { version?: number } | null)?.version ?? 0) + 1,
+      createdAt: new Date(),
+    });
+  } catch (e) {
+    console.error("[trading] 리비전 기록 실패 — 설정 저장은 계속한다", e);
+  }
+}
 
 /** 포트폴리오의 (env, currency) 로 매매기록·이력 숨김/복구 토글 — 소프트 삭제.
  *  (env,currency) 단위라 그 통화의 기록을 통째로 가린다. 계정·시장에 블록이 여럿일 수
@@ -91,7 +118,11 @@ export async function POST(req: NextRequest) {
   const portfolioId = typeof body.portfolioId === "string" ? body.portfolioId : null;
   const prev = portfolioId
     ? await TradingPortfolio.findOne({ _id: portfolioId, accountId: body.accountId })
-        .select({ isDeleted: 1, strategy: 1, strategyHistory: 1 }).lean()
+        // 리비전을 남기려면 이전 값 전체가 필요하다 — 무엇이 바뀌었는지 대조해야 한다.
+        .select({
+          isDeleted: 1, market: 1, strategy: 1, runAt: 1,
+          weekdaysOnly: 1, enabled: 1, reservedCash: 1, config: 1,
+        }).lean()
     : null;
   if (portfolioId && !prev) {
     return NextResponse.json({ error: "포트폴리오를 찾을 수 없습니다" }, { status: 404 });
@@ -108,12 +139,6 @@ export async function POST(req: NextRequest) {
     // 소프트 삭제됐던 문서를 되살릴 때를 위해.
     isDeleted: false, deletedAt: null,
   };
-  // #83 — 전략이 바뀌었을 때만 이력 한 줄. 저장 버튼만 눌러도 여기를 지나므로
-  // 같으면 아무것도 하지 않아야 이력이 같은 줄로 도배되지 않는다.
-  const prevDoc = prev as { strategy?: string; strategyHistory?: StrategyChange[] } | null;
-  const prevHistory = prevDoc?.strategyHistory ?? [];
-  const history = appendStrategyChange(prevHistory, prevDoc?.strategy, strategy, new Date());
-  if (history !== prevHistory) setFields.strategyHistory = history;
   if (isRecreate) setFields.state = {}; // 재생성/신규 — 사이클 상태 초기화
   const doc = portfolioId
     ? await TradingPortfolio.findOneAndUpdate(
@@ -124,6 +149,13 @@ export async function POST(req: NextRequest) {
     : await TradingPortfolio.create({ accountId: body.accountId, market, ...setFields });
   if (!doc) {
     return NextResponse.json({ error: "포트폴리오를 찾을 수 없습니다" }, { status: 404 });
+  }
+  // 값이 바뀐 경우에만 리비전 한 줄 (#350). **안 바뀌면 안 남긴다** — 저장 버튼만 눌러도
+  // 여기를 지나므로, 그러지 않으면 같은 값이 도배돼 이력이 쓸모없어진다.
+  const after = snapshotOf({ market, ...setFields });
+  const changed = prev ? changedKeys(snapshotOf(prev as Record<string, unknown>), after) : [];
+  if (!prev || changed.length > 0) {
+    await recordRevision(doc._id, body.accountId, prev ? "update" : "create", after, changed);
   }
   // 재생성 시 옛 기록을 자동 복구하지 않는다 — 지운 포트폴리오를 같은 계정·시장으로 다시
   // 만들면 '깨끗한 새 차트'를 기대하므로(#피드백). 숨김은 삭제 시점에 고정되고, 복구가
@@ -136,9 +168,17 @@ export async function DELETE(req: NextRequest) {
   if (owner instanceof NextResponse) return owner;
   const id = String(new URL(req.url).searchParams.get("id") ?? "");
   await connectToDB();
-  const pf = await TradingPortfolio.findById(id).select({ accountId: 1, market: 1 }).lean();
+  const pf = await TradingPortfolio.findById(id).select({
+    accountId: 1, market: 1, strategy: 1, runAt: 1,
+    weekdaysOnly: 1, enabled: 1, reservedCash: 1, config: 1,
+  }).lean();
   // 하드 삭제하지 않고 소프트 삭제 — 문서는 남기고 isDeleted 로 숨긴다(스케줄러·목록에서 제외).
   await TradingPortfolio.updateOne({ _id: id }, { $set: { isDeleted: true, deletedAt: new Date() } });
+  // 지워질 때의 값을 남긴다 (#350) — 지운 블록의 설정을 나중에 다시 볼 수 있게.
+  if (pf) {
+    const p = pf as Record<string, unknown>;
+    await recordRevision(id, p.accountId, "delete", snapshotOf(p), []);
+  }
   // 매매기록·이력도 하드 삭제하지 않고 숨김. 재생성해도 자동 복구되지 않으며(POST 참조),
   // 복구가 필요하면 수동으로 hidden 을 되돌린다.
   if (pf) {
