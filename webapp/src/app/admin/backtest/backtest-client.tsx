@@ -876,49 +876,60 @@ function Result({ result }: { result: FullResult }) {
   const isRotation = result.strategy.startsWith("rotation");
   // 총자산(현금+보유) 곡선으로 표시할 전략 — 로테이션 계열 + 듀얼모멘텀(다종목) + 변동성타깃(부분 포지션)
   const isPortfolio = isRotation || result.strategy === "dual_momentum_v1" || result.strategy === "vol_target_v1" || result.strategy === "value_rebalancing";
-  // VR 밴드 (#341). ECharts 에 밴드 영역이 따로 없어 **쌓기**로 만든다 —
-  // 하단선을 투명하게 깔고 그 위에 (상단−하단) 을 쌓아 거기에만 areaStyle 을 준다.
+  // VR 밴드 (#341, #343) — **총자산 차트 안에** 그린다.
+  //
+  // 처음엔 차트를 따로 뒀는데, 그러면 매매가 왜 일어났는지와 자산이 어떻게 움직였는지를
+  // 두 그림을 오가며 봐야 한다. 한 그림에 합치되, 밴드가 감싸는 것이 **주식 평가금**
+  // (qty×종가)이지 총자산(주식+Pool)이 아니라는 점을 지킨다 — 그래서 주식 평가금 선을
+  // 함께 그린다. 밴드만 총자산 위에 얹으면 Pool 만큼 늘 위로 떠 "항상 밴드 밖" 으로 보인다.
+  //
+  // ECharts 에 밴드 영역이 없어 **쌓기**로 만든다 — 하단선을 투명하게 깔고 그 위에
+  // (상단−하단)을 쌓아 거기에만 areaStyle 을 준다.
   const band = result.vrBand ?? [];
   const stockAt = new Map(band.map((r) => [r.date, r.stock]));
-  const vrBandOption: EChartsOption | null = band.length === 0 ? null : {
-    tooltip: { trigger: "axis" },
-    legend: { data: ["주식 평가금", "목표 V", "밴드"], bottom: 0 },
-    grid: { left: 16, right: 16, top: 20, bottom: 44, containLabel: true },
-    xAxis: { type: "category", data: band.map((r) => r.date) },
-    yAxis: { type: "value", scale: true },
-    dataZoom: [{ type: "inside", start: 0, end: 100 }],
-    series: [
-      // 하단(투명) — 쌓기의 바닥. 범례에서 감춘다.
-      { name: "밴드하단", type: "line", stack: "vrband", showSymbol: false, silent: true,
-        lineStyle: { opacity: 0 }, data: band.map((r) => r.low) },
-      { name: "밴드", type: "line", stack: "vrband", showSymbol: false, silent: true,
-        lineStyle: { opacity: 0 }, areaStyle: { color: "#3b82f6", opacity: 0.14 },
-        data: band.map((r) => r.high - r.low) },
-      { name: "목표 V", type: "line", showSymbol: false,
-        lineStyle: { width: 1, type: "dashed", color: "#3b82f6" }, data: band.map((r) => r.v) },
-      { name: "주식 평가금", type: "line", showSymbol: false,
-        lineStyle: { width: 1.6, color: "#111827" }, data: band.map((r) => r.stock) },
-      // 매매는 그날의 평가금 위에 찍는다 — 가격축이 아니라 이 축에서 일어난 판정이다.
-      { name: "매수", type: "scatter", symbol: "triangle", symbolSize: 9, itemStyle: { color: "#dc2626" },
-        data: buys.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 5 },
-      { name: "매도", type: "scatter", symbol: "triangle", symbolRotate: 180, symbolSize: 11, itemStyle: { color: "#2563eb" },
-        data: sells.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 6 },
-    ],
-  };
+  const vrSeries = band.length === 0 ? [] : [
+    { name: "밴드하단", type: "line" as const, stack: "vrband", showSymbol: false, silent: true,
+      lineStyle: { opacity: 0 }, data: band.map((r) => r.low), z: 1 },
+    { name: "밸류 밴드", type: "line" as const, stack: "vrband", showSymbol: false, silent: true,
+      lineStyle: { opacity: 0 }, areaStyle: { color: "#3b82f6", opacity: 0.14 },
+      data: band.map((r) => r.high - r.low), z: 1 },
+    { name: "목표 V", type: "line" as const, showSymbol: false,
+      lineStyle: { width: 1, type: "dashed" as const, color: "#3b82f6" }, data: band.map((r) => r.v), z: 2 },
+    { name: "주식 평가금", type: "line" as const, showSymbol: false,
+      lineStyle: { width: 1.2, color: "#6b7280" }, data: band.map((r) => r.stock), z: 3 },
+  ];
+  // 매매는 그날의 **주식 평가금** 위에 찍는다 — 밴드 판정이 일어난 축이다.
+  // 예전엔 이 차트가 로테이션용이라 매도만 "교체/청산" 으로 찍고 매수는 아예 없었다 (#343).
+  const vrMarkers = band.length === 0 ? [] : [
+    { name: "매수", type: "scatter" as const, symbol: "triangle", symbolSize: 9, itemStyle: { color: "#dc2626" },
+      data: buys.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 5 },
+    { name: "매도", type: "scatter" as const, symbol: "triangle", symbolRotate: 180, symbolSize: 11, itemStyle: { color: "#2563eb" },
+      data: sells.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 6 },
+  ];
 
   const option: EChartsOption = isPortfolio
     ? {
         // 다중 종목 로테이션 — 단일 가격축 대신 총자산(현금+보유) 곡선으로 표시
         tooltip: { trigger: "axis" },
-        legend: { data: ["총자산", "교체/청산"], bottom: 0 },
+        legend: {
+          data: band.length
+            ? ["총자산", "주식 평가금", "목표 V", "밸류 밴드", "매수", "매도"]
+            : ["총자산", "교체/청산"],
+          bottom: 0,
+        },
         grid: { left: 16, right: 16, top: 20, bottom: 44, containLabel: true },
         xAxis: { type: "category", data: result.equityCurve.map((e) => e.date) },
         yAxis: { type: "value", scale: true },
         dataZoom: [{ type: "inside", start: 0, end: 100 }],
         series: [
           { name: "총자산", type: "line", showSymbol: false, data: result.equityCurve.map((e) => e.equity), lineStyle: { width: 1.5 } },
-          { name: "교체/청산", type: "scatter", symbol: "triangle", symbolRotate: 180, symbolSize: 9, itemStyle: { color: "#2563eb" },
-            data: sells.map((t) => { const eq = result.equityCurve.find((e) => e.date === t.date); return [t.date, eq?.equity ?? null]; }), z: 5 },
+          ...vrSeries,
+          // VR 은 단일 종목이라 매수·매도를 따로 찍는다. 로테이션은 종목이 바뀌므로
+          // 총자산 위의 "교체/청산" 한 종류만 뜻이 있다.
+          ...(band.length
+            ? vrMarkers
+            : [{ name: "교체/청산", type: "scatter" as const, symbol: "triangle", symbolRotate: 180, symbolSize: 9, itemStyle: { color: "#2563eb" },
+                 data: sells.map((t) => { const eq = result.equityCurve.find((e) => e.date === t.date); return [t.date, eq?.equity ?? null]; }), z: 5 }]),
         ],
       }
     : {
@@ -971,20 +982,6 @@ function Result({ result }: { result: FullResult }) {
       <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[400px] mb-6">
         <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
       </div>
-
-      {/* VR 밴드 (#341) — 가격이 아니라 **평가금** 축이라 차트를 따로 둔다.
-          밴드가 감싸는 것은 주식 평가금(qty×종가)이지 총자산(+Pool)이 아니다. */}
-      {vrBandOption && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold mb-1">밸류 밴드</h2>
-          <p className="text-xs text-gray-500 mb-2">
-            주식 평가금이 밴드를 벗어난 날에만 사고판다. 밴드는 사이클마다 다시 잡혀 계단 모양이다.
-          </p>
-          <div className="h-72 border border-gray-200 dark:border-gray-700 rounded">
-            <ReactECharts option={vrBandOption} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
-          </div>
-        </div>
-      )}
 
       {result.poolLog && result.poolLog.length > 0 && (
         <div className="mb-6">
