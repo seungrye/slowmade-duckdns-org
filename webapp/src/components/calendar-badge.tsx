@@ -164,7 +164,10 @@ export default function CalendarBadge() {
                 <p className="font-semibold">
                   <span aria-hidden="true">{event.icon}</span> {event.name}
                 </p>
-                <p className="mt-0.5 text-gray-300">{event.description}</p>
+                {/* 표에 없는 이름은 설명이 없다. 이름만이라도 반드시 보여준다. */}
+                {event.description && (
+                  <p className="mt-0.5 text-gray-300">{event.description}</p>
+                )}
               </li>
             ))}
           </ul>

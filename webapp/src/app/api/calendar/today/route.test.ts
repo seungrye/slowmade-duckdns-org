@@ -59,17 +59,22 @@ describe('GET /api/calendar/today', () => {
     expect(data.events[1].name).toBe('입추');
   });
 
-  it('설명 없는 기념일은 빼고 내려준다 — 배지가 장식이 되지 않게', async () => {
+  it('표에 없어 설명이 없는 날도 내려준다 — 안 뜨면 새 공휴일을 놓친다', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(onLiberationDay);
     mockDays.mockResolvedValue([
       { date: '2026-08-15', name: '광복절', kind: 'holiday' },
+      { date: '2026-08-15', name: '처음 보는 임시공휴일', kind: 'holiday' },
       { date: '2026-08-15', name: '조달의 날', kind: 'anniversary' },
     ]);
 
     const { data } = await body();
+    const names = data.events.map((e: { name: string }) => e.name);
 
-    expect(data.events.map((e: { name: string }) => e.name)).toEqual(['광복절']);
+    expect(names).toContain('처음 보는 임시공휴일');
+    expect(names).toContain('조달의 날');
+    // 설명이 없을 뿐, 아이콘은 종류별 기본값으로 반드시 붙는다.
+    for (const e of data.events) expect(e.icon).toBeTruthy();
   });
 
   it('같은 날 같은 이름이 두 종류로 와도 한 번만 내려준다', async () => {

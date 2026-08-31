@@ -1,7 +1,7 @@
 import { apiSuccess } from '@/lib/api-response';
 import { env } from '@/lib/env';
 import { daysForYear } from '@/lib/calendar/cache';
-import { decorate, dedupeEvents, isWorthShowing } from '@/lib/calendar/catalog';
+import { decorate, dedupeEvents } from '@/lib/calendar/catalog';
 import { seoulDateKey, todayInSeoul } from '@/lib/birthday';
 
 /**
@@ -19,10 +19,12 @@ export async function GET() {
     const today = seoulDateKey(now);
     const days = await daysForYear(todayInSeoul(now).year, now);
 
-    // 중복 제거(같은 날이 공휴일·기념일 양쪽에서 온다) → 설명 있는 것만 남긴다.
+    // 그날 것을 전부 내려보낸다. 설명이 없는 날(표에 없는 이름)도 기본 아이콘과 이름으로
+    // 뜬다 — 안 뜨면 새로 지정된 공휴일을 놓치고, 그게 배지가 하나 느는 것보다 나쁘다.
+    // 겹치는 것만 합친다: 같은 날이 공휴일·기념일 응답 양쪽에서 온다.
     const events = dedupeEvents(
       days.filter((d) => d.date === today).map((d) => decorate(d.name, d.kind))
-    ).filter(isWorthShowing);
+    );
 
     return apiSuccess({ events });
   } catch (error) {
