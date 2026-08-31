@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CATALOG, FALLBACK_ICON, decorate, dedupeEvents, isWorthShowing } from './catalog';
+import { CATALOG, FALLBACK_ICON, decorate, dedupeEvents } from './catalog';
 import type { EventKind } from './types';
 
 describe('decorate', () => {
@@ -97,19 +97,6 @@ describe('CATALOG 자체 점검', () => {
     for (const name of holidays) {
       expect(CATALOG[name], name).toBeDefined();
     }
-  });
-});
-
-describe('isWorthShowing', () => {
-  it('설명이 있는 것만 띄운다', () => {
-    expect(isWorthShowing(decorate('설날', 'holiday'))).toBe(true);
-    expect(isWorthShowing(decorate('동지', 'season'))).toBe(true);
-    // 기념일 82종 중 64종은 설명이 없다 — 다 띄우면 사흘에 한 번꼴이라 장식이 된다.
-    expect(isWorthShowing(decorate('조달의 날', 'anniversary'))).toBe(false);
-  });
-
-  it('임시공휴일은 표에 있다 — 설명이 없으면 공휴일인데도 안 뜨기 때문', () => {
-    expect(isWorthShowing(decorate('임시공휴일', 'holiday'))).toBe(true);
   });
 });
 

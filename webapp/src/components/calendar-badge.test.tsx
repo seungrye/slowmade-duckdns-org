@@ -49,6 +49,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const UNKNOWN: CalendarEvent = {
+  name: '조달의 날',
+  kind: 'anniversary',
+  icon: '📌',
+  description: '',
+};
+
 describe('CalendarBadge', () => {
   it('해당 없는 날이면 아무것도 그리지 않는다', async () => {
     mockEvents([]);
@@ -172,6 +179,17 @@ describe('CalendarBadge', () => {
 
       fireEvent.click(more);
       expect(screen.getByRole('tooltip')).toHaveTextContent('식목일');
+    });
+
+    it('설명이 없는 날은 이름만 보여준다 — 표에 없다고 안 뜨면 안 된다', async () => {
+      mockEvents([UNKNOWN]);
+      render(<CalendarBadge />);
+
+      fireEvent.click(await screen.findByLabelText('조달의 날'));
+      const tooltip = screen.getByRole('tooltip');
+      expect(tooltip).toHaveTextContent('조달의 날');
+      // 빈 설명 문단을 그리지 않는다.
+      expect(tooltip.querySelectorAll('p')).toHaveLength(1);
     });
 
     it('다시 누르면 닫힌다', async () => {
