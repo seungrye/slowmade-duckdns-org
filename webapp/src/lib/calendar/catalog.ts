@@ -37,6 +37,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   부부의날: { icon: '💑', description: '부부가 서로에게 고마움을 전하는 날입니다.' },
   국군의날: { icon: '🎖️', description: '국군의 노고를 기리는 날입니다.' },
   전국동시지방선거: { icon: '🗳️', description: '지방자치단체장과 의원을 뽑는 날. 임시공휴일입니다.' },
+  임시공휴일: { icon: '🎏', description: '정부가 그해에만 따로 지정한 공휴일입니다.' },
   '4·19혁명기념일': { icon: '🕊️', description: '1960년 4·19 혁명을 기리는 날입니다.' },
   '5·18민주화운동기념일': { icon: '🌼', description: '1980년 5·18 민주화운동을 기리는 날입니다.' },
   '6·25전쟁일': { icon: '🪖', description: '1950년 한국전쟁이 일어난 날을 기리는 날입니다.' },
@@ -107,6 +108,41 @@ export const FALLBACK_ICON: Record<EventKind, string> = {
  */
 function normalize(name: string): string {
   return name.replace(/\s+/g, '');
+}
+
+/**
+ * 배지로 띄울 가치가 있는가 — **설명이 있는 것만** 띄운다.
+ *
+ * 기념일이 연 82종이라(`조달의 날`·`곤충의 날` …) 전부 띄우면 사흘에 한 번꼴로 뭔가 떠서
+ * 특별한 날이 아니라 장식이 된다. 설명을 붙일 만큼 알려진 날만 남긴다.
+ *
+ * ⚠ 대가: 표에 없는 이름은 **공휴일이라도 안 뜬다.** 그래서 `임시공휴일` 처럼 미리 올 법한
+ * 이름은 표에 넣어 둔다. 새 이름이 보이면 표에 추가할 것.
+ */
+export function isWorthShowing(event: CalendarEvent): boolean {
+  return event.description !== '';
+}
+
+/**
+ * 같은 날 같은 이름이 두 번 오는 것을 합친다.
+ *
+ * 실측(2026): `어린이날`(5/5)·`현충일`(6/6)이 **공휴일과 기념일 응답 양쪽에** 있다. 안 합치면
+ * 같은 날이 배지에 두 번 뜬다. 무게가 높은 쪽(공휴일 > 기념일 > 절기)을 남긴다.
+ */
+const WEIGHT_ORDER: EventKind[] = ['holiday', 'anniversary', 'season'];
+
+export function dedupeEvents(events: CalendarEvent[]): CalendarEvent[] {
+  const best = new Map<string, CalendarEvent>();
+  for (const event of events) {
+    const kept = best.get(event.name);
+    if (!kept || WEIGHT_ORDER.indexOf(event.kind) < WEIGHT_ORDER.indexOf(kept.kind)) {
+      best.set(event.name, event);
+    }
+  }
+  // 무게순으로 정렬해 공휴일이 스택 맨 앞에 오게 한다.
+  return [...best.values()].sort(
+    (a, b) => WEIGHT_ORDER.indexOf(a.kind) - WEIGHT_ORDER.indexOf(b.kind)
+  );
 }
 
 export function decorate(name: string, kind: EventKind): CalendarEvent {

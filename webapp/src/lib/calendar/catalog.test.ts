@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CATALOG, FALLBACK_ICON, decorate } from './catalog';
+import { CATALOG, FALLBACK_ICON, decorate, dedupeEvents, isWorthShowing } from './catalog';
 import type { EventKind } from './types';
 
 describe('decorate', () => {
@@ -97,5 +97,52 @@ describe('CATALOG 자체 점검', () => {
     for (const name of holidays) {
       expect(CATALOG[name], name).toBeDefined();
     }
+  });
+});
+
+describe('isWorthShowing', () => {
+  it('설명이 있는 것만 띄운다', () => {
+    expect(isWorthShowing(decorate('설날', 'holiday'))).toBe(true);
+    expect(isWorthShowing(decorate('동지', 'season'))).toBe(true);
+    // 기념일 82종 중 64종은 설명이 없다 — 다 띄우면 사흘에 한 번꼴이라 장식이 된다.
+    expect(isWorthShowing(decorate('조달의 날', 'anniversary'))).toBe(false);
+  });
+
+  it('임시공휴일은 표에 있다 — 설명이 없으면 공휴일인데도 안 뜨기 때문', () => {
+    expect(isWorthShowing(decorate('임시공휴일', 'holiday'))).toBe(true);
+  });
+});
+
+describe('dedupeEvents', () => {
+  it('같은 날 같은 이름이 두 번 오면 무게 높은 쪽만 남긴다', () => {
+    // 실측(2026): 어린이날 5/5, 현충일 6/6 이 공휴일·기념일 양쪽에 있다.
+    const merged = dedupeEvents([
+      decorate('어린이 날', 'anniversary'),
+      decorate('어린이날', 'holiday'),
+    ]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].kind).toBe('holiday');
+  });
+
+  it('순서와 무관하게 같은 결과', () => {
+    const a = dedupeEvents([decorate('현충일', 'holiday'), decorate('현충일', 'anniversary')]);
+    const b = dedupeEvents([decorate('현충일', 'anniversary'), decorate('현충일', 'holiday')]);
+    expect(a).toEqual(b);
+    expect(a[0].kind).toBe('holiday');
+  });
+
+  it('공휴일이 앞, 절기가 뒤로 정렬된다 — 스택 맨 앞이 가장 중요한 날이어야 한다', () => {
+    const sorted = dedupeEvents([
+      decorate('백로', 'season'),
+      decorate('어버이 날', 'anniversary'),
+      decorate('설날', 'holiday'),
+    ]);
+    expect(sorted.map((e) => e.kind)).toEqual(['holiday', 'anniversary', 'season']);
+  });
+
+  it('다른 이름은 그대로 둔다', () => {
+    const events = [decorate('백로', 'season'), decorate('동지', 'season')];
+    expect(dedupeEvents(events)).toHaveLength(2);
   });
 });

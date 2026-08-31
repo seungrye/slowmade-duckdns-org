@@ -16,22 +16,26 @@ export const CALENDAR_CHECKED_KEY = 'calendar-checked';
 const CACHED_EVENTS_KEY = 'calendar-events';
 
 /**
- * 종류별 시각적 무게.
+ * 종류별 색.
  *
- * 24절기까지 표시하면 연 80일 넘게 뜬다. 다 같은 무게로 그리면 특별한 날이 아니라 장식이
- * 되므로, 아이콘으로 *무슨 날인지*를 알리고 무게로 *얼마나 중요한지*를 알린다.
+ * 겹쳐 쌓는 방식이라 크기로 무게를 나누면 뒤엣것이 앞엣것에 가려 안 보인다. 대신 색으로
+ * 나눈다 — 공휴일은 붉게(쉬는 날), 기념일은 푸르게, 절기는 무채색으로.
  */
-const WEIGHT: Record<EventKind, string> = {
-  holiday: 'text-base opacity-100',
-  anniversary: 'text-sm opacity-90',
-  season: 'text-xs opacity-60 grayscale',
+const TONE: Record<EventKind, string> = {
+  holiday: 'bg-rose-600/90',
+  anniversary: 'bg-sky-700/90',
+  season: 'bg-gray-600/90',
 };
 
-const MAX_ICONS = 3;
+/** 스택에 실제로 그리는 최대 개수. 넘으면 마지막 칸이 +N 이 된다. */
+const VISIBLE = 3;
 
 export default function CalendarBadge() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [open, setOpen] = useState(false);
+  /** 마우스·포커스가 짚은 칸. null 이면 아무것도 안 짚은 상태. */
+  const [hovered, setHovered] = useState<number | null>(null);
+  /** 눌러서 연 상태(모바일). hover 가 없는 기기에서 툴팁을 여는 유일한 길이다. */
+  const [pinned, setPinned] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -74,12 +78,12 @@ export default function CalendarBadge() {
 
   // Esc·바깥 클릭으로 닫기 — navbar 의 드롭다운과 같은 방식.
   useEffect(() => {
-    if (!open) return;
+    if (!pinned) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') setPinned(false);
     };
     const onOutside = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!rootRef.current?.contains(e.target as Node)) setPinned(false);
     };
     document.addEventListener('keydown', onKey);
     document.addEventListener('mousedown', onOutside);
@@ -87,49 +91,80 @@ export default function CalendarBadge() {
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onOutside);
     };
-  }, [open]);
+  }, [pinned]);
 
   // 해당 없는 날엔 자리도 차지하지 않는다.
   if (events.length === 0) return null;
 
-  const label = events.map((e) => e.name).join(' · ');
+  const shown = events.slice(0, VISIBLE);
+  const overflow = events.length - shown.length;
+  const open = hovered !== null || pinned;
+  // 짚은 칸이 있으면 그것만, 없으면(=탭으로 연 모바일) 전부 보여준다.
+  const listed = hovered !== null ? [events[hovered]] : events;
+
+  /**
+   * 누르면 "전부 보기". 데스크톱에선 hover 로 하나씩 보다가 누르면 전체가 되고,
+   * 모바일은 hover 가 없어 탭이 곧 전체 보기가 된다.
+   */
+  const showAll = () => {
+    setHovered(null);
+    setPinned((v) => !v);
+  };
 
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        aria-label={`오늘은 ${label}`}
-        aria-expanded={open}
-        aria-describedby={open ? 'calendar-tooltip' : undefined}
-        onClick={() => setOpen((v) => !v)}
-        // hover 만으로는 모바일에서 못 연다. click·focus 와 함께 셋 다 지원한다.
-        onMouseEnter={() => setOpen(true)}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        className="flex items-center gap-0.5 rounded px-1 py-0.5 leading-none hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
-      >
-        {events.slice(0, MAX_ICONS).map((e, i) => (
-          <span key={`${e.name}-${i}`} className={WEIGHT[e.kind]} aria-hidden="true">
-            {e.icon}
-          </span>
+    <div
+      ref={rootRef}
+      className="relative flex items-center"
+      onMouseLeave={() => setHovered(null)}
+    >
+      <div className="flex items-center">
+        {shown.map((event, i) => (
+          <button
+            key={`${event.name}-${i}`}
+            type="button"
+            aria-label={event.name}
+            onMouseEnter={() => setHovered(i)}
+            onFocus={() => setHovered(i)}
+            onBlur={() => setHovered(null)}
+            onClick={showAll}
+            // 겹쳐 쌓되(-ml-2), 링으로 경계를 그어 이모지끼리 뭉개지지 않게 한다.
+            // 링 색은 navbar 배경과 같아야 오려낸 것처럼 보인다.
+            style={{ zIndex: hovered === i ? 30 : shown.length - i }}
+            className={`relative -ml-2 flex h-7 w-7 items-center justify-center rounded-full text-sm leading-none ring-2 ring-gray-900 transition first:ml-0 focus:outline-none ${TONE[event.kind]} ${
+              hovered === i ? 'scale-110 ring-white' : ''
+            }`}
+          >
+            <span aria-hidden="true">{event.icon}</span>
+          </button>
         ))}
-      </button>
+
+        {overflow > 0 && (
+          <button
+            type="button"
+            aria-label={`외 ${overflow}건 더 보기`}
+            onMouseEnter={() => setHovered(null)}
+            onFocus={() => setHovered(null)}
+            onClick={showAll}
+            style={{ zIndex: 0 }}
+            className="relative -ml-2 flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-xs font-semibold leading-none text-gray-100 ring-2 ring-gray-900 focus:outline-none focus-visible:ring-white"
+          >
+            +{overflow}
+          </button>
+        )}
+      </div>
 
       {open && (
         <div
-          id="calendar-tooltip"
           role="tooltip"
           className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg bg-gray-800 p-3 text-left text-sm text-gray-100 shadow-xl ring-1 ring-white/10"
         >
           <ul className="space-y-2">
-            {events.map((e, i) => (
-              <li key={`${e.name}-${i}`}>
+            {listed.map((event, i) => (
+              <li key={`${event.name}-${i}`}>
                 <p className="font-semibold">
-                  <span aria-hidden="true">{e.icon}</span> {e.name}
+                  <span aria-hidden="true">{event.icon}</span> {event.name}
                 </p>
-                {/* 표에 없는 이름은 설명이 없다. 이름만이라도 반드시 보여준다. */}
-                {e.description && <p className="mt-0.5 text-gray-300">{e.description}</p>}
+                <p className="mt-0.5 text-gray-300">{event.description}</p>
               </li>
             ))}
           </ul>
