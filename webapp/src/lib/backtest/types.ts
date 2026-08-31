@@ -56,7 +56,13 @@ export interface EquityPoint {
 export interface BacktestResult {
   trades: BtTrade[];
   equityCurve: EquityPoint[];
-  totalPnl: number; // 매도 실현손익 합계
+  /**
+   * 전략에 따라 뜻이 다르다 — 화면이 이름을 갈라 붙인다 (#345).
+   *   무한매수·로테이션·듀얼모멘텀  매도 실현손익 합계
+   *   VR·변동성타깃                최종자산 − 투입원금 (**평가손익 포함**)
+   * 계속 들고 가는 전략은 실현손익만 보면 실제 성과를 못 나타내서 총손익을 쓴다.
+   */
+  totalPnl: number;
   resolvedV?: number; // 무한매수 v4: 실제 채점에 쓰인 V(변동성 계수). 사용자 입력값 또는 자동 유도값.
   poolLog?: string[]; // rotation 후보 자동선발 풀 변경 이력 (자동선발 모드에서만)
   /**
@@ -67,6 +73,14 @@ export interface BacktestResult {
    * 늘 위로 떠 "항상 밴드 밖" 처럼 보인다.
    */
   vrBand?: { date: string; v: number; low: number; high: number; stock: number }[];
+  /**
+   * VR 실효평단 = (누적매수 − 누적매도) / 보유수량 (원문 4.2). 보유가 0 이면 null.
+   *
+   * 명목평단(증권사 화면)은 매도해도 안 변하지만 이것은 변한다 — 수익 매도가 쌓이면
+   * 내려가고, 끝내 **마이너스**가 되면 매수에 쓴 돈보다 매도로 번 돈이 크다는 뜻이다
+   * (원문 4.3 "원금 ZERO 상태").
+   */
+  effectiveAvg?: number | null;
   // 적립식(주기 입금) — contribution 지정 시에만 채워진다. 지표(TWR)·총납입 표시용.
   contributions?: { date: string; amount: number }[]; // 실제 입금이 일어난 날짜·금액
   totalContributed?: number; // 초기 원금 + Σ 입금 (수익률 분모 왜곡 방지용 참고값)
@@ -183,9 +197,16 @@ export interface VolTargetV1Config {
  *  밴드 경계까지 리밸런스(하단 아래→매수, 상단 위→매도). 평단 무관(가격만 사용). 적립/거치/인출 지원. */
 export interface ValueRebalancingConfig {
   principal: number; // 초기 총자금(주식 + Pool)
-  gradient: number; // G — 위험 다이얼(적립·거치 10 / 인출 20). 클수록 보수적(현금 두껍게)
+  /** G — 위험 다이얼. **안 적으면 운용 형태에서 유도**(적립·거치 10 / 인출 20, 원문 7.1). 클수록 보수적 */
+  gradient?: number;
   bandPct: number; // 밴드폭 b (기본 0.15 = ±15%) — 매매 빈도 조절(저민감)
-  poolLimitPct: number; // 사이클당 Pool 매수 사용 한도 u (적립 0.75 / 거치 0.50 / 인출 0.25)
+  /**
+   * 사이클당 Pool 매수 사용 한도 u. **안 적으면 운용 형태에서 유도**(적립 0.75 / 거치 0.50 /
+   * 인출 0.25, 원문 3장). 원문이 "가이드일 뿐이며 선택 가능" 이라 해서 덮어쓸 수 있게 둔다.
+   *
+   * ⚠ 원문은 "적립**후** pool 의 75%" — 한도는 CF **반영 후** pool 기준이다(V 는 CF 전 pool).
+   */
+  poolLimitPct?: number;
   cycleDays: number; // 사이클 길이(거래일, 기본 10 = 2주)
   initStockRatio?: number; // 초기 주식:Pool 비율(기본 0.85 = 85:15). 원문 미규정 — 평형 현금비중 근사
   cashflow?: number; // 사이클당 현금흐름 CF: 양수=적립, 음수=인출, 0/미지정=거치

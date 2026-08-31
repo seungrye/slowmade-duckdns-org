@@ -12,6 +12,54 @@ export function updateVBasic(v1: number, pool: number, gradient: number, cf: num
   return v1 + (gradient > 0 ? pool / gradient : 0) + cf;
 }
 
+/** 운용 형태 — CF 부호가 정한다 (원문 7.1). */
+export type VRForm = "적립식" | "거치식" | "인출식";
+
+export function vrFormOf(cashflow?: number): VRForm {
+  const cf = cashflow ?? 0;
+  return cf > 0 ? "적립식" : cf < 0 ? "인출식" : "거치식";
+}
+
+/**
+ * 형태별 기본값 (원문 7.1 표).
+ *
+ * | 형태 | G 시작 | Pool 한도 |
+ * |---|---|---|
+ * | 적립식 | 10 | 75% |
+ * | 거치식 | 10 | 50% |
+ * | 인출식 | 20 | 25% |
+ *
+ * 원문이 "가이드일 뿐이며 더 공격적으로 더 방어적으로 선택하셔도 됩니다" 라 했으므로
+ * 설정에 적으면 그 값이 이긴다. **안 적었을 때 형태를 따르지 않던 것이 문제였다** — 적립식
+ * 인데 거치식 한도(50%)로 돌고 있었다.
+ */
+export function defaultsForForm(cashflow?: number): { gradient: number; poolLimitPct: number } {
+  switch (vrFormOf(cashflow)) {
+    case "적립식": return { gradient: 10, poolLimitPct: 0.75 };
+    case "인출식": return { gradient: 20, poolLimitPct: 0.25 };
+    default: return { gradient: 10, poolLimitPct: 0.5 };
+  }
+}
+
+/** 설정 + 형태 기본값을 합친 실효 파라미터. 적은 값이 이긴다. */
+export function resolveVR(cfg: ValueRebalancingConfig): { gradient: number; poolLimitPct: number } {
+  const d = defaultsForForm(cfg.cashflow);
+  return {
+    gradient: cfg.gradient && cfg.gradient > 0 ? cfg.gradient : d.gradient,
+    poolLimitPct: cfg.poolLimitPct && cfg.poolLimitPct > 0 ? cfg.poolLimitPct : d.poolLimitPct,
+  };
+}
+
+/**
+ * 실효평단 = (누적매수 − 누적매도) / 보유수량 (원문 4.2).
+ *
+ * 명목평단(증권사 화면)은 매도해도 안 변하지만 이것은 변한다. 수익 매도가 쌓이면 내려가고,
+ * 끝내 마이너스가 되면 매수에 쓴 돈보다 매도로 번 돈이 크다는 뜻이다(원문 4.3 원금 ZERO).
+ */
+export function effectiveAvgPrice(a: { cumBuy: number; cumSell: number; qty: number }): number | null {
+  return a.qty > 0 ? (a.cumBuy - a.cumSell) / a.qty : null;
+}
+
 /** 밴드 [하단, 상단] = [V(1−b), V(1+b)]. */
 export function bandOf(v: number, b: number): { low: number; high: number } {
   return { low: v * (1 - b), high: v * (1 + b) };
@@ -59,7 +107,7 @@ export function seedVR(cfg: ValueRebalancingConfig, price0: number): VRState {
   const qty = Math.floor((cfg.principal * initStock) / (price0 * (1 + fee)));
   const cumBuy = qty * price0 * (1 + fee);
   const pool = cfg.principal - cumBuy;
-  return { qty, pool, V: qty * price0, buyBudget: cfg.poolLimitPct * pool, sinceCycle: 0, cumBuy, cumSell: 0 };
+  return { qty, pool, V: qty * price0, buyBudget: resolveVR(cfg).poolLimitPct * pool, sinceCycle: 0, cumBuy, cumSell: 0 };
 }
 
 /** 인출(CF<0)이 Pool 로 부족하면 주식 매도로 충당할 주수(Pool≥0 불변식). 충당 불필요/불가면 0.
@@ -77,9 +125,12 @@ export function cycleCoverSellQty(state: VRState, cfg: ValueRebalancingConfig, p
  *  cover-sell(인출충당)은 이 호출 전에 applyVRFill 로 pool/qty 에 이미 반영돼 있어야 한다. */
 export function advanceCycleVR(state: VRState, cfg: ValueRebalancingConfig): VRState {
   const cf = cfg.cashflow ?? 0;
-  const V = updateVBasic(state.V, state.pool, cfg.gradient, cf); // Pool 은 CF 반영 전 값(원문 예시)
+  const { gradient, poolLimitPct } = resolveVR(cfg);
+  // V 는 CF **전** pool 로 (원문: "이번 사이클이 끝나고 V=9000, pool=1000" → 9000+1000/10+250)
+  const V = updateVBasic(state.V, state.pool, gradient, cf);
   const pool = cf !== 0 ? Math.max(0, state.pool + cf) : state.pool;
-  return { ...state, V, pool, buyBudget: cfg.poolLimitPct * pool, sinceCycle: 0 };
+  // 한도는 CF **후** pool 로 (원문: "적립후 pool 의 75%", "인출후 pool 의 25%")
+  return { ...state, V, pool, buyBudget: poolLimitPct * pool, sinceCycle: 0 };
 }
 
 /** 체결 1건을 Pool 장부에 반영(매수→pool·buyBudget↓·qty↑ / 매도→pool↑·qty↓). fee 는 대금에 반영. */
@@ -153,6 +204,7 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
   const totalPnl = equityCurve.length ? equityCurve[equityCurve.length - 1].equity - invested : 0;
   return {
     trades, equityCurve, totalPnl, vrBand,
+    effectiveAvg: effectiveAvgPrice(state),
     ...(poolLog.length ? { poolLog } : {}),
     ...(cf !== 0 ? { contributions, totalContributed: invested } : {}),
   };
