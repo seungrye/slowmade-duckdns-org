@@ -28,7 +28,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   대체공휴일: { icon: '🔁', description: '공휴일이 주말과 겹쳐 대신 쉬는 날입니다.' },
 
   // ── 기념일 ──
-  제헌절: { icon: '📜', description: '1948년 헌법이 공포된 것을 기리는 날입니다. 국경일이지만 쉬지는 않습니다.' },
+  제헌절: { icon: '📜', description: '1948년 헌법이 공포된 것을 기리는 날입니다.' },
   식목일: { icon: '🌳', description: '나무를 심고 가꾸는 날입니다.' },
   근로자의날: { icon: '🛠️', description: '일하는 사람들의 노고를 기리는 날입니다.' },
   어버이날: { icon: '🌹', description: '부모님께 감사를 전하는 날입니다.' },
@@ -36,6 +36,16 @@ export const CATALOG: Record<string, CatalogEntry> = {
   성년의날: { icon: '🌷', description: '만 19세가 된 이들의 성년을 축하하는 날입니다.' },
   부부의날: { icon: '💑', description: '부부가 서로에게 고마움을 전하는 날입니다.' },
   국군의날: { icon: '🎖️', description: '국군의 노고를 기리는 날입니다.' },
+  전국동시지방선거: { icon: '🗳️', description: '지방자치단체장과 의원을 뽑는 날. 임시공휴일입니다.' },
+  '4·19혁명기념일': { icon: '🕊️', description: '1960년 4·19 혁명을 기리는 날입니다.' },
+  '5·18민주화운동기념일': { icon: '🌼', description: '1980년 5·18 민주화운동을 기리는 날입니다.' },
+  '6·25전쟁일': { icon: '🪖', description: '1950년 한국전쟁이 일어난 날을 기리는 날입니다.' },
+  순국선열의날: { icon: '🏵️', description: '나라를 위해 목숨을 바친 선열을 기리는 날입니다.' },
+  환경의날: { icon: '🌏', description: '환경 보전의 중요성을 되새기는 날입니다.' },
+  소방의날: { icon: '🚒', description: '소방관의 노고를 기리는 날입니다.' },
+  경찰의날: { icon: '👮', description: '경찰의 노고를 기리는 날입니다.' },
+  장애인의날: { icon: '♿', description: '장애인에 대한 이해를 넓히는 날입니다.' },
+  노인의날: { icon: '🧓', description: '어르신을 공경하는 마음을 되새기는 날입니다.' },
 
   // ── 24절기 ──
   입춘: { icon: '🌱', description: '봄의 시작을 알리는 절기입니다.' },
@@ -72,7 +82,16 @@ const ALIAS: Record<string, string> = {
   '1월1일': '신정',
   크리스마스: '기독탄신일',
   석가탄신일: '부처님오신날',
+  // 공휴일 엔드포인트는 '노동절', 기념일 엔드포인트는 '근로자의 날' 로 같은 날을 부른다.
+  노동절: '근로자의날',
 };
+
+/**
+ * 이름 뒤에 괄호가 붙어 오는 것들. 실측: `대체공휴일(개천절)`·`대체공휴일(광복절)` …
+ * 괄호까지 표에 넣으면 매년 조합이 달라져 끝이 없으므로, 앞부분으로 찾고 **표시 이름은
+ * 원문 그대로** 둔다 — 어느 공휴일의 대체인지가 정보다.
+ */
+const PREFIX_KEYS = ['대체공휴일'];
 
 /** 표에 없는 이름도 반드시 보여준다 — 안 그러면 API 가 새 기념일을 줄 때 조용히 샌다. */
 export const FALLBACK_ICON: Record<EventKind, string> = {
@@ -81,15 +100,31 @@ export const FALLBACK_ICON: Record<EventKind, string> = {
   season: '🗓️',
 };
 
+/**
+ * 공백을 지운다. 실측해 보니 **엔드포인트마다 띄어쓰기가 다르다** — 기념일은 `'어버이 날'`,
+ * `'스승의 날'`, `'국군의 날'` 처럼 띄어 쓰고 공휴일은 붙여 쓴다. 표를 두 벌 두는 대신
+ * 찾을 때 공백을 지운다.
+ */
+function normalize(name: string): string {
+  return name.replace(/\s+/g, '');
+}
+
 export function decorate(name: string, kind: EventKind): CalendarEvent {
   const trimmed = name.trim();
-  const key = ALIAS[trimmed] ?? trimmed;
+  const normalized = normalize(trimmed);
+  const key = ALIAS[normalized] ?? normalized;
   const entry = CATALOG[key];
 
-  return {
-    name: key,
-    kind,
-    icon: entry?.icon ?? FALLBACK_ICON[kind],
-    description: entry?.description ?? '',
-  };
+  if (entry) {
+    return { name: key, kind, icon: entry.icon, description: entry.description };
+  }
+
+  // `대체공휴일(개천절)` 처럼 괄호가 붙은 것 — 표시 이름은 원문을 살린다.
+  const prefix = PREFIX_KEYS.find((p) => normalized.startsWith(p));
+  if (prefix) {
+    const base = CATALOG[prefix];
+    return { name: trimmed, kind, icon: base.icon, description: base.description };
+  }
+
+  return { name: trimmed, kind, icon: FALLBACK_ICON[kind], description: '' };
 }

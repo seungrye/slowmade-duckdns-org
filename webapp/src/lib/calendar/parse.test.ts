@@ -45,18 +45,33 @@ describe('parseSpecialDays', () => {
     expect(parseSpecialDays(payload, 'season')[0].date).toBe('2026-02-04');
   });
 
-  it('국경일이지만 공휴일이 아니면(isHoliday=N) 기념일로 낮춘다', () => {
-    // 제헌절은 국경일이나 쉬는 날이 아니다. 색 배지로 띄우면 쉬는 날처럼 읽힌다.
+  it('공휴일 목록에 있어도 isHoliday=N 이면 기념일로 낮춘다', () => {
+    // 색 배지는 "쉬는 날"로 읽힌다. 안 쉬는 날이 섞이면 무게를 낮춰야 한다.
+    // (실측 2026 에서는 22건이 전부 Y 라 걸리지 않지만, 지정은 해마다 바뀐다.)
     const payload = envelope({
       item: [
-        { dateName: '제헌절', isHoliday: 'N', locdate: 20260717 },
+        { dateName: '어떤국경일', isHoliday: 'N', locdate: 20260717 },
         { dateName: '광복절', isHoliday: 'Y', locdate: 20260815 },
       ],
     });
     expect(parseSpecialDays(payload, 'holiday')).toEqual([
-      { date: '2026-07-17', name: '제헌절', kind: 'anniversary' },
+      { date: '2026-07-17', name: '어떤국경일', kind: 'anniversary' },
       { date: '2026-08-15', name: '광복절', kind: 'holiday' },
     ]);
+  });
+
+  it('기념일·절기는 전부 isHoliday=N 이라 낮추지 않는다 — 낮추면 24절기가 통째로 기념일이 된다', () => {
+    // 실측(2026): getAnniversaryInfo 82건·get24DivisionsInfo 24건이 모두 isHoliday='N'.
+    const payload = envelope({
+      item: [
+        { dateName: '동지', isHoliday: 'N', locdate: 20261222 },
+        { dateName: '소한', isHoliday: 'N', locdate: 20260105 },
+      ],
+    });
+    expect(parseSpecialDays(payload, 'season').every((d) => d.kind === 'season')).toBe(true);
+
+    const anniv = envelope({ item: { dateName: '어버이 날', isHoliday: 'N', locdate: 20260508 } });
+    expect(parseSpecialDays(anniv, 'anniversary')[0].kind).toBe('anniversary');
   });
 
   it('isHoliday 가 아예 없으면 넘긴 종류를 그대로 쓴다', () => {

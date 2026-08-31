@@ -61,9 +61,15 @@ export function parseSpecialDays(payload: unknown, kind: EventKind): CalendarDay
     // 한 건이 깨졌다고 그 해 전체를 잃지 않는다.
     if (!date || !name) return [];
 
-    // 국경일이지만 쉬는 날이 아닌 것(제헌절 등)은 기념일로 낮춘다. 색 배지로 띄우면
-    // 쉬는 날처럼 읽히기 때문이다.
-    const resolved: EventKind = item.isHoliday === 'N' ? 'anniversary' : kind;
+    // 공휴일 목록에 실렸는데 쉬는 날이 아니라고 표시된 것은 기념일로 낮춘다. 색 배지로
+    // 띄우면 쉬는 날처럼 읽히기 때문이다.
+    //
+    // 실측(2026): `getRestDeInfo` 22건은 **전부 Y** 라 이 분기는 지금 걸리지 않는다. 해마다
+    // 지정이 바뀌므로(제헌절도 예전엔 쉬지 않았다) 안전망으로 남겨 둔다.
+    //
+    // **공휴일 엔드포인트에만 적용한다.** 기념일·24절기 응답은 모든 항목이 `isHoliday: "N"`
+    // 이라, 무조건 적용하면 24절기가 통째로 기념일이 되어 무게 구분이 무너진다.
+    const resolved: EventKind = kind === 'holiday' && item.isHoliday === 'N' ? 'anniversary' : kind;
 
     return [{ date, name, kind: resolved }];
   });
