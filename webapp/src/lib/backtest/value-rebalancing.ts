@@ -100,6 +100,8 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
   const trades: BtTrade[] = [];
   const equityCurve: EquityPoint[] = [];
   const poolLog: string[] = [];
+  // 차트용 — 그날 판정에 쓴 밴드와, 밴드가 실제로 감싸는 주식 평가금 (#341).
+  const vrBand: { date: string; v: number; low: number; high: number; stock: number }[] = [];
   const contributions: { date: string; amount: number }[] = [];
   const fee = cfg.feeRate && cfg.feeRate > 0 ? cfg.feeRate : 0;
   const b = cfg.bandPct;
@@ -108,7 +110,7 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
   const tk = target.ticker;
 
   const bars = target.bars.filter((bar) => (!cfg.from || bar.date >= cfg.from) && (!cfg.to || bar.date <= cfg.to) && bar.close > 0);
-  if (bars.length === 0) return { trades, equityCurve, totalPnl: 0 };
+  if (bars.length === 0) return { trades, equityCurve, totalPnl: 0, vrBand };
 
   const p0 = bars[0].close;
   let state = seedVR(cfg, p0);
@@ -142,13 +144,15 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
     else if (delta < 0) fill(date, "sell", price, -delta);
 
     equityCurve.push({ date, equity: state.qty * price + state.pool });
+    // 판정에 쓴 그 밴드를 그대로 남긴다 — 화면이 다시 계산하면 둘이 어긋날 수 있다.
+    vrBand.push({ date, v: state.V, low: band.low, high: band.high, stock: state.qty * price });
     state = { ...state, sinceCycle: state.sinceCycle + 1 };
   }
 
   const invested = cf !== 0 ? cfg.principal + contributions.reduce((s, c) => s + c.amount, 0) : cfg.principal;
   const totalPnl = equityCurve.length ? equityCurve[equityCurve.length - 1].equity - invested : 0;
   return {
-    trades, equityCurve, totalPnl,
+    trades, equityCurve, totalPnl, vrBand,
     ...(poolLog.length ? { poolLog } : {}),
     ...(cf !== 0 ? { contributions, totalContributed: invested } : {}),
   };
