@@ -11,10 +11,22 @@ const HOLIDAY: CalendarEvent = {
   description: '1945년 일제로부터 해방된 것을 기리는 날입니다.',
 };
 const SEASON: CalendarEvent = {
-  name: '말복',
+  name: '백로',
   kind: 'season',
-  icon: '🗓️',
-  description: '',
+  icon: '💦',
+  description: '이슬이 맺히기 시작하는 절기입니다.',
+};
+const ANNIV: CalendarEvent = {
+  name: '푸른하늘의날',
+  kind: 'anniversary',
+  icon: '🌏',
+  description: '맑은 하늘의 소중함을 되새기는 날입니다.',
+};
+const EXTRA: CalendarEvent = {
+  name: '식목일',
+  kind: 'anniversary',
+  icon: '🌳',
+  description: '나무를 심고 가꾸는 날입니다.',
 };
 
 function mockEvents(events: CalendarEvent[]) {
@@ -25,6 +37,8 @@ function mockEvents(events: CalendarEvent[]) {
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
+
+const icons = () => screen.getAllByRole('button');
 
 beforeEach(() => {
   localStorage.clear();
@@ -44,13 +58,6 @@ describe('CalendarBadge', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('오늘이 특일이면 아이콘을 보여준다', async () => {
-    mockEvents([HOLIDAY]);
-    render(<CalendarBadge />);
-
-    expect(await screen.findByRole('button')).toHaveTextContent('🎗️');
-  });
-
   it('조회 실패해도 화면이 깨지지 않는다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     const { container } = render(<CalendarBadge />);
@@ -61,51 +68,128 @@ describe('CalendarBadge', () => {
   it('하루에 한 번만 조회한다', async () => {
     const fetchMock = mockEvents([HOLIDAY]);
     const { unmount } = render(<CalendarBadge />);
-    await screen.findByRole('button');
+    await screen.findByLabelText('광복절');
     unmount();
 
     render(<CalendarBadge />);
-    // 두 번째 마운트는 표식을 보고 조회를 건너뛴다.
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
 
-  describe('툴팁', () => {
-    it('눌러서 연다 — 모바일엔 hover 가 없다', async () => {
-      mockEvents([HOLIDAY]);
+  describe('스택', () => {
+    it('겹칠 이벤트마다 칸을 하나씩 그린다', async () => {
+      mockEvents([HOLIDAY, SEASON]);
       render(<CalendarBadge />);
-      const button = await screen.findByRole('button');
 
-      expect(screen.queryByRole('tooltip')).toBeNull();
-      fireEvent.click(button);
-      expect(screen.getByRole('tooltip')).toHaveTextContent('1945년');
+      await screen.findByLabelText('광복절');
+      expect(screen.getByLabelText('백로')).toBeInTheDocument();
+      expect(icons()).toHaveLength(2);
     });
 
-    it('마우스를 올려도 열린다', async () => {
-      mockEvents([HOLIDAY]);
+    it('세 개를 넘으면 마지막 칸이 +N 이 된다', async () => {
+      mockEvents([HOLIDAY, ANNIV, SEASON, EXTRA]);
       render(<CalendarBadge />);
-      const button = await screen.findByRole('button');
 
-      fireEvent.mouseEnter(button);
+      await screen.findByLabelText('광복절');
+      // 앞의 3개 + 넘침 칸
+      expect(icons()).toHaveLength(4);
+      expect(screen.getByLabelText('외 1건 더 보기')).toHaveTextContent('+1');
+      // 4번째 이벤트는 칸으로는 안 그린다.
+      expect(screen.queryByLabelText('식목일')).toBeNull();
+    });
+
+    it('앞선 칸이 위로 쌓인다 — 가장 중요한 날이 맨 앞', async () => {
+      mockEvents([HOLIDAY, SEASON]);
+      render(<CalendarBadge />);
+      const first = await screen.findByLabelText('광복절');
+      const second = screen.getByLabelText('백로');
+
+      expect(Number(first.style.zIndex)).toBeGreaterThan(Number(second.style.zIndex));
+    });
+  });
+
+  describe('데스크톱 — 짚은 것만', () => {
+    it('마우스를 올리면 그 날만 설명한다', async () => {
+      mockEvents([HOLIDAY, SEASON]);
+      render(<CalendarBadge />);
+      const season = await screen.findByLabelText('백로');
+
+      fireEvent.mouseEnter(season);
+      const tooltip = screen.getByRole('tooltip');
+      expect(tooltip).toHaveTextContent('이슬이 맺히기');
+      expect(tooltip).not.toHaveTextContent('1945년');
+    });
+
+    it('짚은 칸이 맨 앞으로 나온다', async () => {
+      mockEvents([HOLIDAY, SEASON]);
+      render(<CalendarBadge />);
+      const season = await screen.findByLabelText('백로');
+      const before = Number(season.style.zIndex);
+
+      fireEvent.mouseEnter(season);
+      expect(Number(season.style.zIndex)).toBeGreaterThan(before);
+      expect(season.className).toContain('ring-white');
+    });
+
+    it('벗어나면 닫힌다', async () => {
+      mockEvents([HOLIDAY, SEASON]);
+      const { container } = render(<CalendarBadge />);
+      const holiday = await screen.findByLabelText('광복절');
+
+      fireEvent.mouseEnter(holiday);
       expect(screen.getByRole('tooltip')).toBeInTheDocument();
-      fireEvent.mouseLeave(button);
+      fireEvent.mouseLeave(container.firstChild as Element);
       expect(screen.queryByRole('tooltip')).toBeNull();
     });
 
-    it('키보드 포커스로도 열린다', async () => {
+    it('키보드 포커스도 hover 처럼 동작한다', async () => {
+      mockEvents([HOLIDAY, SEASON]);
+      render(<CalendarBadge />);
+      const season = await screen.findByLabelText('백로');
+
+      fireEvent.focus(season);
+      expect(screen.getByRole('tooltip')).toHaveTextContent('이슬이 맺히기');
+      fireEvent.blur(season);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
+  });
+
+  describe('모바일 — 누르면 전부', () => {
+    it('누르면 그날 것을 전부 보여준다', async () => {
+      mockEvents([HOLIDAY, SEASON]);
+      render(<CalendarBadge />);
+      const holiday = await screen.findByLabelText('광복절');
+
+      fireEvent.click(holiday);
+      const tooltip = screen.getByRole('tooltip');
+      expect(tooltip).toHaveTextContent('광복절');
+      expect(tooltip).toHaveTextContent('백로');
+    });
+
+    it('+N 을 눌러도 전부 보여준다 — 잘린 것도 여기서 읽는다', async () => {
+      mockEvents([HOLIDAY, ANNIV, SEASON, EXTRA]);
+      render(<CalendarBadge />);
+      const more = await screen.findByLabelText('외 1건 더 보기');
+
+      fireEvent.click(more);
+      expect(screen.getByRole('tooltip')).toHaveTextContent('식목일');
+    });
+
+    it('다시 누르면 닫힌다', async () => {
       mockEvents([HOLIDAY]);
       render(<CalendarBadge />);
-      const button = await screen.findByRole('button');
+      const holiday = await screen.findByLabelText('광복절');
 
-      fireEvent.focus(button);
+      fireEvent.click(holiday);
       expect(screen.getByRole('tooltip')).toBeInTheDocument();
+      fireEvent.click(holiday);
+      expect(screen.queryByRole('tooltip')).toBeNull();
     });
 
     it('Esc 로 닫힌다', async () => {
       mockEvents([HOLIDAY]);
       render(<CalendarBadge />);
-      const button = await screen.findByRole('button');
+      fireEvent.click(await screen.findByLabelText('광복절'));
 
-      fireEvent.click(button);
       fireEvent.keyDown(document, { key: 'Escape' });
       expect(screen.queryByRole('tooltip')).toBeNull();
     });
@@ -113,32 +197,10 @@ describe('CalendarBadge', () => {
     it('바깥을 누르면 닫힌다', async () => {
       mockEvents([HOLIDAY]);
       render(<CalendarBadge />);
-      const button = await screen.findByRole('button');
+      fireEvent.click(await screen.findByLabelText('광복절'));
 
-      fireEvent.click(button);
       fireEvent.mouseDown(document.body);
       expect(screen.queryByRole('tooltip')).toBeNull();
-    });
-
-    it('설명이 없는 날은 이름만 보여준다', async () => {
-      mockEvents([SEASON]);
-      render(<CalendarBadge />);
-      fireEvent.click(await screen.findByRole('button'));
-
-      expect(screen.getByRole('tooltip')).toHaveTextContent('말복');
-    });
-
-    it('여러 날이 겹치면 전부 나열한다', async () => {
-      mockEvents([HOLIDAY, SEASON]);
-      render(<CalendarBadge />);
-      const button = await screen.findByRole('button');
-
-      expect(button).toHaveTextContent('🎗️');
-      expect(button).toHaveTextContent('🗓️');
-      fireEvent.click(button);
-      const tooltip = screen.getByRole('tooltip');
-      expect(tooltip).toHaveTextContent('광복절');
-      expect(tooltip).toHaveTextContent('말복');
     });
   });
 });

@@ -17,8 +17,8 @@ const onLiberationDay = new Date('2026-08-14T15:00:00Z');
 
 const YEAR_2026: CalendarDay[] = [
   { date: '2026-08-15', name: '광복절', kind: 'holiday' },
-  { date: '2026-08-15', name: '말복', kind: 'season' },
-  { date: '2026-08-16', name: '다른날', kind: 'anniversary' },
+  { date: '2026-08-15', name: '입추', kind: 'season' },
+  { date: '2026-08-16', name: '식목일', kind: 'anniversary' },
 ];
 
 beforeEach(() => {
@@ -55,9 +55,36 @@ describe('GET /api/calendar/today', () => {
       icon: '🎗️',
       description: expect.stringContaining('1945'),
     });
-    // 표에 없는 이름도 종류별 기본 아이콘으로 나온다.
-    expect(data.events[1].name).toBe('말복');
-    expect(data.events[1].icon).toBeTruthy();
+    // 무게순 정렬 — 공휴일이 앞, 절기가 뒤. 스택 맨 앞이 가장 중요한 날이어야 한다.
+    expect(data.events[1].name).toBe('입추');
+  });
+
+  it('설명 없는 기념일은 빼고 내려준다 — 배지가 장식이 되지 않게', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(onLiberationDay);
+    mockDays.mockResolvedValue([
+      { date: '2026-08-15', name: '광복절', kind: 'holiday' },
+      { date: '2026-08-15', name: '조달의 날', kind: 'anniversary' },
+    ]);
+
+    const { data } = await body();
+
+    expect(data.events.map((e: { name: string }) => e.name)).toEqual(['광복절']);
+  });
+
+  it('같은 날 같은 이름이 두 종류로 와도 한 번만 내려준다', async () => {
+    // 실측: 어린이날·현충일이 공휴일·기념일 응답 양쪽에 있다.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-05T15:00:00Z')); // KST 2026-06-06
+    mockDays.mockResolvedValue([
+      { date: '2026-06-06', name: '현충일', kind: 'anniversary' },
+      { date: '2026-06-06', name: '현충일', kind: 'holiday' },
+    ]);
+
+    const { data } = await body();
+
+    expect(data.events).toHaveLength(1);
+    expect(data.events[0].kind).toBe('holiday');
   });
 
   it('해당 없는 날이면 빈 배열', async () => {

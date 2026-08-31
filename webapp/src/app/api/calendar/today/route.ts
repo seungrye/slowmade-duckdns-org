@@ -1,7 +1,7 @@
 import { apiSuccess } from '@/lib/api-response';
 import { env } from '@/lib/env';
 import { daysForYear } from '@/lib/calendar/cache';
-import { decorate } from '@/lib/calendar/catalog';
+import { decorate, dedupeEvents, isWorthShowing } from '@/lib/calendar/catalog';
 import { seoulDateKey, todayInSeoul } from '@/lib/birthday';
 
 /**
@@ -19,9 +19,12 @@ export async function GET() {
     const today = seoulDateKey(now);
     const days = await daysForYear(todayInSeoul(now).year, now);
 
-    return apiSuccess({
-      events: days.filter((d) => d.date === today).map((d) => decorate(d.name, d.kind)),
-    });
+    // 중복 제거(같은 날이 공휴일·기념일 양쪽에서 온다) → 설명 있는 것만 남긴다.
+    const events = dedupeEvents(
+      days.filter((d) => d.date === today).map((d) => decorate(d.name, d.kind))
+    ).filter(isWorthShowing);
+
+    return apiSuccess({ events });
   } catch (error) {
     console.error('Error loading today calendar:', error);
     return apiSuccess({ events: [] });
