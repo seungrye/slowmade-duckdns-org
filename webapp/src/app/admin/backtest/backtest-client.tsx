@@ -876,6 +876,36 @@ function Result({ result }: { result: FullResult }) {
   const isRotation = result.strategy.startsWith("rotation");
   // 총자산(현금+보유) 곡선으로 표시할 전략 — 로테이션 계열 + 듀얼모멘텀(다종목) + 변동성타깃(부분 포지션)
   const isPortfolio = isRotation || result.strategy === "dual_momentum_v1" || result.strategy === "vol_target_v1" || result.strategy === "value_rebalancing";
+  // VR 밴드 (#341). ECharts 에 밴드 영역이 따로 없어 **쌓기**로 만든다 —
+  // 하단선을 투명하게 깔고 그 위에 (상단−하단) 을 쌓아 거기에만 areaStyle 을 준다.
+  const band = result.vrBand ?? [];
+  const stockAt = new Map(band.map((r) => [r.date, r.stock]));
+  const vrBandOption: EChartsOption | null = band.length === 0 ? null : {
+    tooltip: { trigger: "axis" },
+    legend: { data: ["주식 평가금", "목표 V", "밴드"], bottom: 0 },
+    grid: { left: 16, right: 16, top: 20, bottom: 44, containLabel: true },
+    xAxis: { type: "category", data: band.map((r) => r.date) },
+    yAxis: { type: "value", scale: true },
+    dataZoom: [{ type: "inside", start: 0, end: 100 }],
+    series: [
+      // 하단(투명) — 쌓기의 바닥. 범례에서 감춘다.
+      { name: "밴드하단", type: "line", stack: "vrband", showSymbol: false, silent: true,
+        lineStyle: { opacity: 0 }, data: band.map((r) => r.low) },
+      { name: "밴드", type: "line", stack: "vrband", showSymbol: false, silent: true,
+        lineStyle: { opacity: 0 }, areaStyle: { color: "#3b82f6", opacity: 0.14 },
+        data: band.map((r) => r.high - r.low) },
+      { name: "목표 V", type: "line", showSymbol: false,
+        lineStyle: { width: 1, type: "dashed", color: "#3b82f6" }, data: band.map((r) => r.v) },
+      { name: "주식 평가금", type: "line", showSymbol: false,
+        lineStyle: { width: 1.6, color: "#111827" }, data: band.map((r) => r.stock) },
+      // 매매는 그날의 평가금 위에 찍는다 — 가격축이 아니라 이 축에서 일어난 판정이다.
+      { name: "매수", type: "scatter", symbol: "triangle", symbolSize: 9, itemStyle: { color: "#dc2626" },
+        data: buys.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 5 },
+      { name: "매도", type: "scatter", symbol: "triangle", symbolRotate: 180, symbolSize: 11, itemStyle: { color: "#2563eb" },
+        data: sells.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 6 },
+    ],
+  };
+
   const option: EChartsOption = isPortfolio
     ? {
         // 다중 종목 로테이션 — 단일 가격축 대신 총자산(현금+보유) 곡선으로 표시
@@ -941,6 +971,20 @@ function Result({ result }: { result: FullResult }) {
       <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[400px] mb-6">
         <ReactECharts option={option} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
       </div>
+
+      {/* VR 밴드 (#341) — 가격이 아니라 **평가금** 축이라 차트를 따로 둔다.
+          밴드가 감싸는 것은 주식 평가금(qty×종가)이지 총자산(+Pool)이 아니다. */}
+      {vrBandOption && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-1">밸류 밴드</h2>
+          <p className="text-xs text-gray-500 mb-2">
+            주식 평가금이 밴드를 벗어난 날에만 사고판다. 밴드는 사이클마다 다시 잡혀 계단 모양이다.
+          </p>
+          <div className="h-72 border border-gray-200 dark:border-gray-700 rounded">
+            <ReactECharts option={vrBandOption} style={{ width: "100%", height: "100%" }} notMerge lazyUpdate />
+          </div>
+        </div>
+      )}
 
       {result.poolLog && result.poolLog.length > 0 && (
         <div className="mb-6">

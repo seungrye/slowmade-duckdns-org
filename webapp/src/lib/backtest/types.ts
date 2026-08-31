@@ -59,6 +59,14 @@ export interface BacktestResult {
   totalPnl: number; // 매도 실현손익 합계
   resolvedV?: number; // 무한매수 v4: 실제 채점에 쓰인 V(변동성 계수). 사용자 입력값 또는 자동 유도값.
   poolLog?: string[]; // rotation 후보 자동선발 풀 변경 이력 (자동선발 모드에서만)
+  /**
+   * VR: 하루치 목표선·밴드·주식 평가금 (#341). 차트가 "왜 그날 사고팔았는지" 를 그린다.
+   *
+   * `stock` 을 따로 내는 이유: 밴드가 감싸는 것은 **주식 평가금**(qty × 종가)이지
+   * `equityCurve.equity`(= 주식 + Pool 현금)가 아니다. 총자산에 밴드를 겹치면 Pool 만큼
+   * 늘 위로 떠 "항상 밴드 밖" 처럼 보인다.
+   */
+  vrBand?: { date: string; v: number; low: number; high: number; stock: number }[];
   // 적립식(주기 입금) — contribution 지정 시에만 채워진다. 지표(TWR)·총납입 표시용.
   contributions?: { date: string; amount: number }[]; // 실제 입금이 일어난 날짜·금액
   totalContributed?: number; // 초기 원금 + Σ 입금 (수익률 분모 왜곡 방지용 참고값)

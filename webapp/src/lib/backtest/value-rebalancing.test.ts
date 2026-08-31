@@ -153,3 +153,59 @@ describe("VR cycleCoverSellQty — 인출 충당 매도", () => {
     expect(cycleCoverSellQty(st, VCFG, 100)).toBe(0);
   });
 });
+
+// ── 차트용 밴드 (#341) ──
+describe("vrBand — 왜 사고팔았는지 그리려면", () => {
+  const flat = () => runValueRebalancingBacktest(cand(Array(30).fill(100)), CFG);
+
+  it("하루에 한 줄씩 낸다", () => {
+    const r = flat();
+    expect(r.vrBand).toHaveLength(r.equityCurve.length);
+    expect(r.vrBand!.map((x) => x.date)).toEqual(r.equityCurve.map((e) => e.date));
+  });
+
+  it("밴드는 목표 V 를 b 만큼 위아래로 벌린 것", () => {
+    for (const row of flat().vrBand!) {
+      expect(row.low).toBeCloseTo(row.v * (1 - CFG.bandPct), 6);
+      expect(row.high).toBeCloseTo(row.v * (1 + CFG.bandPct), 6);
+    }
+  });
+
+  /**
+   * 밴드가 감싸는 것은 **주식 평가금**이지 총자산이 아니다.
+   * equityCurve.equity 는 qty×price + pool 이라 Pool 현금만큼 늘 위로 떠, 그걸 밴드와
+   * 겹치면 "항상 밴드 밖" 처럼 보인다. 그래서 stock 을 따로 낸다.
+   */
+  it("stock 은 주식 평가금만 — 총자산보다 Pool 만큼 작다", () => {
+    const r = flat();
+    for (let i = 0; i < r.vrBand!.length; i++) {
+      expect(r.vrBand![i].stock).toBeLessThanOrEqual(r.equityCurve[i].equity);
+    }
+    // 초기 85:15 분할이라 Pool 이 남아 있다 — 둘이 같으면 안 된다.
+    expect(r.vrBand![0].stock).toBeLessThan(r.equityCurve[0].equity);
+  });
+
+  it("밴드 안에 있으면 그날 매매가 없다", () => {
+    const r = flat();
+    const 매매일 = new Set(r.trades.map((t) => t.date));
+    for (const row of r.vrBand!) {
+      const 안쪽 = row.stock > row.low && row.stock < row.high;
+      if (안쪽 && row.date !== r.vrBand![0].date) {
+        expect(매매일.has(row.date), `${row.date} 는 밴드 안인데 매매가 있다`).toBe(false);
+      }
+    }
+  });
+
+  it("밴드는 사이클 경계에서만 바뀐다 — 계단 모양이다", () => {
+    const r = runValueRebalancingBacktest(cand(Array.from({ length: 30 }, (_, i) => 100 + i)), CFG);
+    const 바뀐횟수 = r.vrBand!.filter((row, i) => i > 0 && row.v !== r.vrBand![i - 1].v).length;
+
+    expect(바뀐횟수).toBeGreaterThan(0);
+    // 매일 바뀌면 계단이 아니다 — cycleDays(5)마다이므로 날 수보다 훨씬 적어야 한다.
+    expect(바뀐횟수).toBeLessThan(r.vrBand!.length / 2);
+  });
+
+  it("바가 없으면 빈 배열", () => {
+    expect(runValueRebalancingBacktest(cand([]), CFG).vrBand).toEqual([]);
+  });
+});
