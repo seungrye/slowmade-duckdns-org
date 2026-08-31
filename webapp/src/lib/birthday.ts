@@ -81,6 +81,15 @@ export function todayInSeoul(now: Date): SeoulDate {
 }
 
 /**
+ * KST 기준 오늘을 'YYYY-MM-DD' 문자열로. 달력 조회·localStorage 표식이 같은 키를 써야
+ * 하루 경계가 어긋나지 않으므로 한 곳에서 만든다.
+ */
+export function seoulDateKey(now: Date): string {
+  const { year, month, day } = todayInSeoul(now);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
  * KST 로 오늘이 생일인가.
  *
  * 2월 29일생은 평년에 생일이 없으므로 **3월 1일**에 축하한다. 윤년에는 2월 29일에만
