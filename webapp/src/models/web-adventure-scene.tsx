@@ -10,6 +10,8 @@
 // path-level validate() 로 동적 검증한다 (validateSync 에서도 호출됨).
 
 import { Schema, model, models, Model } from "mongoose";
+// 엔딩 목록의 단일 출처 (#352). jiti 스크립트 호환을 위해 상대경로.
+import { ENDING_IDS } from '../types/web-adventure';
 
 // ── Choice 의 condition (conditional 종류일 때만 사용) ─────────────────────
 const ChoiceConditionSchema = new Schema(
@@ -153,7 +155,7 @@ const WebAdventureSceneSchema = new Schema(
     isEnding: { type: Boolean },
     endingId: {
       type: String,
-      enum: ["ascension", "revolution", "harmony", "fall", "petrification", "sylvan_bond", "liberation", "usurpation", "regency", "purge", "wayfarer"],
+      enum: [...ENDING_IDS], // #352 단일 출처
     },
     // #222 — /scenes/graph 노드 좌표 (사용자 드래그로 갱신). optional.
     position: { type: PositionSchema },

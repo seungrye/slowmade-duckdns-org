@@ -19,7 +19,8 @@ import { env } from '@/lib/env';
 import WebAdventureFeedbackNote from '@/models/web-adventure-feedback-note';
 import WebAdventurePastRun from '@/models/web-adventure-past-run';
 import WebAdventureScene from '@/models/web-adventure-scene';
-import { generateFeedbackNote, ENDING_LABEL } from '@/lib/web-adventure/feedback-note';
+import { generateFeedbackNote } from '@/lib/web-adventure/feedback-note';
+import { endingLabel } from '@/content/web-adventure/endings';
 import { STALE_MS, GEN_TIMEOUT_MS } from '@/lib/web-adventure/feedback-worker-timing';
 
 const MAX_ATTEMPTS = 3;
@@ -101,7 +102,7 @@ export async function POST(req: NextRequest) {
     // AI 는 작가 노트(제안/개선안)만 생성. 서사는 엔딩 원본 로그를 그대로, 제목은 엔딩명.
     note.authorNote = result.authorNote;
     note.narrative = (run.log ?? []).join('\n');
-    note.title = `${ENDING_LABEL[run.endingId] ?? run.endingId} 회차 #${run.runIndex}`;
+    note.title = `${endingLabel(run.endingId)} 회차 #${run.runIndex}`;
     note.voice = run.voice ?? '';
     note.status = 'ready';
     note.error = '';

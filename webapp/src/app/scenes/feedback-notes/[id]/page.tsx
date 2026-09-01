@@ -1,6 +1,7 @@
 // /scenes/feedback-notes/[id] — 피드백 노트 단건 뷰 (owner 전용). LLM 원문 유지. (#9)
 
 import { notFound } from 'next/navigation';
+import { endingLabel } from '@/content/web-adventure/endings';
 import Link from 'next/link';
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/require-owner';
@@ -11,14 +12,6 @@ import { tabLabel } from '@/lib/web-adventure/scene-body-tabs';
 
 export const dynamic = 'force-dynamic';
 
-const ENDING_LABEL: Record<string, string> = {
-  ascension: '승천',
-  revolution: '혁명',
-  harmony: '조화',
-  fall: '몰락',
-  petrification: '석화',
-  sylvan_bond: '숲의 유대',
-};
 
 export default async function FeedbackNoteDetailPage({
   params,
@@ -38,7 +31,7 @@ export default async function FeedbackNoteDetailPage({
   }
   if (!note || note.isDeleted || note.ownerEmail !== owner.email) notFound();
 
-  const endingLabel = ENDING_LABEL[note.endingId] ?? note.endingId;
+  const label = endingLabel(note.endingId);
   // #90 — 어떤 문체로 읽은 회차인지. 노트가 인용한 문장의 출처를 짚을 수 있다.
   //   옛 노트에는 없으므로 그때만 표기를 생략한다.
   const voiceLabel = note.voice ? tabLabel(note.voice) : null;
@@ -51,7 +44,7 @@ export default async function FeedbackNoteDetailPage({
 
       <header className="mt-3 mb-6">
         <div className="text-xs text-gray-400">
-          #{note.runIndex} · {endingLabel} · {note.status}
+          #{note.runIndex} · {label} · {note.status}
           {voiceLabel && <> · 문체 {voiceLabel}</>}
         </div>
         <h1 className="text-2xl font-bold mt-1">{note.title || '(제목 없음)'}</h1>

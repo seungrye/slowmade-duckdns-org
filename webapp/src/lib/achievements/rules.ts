@@ -14,8 +14,14 @@ import type { AchievementStats, Evaluation } from './types';
  * 새 업적을 넣으려면 `definitions.ts` 에 한 줄, 여기에 한 줄이면 끝이다.
  */
 
-/** 웹어드벤처 엔딩 (실측 2026: 6종). 수집형 업적의 분모다. */
-export const ENDING_IDS = ['ascension', 'fall', 'harmony', 'petrification', 'revolution', 'sylvan_bond'] as const;
+/**
+ * 웹어드벤처 엔딩 — 수집형 업적의 분모. 목록은 types 가 원본이다 (#352).
+ *
+ * 예전엔 여기에 6종을 손으로 적어 뒀다. 엔딩이 11종이 된 뒤에도 이 값이 6이라
+ * 「모든 엔딩」 업적이 실제보다 일찍 열렸다. 다시 어긋나지 않게 다시 내보내기만 한다.
+ */
+export { ENDING_IDS } from '@/types/web-adventure';
+import { ENDING_IDS } from '@/types/web-adventure';
 
 /** 주인공 (실측 2026: 3명). */
 export const PROTAGONISTS = ['kael', 'rin', 'solwen'] as const;

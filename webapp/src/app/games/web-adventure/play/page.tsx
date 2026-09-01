@@ -328,11 +328,34 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         character: state.character,
       }),
     })
-      .then((res) => {
-        if (res.ok) setRunIndex((n) => n + 1);
+      .then(async (res) => {
+        if (res.ok) {
+          setRunIndex((n) => n + 1);
+          return;
+        }
+        // #352 — **실패를 삼키지 않는다.** 예전엔 `if (res.ok)` 뿐이라 서버가 거절해도
+        //   아무 흔적이 없었다. 실제로 엔딩 5종이 스키마 enum 에 빠져 전부 500 이었는데
+        //   플레이어에게도 로그에도 안 남아 2주 넘게 몰랐다. 회차 기록이 사라지면
+        //   피드백 노트·갤러리·업적이 통째로 날아간다.
+        const detail = await res.json().catch(() => null);
+        const reason = detail?.message ?? `HTTP ${res.status}`;
+        console.error("[web-adventure] 회차 저장 실패 — 기록이 남지 않았다:", reason);
+        logAdvEvent("ending_save_failed", {
+          ending_id: state.endingId,
+          run_index: runIndex,
+          status: res.status,
+          reason: String(reason).slice(0, 120),
+        });
       })
-      .catch(() => {
-        /* 네트워크/auth 실패 silent — 다음 게임 시작 시 save 갱신으로 회복 */
+      .catch((err) => {
+        // 네트워크 단절 — 여기서만은 회복 가능성이 있다(다음 게임 시작 시 save 갱신).
+        console.error("[web-adventure] 회차 저장 요청 자체가 실패했다:", err);
+        logAdvEvent("ending_save_failed", {
+          ending_id: state.endingId,
+          run_index: runIndex,
+          status: 0,
+          reason: "network",
+        });
       });
   }, [state, runIndex]);
 

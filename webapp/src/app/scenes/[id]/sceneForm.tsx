@@ -11,15 +11,8 @@ import {
   tabLabel,
 } from "@/lib/web-adventure/scene-body-tabs";
 
-// #253 〈에테르니아〉 — CMS 의 endingId 드롭다운.
-const ENDING_IDS: NonNullable<Scene["endingId"]>[] = [
-  "ascension",
-  "revolution",
-  "harmony",
-  "fall",
-  "petrification",
-  "sylvan_bond",
-];
+// CMS 의 endingId 드롭다운 — 목록은 types 가 원본 (#352).
+import { ENDING_IDS } from "@/types/web-adventure";
 
 const inputCls = "w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800";
 

@@ -41,14 +41,9 @@ export interface FeedbackNoteResult {
 // shim 이 n_predict 를 자동 클램프하므로 크래시 없이 graceful 하게 줄어든다.
 export const MAX_LOG_CHARS = 32000;
 
-export const ENDING_LABEL: Record<string, string> = {
-  ascension: '승천',
-  revolution: '혁명',
-  harmony: '조화',
-  fall: '몰락',
-  petrification: '석화',
-  sylvan_bond: '숲의 유대',
-};
+// 엔딩 짧은 이름은 content 가 원본 (#352). 여기 있던 사본은 제거했다.
+export { ENDING_LABEL, endingLabel } from '@/content/web-adventure/endings';
+import { endingLabel } from '@/content/web-adventure/endings';
 
 /** 로그 문자열 배열을 예산 안으로 절삭. 초과 시 앞 60% + 뒤 40% 를 남기고 중략 표시. */
 export function truncateLog(log: string[], maxChars = MAX_LOG_CHARS): string {
@@ -66,7 +61,7 @@ export function buildMessages(
   input: FeedbackNoteInput,
   opts: { echoToken?: string } = {},
 ): Array<{ role: string; content: string }> {
-  const endingLabel = ENDING_LABEL[input.endingId] ?? input.endingId;
+  const label = endingLabel(input.endingId);
   const c = input.character ?? {};
   const charLine = [
     c.protagonist ? `주인공: ${c.protagonist}` : null,
@@ -118,7 +113,7 @@ export function buildMessages(
   })();
 
   const user = [
-    `엔딩: ${endingLabel} (${input.endingId})`,
+    `엔딩: ${label} (${input.endingId})`,
     charLine ? `캐릭터: ${charLine}` : '',
     input.scenePath.length ? `씬 경로(${input.scenePath.length}): ${input.scenePath.join(' → ')}` : '',
     '',

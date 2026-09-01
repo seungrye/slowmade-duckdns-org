@@ -1,6 +1,6 @@
 // 〈에테르니아의 추락〉 엔딩 메타 (#253 리프래시).
 //
-// 6 엔딩 — 천체 마법공학 다크 에픽 톤. 한국어 에필로그 200-400 자.
+// 엔딩 메타 — 한국어 에필로그 200-400 자. 목록은 types/web-adventure 의 ENDING_IDS 가 원본(#352).
 //
 // EndingId 는 types/web-adventure.ts 에서 단일 정의 (mongoose enum 과 동기).
 
@@ -18,6 +18,40 @@ export type EndingMeta = {
    */
   aftermath: string;
 };
+
+/**
+ * 엔딩 짧은 이름 — 노트 제목·목록·상세가 함께 쓴다.
+ *
+ * `Record<EndingId, …>` 라 **엔딩을 더하면 여기서 타입 에러가 난다** (#352). 예전엔
+ * `Record<string, …>` 사본이 화면 두 곳과 lib 에 각각 있었고, 새 엔딩이 어디에도 없어
+ * 화면에 id 가 그대로 노출됐다.
+ *
+ * 여기 있는 이유: 이 파일은 순수 데이터라 **서버·클라이언트 어디서든 import 해도 안전**하다.
+ * feedback-note.ts 는 node:crypto·undici 를 물고 있어 클라이언트가 못 가져간다.
+ */
+export const ENDING_LABEL: Record<EndingId, string> = {
+  ascension: "승천",
+  revolution: "혁명",
+  harmony: "조화",
+  fall: "몰락",
+  petrification: "석화",
+  sylvan_bond: "숲의 유대",
+  liberation: "해방",
+  usurpation: "찬탈",
+  regency: "권좌",
+  purge: "숙청",
+  wayfarer: "여로",
+};
+
+/**
+ * DB 에서 온 문자열로 라벨을 찾는다. 모르는 값이면 그대로 돌려준다.
+ *
+ * ENDING_LABEL 은 `Record<EndingId, …>` 라 완전성이 강제되지만, past-run·노트의 endingId 는
+ * 저장된 문자열이라 타입이 좁혀지지 않는다. 그 캐스팅을 화면마다 흩지 않고 여기서 한 번만 한다.
+ */
+export function endingLabel(id: string): string {
+  return ENDING_LABEL[id as EndingId] ?? id;
+}
 
 export const endingsMeta: Record<EndingId, EndingMeta> = {
   ascension: {

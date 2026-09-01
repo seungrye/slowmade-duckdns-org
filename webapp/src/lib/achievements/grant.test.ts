@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ENDING_IDS } from '@/types/web-adventure';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/achievement', () => ({ default: { findOneAndUpdate: vi.fn() } }));
@@ -60,13 +61,15 @@ describe('evaluateAndGrant', () => {
   });
 
   it('과거 기록이 쌓여 있으면 한꺼번에 열린다 — 소급 부여', async () => {
-    // 실제 사용자: 글 174 · 덧글 98 · 웹어드벤처 405 · 엔딩 6종 · 롬 16 · 세이브 7
+    // 실제 사용자: 글 174 · 덧글 98 · 웹어드벤처 405 · 롬 16 · 세이브 7.
+    //   엔딩은 WA_ENDING_ALL 이 열리는지 보는 케이스라 전 종류를 넣는다(#352 — 숫자를
+    //   박아 두면 엔딩이 늘 때 이 테스트가 조용히 뜻을 잃는다).
     mockStats.mockResolvedValue(
       stats({
         postCount: 174,
         commentCount: 98,
         waRunCount: 405,
-        waEndings: ['ascension', 'fall', 'harmony', 'petrification', 'revolution', 'sylvan_bond'],
+        waEndings: [...ENDING_IDS],
         waProtagonists: ['kael', 'rin', 'solwen'],
         retroRomCount: 16,
         retroSaveCount: 7,
