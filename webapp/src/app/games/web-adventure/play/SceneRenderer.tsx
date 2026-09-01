@@ -6,7 +6,7 @@ import type { Character, PendingRoll, Scene } from "@/types/web-adventure";
 import ChoiceList from "./ChoiceList";
 import { pickDisplayedChoices } from "@/lib/web-adventure/engine/choiceSample";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
-import { parseScript } from "@/lib/web-adventure/script";
+import { parseScript, revealSchedule, varsByParagraph } from "@/lib/web-adventure/script";
 import { stigmaVars } from "@/lib/web-adventure/stigma-sense";
 import { AudioBus } from "./audio-bus";
 import {
@@ -136,21 +136,21 @@ export default function SceneRenderer({
   // 언마운트(플레이 종료) 시 BGM 정지.
   useEffect(() => () => bus.dispose(), [bus]);
 
+  // 문단이 열릴 시각 — <<wait>> 을 반영한 누적 일정 (#321).
+  const 일정 = useMemo(() => revealSchedule(scene.body, STEP_MS), [scene.body]);
+
   // 문단 순차 reveal — 타이머 기반.
   useEffect(() => {
     if (skipAll || skipSequential || total === 0) {
       setRevealCount(total);
       return;
     }
+    // 등간격이 아니라 **문단별 일정**으로 연다 (#321). <<wait 600>> 이 있으면 그 문단
+    // 뒤부터 600ms 씩 밀린다 — 예전엔 setInterval 고정이라 wait 이 무시됐다.
     setRevealCount(1);
-    let n = 1;
-    const id = window.setInterval(() => {
-      n += 1;
-      setRevealCount(n);
-      if (n >= total) window.clearInterval(id);
-    }, STEP_MS);
-    return () => window.clearInterval(id);
-  }, [scene.id, skipSequential, skipAll, total]);
+    const ids = 일정.slice(1).map((at, j) => window.setTimeout(() => setRevealCount(j + 2), at));
+    return () => ids.forEach((id) => window.clearTimeout(id));
+  }, [scene.id, skipSequential, skipAll, total, 일정]);
 
   // ChoiceList 표시 — 모든 문단 노출 후 한 박자 뒤.
   useEffect(() => {
@@ -172,6 +172,10 @@ export default function SceneRenderer({
     () => ({ ...stigmaVars(character.stigmaErosion), ...(character.variables ?? {}) }),
     [character.stigmaErosion, character.variables],
   );
+
+  // 문단별 변수 묶음 — bodyVars 를 밑에 깔고 본문 <<set>> 을 문단마다 누적한다 (#321).
+  // set 이 든 문단 **자신부터** 새 값이다. 씬이 바뀌면 본문도 바뀌므로 scene.body 의존.
+  const varsByPara = useMemo(() => varsByParagraph(scene.body, bodyVars), [scene.body, bodyVars]);
 
   useEffect(() => {
     if (fxSceneRef.current !== scene.id) {
@@ -258,7 +262,8 @@ export default function SceneRenderer({
         {scene.body.slice(0, revealCount).map((p, i) => {
           // {{변수}} 치환 + << 디렉티브 >> 분리. 표시 텍스트는 <p>, <<img>> 는 블록 삽화로.
           // (오디오/화면효과 디렉티브 재생은 후속 태스크 — 여기선 표시에 영향 없음.)
-          const segs = parseScript(p, bodyVars);
+          // #321 — 문단별 varsByPara[i] 로 본문 <<set>> 이 그 문단부터 보이게.
+          const segs = parseScript(p, varsByPara[i]);
           const texts = segs.filter((s) => s.kind === "text");
           const imgs = segs.filter((s) => s.kind === "directive" && s.cmd === "img");
           return (
