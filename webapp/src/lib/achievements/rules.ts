@@ -23,8 +23,12 @@ import type { AchievementStats, Evaluation } from './types';
 export { ENDING_IDS } from '@/types/web-adventure';
 import { ENDING_IDS } from '@/types/web-adventure';
 
-/** 주인공 (실측 2026: 3명). */
-export const PROTAGONISTS = ['kael', 'rin', 'solwen'] as const;
+/**
+ * 주인공 — 수집형 업적의 분모. 목록은 types 가 원본이다 (#354).
+ * 엔딩(ENDING_IDS)과 같은 이유로 여기에 따로 적지 않는다.
+ */
+export { PROTAGONIST_IDS as PROTAGONISTS } from '@/types/web-adventure';
+import { PROTAGONIST_IDS as PROTAGONISTS } from '@/types/web-adventure';
 
 /** 판정에 쓰는 전부 0/빈 상태. 테스트와 신규 사용자의 출발점. */
 export function emptyStats(): AchievementStats {

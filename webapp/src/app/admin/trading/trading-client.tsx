@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { LIVE_STRATEGY_IDS, LIVE_STRATEGY_LABEL, isLiveStrategy, type LiveStrategyId } from "@/types/trading";
 
 /**
  * 자동매매 설정 — 계정(다수)·포트폴리오 블록·wire 토글·실행 이력.
@@ -38,14 +39,16 @@ const CRED_FIELDS: Record<string, { key: string; label: string; required: boolea
     { key: "accountSeq", label: "TOSS_ACCOUNT_SEQ (생략 시 자동)", required: false },
   ],
 };
-const DEFAULT_CONFIG: Record<string, object> = {
+// #354 — Record<LiveStrategyId, …> 라 전략을 더하면 여기서 컴파일이 깨진다.
+//   예전엔 Record<string, …> 라 빠뜨려도 조용히 빈 config 가 됐다.
+const DEFAULT_CONFIG: Record<LiveStrategyId, object> = {
   lrs_v1: { signal: "QQQ", target: "TQQQ", sma: 200, band: 1 },
   rotation_v1: { signal: "QQQ", sma: 200, band: 1, mom: 126, rebalance: 63 },
   trend_v1: { universe: ["TQQQ", "QQQ"], shortMa: 20, longMa: 60, positionSize: 0.1 },
   infinite_v4: { symbol: "TQQQ", principal: 10000, splits: 20, starBase: 15, sellTarget: 15 },
   value_rebalancing: { symbol: "TQQQ", principal: 10000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5, cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0 },
 };
-const DEFAULT_RUN_AT: Record<string, { kr: string; us: string }> = {
+const DEFAULT_RUN_AT: Record<LiveStrategyId, { kr: string; us: string }> = {
   lrs_v1: { kr: "09:05", us: "09:35" },
   rotation_v1: { kr: "09:05", us: "09:35" },
   trend_v1: { kr: "15:40", us: "09:35" },
@@ -73,7 +76,8 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
   // 포트폴리오 편집 폼
   const [pAccount, setPAccount] = useState("");
   const [pMarket, setPMarket] = useState<"kr" | "us">("us");
-  const [pStrategy, setPStrategy] = useState("lrs_v1");
+  // 전략 상태를 처음부터 좁혀 둔다 (#354) — 화면 곳곳에서 캐스팅하지 않으려고.
+  const [pStrategy, setPStrategy] = useState<LiveStrategyId>("lrs_v1");
   const [pRunAt, setPRunAt] = useState("09:35");
   const [pConfig, setPConfig] = useState(JSON.stringify(DEFAULT_CONFIG.lrs_v1, null, 2));
 
@@ -135,7 +139,8 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     setPEditing(p.id);
     setPAccount(p.accountId);
     setPMarket(p.market);
-    setPStrategy(p.strategy);
+    // DB 에서 온 문자열 — 경계에서 한 번만 좁힌다. 모르는 값이면 기본 전략으로.
+    setPStrategy(isLiveStrategy(p.strategy) ? p.strategy : "lrs_v1");
     setPRunAt(p.runAt);
     setPConfig(JSON.stringify(p.config, null, 2));
     setPReserved(p.reservedCash ? String(p.reservedCash) : "");
@@ -406,16 +411,15 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
               <option value="kr">국장</option>
             </select>
             <select value={pStrategy} onChange={(e) => {
-              const st = e.target.value;
+              const st = e.target.value as LiveStrategyId; // 목록이 단일 출처라 항상 유효하다
               setPStrategy(st);
               setPConfig(JSON.stringify(DEFAULT_CONFIG[st] ?? {}, null, 2));
               setPRunAt(DEFAULT_RUN_AT[st]?.[pMarket] ?? "09:35");
             }} className={inputCls + " !w-40"}>
-              <option value="lrs_v1">LRS</option>
-              <option value="rotation_v1">모멘텀 로테이션</option>
-              <option value="trend_v1">추세추종</option>
-              <option value="infinite_v4">무한매수 V4</option>
-              <option value="value_rebalancing">밸류리밸런싱 VR</option>
+              {/* 목록을 손으로 적지 않는다 (#354) — 모델 enum 과 어긋나면 고른 전략이 400 이 난다. */}
+              {LIVE_STRATEGY_IDS.map((id) => (
+                <option key={id} value={id}>{LIVE_STRATEGY_LABEL[id]}</option>
+              ))}
             </select>
             {/* 이 블록이 쓸 현금 (#339). 비우면 전액 — 블록이 하나뿐이면 예전과 같다. */}
             <input value={pReserved} onChange={(e) => setPReserved(e.target.value)}

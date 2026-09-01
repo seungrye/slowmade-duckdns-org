@@ -7,6 +7,7 @@ import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
 import TradingPortfolioRevision from "@/models/trading-portfolio-revision";
 import { snapshotOf, changedKeys } from "@/lib/trading/portfolio-revision";
+import { LIVE_STRATEGY_IDS, isLiveStrategy } from "@/types/trading";
 
 /**
  * 설정이 바뀐 순간의 값을 한 줄 남긴다 (#350).
@@ -87,8 +88,9 @@ export async function POST(req: NextRequest) {
   if (!["kr", "us"].includes(market)) {
     return NextResponse.json({ error: "market 은 kr|us" }, { status: 400 });
   }
-  if (!["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4", "value_rebalancing"].includes(strategy)) {
-    return NextResponse.json({ error: "strategy 는 lrs_v1|rotation_v1|trend_v1|infinite_v4|value_rebalancing" }, { status: 400 });
+  // #354 — 목록과 에러 메시지가 각각 문자열을 들고 있었다. 이제 둘 다 단일 출처에서 나온다.
+  if (!isLiveStrategy(strategy)) {
+    return NextResponse.json({ error: `strategy 는 ${LIVE_STRATEGY_IDS.join("|")}` }, { status: 400 });
   }
   const runAt = String(body.runAt ?? (market === "kr" ? "09:05" : "09:35"));
   if (!/^\d{2}:\d{2}$/.test(runAt)) {
