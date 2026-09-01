@@ -210,6 +210,14 @@ export interface ValueRebalancingConfig {
   cycleDays: number; // 사이클 길이(거래일, 기본 10 = 2주)
   initStockRatio?: number; // 초기 주식:Pool 비율(기본 0.85 = 85:15). 원문 미규정 — 평형 현금비중 근사
   cashflow?: number; // 사이클당 현금흐름 CF: 양수=적립, 음수=인출, 0/미지정=거치
+  /**
+   * V 갱신 공식 (#358). **안 적으면 실력공식**(문서 기준).
+   *
+   * - `skill` — `V₁ + Pool/G + (E−V₁)/(2√G) + CF`. 목표선이 실제 평가금을 일부 따라간다.
+   * - `basic` — `V₁ + Pool/G + CF`. 시장과 무관하게 기계적으로 오른다. 긴 하락장에서
+   *   Pool 을 다 태우고 V 가 멈추는 존버모드에 빠진다. 예전 블록 재현용으로 남긴다.
+   */
+  formula?: "basic" | "skill";
   feeRate?: number; // 편도 수수료+슬리피지
   from?: string;
   to?: string;

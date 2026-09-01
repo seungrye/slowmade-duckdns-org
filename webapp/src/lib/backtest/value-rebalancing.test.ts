@@ -125,10 +125,12 @@ describe("VR applyVRFill — 체결 장부 반영", () => {
   });
 });
 
-describe("VR advanceCycleVR — 사이클 경계 V 갱신", () => {
+// 이 describe 는 **기본공식**의 원문 예시다. 기본값은 실력공식이므로(#358) 여기서는
+// formula 를 명시해 예시를 그대로 재현한다 — 실력공식 쪽은 vr-skill-formula.test.ts.
+describe("VR advanceCycleVR — 사이클 경계 V 갱신 (기본공식)", () => {
   it("원문 예시: V9000·Pool1000·G10·CF250 → V9350·Pool1250·budget=u×1250·sinceCycle0", () => {
     const st = { qty: 50, pool: 1000, V: 9000, buyBudget: 111, sinceCycle: 5, cumBuy: 0, cumSell: 0 };
-    const s = advanceCycleVR(st, { ...VCFG, cashflow: 250 });
+    const s = advanceCycleVR(st, { ...VCFG, cashflow: 250, formula: "basic" }, 180);
     expect(s.V).toBe(9350);
     expect(s.pool).toBe(1250);
     expect(s.buyBudget).toBe(0.5 * 1250);
@@ -136,7 +138,7 @@ describe("VR advanceCycleVR — 사이클 경계 V 갱신", () => {
   });
   it("거치(CF=0): V += Pool/G, pool 불변", () => {
     const st = { qty: 50, pool: 1000, V: 9000, buyBudget: 0, sinceCycle: 5, cumBuy: 0, cumSell: 0 };
-    const s = advanceCycleVR(st, VCFG);
+    const s = advanceCycleVR(st, { ...VCFG, formula: "basic" }, 180);
     expect(s.V).toBe(9100);
     expect(s.pool).toBe(1000);
   });
