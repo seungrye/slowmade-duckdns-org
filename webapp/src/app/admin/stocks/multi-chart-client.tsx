@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { strategyLabel, strategyMarker } from "@/types/trading-marker";
 import { useRouter, useSearchParams } from "next/navigation";
 import ReactECharts from "echarts-for-react";
 import type { EChartsOption } from "echarts";
@@ -338,10 +339,10 @@ export default function MultiChartClient({ stocks }: Props) {
 
       // 매매 마커 — 색=매수(빨강)/매도(파랑), 모양=전략(무한매수 v1 ▲ / 추세 ◆ / 기타 ●).
       // 전략별로 scatter series 를 나눠 모양과 툴팁으로 구분한다. legend 엔 종목 line 만 노출.
-      const stratSymbol = (s?: string) =>
-        s === "infinite_v1" ? "triangle" : s === "trend_v1" ? "diamond" : "circle";
-      const stratLabel = (s?: string) =>
-        s === "infinite_v1" ? "무한매수 v1" : s === "trend_v1" ? "추세추종 v1" : "기타";
+      // 매핑은 types/trading-marker 가 원본이다 (#367). 여기서 직접 비교하던 시절엔
+      // 전략이 늘어도 아무도 안 고쳐서, infinite_v4 145건이 전부 "기타 ○" 로 그려졌다.
+      const stratSymbol = strategyMarker;
+      const stratLabel = strategyLabel;
       type MarkerPoint = { value: [string, number]; qty: number; cum: number };
       const pushMarkers = (action: "buy" | "sell", clr: string, krLabel: string) => {
         const group: Record<string, MarkerPoint[]> = {};
