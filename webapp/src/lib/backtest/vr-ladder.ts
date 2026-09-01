@@ -27,8 +27,14 @@ export interface VRLadderRung {
   poolAfter: number;
 }
 
-/** 사다리를 무한정 만들지 않기 위한 상한. 실제로는 예산·보유가 먼저 걸린다. */
-const MAX_RUNGS = 200;
+/**
+ * 한 사다리의 최대 칸 수.
+ *
+ * 문서 사례는 25~96주라 1주씩으로 6~11칸이면 끝난다. 그런데 분할조정된 저가 종목이면
+ * 같은 원금이 수십만 주가 되어 1주씩으로는 수만 칸이 필요하다 — 현실에서도 주문을 그렇게
+ * 낼 수 없다. 그래서 칸당 수량(`lot`)을 호출측이 키울 수 있게 두고, 여기서는 방어 상한만.
+ */
+const MAX_RUNGS = 500;
 
 /**
  * 매수 사다리 — 밴드 하단을 향해 1주씩.
@@ -38,8 +44,13 @@ const MAX_RUNGS = 200;
  */
 export function vrBuyLadder(args: {
   low: number; qty: number; pool: number; budget: number;
+  /** 칸당 주수. 문서는 1주씩이다. 보유가 커서 1주씩이 비현실적일 때만 키운다. */
+  lot?: number;
+  /** 칸 수 상한. ladderLot 의 추정만으로는 한 칸쯤 넘칠 수 있어 여기서 못 박는다. */
+  maxRungs?: number;
 }): VRLadderRung[] {
   const { low, qty, pool, budget } = args;
+  const lot = Math.max(1, Math.floor(args.lot ?? 1));
   // 밴드하단 ÷ 보유수 이므로 보유가 0 이면 정의되지 않는다. 첫 진입은 seedVR 의 몫이다.
   if (!(low > 0) || qty < 1) return [];
 
@@ -47,13 +58,15 @@ export function vrBuyLadder(args: {
   let n = qty;
   let 남은Pool = pool;
   let 남은예산 = budget;
-  while (out.length < MAX_RUNGS) {
+  const 상한 = Math.min(args.maxRungs ?? MAX_RUNGS, MAX_RUNGS);
+  while (out.length < 상한) {
     const price = low / n;
+    const 대금 = price * lot;
     // 다음 칸을 Pool 도 한도도 감당해야 건다. 못 걸면 거기서 끝이다.
-    if (!(price > 0) || price > 남은Pool || price > 남은예산) break;
-    남은Pool -= price;
-    남은예산 -= price;
-    n += 1;
+    if (!(price > 0) || 대금 > 남은Pool || 대금 > 남은예산) break;
+    남은Pool -= 대금;
+    남은예산 -= 대금;
+    n += lot;
     out.push({ qtyAfter: n, price, poolAfter: 남은Pool });
   }
   return out;
@@ -67,19 +80,42 @@ export function vrBuyLadder(args: {
  */
 export function vrSellLadder(args: {
   high: number; qty: number; pool: number; maxRungs?: number;
+  /** 칸당 주수. 매수와 같은 이유로 둔다. */
+  lot?: number;
 }): VRLadderRung[] {
   const { high, qty, pool } = args;
   if (!(high > 0) || qty < 1) return [];
 
-  const 칸수 = Math.min(qty, args.maxRungs ?? qty, MAX_RUNGS);
+  const lot = Math.max(1, Math.floor(args.lot ?? 1));
+  const 칸수 = Math.min(Math.floor(qty / lot), args.maxRungs ?? qty, MAX_RUNGS);
   const out: VRLadderRung[] = [];
   let n = qty;
   let 남은Pool = pool;
   for (let i = 0; i < 칸수; i++) {
     const price = high / n;
-    남은Pool += price;
-    n -= 1;
+    남은Pool += price * lot;
+    n -= lot;
     out.push({ qtyAfter: n, price, poolAfter: 남은Pool });
   }
   return out;
+}
+
+/**
+ * 칸당 주수 — 문서는 **1주씩**이다 (#360).
+ *
+ * 그런데 분할조정된 저가 종목이면 같은 예산이 수만 칸이 된다(실측: TQQQ 2011년 20,161칸).
+ * 현실에서도 주문을 그렇게 못 내므로, 사다리가 `maxRungs` 안에 들어오도록 칸을 키운다.
+ *
+ * **보유량이 아니라 "필요한 칸 수"로 정한다.** 보유량으로 잡으면 문서의 4기(85주 보유,
+ * 11칸을 1주씩)에서도 7주씩이 되어 문서와 어긋난다.
+ */
+export function ladderLot(args: {
+  low: number; qty: number; budget: number; maxRungs: number;
+}): number {
+  const { low, qty, budget, maxRungs } = args;
+  if (!(low > 0) || qty < 1 || !(budget > 0) || maxRungs < 1) return 1;
+  const 첫칸가 = low / qty;
+  if (!(첫칸가 > 0)) return 1;
+  const 대략칸수 = Math.floor(budget / 첫칸가);
+  return Math.max(1, Math.ceil(대략칸수 / maxRungs));
 }
