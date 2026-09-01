@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { strategyLabel } from "@/types/trading-marker";
 import { useRouter } from "next/navigation";
 import { envLabel } from "@/lib/env-label";
 import { useDragScrollX } from "@/hooks/use-drag-scroll";
@@ -30,6 +31,8 @@ type PortfolioResponse = {
   env: string;
   currency: "KRW" | "USD";
   history: HistoryPoint[];
+  /** 블록(전략)별 자산 곡선 (#367). 한 계정·한 시장에 블록이 여럿일 때 구분해 보여준다. */
+  blocks?: { portfolioId: string; strategy: string; history: HistoryPoint[] }[];
   tradesByDate: Record<string, TradeStats>;
 };
 
@@ -145,6 +148,18 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
       return lines.join("<br/>");
     };
 
+    const 블록색 = ["#9333ea", "#0891b2", "#ca8a04", "#db2777", "#4d7c0f"];
+    const blockLines = (data.blocks ?? []).map((b, i) => ({
+      type: "line" as const,
+      name: `${strategyLabel(b.strategy)} 총액`,
+      // 계좌 곡선과 x 축을 맞춘다. 그 블록이 아직 없던 날은 빈 값으로 둔다.
+      data: dates.map((d) => new Map(b.history.map((h) => [h.dateStr, h.totalValue])).get(d) ?? null),
+      connectNulls: false,
+      showSymbol: false,
+      lineStyle: { color: 블록색[i % 블록색.length], width: 1.5 },
+      itemStyle: { color: 블록색[i % 블록색.length] },
+    }));
+
     const series: ESeries = [
       {
         type: "line",
@@ -171,7 +186,12 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
         lineStyle: { color: "#ea580c", width: 1.5, type: "dashed" },
         itemStyle: { color: "#ea580c" },
       },
+      // 블록(전략)별 총액 선 (#367). 계좌 선과 **함께** 그린다 — 블록 장부의 합이 계좌와
+      // 안 맞을 수 있는데(예약을 넘겨 잡은 블록), 나란히 놓여야 그게 눈에 띈다.
+      // 블록이 하나뿐이면 계좌 선과 겹치므로 그리지 않는다.
+      ...(blockLines.length > 1 ? blockLines : []),
     ];
+
 
     if (buyOnly.length) {
       series.push({

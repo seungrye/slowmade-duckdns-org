@@ -57,14 +57,43 @@ export type TradeStats = {
   sellTickers: string[];
 };
 
+/** 블록(전략) 하나의 자산 곡선 (#367). */
+export type BlockSeries = {
+  portfolioId: string;
+  strategy: string;
+  history: HistoryPoint[];
+};
+
 export type PortfolioData = {
   env: Env;
   currency: Currency;
   history: HistoryPoint[];
+  /** 계정·시장에 블록이 여럿일 때 블록마다 한 줄 (#367). 하나뿐이면 빈 배열이어도 무방. */
+  blocks: BlockSeries[];
   tradesByDate: Record<string, TradeStats>;
 };
 
 type HistDoc = HistoryPoint & Record<string, unknown>;
+type BlockDoc = HistDoc & { portfolioId: unknown; strategy?: string };
+
+/**
+ * 블록 행을 블록별로 묶는다(순수). 같은 날 중복은 계좌 행과 같은 규칙으로 마지막 것만.
+ *
+ * 블록이 하나뿐이면 굳이 선을 더 그릴 이유가 없지만, 그 판단은 화면이 한다 —
+ * 여기서 걸러 버리면 "왜 안 보이지" 를 또 코드에서 찾아야 한다.
+ */
+export function groupBlocks(docs: BlockDoc[]): BlockSeries[] {
+  const by = new Map<string, BlockDoc[]>();
+  for (const d of docs) {
+    const id = String(d.portfolioId);
+    (by.get(id) ?? by.set(id, []).get(id)!).push(d);
+  }
+  return [...by.entries()].map(([portfolioId, rows]) => ({
+    portfolioId,
+    strategy: rows[rows.length - 1]?.strategy ?? "",
+    history: dedupeHistory(rows),
+  }));
+}
 type TradeDoc = {
   ticker: string;
   action?: string;
@@ -121,8 +150,18 @@ export function aggregateTradesByDate(trades: TradeDoc[]): Record<string, TradeS
  */
 export async function getPortfolioData(env: Env, currency: Currency): Promise<PortfolioData> {
   await connectToDB();
-  const histDocs = await PortfolioHistory.find({ env, currency, hidden: { $ne: true } })
+  // 계좌 행만 (#367) — 블록 행은 portfolioId 가 있다. 없는 옛 문서도 여기 걸린다.
+  const histDocs = await PortfolioHistory.find({
+    env, currency, hidden: { $ne: true }, portfolioId: null,
+  })
     .select({ date: 1, dateStr: 1, totalValue: 1, cash: 1, holdingsValue: 1, cumulativePnl: 1, _id: 0 })
+    .sort({ date: 1 })
+    .lean();
+  // 블록 행 — 블록마다 한 줄씩 그린다.
+  const blockDocs = await PortfolioHistory.find({
+    env, currency, hidden: { $ne: true }, portfolioId: { $ne: null },
+  })
+    .select({ date: 1, dateStr: 1, totalValue: 1, cash: 1, holdingsValue: 1, portfolioId: 1, strategy: 1, _id: 0 })
     .sort({ date: 1 })
     .lean();
   const trades = await StockTrade.find({ env, currency, hidden: { $ne: true } })
@@ -133,6 +172,7 @@ export async function getPortfolioData(env: Env, currency: Currency): Promise<Po
     env,
     currency,
     history: dedupeHistory(histDocs as unknown as HistDoc[]),
+    blocks: groupBlocks(blockDocs as unknown as BlockDoc[]),
     tradesByDate: aggregateTradesByDate(trades as unknown as TradeDoc[]),
   };
 }
