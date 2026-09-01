@@ -76,14 +76,6 @@ const gameLinks = [
                 authOnly: true,
                 ownerOnly: true,
             },
-            {
-                href: "/scenes/status",
-                label: "서버 상태",
-                description: "로컬 LLM/서버 상태 (읽기 전용)",
-                icon: <Server size={20} />,
-                authOnly: true,
-                ownerOnly: true,
-            },
         ],
     },
     {
@@ -100,6 +92,33 @@ const gameLinks = [
                 icon: <Joystick size={20} />,
                 authOnly: true,
                 ownerOnly: false,
+            },
+        ],
+    },
+    {
+        /**
+         * 서버 상태는 특정 게임의 것이 아니라 로컬 LLM·서버 전반이라, 게임 메뉴 **바로
+         * 아래 평탄한 항목**으로 둔다 (#316). 예전엔 "에테르니아의 추락" 하위에 묻혀
+         * 있어서 두 번 눌러야 했다.
+         *
+         * 하위가 하나뿐인 묶음은 이름 자체가 그 링크로 그려진다(#51). 그래서 JSX 를
+         * 안 고치고 데이터만으로 평탄해진다.
+         *
+         * **맨 끝에 둔다** — 앞에 끼우면 모바일 기본 펼침 대상(`gameLinks[0].key`)이
+         * 바뀐다.
+         */
+        key: "server-status",
+        label: "서버 상태",
+        description: "로컬 LLM/서버 상태 (읽기 전용)",
+        icon: <Server size={20} />,
+        children: [
+            {
+                href: "/scenes/status",
+                label: "서버 상태",
+                description: "로컬 LLM/서버 상태 (읽기 전용)",
+                icon: <Server size={20} />,
+                authOnly: true,
+                ownerOnly: true,
             },
         ],
     },
