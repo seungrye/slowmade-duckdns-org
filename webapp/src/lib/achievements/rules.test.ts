@@ -75,17 +75,19 @@ describe('웹어드벤처', () => {
   });
 
   describe('수집형 — 세트를 다 채워야 열린다', () => {
-    it('엔딩은 6종을 다 봐야 한다', () => {
-      const five = stats({ waEndings: ENDING_IDS.slice(0, 5) });
-      expect(unlockedKeys(five)).toContain('WA_ENDING_3');
-      expect(unlockedKeys(five)).not.toContain('WA_ENDING_ALL');
+    it('엔딩은 전 종류를 다 봐야 한다', () => {
+      const almost = stats({ waEndings: ENDING_IDS.slice(0, ENDING_IDS.length - 1) });
+      expect(unlockedKeys(almost)).toContain('WA_ENDING_3');
+      // 하나만 모자라도 안 열린다.
+      expect(unlockedKeys(almost)).not.toContain('WA_ENDING_ALL');
 
       expect(unlockedKeys(stats({ waEndings: [...ENDING_IDS] }))).toContain('WA_ENDING_ALL');
     });
 
     it('엔딩 진행도는 본 개수 / 전체', () => {
       const e = byKey(stats({ waEndings: ENDING_IDS.slice(0, 4) }))['WA_ENDING_ALL'];
-      expect(e).toMatchObject({ current: 4, target: 6 });
+      // #352 — target 을 숫자로 박아 두면 엔딩이 늘 때 또 어긋난다. 분모는 상수에서.
+      expect(e).toMatchObject({ current: 4, target: ENDING_IDS.length });
     });
 
     it('주인공 3명을 다 굴려야 한다', () => {

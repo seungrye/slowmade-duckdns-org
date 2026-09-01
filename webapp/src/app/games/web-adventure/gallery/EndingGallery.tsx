@@ -1,6 +1,6 @@
 'use client';
 
-// EndingGallery — Web Adventure 의 6 엔딩 카드 그리드 (#244).
+// EndingGallery — Web Adventure 의 엔딩 카드 그리드 (#244).
 //
 // 도달한 엔딩: icon + title + epilogue + 도달 카운트.
 // 미도달: ❓ + ???. 전체 도달률 표시.
@@ -8,12 +8,18 @@
 
 import { endingsMeta, type EndingId } from '@/content/web-adventure/endings';
 
-// #253 〈에테르니아〉 — 6 엔딩 (좋음 → 나쁨 흐름).
-const ENDING_ORDER: EndingId[] = [
+// 엔딩 전시 순서 (좋음 → 나쁨 흐름). 목록이 빠지면 그 엔딩 카드가 갤러리에 아예 안 나오므로
+// __tests__/ending-ids.test.ts 가 ENDING_IDS 와의 일치를 지킨다 (#352).
+export const ENDING_ORDER: EndingId[] = [
   'harmony',
   'ascension',
   'revolution',
   'sylvan_bond',
+  'liberation',
+  'wayfarer',
+  'regency',
+  'usurpation',
+  'purge',
   'fall',
   'petrification',
 ];

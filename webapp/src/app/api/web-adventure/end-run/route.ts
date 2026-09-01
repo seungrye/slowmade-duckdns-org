@@ -87,6 +87,9 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : '회차 적치 실패';
+    // #352 — 조용히 응답만 돌려주면 어디에도 안 남는다. 엔딩 5종이 enum 에 빠져 모든 완주가
+    //   버려졌을 때 서버 로그가 비어 있어 2주 넘게 몰랐다. 회차 유실은 반드시 남긴다.
+    console.error('[web-adventure] 회차 적치 실패(로그인):', session.user.email, body.endingId, message);
     return apiError(message, 400);
   }
 
@@ -158,6 +161,9 @@ async function endAnonymousRun(
       const dup = err instanceof Error && err.message.includes('E11000');
       if (dup && attempt < 2) continue;
       const message = err instanceof Error ? err.message : '회차 적치 실패';
+      // #352 — 위와 같은 이유로 반드시 남긴다. 비로그인은 되돌릴 save 조차 없어 여기서
+      //   놓치면 그 회차는 영영 사라진다.
+      console.error('[web-adventure] 회차 적치 실패(비로그인):', body.endingId, message);
       return apiError(message, 500);
     }
   }

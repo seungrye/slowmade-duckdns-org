@@ -4,6 +4,9 @@
 // 로 재생성된다 (회차 시스템). 갤러리/통계에 사용.
 
 import { Schema, model, models, Model } from 'mongoose';
+// 엔딩 목록의 단일 출처 (#352). alias(@/) 가 아니라 상대경로다 — 이 모델은 jiti 로 도는
+// scripts/*.mjs(migrate-web-adventure-scenes 등)에서도 로드된다.
+import { ENDING_IDS, type EndingId } from '../types/web-adventure';
 
 const StatsSchema = new Schema(
   {
@@ -42,7 +45,9 @@ const WebAdventurePastRunSchema = new Schema(
     endingId: {
       type: String,
       required: true,
-      enum: ['ascension', 'revolution', 'harmony', 'fall', 'petrification', 'sylvan_bond'],
+      // #352 — 손으로 복사한 목록이었다. 엔딩 5종이 추가됐을 때 여기만 안 따라와서
+      //   그 엔딩으로 끝낸 회차가 전부 검증 실패로 버려졌다. 이제 단일 출처를 쓴다.
+      enum: [...ENDING_IDS],
     },
     finalSceneId: { type: String, required: true },
     // 시작 → 종료까지 거쳐간 씬 id 시퀀스 (경로 분포 통계용). 기존 데이터엔 없음.
@@ -73,7 +78,7 @@ export interface WebAdventurePastRunDoc {
   _id: unknown;
   userEmail: string;
   runIndex: number;
-  endingId: 'ascension' | 'revolution' | 'harmony' | 'fall' | 'petrification' | 'sylvan_bond';
+  endingId: EndingId;
   /** #90 그 회차를 읽은 문체. 미기록이면 빈 문자열. */
   voice?: string;
   finalSceneId: string;

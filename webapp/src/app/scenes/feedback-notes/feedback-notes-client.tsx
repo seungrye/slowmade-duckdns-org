@@ -3,6 +3,7 @@
 // 피드백 노트 목록 UI (owner 전용). 노트는 엔딩 시 자동 생성 — 이 화면은 열람/상태/삭제 + 폴링. (#9, #11)
 
 import { useCallback, useEffect, useState } from "react";
+import { endingLabel } from "@/content/web-adventure/endings";
 import Link from "next/link";
 
 interface NoteItem {
@@ -16,14 +17,6 @@ interface NoteItem {
   createdAt: string;
 }
 
-const ENDING_LABEL: Record<string, string> = {
-  ascension: "승천",
-  revolution: "혁명",
-  harmony: "조화",
-  fall: "몰락",
-  petrification: "석화",
-  sylvan_bond: "숲의 유대",
-};
 
 const STATUS_BADGE: Record<NoteItem["status"], { label: string; cls: string }> = {
   queued: { label: "대기 중", cls: "bg-gray-200 text-gray-700" },
@@ -84,7 +77,7 @@ export default function FeedbackNotesClient({ initialNotes }: { initialNotes: No
                   <div className="flex items-center gap-2">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                     <span className="text-xs text-gray-400">
-                      #{n.runIndex} · {ENDING_LABEL[n.endingId] ?? n.endingId}
+                      #{n.runIndex} · {endingLabel(n.endingId)}
                       {n.sourceUserEmail ? ` · ${n.sourceUserEmail}` : ""}
                     </span>
                   </div>

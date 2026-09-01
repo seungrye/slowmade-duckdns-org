@@ -20,21 +20,35 @@ export type AbilityKey = "lunar" | "selene" | "hecate" | "none";
 /** 주인공 — 3 갈래 시작점. */
 export type Protagonist = "kael" | "rin" | "solwen";
 
-/** 엔딩 6 종 — 에테르니아 리프래시. */
-export type EndingId =
-  | "ascension"
-  | "revolution"
-  | "harmony"
-  | "fall"
-  | "petrification"
-  | "sylvan_bond"
+/**
+ * 엔딩 목록 — **여기가 단일 출처다** (#352).
+ *
+ * 예전엔 이게 타입(union)뿐이었고, mongoose enum·업적 분모·UI 목록은 문자열 배열을 손으로
+ * 복사해 뒀다. #359·#361 이 엔딩 5종을 더할 때 past-run 모델의 enum 만 안 따라와서, 그 5종으로
+ * 끝낸 회차가 전부 검증 실패(500)로 버려졌다 — 피드백 노트·갤러리·업적까지 통째로. 타입은
+ * 런타임 문자열 배열을 못 보니 TypeScript 도 못 잡았고 2주 넘게 몰랐다.
+ *
+ * 그래서 **런타임 배열을 원본으로 두고 타입을 거기서 파생**한다. 엔딩을 더할 땐 이 배열에만
+ * 넣으면 된다 — `Record<EndingId, …>` 로 선언한 맵은 타입 에러로, mongoose enum 은
+ * `lib/web-adventure/__tests__/ending-ids.test.ts` 로 빠짐없이 걸린다.
+ */
+export const ENDING_IDS = [
+  "ascension",
+  "revolution",
+  "harmony",
+  "fall",
+  "petrification",
+  "sylvan_bond",
   /** #359 각성 루트 전용 엔딩 — 옴팔로스를 우회한 독립 스토리의 결말. */
-  | "liberation"
-  | "usurpation"
+  "liberation",
+  "usurpation",
   /** #361 린 각성 루트(신념과 타락) 엔딩. regency=타락 생존, purge=타살死(범용), wayfarer=열린 결말. */
-  | "regency"
-  | "purge"
-  | "wayfarer";
+  "regency",
+  "purge",
+  "wayfarer",
+] as const;
+
+export type EndingId = (typeof ENDING_IDS)[number];
 
 export type Character = {
   stats: Record<StatKey, number>;

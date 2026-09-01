@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { Character, Protagonist, Scene, StatKey } from "@/types/web-adventure";
+import type { Character, EndingId, Protagonist, Scene, StatKey } from "@/types/web-adventure";
 import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
 import { protagonists } from "@/content/web-adventure/protagonists";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
@@ -31,19 +31,29 @@ const STAT_LABELS: Record<StatKey, string> = {
 
 const STAT_ORDER: StatKey[] = ["str", "dex", "int", "cha", "con", "wis"];
 
-/** #253 〈에테르니아〉 — 엔딩별 톤. 다크 판타지 6 색. */
-const ENDING_TONE: Record<string, string> = {
+/**
+ * 엔딩별 톤. `Record<EndingId, …>` 라 엔딩을 더하면 여기서 타입 에러가 난다 (#352).
+ * 예전엔 `Record<string, …>` 라 새 엔딩 5종이 조용히 기본 색으로 떨어졌다.
+ */
+const ENDING_TONE: Record<EndingId, string> = {
   ascension: "bg-indigo-100/70 border-indigo-300",
   revolution: "bg-orange-100/70 border-orange-400",
   harmony: "bg-emerald-100/70 border-emerald-300",
   fall: "bg-gray-200/80 border-gray-400",
   petrification: "bg-slate-200/80 border-slate-400",
   sylvan_bond: "bg-lime-100/70 border-lime-400",
+  liberation: "bg-sky-100/70 border-sky-400",
+  usurpation: "bg-violet-100/70 border-violet-400",
+  regency: "bg-amber-100/70 border-amber-400",
+  purge: "bg-rose-100/70 border-rose-400",
+  wayfarer: "bg-teal-100/70 border-teal-300",
 };
 
 export default function EndingScreen({ endingId, character, log, finalScene, onRestart }: Props) {
   const meta = getEndingMeta(endingId);
-  const tone = ENDING_TONE[endingId] ?? "bg-amber-100/70 border-amber-300";
+  // endingId 는 저장된 문자열이라 타입이 안 좁혀진다. 맵의 완전성은 Record<EndingId,…>
+  // 가 지키므로, 모르는 값(옛 데이터)만 기본 톤으로 떨어진다.
+  const tone = ENDING_TONE[endingId as EndingId] ?? "bg-amber-100/70 border-amber-300";
   // ending_* 씬은 본문=epilogue 라 생략. 발각/죽음 전환 씬만 본문을 엔딩 위에 표시.
   const transitionBody =
     finalScene && !finalScene.id.startsWith("ending_") && finalScene.body?.length
