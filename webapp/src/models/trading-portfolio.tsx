@@ -7,7 +7,7 @@ const { Schema, model, models } = mongoose;
 
 // 실매매 전략 목록의 단일 출처 (#354). alias(@/) 가 아니라 상대경로 — 이 모델은 Next 밖
 // (trading-smoke 등)에서도 로드된다.
-import { LIVE_STRATEGY_IDS, type LiveStrategyId } from '../types/trading';
+import { LIVE_STRATEGY_IDS } from '../types/trading';
 
 /**
  * 자동매매 포트폴리오 — 계정(TradingAccount) 1개에 시장×전략 블록 여러 개.
