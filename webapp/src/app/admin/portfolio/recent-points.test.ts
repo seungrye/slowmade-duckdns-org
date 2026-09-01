@@ -140,3 +140,68 @@ describe('windowAround', () => {
     expect(windowAround([], '2026-08-01', true)).toBeUndefined();
   });
 });
+
+/**
+ * 창의 경계는 **축에 실제로 있는 날짜**여야 한다 (#370).
+ *
+ * `startValue` 는 달력 날짜(마지막 날 −29일)로 계산되는데 x 축 카테고리는 **거래일**뿐이다.
+ * 그 날이 주말·휴장일이면 축에 없는 값이 되고, ECharts 는 카테고리 축에서 못 찾은 값을
+ * 무시해 **창이 안 잡힌 채 전체가 보인다.**
+ *
+ * 메인 차트(/admin/portfolio)는 스냅샷이 46일뿐이라 대개 "이미 창 안" 으로 빠져 이 경로를
+ * 안 탔다. 몇 년치 일봉을 그리는 매매 상세에서만 드러났다.
+ */
+describe("창 경계는 축에 있는 날짜여야 한다 (#370)", () => {
+  // 주말을 뺀 거래일만 — 실제 일봉과 같은 모양.
+  const 거래일 = (n: number): string[] => {
+    const out: string[] = [];
+    for (let i = 0; out.length < n; i++) {
+      const d = new Date(Date.UTC(2025, 0, 1) + i * 86_400_000);
+      if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) out.push(d.toISOString().slice(0, 10));
+    }
+    return out;
+  };
+
+  // 끝나는 날을 하루씩 옮겨 가며 본다 — 한 경우만 보면 우연히 평일에 걸려 통과한다.
+  it("startValue 는 언제나 목록에 있는 날짜다 (끝 날짜 60가지)", () => {
+    const 전체 = 거래일(400);
+    const 어긋난것: string[] = [];
+    for (let n = 340; n < 400; n++) {
+      const dates = 전체.slice(0, n);
+      const s = windowStartDate(dates, true);
+      if (s && !dates.includes(s)) 어긋난것.push(`${dates[n - 1]} → ${s}`);
+    }
+    expect(어긋난것, `축에 없는 날을 startValue 로 준다 — ECharts 가 무시한다`).toEqual([]);
+  });
+
+  it("데스크톱도 마찬가지 (끝 날짜 60가지)", () => {
+    const 전체 = 거래일(400);
+    const 어긋난것: string[] = [];
+    for (let n = 340; n < 400; n++) {
+      const dates = 전체.slice(0, n);
+      const s = windowStartDate(dates, false);
+      if (s && !dates.includes(s)) 어긋난것.push(`${dates[n - 1]} → ${s}`);
+    }
+    expect(어긋난것).toEqual([]);
+  });
+
+  it("windowAround 의 양끝도 언제나 목록에 있는 날짜다 (중심 60가지)", () => {
+    const dates = 거래일(400);
+    const 어긋난것: string[] = [];
+    for (let i = 100; i < 160; i++) {
+      const w = windowAround(dates, dates[i], true);
+      if (!w) continue;
+      if (!dates.includes(w.startValue)) 어긋난것.push(`start ${w.startValue}`);
+      if (!dates.includes(w.endValue)) 어긋난것.push(`end ${w.endValue}`);
+    }
+    expect(어긋난것).toEqual([]);
+  });
+
+  it("창 길이는 여전히 대략 30일이다 — 스냅이 창을 망치지 않는다", () => {
+    const dates = 거래일(400);
+    const s = windowStartDate(dates, true)!;
+    const 일수 = (Date.parse(dates[dates.length - 1]) - Date.parse(s)) / 86_400_000 + 1;
+    expect(일수).toBeGreaterThan(25);
+    expect(일수).toBeLessThanOrEqual(30);
+  });
+});
