@@ -50,33 +50,49 @@ describe("VR 엔진 — 시드/채택", () => {
     expect(persisted.at(-1)).toMatchObject({ vInit: false, lastRunDate: "20260722" }); // 미초기화 유지
   });
 
-  it("첫 실행·기존 보유 → 재매수 없이 채택(V=보유×가격), 밴드 안이면 무주문", async () => {
+  it("첫 실행·기존 보유 → 재매수 없이 채택(V=보유×가격)", async () => {
     await run(fakeBroker({ holding: 85, price: 100, cash: 1500 }));
-    expect(orderLogs).toHaveLength(0); // 8500 ∈ [7225,9775]
+    // 채택이 핵심 — 가진 것을 그대로 인정하고 V 만 잡는다. 시장가 재매수는 없다.
     expect(persisted.at(-1)).toMatchObject({ vInit: true, V: 8500 });
+    expect(orderLogs.some((o) => o.ordType === "market")).toBe(false);
   });
 });
 
 describe("VR 엔진 — 밴드 리밸런스", () => {
   const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500, buyBudget: 750, sinceCycle: 0, cumBuy: 8500, cumSell: 0, lastRunDate: "20260721" };
-  it("평가금 > 상단 → 매도", async () => {
+  // #360 — 사다리는 밴드 경계 기준으로 걸리므로, "지금 가격이 밴드 밖" 이면 이미 채워질
+  // 칸이 나온다. 그 칸의 지정가가 현재가보다 유리한 쪽에 있는지를 본다.
+  it("평가금 > 상단 → 매도 사다리가 현재가 아래(=즉시 체결 가능)까지 내려온다", async () => {
     await run(fakeBroker({ holding: 85, price: 130, cash: 1500 }), CFG, { vr: seeded });
-    expect(orderLogs).toHaveLength(1);
-    expect(orderLogs[0]).toMatchObject({ side: "sell", qty: 9 }); // floor((11050-9775)/130)
+    const 매도 = orderLogs.filter((o) => o.side === "sell");
+    expect(매도.length).toBeGreaterThan(0);
+    expect(Math.min(...매도.map((o) => o.price))).toBeLessThanOrEqual(130);
   });
-  it("평가금 < 하단 → 매수(Pool·한도 내)", async () => {
+  it("평가금 < 하단 → 매수 사다리가 현재가 위(=즉시 체결 가능)까지 올라온다", async () => {
     await run(fakeBroker({ holding: 85, price: 80, cash: 5000 }), CFG, { vr: seeded });
-    expect(orderLogs).toHaveLength(1);
-    expect(orderLogs[0]).toMatchObject({ side: "buy", qty: 5 }); // floor((7225-6800)/80)
+    const 매수 = orderLogs.filter((o) => o.side === "buy");
+    expect(매수.length).toBeGreaterThan(0);
+    expect(Math.max(...매수.map((o) => o.price))).toBeGreaterThanOrEqual(80);
   });
-  it("밴드 안 → 무주문", async () => {
+  // #360 — 사다리로 바뀌면서 **밴드 안이어도 주문을 건다.** 문서가 그렇게 한다: 밴드
+  // 경계를 기준으로 1주씩 지정가를 걸어 두고 가격이 오기를 기다린다. 예전엔 종가 근처에
+  // 한 건만 냈고, 그래서 장중에 밴드를 스치고 돌아오는 움직임을 통째로 놓쳤다.
+  it("밴드 안 → 양쪽 사다리를 걸어 둔다(체결은 가격이 와야 한다)", async () => {
     await run(fakeBroker({ holding: 85, price: 100, cash: 5000 }), CFG, { vr: seeded });
-    expect(orderLogs).toHaveLength(0);
+    expect(orderLogs.length).toBeGreaterThan(0);
+    // 매수는 밴드 하단 아래, 매도는 상단 위 — 지금 가격(100)으로는 하나도 안 채워진다.
+    for (const o of orderLogs) {
+      if (o.side === "buy") expect(o.price).toBeLessThan(100);
+      else expect(o.price).toBeGreaterThan(100);
+    }
+    expect(orderLogs.every((o) => o.ordType === "limit")).toBe(true);
   });
-  it("매수는 실계좌 현금으로 캡(공유 계좌 안전)", async () => {
-    // 원하는 5주지만 현금 200 → floor(200/80)=2 주만
+  it("매수 사다리는 실계좌 현금 안에서만 건다(공유 계좌 안전)", async () => {
+    // 현금 200 이면 80 언저리 칸을 두 개쯤 걸고 멈춘다 — 계좌를 넘겨 걸지 않는다.
     await run(fakeBroker({ holding: 85, price: 80, cash: 200 }), CFG, { vr: seeded });
-    expect(orderLogs[0]).toMatchObject({ side: "buy", qty: 2 });
+    const 매수 = orderLogs.filter((o) => o.side === "buy");
+    expect(매수.length).toBeGreaterThan(0);
+    expect(매수.reduce((s2, o) => s2 + o.qty * o.price, 0)).toBeLessThanOrEqual(200);
   });
 });
 

@@ -5,6 +5,7 @@
 
 import type { BacktestResult, BtTrade, EquityPoint, ValueRebalancingConfig } from "./types";
 import type { RotationCandidate } from "./rotation";
+import { ladderLot, vrBuyLadder, vrSellLadder } from "./vr-ladder";
 
 /** 기본공식 V 갱신: V₂ = V₁ + Pool/G + CF. (Pool 은 CF 반영 전 값 — 원문 예시 9000+1000/10+250=9350)
  *  시장을 안 본다 — 긴 하락장이면 V 가 기계적으로 올라 Pool 을 다 태운다(존버모드). */
@@ -219,10 +220,36 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
       band = bandOf(state.V, b);
     }
 
-    // 매일 밴드 판정 매매
-    const delta = rebalanceShares({ qty: state.qty, price, low: band.low, high: band.high, buyBudget: state.buyBudget, pool: state.pool, fee });
-    if (delta > 0) fill(date, "buy", price, delta);
-    else if (delta < 0) fill(date, "sell", price, -delta);
+    // 매일 밴드 판정 매매 — **1주씩 지정가 사다리** (#360).
+    //
+    // 예전엔 종가에 밴드 경계까지 한 번에 체결했다. 그러면 장중에 밴드를 스치고 돌아오는
+    // 움직임을 통째로 놓친다. 문서는 밴드 경계 기준으로 1주씩 지정가를 걸어 두므로,
+    // 그날 **저가가 닿은 칸**까지 매수가 채워지고 **고가가 닿은 칸**까지 매도가 채워진다.
+    //
+    // 종가만 있는 데이터(open=high=low=close)에서는 밴드 안으로 들어올 때까지 칸이
+    // 채워져 예전 방식과 같은 결과로 수렴한다 — 그래서 기존 재현 테스트가 그대로 산다.
+    const 저가 = bars[i].low > 0 ? bars[i].low : price;
+    const 고가 = bars[i].high > 0 ? bars[i].high : price;
+    // 체결가는 지정가가 아니라 **더 유리한 쪽**이다. 시가가 이미 지정가 아래면 그 값에
+    // 사진다 — 지정가보다 비싸게 사는 일은 없다. 이걸 빼먹으면 사다리가 시장가보다
+    // 불리하게 체결된 것으로 계산돼 수익이 통째로 낮게 나온다(실측: CAGR 47.4→43.4).
+    const 시가 = bars[i].open > 0 ? bars[i].open : price;
+
+    // 칸당 주수 — 필요한 칸 수로 정한다(보유량이 아니다). 문서 규모에서는 1주씩 그대로다.
+    const lot = ladderLot({ low: band.low, qty: state.qty, budget: Math.min(state.buyBudget, state.pool), maxRungs: 40 });
+
+    for (const r of vrBuyLadder({ low: band.low, qty: state.qty, pool: state.pool, budget: state.buyBudget, lot, maxRungs: 40 })) {
+      if (r.price < 저가) break;              // 가격이 내림차순이라 더 아래 칸은 오늘 안 닿았다
+      const 체결가 = Math.min(r.price, 시가);
+      const 대금 = 체결가 * lot * (1 + fee);
+      if (대금 > state.pool || 대금 > state.buyBudget) break;
+      fill(date, "buy", 체결가, lot);
+    }
+    for (const r of vrSellLadder({ high: band.high, qty: state.qty, pool: state.pool, lot })) {
+      if (r.price > 고가) break;              // 가격이 오름차순
+      if (lot > state.qty) break;
+      fill(date, "sell", Math.max(r.price, 시가), lot);
+    }
 
     equityCurve.push({ date, equity: state.qty * price + state.pool });
     // 판정에 쓴 그 밴드를 그대로 남긴다 — 화면이 다시 계산하면 둘이 어긋날 수 있다.

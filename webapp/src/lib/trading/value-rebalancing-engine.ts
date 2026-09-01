@@ -16,7 +16,11 @@ import TradingPortfolio from "@/models/trading-portfolio";
 import type { Types } from "mongoose";
 import type { ValueRebalancingConfig } from "@/lib/backtest/types";
 import {
-  advanceCycleVR, applyVRFill, bandOf, rebalanceShares, seedVR, type VRState, resolveVR } from "@/lib/backtest/value-rebalancing";
+  advanceCycleVR, applyVRFill, bandOf, seedVR, type VRState, resolveVR } from "@/lib/backtest/value-rebalancing";
+import { ladderLot, vrBuyLadder, vrSellLadder } from "@/lib/backtest/vr-ladder";
+
+/** 한쪽 사다리에 걸 최대 칸 수. 문서는 6~11칸이고, 유량제한(호출당 ≥1초)도 감안한 값이다. */
+const LADDER_RUNGS = 12;
 import { prevMarketDay, type V4Broker } from "./infinite-v4-engine";
 import { marketToday, type CycleLogger } from "./engines";
 import { formatMoney } from "@/lib/format";
@@ -77,7 +81,7 @@ export async function runValueRebalancing(
   const { holding, price, cash } = await broker.snapshot(sym);
   if (!(price > 0)) throw new Error(`VR ${sym}: 현재가 조회 실패`);
 
-  const orders: { side: "buy" | "sell"; qty: number; price: number; reason: string }[] = [];
+  const orders: { side: "buy" | "sell"; qty: number; price: number; reason: string; ordType?: "loc" | "limit" }[] = [];
   let persisted = loadState((portfolio.state as Json | undefined)?.vr);
 
   // ── 미초기화: 보유가 있으면 채택, 없으면 시드 매수 후 다음 실행에서 채택 ──
@@ -138,15 +142,40 @@ export async function runValueRebalancing(
     log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)}`);
   }
 
-  // ── 오늘 밴드 판정 → 델타 1건 ──
+  // ── 밴드 경계 기준 1주씩 지정가 사다리 (#360) ──
+  //
+  // 예전엔 종가 근처에 한 건만 냈다. 그러면 장중에 밴드를 스치고 돌아오는 움직임을 통째로
+  // 놓친다. 문서는 밴드 경계를 기준으로 1주씩 지정가를 걸어 둔다 — 그 가격이 되면 평가금이
+  // 정확히 밴드 경계인 지점마다 한 칸씩.
   const band = bandOf(state.V, b);
-  let delta = rebalanceShares({ qty: state.qty, price, low: band.low, high: band.high, buyBudget: state.buyBudget, pool: state.pool, fee });
-  if (delta > 0) {
-    const byCash = Math.floor(cash / (price * (1 + fee))); // 실계좌 현금 캡(공유 계좌 안전)
-    delta = Math.min(delta, byCash);
-    if (delta > 0) orders.push({ side: "buy", qty: delta, price: price * 1.1, reason: `VR 밴드하단 매수(V=${formatMoney(state.V, market)})` });
-  } else if (delta < 0) {
-    orders.push({ side: "sell", qty: -delta, price: price * 0.9, reason: `VR 밴드상단 매도(V=${formatMoney(state.V, market)})` });
+
+  // 묵은 주문부터 지운다(v4 와 같은 취소 후 재등록). 매일 밴드가 새로 계산되므로 어제 건
+  // 사다리는 값이 틀리다. 조회 실패는 삼키고 계속 — 못 지웠다고 오늘 주문을 안 낼 이유는 없다.
+  try {
+    const open = await broker.openOrders(sym);
+    for (const o of open) {
+      await broker.cancel(sym, o.orderNo, o.qty);
+      log(`[vr:${sym}] 묵은 주문 취소 ${o.orderNo} x${o.qty}`);
+    }
+  } catch (e) {
+    log(`[vr:${sym}] ⚠ 미체결 조회/취소 실패 — 주문은 계속: ${e instanceof Error ? e.message : e}`);
+  }
+
+  // 칸당 주수 — 필요한 칸 수로 정한다. 문서 규모(수십 주)에서는 1주씩 그대로다.
+  const lot = ladderLot({ low: band.low, qty: state.qty, budget: Math.min(state.buyBudget, state.pool, cash), maxRungs: LADDER_RUNGS });
+  const 현금캡 = Math.max(0, cash);
+  let 쓸현금 = 현금캡;
+
+  for (const r of vrBuyLadder({ low: band.low, qty: state.qty, pool: state.pool, budget: state.buyBudget, lot, maxRungs: LADDER_RUNGS })) {
+    const 대금 = r.price * lot * (1 + fee);
+    if (대금 > 쓸현금) break;   // 실계좌 현금 캡(공유 계좌 안전)
+    쓸현금 -= 대금;
+    orders.push({ side: "buy", qty: lot, price: r.price, ordType: "limit",
+      reason: `VR 사다리 매수 ${r.qtyAfter}주째(밴드하단 ${formatMoney(band.low, market)})` });
+  }
+  for (const r of vrSellLadder({ high: band.high, qty: state.qty, pool: state.pool, lot }).slice(0, LADDER_RUNGS)) {
+    orders.push({ side: "sell", qty: lot, price: r.price, ordType: "limit",
+      reason: `VR 사다리 매도 ${r.qtyAfter}주째(밴드상단 ${formatMoney(band.high, market)})` });
   }
 
   await sendOrders(orders, broker, { account, runId, market, sym, live, log });
@@ -162,7 +191,7 @@ export async function runValueRebalancing(
 
 /** 주문 전송(LOC, dry-run 게이트) + 원장 기록. 주문 단위 격리(한 건 실패가 나머지·상태저장을 안 막게). */
 async function sendOrders(
-  orders: { side: "buy" | "sell"; qty: number; price: number; reason: string }[],
+  orders: { side: "buy" | "sell"; qty: number; price: number; reason: string; ordType?: "loc" | "limit" }[],
   broker: V4Broker,
   ctx: {
     account: { _id: Types.ObjectId; envKey: string };
@@ -173,10 +202,11 @@ async function sendOrders(
     let orderNo = "";
     try {
       if (ctx.live) {
-        orderNo = await broker.place(ctx.sym, { side: o.side, qty: o.qty, price: o.price, ordType: "loc", reason: o.reason });
-        ctx.log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)} (loc)`);
+        const 형식 = o.ordType ?? "loc";
+        orderNo = await broker.place(ctx.sym, { side: o.side, qty: o.qty, price: o.price, ordType: 형식, reason: o.reason });
+        ctx.log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)} (${형식})`);
       } else {
-        ctx.log(`[DRY-RUN] ${o.side} ${ctx.sym} x${o.qty} @${formatMoney(o.price, ctx.market)} (loc) — ${o.reason}`);
+        ctx.log(`[DRY-RUN] ${o.side} ${ctx.sym} x${o.qty} @${formatMoney(o.price, ctx.market)} (${o.ordType ?? "loc"}) — ${o.reason}`);
       }
     } catch (e) {
       ctx.log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
@@ -186,7 +216,7 @@ async function sendOrders(
       accountId: ctx.account._id, runId: ctx.runId, envKey: ctx.account.envKey,
       market: ctx.market, strategy: "value_rebalancing",
       symbol: ctx.sym, side: o.side, qty: o.qty, price: Math.round(o.price * 100) / 100,
-      ordType: "loc", reason: o.reason, dryRun: !ctx.live, orderNo,
+      ordType: o.ordType ?? "loc", reason: o.reason, dryRun: !ctx.live, orderNo,
     });
   }
 }

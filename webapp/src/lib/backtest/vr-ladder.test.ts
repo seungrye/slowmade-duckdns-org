@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { vrBuyLadder, vrSellLadder } from "./vr-ladder";
+import { ladderLot, vrBuyLadder, vrSellLadder } from "./vr-ladder";
 
 /**
  * VR 사다리 — 문서(2025 VR 강의 정리)의 주문표를 그대로 재현한다 (#360).
@@ -99,5 +99,31 @@ describe("사다리 경계", () => {
     expect(매수.every((r, i) => i === 0 || r.price < 매수[i - 1].price)).toBe(true);
     const 매도 = vrSellLadder({ high: 2310.52, qty: 25, pool: 0, maxRungs: 5 });
     expect(매도.every((r, i) => i === 0 || r.price > 매도[i - 1].price)).toBe(true);
+  });
+});
+
+describe("ladderLot — 문서 규모에서는 1주씩 (#360)", () => {
+  it("4기 87주차(85주 보유·한도 687.55)는 1주씩이다", () => {
+    // 보유량으로 잡으면 여기서 7주씩이 되어 문서(11칸을 1주씩)와 어긋난다.
+    expect(ladderLot({ low: 5270.03, qty: 85, budget: 982.22 * 0.7, maxRungs: 12 })).toBe(1);
+  });
+
+  it("6기 33주차(25주 보유·Pool 375.79)도 1주씩이다", () => {
+    expect(ladderLot({ low: 1707.78, qty: 25, budget: 375.79, maxRungs: 12 })).toBe(1);
+  });
+
+  it("분할조정 저가 종목처럼 칸이 수만 개가 되면 칸을 키운다", () => {
+    // 실측: TQQQ 2011년 — 보유 21만 주, 첫 칸 0.372달러, 예산 7500 → 2만 칸이 필요하다.
+    const lot = ladderLot({ low: 78625, qty: 211180, budget: 7500, maxRungs: 40 });
+    expect(lot).toBeGreaterThan(100);
+    // 그래도 칸 수는 상한 안에 들어와야 한다.
+    expect(vrBuyLadder({ low: 78625, qty: 211180, pool: 15000, budget: 7500, lot, maxRungs: 40 }).length)
+      .toBeLessThanOrEqual(40);
+  });
+
+  it("살 돈이 없으면 1주씩으로 둔다 — 0 으로 나누지 않는다", () => {
+    expect(ladderLot({ low: 1000, qty: 10, budget: 0, maxRungs: 12 })).toBe(1);
+    expect(ladderLot({ low: 0, qty: 10, budget: 100, maxRungs: 12 })).toBe(1);
+    expect(ladderLot({ low: 1000, qty: 0, budget: 100, maxRungs: 12 })).toBe(1);
   });
 });
