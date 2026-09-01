@@ -8,7 +8,8 @@ import type { Bar } from "./types";
  * 원문 백테스트 재현 (#345).
  *
  * 라오어 「VR 5.0 상승률 수치별 비교 백테스트」의 표를 우리 구현이 재현하는지 본다.
- * 조건: **거치식** · TQQQ · 2011~2020 · 밴드 ±15% (원문 "이 수치는 모두 거치식VR 기준").
+ * 조건: **거치식** · TQQQ · 2011~2020 · 밴드 ±15% · **기본공식**
+ * (원문 "이 수치는 모두 거치식VR 기준". 공식은 #358 참조 — 이 표는 5.0 시절 것이다).
  *
  * ⚠️ **이 일치는 "공식이 맞다"의 증명이 아니다.** 실제로 측정해 보니 우리 G=10 결과는 원문
  * G=20 쪽에 더 가깝다(아래 "G 를 가려내지는 못한다" 참조) — 값이 근처에 있을 뿐, G 를
@@ -56,6 +57,15 @@ function run(G: number) {
   const r = runValueRebalancingBacktest({ ticker: "TQQQ", bars }, {
     principal: PRINCIPAL, gradient: G, bandPct: 0.15, poolLimitPct: 0.5,
     cycleDays: 10, initStockRatio: 0.85,
+    // **기본공식으로 고정한다** (#358). 이 표는 VR 5.0 시절 문서의 것이고, 실력공식
+    // 수식은 2025 강의 정리에서야 나왔다. 기본값(실력)으로 돌리면 서로 다른 공식의
+    // 결과를 비교하게 돼 이 재현의 뜻이 사라진다.
+    //
+    // 실제로 실력공식으로 돌리면 CAGR 은 원문에 **가까워지고**(47.41→48.78, 원문 49.47)
+    // MDD 는 **멀어진다**(−61.17→−63.46, 원문 −58.41). 5.0 표가 어느 공식으로 만들어진
+    // 것인지 문서에 없어서 이 어긋남을 어느 쪽 탓으로도 돌릴 수 없다 — 사다리 미구현이
+    // 겹쳐 있기도 하다(#345). 그래서 여기서는 판단하지 않고 조건만 맞춘다.
+    formula: "basic",
   });
   const m = computeMetrics(r.equityCurve, PRINCIPAL);
   // P/V = Pool / V. equity = 주식 + Pool, vrBand.stock = 주식.
@@ -127,7 +137,7 @@ describe("원문 백테스트 재현 — 거치식 TQQQ 2011~2020", () => {
     // 반면 원문 미규정 파라미터를 크게 흔들어도 거의 안 움직인다.
     const 반반 = runValueRebalancingBacktest({ ticker: "TQQQ", bars }, {
       principal: PRINCIPAL, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5,
-      cycleDays: 10, initStockRatio: 0.5,
+      cycleDays: 10, initStockRatio: 0.5, formula: "basic", // 위 run() 과 같은 조건으로
     });
     const m = computeMetrics(반반.equityCurve, PRINCIPAL);
     expect(Math.abs(m.cagr - 정상.cagr)).toBeLessThan(1);

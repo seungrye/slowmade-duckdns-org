@@ -46,7 +46,7 @@ const DEFAULT_CONFIG: Record<LiveStrategyId, object> = {
   rotation_v1: { signal: "QQQ", sma: 200, band: 1, mom: 126, rebalance: 63 },
   trend_v1: { universe: ["TQQQ", "QQQ"], shortMa: 20, longMa: 60, positionSize: 0.1 },
   infinite_v4: { symbol: "TQQQ", principal: 10000, splits: 20, starBase: 15, sellTarget: 15 },
-  value_rebalancing: { symbol: "TQQQ", principal: 10000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5, cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0 },
+  value_rebalancing: { symbol: "TQQQ", principal: 10000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5, cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0, formula: "skill" },
 };
 const DEFAULT_RUN_AT: Record<LiveStrategyId, { kr: string; us: string }> = {
   lrs_v1: { kr: "09:05", us: "09:35" },
@@ -513,10 +513,13 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
   "cycleDays": 10,        // V 갱신 주기(실행일 수, 2주=10)
   "initStockRatio": 0.85, // 첫 실행 시드 주식 비중(85:15) — 원금의 이만큼 즉시 매수
   "cashflow": 0,          // 사이클당 현금흐름 CF: +적립 / 0 거치 / −인출
-  "feeRate": 0            // 편도 수수료+슬리피지(0.0025=0.25%)
+  "feeRate": 0,           // 편도 수수료+슬리피지(0.0025=0.25%)
+  "formula": "skill"      // (선택) V 갱신 공식. 안 적으면 skill
+                          //   skill = V₁+Pool/G+(E−V₁)/(2√G)+CF  목표선이 평가금을 일부 따라간다
+                          //   basic = V₁+Pool/G+CF               시장을 안 본다(예전 블록 재현용)
 }`}</pre>
                 <p className="mt-1">
-                  계좌 = 주식(보유×가격) + Pool(현금 장부, state.vr 영속). 사이클마다 V₂=V₁+Pool/G+CF,
+                  계좌 = 주식(보유×가격) + Pool(현금 장부, state.vr 영속). 사이클마다 V₂=V₁+Pool/G+(E−V₁)/(2√G)+CF,
                   밴드 재계산. 매일 평가금이 밴드 하단↓이면 매수·상단↑이면 매도(경계까지) 1건.
                   <b>첫 실행에 원금의 {"initStockRatio"}(기본 85%)를 실제 매수해 진입</b>(이미 그 종목을 보유
                   중이면 재매수 없이 채택). <b>실행 시각은 종가 근처 권장</b>(LOC 종가 체결). <code>cashflow≠0</code>

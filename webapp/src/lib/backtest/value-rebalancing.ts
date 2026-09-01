@@ -7,9 +7,31 @@ import type { BacktestResult, BtTrade, EquityPoint, ValueRebalancingConfig } fro
 import type { RotationCandidate } from "./rotation";
 
 /** 기본공식 V 갱신: V₂ = V₁ + Pool/G + CF. (Pool 은 CF 반영 전 값 — 원문 예시 9000+1000/10+250=9350)
- *  실력공식(Pool≈0 에서 V 아래로 꺾임)은 문서상 수식 미공개라 여기 자리만 예약(교체 훅). */
+ *  시장을 안 본다 — 긴 하락장이면 V 가 기계적으로 올라 Pool 을 다 태운다(존버모드). */
 export function updateVBasic(v1: number, pool: number, gradient: number, cf: number): number {
   return v1 + (gradient > 0 ? pool / gradient : 0) + cf;
+}
+
+/**
+ * 실력공식 V 갱신 (#358): V₂ = V₁ + Pool/G + (E−V₁)/(2√G) + CF.
+ *
+ * 보정항이 **목표선 V 를 실제 평가금 E 쪽으로 끌어당긴다.** 하락장(E<V₁)이면 V 를 덜 올려
+ * 덜 사고(Pool 보존), 상승장(E>V₁)이면 더 올려 덜 판다. `2√G` 가 세기다 — G=10 이면 벌어진
+ * 차이의 약 16% 를 매 사이클 흡수한다.
+ *
+ * 2025 VR 강의 정리 문서의 6기·4기 중계표 3건을 소수점까지 재현한다
+ * (vr-skill-formula.test.ts). 여태는 이 수식을 몰라 기본공식만 있었다.
+ */
+export function updateVSkill(
+  v1: number, pool: number, gradient: number, cf: number, e: number,
+): number {
+  const g = gradient > 0 ? gradient : 1;
+  return v1 + pool / g + (e - v1) / (2 * Math.sqrt(g)) + cf;
+}
+
+/** 쓸 공식 — 안 적으면 실력공식 (#358). */
+export function formulaOf(cfg: ValueRebalancingConfig): "basic" | "skill" {
+  return cfg.formula === "basic" ? "basic" : "skill";
 }
 
 /** 운용 형태 — CF 부호가 정한다 (원문 7.1). */
@@ -123,11 +145,19 @@ export function cycleCoverSellQty(state: VRState, cfg: ValueRebalancingConfig, p
 
 /** 사이클 경계: V 갱신(V₂=V₁+Pool/G+CF, Pool 은 CF 반영 전) + CF 적용 + 매수예산 리셋 + sinceCycle=0.
  *  cover-sell(인출충당)은 이 호출 전에 applyVRFill 로 pool/qty 에 이미 반영돼 있어야 한다. */
-export function advanceCycleVR(state: VRState, cfg: ValueRebalancingConfig): VRState {
+export function advanceCycleVR(
+  state: VRState,
+  cfg: ValueRebalancingConfig,
+  /** 사이클 종료 시점 종가 — 실력공식의 E(평가금 = qty×price) 를 구한다 (#358).
+   *  일부러 필수다. 안 넘기면 컴파일이 깨져 호출측이 빠뜨릴 수 없다. */
+  price: number,
+): VRState {
   const cf = cfg.cashflow ?? 0;
   const { gradient, poolLimitPct } = resolveVR(cfg);
   // V 는 CF **전** pool 로 (원문: "이번 사이클이 끝나고 V=9000, pool=1000" → 9000+1000/10+250)
-  const V = updateVBasic(state.V, state.pool, gradient, cf);
+  const V = formulaOf(cfg) === "skill"
+    ? updateVSkill(state.V, state.pool, gradient, cf, state.qty * price)
+    : updateVBasic(state.V, state.pool, gradient, cf);
   const pool = cf !== 0 ? Math.max(0, state.pool + cf) : state.pool;
   // 한도는 CF **후** pool 로 (원문: "적립후 pool 의 75%", "인출후 pool 의 25%")
   return { ...state, V, pool, buyBudget: poolLimitPct * pool, sinceCycle: 0 };
@@ -182,7 +212,7 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
     if (i > 0 && state.sinceCycle >= cycleDays) {
       const coverQ = cycleCoverSellQty(state, cfg, price);
       if (coverQ > 0) fill(date, "sell", price, coverQ);
-      state = advanceCycleVR(state, cfg);
+      state = advanceCycleVR(state, cfg, price);
       if (cf !== 0) contributions.push({ date, amount: cf });
       // 존버모드 감지: Pool 이 1주도 못 살 만큼 소진 → V 정체(기본공식 한계)
       if (state.pool < price) poolLog.push(`${date} 존버모드 경보: Pool 소진(${state.pool.toFixed(0)}) — 기본공식 V 정체`);

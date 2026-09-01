@@ -133,7 +133,8 @@ export async function runValueRebalancing(
     if (cf < 0 && state.pool + cf < 0) {
       log(`[vr:${sym}] ⚠ 인출 ${formatMoney(cf, market)} 이 Pool(${formatMoney(state.pool, market)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
     }
-    state = advanceCycleVR(state, cfg);
+    // 실력공식은 사이클 종료 시점 평가금(qty×price)을 본다 (#358).
+    state = advanceCycleVR(state, cfg, price);
     log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)}`);
   }
 
