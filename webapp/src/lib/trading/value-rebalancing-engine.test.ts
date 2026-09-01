@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // 모델·시계 목킹 — DB/네트워크 없이 엔진 오케스트레이션(시드/채택/밴드/경계/현금캡)만 검증.
-const orderLogs: Array<Record<string, unknown>> = [];
+/** 주문 로그 — 사다리 검증에 수량·가격을 자주 보므로 그 둘만 타입을 준다 (#360). */
+type OrderLog = Record<string, unknown> & { side: string; qty: number; price: number; ordType: string };
+const orderLogs: OrderLog[] = [];
 const persisted: Array<Record<string, unknown>> = [];
 
 vi.mock("@/models/trading-order-log", () => ({
-  default: { create: vi.fn(async (doc: Record<string, unknown>) => { orderLogs.push(doc); }) },
+  default: { create: vi.fn(async (doc: Record<string, unknown>) => { orderLogs.push(doc as OrderLog); }) },
 }));
 vi.mock("@/models/trading-portfolio", () => ({
   default: {
