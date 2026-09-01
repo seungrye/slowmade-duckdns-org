@@ -11,6 +11,26 @@ export const MOBILE_CHART_DAYS = 30;
 /** 데스크톱에서 처음 보여줄 일수 — 최근 3 개월. */
 export const DESKTOP_CHART_DAYS = 90;
 
+/**
+ * `at` 이후(포함)로 **목록에 실제로 있는** 첫 날. 없으면 마지막 날.
+ *
+ * 카테고리 축의 `dataZoom` 은 **축에 없는 값을 못 알아본다**. 그런데 창 경계는 달력으로
+ * 계산되고(마지막 날 −29일) 축은 **거래일**뿐이라, 그 날이 주말·휴장일이면 값이 축에
+ * 없어 ECharts 가 통째로 무시한다 — 창이 안 잡히고 전체가 보인다 (#370).
+ *
+ * 메인 차트는 스냅샷이 46일뿐이라 대개 "이미 창 안" 으로 빠져 이 경로를 안 탔다.
+ * 몇 년치 일봉을 그리는 매매 상세에서만 드러났다.
+ */
+function snapForward(dates: string[], at: string): string {
+  return dates.find((d) => d >= at) ?? dates[dates.length - 1];
+}
+
+/** `at` 이전(포함)으로 목록에 있는 마지막 날. 없으면 첫 날. */
+function snapBack(dates: string[], at: string): string {
+  for (let i = dates.length - 1; i >= 0; i--) if (dates[i] <= at) return dates[i];
+  return dates[0];
+}
+
 export function windowDays(isMobile: boolean, days?: number): number {
   return days ?? (isMobile ? MOBILE_CHART_DAYS : DESKTOP_CHART_DAYS);
 }
@@ -43,7 +63,8 @@ export function windowStartDate(
   const cutoff = newest - (windowDays(isMobile, days) - 1) * 86_400_000;
   if (oldest >= cutoff) return undefined; // 이미 창 안이다
 
-  return new Date(cutoff).toISOString().slice(0, 10);
+  // 축에 실제로 있는 날로 맞춘다 — 없는 값을 주면 ECharts 가 무시한다 (#370).
+  return snapForward(dates, new Date(cutoff).toISOString().slice(0, 10));
 }
 
 /**
@@ -82,5 +103,6 @@ export function windowAround(
   }
 
   const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
-  return { startValue: iso(start), endValue: iso(end) };
+  // 양끝도 축에 있는 날로 (#370). 안쪽으로 맞춰 창이 데이터 밖으로 안 나가게 한다.
+  return { startValue: snapForward(dates, iso(start)), endValue: snapBack(dates, iso(end)) };
 }
