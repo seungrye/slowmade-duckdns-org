@@ -17,8 +17,16 @@ export type StatKey = "str" | "dex" | "int" | "cha" | "con" | "wis";
  */
 export type AbilityKey = "lunar" | "selene" | "hecate" | "none";
 
-/** 주인공 — 3 갈래 시작점. */
-export type Protagonist = "kael" | "rin" | "solwen";
+/**
+ * 주인공 — 3 갈래 시작점. 목록이 원본이고 타입을 파생한다 (#354).
+ *
+ * 업적의 분모(lib/achievements/rules.PROTAGONISTS)와 전시 순서(content/protagonists)가
+ * 각자 같은 배열을 들고 있었다. #352 에서 엔딩이 정확히 그것 때문에 틀렸다 —
+ * 「모든 엔딩」이 6종에서 열렸는데 실제로는 11종이었다.
+ */
+export const PROTAGONIST_IDS = ["kael", "rin", "solwen"] as const;
+
+export type Protagonist = (typeof PROTAGONIST_IDS)[number];
 
 /**
  * 엔딩 목록 — **여기가 단일 출처다** (#352).

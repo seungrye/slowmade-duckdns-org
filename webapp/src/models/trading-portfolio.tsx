@@ -5,6 +5,10 @@ import type { InferSchemaType, Model } from "mongoose";
 // (Next/webpack·tsx 스크립트 양쪽 호환 — trading-smoke 등 서버 외 구동 지원).
 const { Schema, model, models } = mongoose;
 
+// 실매매 전략 목록의 단일 출처 (#354). alias(@/) 가 아니라 상대경로 — 이 모델은 Next 밖
+// (trading-smoke 등)에서도 로드된다.
+import { LIVE_STRATEGY_IDS } from '../types/trading';
+
 /**
  * 자동매매 포트폴리오 — 계정(TradingAccount) 1개에 시장×전략 블록 여러 개.
  * 파이썬 portfolio.yaml 의 overseas/domestic 블록에 해당.
@@ -27,7 +31,8 @@ const TradingPortfolioSchema = new Schema(
   {
     accountId: { type: Schema.Types.ObjectId, ref: "TradingAccount", required: true, index: true },
     market: { type: String, required: true, enum: ["kr", "us"] },
-    strategy: { type: String, required: true, enum: ["lrs_v1", "rotation_v1", "trend_v1", "infinite_v4", "value_rebalancing"] },
+    // #354 — 손으로 복사한 목록이었다. #352 에서 엔딩이 같은 구조로 어긋나 사고가 났다.
+    strategy: { type: String, required: true, enum: [...LIVE_STRATEGY_IDS] },
     runAt: { type: String, required: true, default: "09:05" }, // kr=KST, us=ET
     weekdaysOnly: { type: Boolean, default: true },
     enabled: { type: Boolean, default: true },

@@ -1,6 +1,6 @@
 // 〈에테르니아의 추락〉 3 주인공 메타 (#251).
 
-import type { Protagonist, StatKey } from "@/types/web-adventure";
+import { PROTAGONIST_IDS, type Protagonist, type StatKey } from "@/types/web-adventure";
 
 export type ProtagonistMeta = {
   name: string;
@@ -46,4 +46,6 @@ export const protagonists: Record<Protagonist, ProtagonistMeta> = {
   },
 };
 
-export const PROTAGONIST_ORDER: Protagonist[] = ["kael", "rin", "solwen"];
+// 전시 순서 — 지금은 정의 순서와 같다. 달라져야 하면 여기만 다시 적되,
+// __tests__/protagonist-ids.test.ts 가 빠진 주인공을 잡아 준다 (#354).
+export const PROTAGONIST_ORDER: Protagonist[] = [...PROTAGONIST_IDS];
