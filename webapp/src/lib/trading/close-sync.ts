@@ -11,6 +11,7 @@
 import StockDailyPrice from "@/models/stock-daily-price";
 import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
+import { blockSnapshot } from "./block-snapshot";
 import TradingOrderLog from "@/models/trading-order-log";
 import type { Types } from "mongoose";
 import { KisClient, usQuoteExcd, registerUsExcd } from "./kis-client";
@@ -166,6 +167,8 @@ type AccountDoc = {
 };
 type PortfolioDoc = {
   _id: Types.ObjectId; market: string; strategy: string; config: unknown;
+  /** 블록 스냅샷이 자기 현금 장부를 읽는다 (#367). 스케줄러가 select 없이 lean() 으로 읽어 온다. */
+  state?: unknown;
 };
 
 export async function runCloseSync(
@@ -376,6 +379,30 @@ export async function runCloseSync(
         { upsert: true },
       );
       log(`포트폴리오 스냅샷: 현금 ${formatMoney(cash, market)} + 보유 ${formatMoney(hv, market)}`);
+
+      // 블록 행 (#367) — 계좌 행만으로는 한 계정·한 시장의 블록 둘을 구분할 수 없다.
+      // 그 블록이 아는 것만 적는다(장부가 없는 전략은 cash 를 비운다).
+      const blk = blockSnapshot({
+        strategy: portfolio.strategy,
+        config: cfg as Record<string, unknown>,
+        state: (portfolio.state ?? {}) as Record<string, unknown>,
+        evalRows, hvBroker,
+      });
+      if (blk) {
+        await PortfolioHistory.collection.updateOne(
+          { env: account.envKey, currency, portfolioId: portfolio._id, date: now.toISOString() },
+          { $set: {
+              env: account.envKey, currency, portfolioId: portfolio._id,
+              strategy: portfolio.strategy, date: now.toISOString(), dateStr: today,
+              totalValue: Math.round(blk.totalValue * 10000) / 10000,
+              cash: blk.cash === null ? 0 : Math.round(blk.cash * 10000) / 10000,
+              holdingsValue: Math.round(blk.holdingsValue * 10000) / 10000,
+            } },
+          { upsert: true },
+        );
+        log(`  ↳ ${portfolio.strategy} 블록: 장부현금 ${blk.cash === null ? "(없음)" : formatMoney(blk.cash, market)}`
+          + ` + 보유 ${formatMoney(blk.holdingsValue, market)} [${blk.symbols.join(",")}]`);
+      }
     }
   }
 
