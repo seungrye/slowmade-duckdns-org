@@ -9,6 +9,7 @@
 // 자동 직렬화된다 (mongoose 가 plain object → Map 변환을 지원).
 
 import { NextRequest } from 'next/server';
+import { flagsForStore } from '@/lib/web-adventure/flags';
 import { connectToDB } from '@/lib/db';
 import { apiSuccess, apiError } from '@/lib/api-response';
 import WebAdventureSave from '@/models/web-adventure-save';
@@ -47,7 +48,8 @@ export async function POST(req: NextRequest) {
       {
         userEmail: session.user.email,
         runIndex: body.runIndex,
-        character: body.character,
+        // #356 — flags 의 점 든 키(world.*) 때문에 저장이 통째로 실패했다.
+        character: { ...(body.character as Record<string, unknown>), flags: flagsForStore((body.character as { flags?: unknown }).flags) },
         currentSceneId: body.currentSceneId,
       },
       { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true },

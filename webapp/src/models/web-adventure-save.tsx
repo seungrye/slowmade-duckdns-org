@@ -30,7 +30,10 @@ const CharacterSchema = new Schema(
     stigmaErosion: { type: Number, required: true, min: 0, max: 100 },
     inventory: { type: [String], required: true, default: [] },
     // flags: 임의 string key → boolean. Mongoose 의 Map<Boolean>.
-    flags: { type: Map, of: Boolean, default: {} },
+    // #356 — Map 이 아니다. world.* 플래그의 키에 **점**이 들어 있는데 MongoDB 는 Map
+    //   키에 점을 못 쓴다. 그 탓에 두 번째 회차부터 문서 전체가 저장되지 않았다.
+    //   코드는 어디서도 Map 으로 안 쓴다 — 늘 character.flags[key] 로 읽는다.
+    flags: { type: Schema.Types.Mixed, default: {} },
     rerollsLeft: { type: Number, required: true },
   },
   { _id: false },
