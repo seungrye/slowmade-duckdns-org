@@ -21,6 +21,8 @@ import { TossClient } from "./toss-client";
 import { sendTradingMail } from "./mailer";
 import { UNIVERSES, EXCD_MAPS } from "./universes";
 import { buildTradeUpsertOp } from "./trade-upsert";
+import TradingPortfolio from "@/models/trading-portfolio";
+import { ownerLookup, contestedSymbols, type AttributionBlock, type FillOwner } from "./fill-attribution";
 import { formatMoney } from "@/lib/format";
 
 type Json = Record<string, unknown>;
@@ -29,7 +31,12 @@ type Fill = {
   qty: number; price: number; currency: string;
 };
 
-const RECENT_TRADES = 100;
+// 마감마다 다시 밀어 넣는 최근 체결 수. 조회한 90일치를 다 덮도록 넉넉히 — API 를 더 부르지
+// 않으므로 공짜고, 블록 귀속(#372) 교정이 그 창 안의 옛 기록에도 스스로 따라붙는다.
+const RECENT_TRADES = 500;
+// 체결내역 조회 범위. **차트가 보는 기간과는 무관하다** — 매매·일봉·스냅샷은 전부 우리 DB 에
+// 쌓여 있고, 이 조회는 마지막 sync 이후의 새 체결을 줍는 용도다. 늘려 봐야 이미 가진 것을
+// 매일 다시 받아올 뿐이고, 국내 inquire-daily-ccld 는 조회기간 3개월 제한도 있다.
 const LOOKBACK_DAYS = 90;
 // 현재가 조회 실패 비중이 이 값을 넘으면 스냅샷을 기록하지 않는다(휴장일·대규모 장애 시
 // 부분 평가가 총자산으로 영속되는 것을 방지). 그 이하의 소수 실패는 평단가 대체로 흡수.
@@ -86,7 +93,16 @@ export function parseFill(f: Json): Fill | null {
 }
 
 export function fillsToTradesAndPnl(
-  fills: Fill[], opts: { env: string; strategy: string; market: "kr" | "us"; today: string },
+  fills: Fill[],
+  opts: {
+    env: string; market: "kr" | "us"; today: string;
+    /**
+     * 종목 → 그 체결을 낸 블록 (#372). 예전엔 여기에 `strategy: portfolio.strategy` 가
+     * 들어와 **계좌 전체 체결을 자기 전략으로 통째 태깅**했다 — 블록이 둘이 되자
+     * 먼저 도는 쪽이 선점했다. 이제 주인이 분명한 체결만 태그를 받는다.
+     */
+    owner: (ticker: string, date: string) => FillOwner | null;
+  },
 ): { records: Json[]; run: number; cum: number } {
   const defaultCur = opts.market === "kr" ? "KRW" : "USD";
   // 같은 (종목·시각·구분) 부분체결 합산(가중평균)
@@ -124,14 +140,20 @@ export function fillsToTradesAndPnl(
     enriched.push({ r, cumQty: st[0], price });
   }
   const recent = enriched.slice(-RECENT_TRADES);
-  const records = recent.map(({ r, cumQty, price }) => ({
-    env: opts.env, ticker: r.ticker, action: r.side, strategy: opts.strategy,
+  const records = recent.map(({ r, cumQty, price }) => {
+    // 주인이 없으면(옛 유니버스 청산분·겹치는 종목) 태그 없이 기록만 남긴다.
+    // buildTradeUpsertOp 이 undefined 를 걸러 빈 값을 박지 않는다.
+    const own = opts.owner(r.ticker, r.date);
+    return {
+    env: opts.env, ticker: r.ticker, action: r.side,
+    ...(own ? { strategy: own.strategy, portfolioId: own.id } : {}),
     qty: r.qty, cumulativeQty: cumQty,
     price: Math.round(price * 10000) / 10000,
     amount: Math.round(r.amount * 10000) / 10000,
     currency: r.currency || defaultCur,
     date: r.date, time: r.time,
-  }));
+    };
+  });
   return { records, run, cum };
 }
 
@@ -169,6 +191,8 @@ type PortfolioDoc = {
   _id: Types.ObjectId; market: string; strategy: string; config: unknown;
   /** 블록 스냅샷이 자기 현금 장부를 읽는다 (#367). 스케줄러가 select 없이 lean() 으로 읽어 온다. */
   state?: unknown;
+  /** 체결 귀속의 하한선 (#372). 이 날 전의 체결은 이 블록 것이 아니다. */
+  createdAt?: Date;
 };
 
 export async function runCloseSync(
@@ -311,8 +335,34 @@ export async function runCloseSync(
       }
     }
   }
+  // 체결 귀속(#372) — 같은 계정·시장의 **형제 블록**을 함께 봐야 "이 종목의 주인이 나뿐인가"
+  // 를 판단할 수 있다. 블록 하나가 자기 종목만 보면 겹침을 못 알아챈다.
+  let siblings: AttributionBlock[] = [];
+  try {
+    const docs = await TradingPortfolio.find({
+      accountId: account._id, market, isDeleted: { $ne: true },
+    }).select({ strategy: 1, config: 1, createdAt: 1 }).lean();
+    siblings = docs.map((d) => ({
+      id: String(d._id), strategy: String(d.strategy ?? ""),
+      config: (d.config ?? {}) as Record<string, unknown>,
+      // 블록이 생기기 전 체결은 그 블록 것이 아니다 — 90일 재훑기가 옛 전략 매매를 끌어간다.
+      ...(d.createdAt ? { since: new Date(d.createdAt as Date).toISOString().slice(0, 10) } : {}),
+    }));
+  } catch (e) {
+    // 조회 실패 시 자기 블록만으로 판단한다 — 태그가 덜 붙을 뿐 틀리게 붙지는 않는다.
+    log(`형제 블록 조회 실패 — 자기 블록만으로 귀속: ${e instanceof Error ? e.message : e}`);
+    siblings = [{
+      id: String(portfolio._id), strategy: portfolio.strategy,
+      config: (portfolio.config ?? {}) as Record<string, unknown>,
+      ...(portfolio.createdAt ? { since: new Date(portfolio.createdAt).toISOString().slice(0, 10) } : {}),
+    }];
+  }
+  const contested = contestedSymbols(siblings);
+  if (contested.length) {
+    log(`⚠ 두 블록이 함께 무는 종목 — 귀속 보류(계좌 귀속): ${contested.join(", ")}`);
+  }
   const out = fillsToTradesAndPnl(fills, {
-    env: account.envKey, strategy: portfolio.strategy, market, today,
+    env: account.envKey, market, today, owner: ownerLookup(siblings),
   });
   run = out.run;   // 폴백값(체결내역 avg-cost 자체계산)
   cum = out.cum;

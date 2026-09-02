@@ -27,12 +27,18 @@ export interface TradeUpsertOp {
  * 고유키는 (env, ticker, time) — ingest API 와 같은 키를 쓴다.
  */
 export function buildTradeUpsertOp(record: Json): TradeUpsertOp {
-  const { strategy, ...rest } = record;
+  const { strategy, portfolioId, ...rest } = record;
   const time = normalizeTradeTime(String(record.time));
   const update: { $set: Json; $setOnInsert?: Json } = { $set: { ...rest, time } };
   // 전략을 모르는 레코드에 빈 값을 박아 두지 않는다 — 나중에 채울 여지를 남긴다.
   if (strategy !== undefined && strategy !== null && strategy !== "") {
     update.$setOnInsert = { strategy };
+  }
+  // 블록 귀속(#372)은 strategy 와 달리 **정정 가능**하다 — 블록을 지웠다 다시 만들면
+  // id 가 바뀌므로 재푸시가 따라와야 한다. 다만 **주인을 모를 때는 손대지 않는다**:
+  // null 을 $set 하면 교정 스크립트가 붙여 둔 귀속을 다음 마감에 다시 지워 버린다.
+  if (portfolioId !== undefined && portfolioId !== null) {
+    update.$set.portfolioId = portfolioId;
   }
   return {
     updateOne: {

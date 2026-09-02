@@ -28,6 +28,15 @@ const StockTradeSchema = new Schema(
     currency: { type: String, default: "KRW" },
     date: { type: String, required: true }, // YYYY-MM-DD
     time: { type: String, required: true }, // ISO
+    /**
+     * 이 체결을 낸 블록 (#372). **주인이 분명할 때만** 채운다.
+     *
+     * close-sync 는 계좌 전체 체결내역을 받는데, 블록마다 돌면서 그걸 전부 자기 전략으로
+     * 태깅하고 있었다 — 미국 계좌에 블록이 둘이 되자 먼저 도는 쪽이 선점했다(2026-09-01
+     * SOXL 이 VR 주문인데 infinite_v4 로 기록). 종목의 주인이 정확히 하나일 때만 붙인다.
+     * 주인이 없거나 겹치면 null 로 두고 계좌 귀속으로 남긴다.
+     */
+    portfolioId: { type: Schema.Types.ObjectId, ref: "TradingPortfolio", default: null, index: true },
     // 소프트 삭제 — 포트폴리오 삭제 시 (env,currency) 기록을 숨긴다(하드 삭제 아님, 복구 가능).
     // 미설정(undefined)=표시. 조회는 { hidden: { $ne: true } } 로 제외.
     hidden: { type: Boolean, default: false },
