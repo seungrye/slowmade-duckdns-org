@@ -34,6 +34,15 @@ const PortfolioHistorySchema = new Schema(
     portfolioId: { type: Schema.Types.ObjectId, ref: "TradingPortfolio", default: null, index: true },
     /** 블록 행의 전략(화면 라벨용). 계좌 행은 빈 값. */
     strategy: { type: String, default: "" },
+    /**
+     * 매매기록·일봉으로 **되살린** 과거 행 (#373). 라이브 행과 섞이지 않게 표시한다.
+     *
+     * 되살릴 수 있는 건 보유 평가액뿐이다 — 블록 장부 현금(v4 `cycleCash`·VR `pool`)은
+     * 과거값이 DB 에 없다. 그래서 이 행의 `cash`·`totalValue` 는 **모르는 값**이고,
+     * 화면은 숫자가 아니라 `—` 로 보여야 한다. 0 을 숫자로 내보이면 "현금이 없다"는
+     * 거짓말이 된다(`block-snapshot.ts` 가 같은 이유로 cash: null 을 쓴다).
+     */
+    backfilled: { type: Boolean, default: false },
     // 소프트 삭제 — 포트폴리오 삭제 시 (env,currency) 스냅샷을 숨긴다(복구 가능). 조회는 { hidden: { $ne: true } }.
     hidden: { type: Boolean, default: false },
   },
