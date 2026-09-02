@@ -432,6 +432,12 @@ export async function runCloseSync(
 
       // 블록 행 (#367) — 계좌 행만으로는 한 계정·한 시장의 블록 둘을 구분할 수 없다.
       // 그 블록이 아는 것만 적는다(장부가 없는 전략은 cash 를 비운다).
+      //
+      // ⚠ runPnl·cumulativePnl 은 **일부러 안 쓴다** (#382). 위의 run/cum 은 증권사
+      //   기간손익 API 나 계좌 전체 체결로 구한 **계좌 단위** 값이라, 블록 행에 그대로
+      //   넣으면 블록마다 계좌 전체 손익을 제 것이라 주장하게 된다. 블록별 실현손익을
+      //   구하려면 그 블록에 귀속된 체결만으로 따로 계산해야 하는데 아직 안 한다.
+      //   화면은 없는 값을 `—` 로 낸다(0 으로 채우면 "손익 0" 이라는 거짓말이 된다).
       const blk = blockSnapshot({
         strategy: portfolio.strategy,
         config: cfg as Record<string, unknown>,

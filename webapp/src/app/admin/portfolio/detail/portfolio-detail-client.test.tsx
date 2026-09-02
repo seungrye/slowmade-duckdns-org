@@ -193,3 +193,46 @@ describe('되살린(backfilled) 행 표시', () => {
     expect(screen.getByText('되살림')).toBeTruthy();
   });
 });
+
+// #382 — 실측 재현. 라이브 **블록** 스냅샷에는 cumulativePnl 이 아예 없다.
+//   close-sync 가 블록 행에 totalValue/cash/holdingsValue 만 쓰고(실현손익은 계좌 단위로만
+//   계산된다), getPortfolioData 의 블록 select 도 그 필드를 안 뽑는다.
+//   그 행을 formatMoney 에 그대로 넘겨 `undefined.toLocaleString()` 로 페이지 전체가 죽었다.
+//   /admin/portfolio/detail?...&portfolioId=6a5a1a98... 가 통째로 열리지 않았다.
+describe('모르는 값이 든 스냅샷 행 (#382)', () => {
+  const 라이브블록행 = {
+    dateStr: '2026-09-01', totalValue: 96379.1577, cash: 51345.201, holdingsValue: 45033.9567,
+    // cumulativePnl 없음 — 실제 DB 문서가 이렇다
+  } as unknown as { dateStr: string; totalValue: number; cash: number; holdingsValue: number; cumulativePnl: number };
+
+  it('cumulativePnl 이 없어도 렌더가 죽지 않는다', () => {
+    expect(() => renderPage({ history: [라이브블록행] })).not.toThrow();
+  });
+
+  it('모르는 값은 — 로 낸다 (0 으로 꾸미지 않는다)', () => {
+    renderPage({ history: [라이브블록행] });
+    const row = screen.getByText('2026-09-01').closest('tr')!;
+    const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
+    expect(cells[1]).toContain('96,379'); // 총재산 — 있는 값은 그대로
+    expect(cells[2]).toContain('51,345'); // 현금 — 있는 값은 그대로
+    expect(cells[3]).toContain('45,034'); // 보유 평가액 (KRW 는 반올림)
+    expect(cells[4]).toBe('—');           // 누적 손익 — 블록 단위로는 모른다
+  });
+
+  it('다른 숫자가 비어도 그 칸만 — 가 되고 나머지는 살아 있다', () => {
+    const 구멍 = { dateStr: '2026-09-02', holdingsValue: 1000 } as never;
+    expect(() => renderPage({ history: [구멍] })).not.toThrow();
+    const row = screen.getByText('2026-09-02').closest('tr')!;
+    const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
+    expect(cells[1]).toBe('—');
+    expect(cells[2]).toBe('—');
+    expect(cells[3]).toContain('1,000');
+  });
+
+  it('매매 기록의 수량이 비어도 죽지 않는다', () => {
+    const 구멍매매 = {
+      ticker: 'TQQQ', action: 'buy' as const, date: '2026-09-01', strategy: 'infinite_v4',
+    } as never;
+    expect(() => renderPage({ trades: [구멍매매], history: [] })).not.toThrow();
+  });
+});
