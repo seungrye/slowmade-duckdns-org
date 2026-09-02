@@ -66,3 +66,26 @@ describe('buildTradeUpsertOp', () => {
     expect(op.updateOne.update.$set).not.toHaveProperty('strategy');
   });
 });
+
+// #372 — 블록 귀속. strategy 와 달리 정정 가능해야 하지만, 모를 때 지우면 안 된다.
+describe('buildTradeUpsertOp — portfolioId (#372)', () => {
+  it('주인이 분명하면 $set 으로 간다 (정정 가능)', () => {
+    const op = buildTradeUpsertOp(rec({ portfolioId: '6a96cf256e28c3f7746f65cc' }));
+    expect(op.updateOne.update.$set.portfolioId).toBe('6a96cf256e28c3f7746f65cc');
+  });
+
+  it('주인을 모르면 아예 손대지 않는다 — 교정해 둔 귀속이 지워지면 안 된다', () => {
+    for (const v of [undefined, null]) {
+      const op = buildTradeUpsertOp(rec({ portfolioId: v }));
+      expect(op.updateOne.update.$set).not.toHaveProperty('portfolioId');
+      expect(op.updateOne.update.$setOnInsert ?? {}).not.toHaveProperty('portfolioId');
+    }
+  });
+
+  it('portfolioId 가 $setOnInsert 와 겹치지 않는다', () => {
+    const op = buildTradeUpsertOp(rec({ portfolioId: 'x' }));
+    const a = Object.keys(op.updateOne.update.$set);
+    const b = Object.keys(op.updateOne.update.$setOnInsert ?? {});
+    expect(a.filter((k) => b.includes(k))).toEqual([]);
+  });
+});

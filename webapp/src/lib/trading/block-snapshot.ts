@@ -15,9 +15,13 @@
  * | `lrs_v1` | 없음 | `config.target` |
  * | `rotation_v1` | 없음 | **모름**(후보 자동선발) → 행을 안 쓴다 |
  *
+ * 종목 표는 `block-symbols.ts` 로 옮겼다 (#372) — 체결 귀속이 같은 질문을 하기 때문이다.
+ *
  * 장부가 없으면 `cash` 를 **null** 로 둔다. 0 을 적으면 "현금이 없다"는 **거짓말**이 된다.
  * 종목을 모르면 아예 `null` 을 돌려줘 행을 안 쓴다 — 없는 것을 지어내지 않는다.
  */
+
+import { blockSymbols } from "./block-symbols";
 
 export interface BlockSnapshot {
   /** 그 블록의 장부 현금. 장부가 없는 전략은 null. */
@@ -26,19 +30,6 @@ export interface BlockSnapshot {
   /** cash + holdingsValue. cash 가 없으면 holdingsValue. */
   totalValue: number;
   symbols: string[];
-}
-
-/** 이 블록이 굴리는 종목. 모르면 null(행을 안 쓴다). */
-function symbolsOf(strategy: string, config: Record<string, unknown>): string[] | null {
-  const one = typeof config.symbol === "string" ? config.symbol : null;
-  if (one) return [one];
-  if (typeof config.target === "string") return [config.target];
-  if (Array.isArray(config.universe)) {
-    return config.universe.filter((s): s is string => typeof s === "string");
-  }
-  // rotation 처럼 후보를 자동 선발하는 전략은 config 만으로 알 수 없다.
-  void strategy;
-  return null;
 }
 
 /** 그 블록의 장부 현금. 없으면 null. */
@@ -62,7 +53,7 @@ export function blockSnapshot(args: {
   /** 증권사가 준 총 평가금. >0 이면 evalRows 의 가격 자리가 **평단**이라 스케일이 필요하다. */
   hvBroker: number;
 }): BlockSnapshot | null {
-  const symbols = symbolsOf(args.strategy, args.config);
+  const symbols = blockSymbols(args.config);
   if (!symbols) return null;
 
   const 내것 = new Set(symbols);
