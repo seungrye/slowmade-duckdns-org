@@ -5,6 +5,7 @@ import { envLabel } from "@/lib/env-label";
 import { useMemo, useState } from "react";
 import { useMobile } from "@/hooks/use-mobile";
 import { windowAround, windowStartDate } from "../recent-points";
+import { strategyLabel } from "@/types/trading-marker";
 import Link from "next/link";
 import ReactECharts from "echarts-for-react";
 import Pager, { pageOfIndex, pageSlice } from "@/components/pager";
@@ -32,6 +33,8 @@ type HistoryPoint = {
   cash: number;
   holdingsValue: number;
   cumulativePnl: number;
+  /** 매매기록·일봉으로 되살린 행 (#373). 현금·총재산·누적손익은 모르는 값이라 `—` 로 낸다. */
+  backfilled?: boolean;
 };
 
 type Props = {
@@ -42,6 +45,10 @@ type Props = {
   pricesByTicker: Record<string, { date: string; close: number }[]>;
   names: Record<string, string>;
   history: HistoryPoint[];
+  /** 이 계정·시장의 블록들 — 상단 탭 (#374). */
+  blocks?: { portfolioId: string; strategy: string }[];
+  /** 지금 고른 블록. null 이면 전체. */
+  portfolioId?: string | null;
 };
 
 // 종목별 색 팔레트 — 종가/20일선/60일선을 같은 색으로, 선 스타일로 구분.
@@ -79,6 +86,8 @@ export default function PortfolioDetailClient({
   pricesByTicker,
   names,
   history,
+  blocks = [],
+  portfolioId = null,
 }: Props) {
   const isMobile = useMobile();
   const label = (tk: string) => names[tk] ?? tk;
@@ -238,6 +247,32 @@ export default function PortfolioDetailClient({
         {center ? `${center} 매매 종목` : "매매 종목"}을 기본 표시. 범례에서 종목을 켜고 끄면 종가·20일선·60일선이 함께 토글됩니다. 종가 실선, 20일선 파선, 60일선 점선. 매수(▲)/매도(▼) 마커.
       </p>
 
+      {/* 전략(포트폴리오) 탭 — 블록이 둘 이상일 때만. 하나면 「전체」와 같아 군더더기다. */}
+      {blocks.length > 1 && (
+        <div className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden">
+          {[{ portfolioId: "", strategy: "" }, ...blocks].map((b) => {
+            const active = (b.portfolioId || null) === portfolioId;
+            const q = new URLSearchParams({ env, currency });
+            if (center) q.set("center", center);
+            if (b.portfolioId) q.set("portfolioId", b.portfolioId);
+            return (
+              <Link
+                key={b.portfolioId || "all"}
+                href={`/admin/portfolio/detail?${q.toString()}`}
+                className={
+                  "px-3 py-2 text-sm border-b-2 -mb-px transition whitespace-nowrap shrink-0 " +
+                  (active
+                    ? "border-blue-600 text-blue-600 font-medium"
+                    : "border-transparent text-gray-500 hover:text-gray-700")
+                }
+              >
+                {b.portfolioId ? strategyLabel(b.strategy) : "전체"}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       {tickers.length > 0 ? (
         <div className="w-full aspect-[4/3] sm:aspect-auto sm:h-[420px]">
           <ReactECharts
@@ -261,6 +296,7 @@ export default function PortfolioDetailClient({
             <tr className="border-b text-gray-500 text-left">
               <th className="py-2 pr-3">날짜</th>
               <th className="py-2 pr-3">종목</th>
+              <th className="py-2 pr-3">전략</th>
               <th className="py-2 pr-3">구분</th>
               <th className="py-2 pr-3 text-right">수량</th>
               <th className="py-2 pr-3 text-right">가격</th>
@@ -280,6 +316,9 @@ export default function PortfolioDetailClient({
                 <td className="py-1.5 pr-3">
                   {label(t.ticker)} <span className="text-xs text-gray-400 font-mono">{t.ticker}</span>
                 </td>
+                <td className="py-1.5 pr-3 text-xs text-gray-500 whitespace-nowrap">
+                  {strategyLabel(t.strategy)}
+                </td>
                 <td className={`py-1.5 pr-3 font-medium ${t.action === "buy" ? "text-red-600" : "text-blue-600"}`}>
                   {t.action === "buy" ? "▲ 매수" : "▼ 매도"}
                 </td>
@@ -290,7 +329,7 @@ export default function PortfolioDetailClient({
               </tr>
             ))}
             {tradesDesc.length === 0 && (
-              <tr><td colSpan={7} className="py-6 text-center text-gray-400">매매 기록이 없습니다.</td></tr>
+              <tr><td colSpan={8} className="py-6 text-center text-gray-400">매매 기록이 없습니다.</td></tr>
             )}
           </tbody>
         </table>
@@ -313,12 +352,22 @@ export default function PortfolioDetailClient({
           <tbody>
             {pageSlice(historyDesc, historyPage, PAGE_SIZE).map((h) => (
               <tr key={h.dateStr} className="border-b border-gray-100 dark:border-gray-800">
-                <td className="py-1.5 pr-3 whitespace-nowrap">{h.dateStr}</td>
-                <td className="py-1.5 pr-3 text-right font-medium">{formatMoney(h.totalValue, currency)}</td>
-                <td className="py-1.5 pr-3 text-right">{formatMoney(h.cash, currency)}</td>
+                <td className="py-1.5 pr-3 whitespace-nowrap">
+                  {h.dateStr}
+                  {h.backfilled && (
+                    <span className="ml-1 text-[10px] text-gray-400" title="매매기록·일봉으로 되살린 값">되살림</span>
+                  )}
+                </td>
+                {/* 되살린 행은 보유 평가액만 안다 — 나머지는 모르는 값이라 숫자로 내보이지 않는다. */}
+                <td className="py-1.5 pr-3 text-right font-medium">
+                  {h.backfilled ? "—" : formatMoney(h.totalValue, currency)}
+                </td>
+                <td className="py-1.5 pr-3 text-right">
+                  {h.backfilled ? "—" : formatMoney(h.cash, currency)}
+                </td>
                 <td className="py-1.5 pr-3 text-right">{formatMoney(h.holdingsValue, currency)}</td>
                 <td className={`py-1.5 pr-3 text-right ${h.cumulativePnl >= 0 ? "text-red-600" : "text-blue-600"}`}>
-                  {formatMoney(h.cumulativePnl, currency)}
+                  {h.backfilled ? "—" : formatMoney(h.cumulativePnl, currency)}
                 </td>
               </tr>
             ))}

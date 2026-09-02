@@ -115,3 +115,81 @@ describe('매매 상세 — 표 페이징', () => {
     expect(screen.getByText('포트폴리오 기록이 없습니다.')).toBeTruthy();
   });
 });
+
+// #374 — 포트폴리오(블록)별 구분. 미국 계좌에 블록이 둘이라 합쳐 보이면 못 읽는다.
+describe('블록(전략) 구분', () => {
+  const BLOCKS = [
+    { portfolioId: 'aaaaaaaaaaaaaaaaaaaaaaaa', strategy: 'infinite_v4' },
+    { portfolioId: 'bbbbbbbbbbbbbbbbbbbbbbbb', strategy: 'value_rebalancing' },
+  ];
+
+  it('블록이 둘 이상이면 탭이 나온다 — 전체 + 전략별', () => {
+    renderPage({ blocks: BLOCKS });
+    expect(screen.getByRole('link', { name: '전체' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '무한매수 V4' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '밸류리밸런싱 VR' })).toBeTruthy();
+  });
+
+  it('탭 링크가 env·통화·center·portfolioId 를 실어 나른다', () => {
+    renderPage({ blocks: BLOCKS, center: '2026-06-05' });
+    const href = screen.getByRole('link', { name: '무한매수 V4' }).getAttribute('href')!;
+    expect(href).toContain('env=paper-50194613');
+    expect(href).toContain('currency=KRW');
+    expect(href).toContain('center=2026-06-05');
+    expect(href).toContain('portfolioId=aaaaaaaaaaaaaaaaaaaaaaaa');
+  });
+
+  it('「전체」 탭 링크에는 portfolioId 가 없다', () => {
+    renderPage({ blocks: BLOCKS });
+    expect(screen.getByRole('link', { name: '전체' }).getAttribute('href')).not.toContain('portfolioId');
+  });
+
+  it('고른 블록 탭이 표시된다', () => {
+    renderPage({ blocks: BLOCKS, portfolioId: 'bbbbbbbbbbbbbbbbbbbbbbbb' });
+    expect(screen.getByRole('link', { name: '밸류리밸런싱 VR' }).className).toContain('border-blue-600');
+    expect(screen.getByRole('link', { name: '전체' }).className).not.toContain('border-blue-600');
+  });
+
+  it('블록이 하나뿐이면 탭을 안 그린다 — 「전체」와 같아 군더더기다', () => {
+    renderPage({ blocks: [BLOCKS[0]] });
+    expect(screen.queryByRole('link', { name: '전체' })).toBeNull();
+  });
+
+  it('매매 기록 표에 전략 열이 있다', () => {
+    renderPage({ blocks: BLOCKS });
+    expect(screen.getByRole('columnheader', { name: '전략' })).toBeTruthy();
+    expect(screen.getAllByText('무한매수 V4').length).toBeGreaterThan(0);
+  });
+});
+
+// #373 — 되살린 행은 보유 평가액만 안다. 나머지를 숫자로 내보이면 거짓말이 된다.
+describe('되살린(backfilled) 행 표시', () => {
+  const 되살림 = [
+    { dateStr: '2026-07-01', totalValue: 900, cash: 0, holdingsValue: 900, cumulativePnl: 0, backfilled: true },
+    { dateStr: '2026-07-02', totalValue: 1000, cash: 400, holdingsValue: 600, cumulativePnl: 12 },
+  ];
+
+  it('되살린 행의 현금·총재산·누적손익은 — 로 나온다', () => {
+    renderPage({ history: 되살림 });
+    const row = screen.getByText('2026-07-01').closest('tr')!;
+    const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
+    expect(cells[1]).toBe('—'); // 총재산
+    expect(cells[2]).toBe('—'); // 현금
+    expect(cells[3]).toContain('900'); // 보유 평가액은 실측이라 그대로
+    expect(cells[4]).toBe('—'); // 누적손익
+  });
+
+  it('라이브 행은 종전대로 숫자가 나온다', () => {
+    renderPage({ history: 되살림 });
+    const row = screen.getByText('2026-07-02').closest('tr')!;
+    const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
+    expect(cells[1]).toContain('1,000');
+    expect(cells[2]).toContain('400');
+    expect(cells[4]).toContain('12');
+  });
+
+  it('되살린 행에는 표시가 붙는다', () => {
+    renderPage({ history: 되살림 });
+    expect(screen.getByText('되살림')).toBeTruthy();
+  });
+});
