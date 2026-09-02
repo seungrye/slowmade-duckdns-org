@@ -95,7 +95,9 @@ for (const p of ports) {
             env: envKey, currency, portfolioId: p._id, strategy: p.strategy,
             date: `${s.date}T00:00:00.000Z`, dateStr: s.date,
             holdingsValue: s.holdingsValue, totalValue: s.holdingsValue,
-            cash: 0, runPnl: 0, cumulativePnl: 0,
+            cash: 0,
+            // runPnl·cumulativePnl 은 안 쓴다 (#382) — 블록별 실현손익은 계산하지 않는다.
+            // 0 을 넣으면 "손익 0" 이라는 거짓말이 된다. 화면은 없으면 `—` 로 낸다.
             backfilled: true,
           },
           $currentDate: { updatedAt: true },

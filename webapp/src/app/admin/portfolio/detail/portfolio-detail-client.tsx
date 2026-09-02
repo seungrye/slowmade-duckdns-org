@@ -20,19 +20,24 @@ type Currency = "KRW" | "USD";
 type Trade = {
   ticker: string;
   action: "buy" | "sell";
-  qty: number;
-  cumulativeQty: number;
-  price: number;
-  amount: number;
+  qty?: number;
+  cumulativeQty?: number;
+  price?: number;
+  amount?: number;
   date: string;
   strategy: string;
 };
 type HistoryPoint = {
   dateStr: string;
-  totalValue: number;
-  cash: number;
-  holdingsValue: number;
-  cumulativePnl: number;
+  /**
+   * 블록 스냅샷에는 **없는 값이 있다** (#382). close-sync 는 블록 행에
+   * totalValue/cash/holdingsValue 만 쓴다 — 실현손익은 계좌 단위로만 계산되기 때문이다.
+   * 그래서 전부 optional 이다. 없는 값을 0 으로 꾸미지 않고 `—` 로 낸다.
+   */
+  totalValue?: number;
+  cash?: number;
+  holdingsValue?: number;
+  cumulativePnl?: number;
   /** 매매기록·일봉으로 되살린 행 (#373). 현금·총재산·누적손익은 모르는 값이라 `—` 로 낸다. */
   backfilled?: boolean;
 };
@@ -58,6 +63,22 @@ const PALETTE = [
   "#2f4b7c", "#665191", "#a05195", "#d45087", "#f95d6a",
   "#ff7c43", "#ffa600", "#488f31", "#de425b", "#69b3a2",
 ];
+
+/**
+ * 스냅샷 칸 하나. 값이 없거나 숫자가 아니면 `—`.
+ *
+ * 예전엔 그대로 formatMoney 에 넘겨 `undefined.toLocaleString()` 로 **페이지 전체가**
+ * 죽었다(#382 — 블록별 매매 상세가 통째로 안 열렸다). 한 칸이 비었다고 화면이 사라지면
+ * 안 되고, 0 으로 채우면 "손익이 0" 이라는 거짓말이 된다.
+ */
+function money(v: number | undefined, currency: Currency): string {
+  return typeof v === "number" && Number.isFinite(v) ? formatMoney(v, currency) : "—";
+}
+
+/** 수량처럼 통화가 아닌 숫자. 없으면 `—`. */
+function num(v: number | undefined): string {
+  return typeof v === "number" && Number.isFinite(v) ? v.toLocaleString() : "—";
+}
 
 function formatMoney(v: number, currency: Currency): string {
   if (currency === "USD") {
@@ -135,7 +156,11 @@ export default function PortfolioDetailClient({
       selected[nameClose] = isOn(tk);
 
       // 매매 마커 — 종가 series 의 markPoint 로 붙여, 종가 legend 토글 시 함께 켜지고 꺼짐.
-      const tks = trades.filter((t) => t.ticker === tk);
+      // 가격이 없는 체결은 마커를 찍을 y 좌표가 없다 — 넣으면 undefined 가 coord 로 들어간다 (#382).
+      const tks = trades.filter(
+        (t): t is typeof t & { price: number } =>
+          t.ticker === tk && typeof t.price === "number" && Number.isFinite(t.price),
+      );
       const markData = [
         ...tks.filter((t) => t.action === "buy").map((t) => ({
           name: "매수", coord: [t.date, t.price], symbol: "triangle", symbolSize: 12, itemStyle: { color: "#dc2626" },
@@ -322,10 +347,10 @@ export default function PortfolioDetailClient({
                 <td className={`py-1.5 pr-3 font-medium ${t.action === "buy" ? "text-red-600" : "text-blue-600"}`}>
                   {t.action === "buy" ? "▲ 매수" : "▼ 매도"}
                 </td>
-                <td className="py-1.5 pr-3 text-right">{t.qty.toLocaleString()}</td>
-                <td className="py-1.5 pr-3 text-right">{formatMoney(t.price, currency)}</td>
-                <td className="py-1.5 pr-3 text-right">{formatMoney(t.amount, currency)}</td>
-                <td className="py-1.5 pr-3 text-right">{t.cumulativeQty.toLocaleString()}</td>
+                <td className="py-1.5 pr-3 text-right">{num(t.qty)}</td>
+                <td className="py-1.5 pr-3 text-right">{money(t.price, currency)}</td>
+                <td className="py-1.5 pr-3 text-right">{money(t.amount, currency)}</td>
+                <td className="py-1.5 pr-3 text-right">{num(t.cumulativeQty)}</td>
               </tr>
             ))}
             {tradesDesc.length === 0 && (
@@ -360,14 +385,14 @@ export default function PortfolioDetailClient({
                 </td>
                 {/* 되살린 행은 보유 평가액만 안다 — 나머지는 모르는 값이라 숫자로 내보이지 않는다. */}
                 <td className="py-1.5 pr-3 text-right font-medium">
-                  {h.backfilled ? "—" : formatMoney(h.totalValue, currency)}
+                  {h.backfilled ? "—" : money(h.totalValue, currency)}
                 </td>
                 <td className="py-1.5 pr-3 text-right">
-                  {h.backfilled ? "—" : formatMoney(h.cash, currency)}
+                  {h.backfilled ? "—" : money(h.cash, currency)}
                 </td>
-                <td className="py-1.5 pr-3 text-right">{formatMoney(h.holdingsValue, currency)}</td>
-                <td className={`py-1.5 pr-3 text-right ${h.cumulativePnl >= 0 ? "text-red-600" : "text-blue-600"}`}>
-                  {h.backfilled ? "—" : formatMoney(h.cumulativePnl, currency)}
+                <td className="py-1.5 pr-3 text-right">{money(h.holdingsValue, currency)}</td>
+                <td className={`py-1.5 pr-3 text-right ${(h.cumulativePnl ?? 0) >= 0 ? "text-red-600" : "text-blue-600"}`}>
+                  {h.backfilled ? "—" : money(h.cumulativePnl, currency)}
                 </td>
               </tr>
             ))}
