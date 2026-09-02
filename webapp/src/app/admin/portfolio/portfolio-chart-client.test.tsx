@@ -8,7 +8,6 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 const push = vi.fn();
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
-const dispatchAction = vi.fn();
 type Captured = { onEvents?: Record<string, (p: unknown) => void> };
 const captured: Captured = {};
 vi.mock('echarts-for-react', () => ({

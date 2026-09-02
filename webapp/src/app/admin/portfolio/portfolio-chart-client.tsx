@@ -10,7 +10,6 @@ import { useMobile } from "@/hooks/use-mobile";
 import { windowStartDate } from "./recent-points";
 import { buildChartOption } from "./chart-option";
 import ReactECharts from "echarts-for-react";
-import type { EChartsOption } from "echarts";
 
 type Env = string;
 type Currency = "KRW" | "USD";
