@@ -31,9 +31,14 @@ type PortfolioResponse = {
   env: string;
   currency: "KRW" | "USD";
   history: HistoryPoint[];
-  /** 블록(전략)별 자산 곡선 (#367). 한 계정·한 시장에 블록이 여럿일 때 구분해 보여준다. */
-  blocks?: { portfolioId: string; strategy: string; history: HistoryPoint[] }[];
+  /** 블록(전략)별 자산 곡선 (#367·#373). 한 계정·한 시장에 블록이 여럿일 때 구분해 보여준다. */
+  blocks?: {
+    portfolioId: string; strategy: string; history: HistoryPoint[];
+    tradesByDate?: Record<string, TradeStats>;
+  }[];
   tradesByDate: Record<string, TradeStats>;
+  /** 어느 블록에도 안 붙은 매매만 (#373). 블록 마커를 쓸 때 계좌 선엔 이것만 남긴다. */
+  unownedTradesByDate?: Record<string, TradeStats>;
 };
 
 type Env = string;
@@ -107,28 +112,48 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     const cashData = history.map((h) => h.cash);
     const holdingsData = history.map((h) => h.holdingsValue);
 
-    // 매매 마커 — totalValue line 위에 표시.
-    // 매수만: ▲ 빨강 / 매도만: ▼ 파랑 / 둘 다: ■ 보라.
+    // 매매 마커. 모양이 방향을 말한다 — 매수만 ▲ / 매도만 ▼ / 둘 다 ■.
+    // 블록이 여럿이면 **그 블록 선 위에** 블록색으로 찍는다 (#373) — 그래야 어느 전략이
+    // 샀는지 한눈에 보이고, 눌렀을 때 그 블록의 매매 상세로 갈 수 있다.
     type ESeries = NonNullable<EChartsOption["series"]>;
-    const buyOnly: Array<[string, number]> = [];
-    const sellOnly: Array<[string, number]> = [];
-    const both: Array<[string, number]> = [];
     const tradeMeta: Record<string, TradeStats> = data.tradesByDate;
 
-    for (const h of history) {
-      const stats = tradeMeta[h.dateStr];
-      if (!stats) continue;
-      const point: [string, number] = [h.dateStr, h.totalValue];
-      if (stats.buy > 0 && stats.sell > 0) both.push(point);
-      else if (stats.buy > 0) buyOnly.push(point);
-      else if (stats.sell > 0) sellOnly.push(point);
-    }
+    type MarkerItem = {
+      value: [string, number];
+      symbol: string;
+      symbolRotate?: number;
+      /** 클릭 시 어느 블록의 상세로 갈지. 계좌(주인 없음)면 빈 문자열. */
+      portfolioId: string;
+      stats: TradeStats;
+    };
+    const 마커 = (
+      stats: Record<string, TradeStats>,
+      값: (dateStr: string) => number | null,
+      portfolioId: string,
+    ): MarkerItem[] => {
+      const out: MarkerItem[] = [];
+      for (const h of history) {
+        const st = stats[h.dateStr];
+        if (!st || (st.buy === 0 && st.sell === 0)) continue;
+        const y = 값(h.dateStr);
+        if (y === null || !Number.isFinite(y)) continue;
+        const 둘다 = st.buy > 0 && st.sell > 0;
+        out.push({
+          value: [h.dateStr, y],
+          symbol: 둘다 ? "rect" : "triangle",
+          ...(!둘다 && st.sell > 0 ? { symbolRotate: 180 } : {}),
+          portfolioId,
+          stats: st,
+        });
+      }
+      return out;
+    };
 
     const markerTooltipFormatter = (
-      p: { value: [string, number] },
+      p: { value: [string, number]; data?: { stats?: TradeStats } },
     ) => {
       const d = p.value[0];
-      const stats = tradeMeta[d];
+      const stats = p.data?.stats ?? tradeMeta[d];
       if (!stats) return `${d}<br/>매매 없음`;
       const lines = [`<b>${d}</b>`];
       if (stats.buy > 0) {
@@ -149,16 +174,26 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     };
 
     const 블록색 = ["#9333ea", "#0891b2", "#ca8a04", "#db2777", "#4d7c0f"];
-    const blockLines = (data.blocks ?? []).map((b, i) => ({
-      type: "line" as const,
-      name: `${strategyLabel(b.strategy)} 총액`,
-      // 계좌 곡선과 x 축을 맞춘다. 그 블록이 아직 없던 날은 빈 값으로 둔다.
-      data: dates.map((d) => new Map(b.history.map((h) => [h.dateStr, h.totalValue])).get(d) ?? null),
-      connectNulls: false,
-      showSymbol: false,
-      lineStyle: { color: 블록색[i % 블록색.length], width: 1.5 },
-      itemStyle: { color: 블록색[i % 블록색.length] },
-    }));
+    const blocks = data.blocks ?? [];
+    // 블록 선은 **보유 평가액**이다 (#373). 계좌 「보유 평가액」선의 분해라 블록 선들의 합이
+    // 계좌선과 겹쳐 눈으로 검증된다. 총액(장부현금+평가액)으로 그리려 해도 블록 장부 현금은
+    // 과거값이 DB 에 없어 곡선이 안 된다 — 없는 것을 지어내지 않는다.
+    const blockLines = blocks.map((b, i) => {
+      const 값 = new Map(b.history.map((h) => [h.dateStr, h.holdingsValue]));
+      return {
+        type: "line" as const,
+        name: `${strategyLabel(b.strategy)} 평가액`,
+        // 계좌 곡선과 x 축을 맞춘다. 그 블록이 아직 없던 날은 빈 값으로 둔다.
+        data: dates.map((d) => 값.get(d) ?? null),
+        connectNulls: false,
+        // 점이 하나뿐이면 선이 안 그려진다 — 그때만 점을 보인다.
+        showSymbol: b.history.length < 2,
+        symbolSize: 6,
+        lineStyle: { color: 블록색[i % 블록색.length], width: 1.5 },
+        itemStyle: { color: 블록색[i % 블록색.length] },
+      };
+    });
+    const 블록선표시 = blockLines.length > 1;
 
     const series: ESeries = [
       {
@@ -186,46 +221,52 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
         lineStyle: { color: "#ea580c", width: 1.5, type: "dashed" },
         itemStyle: { color: "#ea580c" },
       },
-      // 블록(전략)별 총액 선 (#367). 계좌 선과 **함께** 그린다 — 블록 장부의 합이 계좌와
-      // 안 맞을 수 있는데(예약을 넘겨 잡은 블록), 나란히 놓여야 그게 눈에 띈다.
+      // 블록(전략)별 평가액 선 (#367·#373). 계좌 선과 **함께** 그린다 — 합이 계좌
+      // 「보유 평가액」과 맞는지 나란히 놓여야 보인다.
       // 블록이 하나뿐이면 계좌 선과 겹치므로 그리지 않는다.
-      ...(blockLines.length > 1 ? blockLines : []),
+      ...(블록선표시 ? blockLines : []),
     ];
 
 
-    if (buyOnly.length) {
+    // ── 마커 시리즈 ─────────────────────────────────────────────
+    // 블록이 여럿이면 블록 선 위에 블록색으로. 어느 블록에도 안 붙은 매매(폐기된 전략의
+    // 기록)만 계좌 선에 남긴다 — 안 그러면 같은 매매가 두 번 찍힌다.
+    const 마커시리즈이름 = new Set<string>();
+    const pushMarkers = (name: string, items: MarkerItem[], color: string) => {
+      if (!items.length) return;
+      마커시리즈이름.add(name);
       series.push({
         type: "scatter",
-        name: "▲ 매수만",
-        data: buyOnly,
-        symbol: "triangle",
-        symbolSize: 12,
-        itemStyle: { color: "#dc2626", borderColor: "#dc2626" },
-        tooltip: { trigger: "item", formatter: markerTooltipFormatter },
-      } as never);
-    }
-    if (sellOnly.length) {
-      series.push({
-        type: "scatter",
-        name: "▼ 매도만",
-        data: sellOnly,
-        symbol: "triangle",
-        symbolRotate: 180,
-        symbolSize: 12,
-        itemStyle: { color: "#2563eb", borderColor: "#2563eb" },
-        tooltip: { trigger: "item", formatter: markerTooltipFormatter },
-      } as never);
-    }
-    if (both.length) {
-      series.push({
-        type: "scatter",
-        name: "■ 매수+매도",
-        data: both,
-        symbol: "rect",
+        name,
+        data: items,
         symbolSize: 11,
-        itemStyle: { color: "#9333ea", borderColor: "#9333ea" },
+        itemStyle: { color, borderColor: color },
         tooltip: { trigger: "item", formatter: markerTooltipFormatter },
       } as never);
+    };
+
+    if (블록선표시) {
+      blocks.forEach((b, i) => {
+        const 값 = new Map(b.history.map((h) => [h.dateStr, h.holdingsValue]));
+        pushMarkers(
+          `${strategyLabel(b.strategy)} 매매`,
+          마커(b.tradesByDate ?? {}, (d) => 값.get(d) ?? null, b.portfolioId),
+          블록색[i % 블록색.length],
+        );
+      });
+      const 계좌값 = new Map(history.map((h) => [h.dateStr, h.totalValue]));
+      pushMarkers(
+        "기타 매매",
+        마커(data.unownedTradesByDate ?? {}, (d) => 계좌값.get(d) ?? null, ""),
+        "#64748b",
+      );
+    } else {
+      // 블록이 하나뿐(또는 없음)이면 종전대로 계좌 선 위에 방향별로 나눠 찍는다.
+      const 계좌값 = new Map(history.map((h) => [h.dateStr, h.totalValue]));
+      const all = 마커(tradeMeta, (d) => 계좌값.get(d) ?? null, "");
+      pushMarkers("▲ 매수만", all.filter((m) => m.stats.buy > 0 && m.stats.sell === 0), "#dc2626");
+      pushMarkers("▼ 매도만", all.filter((m) => m.stats.sell > 0 && m.stats.buy === 0), "#2563eb");
+      pushMarkers("■ 매수+매도", all.filter((m) => m.stats.buy > 0 && m.stats.sell > 0), "#9333ea");
     }
 
     return {
@@ -248,9 +289,9 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
           const date = String(params[0].axisValue ?? "");
           const lines = [`<b>${date}</b>`];
           for (const p of params) {
-            // scatter (매수/매도/둘다) series 는 axis tooltip 에서 중복 노출 회피
+            // scatter(매매 마커) series 는 axis tooltip 에서 중복 노출 회피
             const n = p.seriesName ?? "";
-            if (n.startsWith("▲") || n.startsWith("▼") || n.startsWith("■")) continue;
+            if (마커시리즈이름.has(n)) continue;
             const raw = p.value;
             const v = Array.isArray(raw) ? Number(raw[1]) : Number(raw);
             if (!Number.isFinite(v)) continue;
@@ -309,9 +350,11 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
   const handleChartClick = (params: { name?: string; value?: unknown; data?: unknown }) => {
     if (!data) return;
     // params.name 은 category axis 라벨 (dateStr) — line series click 시 사용.
-    // scatter series 는 value: [date, total] 또는 data: [date, total].
+    // scatter series 는 data 가 { value: [date, y], portfolioId } 객체다 (#373).
+    const item = params.data as { value?: unknown; portfolioId?: string } | undefined;
     let date: string | null = null;
-    if (typeof params.name === "string" && params.name) date = params.name;
+    if (Array.isArray(item?.value) && typeof item.value[0] === "string") date = item.value[0];
+    else if (typeof params.name === "string" && params.name) date = params.name;
     else if (Array.isArray(params.value) && typeof params.value[0] === "string") date = params.value[0];
     else if (Array.isArray(params.data) && typeof params.data[0] === "string") date = params.data[0] as string;
     if (!date) return;
@@ -319,9 +362,10 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     if (!stats) return;
     const tickers = Array.from(new Set([...stats.buyTickers, ...stats.sellTickers]));
     if (tickers.length === 0) return;
-    // 매매 상세 페이지로 이동 — 그 env·통화의 매매 종목 주가+마커 차트와 매매/포트폴리오 표.
-    const params2 = new URLSearchParams({ env, currency, center: date });
-    router.push(`/admin/portfolio/detail?${params2.toString()}`);
+    // 매매 상세 페이지로 이동. 블록 마커를 눌렀으면 그 블록만 보여준다 (#374).
+    const q = new URLSearchParams({ env, currency, center: date });
+    if (item?.portfolioId) q.set("portfolioId", item.portfolioId);
+    router.push(`/admin/portfolio/detail?${q.toString()}`);
   };
 
   return (
@@ -396,6 +440,8 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
       )}
       <p className="text-xs text-gray-400 mt-2">
         차트에서 마우스 휠로 확대/축소 · 잡고 드래그로 기간 이동 · 마커에 마우스 올리면 매매 요약 표시
+        <br />
+        마커 모양: ▲ 매수만 · ▼ 매도만 · ■ 매수+매도. 마커를 누르면 그 날(전략별) 매매 상세로 갑니다.
       </p>
     </div>
   );
