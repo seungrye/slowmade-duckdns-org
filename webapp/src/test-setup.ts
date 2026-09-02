@@ -1,4 +1,8 @@
-import '@testing-library/jest-dom';
+// jsdom 파일에서만 싣는다 — node 환경 파일(288 중 221)이 매번 물 이유가 없다.
+// 실측: setup 합계 40s → 10s, 전체 43s → 34s. 매처가 실렸는지는 test-setup.test.ts 가 못 박는다.
+// (기본 진입점 '@testing-library/jest-dom' 은 타입 파일이 모듈이 아니라 동적 import 에서
+//  tsc 가 TS2306 을 낸다. vitest 전용 진입점은 정상적인 모듈이다.)
+if (typeof window !== 'undefined') await import('@testing-library/jest-dom/vitest');
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 

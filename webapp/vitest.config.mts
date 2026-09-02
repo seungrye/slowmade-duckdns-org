@@ -19,6 +19,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // 워커를 프로세스(forks) 대신 스레드로. 파일 288 개 중 절반 이상이 0.03 초짜리라
+    // **파일당 부팅 비용이 전체를 지배**한다 — 실측 43s → 39s.
+    // (seed-idempotency 는 child_process 를 쓰므로 vitest.seed.config.mts 로 분리돼 있고
+    //  거기는 기본 forks 를 그대로 쓴다.)
+    pool: 'threads',
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: [
