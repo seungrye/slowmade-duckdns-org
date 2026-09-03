@@ -8,6 +8,7 @@
 // 건드리지 않는다. 나머지 필드(가격·수량·누적)는 계속 갱신되어야 하므로 $set 에 둔다.
 import { describe, it, expect } from 'vitest';
 import { buildTradeUpsertOp } from './trade-upsert';
+import { Types } from 'mongoose';
 
 const rec = (over: Record<string, unknown> = {}) => ({
   env: 'paper-50194613',
@@ -71,7 +72,8 @@ describe('buildTradeUpsertOp', () => {
 describe('buildTradeUpsertOp — portfolioId (#372)', () => {
   it('주인이 분명하면 $set 으로 간다 (정정 가능)', () => {
     const op = buildTradeUpsertOp(rec({ portfolioId: '6a96cf256e28c3f7746f65cc' }));
-    expect(op.updateOne.update.$set.portfolioId).toBe('6a96cf256e28c3f7746f65cc');
+    // 값은 ObjectId 로 박힌다 (#384) — 문자열로 두면 조회가 한 건도 안 맞는다.
+    expect(String(op.updateOne.update.$set.portfolioId)).toBe('6a96cf256e28c3f7746f65cc');
   });
 
   it('주인을 모르면 아예 손대지 않는다 — 교정해 둔 귀속이 지워지면 안 된다', () => {
@@ -87,5 +89,31 @@ describe('buildTradeUpsertOp — portfolioId (#372)', () => {
     const a = Object.keys(op.updateOne.update.$set);
     const b = Object.keys(op.updateOne.update.$setOnInsert ?? {});
     expect(a.filter((k) => b.includes(k))).toEqual([]);
+  });
+});
+
+// #384 — 실측 재현. upsertTrades 는 StockTrade.collection.bulkWrite(원시 드라이버)를 쓴다.
+//   거기엔 **mongoose 캐스팅이 없다** — 문자열을 주면 문자열로 박힌다.
+//   ownerLookup 이 String(_id) 를 돌려주므로 그대로 넘어갔고, 마감 sync 가 돌면서
+//   교정해 둔 ObjectId 148건을 문자열로 덮었다. 그 뒤 매매 상세가
+//   `StockTrade.find({ portfolioId: "24hex" })` 로 조회하면 mongoose 가 **질의만** 캐스팅해
+//   0건이 나온다 → "매매 종목 주가 데이터가 없습니다".
+describe('buildTradeUpsertOp — portfolioId 타입 (#384)', () => {
+  it('24자리 hex 는 ObjectId 로 박는다 — 원시 드라이버는 캐스팅해 주지 않는다', () => {
+    const op = buildTradeUpsertOp(rec({ portfolioId: '6a5a1a98b1b5dac7f7583ccf' }));
+    const pid = op.updateOne.update.$set.portfolioId as { _bsontype?: string };
+    expect(typeof pid).not.toBe('string');
+    expect(String(pid)).toBe('6a5a1a98b1b5dac7f7583ccf');
+  });
+
+  it('이미 ObjectId 면 그대로 둔다', () => {
+    const oid = new Types.ObjectId('6a96cf256e28c3f7746f65cc');
+    const op = buildTradeUpsertOp(rec({ portfolioId: oid }));
+    expect(String(op.updateOne.update.$set.portfolioId)).toBe('6a96cf256e28c3f7746f65cc');
+  });
+
+  it('ObjectId 로 볼 수 없는 값은 손대지 않는다 — 조용히 바꿔치기하지 않는다', () => {
+    const op = buildTradeUpsertOp(rec({ portfolioId: 'not-an-object-id' }));
+    expect(op.updateOne.update.$set.portfolioId).toBe('not-an-object-id');
   });
 });
