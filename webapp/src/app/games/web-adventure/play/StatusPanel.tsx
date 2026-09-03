@@ -14,6 +14,7 @@
 // 기존 InventoryStrip 의 인벤/HP/재굴림 로직 흡수 — 상위 컴포넌트는 이 패널 하나만 마운트.
 
 import type { Character, StatKey } from '@/types/web-adventure';
+import { stigmaTier, stigmaVars } from "@/lib/web-adventure/stigma-sense";
 import { abilities } from '@/content/web-adventure/abilities';
 import { items } from '@/content/web-adventure/items';
 import { groupInventory, formatGroupedItem } from '@/lib/web-adventure/engine/inventory';
@@ -36,22 +37,16 @@ export interface StatusPanelProps {
   onUseItem: (itemId: string) => void;
 }
 
-// #259 — 침식 단계.
-type StigmaLevel = "normal" | "debuff" | "critical";
-function stigmaLevel(stigma: number): StigmaLevel {
-  if (stigma >= 80) return "critical";
-  if (stigma >= 50) return "debuff";
-  return "normal";
-}
-const STIGMA_FLAVOR: Record<StigmaLevel, string> = {
-  normal: "",
-  debuff: "손끝이 딱딱하게 굳어갑니다.",
-  critical: "체온이 느껴지지 않습니다. 관절을 움직일 때마다 석고가 부서지는 소리가 납니다.",
-};
-const STIGMA_BAR_COLOR: Record<StigmaLevel, string> = {
-  normal: "bg-sky-400/60",
-  debuff: "bg-violet-500/70",
-  critical: "bg-indigo-700/80 animate-pulse",
+// 성흔 침식 시각화 — stigma-sense(#370)를 단일 출처로 (#397).
+// 예전엔 여기(#259)에 3단계 하드코딩 flavor 2줄이 따로 있었는데, 나중에 같은 피드백 때문에
+// 만든 stigma-sense(5단계·4감각)와 어긋났다. 항상 보이는 이 패널이 낡은 채로 남아 침식이
+// '수치'로만 읽혔다. 이제 씬 본문과 같은 감각을 패널도 쓴다 — 신체(손)·심리(마음)로 체감.
+const TIER_BAR: Record<number, string> = {
+  0: "bg-sky-400/60",
+  1: "bg-sky-500/70",
+  2: "bg-violet-500/70",
+  3: "bg-indigo-600/80",
+  4: "bg-indigo-800/90 animate-pulse",
 };
 
 export default function StatusPanel({
@@ -63,7 +58,8 @@ export default function StatusPanel({
   const grouped = groupInventory(character.inventory);
   const hpPct = Math.max(0, Math.min(100, (character.hp / character.maxHp) * 100));
   const stigma = character.stigmaErosion;
-  const level = stigmaLevel(stigma);
+  const tier = stigmaTier(stigma);
+  const sense = stigmaVars(stigma); // { 침식_손, 침식_마음, … } — 씬 본문과 같은 감각
   const stigmaPct = Math.max(0, Math.min(100, stigma));
 
   return (
@@ -102,20 +98,22 @@ export default function StatusPanel({
           <span className="font-mono">{stigma} / 100</span>
         </div>
         <div
-          className={`h-2 rounded overflow-hidden ${level === "critical" ? "bg-indigo-200/70 ring-1 ring-indigo-400" : "bg-amber-200/60"}`}
+          className={`h-2 rounded overflow-hidden ${tier >= 3 ? "bg-indigo-200/70 ring-1 ring-indigo-400" : "bg-amber-200/60"}`}
         >
           <div
-            className={`h-full ${STIGMA_BAR_COLOR[level]}`}
+            className={`h-full ${TIER_BAR[tier]}`}
             style={{ width: `${stigmaPct}%` }}
             data-testid="stigma-bar"
-            data-level={level}
+            data-tier={tier}
           />
         </div>
-        {STIGMA_FLAVOR[level] && (
+        {tier >= 1 && (
           <div
-            className={`text-[10px] italic mt-0.5 ${level === "critical" ? "text-indigo-800 font-semibold" : "text-violet-800"}`}
+            className={`text-[10px] italic mt-0.5 ${tier >= 3 ? "text-indigo-800 font-semibold" : "text-violet-800"}`}
+            data-testid="stigma-sense"
           >
-            {STIGMA_FLAVOR[level]}
+            <div>{sense.침식_손}</div>
+            {tier >= 3 && <div className="mt-0.5">{sense.침식_마음}</div>}
           </div>
         )}
       </div>
