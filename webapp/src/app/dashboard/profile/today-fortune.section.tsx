@@ -12,6 +12,7 @@ import { useSession } from 'next-auth/react';
 
 type Fortune = {
   dateKey: string;
+  seen: boolean;
   orientation: 'up' | 'rev';
   reading: string;
   readingSource: 'llm' | 'template';
@@ -31,7 +32,13 @@ export default function TodayFortuneSection() {
     let cancelled = false;
     fetch('/api/fortune/today')
       .then((r) => (r.ok ? r.json() : null))
-      .then((res) => { if (!cancelled) setData(res?.data ?? null); })
+      .then((res) => {
+        if (cancelled) return;
+        const f = res?.data ?? null;
+        setData(f);
+        // 오늘 이미 확인했으면 다음날까지 뒤집힌 채로 — 매번 다시 뒤집게 하지 않는다.
+        if (f?.seen) setRevealed(true);
+      })
       .catch(() => { if (!cancelled) setData(null); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
