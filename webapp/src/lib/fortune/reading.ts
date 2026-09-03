@@ -116,15 +116,14 @@ export interface GeneratedReading {
 }
 
 /**
- * 오늘의 풀이 생성 — LLM → 존댓말 검사 → 실패 시 재생성 1회 → 그래도 실패면 템플릿.
- * 어떤 경우에도 존댓말 결과를 돌려준다.
+ * 프롬프트로 존댓말 풀이 생성(범용) — LLM → 존댓말 검사 → 실패 시 재생성 1회 → 그래도 실패면
+ * fallback(항상 존댓말 템플릿). 타로·사주가 공유한다. 어떤 경우에도 존댓말 결과를 돌려준다.
  */
-export async function generateReading(
-  card: TarotCard,
-  orientation: Orientation,
+export async function generatePolite(
+  messages: LlmMessage[],
+  fallback: string,
   opts?: { signal?: AbortSignal; retries?: number },
 ): Promise<GeneratedReading> {
-  const messages = buildPrompt(card, orientation);
   const attempts = (opts?.retries ?? 1) + 1;
   for (let i = 0; i < attempts; i++) {
     try {
@@ -132,9 +131,17 @@ export async function generateReading(
       if (out && isPolite(out)) return { reading: out, source: "llm" };
       // 반말이 새면 재시도(shim temp 0.9 라 다음엔 존댓말일 확률이 높다).
     } catch {
-      // 네트워크·shim 오류 — 폴백으로 간다.
-      break;
+      break; // 네트워크·shim 오류 — 폴백으로 간다.
     }
   }
-  return { reading: templateReading(card, orientation), source: "template" };
+  return { reading: fallback, source: "template" };
+}
+
+/** 타로 오늘의 풀이 생성. */
+export async function generateReading(
+  card: TarotCard,
+  orientation: Orientation,
+  opts?: { signal?: AbortSignal; retries?: number },
+): Promise<GeneratedReading> {
+  return generatePolite(buildPrompt(card, orientation), templateReading(card, orientation), opts);
 }

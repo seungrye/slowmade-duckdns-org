@@ -29,6 +29,8 @@ const UserSchema = new mongoose.Schema(
     // 생일 (#326). 'YYYY-MM-DD' 를 **UTC 자정**으로 저장하고 월·일도 UTC 게터로 읽는다.
     // 로컬 시각으로 만들면 KST 사용자의 1990-03-15 가 UTC 03-14T15:00Z 가 되어 하루 밀린다.
     birthday: { type: Date },
+    // 태어난 시 "HH:mm" (#390) — 선택. 있으면 사주 시주(時柱)까지 계산. 없으면 3주만.
+    birthTime: { type: String, default: undefined },
     likedPosts: { type: [String], default: [] }, // 좋아요한 게시글 ID 목록
     // 덧글 알림 읽음 상태 (#237, #247). 두 값이 함께 판정한다.
     //   기준선  이 시각보다 오래된 것은 무조건 읽음. 없으면(한 번도 안 봤으면) 전부 새 것.

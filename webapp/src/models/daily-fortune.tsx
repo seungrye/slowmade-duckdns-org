@@ -28,6 +28,11 @@ const DailyFortuneSchema = new Schema(
     readingSource: { type: String, enum: ["llm", "template"], default: "template" },
     status: { type: String, enum: ["pending", "ready", "failed"], default: "pending" },
     seenAt: { type: Date, default: null },
+    // 사주 풀이 (#390) — birthday 있는 사용자만. 타로와 같은 문서·같은 날.
+    // 사주판·일간은 생일에서 매번 계산(결정론)하므로 저장 안 하고, LLM 풀이만 캐시.
+    sajuReading: { type: String, default: "" },
+    sajuSource: { type: String, enum: ["llm", "template"], default: "template" },
+    sajuStatus: { type: String, enum: ["pending", "ready", "failed", "none"], default: "none" },
   },
   { timestamps: true },
 );

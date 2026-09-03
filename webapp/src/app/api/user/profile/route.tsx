@@ -11,7 +11,7 @@ export async function GET() {
 
   try {
     await connectToDB();
-    const user = await User.findOne({ email: auth.email }).select('name email profileImage points createdAt birthday');
+    const user = await User.findOne({ email: auth.email }).select('name email profileImage points createdAt birthday birthTime');
 
     if (!user) {
       return apiError("사용자를 찾을 수 없습니다.", 404);
@@ -34,7 +34,7 @@ export async function PUT(request: Request) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  let body: { birthday?: unknown };
+  let body: { birthday?: unknown; birthTime?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -52,19 +52,37 @@ export async function PUT(request: Request) {
     return apiError("생일이 올바르지 않습니다. 1900년 이후의 지난 날짜여야 합니다.", 400);
   }
 
+  // 태어난 시(선택) — "HH:mm" 또는 비움. 사주 시주 계산용. (#390)
+  const rawTime = body.birthTime;
+  const clearingTime = rawTime === null || rawTime === '' || rawTime === undefined;
+  let birthTime: string | null = null;
+  if (!clearingTime) {
+    if (typeof rawTime !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(rawTime)) {
+      return apiError("태어난 시는 'HH:mm' 형식이어야 합니다.", 400);
+    }
+    birthTime = rawTime;
+  }
+
   try {
     await connectToDB();
+    // 생일이 지워지면 태어난 시도 함께 지운다(사주 근거가 없어지므로).
+    const set: Record<string, unknown> = {};
+    const unset: Record<string, unknown> = {};
+    if (birthday) set.birthday = birthday; else unset.birthday = 1;
+    if (birthday && birthTime) set.birthTime = birthTime; else unset.birthTime = 1;
+    const update: Record<string, unknown> = {};
+    if (Object.keys(set).length) update.$set = set;
+    if (Object.keys(unset).length) update.$unset = unset;
     const updated = await User.findOneAndUpdate(
-      { email: auth.email },
-      birthday ? { $set: { birthday } } : { $unset: { birthday: 1 } },
-      { new: true, projection: { birthday: 1 } }
+      { email: auth.email }, update,
+      { new: true, projection: { birthday: 1, birthTime: 1 } }
     );
 
     if (!updated) {
       return apiError("사용자를 찾을 수 없습니다.", 404);
     }
 
-    return apiSuccess({ birthday: updated.birthday ?? null });
+    return apiSuccess({ birthday: updated.birthday ?? null, birthTime: updated.birthTime ?? null });
   } catch (error) {
     console.error("Error updating birthday:", error);
     return apiError("생일을 저장하는 데 실패했습니다.", 500);

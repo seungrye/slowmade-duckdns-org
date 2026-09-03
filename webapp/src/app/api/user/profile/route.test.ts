@@ -83,7 +83,8 @@ describe('PUT /api/user/profile', () => {
       mockFindOneAndUpdate.mockClear();
       const res = await PUT(putRequest(body));
       expect(res.status).toBe(200);
-      expect(mockFindOneAndUpdate.mock.calls[0][1]).toEqual({ $unset: { birthday: 1 } });
+      // 생일을 지우면 사주 근거가 없어지므로 태어난 시도 함께 지운다 (#390).
+      expect(mockFindOneAndUpdate.mock.calls[0][1]).toEqual({ $unset: { birthday: 1, birthTime: 1 } });
     }
   });
 
@@ -110,5 +111,33 @@ describe('PUT /api/user/profile', () => {
     signedIn();
     const bad = new Request('http://localhost/api/user/profile', { method: 'PUT', body: 'not json' });
     expect((await PUT(bad)).status).toBe(400);
+  });
+});
+
+describe('PUT /api/user/profile — 태어난 시 (#390)', () => {
+  it('birthTime 이 있으면 함께 저장한다', async () => {
+    signedIn();
+    mockFindOneAndUpdate.mockResolvedValue({ birthday: new Date('1990-03-15T00:00:00Z'), birthTime: '09:30' });
+    const res = await PUT(putRequest({ birthday: '1990-03-15', birthTime: '09:30' }));
+    expect(res.status).toBe(200);
+    expect(mockFindOneAndUpdate.mock.calls[0][1].$set.birthTime).toBe('09:30');
+  });
+
+  it('birthTime 형식이 틀리면 400', async () => {
+    signedIn();
+    for (const t of ['9:30', '25:00', '12:60', 'abc']) {
+      mockFindOneAndUpdate.mockClear();
+      const res = await PUT(putRequest({ birthday: '1990-03-15', birthTime: t }));
+      expect(res.status).toBe(400);
+      expect(mockFindOneAndUpdate).not.toHaveBeenCalled();
+    }
+  });
+
+  it('birthday 만 있고 birthTime 은 비우면 birthTime 을 unset 한다', async () => {
+    signedIn();
+    mockFindOneAndUpdate.mockResolvedValue({ birthday: new Date('1990-03-15T00:00:00Z') });
+    const res = await PUT(putRequest({ birthday: '1990-03-15', birthTime: null }));
+    expect(res.status).toBe(200);
+    expect(mockFindOneAndUpdate.mock.calls[0][1].$unset).toEqual({ birthTime: 1 });
   });
 });

@@ -21,6 +21,7 @@ export default function MyProfile({session}: { session: Session | null }) {
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [birthday, setBirthday] = useState('');
+    const [birthTime, setBirthTime] = useState('');
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
 
@@ -34,6 +35,7 @@ export default function MyProfile({session}: { session: Session | null }) {
                     const { data } = await res.json();
                     setProfile(data);
                     setBirthday(formatBirthdayInput(data?.birthday ? new Date(data.birthday) : null));
+                    setBirthTime(typeof data?.birthTime === 'string' ? data.birthTime : '');
                 }
             } catch (error) {
                 console.error("Failed to fetch profile", error);
@@ -52,7 +54,7 @@ export default function MyProfile({session}: { session: Session | null }) {
             const res = await fetch('/api/user/profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ birthday: birthday || null }),
+                body: JSON.stringify({ birthday: birthday || null, birthTime: birthTime || null }),
             });
             const body = await res.json();
             if (!res.ok) {
@@ -99,10 +101,10 @@ export default function MyProfile({session}: { session: Session | null }) {
                 </Button>
             </Card>
 
-            <Card className="mt-4">
+            <Card className="mt-4" id="birthday-card">
                 <h3 className="text-lg font-semibold">생일</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    등록해 두면 생일 당일 처음 접속할 때 축하 폭죽이 터집니다. 비워 두고 저장하면 지워집니다.
+                    등록해 두면 생일 당일 처음 접속할 때 축하 폭죽이 터지고, <b className="text-violet-600 dark:text-violet-400">오늘의 사주 운세</b>가 열립니다. 비워 두고 저장하면 지워집니다.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     <label htmlFor="birthday" className="sr-only">생일</label>
@@ -115,6 +117,15 @@ export default function MyProfile({session}: { session: Session | null }) {
                         disabled={loading || saving}
                         className="rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                     />
+                    <label htmlFor="birthTime" className="text-sm text-gray-500 dark:text-gray-400">태어난 시</label>
+                    <input
+                        id="birthTime"
+                        type="time"
+                        value={birthTime}
+                        onChange={(e) => { setBirthTime(e.target.value); setMessage(''); }}
+                        disabled={loading || saving}
+                        className="rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    />
                     <Button onClick={saveBirthday} disabled={loading || saving}>
                         {saving ? '저장 중...' : '저장'}
                     </Button>
@@ -122,6 +133,7 @@ export default function MyProfile({session}: { session: Session | null }) {
                         <span className="text-sm text-gray-600 dark:text-gray-400" role="status">{message}</span>
                     )}
                 </div>
+                <p className="text-xs text-gray-400 mt-2">태어난 시를 모르면 비워 두세요 — 사주 시주(時柱)만 생략됩니다.</p>
             </Card>
         </>
     );
