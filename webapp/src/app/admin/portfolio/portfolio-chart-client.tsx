@@ -209,7 +209,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
       <p className="text-xs text-gray-400 mt-2">
         차트에서 마우스 휠로 확대/축소 · 잡고 드래그로 기간 이동 · 마커에 마우스 올리면 매매 요약 표시
         <br />
-        마커 모양: ▲ 매수만 · ▼ 매도만 · ■ 매수+매도. 마커를 누르면 그 날(전략별) 매매 상세로 갑니다.
+        마커: ▲(채움) 매수 · ▽(테두리) 매도 · ▭(테두리) 매수+매도. 누르면 그 날(전략별) 매매 상세로 갑니다.
       </p>
     </div>
   );
