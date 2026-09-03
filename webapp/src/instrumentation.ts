@@ -6,5 +6,8 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startTradingScheduler } = await import("@/lib/trading/scheduler");
     startTradingScheduler();
+    // 오늘의 운세 밤 배치 (#388) — 매매와 독립된 스케줄러.
+    const { startFortuneScheduler } = await import("@/lib/fortune/scheduler");
+    startFortuneScheduler();
   }
 }
