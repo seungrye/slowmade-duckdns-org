@@ -30,6 +30,8 @@ type Fortune = {
 
 import { EL_COLOR, ELEMENTS, meaningOf, ZHI_EL } from '@/lib/fortune/saju-labels';
 const ZHI_EL_OF = (z: string) => ZHI_EL[z] ?? '토';
+// 사주 글자 수 — 시주가 있으면 4기둥×2=8, 없으면 3기둥×2=6.
+const sajuTotal = (saju: SajuBlock) => (saju.pillars.time ? 8 : 6);
 
 export default function TodayFortuneSection() {
   const { status } = useSession();
@@ -248,9 +250,25 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
       </div>
 
       {/* 오행 분포 */}
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="mt-4 flex items-center gap-1.5">
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">오행 분포</span>
+        <span className="group/oh relative inline-flex cursor-help text-gray-400" tabIndex={0} aria-label="오행 분포란">
+          <span className="grid h-4 w-4 place-items-center rounded-full border border-gray-300 text-[10px] dark:border-gray-600">?</span>
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute bottom-full left-0 z-20 mb-1 w-max max-w-[240px] rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/oh:opacity-100 group-focus/oh:opacity-100 dark:bg-gray-700"
+          >
+            사주 {sajuTotal(saju)}글자 중 각 오행이 몇 개인지예요. 많거나 없는 기운이 그 사람의 균형을 말해 줍니다.
+          </span>
+        </span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
         {ELEMENTS.map((el) => (
-          <span key={el} className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400">
+          <span
+            key={el}
+            title={`사주 ${sajuTotal(saju)}글자 중 ${el} ${saju.elements[el] ?? 0}개`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
+          >
             <span className="h-2 w-2 rounded-full" style={{ background: EL_COLOR[el] }} />{el} {saju.elements[el] ?? 0}
           </span>
         ))}
