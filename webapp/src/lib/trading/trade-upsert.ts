@@ -11,6 +11,8 @@
 // DB 를 모르는 순수 함수로 떼어 둔 이유는 테스트 때문이다 — close-sync 는 mongoose 모델과
 // KIS 클라이언트를 최상위에서 끌어와 단위 테스트로 감싸기 어렵다.
 import { normalizeTradeTime } from "@/lib/trade-time";
+// Types 만 쓴다(연결 없음) — 캐스팅을 조립하는 이 한 곳에 두려는 것이다.
+import { Types } from "mongoose";
 
 type Json = Record<string, unknown>;
 
@@ -37,8 +39,18 @@ export function buildTradeUpsertOp(record: Json): TradeUpsertOp {
   // 블록 귀속(#372)은 strategy 와 달리 **정정 가능**하다 — 블록을 지웠다 다시 만들면
   // id 가 바뀌므로 재푸시가 따라와야 한다. 다만 **주인을 모를 때는 손대지 않는다**:
   // null 을 $set 하면 교정 스크립트가 붙여 둔 귀속을 다음 마감에 다시 지워 버린다.
+  //
+  // ⚠ 반드시 ObjectId 로 박는다 (#384). 이 연산은 `StockTrade.collection.bulkWrite`
+  //   (원시 드라이버)로 나가는데 **거기엔 mongoose 캐스팅이 없다** — 문자열을 주면
+  //   문자열로 저장된다. 반면 조회(`StockTrade.find({ portfolioId })`)는 스키마대로
+  //   ObjectId 로 캐스팅되므로 **한 건도 안 맞는다.** 실제로 마감 sync 가 돌면서 교정해
+  //   둔 148 건을 문자열로 덮었고, 블록별 매매 상세가 "매매 종목 주가 데이터가 없습니다"
+  //   로 비었다.
   if (portfolioId !== undefined && portfolioId !== null) {
-    update.$set.portfolioId = portfolioId;
+    update.$set.portfolioId =
+      typeof portfolioId === "string" && Types.ObjectId.isValid(portfolioId)
+        ? new Types.ObjectId(portfolioId)
+        : portfolioId;
   }
   return {
     updateOne: {
