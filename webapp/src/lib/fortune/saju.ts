@@ -9,25 +9,8 @@
  */
 import { Solar } from "lunar-javascript";
 import { todayInSeoul } from "@/lib/birthday";
+import { GAN_EL, ZHI_EL, GAN_KR, ZHI_KR, type WuXing } from "./saju-labels";
 import { generatePolite, type LlmMessage, type GeneratedReading } from "./reading";
-
-export type WuXing = "목" | "화" | "토" | "금" | "수";
-
-// 천간·지지 → 오행(표준). 라이브러리에 의존하지 않는다.
-const GAN_EL: Record<string, WuXing> = {
-  甲: "목", 乙: "목", 丙: "화", 丁: "화", 戊: "토", 己: "토", 庚: "금", 辛: "금", 壬: "수", 癸: "수",
-};
-const ZHI_EL: Record<string, WuXing> = {
-  寅: "목", 卯: "목", 巳: "화", 午: "화", 辰: "토", 戌: "토", 丑: "토", 未: "토",
-  申: "금", 酉: "금", 亥: "수", 子: "수",
-};
-const GAN_KR: Record<string, string> = {
-  甲: "갑", 乙: "을", 丙: "병", 丁: "정", 戊: "무", 己: "기", 庚: "경", 辛: "신", 壬: "임", 癸: "계",
-};
-const ZHI_KR: Record<string, string> = {
-  子: "자", 丑: "축", 寅: "인", 卯: "묘", 辰: "진", 巳: "사", 午: "오", 未: "미",
-  申: "신", 酉: "유", 戌: "술", 亥: "해",
-};
 
 export interface Pillar {
   ganzhi: string; // 干支 예: "戊午"
@@ -177,18 +160,18 @@ export function sajuContext(saju: Saju, iljin: Pillar): SajuContext {
 }
 
 // ── 클라이언트 DTO 블록 (서버에서 조립) ──────────────────────────────
-export interface SajuPillarDTO { ganzhi: string; ganKr: string; zhiKr: string; ganEl: WuXing; zhiEl: WuXing; }
+export interface SajuPillarDTO { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: WuXing; zhiEl: WuXing; }
 export interface SajuBlockDTO {
   pillars: { year: SajuPillarDTO; month: SajuPillarDTO; day: SajuPillarDTO; time: SajuPillarDTO | null };
   dayGanKr: string; dayEl: WuXing; elements: Record<WuXing, number>;
-  iljin: { ganzhi: string; ganKr: string; zhiKr: string; ganEl: WuXing };
+  iljin: { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: WuXing };
   relation: { key: RelationKey; meaning: string };
   reading: string; readingSource: "llm" | "template";
   hasBirthTime: boolean;
 }
 
 function pillarDTO(p: Pillar): SajuPillarDTO {
-  return { ganzhi: p.ganzhi, ganKr: p.ganKr, zhiKr: p.zhiKr, ganEl: p.ganEl, zhiEl: p.zhiEl };
+  return { ganzhi: p.ganzhi, gan: p.gan, zhi: p.zhi, ganKr: p.ganKr, zhiKr: p.zhiKr, ganEl: p.ganEl, zhiEl: p.zhiEl };
 }
 
 /** 사주 사실 + 캐시된 풀이 → 클라이언트 블록(순수). 풀이 없으면 템플릿으로 즉시 채운다. */
@@ -204,7 +187,7 @@ export function sajuBlock(
       day: pillarDTO(saju.pillars.day), time: saju.pillars.time ? pillarDTO(saju.pillars.time) : null,
     },
     dayGanKr: saju.dayGanKr, dayEl: saju.dayEl, elements: saju.elements,
-    iljin: { ganzhi: iljin.ganzhi, ganKr: iljin.ganKr, zhiKr: iljin.zhiKr, ganEl: iljin.ganEl },
+    iljin: { ganzhi: iljin.ganzhi, gan: iljin.gan, zhi: iljin.zhi, ganKr: iljin.ganKr, zhiKr: iljin.zhiKr, ganEl: iljin.ganEl },
     relation: ctx.relation,
     reading, readingSource: cached?.sajuReading && cached.sajuReading.trim() ? (cached.sajuSource ?? "template") : "template",
     hasBirthTime: saju.pillars.time !== null,
