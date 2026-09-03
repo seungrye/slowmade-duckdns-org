@@ -116,7 +116,6 @@ export function buildChartOption(
       smooth: false,
       lineStyle: { color, width: dashed ? 1.5 : 2, ...(dashed ? { type: "dashed" as const } : {}) },
       itemStyle: { color },
-      z: 2,
     });
     legend.push({ name, color, dashed });
   }
@@ -174,8 +173,6 @@ export function buildChartOption(
       stats: it.stats,
       itemStyle: it.fill
         ? { color, borderColor: color, borderWidth: 1, opacity: 0.9 }
-        // 테두리만(속 투명). z=10 으로 마커가 선 위에 칠해지므로 예전처럼 선이 테두리를
-        // 관통하지 않는다 (#403). 흰 채움은 너무 튀어 투명으로 둔다.
         : { color: "transparent", borderColor: color, borderWidth: 1.6, opacity: 1 },
     }));
     series.push({
@@ -183,10 +180,6 @@ export function buildChartOption(
       name,
       data,
       symbolSize: 9,
-      // 마커는 선 위에 (#403). ECharts 는 선(line)을 scatter 위에 그리는 경향이 있어(배열
-      // 순서만으론 안 됨 — 실측으로 선이 마커를 관통했다), z 로 명시해 마커를 올린다.
-      // 그리는 짝(블록 선→그 마커)은 그대로, 칠하는 층위만 마커를 위로.
-      z: 10,
       tooltip: { trigger: "item", formatter: markerTooltipFormatter },
     } as never);
   };
@@ -209,7 +202,6 @@ export function buildChartOption(
       symbolSize: 6,
       lineStyle: { color, width: 1.5 },
       itemStyle: { color },
-      z: 2,
     });
     legend.push({ name, color });
     pushMarkers(name, 마커(b.tradesByDate ?? {}, (d) => 값.get(d) ?? null, b.portfolioId), color);
