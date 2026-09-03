@@ -16,6 +16,8 @@ import { seoulDateKey } from "@/lib/birthday";
 import { drawDailyCard } from "./draw";
 import { cardById } from "./tarot-deck";
 import { generateReading, templateReading } from "./reading";
+import { computeSaju, todayIljin, sajuContext, generateSajuReading } from "./saju";
+import User from "@/models/user";
 
 /** KST 시(0-23). 한국은 DST 가 없어 UTC+9 고정. */
 export function kstHour(now: Date): number {
@@ -80,15 +82,30 @@ export async function runFortuneBatch(
         { upsert: true },
       );
 
-      const doc = await DailyFortune.findOne({ userEmail: email, dateKey }).select("status").lean();
-      if (doc?.status === "ready") continue; // 이미 LLM 풀이 있음 — 건너뜀(멱등).
+      const doc = await DailyFortune.findOne({ userEmail: email, dateKey }).select("status sajuStatus").lean();
 
-      const { reading, source } = await generateReading(card, orientation);
-      await DailyFortune.updateOne(
-        { userEmail: email, dateKey },
-        { $set: { reading, readingSource: source, status: source === "llm" ? "ready" : "failed" } },
-      );
-      if (source === "llm") generated++; else failed++;
+      // 타로 풀이 — 아직 LLM 으로 안 채웠으면(멱등).
+      if (doc?.status !== "ready") {
+        const { reading, source } = await generateReading(card, orientation);
+        await DailyFortune.updateOne(
+          { userEmail: email, dateKey },
+          { $set: { reading, readingSource: source, status: source === "llm" ? "ready" : "failed" } },
+        );
+        if (source === "llm") generated++; else failed++;
+      }
+
+      // 사주 풀이 — 생일이 있고 아직 안 채웠으면. (#390)
+      if (doc?.sajuStatus !== "ready") {
+        const u = await User.findOne({ email }).select("birthday birthTime").lean<{ birthday?: Date; birthTime?: string | null } | null>();
+        if (u?.birthday) {
+          const ctx = sajuContext(computeSaju(new Date(u.birthday), u.birthTime), todayIljin(now).pillar);
+          const sr = await generateSajuReading(ctx);
+          await DailyFortune.updateOne(
+            { userEmail: email, dateKey },
+            { $set: { sajuReading: sr.reading, sajuSource: sr.source, sajuStatus: sr.source === "llm" ? "ready" : "failed" } },
+          );
+        }
+      }
     } catch (e) {
       failed++;
       log(`[fortune] ${email} 실패: ${e instanceof Error ? e.message : e}`);

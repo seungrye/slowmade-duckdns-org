@@ -16,6 +16,8 @@ import { drawDailyCard } from "@/lib/fortune/draw";
 import { cardById } from "@/lib/fortune/tarot-deck";
 import { templateReading } from "@/lib/fortune/reading";
 import { fortuneDTO } from "@/lib/fortune/dto";
+import User from "@/models/user";
+import { computeSaju, todayIljin, sajuBlock } from "@/lib/fortune/saju";
 
 export const dynamic = "force-dynamic";
 
@@ -54,5 +56,17 @@ export async function GET() {
   const card = cardById(doc.cardId);
   if (!card) return apiError("운세 카드를 찾을 수 없습니다.", 500);
   const imageUrl = buildPublicUrl(env.minio.publicHost, env.minio.bucket, card.image);
-  return apiSuccess(fortuneDTO(doc, card, imageUrl));
+  const dto = fortuneDTO(doc, card, imageUrl);
+
+  // 사주 블록 — 생일이 있을 때만. 사주판·일간은 매번 계산(결정론), LLM 풀이만 doc 에서.
+  const user = await User.findOne({ email }).select("birthday birthTime").lean<{ birthday?: Date; birthTime?: string | null } | null>();
+  const saju = user?.birthday
+    ? sajuBlock(
+        computeSaju(new Date(user.birthday), user.birthTime),
+        todayIljin(new Date()).pillar,
+        { sajuReading: doc.sajuReading, sajuSource: doc.sajuSource },
+      )
+    : null;
+
+  return apiSuccess({ ...dto, saju });
 }

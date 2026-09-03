@@ -137,6 +137,9 @@ importers:
       lucide-react:
         specifier: ^0.485.0
         version: 0.485.0(react@19.2.6)
+      lunar-javascript:
+        specifier: ^1.7.7
+        version: 1.7.7
       minio:
         specifier: ^8.0.7
         version: 8.0.7
@@ -3064,6 +3067,9 @@ packages:
     resolution: {integrity: sha512-NvyQJ0LKyyCxL23nPKESlr/jmz8r7fJO1bkuptSNYSy0s8VVj4ojhX0YAgmE1e0ewfxUZjIlZpvH+otfTnla8Q==}
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  lunar-javascript@1.7.7:
+    resolution: {integrity: sha512-u/KYiwPIBo/0bT+WWfU7qO1d+aqeB90Tuy4ErXenr2Gam0QcWeezUvtiOIyXR7HbVnW2I1DKfU0NBvzMZhbVQw==}
 
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
@@ -7300,6 +7306,8 @@ snapshots:
   lucide-react@0.485.0(react@19.2.6):
     dependencies:
       react: 19.2.6
+
+  lunar-javascript@1.7.7: {}
 
   lz-string@1.5.0: {}
 
