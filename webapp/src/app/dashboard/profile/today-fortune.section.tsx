@@ -10,11 +10,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 
-type Pillar = { ganzhi: string; ganKr: string; zhiKr: string; ganEl: string; zhiEl: string };
+type Pillar = { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: string; zhiEl: string };
 type SajuBlock = {
   pillars: { year: Pillar; month: Pillar; day: Pillar; time: Pillar | null };
   dayGanKr: string; dayEl: string; elements: Record<string, number>;
-  iljin: { ganzhi: string; ganKr: string; zhiKr: string; ganEl: string };
+  iljin: { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: string };
   relation: { key: string; meaning: string };
   reading: string; readingSource: 'llm' | 'template'; hasBirthTime: boolean;
 };
@@ -28,8 +28,8 @@ type Fortune = {
   saju: SajuBlock | null;
 };
 
-const EL_COLOR: Record<string, string> = { 목: '#2f8a63', 화: '#c14338', 토: '#b6873a', 금: '#78839a', 수: '#3a58a6' };
-const ELEMENTS = ['목', '화', '토', '금', '수'] as const;
+import { EL_COLOR, ELEMENTS, meaningOf, ZHI_EL } from '@/lib/fortune/saju-labels';
+const ZHI_EL_OF = (z: string) => ZHI_EL[z] ?? '토';
 
 export default function TodayFortuneSection() {
   const { status } = useSession();
@@ -186,8 +186,22 @@ export default function TodayFortuneSection() {
   );
 }
 
-function ElChar({ ch, el }: { ch: string; el: string }) {
-  return <span style={{ color: EL_COLOR[el] }} className="font-bold">{ch}</span>;
+function ElChar({ hanja, kr, el }: { hanja: string; kr: string; el: string }) {
+  const meaning = meaningOf(hanja);
+  return (
+    <span className="group/char relative inline-flex cursor-help items-baseline gap-0.5" tabIndex={0}>
+      <span style={{ color: EL_COLOR[el as keyof typeof EL_COLOR] }} className="font-bold">{hanja}</span>
+      <span className="text-[10px] text-gray-400">{kr}</span>
+      {meaning && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-max max-w-[200px] -translate-x-1/2 rounded-md bg-gray-900 px-2 py-1 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/char:opacity-100 group-focus/char:opacity-100 dark:bg-gray-700"
+        >
+          {meaning}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function PillarBox({ label, p, me }: { label: string; p: Pillar | null; me?: boolean }) {
@@ -199,8 +213,8 @@ function PillarBox({ label, p, me }: { label: string; p: Pillar | null; me?: boo
       <div className={'text-[10px] ' + (me ? 'font-semibold text-violet-600 dark:text-violet-400' : 'text-gray-400')}>{label}</div>
       {p ? (
         <div className="mt-1">
-          <div className="text-lg leading-tight"><ElChar ch={p.ganKr} el={p.ganEl} /></div>
-          <div className="text-lg leading-tight"><ElChar ch={p.zhiKr} el={p.zhiEl} /></div>
+          <div className="text-lg leading-tight"><ElChar hanja={p.gan} kr={p.ganKr} el={p.ganEl} /></div>
+          <div className="text-lg leading-tight"><ElChar hanja={p.zhi} kr={p.zhiKr} el={p.zhiEl} /></div>
         </div>
       ) : (
         <div className="mt-2 text-[11px] text-gray-400">미상</div>
@@ -245,7 +259,11 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
       {/* 오늘의 사주 풀이 */}
       <div className="mt-4">
         <div className="text-xs text-gray-500 dark:text-gray-400">
-          <b className="text-violet-600 dark:text-violet-400">{saju.dayGanKr}</b> 일간 · 오늘의 일진 <b>{saju.iljin.ganKr}{saju.iljin.zhiKr}</b> · <b>{saju.relation.key}</b>
+          <span className="text-violet-600 dark:text-violet-400 font-bold">{saju.dayGanKr}({saju.pillars.day.gan})</span> 일간 · 오늘의 일진{' '}
+          <span className="inline-flex items-baseline">
+            <ElChar hanja={saju.iljin.gan} kr={saju.iljin.ganKr} el={saju.iljin.ganEl} />
+            <ElChar hanja={saju.iljin.zhi} kr={saju.iljin.zhiKr} el={ZHI_EL_OF(saju.iljin.zhi)} />
+          </span>{' '}· <b>{saju.relation.key}</b>
         </div>
         <p className="mt-2 text-[15px] leading-8">{saju.reading}</p>
         {saju.readingSource === 'template' && (

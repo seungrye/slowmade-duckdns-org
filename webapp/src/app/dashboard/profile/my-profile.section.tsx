@@ -15,6 +15,7 @@ type UserProfile = {
     points: number;
     createdAt: string;
     birthday?: string | null;
+    birthTime?: string | null;
 };
 
 export default function MyProfile({session}: { session: Session | null }) {
@@ -24,6 +25,7 @@ export default function MyProfile({session}: { session: Session | null }) {
     const [birthTime, setBirthTime] = useState('');
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
+    const [editing, setEditing] = useState(false);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -46,6 +48,11 @@ export default function MyProfile({session}: { session: Session | null }) {
         if(session) fetchProfile();
     }, [session]);
 
+    // 사주 패널의 '생일 등록하러 가기' 링크(#birthday-card)로 오면 편집을 자동으로 연다.
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.location.hash === '#birthday-card') setEditing(true);
+    }, []);
+
     // 생일을 저장하면 표식을 지운다 — 오늘이 생일인데 방금 등록한 경우 바로 폭죽이 터지도록.
     const saveBirthday = async () => {
         setSaving(true);
@@ -62,7 +69,9 @@ export default function MyProfile({session}: { session: Session | null }) {
                 return;
             }
             clearBirthdayMarkers();
+            setProfile((prev) => prev ? { ...prev, birthday: birthday || null, birthTime: birthTime || null } : prev);
             setMessage(birthday ? '저장했습니다.' : '생일을 지웠습니다.');
+            setEditing(false);
         } catch {
             setMessage('저장에 실패했습니다.');
         } finally {
@@ -95,14 +104,27 @@ export default function MyProfile({session}: { session: Session | null }) {
                     <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">
                         {loading ? '로딩 중...' : `포인트: ${profile?.points?.toLocaleString() || 0} P | 가입일: ${profile ? new Date(profile.createdAt).toLocaleDateString() : 'N/A'}`}
                     </p>
+                    {!loading && (
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">
+                            생일: {profile?.birthday ? formatBirthdayInput(new Date(profile.birthday)) : '미등록'}
+                            {profile?.birthTime ? ` · 태어난 시 ${profile.birthTime}` : ''}
+                        </p>
+                    )}
                 </div>
-                <Button variant="secondary" className="ml-auto" aria-label="프로필 수정">
-                    프로필 수정
+                <Button
+                    variant="secondary"
+                    className="ml-auto"
+                    aria-label="프로필 수정"
+                    aria-expanded={editing}
+                    onClick={() => { setEditing((v) => !v); setMessage(''); }}
+                >
+                    {editing ? '닫기' : '프로필 수정'}
                 </Button>
             </Card>
 
+            {editing && (
             <Card className="mt-4" id="birthday-card">
-                <h3 className="text-lg font-semibold">생일</h3>
+                <h3 className="text-lg font-semibold">생일 · 태어난 시</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                     등록해 두면 생일 당일 처음 접속할 때 축하 폭죽이 터지고, <b className="text-violet-600 dark:text-violet-400">오늘의 사주 운세</b>가 열립니다. 비워 두고 저장하면 지워집니다.
                 </p>
@@ -135,6 +157,7 @@ export default function MyProfile({session}: { session: Session | null }) {
                 </div>
                 <p className="text-xs text-gray-400 mt-2">태어난 시를 모르면 비워 두세요 — 사주 시주(時柱)만 생략됩니다.</p>
             </Card>
+            )}
         </>
     );
 }
