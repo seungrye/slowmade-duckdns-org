@@ -58,6 +58,8 @@ export type MarkerItem = {
   value: [string, number];
   symbol: string;
   symbolRotate?: number;
+  /** 채움(매수만) vs 테두리만(매도만·매수+매도) — 형태로 구분 (#399). */
+  fill: boolean;
   /** 어느 블록의 상세로 갈지. 계좌(주인 없음)면 빈 문자열. */
   portfolioId: string;
   stats: TradeStats;
@@ -131,11 +133,14 @@ export function buildChartOption(
       if (!st || (st.buy === 0 && st.sell === 0)) continue;
       const y = 값(h.dateStr);
       if (y === null || !Number.isFinite(y)) continue;
+      // 매수만 = 채운 ▲ / 매도만 = 테두리만 ▽ / 매수+매도 = 테두리만 ▭. (#399)
       const 둘다 = st.buy > 0 && st.sell > 0;
+      const 매도만 = !둘다 && st.sell > 0;
       out.push({
         value: [h.dateStr, y],
         symbol: 둘다 ? "rect" : "triangle",
-        ...(!둘다 && st.sell > 0 ? { symbolRotate: 180 } : {}),
+        ...(매도만 ? { symbolRotate: 180 } : {}),
+        fill: !둘다 && !매도만, // 매수만일 때만 채운다
         portfolioId,
         stats: st,
       });
@@ -159,14 +164,22 @@ export function buildChartOption(
   // 범례 항목이 두 배로 늘지 않고, 선을 끄면 마커도 함께 꺼진다.
   const pushMarkers = (name: string, items: MarkerItem[], color: string) => {
     if (!items.length) return;
+    // 항목마다 채움/테두리를 다르게 — 색만으로 구분이 어려워 형태로 명확히 (#399).
+    const data = items.map((it) => ({
+      value: it.value,
+      symbol: it.symbol,
+      ...(it.symbolRotate !== undefined ? { symbolRotate: it.symbolRotate } : {}),
+      portfolioId: it.portfolioId,
+      stats: it.stats,
+      itemStyle: it.fill
+        ? { color, borderColor: color, borderWidth: 1, opacity: 0.9 }
+        : { color: "transparent", borderColor: color, borderWidth: 1.6, opacity: 1 },
+    }));
     series.push({
       type: "scatter",
       name,
-      data: items,
-      // 마커가 크면 그 선을 통째로 덮는다(무한매수 V4 는 거의 매일 매매해 마커가 촘촘하다).
-      // 살짝 투명하게 두어 아래 선이 비치게 한다.
-      symbolSize: 8,
-      itemStyle: { color, borderColor: color, opacity: 0.85 },
+      data,
+      symbolSize: 9,
       tooltip: { trigger: "item", formatter: markerTooltipFormatter },
     } as never);
   };

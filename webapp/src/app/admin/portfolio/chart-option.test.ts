@@ -189,3 +189,34 @@ describe('범례 표식', () => {
     expect(build(두블록).legend.find((x) => x.name === '기타 매매')!.markerOnly).toBe(true);
   });
 });
+
+describe('마커 채움/테두리 구분 (#399)', () => {
+  const scatterData = (data: PortfolioResponse, name: string) => {
+    const s = seriesOf(data).find((x) => x.name === name && x.type === 'scatter')!;
+    return s.data as Array<{ symbol: string; symbolRotate?: number; itemStyle: { color: string; borderColor: string } }>;
+  };
+
+  it('매수만 = 채운 삼각형 (색이 투명 아님)', () => {
+    // 두블록: 무한매수 V4 의 2026-08-10 은 매수만(stats(2,0)).
+    const it = scatterData(두블록, '무한매수 V4 평가액')[0];
+    expect(it.symbol).toBe('triangle');
+    expect(it.symbolRotate).toBeUndefined();
+    expect(it.itemStyle.color).not.toBe('transparent'); // 채움
+    expect(it.itemStyle.color).toBe(it.itemStyle.borderColor);
+  });
+
+  it('매수+매도 = 테두리만 사각형 (채움 투명)', () => {
+    // VR 의 2026-08-11 은 매수+매도(stats(1,1)).
+    const it = scatterData(두블록, '밸류리밸런싱 VR 평가액')[0];
+    expect(it.symbol).toBe('rect');
+    expect(it.itemStyle.color).toBe('transparent'); // 테두리만
+    expect(it.itemStyle.borderColor).not.toBe('transparent');
+  });
+
+  it('매도만 = 테두리만 아래 삼각형', () => {
+    // 한블록: 국장 2026-08-11 은 매도만(stats(0,2)).
+    const it = scatterData(한블록, '무한매수 V4 평가액').find((x) => x.symbolRotate === 180)!;
+    expect(it.symbol).toBe('triangle');
+    expect(it.itemStyle.color).toBe('transparent'); // 테두리만
+  });
+});
