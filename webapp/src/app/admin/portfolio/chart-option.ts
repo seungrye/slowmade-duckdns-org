@@ -173,7 +173,9 @@ export function buildChartOption(
       stats: it.stats,
       itemStyle: it.fill
         ? { color, borderColor: color, borderWidth: 1, opacity: 0.9 }
-        : { color: "transparent", borderColor: color, borderWidth: 1.6, opacity: 1 },
+        // 테두리만이되 속은 흰색으로 채운다 — 투명이면 아래 선이 비쳐 지저분하다 (#401).
+        // (다크에서도 흰 속 + 색 테두리라 오히려 또렷하다.)
+        : { color: "#ffffff", borderColor: color, borderWidth: 1.6, opacity: 1 },
     }));
     series.push({
       type: "scatter",
