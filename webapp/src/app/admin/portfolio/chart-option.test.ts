@@ -209,7 +209,7 @@ describe('마커 채움/테두리 구분 (#399)', () => {
     // VR 의 2026-08-11 은 매수+매도(stats(1,1)).
     const it = scatterData(두블록, '밸류리밸런싱 VR 평가액')[0];
     expect(it.symbol).toBe('rect');
-    expect(it.itemStyle.color).toBe('#ffffff'); // 테두리만(속은 흰색)
+    expect(it.itemStyle.color).toBe('transparent'); // 테두리만(속 투명, z 로 선 위)
     expect(it.itemStyle.borderColor).not.toBe('transparent');
   });
 
@@ -217,6 +217,14 @@ describe('마커 채움/테두리 구분 (#399)', () => {
     // 한블록: 국장 2026-08-11 은 매도만(stats(0,2)).
     const it = scatterData(한블록, '무한매수 V4 평가액').find((x) => x.symbolRotate === 180)!;
     expect(it.symbol).toBe('triangle');
-    expect(it.itemStyle.color).toBe('#ffffff'); // 테두리만(속은 흰색)
+    expect(it.itemStyle.color).toBe('transparent'); // 테두리만(속 투명, z 로 선 위)
+  });
+});
+
+describe('마커는 선 위에 z (#403)', () => {
+  it('마커 scatter 는 z=10, 선은 z=2 — 선이 마커를 덮지 않는다', () => {
+    const s = seriesOf(두블록) as Array<{ type: string; z?: number }>;
+    for (const sc of s.filter((x) => x.type === 'scatter')) expect(sc.z).toBe(10);
+    for (const ln of s.filter((x) => x.type === 'line')) expect(ln.z).toBe(2);
   });
 });
