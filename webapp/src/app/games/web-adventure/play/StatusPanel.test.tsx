@@ -104,41 +104,37 @@ describe('StatusPanel', () => {
     expect(screen.queryByRole('button', { name: /재굴림|다시 굴리기/ })).toBeNull();
   });
 
-  // #259 — 성흔 침식 시각화.
-  it('침식도 0-49 — 정상 표시 (경고 없음)', () => {
-    render(
-      <StatusPanel
-        character={makeCharacter({ stigmaErosion: 30 })}
-        runIndex={1}
-        onUseItem={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'normal');
-    expect(screen.getByText('30 / 100')).toBeInTheDocument();
+  // 성흔 침식 시각화 — stigma-sense 단일 출처(5단계·신체+심리) (#397).
+  const renderStigma = (stigmaErosion: number) => render(
+    <StatusPanel character={makeCharacter({ stigmaErosion })} runIndex={1} onUseItem={vi.fn()} />,
+  );
+
+  it('침식 tier 0(성한 몸) — 감각 캡션 없음', () => {
+    renderStigma(10);
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-tier', '0');
+    expect(screen.queryByTestId('stigma-sense')).toBeNull();
+    expect(screen.getByText('10 / 100')).toBeInTheDocument();
   });
 
-  it('침식도 50-79 — 디버프 단계 표시', () => {
-    render(
-      <StatusPanel
-        character={makeCharacter({ stigmaErosion: 65 })}
-        runIndex={1}
-        onUseItem={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'debuff');
-    expect(screen.getByText(/손끝이 딱딱하게 굳어갑니다/)).toBeInTheDocument();
+  it('침식이 오르면 신체 감각(손)이 늘 보인다 — 수치가 아니라 몸으로', () => {
+    renderStigma(60); // tier 2
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-tier', '2');
+    // stigma-sense 의 손 감각(tier2): "손가락 두 개가 제 뜻대로 접히지 않는다."
+    expect(screen.getByText(/손가락 두 개가 제 뜻대로/)).toBeInTheDocument();
   });
 
-  it('침식도 80+ — 임계 단계 경고 + 푸른 결정 이펙트', () => {
-    render(
-      <StatusPanel
-        character={makeCharacter({ stigmaErosion: 88 })}
-        runIndex={1}
-        onUseItem={vi.fn()}
-      />,
-    );
-    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-level', 'critical');
-    expect(screen.getByText(/체온이 느껴지지 않습니다/)).toBeInTheDocument();
+  it('높은 침식(tier≥3)은 심리 감각(마음)까지 함께 — 신체+심리', () => {
+    renderStigma(90); // tier 3
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-tier', '3');
+    const sense = screen.getByTestId('stigma-sense');
+    expect(sense.textContent).toMatch(/살갗 아래에서 유리 갈리는 소리/); // 손 tier3
+    expect(sense.textContent).toMatch(/결정이 너를 대신해/); // 마음 tier3
+  });
+
+  it('침식 100(tier 4) — 최종 단계 감각', () => {
+    renderStigma(100);
+    expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-tier', '4');
+    expect(screen.getByText(/손등으로 밀어야/)).toBeInTheDocument();
   });
 
   it('consumable 아이템에 "사용" 버튼 + 클릭 시 onUseItem(itemId)', () => {
