@@ -66,6 +66,9 @@ describe('사주 탭 — 한자 병기·뜻 (#393)', () => {
     expect(screen.getAllByText('丁').length).toBeGreaterThan(0);
     expect(screen.getAllByText('정').length).toBeGreaterThan(0);
     expect(screen.getByText('오늘은 성취의 기운이 도는 하루예요.')).toBeInTheDocument();
+    // 오행 분포 라벨 + 칩 툴팁
+    expect(screen.getByText('오행 분포')).toBeInTheDocument();
+    expect(screen.getByText(/사주 6글자 중 목 기운이 1개/)).toBeInTheDocument();
   });
 
   it('생일 없으면 사주 탭에 등록 안내', async () => {

@@ -263,15 +263,24 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
         </span>
       </div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {ELEMENTS.map((el) => (
-          <span
-            key={el}
-            title={`사주 ${sajuTotal(saju)}글자 중 ${el} ${saju.elements[el] ?? 0}개`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
-          >
-            <span className="h-2 w-2 rounded-full" style={{ background: EL_COLOR[el] }} />{el} {saju.elements[el] ?? 0}
-          </span>
-        ))}
+        {ELEMENTS.map((el) => {
+          const n = saju.elements[el] ?? 0;
+          return (
+            <span
+              key={el}
+              tabIndex={0}
+              className="group/chip relative inline-flex cursor-help items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
+            >
+              <span className="h-2 w-2 rounded-full" style={{ background: EL_COLOR[el] }} />{el} {n}
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-max max-w-[220px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/chip:opacity-100 group-focus/chip:opacity-100 dark:bg-gray-700"
+              >
+                사주 {sajuTotal(saju)}글자 중 {el} 기운이 {n}개{n === 0 ? ' — 이 기운은 없어요' : ''}
+              </span>
+            </span>
+          );
+        })}
       </div>
 
       {/* 오늘의 사주 풀이 */}
