@@ -56,6 +56,19 @@ const minio = new Minio.Client({
   secretKey: process.env.MINIO_SECRETKEY,
 });
 
+async function fetchWithBackoff(url, tries = 5) {
+  let wait = 2000;
+  for (let i = 0; i < tries; i++) {
+    const res = await fetch(url, { headers: { 'User-Agent': 'slowmade-tarot/1.0 (personal site; contact seungrye)' } });
+    if (res.ok) return Buffer.from(await res.arrayBuffer());
+    if (res.status === 429 || res.status >= 500) {
+      await new Promise((r) => setTimeout(r, wait)); wait = Math.min(wait * 2, 20000); continue;
+    }
+    throw new Error(`fetch ${res.status}`);
+  }
+  throw new Error('fetch 429 (재시도 소진)');
+}
+
 async function exists(key) {
   try { await minio.statObject(BUCKET, key); return true; } catch { return false; }
 }
@@ -71,13 +84,11 @@ let up = 0, skip = 0, fail = 0;
 for (const t of TARGETS) {
   try {
     if (!FORCE && (await exists(t.key))) { skip++; continue; }
-    const res = await fetch(t.src, { headers: { 'User-Agent': 'slowmade-tarot/1.0 (personal site)' } });
-    if (!res.ok) throw new Error(`fetch ${res.status}`);
-    const buf = Buffer.from(await res.arrayBuffer());
+    const buf = await fetchWithBackoff(t.src);
     await minio.putObject(BUCKET, t.key, buf, buf.length, { 'Content-Type': 'image/jpeg' });
     up++;
     console.log(`  ✓ #${t.id} (${(buf.length / 1024).toFixed(0)}KB) ${sourceFor(t.id)}`);
-    await new Promise((r) => setTimeout(r, 400)); // Wikimedia 예의상 간격
+    await new Promise((r) => setTimeout(r, 1500)); // Wikimedia 예의상 간격
   } catch (e) {
     fail++;
     console.error(`  ✗ #${t.id} ${sourceFor(t.id)}: ${e.message}`);
