@@ -91,7 +91,8 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // 대용량 업로드 라우트(api/attachment/upload·audio/upload·games/retro/rom-upload)는 제외한다.
+      // 대용량 업로드 라우트(api/attachment/upload·audio/upload·games/retro/rom-upload·
+      // work-log/release)는 제외한다.
       // middleware 가 매칭되면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한 →
       // 10MB 초과 업로드가 잘려 req.formData() 파싱 실패(500). 이 라우트에서 middleware 가
       // 하는 일은 응답 CSP·보안헤더뿐이라(owner 검증은 라우트 requireAuth/requireOwner,
@@ -100,7 +101,12 @@ export const config = {
       // 롬 업로드가 목록(`api/games/retro/roms`)과 **다른 경로**인 이유가 여기 있다 — 접두사로
       // 빼면 하위 `[id]/file`(롬 내려받기)까지 딸려 빠져 보안 헤더가 사라진다.
       // attachment 도 같은 이유로 upload 를 따로 뒀다.
-      source: '/((?!_next/static|_next/image|favicon.ico|api/attachment/upload|api/web-adventure/audio/upload|api/games/retro/rom-upload).*)',
+      //
+      // work-log/release 는 나중에 합류했다(#407). APK 가 10MB 를 넘는 순간 잘려
+      // `req.formData()` 가 실패했고, 서버 로그가 그대로 말해 줬다:
+      //   "Request body exceeded 10MB for /api/work-log/release."
+      // 여기 목록은 **새 업로드 라우트를 만들 때마다 같이 봐야 한다.**
+      source: '/((?!_next/static|_next/image|favicon.ico|api/attachment/upload|api/web-adventure/audio/upload|api/games/retro/rom-upload|api/work-log/release).*)',
     },
   ],
 }
