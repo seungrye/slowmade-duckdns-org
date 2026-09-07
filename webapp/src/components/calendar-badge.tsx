@@ -130,16 +130,15 @@ export default function CalendarBadge() {
             // 겹쳐 쌓되 링으로 경계를 그어 이모지끼리 뭉개지지 않게 한다.
             // 링 색은 navbar 배경과 같아야 오려낸 것처럼 보인다.
             //
-            // 겹침을 28.6%(-ml-2)에서 **89.3%(-ml-[25px])로 올렸다** (#410) — navbar 에서
-            // 자리를 너무 먹었다. 스택 폭이 88px → 36px 로 준다. 정확히 90% 면 25.2px 인데
+            // 겹침을 28.6%(-ml-2)에서 **60.7%(-ml-[17px])로 올렸다** (#410) — navbar 에서
+            // 자리를 너무 먹었다. 스택 폭이 88px → 61px 로 준다. 정확히 60% 면 16.8px 인데
             // 소수 px 는 가장자리를 흐려 정수로 둔다.
             //
-            // 대가를 알고 고른 것이다: 첫 칸만 보이고 나머지는 2.8px 실오라기라 **색으로
-            // 종류를 알리던 것이 사실상 사라지고**, 배지별 hover 판정도 그만큼 좁아진다.
-            // 짚어 보기가 아주 죽지는 않는다 — **누르면 "전부 보기"** 가 되고, 모바일은
-            // 원래 hover 가 없어 그 길로만 썼다. 짚어 보기는 데스크톱에서 덤이었다.
+            // **90% 도 그려 봤지만(36px) 안 골랐다.** 그러면 첫 칸만 보이고 나머지는 2.8px
+            // 실오라기가 되어, 위 TONE 주석이 말하는 "크기 대신 색으로 나눈다" 는 장치가
+            // 통째로 죽는다. 60% 면 배지마다 11px 이 남아 **색이 다 살고 +N 도 읽힌다.**
             style={{ zIndex: hovered === i ? 30 : shown.length - i }}
-            className={`relative -ml-[25px] flex h-7 w-7 items-center justify-center rounded-full text-sm leading-none ring-2 ring-gray-900 transition first:ml-0 focus:outline-none ${TONE[event.kind]} ${
+            className={`relative -ml-[17px] flex h-7 w-7 items-center justify-center rounded-full text-sm leading-none ring-2 ring-gray-900 transition first:ml-0 focus:outline-none ${TONE[event.kind]} ${
               hovered === i ? 'scale-110 ring-white' : ''
             }`}
           >
@@ -155,7 +154,7 @@ export default function CalendarBadge() {
             onFocus={() => setHovered(null)}
             onClick={showAll}
             style={{ zIndex: 0 }}
-            className="relative -ml-[25px] flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-xs font-semibold leading-none text-gray-100 ring-2 ring-gray-900 focus:outline-none focus-visible:ring-white"
+            className="relative -ml-[17px] flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-xs font-semibold leading-none text-gray-100 ring-2 ring-gray-900 focus:outline-none focus-visible:ring-white"
           >
             +{overflow}
           </button>
