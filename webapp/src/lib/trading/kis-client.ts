@@ -1,11 +1,11 @@
-// 한국투자증권(KIS) REST 클라이언트 — 파이썬 stock-automator-v2 kis/{auth,client,
-// domestic,overseas}.py 의 TS 포팅(1단계: 추세·LRS·rotation 라이브에 필요한 범위).
+// Korea Investment & Securities (KIS) REST client - a TS port of stock-automator-v2's kis/{auth,client,
+// domestic,overseas}.py (stage 1: what live trend, LRS and rotation need).
 //
-// - 토큰: Mongo(TradingToken) 캐시 — 블루그린 두 인스턴스가 공유(발급 1분 1회 제한 대응).
-// - GET(조회)은 멱등 → 5xx·연결오류 지수백오프 재시도. 토큰 만료(EGW00123)는 강제
-//   재발급 후 재시도. POST(주문)는 비멱등이라 토큰 만료(미접수)일 때만 1회 재전송.
-// - TR ID 는 모의(V*)/실전이 다르다 — _TR 매핑(파이썬과 동일 값).
-// 스펙·함정: stock-automator-v2 docs/kis-api.md
+// - Tokens: cached in Mongo (TradingToken) and shared by both blue/green instances (issuance is capped at one a minute).
+// - A GET (read) is idempotent, so 5xx and connection errors retry with exponential backoff. An expired token
+//   (EGW00123) forces a reissue and retries. A POST (order) is not idempotent, so it is resent once only when the token expired (never accepted).
+// - TR IDs differ between paper (V*) and real - see the _TR map (the same values as Python).
+// Spec and pitfalls: stock-automator-v2 docs/kis-api.md
 
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
@@ -25,7 +25,7 @@ const BASE_URL: Record<KisCreds["env"], string> = {
   real: "https://openapi.koreainvestment.com:9443",
 };
 
-// (paper, real) — 파이썬 kis/domestic.py·overseas.py _TR 과 동일.
+// (paper, real) - the same as _TR in Python's kis/domestic.py and overseas.py.
 const TR: Record<string, [string, string]> = {
   kr_balance: ["VTTC8434R", "TTTC8434R"],
   kr_buy: ["VTTC0012U", "TTTC0012U"],
@@ -75,7 +75,7 @@ export class KisClient {
     return this.creds.env === "paper" ? paper : real;
   }
 
-  // ── 토큰 (Mongo 캐시, 23h TTL) ────────────────────────────────
+  // ── Tokens (Mongo cache, 23h TTL) ────────────────────────────────
 
   private get cacheKey(): string {
     return `kis:${this.creds.env}:${this.creds.appKey.slice(0, 8)}`;
@@ -112,7 +112,7 @@ export class KisClient {
     return this.token;
   }
 
-  /** 사이클 진입 시 선제 재발급(파이썬 force_refresh 대응). */
+  /** Pre-emptive reissue at cycle start (matching Python's force_refresh). */
   async forceRefresh(): Promise<void> {
     await this.getToken(true);
   }
@@ -132,8 +132,8 @@ export class KisClient {
     return body.includes("EGW00123");
   }
 
-  /** 유량제한(초당 거래건수 초과) — HTTP 200·rt_cd=1 로 와서 handle 이 throw 하기 전에
-   *  재시도로 흡수한다(마감 sync 의 현재가·체결내역 대량 조회가 여기 자주 걸림). */
+  /** Rate limiting (transactions per second exceeded) arrives as HTTP 200 with rt_cd=1, so it is absorbed by a
+   *  retry before handle throws (the close sync's bulk price and fill queries hit this often). */
   private static isRateLimited(body: string): boolean {
     return body.includes("초당 거래건수") || body.includes("EGW00201");
   }
@@ -167,7 +167,7 @@ export class KisClient {
         }
       }
       if (KisClient.isRateLimited(text) && attempt < MAX_GET_RETRIES) {
-        await sleep(backoffMs(attempt) + 700); // 초당 거래건수 초과 — throttle(1s) 위에 추가 백오프
+        await sleep(backoffMs(attempt) + 700); // transactions per second exceeded - extra backoff on top of the 1s throttle
         continue;
       }
       return { data: KisClient.handle(resp.status, text), trCont: resp.headers.get("tr_cont") ?? "" };
@@ -179,7 +179,7 @@ export class KisClient {
     return (await this.getRaw(path, trId, params)).data;
   }
 
-  /** tr_cont 연속조회 자동 병합(파이썬 client.get_paged 대응) — 체결내역·미체결 조회용. */
+  /** Automatic tr_cont pagination and merging (matching Python's client.get_paged), for fill and open-order queries. */
   private async getPaged(
     path: string, trId: string, params: Record<string, string>,
     outputKey: string, ctxFk: string, ctxNk: string, maxPages = 10,
@@ -208,7 +208,7 @@ export class KisClient {
     let resp = await doPost();
     let text = await resp.text();
     if (resp.status >= 500 && KisClient.isTokenExpired(text)) {
-      // 토큰 만료 = 주문 미접수 → 재발급 후 1회만 재전송(중복 위험 없음).
+      // An expired token means the order was never accepted, so it is resent exactly once after the reissue (no duplication risk).
       await this.getToken(true);
       await throttle();
       resp = await doPost();
@@ -234,7 +234,7 @@ export class KisClient {
     return data;
   }
 
-  // ── 국내(KR) — 파이썬 kis/domestic.py 포팅 ───────────────────
+  // ── KRX - a port of Python's kis/domestic.py ───────────────────
 
   async krPrice(symbol: string): Promise<number> {
     const d = await this.get("/uapi/domestic-stock/v1/quotations/inquire-price", "FHKST01010100", {
@@ -262,7 +262,7 @@ export class KisClient {
     );
   }
 
-  /** (YYYYMMDD, 종가) 최신순 need+ 건 — 회당 ~100건이라 기간을 옮겨가며 병합. */
+  /** need+ (YYYYMMDD, close) pairs, newest first - about 100 per call, so the window is walked and merged. */
   async krHistoryLong(symbol: string, need = 210): Promise<[string, number][]> {
     const out = new Map<string, number>();
     let end = new Date();
@@ -281,7 +281,7 @@ export class KisClient {
     return [...out.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, need + 30);
   }
 
-  /** 최근 일봉 OHLCV(최신순, ~30영업일) — 사이트 가격 push 용. */
+  /** Recent daily OHLCV (newest first, about 30 trading days), for the site's price push. */
   async krOhlcvRecent(symbol: string): Promise<
     { date: string; open: number; high: number; low: number; close: number; volume: number }[]
   > {
@@ -296,7 +296,7 @@ export class KisClient {
     }));
   }
 
-  /** 거래대금(종가×거래량) 시계열 과거→최신 — rotation 자동선발용(최근 ~30영업일). */
+  /** Traded value (close x volume) oldest to newest, for rotation's auto-selection (about the last 30 trading days). */
   async krValueSeries(symbol: string): Promise<number[]> {
     const now = new Date();
     const fmt = (dt: Date) => dt.toISOString().slice(0, 10).replace(/-/g, "");
@@ -307,7 +307,7 @@ export class KisClient {
       .map(([, v]) => v);
   }
 
-  /** 보유맵 {symbol: [qty, avg]} + 가용현금(익일정산 nxdy_excc_amt — T+2 미결제 반영). */
+  /** Holdings map {symbol: [qty, avg]} plus available cash (next-day settlement nxdy_excc_amt, reflecting T+2). */
   async krAccount(): Promise<[Record<string, [number, number]>, number, number]> {
     const d = await this.get("/uapi/domestic-stock/v1/trading/inquire-balance", this.tr("kr_balance"), {
       CANO: this.cano,
@@ -327,18 +327,18 @@ export class KisClient {
     for (const r of (d.output1 as Json[]) ?? []) {
       const q = Math.trunc(Number(r.hldg_qty ?? 0));
       if (q > 0) pos[String(r.pdno)] = [q, Number(r.pchs_avg_pric ?? 0)];
-      hvSum += Number(r.evlu_amt ?? 0); // 종목별 평가금액
+      hvSum += Number(r.evlu_amt ?? 0); // per-symbol valuation
     }
     const out2raw = d.output2;
     const out2 = (Array.isArray(out2raw) ? out2raw[0] : out2raw) as Json | undefined;
     const cash = Number(out2?.nxdy_excc_amt ?? out2?.dnca_tot_amt ?? 0);
-    const hvBroker = Number(out2?.scts_evlu_amt ?? 0) || hvSum; // 증권사 유가증권평가금액
+    const hvBroker = Number(out2?.scts_evlu_amt ?? 0) || hvSum; // the broker's securities valuation
     return [pos, cash, hvBroker];
   }
 
-  /** 국내 현금 주문 — market=true 시장가(01)/false 지정가(00) → ODNO.
-   *  지정가는 KRX 호가단위 라운딩(기본 ETF 5원 — 매도 올림·매수 내림). 위반 시
-   *  40030000 "호가단위 오류"로 거부되므로 여기서 단일 처리한다. */
+  /** KRX cash order - market=true gives a market order (01), false a limit (00) -> ODNO.
+   *  A limit is rounded to the KRX tick (5 won for ETFs by default; up on sells, down on buys). A violation
+   *  is rejected with 40030000 "tick size error", so it is handled in this one place. */
   async krOrder(symbol: string, qty: number, side: "buy" | "sell",
                 opts: { market?: boolean; price?: number; tick?: KrTickKind } = {}): Promise<string> {
     const market = opts.market ?? true;
@@ -361,7 +361,7 @@ export class KisClient {
     return this.krOrder(symbol, qty, side, { market: true });
   }
 
-  /** 국내 기간 체결내역(체결분만, 매수·매도 전체) — v4 대사용. 날짜 YYYYMMDD. */
+  /** KRX fills over a period (fills only, both sides), for v4 reconciliation. Dates are YYYYMMDD. */
   async krExecutions(symbol: string, startDate: string, endDate: string): Promise<Json[]> {
     return this.getPaged(
       "/uapi/domestic-stock/v1/trading/inquire-daily-ccld", this.tr("kr_ccnl"),
@@ -377,7 +377,7 @@ export class KisClient {
     );
   }
 
-  /** 국내 당일 미체결(취소 대상) — inquire-daily-ccld 미체결 모드(모의 지원 경로). */
+  /** KRX open orders today (cancellation candidates) - inquire-daily-ccld in unfilled mode (the path paper supports). */
   async krOpenOrders(): Promise<Json[]> {
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     return this.getPaged(
@@ -405,7 +405,7 @@ export class KisClient {
     return String((d.output as Json)?.ODNO ?? "");
   }
 
-  // ── 미국(US) — 파이썬 kis/overseas.py 포팅 ───────────────────
+  // ── US - a port of Python's kis/overseas.py ───────────────────
 
   async usPrice(symbol: string, excd = "NAS"): Promise<number> {
     const d = await this.get("/uapi/overseas-price/v1/quotations/price", "HHDFS00000300", {
@@ -451,7 +451,7 @@ export class KisClient {
     return [...out.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1)).slice(0, need + 30);
   }
 
-  /** 최근 일봉 OHLCV(최신순, ~최근 100일 중 상위) — 사이트 가격 push 용. */
+  /** Recent daily OHLCV (newest first, the top of the last ~100 days), for the site's price push. */
   async usOhlcvRecent(symbol: string, excd = "NAS"): Promise<
     { date: string; open: number; high: number; low: number; close: number; volume: number }[]
   > {
@@ -464,7 +464,7 @@ export class KisClient {
     }));
   }
 
-  /** 거래대금 시계열 과거→최신(미국) — rotation 자동선발용. */
+  /** Traded value oldest to newest (US), for rotation's auto-selection. */
   async usValueSeries(symbol: string, excd = "NAS"): Promise<number[]> {
     const rows = await this.usDailyPage(symbol, excd, "");
     return rows
@@ -473,7 +473,7 @@ export class KisClient {
       .map(([, v]) => v);
   }
 
-  /** 미국 보유맵 + 매수가능 USD(psamount — 미체결 반영. 실패 시 현금 0 폴백은 호출측). */
+  /** US holdings map plus buyable USD (psamount, reflecting resting orders. On failure the caller falls back to 0 cash). */
   async usAccount(): Promise<[Record<string, [number, number]>, number, number]> {
     const d = await this.get("/uapi/overseas-stock/v1/trading/inquire-balance", this.tr("us_balance"), {
       CANO: this.cano,
@@ -484,7 +484,7 @@ export class KisClient {
       CTX_AREA_NK200: "",
     });
     const pos: Record<string, [number, number]> = {};
-    let hvBroker = 0; // 증권사 평가금액 합(우리가 현재가를 재조회하지 않는다)
+    let hvBroker = 0; // the broker's total valuation (we do not re-query current prices)
     for (const r of (d.output1 as Json[]) ?? []) {
       const q = Math.trunc(Number(r.ovrs_cblc_qty ?? 0));
       if (q > 0) pos[String(r.ovrs_pdno)] = [q, Number(r.pchs_avg_pric ?? 0)];
@@ -494,7 +494,7 @@ export class KisClient {
     try {
       cash = await this.usBuyable("SPY", 1.0);
     } catch {
-      cash = 0; // 파이썬과 동일: psamount 실패 시 현금 0(매수 스킵) — 보유는 유지
+      cash = 0; // Same as Python: a psamount failure gives 0 cash (buys skipped) while the holdings stand
     }
     return [pos, cash, hvBroker];
   }
@@ -522,9 +522,9 @@ export class KisClient {
     throw new KisError("psamount-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
   }
 
-  /** 미국 종목·가격의 KIS 최대매수수량(max_ord_psbl_qty — 수수료·환율 반영 권위값).
-   *  주문가능'금액'(usBuyable)은 수수료 前 총액이라 floor(금액/가격)이 KIS 한도를 넘길 수
-   *  있다(레버리지 ETF 등). 종목·가격을 넣으면 KIS 가 직접 계산한 수량을 그대로 쓴다. */
+  /** KIS's maximum buyable quantity for a US symbol and price (max_ord_psbl_qty - authoritative, with fees and FX).
+   *  The buyable *amount* (usBuyable) is the gross before fees, so floor(amount / price) can exceed the KIS limit
+   *  (leveraged ETFs especially). Given a symbol and price, KIS's own quantity is used as is. */
   async usBuyableQty(symbol: string, price: number, excd = "NASD"): Promise<number> {
     const d = await this.get(
       "/uapi/overseas-stock/v1/trading/inquire-psamount",
@@ -539,7 +539,7 @@ export class KisClient {
     throw new KisError("psamount-qty-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
   }
 
-  /** 국내 종목·가격의 최대 매수가능수량(nrcvb_buy_qty — 미수 없는 순수 현금 기준, 수수료·세금 반영). */
+  /** Maximum buyable quantity for a KRX symbol and price (nrcvb_buy_qty - pure cash with no margin, fees and tax included). */
   async krBuyableQty(symbol: string, price: number): Promise<number> {
     const d = await this.get(
       "/uapi/domestic-stock/v1/trading/inquire-psbl-order",
@@ -555,7 +555,7 @@ export class KisClient {
     throw new KisError("psbl-qty-unknown", `필드 불명: ${Object.keys(out ?? {}).join(",")}`);
   }
 
-  /** 미국 주문 — ordDvsn 00=지정가 / 34=LOC(모의는 LOC 미지원 → 지정가 폴백). */
+  /** US order - ordDvsn 00 = limit / 34 = LOC (paper has no LOC, so it falls back to a limit). */
   async usOrder(symbol: string, qty: number, price: number, side: "buy" | "sell",
                 excd = "NASD", ordDvsn = "00"): Promise<string> {
     const dvsn = this.creds.env === "paper" && ordDvsn !== "00" ? "00" : ordDvsn;
@@ -575,7 +575,7 @@ export class KisClient {
     return String((d.output as Json)?.ODNO ?? "");
   }
 
-  /** 미국 기간 체결내역(체결분만) — v4 대사용. */
+  /** US fills over a period (fills only), for v4 reconciliation. */
   async usExecutions(symbol: string, startDate: string, endDate: string,
                      excd = "NASD"): Promise<Json[]> {
     return this.getPaged(
@@ -592,9 +592,9 @@ export class KisClient {
     );
   }
 
-  /** 미국 기간 체결내역 — 전 종목(PDNO="")을 거래소별(NASD/NYSE/AMEX)로 일괄 조회·병합.
-   *  종목별 조회(수백 종목)보다 훨씬 적은 호출로 전 거래소 체결을 잡는다.
-   *  (거래소를 지정하지 않으면 KIS 가 NASD 만 반환 → NYSE 상장 보유의 체결을 놓친다.) */
+  /** US fills over a period - every symbol (PDNO="") queried per exchange (NASD/NYSE/AMEX) and merged.
+   *  It catches fills on every exchange in far fewer calls than querying hundreds of symbols one by one.
+   *  (Without naming an exchange KIS returns NASD only, missing fills on NYSE-listed holdings.) */
   async usExecutionsAll(startDate: string, endDate: string): Promise<Json[]> {
     const out: Json[] = [];
     for (const excd of ["NASD", "NYSE", "AMEX"]) {
@@ -607,8 +607,8 @@ export class KisClient {
     return out;
   }
 
-  /** 미국 기간 실현손익 총액(inquire-period-profit output2). 증권사가 계산한 값.
-   *  모의투자는 미지원 → KisError throw(호출측이 자체계산으로 폴백). */
+  /** Total realized P&L over a period for the US (inquire-period-profit output2), as the broker computed it.
+   *  Unsupported on paper, where it throws a KisError (the caller falls back to computing it). */
   async usRealizedPnl(startDate: string, endDate: string): Promise<number> {
     const d = await this.get(
       "/uapi/overseas-stock/v1/trading/inquire-period-profit", this.tr("us_period_profit"),
@@ -622,7 +622,7 @@ export class KisClient {
     return Number(o2?.ovrs_rlzt_pfls_amt ?? o2?.rlzt_pfls_amt ?? 0);
   }
 
-  /** 국내 기간 실현손익 총액(inquire-period-trade-profit output2). 모의 미지원 → throw. */
+  /** Total realized P&L over a period for KRX (inquire-period-trade-profit output2). Unsupported on paper, so it throws. */
   async krRealizedPnl(startDate: string, endDate: string): Promise<number> {
     const d = await this.get(
       "/uapi/domestic-stock/v1/trading/inquire-period-trade-profit", this.tr("kr_period_profit"),
@@ -636,7 +636,7 @@ export class KisClient {
     return Number(o2?.tot_rlzt_pfls ?? o2?.rlzt_pfls ?? 0);
   }
 
-  /** 미국 미체결내역(취소 대상). */
+  /** US open orders (cancellation candidates). */
   async usOpenOrders(excd = "NASD"): Promise<Json[]> {
     return this.getPaged(
       "/uapi/overseas-stock/v1/trading/inquire-nccs", this.tr("us_nccs"),
@@ -663,10 +663,10 @@ export class KisClient {
   }
 }
 
-// 미장 시세 거래소(EXCD) — stock-automator-v2 universe.py US_ETFS 검증값 + 기본 NAS.
-// 심볼→거래소는 계정과 무관한 사실이라 전역 레지스트리로 확장한다(registerUsExcd —
-// trend 유니버스의 SYMBOL:EXCD 페어를 엔진이 등록. NYSE 종목이 NAS 로 조회돼 0건이
-// 나오는 문제 방지).
+// US quote exchanges (EXCD) - the values verified in stock-automator-v2's universe.py US_ETFS, defaulting to NAS.
+// Symbol -> exchange is a fact independent of the account, so it is extensible through a global registry
+// (registerUsExcd - the engine registers the trend universe's SYMBOL:EXCD pairs). This stops NYSE symbols
+// from being queried as NAS and returning nothing.
 export const US_QUOTE_EXCD: Record<string, string> = {
   QQQ: "NAS", TQQQ: "NAS", SQQQ: "NAS",
   SPY: "AMS", VOO: "AMS", UPRO: "AMS",

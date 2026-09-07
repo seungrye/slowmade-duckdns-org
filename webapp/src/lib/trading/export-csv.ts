@@ -1,12 +1,12 @@
-// 매매기록 CSV 내보내기 (#181) — 순수 변환부. DB 도 요청도 모른다.
+// Trade-record CSV export (#181) - the pure conversion. It knows nothing of the DB or the request.
 //
-// 엑셀과 구글시트 양쪽에서 그대로 열리는 것이 목표다.
+// The goal is a file that opens as is in both Excel and Google Sheets.
 
 /**
  * UTF-8 BOM.
  *
- * 엑셀은 BOM 이 없으면 CSV 를 현재 코드페이지로 읽어 한글을 깨뜨린다(구글시트는 괜찮다).
- * 세 바이트로 두 프로그램을 다 만족시킬 수 있으니 늘 붙인다.
+ * Without a BOM, Excel reads the CSV in the current code page and mangles Korean (Sheets is fine).
+ * Three bytes satisfy both programs, so it is always added.
  */
 export const CSV_BOM = '\ufeff';
 
@@ -15,12 +15,12 @@ export interface Column<T> {
   value: (row: T) => string | number | boolean | Date | null | undefined;
 }
 
-/** 셀 앞에 이게 오면 엑셀·시트가 **수식으로 실행한다**. 탭·CR 로 위장하는 변종까지 본다. */
+/** A cell starting with one of these is **executed as a formula** by Excel and Sheets. Tab- and CR-disguised variants count too. */
 const FORMULA_START = /^[\t\r\n ]*[=+\-@]/;
 
 const KST = 'Asia/Seoul';
 
-/** 날짜를 한국 시간 `YYYY-MM-DD HH:mm:ss` 로. 시간대를 안 박으면 서버 로캘에 따라 값이 흔들린다. */
+/** Formats a date as `YYYY-MM-DD HH:mm:ss` in Korean time. Without pinning the zone the value drifts with the server locale. */
 function formatDate(d: Date): string {
   const p = new Intl.DateTimeFormat('sv-SE', {
     timeZone: KST,
@@ -28,19 +28,20 @@ function formatDate(d: Date): string {
     hour: '2-digit', minute: '2-digit', second: '2-digit',
     hour12: false,
   }).format(d);
-  // sv-SE 는 `2026-08-18 10:23:45` 로 준다 — 그대로 쓴다.
+  // sv-SE gives `2026-08-18 10:23:45`, which is used as is.
   return p.replace('T', ' ');
 }
 
 /**
- * 값 하나를 CSV 한 칸으로.
+ * One value into one CSV cell.
  *
- * **수식 주입 차단**이 이 함수의 존재 이유다. 종목명·사유 같은 문자열이 그대로 셀에 들어가는데,
- * `=`·`+`·`-`·`@` 로 시작하면 파일을 여는 순간 수식으로 실행된다(`=HYPERLINK(...)` 로 다른 셀
- * 내용을 외부로 실어 보내는 것이 고전적인 수법이다). 앞에 작은따옴표를 붙여 글자로 고정한다.
+ * **Blocking formula injection** is why this function exists. Strings like symbol names and reasons land in
+ * cells verbatim, and one starting with `=`, `+`, `-` or `@` runs as a formula the moment the file is opened
+ * (`=HYPERLINK(...)` smuggling another cell's contents outward is the classic trick). A leading apostrophe
+ * pins it as text.
  *
- * **숫자는 건드리지 않는다** — 음수 손익까지 글자로 바꾸면 시트에서 합계가 깨진다. 위험한 건
- * 어차피 문자열로 들어온 값이다.
+ * **Numbers are left alone** - turning a negative P&L into text breaks the sheet's totals. What is dangerous
+ * arrived as a string anyway.
  */
 export function csvCell(v: unknown): string {
   if (v === null || v === undefined) return '';
@@ -50,16 +51,16 @@ export function csvCell(v: unknown): string {
 
   let s = String(v);
   if (FORMULA_START.test(s)) s = `'${s}`;
-  // 쉼표·따옴표·줄바꿈이 있으면 감싼다. 감쌌으면 안쪽 따옴표는 두 번 쓴다.
+  // Wrap when there is a comma, quote or newline. Once wrapped, inner quotes are doubled.
   if (/[",\r\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 
 /**
- * 행들을 CSV 문자열로. 행이 없어도 **머리글은 남긴다** — 빈 파일을 받으면 자료가 없는 건지
- * 내보내기가 실패한 건지 구분할 수 없다.
+ * Rows into a CSV string. **The header stays even with no rows** - given an empty file you cannot tell
+ * whether there was no data or the export failed.
  *
- * 줄 끝은 CRLF(엑셀이 기대하는 형식).
+ * Lines end with CRLF (what Excel expects).
  */
 export function toCsv<T>(rows: T[], columns: Column<T>[]): string {
   const head = columns.map((c) => csvCell(c.header)).join(',');

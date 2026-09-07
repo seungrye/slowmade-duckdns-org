@@ -41,11 +41,11 @@ describe("planReservations — 여러 블록에 나눠 준다", () => {
   });
 
   it("모자라면 뒤 블록은 남은 만큼만", () => {
-    // 현금 40,000 인데 30,000 + 20,000 을 예약했다.
+    // Cash is 40,000 but 30,000 + 20,000 was reserved.
     const got = byId(40_000, blocks(["a", 30_000], ["b", 20_000]));
     expect(got.a.granted).toBe(30_000);
     expect(got.b.granted).toBe(10_000);
-    expect(got.b.short).toBe(true); // 원하던 만큼 못 받았다
+    expect(got.b.short).toBe(true); // it got less than it wanted
   });
 
   it("남은 돈이 없으면 그날 보류", () => {
@@ -60,7 +60,7 @@ describe("planReservations — 여러 블록에 나눠 준다", () => {
   });
 
   it("예약 빈 블록이 앞에 있으면 다 가져간다 — 뒤가 보류된다", () => {
-    // 전액을 쓰겠다는 블록을 앞에 두면 뒤에 남는 게 없다. 순서가 곧 우선권이다.
+    // Put a block that wants everything first and nothing is left behind it. Order is priority.
     const got = byId(50_000, blocks(["a", undefined], ["b", 20_000]));
     expect(got.a.granted).toBe(50_000);
     expect(got.b).toMatchObject({ granted: 0, held: true });
@@ -86,7 +86,7 @@ describe("planReservations — 여러 블록에 나눠 준다", () => {
 
   it("음수·이상한 예약은 없는 것으로 본다", () => {
     const got = byId(50_000, blocks(["a", -100], ["b", 20_000]));
-    expect(got.a.granted).toBe(50_000); // 전액 취급
+    expect(got.a.granted).toBe(50_000); // treated as the whole amount
     expect(got.b.held).toBe(true);
   });
 

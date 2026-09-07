@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// 모델·시계 목킹 — DB/네트워크 없이 엔진 오케스트레이션(시드/채택/밴드/경계/현금캡)만 검증.
-/** 주문 로그 — 사다리 검증에 수량·가격을 자주 보므로 그 둘만 타입을 준다 (#360). */
+// Quarter buy - if star point R exceeds reference + 20% (right after a crash), fold down to the big-buy point.
+// Models and the clock are mocked - only the engine's orchestration (seed, adoption, bands, boundaries, cash cap) is checked, with no DB or network.
 type OrderLog = Record<string, unknown> & { side: string; qty: number; price: number; ordType: string };
 const orderLogs: OrderLog[] = [];
 const persisted: Array<Record<string, unknown>> = [];
@@ -49,12 +49,12 @@ describe("VR 엔진 — 시드/채택", () => {
     await run(fakeBroker({ holding: 0, price: 100, cash: 10000 }));
     expect(orderLogs).toHaveLength(1);
     expect(orderLogs[0]).toMatchObject({ side: "buy", qty: 85, strategy: "value_rebalancing" }); // floor(8500/100)
-    expect(persisted.at(-1)).toMatchObject({ vInit: false, lastRunDate: "20260722" }); // 미초기화 유지
+    expect(persisted.at(-1)).toMatchObject({ vInit: false, lastRunDate: "20260722" }); /** Order logs - the ladder checks read quantity and price often, so only those two are typed (#360). */
   });
 
   it("첫 실행·기존 보유 → 재매수 없이 채택(V=보유×가격)", async () => {
     await run(fakeBroker({ holding: 85, price: 100, cash: 1500 }));
-    // 채택이 핵심 — 가진 것을 그대로 인정하고 V 만 잡는다. 시장가 재매수는 없다.
+    // stays uninitialised
     expect(persisted.at(-1)).toMatchObject({ vInit: true, V: 8500 });
     expect(orderLogs.some((o) => o.ordType === "market")).toBe(false);
   });
@@ -62,8 +62,8 @@ describe("VR 엔진 — 시드/채택", () => {
 
 describe("VR 엔진 — 밴드 리밸런스", () => {
   const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500, buyBudget: 750, sinceCycle: 0, cumBuy: 8500, cumSell: 0, lastRunDate: "20260721" };
-  // #360 — 사다리는 밴드 경계 기준으로 걸리므로, "지금 가격이 밴드 밖" 이면 이미 채워질
-  // 칸이 나온다. 그 칸의 지정가가 현재가보다 유리한 쪽에 있는지를 본다.
+  // Adoption is the point - take what is held as it is and just set V. There is no market re-buy.
+  // #360 - the ladder is placed against the band boundaries, so "the price is outside the band right now" means
   it("평가금 > 상단 → 매도 사다리가 현재가 아래(=즉시 체결 가능)까지 내려온다", async () => {
     await run(fakeBroker({ holding: 85, price: 130, cash: 1500 }), CFG, { vr: seeded });
     const 매도 = orderLogs.filter((o) => o.side === "sell");
@@ -76,13 +76,13 @@ describe("VR 엔진 — 밴드 리밸런스", () => {
     expect(매수.length).toBeGreaterThan(0);
     expect(Math.max(...매수.map((o) => o.price))).toBeGreaterThanOrEqual(80);
   });
-  // #360 — 사다리로 바뀌면서 **밴드 안이어도 주문을 건다.** 문서가 그렇게 한다: 밴드
-  // 경계를 기준으로 1주씩 지정가를 걸어 두고 가격이 오기를 기다린다. 예전엔 종가 근처에
-  // 한 건만 냈고, 그래서 장중에 밴드를 스치고 돌아오는 움직임을 통째로 놓쳤다.
+  // some rungs are already fillable. This checks that such a rung's limit sits on the favourable side of the current price.
+  // #360 - with the ladder, **orders go out even inside the band.** That is what the source does: place one-share
+  // limits against the band boundaries and wait for the price to come. Previously only one order went out near the
   it("밴드 안 → 양쪽 사다리를 걸어 둔다(체결은 가격이 와야 한다)", async () => {
     await run(fakeBroker({ holding: 85, price: 100, cash: 5000 }), CFG, { vr: seeded });
     expect(orderLogs.length).toBeGreaterThan(0);
-    // 매수는 밴드 하단 아래, 매도는 상단 위 — 지금 가격(100)으로는 하나도 안 채워진다.
+    // close, which missed every intraday move that brushed the band and came back.
     for (const o of orderLogs) {
       if (o.side === "buy") expect(o.price).toBeLessThan(100);
       else expect(o.price).toBeGreaterThan(100);
@@ -90,7 +90,7 @@ describe("VR 엔진 — 밴드 리밸런스", () => {
     expect(orderLogs.every((o) => o.ordType === "limit")).toBe(true);
   });
   it("매수 사다리는 실계좌 현금 안에서만 건다(공유 계좌 안전)", async () => {
-    // 현금 200 이면 80 언저리 칸을 두 개쯤 걸고 멈춘다 — 계좌를 넘겨 걸지 않는다.
+    // Buys sit below the lower band and sells above the upper - at the current price (100) none fill.
     await run(fakeBroker({ holding: 85, price: 80, cash: 200 }), CFG, { vr: seeded });
     const 매수 = orderLogs.filter((o) => o.side === "buy");
     expect(매수.length).toBeGreaterThan(0);

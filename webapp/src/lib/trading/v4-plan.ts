@@ -1,28 +1,28 @@
-// 무한매수 V4.0 — 하루 주문 계획 단일 소스(백테스트=실거래 공용, 순수 함수).
-// 파이썬 strategy/infinite_v4.plan_day() 와 규칙·상수 완전 대칭.
+// Infinite buying V4.0 - the single source for a day's order plan (shared by backtest and live, pure).
+// Fully symmetrical in rules and constants with Python's strategy/infinite_v4.plan_day().
 //
-// 종가를 모르는 상태에서 실제로 낼 주문 목록을 산출한다:
-//   - 매수 = LOC 분할 매수 사다리(원문 §4): 맨 윗칸(전반 [별지점−0.01 X/2 + 평단 나머지] /
-//     후반 [별지점−0.01 X] / 진입 [전일종가+10%]) + 아래로 X÷k 가격에 1주씩,
-//     참조가−20%(증권사 거부 한계)까지. 참조가+20% 초과 칸은 큰수(참조가+10%)로 접어내림.
-//   - 매도 = ¼ 별지점 LOC + ¾ 평단×(1+목표%) 지정가(장중). 참조가+20% 초과 매도점은
-//     걸지 않음(원문 §4.4 — 매도 거부는 그냥 넘어감).
-//   - 리버스 = 첫날 MOC 매도 / 이후 별지점R 위 LOC 매도 + 잔금/4 쿼터매수(LOC).
-// 실거래 엔진은 이 주문을 브로커로 전송, 백테스트는 LOC 체결 규칙으로 채점한다.
+// It produces the orders actually placed while the close is still unknown:
+//   - Buying is an LOC split-buy ladder (source section 4): the top rung (first half [X/2 at star point - 0.01
+//     plus the rest at the average] / second half [X at star point - 0.01] / entry [previous close + 10%]) plus
+//     one share at each X/k price below, down to reference - 20% (the broker's rejection limit). A rung above
+//     reference + 20% folds down into the big buy (reference + 10%).
+//   - Selling is a quarter at the star-point LOC plus three quarters at a limit of average x (1 + target%),
+//     intraday. A sell point above reference + 20% is not placed (source 4.4 - a rejected sell is simply skipped).
+//   - Reverse is an MOC sell on the first day, then an LOC sell above star point R plus a quarter buy of remaining/4 (LOC).
 
-export const BROKER_GAP = 0.20; // 증권사 주문 거부 한계(현재가 대비) — 사다리 깊이·큰수 기준
-export const BIG_BUY_PCT = 0.10; // 큰수 매수 지점(참조가 +10%) — 원문 "10~15%는 가이드"
+export const BROKER_GAP = 0.20; // The live engine sends these orders to the broker; the backtest scores them with the LOC fill rules.
+export const BIG_BUY_PCT = 0.10; // broker rejection limit relative to the current price - sets ladder depth and the big-buy point
 
 export type V4PlanConfig = {
   splits: number;
-  starBase: number; // 별% base(TQQQ 15 / SOXL 20)
-  sellTarget: number; // 75% 지정가매도 목표(0.15)
+  starBase: number; // big buy point (reference + 10%) - the source calls 10-15% a guideline
+  sellTarget: number; // star% base (TQQQ 15 / SOXL 20)
 };
 
 export type V4PlannedOrder = {
   side: "buy" | "sell";
   qty: number;
-  price: number; // 지정가(LOC/limit). market 은 참조용
+  price: number; // the 75% limit sell target (0.15)
   kind: "loc" | "limit" | "market";
   tag: "entry" | "star" | "avg" | "rung" | "big" | "q25" | "q75"
     | "rev_first" | "rev_sell" | "rev_qbuy";
@@ -31,9 +31,9 @@ export type V4PlannedOrder = {
 export const v4StarPct = (t: number, splits: number, base: number) =>
   (base - (2 * base * t) / splits) / 100;
 
-const r2 = (x: number) => Math.trunc(x * 100) / 100; // 가격 소수점 둘째 자리 버림(원문)
+const r2 = (x: number) => Math.trunc(x * 100) / 100; // limit price (LOC/limit); for market it is only a reference
 
-/** LOC 분할 매수 사다리 — tops=[가격, 배정금액] 순서대로 맨 윗칸, 아래로 X÷k 1주씩. */
+// truncate the price to two decimals, as the source does
 function buyLadder(
   tops: [number, number][], shot: number, ref: number,
 ): V4PlannedOrder[] {
@@ -48,7 +48,7 @@ function buyLadder(
     const q = Math.floor(amt / p);
     if (q < 1) return;
     n += q;
-    if (p > capP) bigQty += q; // 급락으로 매수점이 너무 위 → 큰수로 접기(원문 §4.3)
+    if (p > capP) bigQty += q; /** The LOC split-buy ladder - tops=[price, allocated amount] sizes the top rungs in order, then one share at each X/k price below. */
     else if (p >= floorP) {
       orders.push({ side: "buy", qty: q, price: p, kind: "loc",
                     tag: i === tops.length - 1 && tops.length > 1 ? "avg" : "star" });
@@ -72,9 +72,9 @@ export function v4PlanDay(args: {
   avg: number;
   holding: number;
   cash: number;
-  refPrice: number; // 참조가 = 전일종가(백테스트) / 주문시점 현재가(실거래)
+  refPrice: number; // a crash put the buy point too high -> fold to the big-buy point (source 4.3)
   entryLimit: number | null;
-  prev5: number[]; // 직전 5거래일 종가(리버스 별지점R)
+  prev5: number[]; // reference price = previous close (backtest) / current price at order time (live)
   reverseFirstDay: boolean;
   cfg: V4PlanConfig;
 }): V4PlannedOrder[] {
@@ -126,7 +126,7 @@ export function v4PlanDay(args: {
   const starR = args.prev5.length >= 5
     ? args.prev5.reduce((a, b) => a + b, 0) / args.prev5.length : refPrice;
   let sellQ = Math.floor(holding / (cfg.splits / 2));
-  if (sellQ < 1 && holding > 0) sellQ = 1; // 보유가 등분 미만이어도 정리(원문 미명시 — 실용)
+  if (sellQ < 1 && holding > 0) sellQ = 1; // the previous 5 trading days' closes (reverse star point R)
   if (args.reverseFirstDay) {
     if (sellQ >= 1) orders.push({ side: "sell", qty: sellQ, price: r2(refPrice), kind: "market", tag: "rev_first" });
     return orders;
@@ -135,7 +135,7 @@ export function v4PlanDay(args: {
   if (sellQ >= 1 && sr <= capP) {
     orders.push({ side: "sell", qty: sellQ, price: sr, kind: "loc", tag: "rev_sell" });
   }
-  // 쿼터매수 — 별지점R 이 참조가+20% 를 넘으면(급락 직후) 큰수 지점으로 접어 내림.
+  // wind down even below one portion (the source is silent; this is the practical choice)
   const buyP = Math.min(sr, r2(refPrice * (1 + BIG_BUY_PCT)));
   const q = buyP > 0 ? Math.floor(cash / 4 / buyP) : 0;
   if (q >= 1 && buyP >= floorP) {

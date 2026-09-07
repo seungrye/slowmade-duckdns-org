@@ -3,19 +3,20 @@ import type { LiveBroker } from "./engines";
 import type { V4Broker } from "./infinite-v4-engine";
 
 /**
- * 브로커가 보고하는 **현금만** 예약분으로 줄이는 얇은 껍데기 (#339).
+ * A thin wrapper that reduces **only the cash** the broker reports to the reserved amount (#339).
  *
- * ── 왜 엔진이 아니라 여기인가 ──────────────────────────────────────────
+ * -- Why here rather than in the engines --------------------------------
  *
- * 현금이 엔진으로 들어오는 문은 둘뿐이다 — `LiveBroker.account()` 와 `V4Broker.snapshot()`.
- * 엔진마다 예약을 넣으면 네 군데(LRS·rotation·trend·v4/VR)를 고쳐야 하고, 새 전략이 생길
- * 때마다 또 잊는다. 문 앞에서 한 번 줄이면 **엔진은 한 줄도 안 고쳐도 된다.**
+ * Cash enters the engines through exactly two doors: `LiveBroker.account()` and `V4Broker.snapshot()`.
+ * Putting the reservation in each engine means fixing four places (LRS, rotation, trend, v4/VR) and
+ * forgetting again with every new strategy. Reducing it once at the door means **no engine changes at all.**
  *
- * **현금만 줄인다.** 보유 수량·평단·현재가·증권사 평가금액은 계좌의 사실이라 그대로 둔다 —
- * 그걸 왜곡하면 엔진이 자기 포지션을 오해한다. 주문·체결·취소도 그대로 위임한다.
+ * **Only cash is reduced.** Holdings, average price, current price and the broker's valuation are facts
+ * about the account and stay untouched - distorting them makes an engine misread its own position.
+ * Orders, fills and cancellations are delegated unchanged.
  *
- * 예약이 없으면(`null`) **원래 브로커를 그대로 돌려준다** — 껍데기를 씌우지 않아, 블록이
- * 하나뿐인 기존 사용자는 코드 경로가 예전과 똑같다.
+ * With no reservation (`null`) it **returns the original broker** - no wrapper, so a user with a single
+ * block takes exactly the same code path as before.
  */
 
 export function capLiveBroker(broker: LiveBroker, granted: number | null | undefined): LiveBroker {

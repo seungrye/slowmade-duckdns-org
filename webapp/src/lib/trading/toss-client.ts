@@ -1,6 +1,6 @@
-// 토스증권 Open API 클라이언트 — 파이썬 stock-automator-v2 toss/{auth,client,invest}.py
-// 포팅. 국내·미국 단일 API(심볼로 구분: 6자리 숫자=KR, 티커=US). 실계좌 전용.
-// 스펙 요약: stock-automator-v2 docs/toss-api.md
+// Toss Securities Open API client - a port of stock-automator-v2's Python toss/{auth,client,invest}.py.
+// One API for KRX and the US (told apart by symbol: 6 digits = KR, a ticker = US). Live accounts only.
+// Spec summary: stock-automator-v2 docs/toss-api.md
 
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
@@ -11,7 +11,7 @@ import { feeInclusiveQty } from "./buyable";
 export type TossCreds = {
   clientId: string;
   clientSecret: string;
-  accountSeq?: number | null; // 생략 → 첫 BROKERAGE 계좌 자동
+  accountSeq?: number | null; // omitted -> the first BROKERAGE account
 };
 
 const BASE = "https://openapi.tossinvest.com";
@@ -137,7 +137,7 @@ export class TossClient {
     await throttle();
     let resp = await doPost();
     let text = await resp.text();
-    // 401(미접수)·429(접수 전 차단)만 1회 재시도 — 그 외 비멱등 재시도 금지.
+    // Only 401 (never accepted) and 429 (blocked before acceptance) retry once - no other non-idempotent retry.
     if (resp.status === 401 && TOKEN_ERROR_CODES.has(TossClient.errorCode(text))) {
       await this.getToken(true);
       await throttle();
@@ -166,7 +166,7 @@ export class TossClient {
     return data.result ?? data;
   }
 
-  // ── 도메인(파이썬 toss/invest.py 대응) ───────────────────────
+  // ── Domain (matching Python's toss/invest.py) ───────────────────────
 
   async price(symbol: string): Promise<number> {
     const rows = ((await this.get("/api/v1/prices", { symbols: symbol })) as Json[]) ?? [];
@@ -174,7 +174,7 @@ export class TossClient {
     return Number(rows[0].lastPrice ?? 0);
   }
 
-  /** (YYYYMMDD, 종가) 최신순 — nextBefore 페이지네이션 병합. */
+  /** (YYYYMMDD, close) newest first, merged across nextBefore pages. */
   async historyLong(symbol: string, need = 210): Promise<[string, number][]> {
     const out: [string, number][] = [];
     let before: string | null = null;
@@ -195,7 +195,7 @@ export class TossClient {
     return out;
   }
 
-  /** 거래대금(종가×거래량) 시계열 과거→최신 — rotation 자동선발용. */
+  /** Traded value (close x volume) oldest to newest, for rotation's auto-selection. */
   async valueSeries(symbol: string): Promise<number[]> {
     const result = ((await this.get("/api/v1/candles", {
       symbol, interval: "1d", count: "40", adjusted: "true",
@@ -207,12 +207,12 @@ export class TossClient {
     return rows.map(([, v]) => v);
   }
 
-  /** 보유맵(시장 필터) + 현금(매수가능, KRW|USD). */
+  /** Holdings map (filtered by market) plus cash (buying power, KRW|USD). */
   async account(market: "kr" | "us"): Promise<[Record<string, [number, number]>, number, number]> {
     const data = ((await this.get("/api/v1/holdings", undefined, true)) ?? {}) as Json;
     const country = market === "kr" ? "KR" : "US";
     const pos: Record<string, [number, number]> = {};
-    let hvBroker = 0; // 토스 평가금액(필드 있으면 사용, 없으면 0 → close-sync 폴백)
+    let hvBroker = 0; // Toss's valuation (used when the field is there, otherwise 0 -> close-sync falls back)
     for (const it of (data.items as Json[]) ?? []) {
       if (it.marketCountry !== country) continue;
       const q = Math.trunc(Number(it.quantity ?? 0));
@@ -227,7 +227,7 @@ export class TossClient {
     return [pos, Number(bp.cashBuyingPower ?? 0), hvBroker];
   }
 
-  /** 시장별 수수료율(%) — /api/v1/commissions. 1회 조회 후 캐시(같은 사이클 내). */
+  /** Per-market fee rate (%) - /api/v1/commissions. Queried once and cached (within a cycle). */
   private async commissionRate(market: "kr" | "us"): Promise<number> {
     if (!this.commissionCache) {
       const rows = ((await this.get("/api/v1/commissions", undefined, true)) ?? []) as Json[];
@@ -241,8 +241,8 @@ export class TossClient {
     return this.commissionCache[market === "kr" ? "KR" : "US"] ?? 0;
   }
 
-  /** 종목·가격의 매수가능수량 — KIS max_ord_psbl_qty 대응. 토스는 종목별 최대수량 API 가
-   *  없어 매수여력(cashBuyingPower) ÷ (가격 × (1+수수료율))로 계산한다(수수료 포함). */
+  /** Buyable quantity for a symbol and price, matching KIS's max_ord_psbl_qty. Toss has no per-symbol maximum API,
+   *  so it computes buying power (cashBuyingPower) / (price x (1 + fee rate)), fees included. */
   async buyableQty(symbol: string, price: number, market: "kr" | "us"): Promise<number> {
     if (price <= 0) return 0;
     const bp = ((await this.get(
@@ -251,11 +251,11 @@ export class TossClient {
       true,
     )) ?? {}) as Json;
     const cash = Number(bp.cashBuyingPower ?? 0);
-    const rate = await this.commissionRate(market); // % 단위(예: US 0.25)
+    const rate = await this.commissionRate(market); // a percentage (US is 0.25, say)
     return feeInclusiveQty(cash, price, rate);
   }
 
-  /** 시장가 주문 → orderId. clientOrderId 는 멱등키(10분). */
+  /** Market order -> orderId. clientOrderId is the idempotency key (10 minutes). */
   async orderMarket(symbol: string, qty: number, side: "buy" | "sell",
                     clientOrderId?: string): Promise<string> {
     const body: Json = {
@@ -269,12 +269,12 @@ export class TossClient {
     return String(result.orderId ?? "");
   }
 
-  /** 지정가 주문 — cls=true 면 LOC(LIMIT+timeInForce=CLS, 미국 전용). 가격 포맷:
-   *  KR 정수 원 / US $1↑ 소수2자리·$1↓ 4자리(파이썬 toss/invest._format_price 동일). */
+  /** Limit order - with cls=true it is an LOC (LIMIT + timeInForce=CLS, US only). Price format:
+   *  integer won for KR; two decimals at or above $1 and four below (the same as Python's toss/invest._format_price). */
   async orderLimit(symbol: string, qty: number, side: "buy" | "sell", price: number,
                    opts: { cls?: boolean; clientOrderId?: string } = {}): Promise<string> {
     const priceStr = /^\d+$/.test(symbol)
-      ? String(krTickRound(price, side)) // KR: 호가단위(ETF 5원) — 매도 올림·매수 내림
+      ? String(krTickRound(price, side)) // KR: the tick size (5 won for ETFs) - up on sells, down on buys
       : price < 1 ? price.toFixed(4) : price.toFixed(2);
     const body: Json = {
       symbol,
@@ -289,7 +289,7 @@ export class TossClient {
     return String(result.orderId ?? "");
   }
 
-  /** 대기중(OPEN) 주문 — 취소 안전망용. status=CLOSED 는 토스가 아직 미지원(400). */
+  /** Resting (OPEN) orders, for the cancellation safety net. Toss does not support status=CLOSED yet (400). */
   async openOrders(symbol?: string): Promise<Json[]> {
     const params: Record<string, string> = { status: "OPEN" };
     if (symbol) params.symbol = symbol;
@@ -302,7 +302,7 @@ export class TossClient {
     return String(result.orderId ?? "");
   }
 
-  /** 주문 상세(모든 상태) — 체결 대사용(execution.filledQuantity 등). */
+  /** Order details in any state, for reconciling fills (execution.filledQuantity and the like). */
   async orderDetail(orderId: string): Promise<Json> {
     return ((await this.get(`/api/v1/orders/${orderId}`, undefined, true)) ?? {}) as Json;
   }

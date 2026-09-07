@@ -1,15 +1,15 @@
-// 내보낼 매매 데이터 4종 (#181).
+// The four trading datasets to export (#181).
 //
-// 컬럼 정의만 둔다 — 순수하다. 문서를 읽어 오는 일은 라우트가 한다(그래야 DB 없이 검증된다).
+// Only column definitions live here - pure. Reading the documents is the route's job (so this is verifiable without a DB).
 //
-// 머리글은 화면(`/admin/trading/monitor`)에서 쓰는 말과 맞췄다. 받아 본 사람이 표를 보고
-// 화면과 대조할 수 있어야 한다.
+// The headers match the words used on screen (`/admin/trading/monitor`). Whoever receives the file must be
+// able to hold the table against the screen.
 
 import type { Column } from './export-csv';
 
 export type DatasetId = 'orders' | 'portfolio' | 'runs' | 'trades';
 
-/** 스키마가 자란 뒤에 뽑은 옛 문서엔 없는 필드가 있다 — 어떤 모양이 와도 터지지 않게 느슨히 받는다. */
+/** Documents written before the schema grew are missing fields - accept loosely so no shape can throw. */
 type Doc = Record<string, unknown>;
 
 const s = (k: string) => (r: Doc) => r[k] as string | undefined;
@@ -19,11 +19,11 @@ const d = (k: string) => (r: Doc) => r[k] as Date | undefined;
 
 export interface Dataset {
   id: DatasetId;
-  /** 파일 이름과 버튼에 쓰는 한글 이름. */
+  /** The Korean name used in the filename and on the button. */
   label: string;
-  /** 몽고 컬렉션에 대응하는 모델 키 — 라우트가 이걸로 모델을 고른다. */
+  /** The model key for the Mongo collection - the route picks the model with it. */
   model: 'TradingOrderLog' | 'PortfolioHistory' | 'TradingRun' | 'StockTrade';
-  /** 최신순 정렬 기준 필드. */
+  /** The field to sort by, newest first. */
   sortBy: string;
   columns: Column<Doc>[];
 }
@@ -55,7 +55,7 @@ export const DATASETS: Dataset[] = [
     model: 'PortfolioHistory',
     sortBy: 'dateStr',
     columns: [
-      // 옛 문서는 `date`, 최근 것은 `dateStr` 을 쓴다 — 둘 다 본다.
+      // Older documents use `date`, newer ones `dateStr` - both are read.
       { header: '일자', value: (r) => (r.dateStr ?? r.date) as string | undefined },
       { header: '환경', value: s('env') },
       { header: '통화', value: s('currency') },
@@ -110,7 +110,7 @@ export function datasetById(id: string): Dataset | undefined {
   return DATASETS.find((x) => x.id === id);
 }
 
-/** `매매기록-주문로그-20260818.csv` — 무엇을 언제 뽑았는지 이름만 봐도 알게. 날짜는 한국 기준. */
+/** `매매기록-주문로그-20260818.csv` - the name alone says what was exported and when. The date is Korean time. */
 export function exportFileName(id: DatasetId, at: Date): string {
   const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(at).replace(/-/g, '');
   return `매매기록-${datasetById(id)?.label ?? id}-${day}.csv`;

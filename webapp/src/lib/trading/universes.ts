@@ -1,9 +1,9 @@
-// 명명 유니버스 — 포트폴리오 config.universeRef / syncUniverseRef 로 이름만 참조.
-// 대형 종목 목록(수백 개)을 포트폴리오 DB 문서에서 분리해 여기로 뺐다.
-// 인덱스 리밸런싱 시 이 파일만 갱신하면 되고, 포트폴리오는 이름만 들고 있다.
+// Named universes - referenced by name from a portfolio's config.universeRef / syncUniverseRef.
+// Large symbol lists (hundreds) were pulled out of the portfolio DB document and put here.
+// An index rebalance only needs this file updated; the portfolio just holds the name.
 
 export const UNIVERSES: Record<string, string[]> = {
-  // KOSPI200 + 국장 레버리지/인버스 ETF (069500 v4 가격 push, 211종목)
+  // KOSPI 200 plus KRX leveraged and inverse ETFs (069500 v4 price push, 211 symbols)
   "kospi200-kr": [
     "000080", "000100", "000120", "000150", "000210", "000240", "000270", "000660",
     "000670", "000720", "000810", "000880", "000990", "001040", "001430", "001440",
@@ -33,7 +33,7 @@ export const UNIVERSES: Record<string, string[]> = {
     "069500", "122630", "252670", "233740", "251340", "409820", "423920", "418660",
     "494310", "243880", "462330",
   ],
-  // 미장 trend 매매 유니버스 (514종목)
+  // The US trend trading universe (514 symbols)
   "sp500-us": [
     "MMM", "AOS", "ABT", "ABBV", "ACN", "ADBE", "AMD", "AES",
     "AFL", "A", "APD", "ABNB", "AKAM", "ALB", "ARE", "ALGN",
@@ -103,7 +103,7 @@ export const UNIVERSES: Record<string, string[]> = {
   ],
 };
 
-// 종목 → 거래소 코드(NYS/NAS/AMS) — 미장 시세/주문 라우팅. universe 와 짝.
+// Symbol -> exchange code (NYS/NAS/AMS) for US quote and order routing. Paired with the universe.
 export const EXCD_MAPS: Record<string, Record<string, string>> = {
   "sp500-us": {
     MMM: "NYS", AOS: "NYS", ABT: "NYS", ABBV: "NYS", ACN: "NYS", ADBE: "NAS",
@@ -195,11 +195,11 @@ export const EXCD_MAPS: Record<string, Record<string, string>> = {
   },
 };
 
-// 지수/레버리지 ETF 티커 → 표시명. stocks 컬렉션은 지수 '구성종목'만 이름을 가져
-// ETF(069500=KODEX 200, TQQQ 등)는 이름이 없다. 차트/매매 상세에서 티커만 보이지 않도록
-// 폴백 이름을 제공한다(출처: universe.py US_ETFS/KR_ETFS). DB 이름이 있으면 그쪽이 우선.
+// Index and leveraged ETF tickers -> display names. The stocks collection only names index *constituents*,
+// so ETFs (069500 = KODEX 200, TQQQ and the like) have none. These fallback names keep charts and trade
+// details from showing bare tickers (source: universe.py US_ETFS/KR_ETFS). A name in the DB wins.
 export const ETF_NAMES: Record<string, string> = {
-  // 국장
+  // KRX
   "069500": "KODEX 200",
   "122630": "KODEX 레버리지",
   "252670": "KODEX 200선물인버스2X",
@@ -211,7 +211,7 @@ export const ETF_NAMES: Record<string, string> = {
   "494310": "KODEX 반도체레버리지",
   "243880": "TIGER 200IT레버리지",
   "462330": "KODEX 2차전지산업레버리지",
-  // 미장
+  // US
   QQQ: "Invesco QQQ", TQQQ: "ProShares UltraPro QQQ", SQQQ: "ProShares UltraPro Short QQQ",
   SPY: "SPDR S&P 500", VOO: "Vanguard S&P 500", UPRO: "ProShares UltraPro S&P500",
   SOXL: "Direxion Semiconductor Bull 3X", TECL: "Direxion Technology Bull 3X",

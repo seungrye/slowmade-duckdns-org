@@ -9,7 +9,7 @@ const base = {
 
 describe("snapshotOf — 설정만 뽑는다", () => {
   it("엔진이 매 실행마다 고치는 state 는 절대 안 담는다", () => {
-    // 담으면 설정을 안 건드린 날도 리비전이 쌓여 이력이 쓸모없어진다. 이 기능의 전제다.
+    // Including it would pile up revisions on days nothing was configured, making the history useless. That is the premise of this feature.
     const snap = snapshotOf({ ...base, state: { v4: { t: 9.28, cycleCash: 49785.81 } } });
     expect(snap).not.toHaveProperty("state");
   });
@@ -34,7 +34,7 @@ describe("snapshotOf — 설정만 뽑는다", () => {
 
 describe("changedKeys — 안 바뀌면 빈 배열", () => {
   it("같은 값이면 아무것도 안 나온다", () => {
-    // 저장 버튼만 눌러도 upsert 가 도므로 이게 무너지면 이력이 같은 줄로 도배된다.
+    // An upsert runs on every save-button press, so if this breaks the history fills with identical rows.
     expect(changedKeys(snapshotOf(base), snapshotOf({ ...base }))).toEqual([]);
   });
 

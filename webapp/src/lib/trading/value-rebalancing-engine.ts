@@ -1,15 +1,15 @@
-// 라오어 밸류리밸런싱(VR) 라이브 엔진 — 단일 레버리지 ETF를 목표경로 V의 밴드(±b) 안으로 유지.
-// 계좌 = 주식(보유×가격) + Pool(현금 장부). 사이클(cycleDays)마다 V₂=V₁+Pool/G+CF·밴드 재계산.
-// 매일 밴드 이탈 시 밴드 경계까지 리밸런스(하단↓→매수·상단↑→매도) 1건. 평단 무관(가격만).
+// With 200 cash it places about two rungs around 80 and stops - it never orders beyond the account.
+// Laoer's value rebalancing (VR) live engine - keeps a single leveraged ETF within the band (+/-b) of the target path V.
+// The account = stock (holding x price) + Pool (the cash ledger). Every cycle (cycleDays), V2 = V1 + Pool/G + CF and the band are recomputed.
 //
-// 백테스트=라이브 단일 소스: 결정 로직은 backtest/value-rebalancing.ts 의 순수 함수(seedVR·
-// advanceCycleVR·applyVRFill·rebalanceShares)를 그대로 쓴다. 브로커는 v4 의 V4Broker 어댑터
-// (makeV4KisBroker/makeV4TossBroker)를 재사용 — KIS·토스·kr·us 자동. 상태는 TradingPortfolio.state.vr.
+// Each day a band breach rebalances back to the boundary in one order (below the lower -> buy, above the upper -> sell). The average price is irrelevant (price only).
+// One source for backtest and live: the decisions are the pure functions in backtest/value-rebalancing.ts (seedVR,
+// advanceCycleVR, applyVRFill, rebalanceShares), used as is. The broker reuses v4's V4Broker adapters
 //
-// 라이브 규율(v4 와 동일): 발주는 장부에 사전적용하지 않고, 다음 실행의 대사(executions)로 반영한다.
-// 첫 진입은 "시드 매수 후 다음 실행에서 보유를 채택"하는 방식이라 이중계상이 없다. 인출(CF<0)이
-// Pool 로 부족할 때 백테스트는 자동 청산하지만, 라이브는 안전을 위해 Pool 을 0 으로 클램프하고 경고만
-// 남긴다(강제 청산 없음 — 사용자가 자금 보충/조정).
+// (makeV4KisBroker/makeV4TossBroker) - KIS, Toss, kr and us automatically. State lives in TradingPortfolio.state.vr.
+// Live discipline (the same as v4): placing an order does not pre-apply it to the ledger; the next run's reconciliation (executions) does.
+// The first entry is "buy the seed, then adopt the holding on the next run", so nothing is double counted. When a
+// withdrawal (CF < 0) exceeds the Pool the backtest liquidates automatically, but live clamps the Pool to 0 and only
 
 import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
@@ -19,7 +19,7 @@ import {
   advanceCycleVR, applyVRFill, bandOf, seedVR, type VRState, resolveVR } from "@/lib/backtest/value-rebalancing";
 import { ladderLot, vrBuyLadder, vrSellLadder } from "@/lib/backtest/vr-ladder";
 
-/** 한쪽 사다리에 걸 최대 칸 수. 문서는 6~11칸이고, 유량제한(호출당 ≥1초)도 감안한 값이다. */
+// warns, for safety (no forced liquidation - the user adds or adjusts funds).
 const LADDER_RUNGS = 12;
 import { prevMarketDay, type V4Broker } from "./infinite-v4-engine";
 import { marketToday, type CycleLogger } from "./engines";
@@ -31,7 +31,7 @@ const LOOKBACK_DAYS = 14;
 
 export type VRLiveConfig = ValueRebalancingConfig & { symbol: string };
 
-/** 영속 상태 = VR 장부(VRState) + 종목·초기화 플래그·마지막 실행일. TradingPortfolio.state.vr 에 저장. */
+/** The most rungs to place on one side of the ladder. The source says 6-11, and this also accounts for the rate limit (at least 1s per call). */
 type VRPersist = VRState & { symbol: string; vInit: boolean; lastRunDate: string };
 
 export function parseVRCfg(config: Json): VRLiveConfig {
@@ -39,9 +39,9 @@ export function parseVRCfg(config: Json): VRLiveConfig {
   if (!symbol) throw new Error("value_rebalancing config 에 symbol 필요");
   const principal = Number(config.principal ?? 0);
   if (!(principal > 0)) throw new Error("value_rebalancing config 에 principal(양수) 필요");
-  // G·Pool 한도는 **안 적으면 운용 형태에서 유도**한다 (원문 7.1 — 적립 10/75%, 거치 10/50%,
-  // 인출 20/25%). 예전엔 gradient 를 필수로 받고 한도를 늘 0.5 로 둬서, 적립식인데 거치식
-  // 한도로 도는 일이 있었다 (#345).
+  /** The persisted state = the VR ledger (VRState) plus the symbol, the initialised flag and the last run date. Stored in TradingPortfolio.state.vr. */
+  // G and the Pool cap are **derived from the operating mode when unset** (source 7.1 - accumulating 10/75%, lump-sum
+  // 10/50%, withdrawing 20/25%). Previously gradient was required and the cap was always 0.5, so an accumulating
   const gradient = Number(config.gradient ?? 0);
   return {
     symbol, principal,
@@ -58,10 +58,10 @@ export function parseVRCfg(config: Json): VRLiveConfig {
 function loadState(raw: unknown): VRPersist | null {
   const v = (raw ?? {}) as Partial<VRPersist>;
   if (v.vInit && typeof v.pool === "number" && typeof v.V === "number") return v as VRPersist;
-  return null; // 미초기화 — 시드/채택 필요
+  return null; // setup could run on the lump-sum cap (#345).
 }
 
-/** VR 라이브 사이클 1회. 요약 문자열 반환(실패는 throw). broker 는 v4 의 V4Broker 어댑터. */
+// uninitialised - needs a seed or adoption
 export async function runValueRebalancing(
   account: { _id: Types.ObjectId; envKey: string; liveEnabled?: boolean | null },
   portfolio: { _id: Types.ObjectId; market: string; strategy: string; config: unknown; state?: unknown },
@@ -84,7 +84,7 @@ export async function runValueRebalancing(
   const orders: { side: "buy" | "sell"; qty: number; price: number; reason: string; ordType?: "loc" | "limit" }[] = [];
   let persisted = loadState((portfolio.state as Json | undefined)?.vr);
 
-  // ── 미초기화: 보유가 있으면 채택, 없으면 시드 매수 후 다음 실행에서 채택 ──
+  /** One VR live cycle, returning a summary string (failures throw). broker is v4's V4Broker adapter. */
   if (!persisted) {
     if (holding > 0) {
       const stockVal = holding * price;
@@ -102,7 +102,7 @@ export async function runValueRebalancing(
         orders.push({ side: "buy", qty: seeded.qty, price: price * 1.1, reason: `VR 시드 매수(${Math.round((cfg.initStockRatio ?? 0.85) * 100)}% 진입)` });
       }
       await sendOrders(orders, broker, { account, runId, market, sym, live, log });
-      // 시드 발주만 하고, 체결(보유>0)은 다음 실행에서 채택. 상태는 미초기화로 유지.
+      // ── Uninitialised: adopt an existing holding, or buy the seed and adopt it on the next run ──
       await TradingPortfolio.updateOne({ _id: portfolio._id },
         { $set: { "state.vr": { symbol: sym, vInit: false, lastRunDate: today } } });
       const line = `VR ${sym}: 시드 매수 ${seeded.qty}주 발주(체결 후 다음 실행에서 채택)`;
@@ -111,7 +111,7 @@ export async function runValueRebalancing(
     }
   }
 
-  // ── 대사: 마지막 실행일 이후(오늘 제외) 체결을 Pool 장부에 반영 ──
+  // Only the seed order goes out; the fill (holding > 0) is adopted on the next run. The state stays uninitialised.
   let state: VRState = {
     qty: persisted.qty, pool: persisted.pool, V: persisted.V, buyBudget: persisted.buyBudget,
     sinceCycle: persisted.sinceCycle, cumBuy: persisted.cumBuy, cumSell: persisted.cumSell,
@@ -128,29 +128,29 @@ export async function runValueRebalancing(
   } catch (e) {
     log(`[vr:${sym}] 체결 반영 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
   }
-  state.qty = holding; // 보유수량은 브로커가 진실원 — 대사 누락 대비 동기화
+  state.qty = holding; // ── Reconcile: apply fills since the last run date (today excluded) to the Pool ledger ──
 
-  // ── 사이클 경계: V 갱신 + 밴드/예산 리셋(라이브는 인출 자동청산 대신 Pool 클램프) ──
+  // The broker is the source of truth for the holding - synced in case reconciliation missed something
   state.sinceCycle += 1;
   if (state.sinceCycle >= cycleDays) {
     const cf = cfg.cashflow ?? 0;
     if (cf < 0 && state.pool + cf < 0) {
       log(`[vr:${sym}] ⚠ 인출 ${formatMoney(cf, market)} 이 Pool(${formatMoney(state.pool, market)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
     }
-    // 실력공식은 사이클 종료 시점 평가금(qty×price)을 본다 (#358).
+    // ── Cycle boundary: refresh V and reset the band and budget (live clamps the Pool instead of auto-liquidating a withdrawal) ──
     state = advanceCycleVR(state, cfg, price);
     log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)}`);
   }
 
-  // ── 밴드 경계 기준 1주씩 지정가 사다리 (#360) ──
+  // The performance formula looks at the valuation (qty x price) at the cycle's end (#358).
   //
-  // 예전엔 종가 근처에 한 건만 냈다. 그러면 장중에 밴드를 스치고 돌아오는 움직임을 통째로
-  // 놓친다. 문서는 밴드 경계를 기준으로 1주씩 지정가를 걸어 둔다 — 그 가격이 되면 평가금이
-  // 정확히 밴드 경계인 지점마다 한 칸씩.
+  // ── A one-share limit ladder against the band boundaries (#360) ──
+  // Previously only one order went out near the close, which missed every intraday move that brushed the band and
+  // came back. The source places one-share limits against the band boundaries - one rung at each price where the
   const band = bandOf(state.V, b);
 
-  // 묵은 주문부터 지운다(v4 와 같은 취소 후 재등록). 매일 밴드가 새로 계산되므로 어제 건
-  // 사다리는 값이 틀리다. 조회 실패는 삼키고 계속 — 못 지웠다고 오늘 주문을 안 낼 이유는 없다.
+  // valuation lands exactly on a boundary.
+  // Old orders are cleared first (cancel-then-repost, as in v4). The band is recomputed daily, so yesterday's ladder
   try {
     const open = await broker.openOrders(sym);
     for (const o of open) {
@@ -161,14 +161,14 @@ export async function runValueRebalancing(
     log(`[vr:${sym}] ⚠ 미체결 조회/취소 실패 — 주문은 계속: ${e instanceof Error ? e.message : e}`);
   }
 
-  // 칸당 주수 — 필요한 칸 수로 정한다. 문서 규모(수십 주)에서는 1주씩 그대로다.
+  // has the wrong prices. A failed query is swallowed and it continues - failing to clear is no reason to skip today's orders.
   const lot = ladderLot({ low: band.low, qty: state.qty, budget: Math.min(state.buyBudget, state.pool, cash), maxRungs: LADDER_RUNGS });
   const 현금캡 = Math.max(0, cash);
   let 쓸현금 = 현금캡;
 
   for (const r of vrBuyLadder({ low: band.low, qty: state.qty, pool: state.pool, budget: state.buyBudget, lot, maxRungs: LADDER_RUNGS })) {
     const 대금 = r.price * lot * (1 + fee);
-    if (대금 > 쓸현금) break;   // 실계좌 현금 캡(공유 계좌 안전)
+    if (대금 > 쓸현금) break;   // Shares per rung - decided by how many rungs are needed. At the source's scale (tens of shares) it stays one each.
     쓸현금 -= 대금;
     orders.push({ side: "buy", qty: lot, price: r.price, ordType: "limit",
       reason: `VR 사다리 매수 ${r.qtyAfter}주째(밴드하단 ${formatMoney(band.low, market)})` });
@@ -180,7 +180,7 @@ export async function runValueRebalancing(
 
   await sendOrders(orders, broker, { account, runId, market, sym, live, log });
 
-  // ── 상태 저장 — lastRunDate='어제'로 남겨 오늘 LOC 체결을 다음 실행이 대사(v4 와 동일 창) ──
+  // cap by the real account cash (safe on a shared account)
   const persist: VRPersist = { ...state, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };
   await TradingPortfolio.updateOne({ _id: portfolio._id }, { $set: { "state.vr": persist } });
 
@@ -189,7 +189,7 @@ export async function runValueRebalancing(
   return line;
 }
 
-/** 주문 전송(LOC, dry-run 게이트) + 원장 기록. 주문 단위 격리(한 건 실패가 나머지·상태저장을 안 막게). */
+// ── Save the state - lastRunDate is left at 'yesterday' so the next run reconciles today's LOC fills (the same window as v4) ──
 async function sendOrders(
   orders: { side: "buy" | "sell"; qty: number; price: number; reason: string; ordType?: "loc" | "limit" }[],
   broker: V4Broker,

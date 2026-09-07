@@ -15,7 +15,7 @@ describe("blockSymbols", () => {
   });
 
   it("종목을 알 수 없으면 null — 빈 배열이 아니다", () => {
-    // rotation 은 후보를 자동 선발한다. []를 돌려주면 "아무것도 안 다룬다"는 거짓말이 된다.
+    // rotation auto-selects its candidates. Returning [] would be a lie meaning "it handles nothing".
     expect(blockSymbols({ candidates: [] })).toBeNull();
     expect(blockSymbols({})).toBeNull();
   });

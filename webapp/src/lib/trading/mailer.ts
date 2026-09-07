@@ -1,6 +1,6 @@
-// 자동매매 메일 통지 — 파이썬 notifier/email.py 대응(서버 전용).
-// EMAIL_*(.env.local — 파이썬과 동일 키) 미설정/비활성이면 조용히 no-op.
-// 모든 전송 실패는 로그로 남기고 삼킨다 — 메일 때문에 매매가 멈추지 않는다.
+// Trading mail notifications - matching Python's notifier/email.py (server only).
+// Quietly a no-op when EMAIL_* (.env.local, the same keys as Python) is unset or disabled.
+// Every send failure is logged and swallowed - mail must never stop trading.
 
 import nodemailer from "nodemailer";
 

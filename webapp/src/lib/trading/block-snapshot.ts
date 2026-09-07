@@ -1,38 +1,38 @@
 /**
- * 블록별 자산 스냅샷 — 순수 (#367 ②).
+ * Per-block asset snapshot - pure (#367 (2)).
  *
- * `portfoliohistories` 가 (env, currency, date) 로만 저장돼, 미국 계좌에 블록이 둘
- * (TQQQ v4 · SOXL VR)이어도 USD 줄이 하나였다. 게다가 두 블록이 각각 close-sync 를 돌며
- * **같은 자리에 덮어쓰고** 있었다 — 계좌 전체 값이라 값이 같아서 안 드러났을 뿐이다.
+ * `portfoliohistories` was keyed only by (env, currency, date), so a US account with two blocks
+ * (TQQQ v4 and SOXL VR) still had a single USD row. Worse, both blocks ran close-sync and
+ * **overwrote the same slot** - it just never showed, because the account-wide values matched.
  *
- * 블록 행에는 **그 블록이 아는 것만** 적는다. 엔진마다 자기 현금 장부가 있다.
+ * A block row records **only what that block knows**. Each engine has its own cash ledger.
  *
- * | 전략 | 현금 장부 | 종목 |
+ * | strategy | cash ledger | symbols |
  * |---|---|---|
  * | `infinite_v4` | `state.v4.cycleCash` | `config.symbol` |
  * | `value_rebalancing` | `state.vr.pool` | `config.symbol` |
- * | `trend_v1` | 없음 | `config.universe` |
- * | `lrs_v1` | 없음 | `config.target` |
- * | `rotation_v1` | 없음 | **모름**(후보 자동선발) → 행을 안 쓴다 |
+ * | `trend_v1` | none | `config.universe` |
+ * | `lrs_v1` | none | `config.target` |
+ * | `rotation_v1` | none | **unknown** (auto-selected candidates) -> no row is written |
  *
- * 종목 표는 `block-symbols.ts` 로 옮겼다 (#372) — 체결 귀속이 같은 질문을 하기 때문이다.
+ * The symbol table moved to `block-symbols.ts` (#372) - fill attribution asks the same question.
  *
- * 장부가 없으면 `cash` 를 **null** 로 둔다. 0 을 적으면 "현금이 없다"는 **거짓말**이 된다.
- * 종목을 모르면 아예 `null` 을 돌려줘 행을 안 쓴다 — 없는 것을 지어내지 않는다.
+ * With no ledger, `cash` is **null**. Writing 0 would be a **lie** meaning "there is no cash".
+ * With unknown symbols it returns `null` so no row is written - nothing is invented.
  */
 
 import { blockSymbols } from "./block-symbols";
 
 export interface BlockSnapshot {
-  /** 그 블록의 장부 현금. 장부가 없는 전략은 null. */
+  /** That block's ledger cash. null for strategies with no ledger. */
   cash: number | null;
   holdingsValue: number;
-  /** cash + holdingsValue. cash 가 없으면 holdingsValue. */
+  /** cash + holdingsValue, or holdingsValue when there is no cash. */
   totalValue: number;
   symbols: string[];
 }
 
-/** 그 블록의 장부 현금. 없으면 null. */
+/** That block's ledger cash, or null. */
 function ledgerCash(strategy: string, state: Record<string, unknown>): number | null {
   const 꺼내기 = (키: string, 필드: string): number | null => {
     const s = state[키] as Record<string, unknown> | undefined;
@@ -48,9 +48,9 @@ export function blockSnapshot(args: {
   strategy: string;
   config: Record<string, unknown>;
   state: Record<string, unknown>;
-  /** close-sync 가 이미 계산한 [심볼, 수량, 평단, 가격]. */
+  /** [symbol, qty, avgPrice, price] as close-sync already computed them. */
   evalRows: [string, number, number, number][];
-  /** 증권사가 준 총 평가금. >0 이면 evalRows 의 가격 자리가 **평단**이라 스케일이 필요하다. */
+  /** Total valuation from the broker. When > 0 the price slot of evalRows holds the **average price**, so it needs scaling. */
   hvBroker: number;
 }): BlockSnapshot | null {
   const symbols = blockSymbols(args.config);
@@ -60,8 +60,8 @@ export function blockSnapshot(args: {
   const 값 = (r: [string, number, number, number]) => r[1] * r[3];
   let holdingsValue = args.evalRows.filter((r) => 내것.has(r[0])).reduce((s, r) => s + 값(r), 0);
 
-  // 증권사 총평가금을 쓴 분기에서는 가격 자리가 평단이라 블록 값이 **원가**가 된다.
-  // 총합이 맞도록 비율로 늘려 근사한다(정확한 종목별 시가는 알 수 없다).
+  // On the branch that uses the broker's total valuation, the price slot is the average price, so the block value becomes **cost**.
+  // Scale it proportionally so the total matches (exact per-symbol market prices are unknowable).
   if (args.hvBroker > 0) {
     const 원가합 = args.evalRows.reduce((s, r) => s + 값(r), 0);
     if (원가합 > 0) holdingsValue *= args.hvBroker / 원가합;

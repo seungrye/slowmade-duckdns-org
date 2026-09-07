@@ -1,13 +1,13 @@
-// 자동매매 스케줄러 — 파이썬 데몬 Scheduler 의 site 대응.
+// The trading scheduler - the site's answer to the Python daemon's Scheduler.
 //
-// 동작: instrumentation(서버 기동)에서 start → 60초 틱. 틱마다 활성 포트폴리오의
-// "실행 시각 경과 & 오늘 미실행"을 찾아 **Mongo 원자 클레임**(TradingRun unique
-// (portfolioId, dateKey) + insert) 후 실행한다. 그래서:
-//   - 기동 catch-up: run 시각이 지났는데 오늘 기록이 없으면 첫 틱에서 실행(배포 재시작 내성).
-//   - 블루그린 공존: 구/신 인스턴스가 같은 틱을 돌아도 클레임은 한쪽만 성공(E11000).
-//   - 멱등: 완료(done)·실패(failed) 기록이 있으면 재실행하지 않는다(수동은 run-now).
-//   - 크래시 잔재: running 이 STALE_MS 넘으면 failed 처리(다음 날 정상 재개).
-// 시각: kr=Asia/Seoul, us=America/New_York(서머타임 자동 — 파이썬 zoneinfo 와 동일 의미).
+// How it works: instrumentation (server start) calls start, then a 60-second tick. Each tick finds active
+// portfolios whose "run time has passed and has not run today" and runs them after an **atomic Mongo claim**
+// (a TradingRun unique (portfolioId, dateKey) plus an insert). So:
+//   - Startup catch-up: a run time that has passed with no record today runs on the first tick (surviving a deploy restart).
+//   - Blue/green coexistence: even if the old and new instances tick together, only one claim succeeds (E11000).
+//   - Idempotent: a done or failed record means no re-run (manual runs use run-now).
+//   - Crash leftovers: a running record older than STALE_MS is marked failed (and resumes normally the next day).
+// Times: kr = Asia/Seoul, us = America/New_York (DST automatic - the same meaning as Python's zoneinfo).
 
 import { connectToDB } from "@/lib/db";
 import TradingAccount from "@/models/trading-account";
@@ -18,11 +18,11 @@ import { runPortfolioCycle } from "./engines";
 const TICK_MS = 60_000;
 const STALE_MS = 45 * 60_000;
 
-// ── 순수 헬퍼(테스트 대상) ───────────────────────────────────────
+// ── Pure helpers (what the tests cover) ───────────────────────────
 
 export type MarketClock = { dateKey: string; hhmm: string; isWeekday: boolean };
 
-/** 시장 tz 의 현재 날짜키(YYYY-MM-DD)·시각(HH:MM)·평일 여부. */
+/** The current date key (YYYY-MM-DD), time (HH:MM) and weekday flag in the market's tz. */
 export function marketClock(market: "kr" | "us", now = new Date()): MarketClock {
   const tz = market === "kr" ? "Asia/Seoul" : "America/New_York";
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -40,10 +40,10 @@ export function marketClock(market: "kr" | "us", now = new Date()): MarketClock 
 
 export type Cycle = { phase: "main" | "both" | "sell" | "buy" | "close"; at: string };
 
-/** 포트폴리오의 하루 사이클 목록 — 매매 사이클(들) + 마감 sync(16:10, 시장 tz).
- *  국장 infinite_v4 는 매매가 2사이클(매도 09:30류 + 매수 15:20). */
+/** A portfolio's cycles for the day - the trading cycle(s) plus the close sync (16:10, market tz).
+ *  KRX infinite_v4 has two trading cycles (a 09:30-style sell plus a 15:20 buy). */
 export function cyclesFor(p: { strategy: string; market: string; runAt: string }): Cycle[] {
-  const close: Cycle = { phase: "close", at: "16:10" }; // 체결확인·차트 sync·메일(파이썬 마감 대응)
+  const close: Cycle = { phase: "close", at: "16:10" }; // fill confirmation, chart sync and mail (matching Python's close cycle)
   if (p.strategy === "infinite_v4" && p.market === "kr") {
     return [{ phase: "sell", at: p.runAt }, { phase: "buy", at: "15:20" }, close];
   }
@@ -51,7 +51,7 @@ export function cyclesFor(p: { strategy: string; market: string; runAt: string }
   return [{ phase: "main", at: p.runAt }, close];
 }
 
-/** 실행해야 하는 시점인가 — 시각 경과(당일) && (주중 조건). 기록 유무는 클레임이 판단. */
+/** Whether it is time to run - the time has passed today and the weekday condition holds. Whether a record exists is the claim's job. */
 export function isDue(
   p: { runAt: string; weekdaysOnly?: boolean | null; enabled?: boolean | null },
   clock: MarketClock,
@@ -61,7 +61,7 @@ export function isDue(
   return clock.hhmm >= p.runAt;
 }
 
-// ── 클레임(멱등의 핵심) ──────────────────────────────────────────
+// ── The claim (the heart of idempotency) ──────────────────────────
 
 type ClaimResult = { runId: string } | null;
 
@@ -77,8 +77,8 @@ async function claimRun(
     return { runId: String(doc._id) };
   } catch (e: unknown) {
     const code = (e as { code?: number }).code;
-    if (code !== 11000) throw e; // unique 충돌 외 오류는 전파
-    // 이미 누군가 클레임 — 크래시 잔재(running & stale)면 failed 처리(오늘은 재실행 안 함).
+    if (code !== 11000) throw e; // anything but a unique-key collision propagates
+    // Someone already claimed it - a crash leftover (running and stale) is marked failed (with no re-run today).
     const existing = await TradingRun.findOne({ portfolioId, dateKey, phase });
     if (existing && existing.status === "running" &&
         Date.now() - existing.startedAt.getTime() > STALE_MS) {
@@ -91,7 +91,7 @@ async function claimRun(
   }
 }
 
-// ── 틱 ──────────────────────────────────────────────────────────
+// ── The tick ──────────────────────────────────────────────────────
 
 export async function tradingTick(now = new Date()): Promise<void> {
   await connectToDB();
@@ -108,7 +108,7 @@ export async function tradingTick(now = new Date()): Promise<void> {
       if (!isDue({ runAt: cycle.at, weekdaysOnly: p.weekdaysOnly, enabled: p.enabled }, clock)) continue;
 
       const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
-      const catchUp = clock.hhmm > cycle.at; // 정시 틱(≤1분 지연)이 아니면 catch-up 성격
+      const catchUp = clock.hhmm > cycle.at; // Anything but an on-time tick (within a minute) counts as catch-up
       const claim = await claimRun(
         String(p._id), String(p.accountId), clock.dateKey, cycle.phase, !live, catchUp,
       );
@@ -135,7 +135,7 @@ export async function tradingTick(now = new Date()): Promise<void> {
           { _id: claim.runId },
           { $set: { status: "failed", error: msg, logs, finishedAt: new Date() } },
         );
-        // 실패는 즉시 메일(파이썬 매매 사이클 실패 알림 대응). 실패는 삼킨다.
+        // A failure mails immediately (matching Python's trading-cycle failure notice). Failures are swallowed.
         const { sendTradingMail } = await import("./mailer");
         await sendTradingMail(
           `⚠ 사이클 실패 ${clock.dateKey} — ${account.envKey} ${p.market}/${p.strategy}/${cycle.phase}`,
@@ -146,7 +146,7 @@ export async function tradingTick(now = new Date()): Promise<void> {
   }
 }
 
-// ── 기동(instrumentation 에서 호출) ──────────────────────────────
+// ── Startup (called from instrumentation) ──────────────────────────
 
 declare global {
   var __tradingSchedulerStarted: boolean | undefined;
@@ -155,11 +155,11 @@ declare global {
 
 export function startTradingScheduler(): void {
   if (process.env.TRADING_SCHEDULER_ENABLED === "false") return;
-  if (globalThis.__tradingSchedulerStarted) return; // dev HMR·중복 register 가드
+  if (globalThis.__tradingSchedulerStarted) return; // guards against dev HMR and duplicate registration
   globalThis.__tradingSchedulerStarted = true;
-  // 재진입 가드 — 장시간 사이클(미장 유니버스 스캔 ~수 분)이 60초 틱과 겹쳐
-  // 동시 실행되면 KIS 유량이 폭주한다. 실행 중이면 이번 틱은 건너뛴다(클레임과 별개의
-  // 프로세스 내 직렬화 — 놓친 사이클은 다음 틱의 catch-up 이 줍는다).
+  // Re-entry guard - a long cycle (a US universe scan takes minutes) overlapping the 60-second tick would run
+  // twice at once and flood the KIS quota. While one is running, this tick is skipped (in-process serialisation,
+  // separate from the claim - a missed cycle is picked up by the next tick's catch-up).
   const safeTick = async () => {
     if (globalThis.__tradingTickRunning) return;
     globalThis.__tradingTickRunning = true;
@@ -171,8 +171,8 @@ export function startTradingScheduler(): void {
       globalThis.__tradingTickRunning = false;
     }
   };
-  // 첫 틱 = 기동 catch-up. DB/설정 미비 등 어떤 실패도 서버를 죽이지 않는다.
-  setTimeout(safeTick, 10_000); // 서버 워밍업 직후
+  // The first tick is the startup catch-up. No failure (a missing DB or config) may kill the server.
+  setTimeout(safeTick, 10_000); // just after the server warms up
   setInterval(safeTick, TICK_MS);
   console.log("[trading] 스케줄러 시작 — 60초 틱, catch-up 포함");
 }

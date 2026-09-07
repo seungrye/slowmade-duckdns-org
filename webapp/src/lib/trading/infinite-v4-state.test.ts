@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { absorbIdleCash, emptyPending, newV4State, reconcileDay, type V4State } from "./infinite-v4-state";
 import { cyclesFor } from "./scheduler";
 
-// 파이썬 tests/test_infinite_v4_state.py 와 동일 벡터 — 포팅 일치 확인.
+// The same vectors as Python's tests/test_infinite_v4_state.py, confirming the port matches.
 
 function st(over: Partial<V4State> = {}): V4State {
   return { ...newV4State("TQQQ", 20, 10_000), t: 5, ...over };
@@ -11,9 +11,9 @@ function st(over: Partial<V4State> = {}): V4State {
 describe("infinite-v4-state.absorbIdleCash — 유휴현금(입금) 흡수", () => {
   it("플랫(holding 0) + 계좌현금 > cycleCash → cycleCash 재시드(입금 흡수)", () => {
     const s = st({ cycleCash: 3900 });
-    const out = absorbIdleCash(s, 4900, 0, true); // $1000 입금
+    const out = absorbIdleCash(s, 4900, 0, true); // a $1000 deposit
     expect(out.cycleCash).toBe(4900);
-    expect(s.cycleCash).toBe(3900); // 원본 불변
+    expect(s.cycleCash).toBe(3900); // the input is unchanged
   });
   it("보유 중(holding>0)이면 흡수 안 함(진행 사이클 보호)", () => {
     const out = absorbIdleCash(st({ cycleCash: 3900 }), 4900, 10, true);
@@ -92,7 +92,7 @@ describe("infinite-v4-state.reconcileDay — 파이썬 벡터", () => {
 });
 
 describe("scheduler.cyclesFor — 매매 phase + 마감 sync 사이클", () => {
-  const close = { phase: "close", at: "16:10" }; // 모든 포트폴리오 공통(체결확인·차트·메일)
+  const close = { phase: "close", at: "16:10" }; // shared by every portfolio (fill confirmation, charts, mail)
   it("국장 v4 = 매도(runAt) + 매수(15:20) + 마감", () => {
     expect(cyclesFor({ strategy: "infinite_v4", market: "kr", runAt: "09:30" })).toEqual([
       { phase: "sell", at: "09:30" }, { phase: "buy", at: "15:20" }, close,

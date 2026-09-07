@@ -68,7 +68,7 @@ describe("capV4Broker", () => {
   it("snapshot 의 현금만 줄인다", async () => {
     const snap = await capV4Broker(v4Broker(50_000), 30_000).snapshot("TQQQ");
     expect(snap.cash).toBe(30_000);
-    // 보유·평단·현재가는 계좌의 사실이라 건드리지 않는다.
+    // Holdings, average price and current price are facts about the account and are left alone.
     expect(snap).toMatchObject({ holding: 599, avg: 70, price: 72.5 });
   });
 

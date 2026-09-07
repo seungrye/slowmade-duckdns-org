@@ -1,5 +1,5 @@
-// 자동매매 설정 초기 데이터 로더(서버 전용) — 설정 페이지 SSR 주입 + accounts API 공용.
-// 시크릿은 여기서 마스킹돼 클라이언트로는 평문이 절대 나가지 않는다.
+// Initial data loader for the trading settings (server only) - SSR injection for the settings page and shared with the accounts API.
+// Secrets are masked here, so plaintext never reaches the client.
 
 import { connectToDB } from "@/lib/db";
 import TradingAccount from "@/models/trading-account";
@@ -14,7 +14,7 @@ export type TradingAccountView = {
   envKey: string;
   liveEnabled: boolean;
   memo: string;
-  credentials: Record<string, string>; // 마스킹 값
+  credentials: Record<string, string>; // the masked value
 };
 
 export type TradingPortfolioView = {

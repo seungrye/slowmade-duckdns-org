@@ -1,7 +1,7 @@
-// 라이브 전략 순수 결정 함수 — 파이썬 strategy/{lrs,rotation,trend_following}.py 포팅.
-// 부수효과 없음(브로커를 모른다). 백테스트 lib(lrs.ts/rotation.ts)와 규칙 동일하지만
-// 이쪽은 "오늘 하루"의 결정만 내리는 라이브 형태다. 테스트: strategies.test.ts
-// (파이썬 tests/test_new_strategies.py 와 같은 벡터).
+// Pure decision functions for the live strategies - ports of Python's strategy/{lrs,rotation,trend_following}.py.
+// Side-effect free (they know nothing of brokers). The rules match the backtest lib (lrs.ts/rotation.ts), but
+// these decide "today" alone, in live form. Tests: strategies.test.ts
+// (the same vectors as Python's tests/test_new_strategies.py).
 
 export type OrderIntent = {
   side: "buy" | "sell";
@@ -11,7 +11,7 @@ export type OrderIntent = {
   reason: string;
 };
 
-/** 최신순 종가의 단순이동평균(기간 미달이면 null) — 파이썬 _sma 동일. */
+/** Simple moving average of closes newest first (null when the period is short) - the same as Python's _sma. */
 export function smaNewest(closesNewestFirst: number[], period: number): number | null {
   if (closesNewestFirst.length < period) return null;
   let s = 0;
@@ -22,16 +22,16 @@ export function smaNewest(closesNewestFirst: number[], period: number): number |
 // ── LRS v1 (strategy/lrs.py LrsV1.generate) ─────────────────────
 
 export function lrsDecide(args: {
-  signalCloses: number[]; // 시그널 지수 종가 최신순(전일까지 — open 방식)
+  signalCloses: number[]; // signal index closes, newest first (through yesterday - the open method)
   target: string;
-  price: number; // 대상 현재가
+  price: number; // the target's current price
   holdingQty: number;
   avgPrice: number;
   cash: number;
   smaPeriod?: number;
   bandPct?: number;
-  trailPct?: number; // 선택: 트레일링 스톱(진입 후 고점 대비 -trailPct 이탈 시 청산)
-  peak?: number;     // trailPct 사용 시 진입 후 고점(호출측이 추적해 전달)
+  trailPct?: number; // optional: a trailing stop (exit when it falls trailPct below the high since entry)
+  peak?: number;     // the high since entry when trailPct is used (the caller tracks and passes it)
 }): OrderIntent[] {
   const sma = args.smaPeriod ?? 200;
   const band = args.bandPct ?? 0.01;
@@ -57,7 +57,7 @@ export function lrsDecide(args: {
   return [];
 }
 
-// ── 모멘텀 로테이션 v1 (strategy/rotation.py RotationV1.decide) ──
+// ── Momentum rotation v1 (strategy/rotation.py RotationV1.decide) ──
 
 export type RotationDecision = {
   action: "hold" | "cash" | "switch";
@@ -73,8 +73,8 @@ export function momentum(closesNewestFirst: number[], days: number): number | nu
   return past > 0 ? closesNewestFirst[0] / past - 1 : null;
 }
 
-/** 복합 모멘텀 — 여러 룩백의 momentum 평균(데이터부족 룩백은 스킵). 전부 부족이면 null.
- *  단일 룩백 lookbacks=[d] 는 momentum(closes, d) 과 동일. 타이밍 운을 줄여 강건성↑. */
+/** Composite momentum - the average of several lookbacks' momentum (lookbacks short on data are skipped). null when all are short.
+ *  A single lookback [d] is identical to momentum(closes, d). Averaging reduces timing luck and improves robustness. */
 export function compositeMomentum(closesNewestFirst: number[], lookbacks: number[]): number | null {
   const ms: number[] = [];
   for (const d of lookbacks) {
@@ -85,16 +85,16 @@ export function compositeMomentum(closesNewestFirst: number[], lookbacks: number
 }
 
 export function rotationDecide(args: {
-  candidates: string[]; // 순회 순서 = 동률 tie-break(파이썬과 동일)
+  candidates: string[]; // iteration order is the tie-break (the same as Python)
   signalCloses: number[];
-  candCloses: Record<string, number[]>; // 풀 제한은 호출측이 candCloses 를 풀로 필터
+  candCloses: Record<string, number[]>; // pool restriction is the caller's job, by filtering candCloses to the pool
   holding: string | null;
   daysSinceRebalance: number;
   smaPeriod?: number;
   bandPct?: number;
   momDays?: number;
   rebalanceDays?: number;
-  momLookbacks?: number[]; // 지정 시 복합 모멘텀(여러 룩백 평균). 미지정이면 단일 momDays(기존).
+  momLookbacks?: number[]; // When given, composite momentum (an average over lookbacks); otherwise the single momDays (as before).
 }): RotationDecision {
   const sma = args.smaPeriod ?? 200;
   const band = args.bandPct ?? 0.01;
@@ -150,14 +150,14 @@ export function rotationDecide(args: {
   return { ...none, reason: "밴드 내 유지" };
 }
 
-// ── 추세 v1 (strategy/trend_following.py TrendFollowingV1.generate) ─
+// ── Trend v1 (strategy/trend_following.py TrendFollowingV1.generate) ─
 
 export function trendDecide(args: {
   symbol: string;
-  closes: number[]; // 최신순(오늘 포함 — 파이썬 daily_closes 와 동일)
+  closes: number[]; // newest first, today included (the same as Python's daily_closes)
   price: number;
   holdingQty: number;
-  principal: number; // 매수 시 이 금액만큼
+  principal: number; // how much to spend on a buy
   shortMa?: number;
   longMa?: number;
 }): OrderIntent[] {

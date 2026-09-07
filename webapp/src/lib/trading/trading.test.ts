@@ -27,7 +27,7 @@ describe("trading/crypto — AES-256-GCM", () => {
   });
 });
 
-// 파이썬 tests/test_new_strategies.py 와 같은 벡터 — TS↔py 규칙 일치 확인.
+// The same vectors as Python's tests/test_new_strategies.py, confirming the TS and Python rules match.
 describe("trading/strategies — 파이썬 대응 벡터", () => {
   it("LRS: 레짐 온 진입(시그널 12 > sma3 10)", () => {
     const out = lrsDecide({
@@ -87,7 +87,7 @@ describe("trading/strategies — 파이썬 대응 벡터", () => {
   });
 
   it("trend: 골든크로스 발생일에만 진입", () => {
-    // 어제 단기≤장기 → 오늘 단기>장기 (short 2, long 3)
+    // short <= long yesterday -> short > long today (short 2, long 3)
     const closes = [130, 100, 90, 100, 100];
     const out = trendDecide({ symbol: "A", closes, price: 130, holdingQty: 0,
                               principal: 1300, shortMa: 2, longMa: 3 });
@@ -108,7 +108,7 @@ describe("trading/strategies — 파이썬 대응 벡터", () => {
 
 describe("trading/scheduler — 순수 헬퍼", () => {
   it("marketClock: tz 별 날짜키·시각(고정 시각)", () => {
-    // 2026-07-13T01:00:00Z = KST 10:00(월) / ET 21:00(일, 07-12)
+    // 2026-07-13T01:00:00Z = 10:00 KST (Mon) / 21:00 ET (Sun, 07-12)
     const now = new Date("2026-07-13T01:00:00Z");
     const kr = marketClock("kr", now);
     expect(kr.dateKey).toBe("2026-07-13");
@@ -116,12 +116,12 @@ describe("trading/scheduler — 순수 헬퍼", () => {
     expect(kr.isWeekday).toBe(true);
     const us = marketClock("us", now);
     expect(us.dateKey).toBe("2026-07-12");
-    expect(us.isWeekday).toBe(false); // 일요일
+    expect(us.isWeekday).toBe(false); // Sunday
   });
   it("isDue: 시각 경과·주중·enabled 조합", () => {
     const clock = { dateKey: "2026-07-13", hhmm: "09:36", isWeekday: true };
-    expect(isDue({ runAt: "09:35" }, clock)).toBe(true);   // 경과(catch-up 포함)
-    expect(isDue({ runAt: "09:40" }, clock)).toBe(false);  // 아직
+    expect(isDue({ runAt: "09:35" }, clock)).toBe(true);   // passed (catch-up included)
+    expect(isDue({ runAt: "09:40" }, clock)).toBe(false);  // not yet
     expect(isDue({ runAt: "09:00", enabled: false }, clock)).toBe(false);
     expect(isDue({ runAt: "09:00" }, { ...clock, isWeekday: false })).toBe(false);
     expect(isDue({ runAt: "09:00", weekdaysOnly: false }, { ...clock, isWeekday: false })).toBe(true);
@@ -159,17 +159,17 @@ describe("close-sync valueHoldings — 현재가 실패 원가 폴백", () => {
   });
   it("일부 실패: 평단가로 대체(누락 아님)·failed 집계", () => {
     const r = valueHoldings(H, (s) => (s === "TQQQ" ? 100 : null));
-    expect(r.hv).toBe(10 * 100 + 5 * 20); // SOXL 은 평단 20
+    expect(r.hv).toBe(10 * 100 + 5 * 20); // SOXL's average is 20
     expect(r.failed).toEqual(["SOXL"]);
     expect(r.failRatio).toBe(0.5);
   });
   it("07-12 재현: 전부 실패해도 평가가 0으로 무너지지 않고 원가", () => {
     const r = valueHoldings(H, () => null);
-    expect(r.hv).toBe(10 * 80 + 5 * 20); // 전부 평단
-    expect(r.failRatio).toBe(1);         // 호출측이 MAX_FAIL_RATIO 로 스킵
+    expect(r.hv).toBe(10 * 80 + 5 * 20); // all at the average price
+    expect(r.failRatio).toBe(1);         // the caller skips it via MAX_FAIL_RATIO
   });
   it("07-14 재현: 현재가 0/NaN(유량제한 빈값)도 실패로 처리 → 원가 폴백", () => {
-    // usPrice 가 0(rt_cd=0·last 빈값) 이나 NaN 을 반환해도 0원 평가로 무너지지 않아야 한다.
+    // Even when usPrice returns 0 (rt_cd=0 with an empty last) or NaN, the valuation must not collapse to zero.
     expect(valueHoldings(H, (s) => (s === "TQQQ" ? 100 : 0)).hv).toBe(10 * 100 + 5 * 20);
     expect(valueHoldings(H, () => NaN).hv).toBe(10 * 80 + 5 * 20);
     expect(valueHoldings(H, (s) => (s === "TQQQ" ? 0 : NaN)).failed.sort()).toEqual(["SOXL", "TQQQ"]);

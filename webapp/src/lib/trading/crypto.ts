@@ -1,8 +1,8 @@
-// 자동매매 자격증명 암호화 — AES-256-GCM (at-rest).
+// Encryption for trading credentials - AES-256-GCM (at rest).
 //
-// 키는 서버 env TRADING_SECRET_KEY(64자 hex = 32바이트). DB 에는 iv:tag:ct(base64)
-// 형태로만 저장하고, API 는 평문을 절대 클라이언트로 반환하지 않는다(마스킹만).
-// 키 분실 = 복호 불가 → 계정 재등록. 서버 전용 모듈(클라이언트 번들 금지).
+// The key is the server env TRADING_SECRET_KEY (64 hex chars = 32 bytes). The DB stores only
+// iv:tag:ct (base64), and the API never returns plaintext to the client (masked only).
+// A lost key means no decryption, so the account must be re-registered. Server-only module (never bundle for the client).
 
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
@@ -33,7 +33,7 @@ export function decryptSecret(blob: string): string {
   ]).toString("utf8");
 }
 
-/** UI 표시용 마스킹 — 앞 4자만 노출("PSxx…", 4자 이하면 전부 마스킹). */
+/** Masking for display - only the first 4 characters ("PSxx…"; 4 or fewer are masked entirely). */
 export function maskSecret(plain: string): string {
   if (!plain) return "";
   return plain.length <= 4 ? "····" : `${plain.slice(0, 4)}…(${plain.length}자)`;

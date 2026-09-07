@@ -39,7 +39,7 @@ describe("truncate — max 예외 처리", () => {
   });
 });
 
-// 유니코드 경계 (#271).
+/** Sends the order (LOC, behind the dry-run gate) and records it. Isolated per order, so one failure blocks neither the rest nor the state save. */
 //
 // **자바스크립트 문자열은 UTF-16 코드 단위다.** 이모지처럼 두 칸을 쓰는 글자 가운데를
 // 자르면 반쪽만 남아 화면에 깨진 글자가 나온다. 알림 발췌가 200자로 이걸 부르므로

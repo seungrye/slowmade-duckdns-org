@@ -1,11 +1,11 @@
-// 무한매수 V4.0 실운영 상태 + 전일 체결 대사 — 파이썬 trading/infinite_v4_state.py 포팅.
-// 순수 로직(브로커·DB 를 모른다). 상태는 TradingPortfolio.state.v4 에 영속(파일 대체).
-// 테스트: infinite-v4-state.test.ts (파이썬 tests/test_infinite_v4_state.py 와 같은 벡터).
+// Infinite buying V4.0 live state plus reconciliation of the previous day's fills - a port of Python's trading/infinite_v4_state.py.
+// Pure logic (it knows nothing of brokers or the DB). State persists in TradingPortfolio.state.v4 (replacing the file).
+// Tests: infinite-v4-state.test.ts (the same vectors as Python's tests/test_infinite_v4_state.py).
 
 export type V4Pending = {
-  one: number; // 전일 1회매수금(잔금/(분할−T))
-  q25: number; // ¼ 별지점 LOC 매도 수량
-  q75: number; // ¾ +목표% 지정가 매도 수량
+  one: number; // yesterday's one-round buy amount (remaining / (splits - T))
+  q25: number; // quantity of the quarter star-point LOC sell
+  q75: number; // quantity of the three-quarter limit sell at +target%
   reverseSell: number;
   reverseFirst: boolean;
 };
@@ -13,13 +13,13 @@ export type V4Pending = {
 export type V4State = {
   symbol: string;
   splits: number;
-  cycleCash: number; // 종목 전용 장부 현금(복리) — 실제 계좌 현금과 분리
+  cycleCash: number; // this symbol's dedicated ledger cash (compounding), kept apart from the real account cash
   t: number;
   mode: "normal" | "reverse";
-  entryLimit: number; // 첫 매수 LOC(전일종가×1.10). 0=미설정
+  entryLimit: number; // the first buy LOC (previous close x 1.10). 0 means unset
   reverseFirstDay: boolean;
   recoverConfirmed: boolean;
-  lastRunDate: string; // YYYYMMDD — 이 날짜 이후 체결을 대사
+  lastRunDate: string; // YYYYMMDD - fills after this date are reconciled
   pending: V4Pending;
 };
 
@@ -35,10 +35,11 @@ export function newV4State(symbol: string, splits: number, principal: number): V
   };
 }
 
-/** 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션이 **플랫(holding===0)** 일 때만, 계좌 가용현금이
- *  사이클 장부(cycleCash)보다 크면 cycleCash 를 계좌현금으로 재시드한다(사이클 경계/최초 진입 전).
- *  플랫 시점엔 포지션이 없어 계좌현금=이 종목의 가용 드라이파우더이므로 이중반영·상한위반 없이 안전.
- *  보유 중(holding>0)엔 손대지 않음(진행 사이클의 분할 스케줄 보호). enabled=false 면 무변경. 순수(불변). */
+/** Absorbs idle cash (deposits) to remove cash drag. Only while the position is **flat (holding === 0)**, and only
+ *  when the account's available cash exceeds the cycle ledger (cycleCash), is cycleCash reseeded from account cash
+ *  (at a cycle boundary, or before the first entry). While flat there is no position, so account cash *is* this
+ *  symbol's available dry powder - safe, with no double counting or breach of the cap. While holding (holding > 0)
+ *  nothing is touched (protecting the running cycle's split schedule). With enabled=false nothing changes. Pure (immutable). */
 export function absorbIdleCash(state: V4State, accountCash: number, holding: number, enabled: boolean): V4State {
   if (enabled && holding === 0 && Number.isFinite(accountCash) && accountCash > state.cycleCash) {
     return { ...state, cycleCash: accountCash };
@@ -48,7 +49,7 @@ export function absorbIdleCash(state: V4State, accountCash: number, holding: num
 
 export type V4Fill = { side: "buy" | "sell"; qty: number; price: number };
 
-/** 하루치 체결을 상태에 적용(순수 — 원본 불변). holdingAfter: 그 날 이후 보유수량 근사. */
+/** Applies one day's fills to the state (pure; the input is unchanged). holdingAfter approximates the quantity held after that day. */
 export function reconcileDay(state: V4State, fills: V4Fill[], holdingAfter: number): V4State {
   const s: V4State = { ...state, pending: { ...state.pending } };
   const pend = state.pending;
@@ -66,7 +67,7 @@ export function reconcileDay(state: V4State, fills: V4Fill[], holdingAfter: numb
   } else {
     const soldQty = sells.reduce((a, f) => a + f.qty, 0);
     if (soldQty > 0 && holdingAfter <= 0) {
-      // 전량 소진 → 사이클 종료(복리 리셋). 같은 날 재진입 체결이 있으면 1회차로.
+      // Fully wound down -> the cycle ends (compounding reset). A same-day re-entry fill counts as round 1.
       s.t = buyAmt > 0 ? 1.0 : 0.0;
       s.mode = "normal";
       s.entryLimit = 0;
@@ -74,7 +75,7 @@ export function reconcileDay(state: V4State, fills: V4Fill[], holdingAfter: numb
       return s;
     }
     if (soldQty > 0) {
-      // 매도 종류 판별 — q75(지정가)면 ×0.25, q25(쿼터 LOC)면 ×0.75. 모호하면 T 유지.
+      // Identify the sell type - q75 (a limit) gives x0.25, q25 (the quarter LOC) gives x0.75. When ambiguous, T is left alone.
       if (pend.q75 && soldQty >= pend.q75) s.t *= 0.25;
       else if (pend.q25 && soldQty >= pend.q25) s.t *= 0.75;
     }

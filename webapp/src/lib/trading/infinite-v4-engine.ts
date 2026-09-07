@@ -1,13 +1,13 @@
-// 무한매수 V4.0 라이브 엔진 — 파이썬 trading/infinite_v4_engine.py 포팅(KIS·토스 겸용).
-// 일일 흐름: 대사(전일 체결→T·모드·cycleCash) → 미체결 취소(멱등) →
-// 오늘 주문(진입 LOC / normal ¼별지점 LOC+¾목표 지정가+매수 레그 / reverse) → 상태 저장.
+// Infinite buying V4.0 live engine - a port of Python's trading/infinite_v4_engine.py (KIS and Toss).
+// Daily flow: reconcile (yesterday's fills -> T, mode, cycleCash) -> cancel resting orders (idempotent) ->
+// today's orders (entry LOC / normal: a quarter star-point LOC, a three-quarter target limit and the buy legs / reverse) -> save state.
 //
-// phase: 미장 "both"(아침 1회 — 실제 LOC: KIS ORD_DVSN 34 / 토스 LIMIT+CLS) /
-//        국장 "sell"(09:30 — ¾ 지정가 매도만) + "buy"(15:20 — 동시호가 지정가 에뮬:
-//        현재가(≈종가)가 조건을 만족하는 레그만 전송). 시장 분기는 엔진이 자동.
-// 대사 소스: KIS 는 계좌 체결내역(inquire-ccnl), 토스는 status=CLOSED 미지원이라
-// **우리가 낸 주문 로그(orderNo)의 상세 조회**로 체결을 취합한다(사이트 주문만 대사).
-// 상태는 TradingPortfolio.state.v4 에 영속(파이썬 v4-state-*.json 대체).
+// phase: US "both" (one morning pass - real LOCs: KIS ORD_DVSN 34 / Toss LIMIT+CLS) /
+//        KRX "sell" (09:30 - the three-quarter limit sell only) plus "buy" (15:20 - a closing-auction limit
+//        emulation: only the legs whose current price, a proxy for the close, qualify). The engine branches by market itself.
+// Reconciliation source: KIS uses the account's fill history (inquire-ccnl); Toss has no status=CLOSED, so
+// fills are gathered by **querying the details of the orders we placed (orderNo)** (only the site's own orders are reconciled).
+// State persists in TradingPortfolio.state.v4 (replacing Python's v4-state-*.json).
 
 import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
@@ -33,13 +33,13 @@ export type V4Config = {
   symbol: string;
   principal: number;
   splits: number; // 20 | 40
-  starBase: number; // 별% base(TQQQ 15 / SOXL 20)
-  sellTarget: number; // 75% 지정가매도 목표(0.15)
+  starBase: number; // star% base (TQQQ 15 / SOXL 20)
+  sellTarget: number; // the 75% limit sell target (0.15)
 };
 
 const LOOKBACK_DAYS = 14;
 
-/** YYYYMMDD 의 하루 전(캘린더일). 대사 윈도우의 lastRunDate 갱신용 순수 헬퍼. */
+/** The calendar day before a YYYYMMDD date. A pure helper for advancing the reconciliation window's lastRunDate. */
 export function prevMarketDay(ymd: string): string {
   const y = Number(ymd.slice(0, 4)), m = Number(ymd.slice(4, 6)), d = Number(ymd.slice(6, 8));
   const dt = new Date(Date.UTC(y, m - 1, d));
@@ -47,18 +47,18 @@ export function prevMarketDay(ymd: string): string {
   return dt.toISOString().slice(0, 10).replace(/-/g, "");
 }
 
-/** v4 가 브로커에 요구하는 최소 계약 — KIS/토스 어댑터가 구현. */
+/** The minimum contract v4 requires of a broker - implemented by the KIS and Toss adapters. */
 export type V4Broker = {
   snapshot(sym: string): Promise<{ holding: number; avg: number; price: number; cash: number }>;
   historyLong(sym: string, need: number): Promise<[string, number][]>;
-  /** (from, to] 구간 체결을 정규화해 반환 — 날짜 YYYYMMDD. */
+  /** Returns normalised fills over (from, to], with YYYYMMDD dates. */
   executions(sym: string, fromDate: string, toDate: string): Promise<DatedFill[]>;
   openOrders(sym: string): Promise<OpenRow[]>;
   cancel(sym: string, orderNo: string, qty: number): Promise<void>;
   place(sym: string, o: Order): Promise<string>;
 };
 
-// ── KIS 어댑터 ──────────────────────────────────────────────────
+// ── KIS adapter ──────────────────────────────────────────────────
 
 export function makeV4KisBroker(client: KisClient, market: "kr" | "us"): V4Broker {
   const usExcd = (sym: string) => US_ORDER_EXCD[usQuoteExcd(sym)] ?? "NASD";
@@ -108,17 +108,17 @@ export function makeV4KisBroker(client: KisClient, market: "kr" | "us"): V4Broke
     },
     async place(sym, o) {
       if (market === "kr") {
-        // 국장 에뮬 — LOC/지정가는 지정가로, 시장가는 시장가로
+        // KRX emulation - LOC and limit go as limits, market goes as market
         return client.krOrder(sym, o.qty, o.side,
           o.ordType === "market" ? { market: true } : { market: false, price: o.price });
       }
-      const dvsn = o.ordType === "loc" ? "34" : "00"; // 모의는 client 가 지정가 폴백
+      const dvsn = o.ordType === "loc" ? "34" : "00"; // on paper the client falls back to a limit
       return client.usOrder(sym, o.qty, o.price, o.side, usExcd(sym), dvsn);
     },
   };
 }
 
-// ── 토스 어댑터 ─────────────────────────────────────────────────
+// ── Toss adapter ─────────────────────────────────────────────────
 
 export function makeV4TossBroker(
   client: TossClient, market: "kr" | "us", accountId: Types.ObjectId,
@@ -131,7 +131,7 @@ export function makeV4TossBroker(
     },
     historyLong: (sym, need) => client.historyLong(sym, need),
     async executions(sym, fromDate, toDate) {
-      // status=CLOSED 미지원 → 우리가 기록한 실주문(orderNo)의 상세로 체결 취합.
+      // status=CLOSED is unsupported, so fills are gathered from the details of the orders we logged (orderNo).
       const since = new Date(
         Date.UTC(+fromDate.slice(0, 4), +fromDate.slice(4, 6) - 1, +fromDate.slice(6, 8)) - 86400_000,
       );
@@ -156,7 +156,7 @@ export function makeV4TossBroker(
             price: Number(ex.averageFilledPrice ?? d.price ?? 0),
           });
         } catch {
-          continue; // 주문 단위 격리 — 하나의 조회 실패가 대사 전체를 막지 않게
+          continue; // Isolate per order, so one failed query does not block the whole reconciliation
         }
       }
       return fills;
@@ -174,14 +174,14 @@ export function makeV4TossBroker(
     },
     async place(sym, o) {
       if (o.ordType === "market") return client.orderMarket(sym, o.qty, o.side);
-      // LOC: 미국은 네이티브(LIMIT+CLS), 국장은 에뮬(일반 지정가 — phase 게이트가 판단)
+      // LOC: native on the US side (LIMIT+CLS), emulated on KRX (an ordinary limit - the phase gate decides)
       const cls = o.ordType === "loc" && market === "us";
       return client.orderLimit(sym, o.qty, o.side, o.price, { cls });
     },
   };
 }
 
-// ── 사이클 ──────────────────────────────────────────────────────
+// ── The cycle ──────────────────────────────────────────────────
 
 function parseCfg(config: Json): V4Config {
   const symbol = String(config.symbol ?? "");
@@ -199,10 +199,10 @@ function parseCfg(config: Json): V4Config {
 function loadState(raw: unknown, cfg: V4Config): V4State {
   const v = (raw ?? {}) as Partial<V4State>;
   if (typeof v.cycleCash === "number" && typeof v.t === "number" && v.pending) {
-    // 진행 상태(t·cycleCash·mode·pending 등)는 이어받되 splits 는 config 를 원본으로 삼는다.
-    // reconcileDay 의 reverse 트리거(t > splits−1)·감쇠(0.9/0.95)는 s.splits 를 읽으므로,
-    // 사이클 도중 config.splits 를 바꿔도 이렇게 해야 즉시 반영된다. (예전엔 ...v 의 stale
-    // state.splits 가 config 를 덮어 주문사이즈=20 / reverse=40 로 혼재됐다.)
+    // Progress (t, cycleCash, mode, pending and so on) carries over, but splits is taken from config as the source.
+    // reconcileDay's reverse trigger (t > splits - 1) and decay (0.9/0.95) read s.splits, so this is what makes
+    // a mid-cycle change to config.splits take effect at once. (Previously the stale state.splits in ...v
+    // overrode config, leaving order size at 20 while reverse used 40.)
     return { ...newV4State(cfg.symbol, cfg.splits, cfg.principal), ...v, splits: cfg.splits } as V4State;
   }
   return newV4State(cfg.symbol, cfg.splits, cfg.principal);
@@ -224,7 +224,7 @@ export async function runInfiniteV4(
 
   const { holding, avg, price, cash } = await broker.snapshot(sym);
 
-  // ── 1) 대사 — 마지막 실행일 이후(오늘 제외) 체결을 일자별 적용 ──
+  // ── 1) Reconcile - apply fills since the last run date (today excluded), day by day ──
   let state = loadState((portfolio.state as Json | undefined)?.v4, cfg);
   const start = state.lastRunDate ||
     new Date(Date.now() - LOOKBACK_DAYS * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
@@ -242,8 +242,8 @@ export async function runInfiniteV4(
     log(`[v4:${sym}] 체결 반영 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
   }
 
-  // ── 1.5) 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션 플랫일 때만 cycleCash 를 계좌현금으로 재시드.
-  const reinvest = ((portfolio.config ?? {}) as Json).reinvestIdleCash !== false; // 기본 활성
+  // ── 1.5) Absorb idle cash (deposits) to remove cash drag. cycleCash is reseeded from account cash only while the position is flat.
+  const reinvest = ((portfolio.config ?? {}) as Json).reinvestIdleCash !== false; // on by default
   {
     const before = state.cycleCash;
     state = absorbIdleCash(state, cash, holding, reinvest);
@@ -252,7 +252,7 @@ export async function runInfiniteV4(
     }
   }
 
-  // ── 2) 미체결 취소(멱등) — buy phase 는 09:30 매도를 살리려 매수만 취소 ──
+  // ── 2) Cancel resting orders (idempotent) - the buy phase cancels only buys, keeping the 09:30 sells ──
   try {
     for (const r of await broker.openOrders(sym)) {
       if (phase === "buy" && r.side !== "buy") continue;
@@ -267,9 +267,9 @@ export async function runInfiniteV4(
     log(`[v4:${sym}] 미체결 조회 실패 → 취소 스킵: ${e instanceof Error ? e.message : e}`);
   }
 
-  // ── 3) 오늘 주문 생성 — v4PlanDay() 단일 소스(백테스트와 같은 함수) ──
-  // 엔진은 phase 게이트(국장 LOC 에뮬: buy phase 는 현재가≈종가가 조건 충족 레그만 전송)와
-  // 전송·pending 영속만 담당한다.
+  // ── 3) Build today's orders - v4PlanDay() as the single source (the same function as the backtest) ──
+  // The engine only handles the phase gate (the KRX LOC emulation: the buy phase sends only the legs whose
+  // current price, a proxy for the close, qualifies), sending, and persisting pending.
   const locBuyOk = (limit: number) => (phase === "both" ? true : price <= limit);
   const locSellOk = (limit: number) => (phase === "both" ? true : price >= limit);
   const orders: Order[] = [];
@@ -306,7 +306,7 @@ export async function runInfiniteV4(
   };
   for (const o of plan) {
     if (o.side === "sell") {
-      // q75(장중 지정가)·rev_first(MOC)는 sell phase, LOC 매도(q25/rev_sell)는 buy phase(에뮬)
+      // q75 (an intraday limit) and rev_first (MOC) go in the sell phase; LOC sells (q25/rev_sell) go in the buy phase (emulated)
       if (o.tag === "q75" || o.tag === "rev_first") {
         if (phase === "buy") continue;
         orders.push({ side: "sell", qty: o.qty, price: o.price,
@@ -326,7 +326,7 @@ export async function runInfiniteV4(
   }
 
   if (holding === 0 && state.mode === "normal" && phase !== "sell") {
-    state.entryLimit = price * 1.10; // 다음 기준 갱신(미체결 대비)
+    state.entryLimit = price * 1.10; // refresh the reference in case it goes unfilled
   }
   if (state.mode === "reverse") {
     const prevClose = prev5[0] ?? price;
@@ -335,7 +335,7 @@ export async function runInfiniteV4(
     }
   }
 
-  // ── 4) 주문 전송(dry-run 게이트) + 상태 저장 ──
+  // ── 4) Send the orders (behind the dry-run gate) and save the state ──
   for (const o of orders) {
     let orderNo = "";
     try {
@@ -346,7 +346,7 @@ export async function runInfiniteV4(
         log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${formatMoney(o.price, market)} (${o.ordType}) — ${o.reason}`);
       }
     } catch (e) {
-      // 주문 단위 격리 — 한 건 거부(호가단위 등)가 나머지 주문·상태 저장을 막지 않게.
+      // Isolate per order, so one rejection (a tick-size violation, say) does not block the rest or the state save.
       log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
       continue;
     }
@@ -359,11 +359,11 @@ export async function runInfiniteV4(
   }
 
   state.pending = pend;
-  // 왜 '어제'인가: LOC 주문은 그날 종가에 체결돼 체결일 == 실행일(today)이 된다. 대사 필터는
-  // `lastRunDate < date < today`(양쪽 strict)라, lastRunDate=today 로 남기면 다음 실행의
-  // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를
-  // '어제'(= 마지막으로 완전 반영된 날)로 남기면 다음 실행 창이 전일 체결을 포함해 대사가 이어진다.
-  // 2단계(sell 09:30 / buy 15:20 동일일)는 sell 이 어제로 올려도 buy 창은 비어 중복반영이 없다.
+  // Why yesterday: a LOC order fills at that day's close, so the fill date equals the run date (today). The
+  // reconciliation filter is `lastRunDate < date < today` (strict on both sides), so leaving lastRunDate at
+  // today empties the next run's window (yesterday < date < today) every day and the previous close's fills are
+  // never applied (a frozen-ledger bug). Leaving lastRunDate at yesterday (the last fully applied day) keeps the window continuous.
+  // In the two-phase case (sell 09:30 and buy 15:20 the same day), sell moving it to yesterday still leaves the buy window empty, so nothing is applied twice.
   state.lastRunDate = prevMarketDay(today);
   await TradingPortfolio.updateOne({ _id: portfolio._id }, { $set: { "state.v4": state } });
 

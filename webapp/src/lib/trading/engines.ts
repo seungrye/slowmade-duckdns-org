@@ -1,9 +1,9 @@
-// 라이브 매매 엔진 — 파이썬 trading/{regime_engine,trend_engine}.py 의 1단계 포팅.
+// Live trading engines - stage 1 port of Python's trading/{regime_engine,trend_engine}.py.
 //
-// 한 사이클 = 한 포트폴리오 블록(계정×시장×전략)의 "오늘 결정 + 주문". open 방식
-// (전일까지의 신호 → 아침 시장가)이며, 주문은 기본 dry-run(TradingOrderLog 에만 기록).
-// 실주문은 계정 liveEnabled && 서버 TRADING_LIVE_ALLOWED=true 이중 게이트.
-// rotation 재평가일·자동선발 풀은 TradingPortfolio.state 에 영속(파이썬 rotation-state 대응).
+// One cycle = one portfolio block (account x market x strategy) deciding and ordering for today. It uses the
+// open method (signal through yesterday, market order in the morning) and dry-runs by default (logged to TradingOrderLog only).
+// Real orders need both gates: the account's liveEnabled and the server's TRADING_LIVE_ALLOWED=true.
+// The rotation re-evaluation date and auto-selected pool persist in TradingPortfolio.state (Python's rotation-state).
 
 import { KR_SEED, US_SEED, liquidityMetric, selectPool, type SeedEntry } from "@/lib/backtest/rotation-pool";
 import { clampBuyQty } from "./buyable";
@@ -25,18 +25,18 @@ type PortfolioDoc = TradingPortfolioType & { _id: Types.ObjectId };
 type Cfg = Record<string, unknown>;
 export type CycleLogger = (line: string) => void;
 
-// ── 브로커 추상화(파이썬 TrendBroker 인터페이스 대응) ─────────────
+// ── Broker abstraction (matching Python's TrendBroker interface) ─────────────
 
 export type LiveBroker = {
   market: "kr" | "us";
-  account(): Promise<[Record<string, [number, number]>, number, number]>; // [보유, 현금, 증권사 평가금액]
+  account(): Promise<[Record<string, [number, number]>, number, number]>; // [holdings, cash, broker valuation]
   priceOf(symbol: string): Promise<number>;
   historyLong(symbol: string, need?: number): Promise<[string, number][]>;
   valueSeries(symbol: string): Promise<number[]>;
   submit(symbol: string, qty: number, side: "buy" | "sell", price: number): Promise<string>;
-  // 종목·가격의 매수가능수량(수수료·환율 반영). KIS=psamount 권위값(max_ord_psbl_qty/
-  // nrcvb_buy_qty), 토스=매수여력/수수료율 계산. 전량매수(rotation/LRS)가 주문가능금액을
-  // 넘겨 거부되는 것을 막는다("현금 관리" — 총액이 아닌 실제 주문가능수량으로 사이징).
+  // Buyable quantity for a symbol and price (fees and FX included). KIS uses psamount's authoritative values
+  // (max_ord_psbl_qty / nrcvb_buy_qty); Toss computes buying power / fee rate. This stops an all-in buy
+  // (rotation/LRS) from exceeding the buying power and being rejected ("cash management" - size from the real buyable quantity, not the gross).
   buyableQty(symbol: string, price: number): Promise<number>;
 };
 
@@ -98,20 +98,20 @@ export function makeBroker(account: AccountDoc, market: "kr" | "us"): LiveBroker
     priceOf: (s) => client.usPrice(s, usQuoteExcd(s)),
     historyLong: (s, need = 210) => client.usHistoryLong(s, usQuoteExcd(s), need),
     valueSeries: (s) => client.usValueSeries(s, usQuoteExcd(s)),
-    // KIS 미국 시장가는 모의 미지원 → 현재가 지정가(파이썬 OverseasTrendBroker.submit 동일)
+    // KIS US market orders are unsupported on paper, so a limit at the current price is used (same as Python's OverseasTrendBroker.submit)
     submit: (s, qty, side, price) =>
       client.usOrder(s, qty, price, side, US_ORDER_EXCD[usQuoteExcd(s)] ?? "NASD"),
     buyableQty: (s, price) => client.usBuyableQty(s, price, US_ORDER_EXCD[usQuoteExcd(s)] ?? "NASD"),
   };
 }
 
-/** 시장 tz 의 오늘(YYYYMMDD) — '오늘 미완성 봉 제외'(open 방식) 판정용. */
+/** Today (YYYYMMDD) in the market's tz, for deciding what "exclude today's unfinished bar" (the open method) means. */
 export function marketToday(market: "kr" | "us", now = new Date()): string {
   const tz = market === "kr" ? "Asia/Seoul" : "America/New_York";
   return new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(now).replace(/-/g, "");
 }
 
-// ── 주문 실행(로그 + 이중 게이트) ────────────────────────────────
+// ── Order execution (logging plus the two gates) ────────────────────────────────
 
 async function execute(
   account: AccountDoc, portfolio: PortfolioDoc, runId: Types.ObjectId,
@@ -120,7 +120,7 @@ async function execute(
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
   let executed = 0;
   for (const it of intents) {
-    // 주문 단위 격리 — 한 종목의 주문 거부가 나머지(특히 trend 유니버스)를 죽이지 않게.
+    // Isolate per order, so one symbol's rejection does not kill the rest (the trend universe especially).
     try {
       let orderNo = "";
       if (live) {
@@ -145,7 +145,7 @@ async function execute(
   return { executed, live };
 }
 
-// ── 전략별 사이클 ────────────────────────────────────────────────
+// ── Per-strategy cycles ────────────────────────────────────────────────
 
 async function runLrs(
   account: AccountDoc, p: PortfolioDoc, runId: Types.ObjectId, broker: LiveBroker, log: CycleLogger,
@@ -165,8 +165,8 @@ async function runLrs(
     smaPeriod: sma, bandPct: Number(cfg.band ?? 1) / 100,
   });
   if (!intents.length) log(`[LRS ${target}] 신호 없음(레짐 유지) — 보유 ${qty}주`);
-  // 전량매수(LRS)도 매수가능수량으로 클램프 — lrsDecide 는 floor(현금/가격) 총액 기준이라
-  // KIS 한도 초과로 거부될 수 있다(rotation 과 동일 원인). 매도는 그대로.
+  // Clamp an all-in buy (LRS) to the buyable quantity too - lrsDecide sizes from floor(cash / price) of the gross,
+  // which can exceed the KIS limit and be rejected (the same cause as rotation). Sells are unchanged.
   const sized: OrderIntent[] = [];
   for (const it of intents) {
     if (it.side !== "buy") { sized.push(it); continue; }
@@ -176,7 +176,7 @@ async function runLrs(
     if (q !== it.qty) log(`[LRS ${it.symbol}] 매수수량 ${it.qty}→${q} 클램프(매수가능수량)`);
     sized.push({ ...it, qty: q });
   }
-  // 유휴현금 top-up(현금 드래그 제거) — 보유 & 레짐 유지(매도 신호 없음)이면 남는 현금을 target 에 추가 투입.
+  // Idle-cash top-up (removing cash drag) - while holding with the regime unchanged (no sell signal), the leftover cash goes into target.
   if (cfg.reinvestIdleCash !== false && qty > 0 && !sized.some((i) => i.side === "sell")) {
     const bq = price > 0 ? await broker.buyableQty(target, price) : 0;
     const q = topUpQty({ targetNotional: cash + qty * price, currentNotional: qty * price, price, buyableQty: bq });
@@ -213,7 +213,7 @@ async function runRotation(
   const last = state.lastRebalance ? String(state.lastRebalance) : null;
   const daysSince = last ? sigRows.filter(([d]) => d > last).length : reb;
 
-  // 자동선발 풀 — 파이썬 RotationEngine._ensure_pool 동일 규칙(구성 변경만 갱신·공지).
+  // The auto-selected pool - same rules as Python's RotationEngine._ensure_pool (only membership changes refresh and notify).
   let pool = manual;
   if (!manual) {
     const saved = Array.isArray(state.autoPool) ? (state.autoPool as string[]) : [];
@@ -262,19 +262,19 @@ async function runRotation(
       const [q] = holdings[holding];
       const sellPrice = await broker.priceOf(holding);
       intents.push({ side: "sell", symbol: holding, qty: q, price: sellPrice, reason: d.reason });
-      cash += q * sellPrice; // 시장가 매도 대금 근사(같은 날 재진입)
+      cash += q * sellPrice; // approximate market-sell proceeds (for a same-day re-entry)
     }
     if (holding !== d.target) {
       const price = await broker.priceOf(d.target);
-      // 수량은 매수가능수량(수수료·환율 반영)으로 — floor(현금/가격)은 총액이라 KIS 한도를
-      // 넘겨 40250000(주문가능금액 부족)로 거부된다(레버리지 ETF 등 특히). 스위치 당일 미정산
-      // 매도대금은 아직 반영 안 되므로 그날 덜 담고 다음 사이클에 마저 진입(안전).
+      // Size from the buyable quantity (fees and FX included) - floor(cash / price) is the gross and exceeds the KIS
+      // limit, giving 40250000 (insufficient buying power), leveraged ETFs especially. On the switch day the unsettled
+      // sale proceeds are not counted yet, so it buys less today and finishes entering next cycle (which is safe).
       const q = price > 0 ? await broker.buyableQty(d.target, price) : 0;
       if (q >= 1) intents.push({ side: "buy", symbol: d.target, qty: q, price, reason: d.reason });
       else log(`[rotation] 매수가능수량 0 — ${d.target} 진입 보류(현금 ${formatMoney(cash, broker.market)}, 가격 ${formatMoney(price, broker.market)})`);
     }
   } else if (d.action === "hold" && holding && d.regimeOn && cfg.reinvestIdleCash !== false) {
-    // 유휴현금 top-up(현금 드래그 제거) — 보유 & 레짐 유지일 때 남는 현금(입금·미정산 정산분)을 보유 종목에 투입.
+    // Idle-cash top-up (removing cash drag) - while holding with the regime unchanged, leftover cash (deposits, settled proceeds) goes into the holding.
     const price = await broker.priceOf(holding);
     const [hq] = holdings[holding];
     const bq = price > 0 ? await broker.buyableQty(holding, price) : 0;
@@ -295,13 +295,13 @@ async function runTrend(
   account: AccountDoc, p: PortfolioDoc, runId: Types.ObjectId, broker: LiveBroker, log: CycleLogger,
 ): Promise<string> {
   const cfg = p.config as Cfg;
-  // universeRef(명명 유니버스) 우선, 없으면 인라인 universe(하위호환).
+  // universeRef (a named universe) wins; otherwise the inline universe (for compatibility).
   const ref = typeof cfg.universeRef === "string" ? cfg.universeRef : null;
   const universe = ref ? (UNIVERSES[ref] ?? []) : (Array.isArray(cfg.universe) ? (cfg.universe as string[]) : []);
   if (!universe.length) return "trend: 유니버스 비어 있음(설정의 universeRef 또는 universe 필요)";
   const excdMap = ref ? EXCD_MAPS[ref] : (cfg.excdMap as Record<string, string> | undefined);
   if (p.market === "us" && excdMap && typeof excdMap === "object") {
-    registerUsExcd(excdMap); // NYSE/AMEX 종목 시세 조회용
+    registerUsExcd(excdMap); // for looking up NYSE/AMEX quotes
   }
   const shortMa = Number(cfg.shortMa ?? 20);
   const longMa = Number(cfg.longMa ?? 60);
@@ -311,8 +311,8 @@ async function runTrend(
   let remaining = cash;
   let buys = 0, sells = 0, scanned = 0;
   const intents: OrderIntent[] = [];
-  let holdingsValue = 0; // 스캔한 보유 종목 평가액 합(top-up 목표비중용 총자산 산정)
-  const topUpCands: { sym: string; price: number; hq: number }[] = []; // 보유 & 상승세 유지 종목
+  let holdingsValue = 0; // total value of the scanned holdings (the total assets the top-up's target weight is based on)
+  const topUpCands: { sym: string; price: number; hq: number }[] = []; // held and still trending up
   for (const sym of universe) {
     let closes: number[];
     try {
@@ -339,9 +339,9 @@ async function runTrend(
       } else { sells++; hadSell = true; }
       intents.push(sig);
     }
-    if (hq > 0 && !hadSell) topUpCands.push({ sym, price, hq }); // 보유 유지(청산 신호 없음) → top-up 후보
+    if (hq > 0 && !hadSell) topUpCands.push({ sym, price, hq }); // still held (no exit signal) -> a top-up candidate
   }
-  // 유휴현금 top-up(현금 드래그 제거) — 보유·상승세 종목을 목표비중(positionSize×총자산)까지 추가 투입.
+  // Idle-cash top-up (removing cash drag) - held, still-rising symbols are topped up to their target weight (positionSize x total assets).
   if (cfg.reinvestIdleCash !== false) {
     const equity = cash + holdingsValue;
     const targetPer = positionSize * equity;
@@ -364,8 +364,8 @@ async function runTrend(
   return line;
 }
 
-/** 포트폴리오 블록 1개의 사이클 실행 — 요약 문자열 반환(실패는 throw).
- *  phase 는 infinite_v4 전용(미장 both / 국장 sell·buy — LOC 에뮬), 그 외 무시. */
+/** Runs one portfolio block's cycle, returning a summary string (failures throw).
+ *  phase is infinite_v4 only (US both / KRX sell and buy - the LOC emulation) and ignored elsewhere. */
 export async function runPortfolioCycle(
   account: AccountDoc, portfolio: PortfolioDoc, runId: Types.ObjectId, log: CycleLogger,
   phase: "main" | "both" | "sell" | "buy" | "close" = "main",
@@ -374,9 +374,9 @@ export async function runPortfolioCycle(
     const { runCloseSync } = await import("./close-sync");
     return runCloseSync(account as never, portfolio as never, runId, log);
   }
-  // 이 블록이 쓸 수 있는 현금 (#339). 계정·시장에 블록이 여럿이면 앞에서부터 선점한 몫만
-  // 보게 한다. 블록이 하나뿐이거나 예약을 안 적었으면 null — 브로커를 감싸지 않아 예전과
-  // 코드 경로가 같다.
+  // The cash this block may use (#339). With several blocks on one account and market, it sees only the share
+  // claimed ahead of it. With a single block, or no reservation recorded, this is null - the broker is not
+  // wrapped, so the code path is the same as before.
   const { grantedCashFor } = await import("./reservation-live");
   const { capLiveBroker, capV4Broker } = await import("./cap-cash");
   const granted = await grantedCashFor(account, portfolio, log);
@@ -391,7 +391,7 @@ export async function runPortfolioCycle(
     return runInfiniteV4(account, portfolio, runId, v4Broker, v4Phase, log);
   }
   if (portfolio.strategy === "value_rebalancing") {
-    // VR 도 v4 의 V4Broker 어댑터를 재사용(snapshot·executions·place — KIS·토스 자동)
+    // VR reuses v4's V4Broker adapter too (snapshot, executions, place - KIS and Toss automatically)
     const { makeV4KisBroker, makeV4TossBroker } = await import("./infinite-v4-engine");
     const { runValueRebalancing } = await import("./value-rebalancing-engine");
     const market = portfolio.market as "kr" | "us";

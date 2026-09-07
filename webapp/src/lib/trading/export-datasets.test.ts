@@ -1,6 +1,6 @@
-// 내보낼 4종 데이터셋 정의 (#181).
+// The four export datasets (#181).
 //
-// 컬럼 정의는 순수하다 — DB 없이 검증한다. 라우트는 문서만 읽어와 여기에 넘긴다.
+// The column definitions are pure and verified without a DB. The route reads the documents and passes them here.
 import { describe, it, expect } from 'vitest';
 import { DATASETS, datasetById, exportFileName, type DatasetId } from './export-datasets';
 import { toCsv, CSV_BOM } from './export-csv';
@@ -69,7 +69,7 @@ describe('포트폴리오 이력 — 수익률 계산용', () => {
 });
 
 describe('숨김 행', () => {
-  // 내보내기가 조용히 빠뜨리면 합계가 안 맞는데 이유를 알 수 없다. 빼지 말고 표시한다.
+  // An export that silently drops something leaves the totals wrong with no way to tell why. Show it rather than omit it.
   it.each(['portfolio', 'trades'] as DatasetId[])('%s 는 숨김 여부를 컬럼으로 남긴다', (id) => {
     expect(datasetById(id)!.columns.map((c) => c.header)).toContain('숨김');
   });

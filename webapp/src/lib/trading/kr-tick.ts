@@ -1,9 +1,9 @@
-// KRX 호가단위(tick) 라운딩 — 국내 지정가 주문은 호가단위 위반 시 거부된다
-// (KIS 40030000 "호가단위 오류", 토스 400 invalid-tick-size).
+// KRX tick-size rounding - a KRX limit order is rejected when it violates the tick
+// (KIS 40030000 "tick size error", Toss 400 invalid-tick-size).
 //
-// 2023-01 개편 기준: ETF·ETN·ELW 는 전 가격대 5원, 주식은 가격 구간별 단위.
-// 자동매매 대상은 사실상 전부 ETF 라 기본 kind="etf". 매도 지정가는 올림(목표가
-// 이상만 체결 — 보수적), 매수 지정가는 내림(한도 이하 지불 — 보수적).
+// Per the 2023-01 revision: ETFs, ETNs and ELWs use 5 won at every price, while stocks use per-band ticks.
+// Automated trading targets are effectively all ETFs, so kind defaults to "etf". A sell limit rounds up (filling
+// only at or above the target - conservative) and a buy limit rounds down (paying at or below the cap - conservative).
 
 export type KrTickKind = "etf" | "stock";
 
