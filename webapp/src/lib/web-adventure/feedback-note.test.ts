@@ -1,5 +1,5 @@
-// 피드백 노트 생성 순수 함수 테스트 (#9)
-// AI 는 작가 노트(제안/개선안)만 생성한다. 서사/제목은 워커가 원본 로그·엔딩으로 채운다.
+// Tests for the pure functions of feedback-note generation (#9)
+// The AI writes only the author's note (suggestions and improvements). The worker fills the narrative and title from the original log and ending.
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -61,12 +61,12 @@ describe('buildMessages (제안/개선안 전용)', () => {
     expect(msgs).toHaveLength(2);
     expect(msgs[0].role).toBe('system');
     expect(msgs[0].content).toContain('제안');
-    expect(msgs[0].content).toContain('서사'); // "서사를 다시 쓰지 마라"
+    expect(msgs[0].content).toContain('서사'); // "do not rewrite the narrative"
     expect(msgs[0].content).toContain('신규 시나리오 힌트');
     expect(msgs[1].role).toBe('user');
-    expect(msgs[1].content).toContain('조화'); // 엔딩 라벨
-    expect(msgs[1].content).toContain('문을 연다'); // 로그 반영
-    expect(msgs[1].content).toContain('kael'); // 캐릭터
+    expect(msgs[1].content).toContain('조화'); // the ending label
+    expect(msgs[1].content).toContain('문을 연다'); // the log is reflected
+    expect(msgs[1].content).toContain('kael'); // the character
   });
 
   it('캐릭터 없어도 안전', () => {
@@ -75,8 +75,8 @@ describe('buildMessages (제안/개선안 전용)', () => {
   });
 });
 
-// shim 이 직전 요청의 응답을 돌려주는 오배달이 실제로 있었다(#65). 서버를 고쳤지만
-// 애플리케이션도 스스로 알아채야 한다 — 요청마다 토큰을 심고 응답에서 대조한다.
+// The shim really did misdeliver, returning the previous request's response (#65). The server was fixed, but the
+// application must notice for itself too - a token is planted in each request and checked in the response.
 describe('에코 토큰', () => {
   it('buildMessages 에 토큰을 주면 system 지시에 포함된다', () => {
     const msgs = buildMessages(
@@ -112,8 +112,8 @@ describe('에코 토큰', () => {
   });
 });
 
-// 실제 사고: LLM 이 "서사를 다시 쓰지 마라" 지시를 무시하고 다른 회차의 산문을 써냈는데,
-// 검증 없이 authorNote 에 그대로 저장됐다. 형식 위반은 거부해 워커가 재시도하게 한다.
+// A real incident: the LLM ignored the "do not rewrite the narrative" instruction and wrote another run's prose,
+// which was saved into authorNote unchecked. A format violation is rejected so the worker retries.
 describe('looksLikeProposal', () => {
   it('요구 소제목이 있으면 제안으로 인정', () => {
     const ok = [
@@ -147,9 +147,9 @@ describe('looksLikeProposal', () => {
     expect(looksLikeProposal('   \n  ')).toBe(false);
   });
 
-// #163 — 노트는 **한 회차의 로그**만 본다. 그런데 프롬프트가 그 사실을 말하지 않아,
-// 그 회차가 안 지난 장면을 "없다·빈약하다" 라고 단정했다. 실제로 "세 달이 겹치는 새벽"
-// 떡밥은 6 개 씬에서 회수되고 있는데도 "회수가 부족하다" 는 노트가 나왔다.
+// #163 - a note sees **one run's log** only. But the prompt never said so, and it declared scenes that run had
+// not passed "absent or thin". The "dawn where three moons overlap" seed is actually paid off across 6 scenes,
+// and the note still said the payoff was lacking.
 describe('한 경로만 본다는 사실을 프롬프트에 명시 (#163)', () => {
   const input = {
     endingId: 'harmony',

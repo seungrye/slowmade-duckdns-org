@@ -1,23 +1,23 @@
-// 〈에테르니아의 추락〉 성흔 침식 메커니즘 (#250).
+// The Fall of Eternia's stigma contamination mechanic (#250).
 //
-// 외부 AI 기획안 매핑:
-//   0-49 : 정상.
-//   50-79: 디버프 — con/dex 판정 -2, 셀레네(selene) 마법 위력 +3 (rollDice 에서 별도).
-//   80-99: 임계 — 디버프 유지 + UI 경고 (텍스트/색상).
-//   100  : 자동 petrification 엔딩 전환.
+// Mapping the external AI design:
+//   0-49 : normal.
+//   50-79: debuffed - con/dex checks take -2, and Selene's magic gains +3 power (handled separately in rollDice).
+//   80-99: critical - the debuff continues plus a UI warning (text and colour).
+//   100  : moves to the automatic petrification ending.
 
 import type { Character, StatKey } from "@/types/web-adventure";
 
-/** 침식 디버프 임계값. */
+/** The contamination debuff threshold. */
 export const STIGMA_DEBUFF_THRESHOLD = 50;
-/** 침식 임계 (UI 경고) 임계값. */
+/** The critical contamination threshold (the UI warning). */
 export const STIGMA_CRITICAL_THRESHOLD = 80;
-/** 침식 최대치 = 자동 petrification. */
+/** Maximum contamination = automatic petrification. */
 export const STIGMA_MAX = 100;
 
 /**
- * 침식도가 임계값 이상이면 con/dex 판정에 -2 디버프.
- * 다른 스탯(str/int/cha/wis)에는 영향 없음.
+ * At or above the threshold, con/dex checks take a -2 debuff.
+ * The other stats (str/int/cha/wis) are unaffected.
  */
 export function stigmaDebuff(character: Character, stat: StatKey): number {
   if (character.stigmaErosion < STIGMA_DEBUFF_THRESHOLD) return 0;
@@ -26,11 +26,11 @@ export function stigmaDebuff(character: Character, stat: StatKey): number {
 }
 
 /**
- * 침식도 가감 — clamp [0, 100]. character 의 *복사본* 반환.
+ * Adjusts contamination, clamped to [0, 100]. It returns *a copy* of the character.
  *
- * #290 NaN/Infinity 방어 — 옛 localStorage 또는 손상된 입력에서 NaN 이 들어오면
- * `??` 가 차단 못 함 (NaN 은 nullish 아님). Math.max(0, Math.min(100, NaN)) = NaN
- * → character 전체 부정. 시작과 delta 양쪽 *유한 number 만* 허용.
+ * #290 guards against NaN and Infinity - a NaN from old localStorage or corrupted input is not blocked by
+ * `??` (NaN is not nullish). Math.max(0, Math.min(100, NaN)) = NaN, which would corrupt the whole character.
+ * Both the start and the delta must be *finite numbers*.
  */
 export function applyStigmaDelta(character: Character, delta: number): Character {
   const safeStart = Number.isFinite(character.stigmaErosion) ? character.stigmaErosion : 0;
@@ -39,15 +39,15 @@ export function applyStigmaDelta(character: Character, delta: number): Character
   return { ...character, stigmaErosion: next };
 }
 
-/** 침식도 100 도달 → 자동 petrification 엔딩. */
+/** Contamination reaching 100 -> the automatic petrification ending. */
 export function isFullyPetrified(character: Character): boolean {
   return character.stigmaErosion >= STIGMA_MAX;
 }
 
 /**
- * #318 — HP 0 도달 → 자동 fall 엔딩.
- * 시나리오 ending (caught/chase 등) 은 *진짜 막다른 결정* 에만, 대부분의 game over 는
- * HP/침식 누적으로.
+ * #318 - HP reaching 0 -> the automatic fall ending.
+ * A scripted ending (caught, chase and so on) is only for *a genuinely final decision*; most game overs come from
+ * accumulated HP or contamination.
  */
 export function isDead(character: Character): boolean {
   return character.hp <= 0;

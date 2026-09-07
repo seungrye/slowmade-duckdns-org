@@ -7,15 +7,15 @@ import { ENDING_IDS as ACHIEVEMENT_ENDING_IDS } from "@/lib/achievements/rules";
 import { ENDING_ORDER } from "@/app/games/web-adventure/gallery/EndingGallery";
 
 /**
- * 엔딩 목록이 어긋나면 여기서 깨진다 (#352).
+ * When the ending list drifts, this is what breaks (#352).
  *
- * #359·#361 이 엔딩 5종(liberation·usurpation·regency·purge·wayfarer)을 추가하면서
- * past-run 모델의 mongoose enum 만 안 고쳤다. enum 이 타입에서 파생된 게 아니라 문자열
- * 배열을 손으로 복사해 둔 구조라 TypeScript 가 못 잡았고, **2주 넘게 모든 완주 기록이
- * 500 으로 버려졌다** — 피드백 노트·갤러리·업적까지 통째로.
+ * #359 and #361 added 5 endings (liberation, usurpation, regency, purge, wayfarer) without fixing the past-run
+ * model's mongoose enum. The enum was a hand-copied string array rather than derived from the type, so TypeScript
+ * could not catch it, and **for over two weeks every completed run was thrown away as a 500** - feedback notes,
+ * the gallery and the achievements with it.
  *
- * Record<EndingId, …> 로 선언한 맵들은 타입이 완전성을 강제하므로 여기서 또 볼 필요가 없다.
- * mongoose enum 은 **런타임 문자열 배열**이라 타입이 못 잡는다 — 그래서 이 테스트가 있다.
+ * Maps declared as Record<EndingId, …> have completeness enforced by the type, so there is no need to check them here.
+ * The mongoose enum is **a runtime string array** the type cannot catch - which is why this test exists.
  */
 const enumOf = (model: { schema: { path(p: string): unknown } }, path: string): string[] => {
   const p = model.schema.path(path) as { enumValues?: string[]; options?: { enum?: string[] } };

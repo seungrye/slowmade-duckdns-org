@@ -1,9 +1,9 @@
-// EmulatorJS 를 띄우는 iframe 주소 만들기 (#109).
+// Building the iframe address that launches EmulatorJS (#109).
 //
-// 왜 iframe 인가: EmulatorJS 는 `EJS_*` **전역 변수**를 읽고 스스로 script·CSS·DOM 을 주입하는
-// 구식 로더다. Next.js 클라이언트 라우팅에서 직접 마운트하면 라우트를 오갈 때 전역과 DOM 이 남아
-// 두 번째 실행이 깨진다. 정적 player.html 을 iframe 으로 띄우면 전역 오염이 그 안에 갇히고,
-// 화면을 떠날 때 iframe 이 사라지면서 통째로 정리된다.
+// Why an iframe: EmulatorJS is an old-style loader that reads `EJS_*` **globals** and injects its own scripts, CSS and
+// DOM. Mounting it directly under Next.js client routing leaves the globals and DOM behind when moving between routes,
+// so the second run breaks. Loading the static player.html in an iframe traps the global pollution inside it, and
+// leaving the screen destroys the iframe and cleans everything up at once.
 
 import { SUPPORTED_CORES } from './platforms';
 import { gameNumberOf } from './game-number';
@@ -11,49 +11,49 @@ import { gameNumberOf } from './game-number';
 export const PLAYER_PATH = '/games/retro/player.html';
 
 export interface PlayerUrlOptions {
-  /** EmulatorJS 코어명. PLATFORMS 에 등록된 것만 허용. */
+  /** The EmulatorJS core name. Only those registered in PLATFORMS are allowed. */
   core: string;
-  /** 롬 주소 — 같은 출처의 절대경로 또는 blob: URL. */
+  /** The ROM address - a same-origin absolute path or a blob: URL. */
   rom: string;
-  /** 플레이어 화면에 띄울 이름. */
+  /** The name to show on the player screen. */
   name?: string;
-  /** 적용할 패치 주소 (#112). 롬과 같은 출처 제약을 받는다. */
+  /** The address of the patch to apply (#112). It is under the same same-origin restriction as the ROM. */
   patch?: string;
   /**
-   * SFC 512 바이트 헤더를 떼고 패치할지 (#112).
+   * Whether to strip the SFC 512-byte header before patching (#112).
    *
-   * 지정하지 않으면 플레이어가 판단한다 — BPS·UPS 는 CRC 로 맞는 쪽을 자동으로 찾고,
-   * IPS 는 검증값이 없어 관행(헤더가 보이면 떼기)을 따른다. 사용자가 뒤집을 때만 실어 보낸다.
+   * Left unset, the player decides - BPS and UPS find the right side automatically by CRC, while IPS has no checksum
+   * and follows convention (strip when a header is visible). It is only sent when the user overrides it.
    */
   stripHeader?: boolean;
   /**
-   * 세이브를 매달 게임 키 (#114) — `builtin:<slug>` 또는 `rom:<id>`.
-   * 주면 플레이어가 네이티브 Save/Load 버튼을 서버로 돌린다. 없으면 저장 기능이 붙지 않는다.
+   * The game key the save hangs on (#114) - `builtin:<slug>` or `rom:<id>`.
+   * Given it, the player routes the native Save/Load buttons to the server. Without it, saving is not wired up at all.
    */
   saveKey?: string;
-  /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 일반적인 것부터. */
+  /** The parent ROM set addresses to place alongside the core (#143) - the common ones first. */
   parents?: string[];
   /**
-   * 옛 이름으로 남은 게임 세이브를 되살릴지 (#175).
+   * Whether to restore a game save left under the old name (#175).
    *
-   * 판단은 서버가 한다(`entry.ts` 의 `ROM_URL_CHANGED_AT`) — 옛 이름 `file.srm` 은 게임끼리
-   * 공유하던 자리라, 아무 게임이나 가져가면 남의 세이브를 끌어오게 된다.
+   * The server decides (`ROM_URL_CHANGED_AT` in `entry.ts`) - the old name `file.srm` was a slot shared between
+   * games, so letting any game take it would pull in someone else's save.
    */
   legacySave?: boolean;
   /**
-   * netplay 로 열지 (#186). 켜면 플레이어가 `EJS_gameID`·`EJS_netplayServer` 를 세팅한다.
+   * Whether to open in netplay (#186). Turning it on makes the player set `EJS_gameID` and `EJS_netplayServer`.
    *
-   * 방을 가르는 것은 `gameID` 다 — 두 PC 가 **같은 게임 키**로 열어야 같은 방이 된다.
+   * `gameID` separates the rooms - both PCs must open with **the same game key** to land in the same room.
    */
   netplay?: boolean;
-  /** netplay 방을 가르는 게임 키(`rom:<id>` 등). netplay 를 켤 때만 쓴다. */
+  /** The game key that separates netplay rooms (`rom:<id>` and so on). Used only when netplay is on. */
   gameKeyForNetplay?: string;
 }
 
 /**
- * @throws 코어가 화이트리스트 밖이거나 롬·패치 주소가 외부 출처면 던진다.
- *   iframe 은 우리 오리진에서 도는 코드라, 여기로 임의 URL 이 새 나가면 남의 서버 파일을
- *   우리 플레이어로 트는 통로가 된다.
+ * @throws when the core is outside the whitelist, or the ROM or patch address is cross-origin.
+ *   The iframe runs code on our origin, so letting an arbitrary URL through here would make it a channel for playing
+ *   someone else's server files in our player.
  */
 export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave, netplay, gameKeyForNetplay }: PlayerUrlOptions): string {
   if (!SUPPORTED_CORES.has(core)) throw new Error(`지원하지 않는 코어: ${core || '(빈 값)'}`);
@@ -73,10 +73,10 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, p
   if (legacySave) params.set('legacy', '1');
   if (netplay) {
     params.set('np', '1');
-    // 게임 번호는 서버에서 계산해 싣는다 — 두 PC 가 같은 수를 봐야 같은 방이 된다.
+    // The game number is computed on the server and sent along - both PCs must see the same number to share a room.
     params.set('gid', String(gameNumberOf(gameKeyForNetplay || saveKey || rom)));
   }
-  // 넘긴 순서를 그대로 지킨다 — URLSearchParams 는 넣은 순서를 보존한다.
+  // The given order is preserved - URLSearchParams keeps insertion order.
   for (const p of parents ?? []) {
     if (!isSameOriginRom(p)) throw new Error(`외부 출처 롬셋은 쓰지 않습니다: ${p}`);
     params.append('set', p);
@@ -85,8 +85,8 @@ export function buildPlayerUrl({ core, rom, name, patch, stripHeader, saveKey, p
 }
 
 /**
- * 같은 출처인가. `/` 로 시작하는 절대경로만 허용하되 `//host` (프로토콜 상대 URL)는 막는다 —
- * 그건 외부 호스트다. 내 컴퓨터 롬 바로 열기용 `blob:` 은 브라우저가 만든 것이라 허용.
+ * Whether it is same-origin. Only absolute paths starting with `/` are allowed, and `//host` (a protocol-relative
+ * URL) is blocked - that is an external host. `blob:` for opening a local ROM directly is allowed, being browser-made.
  */
 function isSameOriginRom(rom: string): boolean {
   if (rom.startsWith('blob:')) return true;

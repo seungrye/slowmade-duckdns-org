@@ -1,47 +1,47 @@
-// 씬 레지스트리 — mongo fetch 단일 소스 (#253 리프래시).
+// The scene registry - a mongo fetch as the single source (the #253 refresh).
 //
-// 〈에테르니아의 추락〉 으로 콘텐츠가 완전 교체되어 정적 import fallback 은 제거.
-// Phase D 의 getScenes() / resetSceneCache() 만 유지 — 클라이언트는 /api/web-adventure/content/v1
-// 에서 씬을 fetch.
+// The content was replaced entirely by The Fall of Eternia, so the static import fallback was removed.
+// Only Phase D's getScenes() and resetSceneCache() remain - the client fetches scenes from
+// /api/web-adventure/content/v1.
 //
-// scenarios.test.ts 와 정적 fallback (Phase D) 호환 위해 빈 `scenes` 객체와
-// `START_SCENE_ID` 는 export 유지 (백업: scripts/backups/web-adventure-pre-aethernia-*.json).
+// For compatibility with scenarios.test.ts and the static fallback (Phase D), an empty `scenes` object and
+// `START_SCENE_ID` are still exported (backup: scripts/backups/web-adventure-pre-aethernia-*.json).
 
 import type { SceneRegistry } from "@/types/web-adventure";
 import type { Coverage } from "../voice";
 
-/** 정적 fallback — 콘텐츠 리프래시 후 비어 있음 (mongo 가 단일 소스). */
+/** The static fallback - empty after the content refresh (mongo is the single source). */
 export const scenes: SceneRegistry = {};
 
-/** Kael 의 시작 씬. Rin/Solwen 은 캐릭터 생성 시 별도 startScene 사용. */
+/** Kael's starting scene. Rin and Solwen use their own startScene at character creation. */
 export const START_SCENE_ID = "kael_infirmary";
 
-// ── Phase D 동적 fetch (mongo 기반) ───────────────────────────────────────────
+// ── Phase D's dynamic fetch (mongo-based) ───────────────────────────────────────────
 let cachedScenes: SceneRegistry | null = null;
-let cachedVoice = ""; // 어떤 문체로 받아둔 캐시인지 (#73)
+let cachedVoice = ""; // which prose style the cache was fetched for (#73)
 let inflight: Promise<SceneRegistry> | null = null;
 
 export interface GetScenesOptions {
-  /** true 면 캐시 무시하고 다시 fetch. */
+  /** true ignores the cache and fetches again. */
   force?: boolean;
-  /** false 면 retry 비활성 (단일 fetch). 기본 true (#292). */
+  /** false disables retrying (a single fetch). true by default (#292). */
   retry?: boolean;
-  /** 문체(#73). 미지정이면 기본 문체. 값이 바뀌면 캐시를 무효화한다. */
+  /** The prose style (#73). Unset gives the default style. A changed value invalidates the cache. */
   voice?: string;
 }
 
-// #292 — 일시 네트워크 fail 대응 retry 정책.
-//   초기 fetch 실패 시 2 회 더 시도 (500ms / 1500ms backoff). 모두 실패해야 throw.
-//   안정적 운영 + 실패 시 page.tsx 의 "재시도" 버튼이 *수동* 추가 보호.
+// #292 - the retry policy for a transient network failure.
+//   A failed initial fetch is tried twice more (500ms then 1500ms backoff). It throws only when all fail.
+//   Stable in operation, with page.tsx's "retry" button as *manual* extra protection on failure.
 const FETCH_RETRIES = 2;
 const FETCH_BACKOFFS_MS = [500, 1500];
 
-// 마지막 응답의 문체 커버리지 (#79).
-// 클라이언트가 받는 씬에는 variants 가 제거돼 있어 완비 여부를 알 수 없다.
-// 랜덤 문체를 고르려면 이 값이 필요하므로 응답에서 따로 챙겨 둔다.
+// The prose-style coverage from the last response (#79).
+// The scenes the client receives have their variants stripped, so completeness cannot be told from them.
+// Choosing a random style needs this value, so it is kept separately from the response.
 let lastVoices: Record<string, Coverage> = {};
 
-/** 마지막 content fetch 가 알려 준 문체별 커버리지. fetch 전에는 빈 객체. */
+/** The per-style coverage the last content fetch reported. An empty object before any fetch. */
 export function getVoiceCoverage(): Record<string, Coverage> {
   return lastVoices;
 }
@@ -66,10 +66,10 @@ async function fetchContentOnce(voice?: string): Promise<SceneRegistry> {
   return map;
 }
 
-/** /api/web-adventure/content/v1 에서 씬을 fetch (모듈 캐시 + inflight 싱글톤 + retry). */
+/** Fetches the scenes from /api/web-adventure/content/v1 (a module cache, an in-flight singleton and retries). */
 export async function getScenes(opts: GetScenesOptions = {}): Promise<SceneRegistry> {
   const voice = opts.voice ?? "";
-  // 문체가 바뀌면 본문이 통째로 달라지므로 캐시·진행 중 요청을 재사용하지 않는다.
+  // A changed style changes every body, so neither the cache nor an in-flight request is reused.
   if (!opts.force && cachedScenes && cachedVoice === voice) return cachedScenes;
   if (inflight && cachedVoice === voice) return inflight;
 
@@ -103,7 +103,7 @@ export async function getScenes(opts: GetScenesOptions = {}): Promise<SceneRegis
   return inflight;
 }
 
-/** 테스트/강제 새로고침 — 모듈 캐시 초기화. */
+/** For tests and forced refreshes - clears the module cache. */
 export function resetSceneCache(): void {
   cachedScenes = null;
   cachedVoice = "";

@@ -1,30 +1,30 @@
 /**
- * 글 작성 리듬 (#333) — **순수**. 날짜 목록만 받아 연속일수·주말·새벽을 센다.
+ * Writing rhythm (#333) - **pure**. Given only a list of dates it counts streaks, weekends and small hours.
  *
- * ── 왜 KST 로 가르나 ─────────────────────────────────────────────────
+ * ── Why it splits by KST ─────────────────────────────────────────────
  *
- * "며칠 연속"과 "주말"과 "새벽"은 전부 **어느 시간대에서 보느냐**에 달렸다. 서버는 UTC 로
- * 도니 그대로 세면 KST 자정~오전 9시에 쓴 글이 전날로 밀린다 — 연속이 끊기고, 토요일 새벽
- * 글이 금요일로 잡힌다. 그래서 한국 날짜·시각으로 환산해 센다.
+ * "Days in a row", "weekend" and "small hours" all depend on **which timezone you look from**. The server runs in
+ * UTC, so counting there pushes anything written between midnight and 09:00 KST back a day - streaks break, and a
+ * Saturday small-hours post lands on Friday. So it converts to Korean dates and times before counting.
  *
- * 세 값을 한 번에 내는 이유는 목록을 세 번 훑지 않으려는 것도 있지만, **같은 환산을 세 번
- * 따로 구현하면 그중 하나만 틀리기 쉬워서**다.
+ * The three values come out together partly to walk the list once, but mostly because **implementing the same
+ * conversion three separate times makes it easy to get exactly one of them wrong**.
  */
 
 const TIME_ZONE = 'Asia/Seoul';
-/** 새벽으로 치는 끝 시각(제외). 0~4시 = 5시 미만. */
+/** The exclusive end of the small hours. 0-4 o'clock = below 5. */
 const NIGHT_END_HOUR = 5;
 
 export type Rhythm = {
-  /** 가장 길었던 연속 작성 일수 */
+  /** The longest run of consecutive writing days */
   streak: number;
-  /** 주말(토·일)에 쓴 글 수 */
+  /** Posts written at the weekend (Saturday or Sunday) */
   weekend: number;
-  /** 새벽(0~5시)에 쓴 글 수 */
+  /** Posts written in the small hours (0-5) */
   night: number;
 };
 
-/** 'YYYY-MM-DD' 와 시각·요일을 KST 로 뽑는다. */
+/** Extracts 'YYYY-MM-DD' plus the hour and weekday in KST. */
 function seoulParts(date: Date): { day: string; hour: number; weekday: string } {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: TIME_ZONE,
@@ -37,13 +37,13 @@ function seoulParts(date: Date): { day: string; hour: number; weekday: string } 
   }).formatToParts(date);
 
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
-  // hour12:false 라도 자정이 '24' 로 오는 환경이 있어 24 를 0 으로 되돌린다.
+  // Even with hour12:false some environments report midnight as '24', so 24 is folded back to 0.
   const hour = Number(get('hour')) % 24;
 
   return { day: `${get('year')}-${get('month')}-${get('day')}`, hour, weekday: get('weekday') };
 }
 
-/** 'YYYY-MM-DD' 를 하루 단위 정수로. 연속 판정에 쓴다. */
+/** 'YYYY-MM-DD' as a whole-day integer. Used to judge streaks. */
 function dayNumber(day: string): number {
   return Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
 }
@@ -60,7 +60,7 @@ export function postRhythm(dates: Date[]): Rhythm {
     if (hour < NIGHT_END_HOUR) night += 1;
   }
 
-  // 하루에 여러 개를 써도 하루다. 정렬해 이어지는 구간의 최대 길이를 잰다.
+  // Several posts in a day are still one day. Sort and measure the longest contiguous run.
   const sorted = [...days].map(dayNumber).sort((a, b) => a - b);
   let streak = 0;
   let run = 0;

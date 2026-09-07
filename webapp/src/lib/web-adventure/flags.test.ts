@@ -4,13 +4,13 @@ import WebAdventurePastRun from "@/models/web-adventure-past-run";
 import WebAdventureSave from "@/models/web-adventure-save";
 
 /**
- * world.* 플래그의 점 때문에 회차 저장이 통째로 실패했다 (#356).
+ * The dots in world.* flags made saving a run fail outright (#356).
  *
- * #256 이 이전 회차의 엔딩을 다음 회차 `character.flags` 에 주입하는데 그 키가 점을 포함한다
- * (`world.harmony_kept`). 두 모델이 flags 를 `Map of Boolean` 으로 선언해 뒀고,
- * **MongoDB 는 Map 키에 점을 못 쓴다** — 캐스팅이 실패하면서 문서 전체가 저장되지 않았다.
+ * #256 injects the previous run's ending into the next run's `character.flags`, and those keys contain dots
+ * (`world.harmony_kept`). Two models declared flags as a `Map of Boolean`, and
+ * **MongoDB cannot use dots in Map keys** - the cast failed and the whole document was never saved.
  *
- * 즉 **두 번째 회차부터 무조건** 터졌다. 첫 회차는 world flag 가 없어 통과하므로 안 드러났다.
+ * In other words it broke **unconditionally from the second run onward**. The first run has no world flags and passes, so it never showed.
  */
 const 캐릭터 = (flags: Record<string, unknown>) => ({
   stats: { str: 5, dex: 5, int: 5, cha: 5, con: 5, wis: 5 },
@@ -21,7 +21,7 @@ const 캐릭터 = (flags: Record<string, unknown>) => ({
 
 describe("flagsForStore — 점이 든 키를 견딘다 (#356)", () => {
   it("점이 든 키를 그대로 둔다", () => {
-    // 키를 바꾸면 씬 조건과 기존 저장이 전부 어긋난다. 그대로 두는 것이 핵심이다.
+    // Changing the keys would break every scene condition and every existing save. Leaving them alone is the point.
     expect(flagsForStore({ "world.harmony_kept": true })).toEqual({ "world.harmony_kept": true });
   });
 

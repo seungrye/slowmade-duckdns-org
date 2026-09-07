@@ -1,4 +1,4 @@
-// #267 — 모든 (엔딩 외) 씬의 body 는 3 줄 이상 (분위기 보강).
+// #267 - every scene body (endings aside) has at least 3 lines (strengthening the atmosphere).
 
 import { describe, it, expect } from "vitest";
 

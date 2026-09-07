@@ -1,7 +1,7 @@
-// 피드백 노트 생성 — 플레이 회차 로그를 로컬 LLM(shim)에 넣어 살 붙인 서사 + 작가 노트 생성. (#9)
+// Feedback-note generation - a play run's log goes to the local LLM (the shim) to produce a fleshed-out narrative plus an author's note. (#9)
 //
-// 프롬프트 조립(buildMessages)·출력 파싱(parseOutput)은 순수 함수(단위 테스트 용이).
-// generateFeedbackNote 만 부수효과(로컬 shim fetch). site 백엔드가 127.0.0.1 로 내부 호출.
+// Assembling the prompt (buildMessages) and parsing the output (parseOutput) are pure functions (easy to unit test).
+// Only generateFeedbackNote has side effects (fetching the local shim). The site backend calls it internally over 127.0.0.1.
 
 import { randomUUID } from 'node:crypto';
 
@@ -15,9 +15,9 @@ export interface FeedbackNoteInput {
   scenePath: string[];
   log: string[];
   /**
-   * 전체 씬 목록(id·제목) (#163). 있으면 user 에 실어 **이미 쓰인 것**을 알려 준다.
+   * The full scene list (id and title) (#163). When present it is put in the user message to say **what has already been written**.
    *
-   * 없으면 종전과 같이 동작한다 — 모델은 로그만 보고 쓴다.
+   * Absent, it behaves as before - the model writes from the log alone.
    */
   sceneIndex?: Array<{ id: string; title?: string }>;
   character?: {
@@ -36,16 +36,16 @@ export interface FeedbackNoteResult {
   authorNote: string;
 }
 
-// 프롬프트 예산: shim n_ctx(32k) 안에서 출력(4000토큰) 여유를 남기려 로그를 대략 절삭.
-// ~32000자까지 로그에 할당(초과 시 앞뒤 보존 + 중략). 입력+출력이 n_ctx 를 넘으면
-// shim 이 n_predict 를 자동 클램프하므로 크래시 없이 graceful 하게 줄어든다.
+// The prompt budget: the log is trimmed roughly to leave room for the output (4000 tokens) inside the shim's n_ctx (32k).
+// Up to ~32000 characters are allocated to the log (beyond that, the head and tail are kept with an elision). If input
+// plus output exceeds n_ctx, the shim clamps n_predict automatically, so it degrades gracefully rather than crashing.
 export const MAX_LOG_CHARS = 32000;
 
-// 엔딩 짧은 이름은 content 가 원본 (#352). 여기 있던 사본은 제거했다.
+// The endings' short names live in content, which is the source (#352). The copy that used to be here was removed.
 export { ENDING_LABEL, endingLabel } from '@/content/web-adventure/endings';
 import { endingLabel } from '@/content/web-adventure/endings';
 
-/** 로그 문자열 배열을 예산 안으로 절삭. 초과 시 앞 60% + 뒤 40% 를 남기고 중략 표시. */
+/** Trims the log string array into the budget. Over it, the leading 60% and trailing 40% are kept with an elision marker. */
 export function truncateLog(log: string[], maxChars = MAX_LOG_CHARS): string {
   const joined = log.join('\n');
   if (joined.length <= maxChars) return joined;
@@ -56,7 +56,7 @@ export function truncateLog(log: string[], maxChars = MAX_LOG_CHARS): string {
   return `${head}\n\n…(중략: 긴 여정이라 중간 일부 생략)…\n\n${tail}`;
 }
 
-/** 회차 입력 → LLM chat messages (system + user). 순수 함수. */
+/** A run's input -> the LLM chat messages (system plus user). A pure function. */
 export function buildMessages(
   input: FeedbackNoteInput,
   opts: { echoToken?: string } = {},
@@ -76,8 +76,8 @@ export function buildMessages(
   const system = [
     '너는 인터랙티브 픽션 「에테르니아」의 시나리오를 다듬는 창작 보조 편집자다.',
     '입력으로 한 플레이어의 실제 플레이 진행 로그(선택·장면 본문·판정 결과)가 주어진다.',
-    // #163 — 이 한 줄이 없어서, 그 회차가 안 지난 장면을 "없다·빈약하다" 로 단정했다.
-    //   실제로 "세 달이 겹치는 새벽" 떡밥은 6 개 씬에서 회수되고 있는데도 부족하다는 노트가 나왔다.
+    // #163 - without this one line, it declared scenes that run had not passed "absent or thin".
+    //   The "dawn where three moons overlap" seed is actually paid off across 6 scenes, and the note still said it was lacking.
     '**너는 전체 이야기 중 이 회차가 지난 한 경로만 본다.** 보지 못한 장면이 훨씬 많다.',
     '로그에 없다는 이유로 "없다·부족하다·회수되지 않았다" 라고 단정하지 마라.',
     '그런 지적을 하려면 "이 경로에서는 …가 드러나지 않았다" 처럼 **경로를 한정해서** 쓴다.',
@@ -85,7 +85,7 @@ export function buildMessages(
     '절대 이야기(서사)를 다시 쓰지 마라. 소설/장면 산문을 쓰지 마라 — 오직 제안·개선안.',
     '"제목:" 이나 "**서사:**" 같은 머리말을 쓰지 마라. 장면 묘사·대사·주사위 판정을 재현하지 마라.',
     '',
-    // 오배달 감지용 — 응답이 이 요청의 것인지 대조한다(#65). 토큰이 없으면 지시하지 않는다.
+    // For detecting misdelivery - it checks the response belongs to this request (#65). With no token, no instruction is given.
     ...(opts.echoToken
       ? [`출력의 맨 첫 줄에는 정확히 [[NOTE:${opts.echoToken}]] 만 쓰고 줄을 바꾼다.`]
       : []),
@@ -101,8 +101,8 @@ export function buildMessages(
     '이 형식을 벗어난 응답(특히 서사 산문)은 폐기되고 다시 생성된다.',
   ].join('\n');
 
-  // 전체 씬 목록 — 이미 쓰인 것을 알면 "없다" 대신 "연결이 약하다" 로 말할 수 있다.
-  // 제목만 실으므로 길지 않고, 그래도 넘치면 잘라 낸다(프롬프트 예산 보호).
+  // The full scene list - knowing what is already written lets it say "the connection is weak" instead of "it is absent".
+  // Only the titles are included, so it is not long, and it is trimmed if it still overflows (protecting the prompt budget).
   const sceneIndexLine = (() => {
     const idx = input.sceneIndex ?? [];
     if (idx.length === 0) return '';
@@ -131,13 +131,13 @@ export function buildMessages(
   ];
 }
 
-/** 응답 첫 줄에 실려 오는 에코 토큰. 없으면 null(모델이 생략할 수 있다). */
+/** The echo token carried on the response's first line. null when absent (the model may omit it). */
 export function extractEchoToken(content: string): string | null {
   const m = String(content ?? '').match(/^\s*\[\[NOTE:([A-Za-z0-9_-]{4,64})\]\]/);
   return m ? m[1] : null;
 }
 
-/** 저장 전에 토큰 줄을 걷어낸다. 토큰이 없으면 원문 그대로. */
+/** Strips the token line before saving. Without a token, the text is unchanged. */
 export function stripEchoToken(content: string): string {
   const text = String(content ?? '');
   return extractEchoToken(text)
@@ -145,14 +145,14 @@ export function stripEchoToken(content: string): string {
     : text;
 }
 
-/** 요구한 소제목의 핵심어 — LLM 이 표기를 조금 바꿔도(##/###, 어미 변형) 잡히도록 느슨하게 본다. */
+/** The keywords of the required subheadings - matched loosely so a slight change of notation (##/###, a different ending) still hits. */
 const PROPOSAL_HEADING_KEYS = ['분기', '캐릭터', '떡밥', '보완', '시나리오 힌트'];
 
 /**
- * 응답이 '제안·개선안' 형식인가(순수).
+ * Whether the response is in the 'suggestions and improvements' format (pure).
  *
- * LLM 이 "서사를 다시 쓰지 마라" 지시를 어기고 산문을 써낸 적이 있는데, 검증이 없어
- * 그대로 작가 노트로 저장됐다. 소제목이 하나도 없으면 형식 위반으로 보고 거부한다.
+ * The LLM has broken the "do not rewrite the narrative" instruction and written prose, and with no validation that
+ * was saved straight into the author's note. Not one subheading counts as a format violation and is rejected.
  */
 export function looksLikeProposal(content: string): boolean {
   const text = String(content ?? '');
@@ -163,7 +163,7 @@ export function looksLikeProposal(content: string): boolean {
     .some((heading) => PROPOSAL_HEADING_KEYS.some((key) => heading.includes(key)));
 }
 
-/** SSE 'data: {...}' 한 줄에서 delta.content 추출(순수). data/[DONE]/파싱실패면 ''. */
+/** Extracts delta.content from one SSE 'data: {...}' line (pure). '' for non-data, [DONE] or a parse failure. */
 export function sseDeltaContent(line: string): string {
   const t = line.trim();
   if (!t.startsWith('data:')) return '';
@@ -177,16 +177,16 @@ export function sseDeltaContent(line: string): string {
   }
 }
 
-/** 부수효과: 로컬 shim 에 chat/completions 호출 → 파싱된 결과. 실패 시 throw.
+/** A side effect: calls the local shim's chat/completions -> the parsed result. Throws on failure.
  *
- * **반드시 스트리밍(stream:true)** 으로 호출한다: 생성이 수십 분이라 non-stream 이면 shim 이
- * 그동안 응답 헤더를 안 보내 Node fetch(undici) 의 기본 headersTimeout(~5분)에 걸려
- * 'fetch failed' 로 abort 된다(#21 재발). 토큰을 계속 흘려보내면 헤더·바디 타임아웃이 리셋된다.
+ * **It must be called with streaming (stream:true)**: generation takes tens of minutes, and without streaming the
+ * shim sends no response header in the meantime, so Node's fetch (undici) hits its default headersTimeout (~5 minutes)
+ * and aborts with 'fetch failed' (#21 recurring). Keeping tokens flowing resets both the header and body timeouts.
  */
-// #102 — Node 내장 fetch(undici)의 기본 바디/헤더 타임아웃(각 5 분)이 먼저 끊어 버린다.
-//   워커는 AbortSignal 로 45 분을 의도하는데 실제로는 10 분쯤에 "terminated" 로 죽었다
-//   (2026-08-12 사고). 로컬 LLM 은 프롬프트 처리만으로도 몇 분이 걸리므로 명시적으로 늘린다.
-//   헤더(첫 응답)와 바디(청크 간격) 둘 다 같은 한도를 준다 — 어느 쪽이 늦어도 죽지 않게.
+// #102 - Node's built-in fetch (undici) cuts it off first with its default body and header timeouts (5 minutes each).
+//   The worker intends 45 minutes through an AbortSignal, but it actually died at around 10 minutes with "terminated"
+//   (the 2026-08-12 incident). A local LLM takes minutes just to process the prompt, so they are raised explicitly.
+//   The same limit is given to both the header (the first response) and the body (the gap between chunks) - so neither being slow kills it.
 const llmDispatcher = new Agent({
   headersTimeout: GEN_TIMEOUT_MS,
   bodyTimeout: GEN_TIMEOUT_MS,
@@ -199,11 +199,11 @@ export async function generateFeedbackNote(
     maxTokens?: number;
     temperature?: number;
     signal?: AbortSignal;
-    echoToken?: string; // 테스트에서 고정하려고 주입 (#65)
+    echoToken?: string; // injected to pin it in tests (#65)
   },
 ): Promise<FeedbackNoteResult> {
   const model = opts?.model ?? 'Qwen3-30B-A3B-Q4_K_M';
-  // 오배달 감지용 토큰 — shim 이 직전 요청의 응답을 돌려준 사고가 있었다(#65).
+  // The misdelivery-detection token - the shim once returned the previous request's response (#65).
   const echoToken = opts?.echoToken ?? randomUUID().replace(/-/g, '').slice(0, 12);
   const res = await fetch(`${env.llmBaseUrl}/chat/completions`, {
     method: 'POST',
@@ -216,7 +216,7 @@ export async function generateFeedbackNote(
       stream: true,
     }),
     signal: opts?.signal,
-    // dispatcher 는 표준 RequestInit 에 없지만 Node(undici) 가 받는다.
+    // dispatcher is not in the standard RequestInit, but Node (undici) accepts it.
     dispatcher: llmDispatcher,
   } as RequestInit & { dispatcher?: unknown });
   if (!res.ok) {
@@ -239,26 +239,26 @@ export async function generateFeedbackNote(
       content += sseDeltaContent(line);
     }
   }
-  content += sseDeltaContent(buf); // 마지막 개행 없는 잔여
+  content += sseDeltaContent(buf); // the remainder with no trailing newline
 
   if (!content.trim()) throw new Error('shim 응답이 비어 있습니다.');
 
-  // 다른 요청의 응답이 넘어온 경우 — 토큰이 이 요청 것과 다르면 저장하지 않는다(#65).
-  // 모델이 토큰을 생략했으면(null) 통과시켜 오탐을 만들지 않는다.
+  // Another request's response came through - a token differing from this request's means it is not saved (#65).
+  // If the model omitted the token (null) it passes, so no false positives are created.
   const echoed = extractEchoToken(content);
   if (echoed && echoed !== echoToken) {
     throw new Error(`응답 토큰 불일치 — 다른 요청의 응답으로 보임(기대 ${echoToken} / 받음 ${echoed})`);
   }
   content = stripEchoToken(content);
 
-  // 형식 위반(서사 산문)은 저장하지 않고 던진다 — 워커가 queued 로 되돌려 재시도한다.
-  // 검증이 없던 탓에 다른 회차의 서사가 작가 노트로 저장된 적이 있다.
+  // A format violation (narrative prose) is thrown rather than saved - the worker returns it to queued and retries.
+  // Without that validation, another run's narrative was once saved as the author's note.
   if (!looksLikeProposal(content)) {
     throw new Error(
       `LLM 이 제안 형식을 따르지 않음(서사 재작성 추정) — 앞부분: ${content.trim().slice(0, 80)}`,
     );
   }
-  // AI 는 제안/개선안(작가 노트)만 생성한다. 서사·제목은 워커가 원본 로그·엔딩으로 채운다
-  //   (서사 재작성은 잘림·시간 낭비라 제거 — 엔딩 원본 로그를 그대로 서사로 쓴다).
+  // The AI writes only the suggestions and improvements (the author's note). The worker fills the narrative and title
+  //   from the original log and ending (rewriting the narrative was removed as truncation-prone and a waste of time - the ending's original log is used as the narrative).
   return { title: '', narrative: '', authorNote: content.trim() };
 }

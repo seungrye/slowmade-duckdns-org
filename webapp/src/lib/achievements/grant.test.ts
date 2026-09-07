@@ -21,7 +21,7 @@ const mockUserUpdate = User.findOneAndUpdate as ReturnType<typeof vi.fn>;
 
 const stats = (over: Partial<AchievementStats> = {}) => ({ ...emptyStats(), ...over });
 
-/** 이미 가진 업적 키 목록을 가진 사용자를 흉내 낸다. */
+/** Stands in for a user who already holds a given list of achievement keys. */
 function stubUser(ownedKeys: string[]) {
   mockUserFindOne.mockReturnValue({
     populate: vi.fn().mockResolvedValue({
@@ -35,7 +35,7 @@ function stubUser(ownedKeys: string[]) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // upsert 는 정의를 그대로 돌려준다고 본다.
+  // upsert is taken to return the definition as is.
   mockAchUpsert.mockImplementation((filter: { key: string }) =>
     Promise.resolve({ ...ACHIEVEMENTS[filter.key], _id: `id-${filter.key}` }),
   );
@@ -61,9 +61,9 @@ describe('evaluateAndGrant', () => {
   });
 
   it('과거 기록이 쌓여 있으면 한꺼번에 열린다 — 소급 부여', async () => {
-    // 실제 사용자: 글 174 · 덧글 98 · 웹어드벤처 405 · 롬 16 · 세이브 7.
-    //   엔딩은 WA_ENDING_ALL 이 열리는지 보는 케이스라 전 종류를 넣는다(#352 — 숫자를
-    //   박아 두면 엔딩이 늘 때 이 테스트가 조용히 뜻을 잃는다).
+    // A real user: 174 posts, 98 comments, 405 web-adventure runs, 16 ROMs, 7 saves.
+    //   Every ending kind is included because this case checks that WA_ENDING_ALL opens (#352 - hard-coding the
+    //   number would quietly empty this test of meaning as endings are added).
     mockStats.mockResolvedValue(
       stats({
         postCount: 174,
@@ -169,7 +169,7 @@ describe('achievementView — 화면에 내려줄 형태', () => {
 
     await achievementView('me@test.com');
 
-    // 프로필을 여는 것만으로 밀린 업적이 부여된다.
+    // Just opening the profile grants the backlog.
     expect(mockUserUpdate).toHaveBeenCalled();
   });
 });

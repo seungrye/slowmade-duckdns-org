@@ -1,4 +1,4 @@
-// inventory — groupInventory 단위 (#300).
+// inventory - unit tests for groupInventory (#300).
 
 import { describe, it, expect } from "vitest";
 import { groupInventory } from "./inventory";

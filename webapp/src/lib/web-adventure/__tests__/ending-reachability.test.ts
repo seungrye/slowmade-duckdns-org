@@ -1,8 +1,8 @@
-// #261 — 6 엔딩의 각 주인공별 *실제* 도달 가능성 검증 (mongo content 의존).
+// #261 - verifying each protagonist's *actual* reachability of the 6 endings (depends on the mongo content).
 //
-// 콘텐츠는 mongo 가 단일 소스이므로 정적 import 없음. 이 테스트는 *문서/매트릭스*
-// 와 *실제 시스템 동작* 의 *일관성 보장* 위해, 주인공 baseStats + 어빌 보너스 +
-// 어떤 flag 조건이 *논리적으로 충족 가능* 한지 검증.
+// mongo is the single source for the content, so there is no static import. To guarantee *consistency* between
+// *the documentation and the matrix* and *how the system actually behaves*, this test checks whether a
+// protagonist's baseStats plus ability bonuses can *logically satisfy* each flag condition.
 
 import { describe, it, expect } from "vitest";
 import { protagonists } from "@/content/web-adventure/protagonists";

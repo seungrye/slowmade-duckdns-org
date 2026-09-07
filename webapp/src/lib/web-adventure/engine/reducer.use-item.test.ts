@@ -1,4 +1,4 @@
-// #258 — USE_ITEM 의 stigmaDelta 통합. items.ts 의 ether_refined_water / mana_stone_fragment.
+// #258 - integrating USE_ITEM's stigmaDelta. items.ts's ether_refined_water / mana_stone_fragment.
 
 import { describe, it, expect } from "vitest";
 import type { Character, GameState, Scene, SceneRegistry } from "@/types/web-adventure";
@@ -42,7 +42,7 @@ describe("USE_ITEM + stigmaDelta (#258)", () => {
     if (next.phase === "playing") {
       // stigmaDelta: -3 → 50-3 = 47
       expect(next.character.stigmaErosion).toBe(47);
-      // 사용된 아이템 제거
+      // the used item is removed
       expect(next.character.inventory).not.toContain("ether_refined_water");
       // 정제수도 heal: 0 — HP 변화 없음. 단순 침식 감소만.
     }

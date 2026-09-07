@@ -1,4 +1,4 @@
-// #284 스토리 흐름 균형 — act1 본문 + Kael 라인 환경 침식.
+// #284 story flow balance - act1's body plus environmental contamination on Kael's line.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";

@@ -25,12 +25,12 @@ describe('decorate', () => {
   ])('표에 없는 이름은 %s 기본 아이콘으로라도 보여준다', (kind, icon) => {
     const unknown = decorate('처음 보는 날', kind);
     expect(unknown.icon).toBe(icon);
-    // 설명은 없어도 이름은 화면에 뜬다. 표에 없다고 사라지면 새 기념일이 조용히 샌다.
+    // The name is shown even without a description. A day disappearing for being absent from the table would silently lose new observances.
     expect(unknown.description).toBe('');
   });
 
   it('엔드포인트마다 띄어쓰기가 달라도 찾는다', () => {
-    // 실측: 기념일은 '어버이 날'·'스승의 날'·'국군의 날' 처럼 띄어 쓴다.
+    // Measured: observances are spaced, as in '어버이 날', '스승의 날' and '국군의 날'.
     for (const [spaced, joined] of [
       ['어버이 날', '어버이날'],
       ['스승의 날', '스승의날'],
@@ -44,7 +44,7 @@ describe('decorate', () => {
   });
 
   it('대체공휴일은 괄호가 붙어 오는데, 아이콘은 찾고 이름은 원문을 살린다', () => {
-    // 어느 공휴일의 대체인지가 정보라 이름을 뭉개면 안 된다.
+    // Which holiday it substitutes for is information, so the name must not be flattened.
     const got = decorate('대체공휴일(개천절)', 'holiday');
     expect(got.icon).toBe(decorate('대체공휴일', 'holiday').icon);
     expect(got.name).toBe('대체공휴일(개천절)');
@@ -102,7 +102,7 @@ describe('CATALOG 자체 점검', () => {
 
 describe('dedupeEvents', () => {
   it('같은 날 같은 이름이 두 번 오면 무게 높은 쪽만 남긴다', () => {
-    // 실측(2026): 어린이날 5/5, 현충일 6/6 이 공휴일·기념일 양쪽에 있다.
+    // Measured (2026): Children's Day 5/5 and Memorial Day 6/6 appear in both the holiday and the observance responses.
     const merged = dedupeEvents([
       decorate('어린이 날', 'anniversary'),
       decorate('어린이날', 'holiday'),

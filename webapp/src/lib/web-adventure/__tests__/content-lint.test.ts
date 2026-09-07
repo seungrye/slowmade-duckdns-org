@@ -1,8 +1,8 @@
-// #271 콘텐츠 구조 lint — orphan scene / dead-end choice / 분기 3 제한 / 6 엔딩 도달성.
+// #271 content structure lint - orphan scenes, dead-end choices, the 3-branch limit and 6-ending reachability.
 //
-// 단일 lint 함수에서 모든 규칙을 평가하고 *위반 리스트* 를 반환한다. lint 함수는
-// 순수 (mongo 의존 X) — 호출 측에서 sceneRegistry 를 주입한다. vitest 는 mongo 의
-// 실 콘텐츠를 로드해 lint 결과가 비어 있는지 검증.
+// A single lint function evaluates every rule and returns *a list of violations*. The lint function is
+// pure (no mongo dependency) - the caller injects the sceneRegistry. vitest loads the real content from mongo
+// and verifies the lint result is empty.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry, EndingId } from "@/types/web-adventure";
@@ -66,7 +66,7 @@ describe("콘텐츠 구조 lint (#271)", () => {
       end_fall: makeScene({ id: "end_fall", isEnding: true, endingId: "fall" }),
     };
     const r = lintSceneContent(reg, { startSceneIds: ["start"], requiredEndings: ALL_ENDINGS });
-    // fall 만 도달 가능 → 나머지 5 종이 UNREACHABLE_ENDING.
+    // only fall is reachable -> the other 5 are UNREACHABLE_ENDING.
     const unreachable = r.issues.filter((i) => i.code === "UNREACHABLE_ENDING").map((i) => i.endingId);
     expect(new Set(unreachable)).toEqual(new Set(ALL_ENDINGS.filter((e) => e !== "fall")));
   });
@@ -85,7 +85,7 @@ describe("콘텐츠 구조 lint (#271)", () => {
   });
 });
 
-// 실 mongo content lint — 모든 규칙 통과.
+// Linting the real mongo content - every rule passes.
 describe("실 콘텐츠 lint (#271)", () => {
   let registry: SceneRegistry | null = null;
 
@@ -113,13 +113,13 @@ describe("실 콘텐츠 lint (#271)", () => {
     const r = lintSceneContent(registry, {
       startSceneIds: ["kael_infirmary", "rin_harbor", "solwen_grove"],
       requiredEndings: ALL_ENDINGS,
-      // #327 — *_caught/_chase 가 우회 씬의 자결 plain 분기로 *재이용* 되어 reachable.
-      //   ending_petrification 은 삭제 (자동 ending 잔재). 씬이 없으므로 endingId
-      //   화이트리스트로 직접 처리.
+      // #327 - *_caught/_chase are *reused* as the detour scenes' plain self-sacrifice branch and so are reachable.
+      //   ending_petrification was deleted (a leftover of the automatic ending). With no scene it is handled
+      //   directly through the endingId whitelist.
       autoEndingSceneIds: [],
       autoEndingIds: ["petrification"],
     });
-    // 실패 시 위반 전체 출력.
+    // On failure, print every violation.
     if (r.issues.length > 0) {
       const grouped = r.issues
         .map((i) => `[${i.code}] ${i.sceneId ?? i.endingId ?? "?"}${i.detail ? " — " + i.detail : ""}`)

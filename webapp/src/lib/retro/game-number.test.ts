@@ -1,11 +1,11 @@
-// netplay 용 게임 번호 (#186).
+// The game number for netplay (#186).
 //
-// EmulatorJS 는 `EJS_gameID` 가 **숫자**일 때만 netplay 를 켠다
-// (`typeof this.config.gameId !== "number"` 면 꺼짐). 우리 게임 키는 `rom:<ObjectId>` ·
-// `builtin:<슬러그>` 라 숫자로 옮겨야 한다.
+// EmulatorJS enables netplay only when `EJS_gameID` is **a number**
+// (`typeof this.config.gameId !== "number"` turns it off). Our game keys are `rom:<ObjectId>` and
+// `builtin:<slug>`, so they have to be mapped to a number.
 //
-// 이 함수의 계약은 하나다 — **두 PC 가 같은 게임에서 같은 수를 뽑아야 한다.** 그래야 같은
-// 방에 들어간다. 그래서 시각·난수·환경에 절대 기대지 않는다.
+// This function has one contract - **two PCs must derive the same number for the same game.** That is what puts them
+// in the same room. So it never relies on the clock, randomness or the environment.
 import { describe, it, expect } from 'vitest';
 import { gameNumberOf } from './game-number';
 
@@ -31,7 +31,7 @@ describe('gameNumberOf', () => {
       .not.toBe(gameNumberOf('rom:aaaaaaaaaaaaaaaaaaaaaaab'));
   });
 
-  // EmulatorJS 가 typeof 로 거른다 — 안전한 정수여야 한다.
+  // EmulatorJS filters on typeof - it must be a safe integer.
   it('항상 안전한 양의 정수', () => {
     for (const k of ['rom:abc', 'builtin:x', '', 'r'.repeat(500), '한글 키', '🎮']) {
       const n = gameNumberOf(k);

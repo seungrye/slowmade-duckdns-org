@@ -1,15 +1,15 @@
-// 문체(voice) 변형 — 사건은 treatment 가 정본이고, 표현만 문체별로 갈린다. (#73)
+// Prose-style (voice) variants - the treatment is canonical for events, and only the expression differs per style. (#73)
 //
-// 설계 원칙 둘:
-//  1) treatment(뼈대)는 **절대 화면에 나가지 않는다.** 변형이 없으면 기본 body 로 폴백한다.
-//     뼈대가 노출되면 몰입이 통째로 깨지지만, 기본 body 는 그 자체로 완성된 문체다.
-//  2) 랜덤 선택은 **완비된 문체만** 후보로 삼는다. 한 회차 안에서 목소리가 오가면 안 되므로.
-//     미완비 문체는 수동 지정(미리보기)으로만 쓴다.
+// Two design principles:
+//  1) The treatment (the skeleton) **never reaches the screen.** With no variant it falls back to the default body.
+//     Exposing the skeleton breaks immersion outright, while the default body is a finished style in its own right.
+//  2) The random choice considers **only complete styles**, because the voice must not wander within one run.
+//     An incomplete style is used only when selected manually (a preview).
 
-/** 기본 문체 — 씬의 body 를 그대로 쓴다. 항상 완비 상태다. */
+/** The default style - the scene's body as it stands. Always complete. */
 export const DEFAULT_VOICE = 'default';
 
-/** 문체 조립에 필요한 최소 형태(모델·lean 결과 양쪽을 받는다). */
+/** The minimum shape needed to assemble a style (it accepts both a model and a lean result). */
 export type VoicedScene = {
   id?: string;
   body: string[];
@@ -24,7 +24,7 @@ function variantOf(scene: VoicedScene, voice: string): string[] | null {
   return Array.isArray(v) && v.length > 0 ? v : null;
 }
 
-/** 이 씬을 요청한 문체로 렌더할 본문. 없으면 기본 body(뼈대 아님). */
+/** The body to render this scene in the requested style. Absent, the default body (never the skeleton). */
 export function resolveBody(scene: VoicedScene, voice: string = DEFAULT_VOICE): string[] {
   if (voice && voice !== DEFAULT_VOICE) {
     const v = variantOf(scene, voice);
@@ -33,7 +33,7 @@ export function resolveBody(scene: VoicedScene, voice: string = DEFAULT_VOICE): 
   return scene.body;
 }
 
-/** 문체별로 몇 개 씬을 채웠는지. CMS 진행률·랜덤 후보 판정에 쓴다. */
+/** How many scenes are filled in per style. Used by the CMS's progress and the random-candidate check. */
 export function voiceCoverage(scenes: VoicedScene[]): Record<string, Coverage> {
   const total = scenes.length;
   const filled: Record<string, number> = {};
@@ -49,26 +49,26 @@ export function voiceCoverage(scenes: VoicedScene[]): Record<string, Coverage> {
   return out;
 }
 
-/** 존재하는 문체 목록 — 기본이 맨 앞, 나머지는 이름순. */
+/** The styles that exist - the default first, the rest by name. */
 export function listVoices(scenes: VoicedScene[]): string[] {
   const names = Object.keys(voiceCoverage(scenes)).sort();
   return [DEFAULT_VOICE, ...names.filter((n) => n !== DEFAULT_VOICE)];
 }
 
 /**
- * 회차 시작 시 쓸 문체를 고른다. 완비된 변형 + 기본 문체 중에서만 뽑는다.
- * @param rnd 0<=x<1 (테스트에서 주입)
+ * Picks the style to use at the start of a run. It draws only from the complete variants plus the default style.
+ * @param rnd 0 <= x < 1 (injected in tests)
  */
 export function pickVoice(scenes: VoicedScene[], rnd: () => number = Math.random): string {
   return pickVoiceFromCoverage(voiceCoverage(scenes), rnd);
 }
 
 /**
- * coverage 만 가지고 문체를 고른다 (#79).
+ * Picks a style from the coverage alone (#79).
  *
- * 클라이언트는 variants 가 제거된 씬을 받으므로 scenes 로는 완비 여부를 알 수 없다.
- * 그래서 API 응답의 voices(coverage)로 뽑는다. 완비된 것만 후보에 넣는 이유는
- * 미완비 문체를 고르면 빈 씬이 기본 본문으로 폴백돼 한 판 안에서 문체가 섞이기 때문이다.
+ * The client receives scenes with their variants stripped, so completeness cannot be told from scenes.
+ * So it draws from the response's voices (the coverage). Only complete ones are candidates because picking an
+ * incomplete style makes the empty scenes fall back to the default body and mixes styles within a run.
  */
 export function pickVoiceFromCoverage(
   coverage: Record<string, Coverage>,
@@ -85,17 +85,17 @@ export function pickVoiceFromCoverage(
   return candidates[i];
 }
 
-/** 한 판(run) 동안 쓸 문체를 저장해 두는 키. */
+/** The key storing the style used for one run. */
 export const RUN_VOICE_KEY = 'web-adventure:run-voice';
 
 type VoiceStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
 /**
- * 이번 판에 쓸 문체를 정한다 (#79).
+ * Decides the style for this run (#79).
  *
- * 우선순위: URL 지정(override) > 이 판에서 이미 뽑아 둔 값 > 새로 뽑기.
- * 한 판 안에서 씬마다 문체가 갈리면 몰입이 깨지므로 한 번 뽑은 값을 저장해 유지한다.
- * 저장된 문체가 더 이상 완비가 아니면(예: 씬이 추가돼 커버리지가 깨짐) 다시 뽑는다.
+ * Priority: the URL's override > a value already drawn for this run > a fresh draw.
+ * A style differing scene by scene within a run breaks immersion, so the drawn value is stored and kept.
+ * If the stored style is no longer complete (coverage broken by an added scene, say) it is drawn again.
  */
 export function chooseRunVoice(args: {
   coverage: Record<string, Coverage>;

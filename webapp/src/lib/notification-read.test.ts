@@ -1,16 +1,16 @@
-// 알림 읽음 상태 (#247) — 순수 부분.
+// Notification read state (#247) - the pure part.
 //
-// 예전엔 `/notifications` 를 여는 것만으로 전부 읽음이 됐다(`notificationsSeenAt` 을 now 로
-// 밀어 버렸다). 그래서 "안 읽음" 표시는 새 덧글이 온 뒤 **첫 렌더 한 번**만 살아있고
-// 새로고침하면 사라졌다 — 표식을 아무리 진하게 해도 정작 볼 때는 볼 것이 없었다.
+// Opening `/notifications` used to mark everything read (it pushed `notificationsSeenAt` to now). So the "unread"
+// marking survived only **the first render** after a new comment arrived and vanished on a reload - however bold the
+// marker was, there was nothing left to see by the time you looked.
 //
-// 이제 읽음은 "봤다"가 아니라 **"처리했다"** 다: 항목을 눌러 덧글로 갔을 때 그것만 읽음.
+// Read now means **"dealt with"**, not "seen": tapping an item and going to the comment marks only that one read.
 //
-// 두 값이 함께 판정한다.
-//   기준선 `notificationsSeenAt` — 이보다 오래된 것은 무조건 읽음
-//   개별   `notificationsReadIds` — 기준선보다 새 것 중 눌러서 처리한 것
-// 기준선이 있어야 [모두 읽음] 한 번으로 정리되고, 기존 122건이 되살아나 뱃지가 99+ 로
-// 돌아가지 않는다.
+// Two values decide it together.
+//   the baseline `notificationsSeenAt` - anything older is read, unconditionally
+//   the per-item `notificationsReadIds` - the ones newer than the baseline that were tapped
+// The baseline is what lets [mark all read] clear everything at once and stops the existing 122 from coming back
+// and pushing the badge to 99+.
 import { describe, it, expect } from 'vitest';
 import {
   isUnread,
@@ -67,8 +67,8 @@ describe('nextReadIds — 읽음 목록에 하나 더하기', () => {
     expect(nextReadIds([], 'a')).toEqual(['a']);
   });
 
-  // [모두 읽음] 을 한 번도 안 누르면 무한히 자랄 수 있어서 상한을 둔다.
-  // 오래된 것부터 버린다 — 어차피 기준선이 올라가면 읽음으로 판정된다.
+  // Never pressing [mark all read] would let it grow without bound, so there is a cap.
+  // The oldest go first - once the baseline rises they count as read anyway.
   it('상한을 넘으면 오래된 것부터 버린다', () => {
     const full = Array.from({ length: READ_IDS_CAP }, (_, i) => `c${i}`);
     const next = nextReadIds(full, 'new');
@@ -83,11 +83,11 @@ describe('nextReadIds — 읽음 목록에 하나 더하기', () => {
   });
 });
 
-// 안 읽은 것을 위로 (#249).
+// Unread first (#249).
 //
-// 코드에서 정렬하면 **이미 잘라 온 20건 안에서만** 섞인다 — 21번째의 안 읽은 알림은
-// 여전히 안 보이고, 벨 배지는 그걸 세고 있으니 숫자와 목록이 어긋난다.
-// 그래서 정렬 키를 DB 로 내려 **자르기 전에** 띄운다.
+// Sorting in code only shuffles **within the 20 already fetched** - an unread notification at position 21 stays
+// invisible while the bell badge counts it, so the number and the list disagree.
+// So the sort key goes down to the DB and lifts it **before** the slice.
 describe('notificationPipeline — 안읽음 먼저, 그 다음 시간순', () => {
   const SEEN_AT = new Date('2026-08-24T00:00:00Z');
   const FILTER = { isDeleted: { $ne: true } };
@@ -104,7 +104,7 @@ describe('notificationPipeline — 안읽음 먼저, 그 다음 시간순', () =
     expect(sort?.$sort).toEqual({ [UNREAD_FIELD]: -1, createdAt: -1 });
   });
 
-  // 자른 뒤에 정렬하면 21번째의 안 읽은 알림이 영영 안 보인다.
+  // Sorting after the slice leaves an unread notification at position 21 invisible forever.
   it('정렬한 다음에 자른다 — 순서가 뒤바뀌면 안 된다', () => {
     const p = notificationPipeline(FILTER, SEEN_AT, [], 20);
     const sortAt = p.findIndex((s) => '$sort' in s);
@@ -121,8 +121,8 @@ describe('notificationPipeline — 안읽음 먼저, 그 다음 시간순', () =
     expect(JSON.stringify(expr)).toContain(SEEN_AT.toISOString());
   });
 
-  // readIds 는 문자열, _id 는 ObjectId 라 그냥 비교하면 절대 안 맞는다.
-  // 그러면 누른 알림이 계속 안읽음으로 남아 맨 위에 붙어 있게 된다.
+  // readIds are strings and _id is an ObjectId, so a plain comparison never matches.
+  // A tapped notification would then stay unread and stick to the top.
   it('누른 id 는 문자열로 바꿔 비교한다', () => {
     const add = stage(notificationPipeline(FILTER, SEEN_AT, ['c1'], 20), '$addFields');
     const expr = JSON.stringify((add?.$addFields as Record<string, unknown>)[UNREAD_FIELD]);

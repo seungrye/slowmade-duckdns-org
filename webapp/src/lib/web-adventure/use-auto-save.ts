@@ -1,12 +1,12 @@
-// useAutoSave — Web Adventure 진행도 자동 저장 + 복원 (#238).
+// useAutoSave - automatically saving and restoring Web Adventure progress (#238).
 //
-// 사용처: play page 의 PlayInner 가 state, runIndex 를 넘기면
-//   - 마운트 시 GET /api/web-adventure/save 시도 → 실패(401)/null 이면 localStorage 의 백업으로 fallback.
-//     복원할 데이터가 있으면 onRestore({ runIndex, currentSceneId, character }) 호출.
-//   - state.phase==="playing" 일 때만, state 변경 후 1초 디바운스 → POST 시도 + localStorage 백업.
-//   - phase==="creating" / "ended" 는 저장 skip (ended 후 회차 전환은 #239 처리).
+// Where it is used: the play page's PlayInner passes state and runIndex, and then
+//   - on mount it tries GET /api/web-adventure/save; on failure (401) or null it falls back to the localStorage backup.
+//     With something to restore it calls onRestore({ runIndex, currentSceneId, character }).
+//   - only while state.phase === "playing", a state change debounces 1 second -> a POST attempt plus a localStorage backup.
+//   - phase === "creating" and "ended" skip saving (moving to the next run after ended is handled by #239).
 //
-// 로그인/비로그인 구분 없이 *fetch + localStorage* 둘 다 시도 — 서버 401 도 silent fallback.
+// It tries *both fetch and localStorage* whether logged in or not - even a server 401 falls back silently.
 
 'use client';
 
@@ -25,9 +25,9 @@ export interface AutoSavePayload {
 
 export interface UseAutoSaveOptions {
   runIndex: number;
-  /** 마운트 시 서버/로컬 에서 복원할 save 가 있으면 콜백 */
+  /** Called on mount when there is a save to restore from the server or locally */
   onRestore?: (payload: AutoSavePayload) => void;
-  /** 디바운스 ms 오버라이드 (테스트용) */
+  /** Overrides the debounce in ms (for tests) */
   debounceMs?: number;
 }
 
@@ -64,11 +64,11 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
   const onRestoreRef = useRef(onRestore);
   onRestoreRef.current = onRestore;
 
-  // ── 마운트 시 복원
+  // ── Restoring on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      // 1. 서버 GET 시도
+      // 1. try the server GET
       try {
         const res = await fetch(API_URL, { method: 'GET' });
         if (!cancelled && res.ok) {
@@ -86,7 +86,7 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
         /* 네트워크 실패 — 로컬 fallback */
       }
       if (cancelled) return;
-      // 2. 로컬 fallback
+      // 2. the local fallback
       const local = readLocal();
       if (local) onRestoreRef.current?.(local);
     })();
@@ -96,7 +96,7 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
     // 마운트 시 1회 — onRestore 는 ref 로 전달, deps 없음이 의도.
   }, []);
 
-  // ── state 변경 시 디바운스 저장
+  // ── Debounced saving on a state change
   useEffect(() => {
     if (state.phase !== 'playing') return;
     const payload: AutoSavePayload = {
@@ -105,9 +105,9 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
       character: state.character,
     };
     const timer = setTimeout(() => {
-      // localStorage 는 항상 (오프라인 견고함).
+      // localStorage always (robust offline).
       writeLocal(payload);
-      // 서버 POST — 401 이면 silent fail.
+      // The server POST - a 401 fails silently.
       void fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,7 +115,7 @@ export function useAutoSave(state: GameState, options: UseAutoSaveOptions): void
       })
         .then((res) => {
           if (res.ok) {
-            // #273 — adv_save_persisted (서버 저장 성공 시).
+            // #273 - adv_save_persisted (on a successful server save).
             void import('./analytics').then(({ logAdvEvent }) => {
               logAdvEvent('save_persisted', {
                 scene_id: payload.currentSceneId,

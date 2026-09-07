@@ -1,9 +1,9 @@
-// 같은 롬을 올렸을 때 물려줄 패치 고르기 (#190).
+// Choosing the patch to inherit when the same ROM is uploaded again (#190).
 //
-// 이 파일이 지키는 것은 하나다 — **모호하면 아무것도 하지 않는다.**
-// 같은 롬에 한글 패치와 영어 패치가 각각 올라와 있을 수 있다. 아무거나 고르면 올린 사람이
-// 원하지 않은 언어로 게임이 바뀌는데, 카드 체크박스는 "패치 켜짐/꺼짐"만 보여 주지 어느
-// 패치인지까지 따지게 하지는 않는다. 그래서 갈리면 손을 뗀다.
+// This file guarantees one thing - **when it is ambiguous, it does nothing.**
+// The same ROM can have both a Korean and an English patch uploaded. Picking either at random changes the game's
+// language against the uploader's wishes, and the card's checkbox shows only "patch on/off" - it never asks which
+// patch. So when they differ, it keeps its hands off.
 import { describe, it, expect } from 'vitest';
 import { pickInheritablePatch } from './inherit-patch';
 
@@ -35,7 +35,7 @@ describe('pickInheritablePatch', () => {
     expect(got!.sha256).toBe('a'.repeat(64));
   });
 
-  // 이게 이 모듈의 존재 이유다.
+  // This is why the module exists.
   it('바이트가 다른 패치가 섞이면 null — 한글판과 영문판 중 아무거나 고르면 안 된다', () => {
     expect(pickInheritablePatch([
       patch({ name: '한글.ips', sha256: 'a'.repeat(64) }),

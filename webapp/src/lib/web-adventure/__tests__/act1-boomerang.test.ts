@@ -1,8 +1,8 @@
-// #283 act1 우회 분기 — 이전 회차 world flag 가 act1 두 번째 씬에 짧은
-// hidden 분기를 해금한다. 본 분기 흐름 유지 + 보너스 stigmaDelta.
+// #283 act1's detour branch - a world flag from a previous run unlocks a short hidden branch in act1's
+// second scene. The main branch flow is preserved plus a bonus stigmaDelta.
 //
-// 1) 콘텐츠 구조 검증 (3 분기 존재 + hidden + condition + to)
-// 2) reducer 시뮬레이션 — flag 없으면 차단, 있으면 통과
+// 1) verifying the content structure (3 branches exist, plus hidden, condition and to)
+// 2) a reducer simulation - blocked without the flag, allowed with it
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type {
@@ -150,8 +150,8 @@ describe("act1 회차 부메랑 분기 (#283)", () => {
     );
     if (after.phase !== "playing") throw new Error("expected playing");
     expect(after.currentScene).toBe("kael_corridor_clear");
-    // 시작은 stigma 50. crystal_path_memory 후 -2 → 48. 단 kael_corridor_clear
-    // 의 onEnter 가 추가 stigmaDelta 가지면 그것 반영. 보수적으로 *원래보다 작음*.
+    // Stigma starts at 50. After crystal_path_memory it is -2 -> 48. If kael_corridor_clear's
+    // onEnter carries a further stigmaDelta, that applies too. Conservatively, *less than it was*.
     expect(after.character.stigmaErosion).toBeLessThan(stigmaBefore);
   });
 });

@@ -1,7 +1,7 @@
 import PainterImageQuota from '@/models/painter-image-quota';
 
 /**
- * UTC 기준 오늘 날짜 키 (`YYYY-MM-DD`).
+ * Today's date key in UTC (`YYYY-MM-DD`).
  */
 export function todayKey(now: Date = new Date()): string {
   const y = now.getUTCFullYear();
@@ -11,9 +11,9 @@ export function todayKey(now: Date = new Date()): string {
 }
 
 /**
- * painter-bot 오늘의 이미지 생성 카운트를 원자적으로 +1. 한도(`limit`) 미만일 때만 성공.
+ * Atomically increments painter-bot's image-generation count for today, succeeding only below the limit.
  *
- * 구현은 enji-bot quota 와 동일 패턴이지만 별도 collection (`PainterImageQuota`) 사용.
+ * The implementation follows the same pattern as enji-bot's quota but uses a separate collection (`PainterImageQuota`).
  */
 export async function tryConsumeDailyQuota(limit: number): Promise<boolean> {
   const key = todayKey();

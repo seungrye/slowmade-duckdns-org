@@ -1,21 +1,21 @@
-// 봇 덧글 권한 (#205).
+// Bot comment permissions (#205).
 //
-// `api/enji` 와 `api/painter` 가 글을 **존재만** 확인하고 통과시켰다. 로그인만 했으면 남의
-// 비공개 글 id 로 덧글을 넣을 수 있었고, enji 는 그 본문 3000자를 남의 명령으로 Gemini 에
-// 보냈다. 읽기 유출은 아니었다(덧글 GET 이 이미 비공개를 막는다) — 문제는 **쓰기 인가**다.
+// `api/enji` and `api/painter` only checked that the post **existed** before letting it through. Merely being logged in
+// allowed commenting via a private post's id, and enji sent 3000 characters of its body to Gemini on someone else's
+// command. It was not a read leak (the comment GET already blocks private posts) - the problem is **write authorisation**.
 //
-// 규칙은 리비전 열람(#168)과 **같다**: 비공개·삭제된 글은 작성자 본인만.
-// 그래서 규칙을 다시 쓰지 않고 `canReadPostHistory` 에 위임한다 — 같은 규칙을 두 벌 두면
-// 언젠가 갈라지고, 갈라진 쪽이 뚫린다. #168 이 정확히 그렇게 났다.
-// 이름을 따로 두는 것은 호출부가 "덧글을 달 수 있나"를 묻고 있기 때문이고, 나중에 규칙이
-// 진짜로 갈라져야 할 때 갈라질 자리를 남겨 두기 위해서다.
+// The rule is **the same** as for reading revisions (#168): a private or deleted post is the author's alone.
+// So rather than restate it, this delegates to `canReadPostHistory` - two copies of one rule eventually diverge, and
+// the diverged one is the one that leaks. That is exactly how #168 happened.
+// It has its own name because the caller is asking "may I comment here?", and to leave a place to split should the
+// rules genuinely need to diverge later.
 import { canReadPostHistory, type PostAccessFields } from './revisions-access';
 
 /**
- * 이 글에 덧글을 달 수 있는가.
+ * Whether this post may be commented on.
  *
- * @param post 글의 권한 필드. 없으면(못 찾음) 거부한다 — 존재 여부도 알려 주지 않는다.
- * @param viewerEmail 로그인 사용자 이메일. 비로그인이면 null(공개 글에는 익명 덧글이 허용된다).
+ * @param post the post's permission fields. Absent (not found) is a refusal - it does not even reveal existence.
+ * @param viewerEmail the logged-in user's email, or null when logged out (anonymous comments are allowed on public posts).
  */
 export function canCommentOn(
   post: PostAccessFields | null | undefined,

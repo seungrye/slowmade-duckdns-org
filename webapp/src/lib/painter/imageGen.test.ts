@@ -71,7 +71,7 @@ describe('painter generateImage', () => {
     expect(putObject).toHaveBeenCalledTimes(1);
     const [bucket, key, body, size, meta] = putObject.mock.calls[0];
     expect(bucket).toBe('public');
-    // painter-bot 은 별도 prefix 사용 (enji-images/ X)
+    // painter-bot uses its own prefix (not enji-images/)
     expect(key).toMatch(/^painter-images\/.*\.jpg$/);
     expect(Buffer.isBuffer(body)).toBe(true);
     expect(size).toBe(4);
@@ -99,7 +99,7 @@ describe('painter generateImage', () => {
       retryDelayMs: 0,
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(2); // 504 → 재시도 → 성공
+    expect(fetchMock).toHaveBeenCalledTimes(2); // 504 -> retry -> success
     expect(putObject).toHaveBeenCalledTimes(1);
     expect(result.url).toBe(`https://cdn.example.com/public/${result.key}`);
   });
@@ -124,7 +124,7 @@ describe('painter generateImage', () => {
         retryDelayMs: 0,
       }),
     ).rejects.toThrow(/Pollinations/);
-    expect(fetchMock).toHaveBeenCalledTimes(3); // 최초 1 + 재시도 2
+    expect(fetchMock).toHaveBeenCalledTimes(3); // the first attempt plus 2 retries
     expect(putObject).not.toHaveBeenCalled();
   });
 
@@ -148,7 +148,7 @@ describe('painter generateImage', () => {
         retryDelayMs: 0,
       }),
     ).rejects.toThrow(/Pollinations 400/);
-    expect(fetchMock).toHaveBeenCalledTimes(1); // 재시도 없음
+    expect(fetchMock).toHaveBeenCalledTimes(1); // no retry
     expect(putObject).not.toHaveBeenCalled();
   });
 
@@ -273,7 +273,7 @@ describe('painter translateAndGenerate', () => {
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const calledUrl = String(fetchMock.mock.calls[0][0]);
-    // 번역된 영문이 URL 에 들어가야 함 (한글 원본 X)
+    // the translated English must be in the URL (not the Korean original)
     expect(calledUrl).toContain(encodeURIComponent('Korean village square at dawn'));
     expect(calledUrl).not.toContain(encodeURIComponent('한국 마을 광장 새벽'));
 

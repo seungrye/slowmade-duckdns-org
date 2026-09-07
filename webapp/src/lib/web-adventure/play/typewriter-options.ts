@@ -1,15 +1,15 @@
-// typewriter-options — 플레이 옵션 (#351/v3) localStorage helper.
+// typewriter-options - the localStorage helper for the play options (#351/v3).
 //
-// 두 개 옵션:
-//   1) 타이프라이터 효과 ON/OFF (`web-adventure:typewriter`)
-//      - "off" 저장 시 모든 본문 즉시 표시.
-//   2) 방문 씬 자동 skip ON/OFF (`web-adventure:typewriter-skip-visited`)
-//      - "on" 저장 시 2 회 이상 진입한 씬 본문은 즉시 표시.
-//      - 방문 기록: `web-adventure:visited-scenes` = JSON.stringify(string[])
+// Two options:
+//   1) the typewriter effect on/off (`web-adventure:typewriter`)
+//      - stored as "off", every body appears at once.
+//   2) automatically skipping visited scenes on/off (`web-adventure:typewriter-skip-visited`)
+//      - stored as "on", a scene entered twice or more appears at once.
+//      - the visit record: `web-adventure:visited-scenes` = JSON.stringify(string[])
 //
-// 모두 *옵셔널* — localStorage 미사용 / 에러 시 기본 동작 유지.
-// 회차 누적 (= 다른 회차에서 본 씬) 의미는 localStorage 가 *세션 간 영속* 이라
-// 자연스럽게 충족 — 별도 회차 단위 분리 없음.
+// Both are *optional* - without localStorage, or on an error, the default behaviour stands.
+// "Across runs" (scenes seen in another run) follows naturally from localStorage being *persistent between
+// sessions* - there is no separate per-run split.
 
 const KEY_TYPEWRITER = "web-adventure:typewriter";
 const KEY_SKIP_VISITED = "web-adventure:typewriter-skip-visited";
@@ -59,7 +59,7 @@ export function setSkipVisitedEnabled(enabled: boolean): void {
   }
 }
 
-/** 방문한 씬 id Set — JSON 파싱 실패 시 빈 Set. */
+/** The set of visited scene ids - an empty Set when the JSON fails to parse. */
 export function getVisitedScenes(): Set<string> {
   if (typeof window === "undefined") return new Set();
   try {
@@ -77,7 +77,7 @@ export function isSceneVisited(sceneId: string): boolean {
   return getVisitedScenes().has(sceneId);
 }
 
-/** 방문 기록 추가 — id 중복 시 no-op. */
+/** Adds to the visit record - a no-op for a duplicate id. */
 export function markSceneVisited(sceneId: string): void {
   if (typeof window === "undefined") return;
   const visited = getVisitedScenes();
@@ -93,7 +93,7 @@ export function markSceneVisited(sceneId: string): void {
   }
 }
 
-/** 디버그/테스트용 — 방문 기록 초기화. */
+/** For debugging and tests - clears the visit record. */
 export function clearVisitedScenes(): void {
   if (typeof window === "undefined") return;
   try {

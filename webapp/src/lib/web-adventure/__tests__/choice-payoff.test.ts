@@ -1,8 +1,8 @@
-// #107 — 남긴 흔적(flag)이 이야기에서 회수되는지.
+// #107 - whether the traces (flags) left behind are paid off in the story.
 //
-// #89 에서 선택마다 flag 를 남겼고, 여기서 그것을 받는 길이 실제로 열리는지 본다.
-// 화면 선택지는 셋을 넘지 않아야 하므로(#262) 기존 판정 자리를 hideWhenFlag 로 비우고
-// 그 자리에 조건부를 넣었다 — 그 맞바꿈이 성립하는지도 함께 확인한다.
+// #89 left a flag at every choice, and this checks that the path receiving it actually opens.
+// The screen must never show more than three choices (#262), so an existing slot was freed with hideWhenFlag and
+// the conditional put in its place - that trade is verified here too.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { isChoiceVisible } from "@/lib/web-adventure/engine/choiceFilter";
@@ -11,7 +11,7 @@ import mongoose from "mongoose";
 
 const NEW_IDS = ["cameo_ally_lever", "tunnel_debt_backdoor", "press_leverage"];
 
-/** [씬, 그 씬에서 회수하는 흔적] */
+/** [the scene, the trace it pays off] */
 const CASES: Array<[string, string]> = [
   ["station_path_steel", "cameoAlly"],
   ["omphalos_infiltration", "tunnelDebt"],
@@ -58,7 +58,7 @@ describe("흔적 회수 (#107)", () => {
     }
   });
 
-  // 자리를 맞바꾸는 것이지 늘리는 것이 아니다.
+  // It is a swap of slots, not an increase.
   it("어느 경우에도 화면 선택지는 셋을 넘지 않고, 갈 곳이 있다", () => {
     if (!scenes) return;
     for (const [id, flag] of CASES) {

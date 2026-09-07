@@ -1,22 +1,22 @@
-// #345 분기별 다른 흐름 분리 — 6 씬의 probability 분기가 더 이상
-// *모두 같은 destination* 으로 흐르지 않고 *각 분기별 우회/결과 씬* 으로 분리됨을 검증.
+// #345 separating the flows per branch - it verifies that the probability branches in 6 scenes no longer
+// all flow to *the same destination* but split into *a detour or outcome scene per branch*.
 //
-// 정책 — A success → C-1, B success → C-2 처럼 *분기 식별 가능한 destination*.
-// 합류 후 공통 합류 씬으로 흐르는 것은 허용 (사용자 명시).
+// The policy - *a destination that identifies the branch*, as in A success -> C-1 and B success -> C-2.
+// Flowing into a shared scene after they converge is allowed (as the user specified).
 //
-// 검증 — 6 씬 각각의 onSuccess 집합과 onFailure 집합 크기가 분기 수와 일치해야 함.
-//   예외 — kael_infirmary 의 fake_flatline onFailure 는 kael_caught (석화 직행) 로 유지.
+// The check - the size of each of the 6 scenes' onSuccess and onFailure sets must equal the branch count.
+//   The exception - kael_infirmary's fake_flatline onFailure stays as kael_caught (straight to petrification).
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";
 
 interface ExpectedDivergence {
   sceneId: string;
-  /** success 경로 분기 id 들 — 각각 *서로 다른* onSuccess 를 가져야 함. */
+  /** The success-path branch ids - each must have a *different* onSuccess. */
   successChoiceIds: string[];
-  /** failure 경로 분기 id 들 — 각각 *서로 다른* onFailure 를 가져야 함. */
+  /** The failure-path branch ids - each must have a *different* onFailure. */
   failureChoiceIds: string[];
-  /** 동일 onFailure 를 명시적으로 허용 (예: kael_infirmary/fake_flatline → kael_caught 석화 직행). */
+  /** Explicitly allowing an identical onFailure (kael_infirmary/fake_flatline -> kael_caught, straight to petrification). */
   sharedFailureChoiceIds?: string[];
 }
 
@@ -85,9 +85,9 @@ describe("#345 분기별 다른 흐름 분리", () => {
         const c = (scene.choices ?? []).find((c) => c.id === cid) as Record<string, unknown> | undefined;
         return c?.onSuccess as string | undefined;
       });
-      // 모두 존재.
+      // all present.
       for (const t of successTargets) expect(t).toBeTruthy();
-      // 모두 서로 다름.
+      // all different.
       expect(new Set(successTargets).size).toBe(ex.successChoiceIds.length);
     });
 

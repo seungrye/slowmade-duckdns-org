@@ -1,14 +1,13 @@
 import { GoogleGenAI } from '@google/genai';
 
 /**
- * Pollinations FLUX 가 한글 prompt 를 잘 못 이해하므로,
- * Gemini 로 한 번 영문 번역한 뒤 호출하기 위한 유틸.
+ * Pollinations FLUX understands Korean prompts poorly, so this translates once into English with Gemini before calling it.
  *
- * - `containsKorean` : 한글 음절 (가-힯) 한 글자라도 있으면 true.
- * - `translateToEnglish` : 한글 입력은 Gemini 로 번역, 영문은 그대로 통과.
+ * - `containsKorean`: true if there is even one Hangul syllable (가-힯).
+ * - `translateToEnglish`: Korean input is translated by Gemini; English passes through.
  *
- * 번역 실패 (Gemini 타임아웃 / 빈 응답 / 키 없음 등) 시 throw — caller (imageGen.translateAndGenerate)
- * 가 fallback 으로 원본 prompt 를 그대로 Pollinations 에 보낸다.
+ * A failed translation (Gemini timeout, empty response, no key and so on) throws - the caller
+ * (imageGen.translateAndGenerate) then falls back to sending the original prompt to Pollinations.
  */
 
 export function containsKorean(text: string): boolean {
@@ -21,9 +20,9 @@ const TRANSLATE_SYSTEM_PROMPT = `You are a translator that converts Korean image
 - Translate poetically — capture mood, not just literal words.
 - Return ONLY the translated prompt. No explanation, no quotes.`;
 
-// 빠른 응답이 중요 (Pollinations 앞단). RPD 한도 우선 — Gemma 4(RPD 1,500 +
-// TPM 무제한)를 메인으로, 신세대 Gemini 를 폴백으로. (2.5 Flash 는 RPD 20 으로
-// 배치에서 금방 소진되어 최후순위.)
+// A fast response matters (it sits in front of Pollinations). The RPD limit comes first - Gemma 4 (RPD 1,500 with
+// unlimited TPM) is the main model and the newer Gemini is the fallback. (2.5 Flash's RPD of 20 is spent quickly in
+// a batch, so it comes last.)
 const TRANSLATE_MODEL_CHAIN = [
   'gemma-4-26b-a4b-it',
   'gemma-4-31b-it',
@@ -37,11 +36,11 @@ function isTransientGeminiError(err: unknown): boolean {
 }
 
 /**
- * 번역 결과 정제 — Gemini 가 가끔 따옴표/공백/개행을 덧붙임.
+ * Cleans up the translation - Gemini sometimes adds quotes, whitespace or newlines.
  */
 function sanitizeTranslation(raw: string): string {
   let s = raw.trim();
-  // 양 끝 따옴표 제거 (한 쌍이 감싸는 경우)
+  // strip surrounding quotes (when a pair wraps it)
   if (s.length >= 2) {
     const first = s.charAt(0);
     const last = s.charAt(s.length - 1);

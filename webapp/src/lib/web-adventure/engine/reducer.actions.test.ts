@@ -1,7 +1,7 @@
-// #306 reducer 직접 단위 — START_GAME / MAKE_CHOICE / RESET / REROLL.
+// #306 direct reducer unit tests - START_GAME / MAKE_CHOICE / RESET / REROLL.
 //
-// 기존 간접 테스트 (use-item, stigma, restore, integration-e2e) 외에 *액션 단위* 직접
-// 검증. 회귀 회피용.
+// Beyond the existing indirect tests (use-item, stigma, restore, integration-e2e), this checks *the actions*
+// directly. A guard against regressions.
 
 import { describe, it, expect } from "vitest";
 import type {
@@ -48,7 +48,7 @@ describe("START_GAME", () => {
     if (next.phase !== "playing") return;
     expect(next.currentScene).toBe("s1");
     expect(next.character.protagonist).toBe("kael");
-    // #348 — log = ▶ 제목 (id) + 들여쓰기 본문.
+    // #348 - the log is the title with an arrow marker and the id, plus an indented body.
     expect(next.log[0]).toBe("▶ 시작 (s1)");
     expect(next.log[1]).toMatch(/^ {2}/);
   });
@@ -62,7 +62,7 @@ describe("START_GAME", () => {
       { type: "START_GAME", character: makeChar({ protagonist: "rin" }), startScene: "s1" },
       scenes,
     );
-    expect(next).toEqual(state); // 무변화
+    expect(next).toEqual(state); // unchanged
   });
 
   it("startScene 미존재 시 → state 무변화 (방어)", () => {
@@ -151,7 +151,7 @@ describe("MAKE_CHOICE — probability", () => {
     state = gameReducer(state, { type: "START_GAME", character: makeChar(), startScene: "a" }, reg);
     state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "roll", rng: () => 0.99 }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
-    // 즉시 전이하지 않음 — 판정 대기.
+    // It does not transition at once - it waits for the roll.
     expect(state.currentScene).toBe("a");
     expect(state.pendingRoll?.success).toBe(true);
     expect(state.pendingRoll?.target).toBe("ok");
@@ -235,18 +235,18 @@ describe("REROLL", () => {
   it("pendingRoll(실패) → REROLL(성공) → 결과 갱신 + rerollsLeft -1 → CONFIRM → onSuccess", () => {
     let state: GameState = { phase: "creating" };
     state = gameReducer(state, { type: "START_GAME", character: makeChar({ rerollsLeft: 2 }), startScene: "a" }, reg);
-    // 실패 (RNG 0) — pendingRoll, 전이 보류.
+    // A failure (RNG 0) - pendingRoll, with the transition held.
     state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "roll", rng: () => 0 }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
     expect(state.pendingRoll?.success).toBe(false);
     expect(state.currentScene).toBe("a");
-    // REROLL — RNG 0.99 (roll 20) 성공 → pendingRoll 갱신, rerollsLeft -1, 아직 전이 X.
+    // REROLL - RNG 0.99 (roll 20) succeeds -> pendingRoll refreshed, rerollsLeft -1, still no transition.
     state = gameReducer(state, { type: "REROLL", rng: () => 0.99 }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
     expect(state.pendingRoll?.success).toBe(true);
     expect(state.character.rerollsLeft).toBe(1);
     expect(state.currentScene).toBe("a");
-    // 확정 → 비로소 전이.
+    // confirmed -> only now does it transition.
     state = gameReducer(state, { type: "CONFIRM_ROLL" }, reg);
     if (state.phase !== "playing") throw new Error("expected playing");
     expect(state.currentScene).toBe("ok");
@@ -276,11 +276,11 @@ describe("onEnter.rerollDelta", () => {
   });
 });
 
-// ── #89 선택지가 남기는 흔적(setFlags) ──────────────────────────────────────
+// ── #89 the traces a choice leaves (setFlags) ──────────────────────────────────────
 //
-// 도착 씬이 같은 선택지들이 있다(골목의 동류 접촉, 갱도 안내 거래 등). 씬의 onEnter 로는
-// 어느 쪽을 골랐는지 남길 수 없어 **선택이 통째로 사라졌다**. 선택지 자체에 흔적을 남긴다.
-// stigmaDelta 가 이미 같은 방식으로 붙어 있어 그 패턴을 따른다.
+// Some choices share a destination scene (meeting one's own kind in the alley, the mine-guide deal). A scene's
+// onEnter cannot record which was chosen, so **the choice vanished entirely**. The trace goes on the choice itself.
+// stigmaDelta is already attached the same way, so it follows that pattern.
 describe("선택지 setFlags (#89)", () => {
   const scenesWith = (choice: Scene["choices"][number]): SceneRegistry => ({
     here: makeScene({ id: "here", choices: [choice] }),

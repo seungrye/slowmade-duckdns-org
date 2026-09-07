@@ -41,13 +41,13 @@ describe("truncate — max 예외 처리", () => {
 
 /** Sends the order (LOC, behind the dry-run gate) and records it. Isolated per order, so one failure blocks neither the rest nor the state save. */
 //
-// **자바스크립트 문자열은 UTF-16 코드 단위다.** 이모지처럼 두 칸을 쓰는 글자 가운데를
-// 자르면 반쪽만 남아 화면에 깨진 글자가 나온다. 알림 발췌가 200자로 이걸 부르므로
-// 200번째가 이모지 중간이면 그대로 라이브에 나갔다.
+// **JavaScript strings are UTF-16 code units.** Cutting through the middle of a character that takes two units,
+// like an emoji, leaves half of it and shows a broken glyph. The notification excerpt calls this with 200, so if
+// the 200th landed mid-emoji it went out live like that.
 //
-// 예전 테스트는 숫자 경계(0·-1·길이가 같을 때)까지 오고 **여기서 멈췄다.**
+// The old tests reached the numeric boundaries (0, -1, equal lengths) and **stopped there.**
 describe("truncate — 사람이 보는 글자 단위로 자른다", () => {
-  /** 반쪽만 남은 서로게이트가 있는가 — 화면에 깨져 보이는 상태. */
+  /** Whether a lone surrogate half is left - what shows as a broken glyph. */
   const 깨졌나 = (s: string) =>
     /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(s);
 
@@ -57,7 +57,7 @@ describe("truncate — 사람이 보는 글자 단위로 자른다", () => {
   });
 
   it("이모지 하나를 한 글자로 센다", () => {
-    // 두 칸을 먹으면 3개만 들어간다. 사람이 보기엔 5글자다.
+    // Taking two units each, only 3 fit. To a person that is 5 characters.
     expect(truncate("👍👍👍👍👍", 5)).toBe("👍👍👍👍👍");
   });
 
@@ -65,7 +65,7 @@ describe("truncate — 사람이 보는 글자 단위로 자른다", () => {
     expect(truncate("👍👍👍👍👍👍", 5)).toBe("👍👍👍👍👍…");
   });
 
-  // 가족 이모지는 ZWJ 로 이어진 여러 글자다. 가운데를 자르면 조각이 흩어진다.
+  // A family emoji is several characters joined by ZWJs. Cutting the middle scatters the pieces.
   it("결합 이모지를 쪼개지 않는다", () => {
     const 가족 = "👨‍👩‍👧";
     expect(truncate(`${가족}뒤`, 1)).toBe(`${가족}…`);

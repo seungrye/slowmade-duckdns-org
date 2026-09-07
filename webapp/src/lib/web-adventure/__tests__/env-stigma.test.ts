@@ -1,5 +1,5 @@
-// #264 — 옴팔로스 및 climax 같이 *환경 자체* 가 침식하는 씬은 onEnter.stigmaDelta
-// 를 가진다. 콘텐츠 정합성 검증.
+// #264 - scenes where *the environment itself* contaminates, such as the Omphalos and the climax, carry an
+// onEnter.stigmaDelta. A content-consistency check.
 
 import { describe, it, expect } from "vitest";
 

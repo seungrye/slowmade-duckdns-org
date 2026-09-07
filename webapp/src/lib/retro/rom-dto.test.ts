@@ -18,7 +18,7 @@ describe('retro/rom-dto', () => {
     it('24 자리 16 진수만 통과한다', () => {
       expect(isRomId('653f1a2b3c4d5e6f70819202')).toBe(true);
       expect(isRomId('nope')).toBe(false);
-      expect(isRomId('653f1a2b3c4d5e6f7081920')).toBe(false); // 23 자리
+      expect(isRomId('653f1a2b3c4d5e6f7081920')).toBe(false); // 23 characters
     });
   });
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Gemini SDK mock — translateToEnglish 가 GoogleGenAI 를 사용한다고 가정.
+// The Gemini SDK mock - it assumes translateToEnglish uses GoogleGenAI.
 const mockGenerateContent = vi.fn();
 vi.mock('@google/genai', () => {
   class MockGoogleGenAI {
@@ -47,7 +47,7 @@ describe('painter translateToEnglish', () => {
     const result = await translateToEnglish('한국 마을 광장 새벽', 'test-key');
     expect(result).toBe('Korean village square at dawn');
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-    // user prompt 가 gemini contents 에 포함되어야 함
+    // the user prompt must be in the gemini contents
     const callArg = mockGenerateContent.mock.calls[0][0];
     expect(JSON.stringify(callArg)).toContain('한국 마을 광장 새벽');
   });

@@ -70,8 +70,8 @@ describe("collectNamedZones", () => {
   });
 
   it("Town zone 은 카탈로그 등록 대상에서 제외 (표준 Named id 는 등록 대상)", () => {
-    // Town 은 시작 마을(코드 정적) → 카탈로그 X. forest/dungeon_<N> 등 표준
-    // Named id 는 카탈로그 자동 등록 대상이므로 결과 set 에 포함된다.
+    // Town is the starting village (static in code) -> not in the catalogue. Standard Named ids such as
+    // forest and dungeon_<N> are auto-registered, so they are in the result set.
     const q = quest({
       transitions: [
         {

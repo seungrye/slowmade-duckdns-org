@@ -1,10 +1,10 @@
-// #305 시드 idempotent 자동 검증.
+// #305 automatically verifying that the seeds are idempotent.
 //
-// seeds-replay.sh 의 모든 시드는 *2 회 연속 실행 시* mongo 상태가 *변경 없어야*
-// 한다 (idempotent). #304 의 seed-npc-dialogue body append 누수 같은 사고 재발
-// 방지.
+// Every seed in seeds-replay.sh must leave mongo's state *unchanged* when *run twice in a row*
+// (idempotent). It prevents a recurrence of incidents like #304's seed-npc-dialogue body-append leak.
+// leak.
 //
-// 실 mongo 백업 → replay → 새 백업 → 의미있는 필드 diff (== 0).
+// A real mongo backup -> replay -> a new backup -> a diff of the meaningful fields (== 0).
 
 import { describe, it, expect } from "vitest";
 import { execSync } from "child_process";
@@ -50,11 +50,11 @@ describe("시드 idempotency (#305)", () => {
       return;
     }
 
-    // 1차 replay (현재 상태 → 안정화).
+    // The first replay (the current state -> stabilised).
     execSync(REPLAY_SCRIPT, { env: { ...process.env }, stdio: "pipe" });
     const before = await snapshot();
 
-    // 2차 replay — *변경 없어야* 정상.
+    // The second replay - *no change* is what is correct.
     execSync(REPLAY_SCRIPT, { env: { ...process.env }, stdio: "pipe" });
     const after = await snapshot();
 

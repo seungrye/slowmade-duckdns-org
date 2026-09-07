@@ -51,8 +51,8 @@ describe('aggregateTradesByDate', () => {
   });
 });
 
-// #373 — 매매를 블록별로 가른다. 마커를 블록 선 위에 찍으려면 필요하고,
-// 주인 없는 매매(폐기된 전략의 기록)를 버리면 그 시절 매매가 차트에서 사라진다.
+// #373 - splits the trades by block. It is needed to place markers on a block's line, and discarding ownerless
+// trades (records from retired strategies) would erase that era's trading from the chart.
 describe('splitTradesByBlock', () => {
   const t = (over: Record<string, unknown> = {}) => ({
     ticker: 'TQQQ', action: 'buy', qty: 1, price: 50, amount: 50, date: '2026-08-10', ...over,

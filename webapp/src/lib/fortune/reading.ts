@@ -1,13 +1,13 @@
 /**
- * 타로 오늘의 풀이 생성 — 로컬 LLM + 존댓말 가드 + 템플릿 폴백 (#388).
+ * Generating the day's tarot reading - the local LLM plus a politeness guard and a template fallback (#388).
  *
- * 실측(3장) 결과 로컬 Qwen 의 내용·뉘앙스는 양호했지만 **존댓말/반말 편차**가 있었다
- * (존댓말로 시켰는데 한 장이 반말로 샜다). 그래서:
- *   1. buildPrompt 가 존댓말을 예시까지 넣어 강하게 요구하고,
- *   2. isPolite 가 결과를 검사해 반말이면 배치가 1회 재생성,
- *   3. 그래도 실패하면 templateReading(항상 존댓말)으로 떨어진다.
+ * Measured over three cards, the local Qwen's content and nuance were fine but **its politeness level wavered**
+ * (told to be polite, one card came back casual). So:
+ *   1. buildPrompt demands polite speech firmly, with examples,
+ *   2. isPolite checks the result and, if it is casual, the batch regenerates once,
+ *   3. and failing that it falls back to templateReading (always polite).
  *
- * LLM 호출은 web-adventure 피드백 노트와 같은 스트리밍 방식이다(sseDeltaContent 재사용).
+ * The LLM call streams the same way as the web-adventure feedback notes (reusing sseDeltaContent).
  */
 import { Agent } from "undici";
 import { env } from "@/lib/env";
@@ -21,7 +21,7 @@ export interface LlmMessage {
   content: string;
 }
 
-/** 프롬프트 조립(순수). 존댓말을 예시까지 넣어 강제한다. */
+/** Assembles the prompt (pure). It enforces polite speech, with examples. */
 export function buildPrompt(card: TarotCard, orientation: Orientation): LlmMessage[] {
   const dir = orientation === "up" ? "정방향" : "역방향";
   const kws = keywordsOf(card, orientation).join(", ");
@@ -40,11 +40,11 @@ export function buildPrompt(card: TarotCard, orientation: Orientation): LlmMessa
 }
 
 /**
- * 반말/존댓말 가드(순수). 모든 문장이 존댓말 어미로 끝나야 통과.
+ * The politeness guard (pure). It passes only when every sentence ends politely.
  *
- * 한 문장이라도 반말로 새면 실패시켜 재생성을 유도한다 — 존댓말/반말이 섞인 글은
- * 완성도가 떨어져 보인다. 완벽한 형태소 분석이 아니라 어미 검사지만, 배치 재생성 1회로
- * 대부분 흡수되고 남으면 템플릿으로 떨어지므로 실해가 없다.
+ * One casual sentence fails it and prompts a regeneration - a mix of polite and casual reads as unfinished. It checks
+ * endings rather than doing real morphological analysis, but one batch regeneration absorbs most of it and the rest
+ * falls back to the template, so nothing is lost.
  */
 export function isPolite(text: string): boolean {
   const t = (text ?? "").trim();
@@ -61,7 +61,7 @@ export function isPolite(text: string): boolean {
   });
 }
 
-/** LLM 실패·미생성 시의 폴백 글(항상 존댓말). 카드 키워드를 담는다. */
+/** The fallback text when the LLM fails or has not run (always polite). It carries the card's keywords. */
 export function templateReading(card: TarotCard, orientation: Orientation): string {
   const kws = keywordsOf(card, orientation);
   const lead = kws[0] ?? "고요함";
@@ -72,7 +72,7 @@ export function templateReading(card: TarotCard, orientation: Orientation): stri
   return `오늘은 ${lead}이 마음에 스치는 날이에요. 서두르기보다 한 박자 쉬어 가 보세요. 무리하지 않아도 괜찮으니, 스스로를 다정하게 대해 주세요.`;
 }
 
-// 로컬 shim 은 생성이 느려(장당 ~30초) 여유 있게 잡는다. 밤 배치라 길어도 무방.
+// The local shim generates slowly (about 30 seconds a card), so the timeout is generous. Being a nightly batch, length is fine.
 const dispatcher = new Agent({ headersTimeout: 200_000, bodyTimeout: 200_000 });
 
 async function callLocalLlm(messages: LlmMessage[], signal?: AbortSignal): Promise<string> {
@@ -83,7 +83,7 @@ async function callLocalLlm(messages: LlmMessage[], signal?: AbortSignal): Promi
       model: "Qwen3-30B-A3B-Q4_K_M",
       messages,
       max_tokens: 240,
-      // 창작이라 다양성은 두되(shim 이 temp 0.9 고정), think 는 꺼 직답을 받는다.
+      // It is creative writing, so variety is kept (the shim pins temp at 0.9) while think is off for a direct answer.
       think: false,
       stream: true,
     }),
@@ -116,8 +116,8 @@ export interface GeneratedReading {
 }
 
 /**
- * 프롬프트로 존댓말 풀이 생성(범용) — LLM → 존댓말 검사 → 실패 시 재생성 1회 → 그래도 실패면
- * fallback(항상 존댓말 템플릿). 타로·사주가 공유한다. 어떤 경우에도 존댓말 결과를 돌려준다.
+ * Generates a polite reading from a prompt (general purpose) - LLM, politeness check, one regeneration on failure,
+ * then the fallback (an always-polite template). Shared by tarot and saju. It returns a polite result in every case.
  */
 export async function generatePolite(
   messages: LlmMessage[],
@@ -131,13 +131,13 @@ export async function generatePolite(
       if (out && isPolite(out)) return { reading: out, source: "llm" };
       // 반말이 새면 재시도(shim temp 0.9 라 다음엔 존댓말일 확률이 높다).
     } catch {
-      break; // 네트워크·shim 오류 — 폴백으로 간다.
+      break; // A network or shim error - fall through to the fallback.
     }
   }
   return { reading: fallback, source: "template" };
 }
 
-/** 타로 오늘의 풀이 생성. */
+/** Generates the day's tarot reading. */
 export async function generateReading(
   card: TarotCard,
   orientation: Orientation,

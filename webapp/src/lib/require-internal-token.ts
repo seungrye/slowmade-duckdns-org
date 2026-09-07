@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { env } from './env';
 
 /**
- * 서버 내부 self-call 전용 가드(/api/revalidate 등).
+ * The guard for the server's internal self-calls (/api/revalidate and the like).
  *
- * 헤더 `X-Internal-Token` 이 env.revalidateToken 과 일치해야 통과.
- * 불일치 또는 env 미설정 시 404 — 존재 자체 비노출 (require-ingest-key 패턴과 일관).
+ * The `X-Internal-Token` header must match env.revalidateToken.
+ * A mismatch, or an unset env, gives 404 - not even existence is revealed (consistent with the require-ingest-key pattern).
  */
 export function requireInternalToken(req: NextRequest): NextResponse | null {
   const expected = env.revalidateToken.trim();

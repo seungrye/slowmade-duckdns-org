@@ -1,14 +1,14 @@
-// 본문 문단의 시간축 — <<set>> 누적과 <<wait>> 지연을 문단 단위 순수 함수로 (#371).
+// The body paragraphs' timeline - <<set>> accumulation and <<wait>> delays as pure per-paragraph functions (#371).
 //
-// 렌더러가 아니라 여기서 전부 계산한다. 씬을 받은 순간 본문에 다 적혀 있으므로
-// 상태가 필요 없다.
+// Everything is computed here rather than in the renderer. It is all written in the body the moment the scene
+// arrives, so no state is needed.
 
 import { describe, it, expect } from "vitest";
 import { parseScript, revealSchedule, varsByParagraph } from "./script";
 
 /**
- * varsByParagraph(body, base?) — 문단 i 가 보간에 쓸 변수 묶음을 문단마다 하나씩.
- * 문단 i = base + 문단 0..i 의 <<set>>. set 이 든 문단 자신부터 새 값.
+ * varsByParagraph(body, base?) - one bundle of interpolation variables per paragraph.
+ * Paragraph i = base plus the <<set>>s of paragraphs 0..i. The new value applies from the paragraph containing the set.
  */
 describe("varsByParagraph — 문단별 <<set>> 누적", () => {
   it("<<set 키 값>> 을 담는다", () => {
@@ -111,8 +111,8 @@ describe("varsByParagraph — 문단별 <<set>> 누적", () => {
 });
 
 /**
- * revealSchedule(body, stepMs) — 문단 i 가 열릴 시각(씬 진입 기준 ms).
- * 문단 0 은 0, 문단 i = i*stepMs + 문단 0..i-1 의 wait 합.
+ * revealSchedule(body, stepMs) - when paragraph i opens (ms from entering the scene).
+ * Paragraph 0 is 0; paragraph i = i*stepMs plus the sum of the waits in paragraphs 0..i-1.
  */
 describe("revealSchedule — 문단별 열림 시각", () => {
   it("wait 이 없으면 stepMs 등간격", () => {

@@ -1,11 +1,11 @@
-// #286 모든 conditional 분기 도달성 — vitest 통합.
+// #286 reachability of every conditional branch - integrated into vitest.
 //
-// 검증:
-//   1. 각 conditional choice 의 씬이 BFS 도달 가능 (시작 씬 3 종에서).
-//   2. 각 condition flag 가 *어딘가에서* set 가능:
-//      - world.* → 6 ending 모두 도달 가능 (반대 검증으로 가정)
-//      - 일반 flag → onEnter.setFlags 또는 onEnter (해당 씬 도달 가능 보장 후)
-//   3. minStat → 최소 1 주인공 통과 가능.
+// It verifies:
+//   1. every conditional choice's scene is reachable by BFS (from the 3 starting scenes).
+//   2. every condition flag can be set *somewhere*:
+//      - world.* -> all 6 endings are reachable (assumed by the converse check)
+//      - an ordinary flag -> onEnter.setFlags or onEnter (once that scene is guaranteed reachable)
+//   3. minStat -> at least one protagonist can pass.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Choice, Scene, SceneRegistry } from "@/types/web-adventure";
@@ -94,8 +94,8 @@ describe("분기 도달성 (#286)", () => {
     const setterKeys = new Set<string>();
     for (const s of Object.values(loaded)) {
       for (const k of Object.keys(s.onEnter?.setFlags ?? {})) setterKeys.add(k);
-      // #89 — 선택지도 흔적을 남긴다. 도착 씬이 같은 갈래는 onEnter 로 구분할 수 없어
-      //   선택지 자체에 setFlags 를 달았으므로, 여기서도 setter 로 인정해야 한다.
+      // #89 - a choice leaves a trace too. Branches with the same destination cannot be told apart by onEnter, so
+      //   setFlags was attached to the choice itself - which must count as a setter here as well.
       for (const c of s.choices ?? []) {
         const cf = (c as { setFlags?: Record<string, boolean> }).setFlags;
         for (const k of Object.keys(cf ?? {})) setterKeys.add(k);
@@ -104,7 +104,7 @@ describe("분기 도달성 (#286)", () => {
     const missing: string[] = [];
     for (const c of conds) {
       if (c.condition.kind !== "flag" || !c.condition.key) continue;
-      if (c.condition.key.startsWith("world.")) continue; // 회차 부메랑 — 별 검증.
+      if (c.condition.key.startsWith("world.")) continue; // The cross-run boomerang - checking the star.
       if (!setterKeys.has(c.condition.key)) {
         missing.push(`${c.sceneId}/${c.choiceId} — ${c.condition.key} setter 없음`);
       }

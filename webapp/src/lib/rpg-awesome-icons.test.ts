@@ -26,7 +26,7 @@ describe('RPG_AWESOME_ICONS 데이터셋', () => {
 
   it('대표 아이콘은 알려진 codepoint 와 일치한다', () => {
     const byName = new Map(RPG_AWESOME_ICONS.map((i) => [i.name, i.codepoint]));
-    // RPG-Awesome 0.0.2 CSS 와 같은 매핑.
+    // The same mapping as RPG-Awesome 0.0.2's CSS.
     expect(byName.get('broadsword')).toBe(0xe946);
     expect(byName.get('shield')).toBe(0xea96);
     expect(byName.get('potion')).toBe(0xea72);
@@ -49,7 +49,7 @@ describe('formatCodepoint / parseCodepoint round-trip', () => {
   it('parseCodepoint 는 형식이 아니면 null 을 반환한다', () => {
     expect(parseCodepoint('')).toBeNull();
     expect(parseCodepoint('A')).toBeNull();
-    expect(parseCodepoint('\\uE946')).toBeNull(); // 중괄호 없음
+    expect(parseCodepoint('\\uE946')).toBeNull(); // no braces
     expect(parseCodepoint('\\u{ZZZ}')).toBeNull();
   });
 

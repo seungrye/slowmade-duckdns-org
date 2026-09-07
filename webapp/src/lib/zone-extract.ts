@@ -27,12 +27,12 @@ export function collectFromQuest(quest: QuestLike): OpenPortalRef[] {
   return out;
 }
 
-// ── Named SpawnZone 수집 (자동 등록용) ───────────────────────────────────────
+// ── Collecting Named SpawnZones (for auto-registration) ───────────────────────────────────────
 //
-// SpawnGuards / PlaceTraps / SpawnMonster 의 `zone: Some(Named("…"))`,
-// 조건의 InZone(Named), spawns[i].zone 의 Named 등 모든 곳에서 Named id 를
-// 모은다. OpenPortal/ClosePortal 의 zone (단순 string) 도 함께 포함하여
-// quest 저장 시 Zone 카탈로그에 upsert 한다.
+// It gathers Named ids from everywhere - SpawnGuards / PlaceTraps / SpawnMonster's `zone: Some(Named("…"))`,
+// a condition's InZone(Named), the Named in spawns[i].zone and so on. OpenPortal/ClosePortal's zone
+// (a plain string) is included too, and they are upserted into the Zone catalogue when
+// the quest is saved.
 
 function collectNamedFromCondition(cond: Condition, out: Set<string>) {
   switch (cond.type) {
@@ -56,7 +56,7 @@ function collectNamedFromAction(a: Action, out: Set<string>) {
       if (a.zone) out.add(a.zone);
       break;
     case "OpenZonePortal":
-      // Town 은 카탈로그 등록 대상이 아니다(코드의 시작 zone). Named id 만 등록.
+      // Town is not registered in the catalogue (it is the code's starting zone). Only Named ids are.
       if (a.target.type === "Named" && a.target.id) out.add(a.target.id);
       break;
     case "SpawnGuards":

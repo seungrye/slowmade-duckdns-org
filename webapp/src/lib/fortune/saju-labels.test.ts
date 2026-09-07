@@ -12,7 +12,7 @@ describe("사주 라벨 단일 출처 (#393)", () => {
       expect(v.kr.length).toBeGreaterThan(0);
       expect(ELEMENTS).toContain(v.el);
       expect(v.meaning.length).toBeGreaterThan(5);
-      expect(h.length).toBe(1); // 한자 한 글자
+      expect(h.length).toBe(1); // a single hanja character
     }
   });
 

@@ -1,4 +1,4 @@
-// 엔딩 → 씬 삽화 큐 적재 (#158).
+// Ending -> queueing a scene illustration (#158).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const countDocuments = vi.fn();
@@ -48,7 +48,7 @@ describe('enqueueSceneImage', () => {
     expect(create.mock.calls[0][0].prompt).toBeTruthy();
   });
 
-  // 느린 단일 워커라 큐가 밀리면 무한정 쌓인다.
+  // With a slow single worker, a backed-up queue grows without bound.
   it('대기가 많으면 넣지 않는다', async () => {
     countDocuments.mockResolvedValue(MAX_PENDING_SCENE_IMAGES);
     await enqueueSceneImage(RUN, 'me@x.test', { rand: () => 0 });
@@ -66,7 +66,7 @@ describe('enqueueSceneImage', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  // 엔딩 종결을 막으면 안 된다 — 그림은 곁다리다.
+  // It must not block ending a run - the picture is a side dish.
   it('실패해도 던지지 않는다', async () => {
     create.mockRejectedValue(new Error('db down'));
     await expect(enqueueSceneImage(RUN, 'me@x.test', { rand: () => 0 })).resolves.toBeUndefined();

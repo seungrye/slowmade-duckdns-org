@@ -8,24 +8,24 @@ import { collectStats } from './stats';
 import type { AchievementDefinition, Evaluation, Tier } from './types';
 
 /**
- * 부여 결과. `_id` 를 싣는 이유는 토스트(lib/show-achievement-toast.tsx)가 그걸 토스트 id 로
- * 쓰기 때문이다 — 없으면 여러 개가 동시에 열려도 하나만 보인다.
+ * The result of granting. `_id` is included because the toast (lib/show-achievement-toast.tsx) uses it as the toast
+ * id - without it, several opening at once would show only one.
  */
 export type GrantedAchievement = AchievementDefinition & { _id: string };
 
 /**
- * 업적 부여와 화면용 조회 (#333) — 부수효과 경계.
+ * Granting achievements and reading them for the UI (#333) - the side-effect boundary.
  *
- * ── 왜 액션별이 아니라 전체 재평가인가 ────────────────────────────────
+ * ── Why re-evaluate everything rather than per action ─────────────────
  *
- * 예전엔 "글을 쓰면 글 업적만 검사"였다. 업적이 40개가 되고 트리거가 다양해지면 검사 함수가
- * 계속 늘고, **어떤 경로로도 안 불리는 업적**이 생긴다(그게 웹어드벤처가 405번 플레이되도록
- * 업적이 0개였던 이유다).
+ * It used to be "writing a post checks only the post achievements". With 40 achievements and varied triggers the
+ * check functions keep multiplying and some achievement ends up **reachable by no path at all** (which is why the web
+ * adventure could be played 405 times with zero achievements).
  *
- * 전체 재평가는 그 문제가 없고, **과거 기록이 자동으로 소급된다** — 별도 마이그레이션 없이
- * 프로필을 여는 순간 밀린 업적이 한꺼번에 열린다.
+ * Re-evaluating everything has none of that problem, and **past activity is credited retroactively** - opening the
+ * profile opens the whole backlog at once, with no migration.
  *
- * 비용은 조회 몇 번인데, 이미 가진 것은 건너뛰므로 쓰기는 새로 열린 것에만 일어난다.
+ * The cost is a few queries, and since what is already held is skipped, writes happen only for what newly opened.
  */
 
 export type UnlockedView = {
@@ -54,7 +54,7 @@ export type AchievementView = { unlocked: UnlockedView[]; locked: LockedView[] }
 
 type OwnedEntry = { key: string; unlockedAt: Date | null };
 
-/** 사용자가 이미 가진 업적의 키와 달성 시각. 없거나 오류면 빈 배열. */
+/** The keys and times of the achievements a user already holds. Empty on absence or error. */
 async function ownedAchievements(userEmail: string): Promise<OwnedEntry[] | null> {
   const user = await User.findOne({ email: userEmail });
   if (!user) return null;
@@ -71,14 +71,14 @@ async function ownedAchievements(userEmail: string): Promise<OwnedEntry[] | null
 }
 
 /**
- * 업적 하나를 부여한다. **이미 가지고 있으면 아무 일도 안 한다** — 조건을 원자적으로 걸어,
- * 동시에 두 번 불려도 포인트가 두 번 오르지 않는다.
+ * Grants one achievement. **If it is already held, nothing happens** - the condition is applied atomically, so two
+ * concurrent calls cannot award the points twice.
  */
 async function grantOne(userEmail: string, key: string): Promise<GrantedAchievement | null> {
   const definition = ACHIEVEMENTS[key];
   if (!definition) return null;
 
-  // 정의가 바뀌면(이름·포인트·등급) 여기서 따라 붙는다.
+  // A changed definition (name, points, tier) is picked up here.
   const achievement = await Achievement.findOneAndUpdate({ key }, definition, {
     upsert: true,
     new: true,
@@ -93,14 +93,14 @@ async function grantOne(userEmail: string, key: string): Promise<GrantedAchievem
     },
   );
 
-  // null 이면 이미 가지고 있었다는 뜻이다 — 정상이라 로그를 남기지 않는다.
+  // null means it was already held - normal, so nothing is logged.
   return updated ? { ...definition, _id: String(achievement._id) } : null;
 }
 
 /**
- * 전부 다시 판정해 새로 달성한 것을 부여한다.
+ * Re-evaluates everything and grants what has newly been earned.
  *
- * **절대 던지지 않는다.** 업적은 부가 기능이라, 판정이 깨졌다고 글쓰기·덧글이 막히면 안 된다.
+ * **It never throws.** Achievements are an extra, so a broken evaluation must never block writing a post or a comment.
  */
 export async function evaluateAndGrant(
   userEmail: string,
@@ -131,7 +131,7 @@ export async function evaluateAndGrant(
   }
 }
 
-/** 숨김 업적은 잠긴 동안 가린다. **서버에서** 가려야 devtools 로 들여다봐도 안 보인다. */
+/** A hidden achievement is masked while locked. Masking **on the server** keeps it hidden even from devtools. */
 function maskIfHidden(definition: AchievementDefinition): { name: string; description: string } {
   return definition.hidden
     ? { name: '???', description: '' }
@@ -139,8 +139,8 @@ function maskIfHidden(definition: AchievementDefinition): { name: string; descri
 }
 
 /**
- * 프로필 화면용 — 달성한 것과 도전 중인 것을 갈라 준다.
- * 보기 전에 재평가하므로, 프로필을 여는 것만으로 밀린 업적이 부여된다.
+ * For the profile screen - splits what is earned from what is in progress.
+ * It re-evaluates before reading, so opening the profile grants the backlog.
  */
 export async function achievementView(
   userEmail: string,
@@ -191,7 +191,7 @@ export async function achievementView(
     }
   }
 
-  // 최근 달성 순. 도전 중인 것은 목표에 가까운 순 — 다음에 뭘 노릴지 바로 보인다.
+  // Earned ones newest first. In-progress ones closest to their target first - so what to aim at next is immediately visible.
   unlocked.sort((a, b) => (b.unlockedAt ?? '').localeCompare(a.unlockedAt ?? ''));
   locked.sort((a, b) => b.current / b.target - a.current / a.target);
 
@@ -199,8 +199,8 @@ export async function achievementView(
 }
 
 /**
- * 글이 반응을 받았을 때 **글쓴이**에게 재평가한다. 누른 사람이 아니다 — 좋아요 업적은
- * 글이 닿은 정도를 재는 것이라 받은 쪽 몫이다.
+ * Re-evaluates for the **author** when a post gets a reaction, not for whoever pressed it - a like achievement
+ * measures how far a post reached, so it belongs to the receiving side.
  */
 export async function evaluateAndGrantForPost(
   postId: string,

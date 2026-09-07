@@ -1,4 +1,4 @@
-// graph.ts — buildGraphFromScenes / autoLayout 단위 (#301).
+// graph.ts - unit tests for buildGraphFromScenes / autoLayout (#301).
 
 import { describe, it, expect } from "vitest";
 import {
@@ -45,10 +45,10 @@ describe("buildGraphFromScenes — nodes", () => {
     expect(nodes[0].position).toEqual({ x: 100, y: 200 });
   });
 
-  // #333 — 시작 씬 화이트리스트 갱신.
-  // 옛 사극 시절의 단일 시작 (town_square_dawn) 잔재 제거.
-  // 〈에테르니아〉 는 3 주인공 — kael_infirmary / rin_harbor / solwen_grove
-  // 모두 시작 씬 으로 인식되어 ⭐ + violet ring 표시.
+  // #333 - refreshing the starting-scene whitelist.
+  // Removing the leftover single start (town_square_dawn) from the old historical-drama era.
+  // Eternia has 3 protagonists - kael_infirmary, rin_harbor and solwen_grove are
+  // all recognised as starting scenes and marked with a star and a violet ring.
   it("kael_infirmary / rin_harbor / solwen_grove 모두 isStart=true", () => {
     const { nodes } = buildGraphFromScenes([
       makeScene({ id: "kael_infirmary" }),

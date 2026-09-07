@@ -1,4 +1,4 @@
-// #318 자동 ending — HP 0 자동 fall + onEnter.hpDelta 누적 시스템.
+// #318 the automatic ending - an automatic fall at HP 0 plus the onEnter.hpDelta accumulation system.
 
 import { describe, it, expect } from "vitest";
 import type { Character, GameState, Scene, SceneRegistry } from "@/types/web-adventure";
@@ -83,6 +83,6 @@ describe("HP 0 자동 fall ending (#318)", () => {
     state = gameReducer(state, { type: "START_GAME", character: makeChar({ hp: 8 }), startScene: "start" }, reg4);
     state = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "go" }, reg4);
     if (state.phase !== "playing") throw new Error("expected playing");
-    expect(state.character.hp).toBe(8); // 그대로
+    expect(state.character.hp).toBe(8); // unchanged
   });
 });

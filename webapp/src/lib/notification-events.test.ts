@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 //
-// 읽음 처리를 화면이 바로 따라가게 (#259).
+// Making the UI follow a read immediately (#259).
 //
-// 벨은 navbar 에 있어 글 화면으로 넘어가도 **다시 마운트되지 않는다.** 그래서 알림을 눌러
-// 읽음 처리를 해도 숫자가 그대로였다. 실측(스테이징):
-//   목록 진입   배지 4 · 안읽음 4
-//   클릭 후     배지 4      ← 서버는 이미 3
-//   [모두 읽음] 목록 0 인데 배지 3 그대로
+// The bell lives in the navbar, so it **is not remounted** when moving to a post. Tapping a notification therefore
+// marked it read while the number stayed. Measured (staging):
+//   opening the list   badge 4, unread 4
+//   after a click      badge 4      <- the server already says 3
+//   [mark all read]    the list is 0 while the badge still says 3
 //
-// 벨과 목록은 서로를 모른다(다른 트리). 상태를 위로 끌어올리려면 navbar~페이지를 감싸는
-// provider 가 필요한데, 알림 숫자 하나 때문에 그럴 일이 아니다. 브라우저 이벤트로 알린다.
+// The bell and the list know nothing of each other (different trees). Lifting the state up would need a provider
+// wrapping the navbar and the page, which is not worth doing for one number. A browser event tells them instead.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   NOTIFICATION_READ,
@@ -25,7 +25,7 @@ describe('decrementUnread — 하나 읽었을 때의 숫자', () => {
     expect(decrementUnread(3)).toBe(2);
   });
 
-  // 화면 값과 서버 값이 어긋나 있을 수 있다 — 음수 뱃지를 보여 주느니 0 으로 멈춘다.
+  // The UI's value and the server's can disagree - better to stop at 0 than show a negative badge.
   it('0 아래로 내려가지 않는다', () => {
     expect(decrementUnread(0)).toBe(0);
     expect(decrementUnread(-5)).toBe(0);
@@ -51,12 +51,12 @@ describe('알림 이벤트', () => {
     window.removeEventListener(NOTIFICATIONS_ALL_READ, heard);
   });
 
-  // 알림을 누르면 곧바로 글 화면으로 넘어간다. 그 순간의 router.refresh() 는 이동에 밀려
-  // 먹지 않는다 — 실측에서 뒤로 갔을 때 안읽음이 4건 그대로였다(서버는 3).
-  // 그래서 "바뀌었다"만 남겨 두고 목록으로 돌아왔을 때 다시 받아온다.
+  // Tapping a notification navigates to the post immediately. A router.refresh() at that moment loses to the
+  // navigation - measured, going back still showed 4 unread (the server said 3).
+  // So only "something changed" is recorded, and it re-fetches on returning to the list.
   describe('목록을 다시 받아와야 하는가', () => {
     it('아무것도 안 했으면 받아올 필요가 없다', () => {
-      consumeNotificationsDirty(); // 앞선 테스트의 흔적을 지우고 시작
+      consumeNotificationsDirty(); // start by clearing what earlier tests left behind
       expect(consumeNotificationsDirty()).toBe(false);
     });
 

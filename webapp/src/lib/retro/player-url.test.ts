@@ -59,7 +59,7 @@ describe('retro/player-url — iframe 에 넘길 주소를 만든다', () => {
       const base = { core: 'snes9x', rom: '/x.sfc', patch: '/p.ips' };
       expect(params(buildPlayerUrl({ ...base, stripHeader: true })).get('strip')).toBe('1');
       expect(params(buildPlayerUrl({ ...base, stripHeader: false })).get('strip')).toBe('0');
-      // 지정하지 않으면 플레이어가 알아서 판단하도록 비워 둔다.
+      // Left unset so the player decides for itself.
       expect(params(buildPlayerUrl(base)).has('strip')).toBe(false);
     });
 
@@ -70,7 +70,7 @@ describe('retro/player-url — iframe 에 넘길 주소를 만든다', () => {
   });
 });
 
-// #175 — 옛 이름의 게임 세이브를 되살릴지는 서버가 판단해 플래그로 넘긴다.
+// #175 - whether to restore a save under the old name is decided by the server and passed as a flag.
 describe('buildPlayerUrl — 옛 세이브 복원 플래그', () => {
   const base = { core: 'snes9x', rom: '/api/games/retro/roms/1/file/1.sfc' };
 
@@ -84,7 +84,7 @@ describe('buildPlayerUrl — 옛 세이브 복원 플래그', () => {
   });
 });
 
-// #186 — netplay 로 열기. 방을 가르는 것은 게임 번호이므로, 두 PC 가 같은 수를 받아야 한다.
+// #186 - opening in netplay. The game number separates the rooms, so both PCs must get the same number.
 describe('buildPlayerUrl — netplay', () => {
   const base = { core: 'snes9x', rom: '/api/games/retro/roms/1/file/1.sfc' };
 

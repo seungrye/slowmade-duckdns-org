@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-// env 목킹: geminiApiKey 빈값(suggestTags 폴백 검증), revalidateToken 은 테스트별로 바꾼다.
-// vi.hoisted 로 올려 mock 팩토리(호이스팅됨)가 참조 가능하게 한다.
+// Mocking env: geminiApiKey is empty (to verify suggestTags' fallback), and revalidateToken varies per test.
+// Hoisted with vi.hoisted so the (hoisted) mock factory can reference it.
 const mockEnv = vi.hoisted(() => ({ geminiApiKey: "", siteUrl: "http://localhost", revalidateToken: "secret" }));
 vi.mock("@/lib/env", () => ({ env: mockEnv }));
-// 이미지 태깅(#234) 검증을 위해 실제 호출을 붙잡는다.
+// Captures the real calls in order to verify image tagging (#234).
 const mockGenerateContent = vi.hoisted(() => vi.fn());
 vi.mock("@google/genai", () => ({
   GoogleGenAI: class { models = { generateContent: mockGenerateContent }; },
@@ -21,14 +21,14 @@ import {
   TAG_LIST_CHAR_BUDGET,
 } from "./suggest-tags";
 
-// 기존 태그를 모델에 얼마나 보여줄 것인가 (#251).
+// How much of the existing tag list to show the model (#251).
 //
-// 예전엔 `allTags.slice(0, 200)` 이었다. 공개글 고유 태그가 396개라 **196개는 모델이 아예
-// 못 봤고**, __getAllTags 에 $sort 가 없어 잘려 나가는 196개가 "덜 쓰이는 것"이 아니라
-// 임의로 정해졌다. 관련 있는 태그가 안 보이는 쪽에 있으면 재사용하고 싶어도 할 수 없다.
+// It used to be `allTags.slice(0, 200)`. With 396 distinct tags across public posts, **196 were never seen by the
+// model at all**, and with no $sort in __getAllTags the 196 cut off were not "the less-used ones" but arbitrary.
+// A relevant tag on the invisible side cannot be reused however much you want to.
 //
-// 전체 396개를 다 넣어도 3,336자다(실측) — 자를 이유가 없다. 예산은 태그가 수천 개로
-// 늘어날 때를 위한 안전장치일 뿐이고, 잘릴 때는 **적게 쓰인 것부터** 잘린다.
+// All 396 come to 3,336 characters (measured) - there is no reason to cut. The budget is only a safeguard for when
+// tags grow into the thousands, and when it does cut, **the least-used go first**.
 describe("fitTagsToBudget — 프롬프트에 실을 기존 태그", () => {
   const t = (tag: string, count: number) => ({ tag, count });
 
@@ -44,7 +44,7 @@ describe("fitTagsToBudget — 프롬프트에 실을 기존 태그", () => {
 
   it("예산을 넘으면 적게 쓰인 것부터 버린다", () => {
     expect(fitTagsToBudget([t("aaaa", 9), t("bbbb", 5), t("cccc", 1)], 10))
-      .toEqual(["aaaa", "bbbb"]); // "aaaa, bbbb" = 10자
+      .toEqual(["aaaa", "bbbb"]); // "aaaa, bbbb" = 10 characters
   });
 
   it("구분자까지 세어 예산을 지킨다 — 넘겨 놓고 잘리면 의미가 없다", () => {
@@ -150,11 +150,11 @@ describe("triggerRevalidate — 내부 엔드포인트 self-fetch", () => {
   });
 });
 
-// 이미지도 보는 자동 태깅 (#234).
+// Automatic tagging that also looks at images (#234).
 //
-// 이 사이트는 글 172건 중 48건이 이미지를 갖고 있고, 유머 글은 이미지가 내용의 전부인
-// 경우도 많다. 실측: 제목이 "연산자 우선순위"인 글의 이미지만 주니 ["수학문제","산수","퀴즈"]
-// 가 나왔다 — 텍스트만으로는 나올 수 없는 태그다.
+// On this site 48 of 172 posts have images, and for humour posts the image is often the whole content.
+// Measured: giving only the image of a post titled "operator precedence" produced ["수학문제", "산수", "퀴즈"] -
+// tags the text alone could never have produced.
 describe("suggestTags — 이미지까지 보기", () => {
   function okImage(bytes = 100, type = "image/webp") {
     return {
@@ -172,9 +172,9 @@ describe("suggestTags — 이미지까지 보기", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  /** 호출된 모델 이름 순서 */
+  /** the order of the model names called */
   const models = () => mockGenerateContent.mock.calls.map((c) => c[0].model);
-  /** 첫 호출의 parts */
+  /** the first call's parts */
   function parts(): Array<Record<string, unknown>> {
     const contents = mockGenerateContent.mock.calls[0][0].contents;
     return contents[0].parts;
@@ -185,7 +185,7 @@ describe("suggestTags — 이미지까지 보기", () => {
     expect(models()[0]).toBe("gemma-4-31b-it");
   });
 
-  // Gemma 는 이미지가 붙으면 한국어 지시를 무시하고 영어로 답한다(실측).
+  // With an image attached, Gemma ignores Korean instructions and answers in English (measured).
   it("이미지가 있으면 Gemini 를 먼저 쓴다", async () => {
     await suggestTags({
       title: "t", htmlContent: "<p>본문</p>", allTags: [], userTags: [],
@@ -204,7 +204,7 @@ describe("suggestTags — 이미지까지 보기", () => {
     expect((inline[0].inlineData as { mimeType: string }).mimeType).toBe("image/webp");
   });
 
-  // 이미지를 못 받는다고 태깅이 죽으면 안 된다 — 이 파일의 기존 원칙이다.
+  // Tagging must not die because the image cannot be fetched - the existing principle of this file.
   it("이미지를 못 받아도 텍스트로 태깅을 끝낸다", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network"); }));
     const tags = await suggestTags({
@@ -213,17 +213,17 @@ describe("suggestTags — 이미지까지 보기", () => {
     });
     expect(tags).toEqual(["태그1", "태그2"]);
     expect(parts().filter((p) => "inlineData" in p)).toHaveLength(0);
-    // 이미지가 없는 셈이므로 기존 체인으로 돌아간다.
+    // It is effectively imageless, so it falls back to the existing chain.
     expect(models()[0]).toBe("gemma-4-31b-it");
   });
 
-  // #251 — 200개 상한 때문에 모델이 절반을 못 보던 것을 고쳤다.
+  // #251 - fixed the 200-item cap that hid half the tags from the model.
   it("기존 태그를 잘라내지 않고 전부 프롬프트에 싣는다", async () => {
     const allTags = Array.from({ length: 396 }, (_, i) => ({ tag: `태그${i}`, count: 1 }));
     await suggestTags({ title: "t", htmlContent: "<p>본문</p>", allTags, userTags: [] });
     const text = (parts()[0] as { text: string }).text;
     expect(text).toContain("태그0");
-    expect(text).toContain("태그395"); // 예전엔 200번째 이후가 통째로 빠졌다
+    expect(text).toContain("태그395"); // everything past the 200th used to be dropped wholesale
   });
 
   it("많이 쓰인 태그를 앞에 싣는다", async () => {
@@ -243,7 +243,7 @@ describe("suggestTags — 이미지까지 보기", () => {
     expect(parts().filter((p) => "inlineData" in p)).toHaveLength(2);
   });
 
-  // 아주 큰 원본은 인라인으로 못 싣는다 — 그때만 축소본으로 내려간다.
+  // A very large original cannot be sent inline - only then does it fall back to the reduced version.
   it("원본이 상한을 넘으면 썸네일로 내려간다", async () => {
     const seen: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (u: string) => {

@@ -24,7 +24,7 @@ const GAMES: GameEntry[] = [
 
 describe('retro/filter', () => {
   it('빈 질의·전체 플랫폼이면 원본을 그대로 준다', () => {
-    // 참조가 유지되어야 useMemo 가 헛돌지 않는다.
+    // The reference must be preserved so useMemo does not spin needlessly.
     expect(filterGames(GAMES, 'all', '')).toBe(GAMES);
     expect(filterGames(GAMES, 'all', '   ')).toBe(GAMES);
   });
@@ -44,9 +44,9 @@ describe('retro/filter', () => {
   });
 
   it('플랫폼과 검색을 함께 적용한다', () => {
-    // 'ego' 는 NES 의 Alter Ego 에만 있다.
+    // 'ego' appears only in the NES Alter Ego.
     expect(filterGames(GAMES, 'snes', 'ego').map((g) => g.id)).toEqual(['b']);
-    // 검색어가 맞아도 플랫폼이 다르면 빠진다.
+    // A matching search term still drops out on a different platform.
     expect(filterGames(GAMES, 'arcade', 'ego')).toEqual([]);
   });
 

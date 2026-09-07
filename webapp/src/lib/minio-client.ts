@@ -1,7 +1,7 @@
-// MinIO 클라이언트 (지연 생성·재사용).
+// The MinIO client (created lazily and reused).
 //
-// painter 라우트 안의 지역 함수였는데, 씬 삽화 워커(#158)도 같은 클라이언트가 필요해
-// 공용 모듈로 뺐다. 두 벌로 두면 접속 설정이 갈린다.
+// It was a local function inside the painter route, but the scene-illustration worker (#158) needs the same client,
+// so it was pulled out into a shared module. Two copies would let the connection settings diverge.
 
 import * as Minio from 'minio';
 import { env } from '@/lib/env';

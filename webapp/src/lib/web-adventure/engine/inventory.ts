@@ -1,9 +1,9 @@
-// 인벤토리 표시 헬퍼 — #220.
+// The inventory display helper - #220.
 //
-// reducer 가 다루는 인벤은 `string[]` (아이템 id 의 평면 배열) 이라 같은 id 가
-// 반복될 수 있다 (stackable consumable). UI 에서는 같은 id 를 한 묶음으로
-// 보여 주는 게 자연스러우므로, id 별 count 누적 + displayName 결합 작업을
-// 한곳에 모은다.
+// The inventory the reducer handles is a `string[]` (a flat array of item ids), so the same id can
+// repeat (a stackable consumable). Showing the same id as one group is more natural in the UI, so
+// accumulating the per-id count and joining the displayName are gathered
+// in one place.
 
 import { items } from "@/content/web-adventure/items";
 
@@ -14,11 +14,11 @@ export type GroupedInventoryEntry = {
 };
 
 /**
- * inventory 의 아이템 id 배열을 displayName + count 페어 배열로 변환.
+ * Converts the inventory's item id array into displayName plus count pairs.
  *
- * - 같은 id 가 여러 개면 count 누적.
- * - 진입 순서 (첫 등장 위치) 보존.
- * - 아이템 정의 미존재 id 는 fallback 으로 id 자체를 displayName 으로 사용.
+ * - Several of the same id accumulate a count.
+ * - The entry order (first appearance) is preserved.
+ * - An id with no item definition falls back to using the id itself as the displayName.
  */
 export function groupInventory(inventory: string[]): GroupedInventoryEntry[] {
   const order: string[] = [];
@@ -40,10 +40,10 @@ export function groupInventory(inventory: string[]): GroupedInventoryEntry[] {
 }
 
 /**
- * 사용자 표시용 문자열.
+ * The string shown to the user.
  *
- * - count === 1 → "이름"
- * - count > 1   → "이름 × N"
+ * - count === 1 -> "name"
+ * - count > 1   -> "name x N"
  */
 export function formatGroupedItem(entry: GroupedInventoryEntry): string {
   return entry.count > 1

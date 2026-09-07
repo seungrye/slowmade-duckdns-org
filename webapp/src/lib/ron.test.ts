@@ -343,7 +343,7 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
   });
 
   it("OpenZonePortal — 옛 MountainVillage 텍스트가 Named('mountain_village') 로 호환 파싱", () => {
-    // 옛 RON 의 정적 variant 명도 파서가 새 schema Named id 로 자동 변환.
+    // The parser also converts an old RON's static variant name into the new schema's Named id automatically.
     const quest = parseRon(wrap(
       `Transition(from:"a",trigger:Interact,actions:[OpenZonePortal(target:MountainVillage)],to:"b")`,
     ));
@@ -463,7 +463,7 @@ describe("parseRon — 액션/조건 변형 (B1)", () => {
       ])`;
     const quest = parseRon(src);
     expect(quest.spawns[0]).toEqual({ phase: "a", item: "x", zone: { type: "Named", id: "z" }, count: 3 });
-    // 옛 Forest 텍스트는 새 schema 의 Named('forest') 로 자동 흡수된다.
+    // Old Forest text is absorbed automatically into the new schema's Named('forest').
     expect(quest.spawns[1]).toEqual({ phase: "a", item: "y", zone: { type: "Named", id: "forest" }, condition: { type: "HasFlag", flag: "f" } });
   });
 
@@ -558,7 +558,7 @@ describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립",
       spawns: [],
     };
     const ron = serializeRon(quest);
-    // 게임이 export 하는 표기와 정확히 일치하는지 확인
+    // checks it matches exactly the notation the game exports
     expect(ron).toContain("PlaceTraps(kind: Alarm, count: 4, hidden: true)");
     expect(ron).toContain("PlaceTraps(kind: Spike, count: 6, hidden: false)");
     expect(ron).toContain("Explode(radius: 4, terrain: true, entity_damage: 8)");
@@ -568,7 +568,7 @@ describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립",
   });
 
   it("bevy-rogue assets 미러 — 게임 .ron 의 액션 라인을 import→재export 하면 동일", () => {
-    // 실제 assets/quests/*.ron 에서 그대로 가져온 액션 라인들
+    // action lines taken verbatim from the real assets/quests/*.ron
     const src = `QuestDef(id:"m",title:"m",giver_npc:"n",initial_phase:"a",
       phases:{"a":QuestPhaseDef(dialog:[],objective:None),"b":QuestPhaseDef(dialog:[],objective:None)},
       transitions:[Transition(from:"a",trigger:Interact,actions:[
@@ -581,9 +581,9 @@ describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립",
         SpawnMonster(id: "troll", count: 2),
       ],to:"b")],spawns:[])`;
     const quest = parseRon(src);
-    // import 후 재export → 재import 라운드트립 정합성
+    // import -> re-export -> re-import round-trip consistency
     expect(parseRon(serializeRon(quest))).toEqual(quest);
-    // 액션 구조 확인
+    // checks the action structure
     expect(quest.transitions[0].actions).toEqual([
       { type: "SpawnGuards", count: 5 },
       { type: "PlaceTraps", kind: "Alarm", count: 4, hidden: true },
@@ -596,7 +596,7 @@ describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립",
   });
 
   it("zone 인자가 있는 spawn 액션은 라운드트립을 보존한다(deferred 의도)", () => {
-    // infiltration/vault_heist/trap_mine/dragon_hunt 의 신규 형식 — zone:Some(Named).
+    // The new form used by infiltration/vault_heist/trap_mine/dragon_hunt - zone:Some(Named).
     const quest: QuestDef = {
       id: "z", title: "z", giverNpc: "n", initialPhase: "a",
       phases: {
@@ -619,11 +619,11 @@ describe("serializeRon — PlaceTraps / Explode / SpawnMonster 라운드트립",
       spawns: [],
     };
     const ron = serializeRon(quest);
-    // 직렬화 표기 확인 — `zone: Some(Named("…"))`.
+    // checks the serialised notation - `zone: Some(Named("…"))`.
     expect(ron).toContain(`SpawnGuards(count: 5, zone: Some(Named("infiltration")))`);
     expect(ron).toContain(`zone: Some(Named("infiltration"))`);
     expect(ron).toContain(`SpawnMonster(id: "frost_wyrm", count: 1, zone: Some(Named("wyrm_lair")))`);
-    // 라운드트립 보존.
+    // preserved across a round trip.
     expect(parseRon(ron)).toEqual(quest);
   });
 });
@@ -752,9 +752,9 @@ describe("parse/serialize QuestItemsRon", () => {
   });
 
   it("glyph_game_icon 의 \\u{XXXXX} escape 가 실제 PUA 코드포인트로 디코드된다", () => {
-    // 게임 RON 은 game-icons.net PUA codepoint (U+FF000~U+100005) 를 \u{FF23C}
-    // 형식으로 기록한다. 사이트 파서가 이를 단일 PUA 문자로 정확히 복원해야 한다.
-    // 옛 glyph_unicode 키도 silently 흡수해 캐시된 RON 호환을 보장한다.
+    // The game's RON writes game-icons.net PUA code points (U+FF000-U+100005) in the \u{FF23C}
+    // form. The site's parser must restore them exactly as a single PUA character.
+    // It also silently absorbs the old glyph_unicode key, keeping cached RON compatible.
     const src = `[
       QuestItemDef(
           id: "x", display_name: "x", glyph_ascii: "/",
@@ -765,8 +765,8 @@ describe("parse/serialize QuestItemsRon", () => {
     ]`;
     const items = parseQuestItemsRon(src);
     expect(items[0].glyphGameIcon).toBe("\u{FFAFD}");
-    // Supplementary plane PUA 는 UTF-16 surrogate pair 1쌍 (length=2) 이지만
-    // codepoint 는 단일.
+    // A supplementary-plane PUA character is one UTF-16 surrogate pair (length = 2) while its
+    // code point is single.
     expect([...items[0].glyphGameIcon]).toHaveLength(1);
   });
 
@@ -785,7 +785,7 @@ describe("parse/serialize QuestItemsRon", () => {
 });
 
 describe("parse/serialize WeaponsRon — 신규 random-stat 필드 (게임 RON 형식)", () => {
-  // bevy-rogue 의 assets/items/weapons.ron 미러 — attack_power_min/max + tier
+  // Mirrors bevy-rogue's assets/items/weapons.ron - attack_power_min/max plus tier
   const NEW_SRC = `[
     WeaponDef(
         id: "dagger",
@@ -818,7 +818,7 @@ describe("parse/serialize WeaponsRon — 신규 random-stat 필드 (게임 RON �
     expect(weapons[0].attackPowerMin).toBe(3);
     expect(weapons[0].attackPowerMax).toBe(6);
     expect(weapons[0].tier).toBe(1);
-    expect(weapons[0].attackPower).toBe(5); // round((3+6)/2)=5 (Math.round 사용)
+    expect(weapons[0].attackPower).toBe(5); // round((3+6)/2) = 5 (using Math.round)
     expect(weapons[1].element).toBe("fire");
     expect(weapons[1].tier).toBe(1);
   });
@@ -829,7 +829,7 @@ describe("parse/serialize WeaponsRon — 신규 random-stat 필드 (게임 RON �
     expect(out).toContain("attack_power_min: 3");
     expect(out).toContain("attack_power_max: 6");
     expect(out).toContain("tier: 1");
-    // 단일값 라인은 출력되지 않아야 함 (random-stat 모드)
+    // the single-value line must not be emitted (random-stat mode)
     expect(out).not.toMatch(/^\s*attack_power:\s/m);
     const reparsed = parseWeaponsRon(out);
     expect(reparsed).toEqual(weapons);
@@ -889,7 +889,7 @@ describe("parseVillagersRon — stationary / vendor 신규 필드", () => {
     const villagers = parseVillagersRon(SRC);
     expect(villagers[0].stationary).toBe(true);
     expect(villagers[0].vendor).toBe(true);
-    // 미지정은 undefined (또는 false 와 동등)
+    // unspecified is undefined (or equivalent to false)
     expect(villagers[1].stationary ?? false).toBe(false);
     expect(villagers[1].vendor ?? false).toBe(false);
   });
@@ -899,18 +899,18 @@ describe("parseVillagersRon — stationary / vendor 신규 필드", () => {
     const out = serializeVillagersRon(villagers);
     expect(out).toContain("stationary: true");
     expect(out).toContain("vendor: true");
-    // 두 번째 villager 줄에는 stationary/vendor 라인이 없어야 함
+    // the second villager line must have no stationary/vendor line
     const elderBlock = out.slice(out.indexOf("elder"));
     expect(elderBlock).not.toContain("stationary");
     expect(elderBlock).not.toContain("vendor");
-    // 라운드트립 정합
+    // round-trip consistency
     expect(parseVillagersRon(out)).toEqual(villagers);
   });
 });
 
 describe("parseVillagersRon — vendor_vision_radius (Option<u32>)", () => {
-  // 데이터 주도 가드: vendor 별 시야 반경 override.
-  // 미지정 → game 측 fallback default (6). 명시 → 그 vendor 만 적용.
+  // A data-driven guard: a per-vendor vision radius override.
+  // Unspecified falls back to the game's default (6). Specified applies to that vendor only.
   it("vendor_vision_radius: Some(2) 가 파싱·라운드트립 보존된다", () => {
     const src = `[
     VillagerDef(
@@ -946,7 +946,7 @@ describe("parseVillagersRon — vendor_vision_radius (Option<u32>)", () => {
 ]`;
     const villagers = parseVillagersRon(src);
     expect(villagers[0].vendorVisionRadius).toBeUndefined();
-    // serializer 는 undefined 면 vendor_vision_radius 줄을 출력하지 않는다.
+    // the serializer omits the vendor_vision_radius line when it is undefined.
     const out = serializeVillagersRon(villagers);
     expect(out).not.toContain("vendor_vision_radius");
   });
@@ -969,7 +969,7 @@ describe("parseVillagersRon — vendor_vision_radius (Option<u32>)", () => {
 });
 
 describe("parseRon — QuestSpawn.vendor_distance_min (Option<u32>)", () => {
-  // 데이터 주도 가드: super_tintham_cracker 가 vendor 옆에 spawn 되지 않게.
+  // A data-driven guard: super_tintham_cracker must not spawn beside a vendor.
   it("vendor_distance_min: Some(2) 가 RON 라운드트립으로 보존된다", () => {
     const quest: QuestDef = {
       id: "elder_tintham_quest",
@@ -1020,8 +1020,8 @@ describe("parseRon — QuestSpawn.vendor_distance_min (Option<u32>)", () => {
 });
 
 describe("parseVillagersRon — home_zone (마을 분산)", () => {
-  // 새 schema: Town | Named. 옛 RON 의 bare ident(MountainVillage/SeasideHarbor)
-  // 도 호환되어 Named 로 자동 변환된다.
+  // The new schema: Town | Named. An old RON's bare ident (MountainVillage/SeasideHarbor)
+  // is compatible too and converts to Named automatically.
   const SRC = `[
     VillagerDef(
         id: "burgomaster",
@@ -1061,8 +1061,8 @@ describe("parseVillagersRon — home_zone (마을 분산)", () => {
     expect(v[0].homeZone).toEqual({ type: "Town" });
     expect(v[1].homeZone).toEqual({ type: "Named", id: "mountain_village" });
     expect(v[2].homeZone).toEqual({ type: "Named", id: "seaside_harbor" });
-    // 마지막 elder 는 home_zone 필드 자체가 없는 RON — TS 상 undefined.
-    // 게임 측 #[serde(default)] 미러: 마이그레이션/DB 에서 Town 으로 보정된다.
+    // The last elder's RON has no home_zone field at all - undefined in TS.
+    // Mirroring the game's #[serde(default)]: the migration and DB correct it to Town.
     expect(v[3].homeZone).toBeUndefined();
   });
 
@@ -1071,12 +1071,12 @@ describe("parseVillagersRon — home_zone (마을 분산)", () => {
     const out = serializeVillagersRon(v);
     expect(out).toContain('home_zone: Named("mountain_village")');
     expect(out).toContain('home_zone: Named("seaside_harbor")');
-    // Town 은 default 라 출력 생략 (호환을 위해 기존 RON 텍스트 모양 유지).
+    // Town is the default, so it is omitted (keeping the existing RON text shape for compatibility).
     const burgoBlock = out.slice(out.indexOf("burgomaster"), out.indexOf("huntmaster"));
     expect(burgoBlock).not.toContain("home_zone:");
-    // 라운드트립 — parse → serialize → parse 했을 때 Town 의 명시/생략 차이는 의도된 lossy.
-    // 정규화 후 동치를 보장: Town 명시는 parse 결과에서 homeZone 키가 유지되지만,
-    // serialize 가 생략하므로 두 번째 parse 에서는 키 자체가 없다. 두 값을 정규화 비교.
+    // Round trip - across parse -> serialize -> parse, the difference between stating and omitting Town is intentionally lossy.
+    // Equivalence after normalisation is guaranteed: a stated Town keeps the homeZone key in the parse result, but
+    // serialize omits it, so the second parse has no key at all. The two are compared normalised.
     const normalize = (defs: ReturnType<typeof parseVillagersRon>) =>
       defs.map((d) => {
         const { homeZone, ...rest } = d;
@@ -1088,8 +1088,8 @@ describe("parseVillagersRon — home_zone (마을 분산)", () => {
 });
 
 describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
-  // 새 필드: HomeLandmark enum — Random(기본) / Road / 6 landmark.
-  // 게임 측 #[serde(default)] 와 동일 — 누락 시 undefined, Random 명시 시도 호환.
+  // A new field: the HomeLandmark enum - Random (the default), Road, or one of 6 landmarks.
+  // The same as the game's #[serde(default)] - absent gives undefined, and stating Random is also compatible.
   const SRC = `[
     VillagerDef(
         id: "innkeeper",
@@ -1138,7 +1138,7 @@ describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
     expect(v[1].homeLandmark).toBe("guard");
     expect(v[2].homeLandmark).toBe("road");
     expect(v[3].homeLandmark).toBe("random");
-    // 미지정 → undefined (게임 측 #[serde(default)] 미러 — DB 에서 "random" 보정)
+    // unspecified -> undefined (mirroring the game's #[serde(default)] - corrected to "random" in the DB)
     expect(v[4].homeLandmark).toBeUndefined();
   });
 
@@ -1148,13 +1148,13 @@ describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
     expect(out).toContain("home_landmark: Inn");
     expect(out).toContain("home_landmark: Guard");
     expect(out).toContain("home_landmark: Road");
-    // Random 은 default 라 출력 생략
+    // Random is the default, so it is omitted
     const burgoBlock = out.slice(out.indexOf("burgomaster"), out.indexOf("elder"));
     expect(burgoBlock).not.toContain("home_landmark");
-    // elder 도 미지정이므로 출력 없음
+    // the elder is unspecified too, so nothing is emitted
     const elderBlock = out.slice(out.indexOf("elder"));
     expect(elderBlock).not.toContain("home_landmark");
-    // 정규화 라운드트립 — Random/undefined 동치 처리
+    // A normalised round trip - Random and undefined are treated as equivalent
     const normalize = (defs: ReturnType<typeof parseVillagersRon>) =>
       defs.map((d) => {
         const { homeLandmark, ...rest } = d;
@@ -1210,7 +1210,7 @@ describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
   });
 
   it("기존 RON (home_landmark 없음) 도 무영향 — 미지정은 undefined", () => {
-    // 회귀 가드 — bevy-rogue 의 기존 villagers.ron 호환.
+    // A regression guard - compatibility with bevy-rogue's existing villagers.ron.
     const oldRon = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0)]`;
     const v = parseVillagersRon(oldRon);
     expect("homeLandmark" in v[0]).toBe(false);
@@ -1218,8 +1218,8 @@ describe("parseVillagersRon — home_landmark (Town 안 spawn 위치)", () => {
 });
 
 describe("parseVillagersRon — free_roam (거주영역 제한 해제)", () => {
-  // 게임 측 `#[serde(default)] free_roam: false` 미러 — 누락 시 undefined,
-  // 명시 시 boolean. true 만 직렬화에 출력(기본 false 는 생략).
+  // Mirrors the game's `#[serde(default)] free_roam: false` - absent gives undefined,
+  // stated gives a boolean. Only true is serialised (the default false is omitted).
 
   it("free_roam 누락 시 undefined", () => {
     const ron = `[VillagerDef(id:"x",name:"x",color:(0,0,0),dialogs:[],speed:1.0)]`;
@@ -1246,13 +1246,13 @@ describe("parseVillagersRon — free_roam (거주영역 제한 해제)", () => {
       { id: "c", name: "c", color: [0, 0, 0], dialogs: [], speed: 1.0 },
     ];
     const out = serializeVillagersRon(v);
-    // a 블록 — true 명시
+    // block a - true, stated
     const aBlock = out.slice(out.indexOf('"a"'), out.indexOf('"b"'));
     expect(aBlock).toContain("free_roam: true");
-    // b 블록 — false 는 생략 (기본값)
+    // block b - false is omitted (the default)
     const bBlock = out.slice(out.indexOf('"b"'), out.indexOf('"c"'));
     expect(bBlock).not.toContain("free_roam");
-    // c 블록 — undefined 도 생략
+    // block c - undefined is omitted too
     const cBlock = out.slice(out.indexOf('"c"'));
     expect(cBlock).not.toContain("free_roam");
   });
@@ -1384,7 +1384,7 @@ describe("parse/serialize AccessoriesRon", () => {
   });
 
   it("desc 필드가 빠진 AccessoryDef 도 빈 문자열로 안전하게 파싱된다", () => {
-    // desc 가 없어도 parser 가 throw 하지 않고 빈 문자열로 채운다.
+    // Without desc the parser does not throw and fills in an empty string.
     const noDesc = `[AccessoryDef(id:"x",display_name:"x",glyph_ascii:"x",glyph_unicode:"x",glyph_game_icon:"x",pickup_message:"x")]`;
     const accs = parseAccessoriesRon(noDesc);
     expect(accs[0].desc).toBe("");
@@ -1428,7 +1428,7 @@ describe("parse/serialize AccessoriesRon", () => {
     const src = `[AccessoryDef(id:"x",display_name:"x",glyph_ascii:"x",glyph_unicode:"x",glyph_game_icon:"x",pickup_message:"x",desc:"x")]`;
     const accs = parseAccessoriesRon(src);
     expect(accs[0].effects).toBeUndefined();
-    // 직렬화 결과에는 effects 줄이 없어야 한다 — 라운드트립 안정.
+    // the serialised result must have no effects line - round-trip stable.
     const ron = serializeAccessoriesRon(accs);
     expect(ron).not.toContain("effects:");
   });
@@ -1438,8 +1438,8 @@ describe("parse/serialize AccessoriesRon", () => {
     expect(() => parseAccessoriesRon(bad)).toThrow(/Unknown AccessoryEffect/);
   });
 
-  // 잠입 퀘스트 "장로의 비밀 간식" 에서 도입한 신규 효과 키. vendor (시장 주인)
-  // 의 시야 영역을 시각화하는 액세서리 — 가드 시야와 분리된 별도 키.
+  // A new effect key introduced by the infiltration quest "the elder's secret snack". An accessory that
+  // visualises a vendor's (the market owner's) field of view - a separate key from the guard's vision.
   it("RevealVendorVision 효과 키도 라운드트립으로 보존된다", () => {
     const src = `[
       AccessoryDef(
@@ -1461,7 +1461,7 @@ describe("parse/serialize AccessoriesRon", () => {
 });
 
 describe("parse/serialize MonstersRon — 기본 (실제 monsters.ron 형식)", () => {
-  // bevy-rogue 의 assets/monsters/monsters.ron 미러
+  // Mirrors bevy-rogue's assets/monsters/monsters.ron
   const SRC = `[
     MonsterDef(
         id: "goblin",
@@ -1515,10 +1515,10 @@ describe("parse/serialize MonstersRon — 기본 (실제 monsters.ron 형식)", 
       zones: [],
       questOnly: false,
     });
-    // element: fire / glyph 대문자도 보존
+    // element: fire, and the glyph's capitalisation is preserved too
     expect(monsters[1].element).toBe("fire");
     expect(monsters[1].glyph).toBe("O");
-    // spawn_condition: None 은 키가 없어야 한다 (undefined)
+    // spawn_condition: None must leave no key at all (undefined)
     expect("spawnCondition" in monsters[0]).toBe(false);
   });
 
@@ -1538,7 +1538,7 @@ describe("parse/serialize MonstersRon — 기본 (실제 monsters.ron 형식)", 
 });
 
 describe("parse/serialize MonstersRon — zones·중첩 spawn_condition·quest_only", () => {
-  // quest_only 보스 + zones(ZoneId 변형) + 중첩 And/Or/Not/HasFlag/PhaseIs 조건
+  // A quest_only boss plus zones (ZoneId variants) and nested And/Or/Not/HasFlag/PhaseIs conditions
   const SRC = `[
     MonsterDef(
         id: "shadow_lord",
@@ -1614,7 +1614,7 @@ describe("parse/serialize MonstersRon — zones·중첩 spawn_condition·quest_o
     expect(out).toContain("spawn_condition: None");
     expect(out).toContain("quest_only: false");
     expect(out).not.toContain("Some(");
-    // 라운드트립으로 정합성 확인
+    // consistency checked by a round trip
     expect(parseMonstersRon(out)).toEqual([m]);
   });
 
@@ -1743,18 +1743,18 @@ describe("serializeStartLoadoutRon", () => {
 
   it("게임 측 assets/items/start_loadout.ron 미러 (가능하면)", () => {
     const ronPath = "/home/seungrye/bevy-rogue/assets/items/start_loadout.ron";
-    if (!fs.existsSync(ronPath)) return; // 게임 repo 가 없는 환경에서는 스킵
+    if (!fs.existsSync(ronPath)) return; // skipped in an environment without the game repo
     const src = fs.readFileSync(ronPath, "utf8");
     const parsed = parseStartLoadoutDef(src);
-    // 게임 파일이 변동 가능하므로 round-trip 동치성만 검증.
+    // The game's files can change, so only round-trip equivalence is verified.
     const round = parseStartLoadoutDef(serializeStartLoadoutRon(parsed));
     expect(round).toEqual(parsed);
-    // 회귀 가드: 비어있지 않아야 함
+    // A regression guard: it must not be empty
     expect(parsed.gold).toBeGreaterThanOrEqual(0);
-    // 게임이 sword/spear/bow + health_potion 을 기대 → spot check
+    // The game expects sword/spear/bow plus health_potion -> spot check
     expect(parsed.items).toContain("sword");
     expect(parsed.consumables.find((c) => c.id === "health_potion")?.count).toBeGreaterThanOrEqual(1);
-    // path/fs 변수가 사용됨을 명시
+    // makes clear that the path and fs variables are used
     void path;
   });
 });
@@ -1812,7 +1812,7 @@ describe("serializeTownConfigRon", () => {
   });
 });
 
-// ── Phase 2: 새 TriggerKind / ActionKind round-trip ──────────────────────────
+// ── Phase 2: round-tripping the new TriggerKind / ActionKind ──────────────────────────
 
 describe("quest RON — Phase 2: FOV 트리거 + 텔레포트/회수 액션", () => {
   function wrap(transitions: string, phases = `"a":QuestPhaseDef(dialog:[],objective:None),"b":QuestPhaseDef(dialog:[],objective:None)`) {
@@ -1913,7 +1913,7 @@ describe("quest RON — Phase 2: FOV 트리거 + 텔레포트/회수 액션", ()
   });
 
   it("ConsumableDef hidden=true 가 RON 라운드트립으로 보존된다", () => {
-    // 보너스 1: hidden 필드로 vendor 인벤토리 노출 제어.
+    // Bonus 1: the hidden field controls whether a vendor's inventory is exposed.
     const ron = serializeConsumablesRon([
       {
         kind: "consumable",
@@ -1949,7 +1949,7 @@ describe("quest RON — Phase 2: FOV 트리거 + 텔레포트/회수 액션", ()
   });
 
   it("QuestSpawn landmark=market 가 RON 라운드트립으로 보존된다", () => {
-    // 보너스 2: spawn 위치를 Town 안 Market landmark 로 한정.
+    // Bonus 2: the spawn position is restricted to the Market landmark inside Town.
     const quest: QuestDef = {
       id: "elder_tintham_quest",
       title: "장로의 비밀 간식",
@@ -1991,17 +1991,17 @@ describe("quest RON — Phase 2: FOV 트리거 + 텔레포트/회수 액션", ()
     const ron = serializeRon(quest);
     expect(ron).toContain("trigger: Interact");
     expect(ron).toContain("trigger: Auto");
-    // 구조체 형태가 아닌 bare ident
+    // a bare ident rather than a struct form
     expect(ron).not.toContain("Interact(");
     expect(ron).not.toContain("Auto(");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 상점 시스템 — buyPrice / sellPrice (Item) + vendorInventory (Villager)
+// The shop system - buyPrice / sellPrice (Item) plus vendorInventory (Villager)
 //
-// 게임 측 phase 2 에서 SHOP_CATALOG 하드코딩을 DB-driven 으로 전환하기 위한
-// webapp 측 데이터 + RON 직렬화. 모든 신규 필드는 Option<...> 으로 누락 호환.
+// The webapp-side data and RON serialisation for turning the game's phase-2 hard-coded SHOP_CATALOG
+// into something DB-driven. Every new field is Option<...>, so absence stays compatible.
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("serializeWeaponsRon — buyPrice/sellPrice (상점 가격)", () => {

@@ -1,13 +1,13 @@
-// 자동 생성된 RPG-Awesome 0.0.2 아이콘 메타데이터
-// 원본: https://github.com/nagoshiashumari/Rpg-Awesome (MIT/OFL 라이선스)
-// CSS 의 .ra-<name>:before { content: "<char>"; } 룰에서 추출.
-// 각 codepoint 는 PUA 영역(U+E900..=U+EAEE) 안에 있고, rpg-awesome.ttf 폰트로만
-// 표시 가능하다. 사용 예: <span className="rpg-icon">{String.fromCodePoint(0xe946)}</span>.
+// Auto-generated RPG-Awesome 0.0.2 icon metadata
+// Source: https://github.com/nagoshiashumari/Rpg-Awesome (MIT/OFL licensed)
+// Extracted from the CSS's .ra-<name>:before { content: "<char>"; } rules.
+// Every code point is inside the PUA range (U+E900..=U+EAEE) and can only be displayed with the
+// rpg-awesome.ttf font. Usage: <span className="rpg-icon">{String.fromCodePoint(0xe946)}</span>.
 
 export interface RpgAwesomeIcon {
-  /** kebab-case 아이콘 이름 (예: "broadsword") */
+  /** The kebab-case icon name ("broadsword", say) */
   name: string;
-  /** PUA 코드포인트 (10진수). 16진수는 toString(16) 으로 \u{XXXX} 변환. */
+  /** The PUA code point (decimal). toString(16) converts it to the hex \u{XXXX} form. */
   codepoint: number;
 }
 
@@ -509,12 +509,12 @@ export const RPG_AWESOME_ICONS: readonly RpgAwesomeIcon[] = [
   { name: "zigzag-leaf", codepoint: 0xEAEE },
 ];
 
-/** 코드포인트를 게임 RON 호환의 `\u{XXXX}` 리터럴로 포맷한다. */
+/** Formats a code point as the game's RON-compatible `\u{XXXX}` literal. */
 export function formatCodepoint(cp: number): string {
   return `\\u{${cp.toString(16).toUpperCase()}}`;
 }
 
-/** RON 의 `\u{XXXX}` 표기를 PUA 정수로 파싱한다. 실패 시 null. */
+/** Parses RON's `\u{XXXX}` notation into a PUA integer. null on failure. */
 export function parseCodepoint(literal: string): number | null {
   const m = literal.match(/^\\u\{([0-9a-fA-F]+)\}$/);
   if (!m) return null;

@@ -13,7 +13,7 @@ vi.mock('@/models/comment', () => ({ default: {} }));
 import Post from '@/models/post';
 import { getPaginatedPosts, __getAllTags } from './posts';
 
-// $facet.data 파이프라인 추출 헬퍼
+// a helper that extracts the $facet.data pipeline
 function getFacetData(pipeline: unknown[]): unknown[] {
   const facet = pipeline.find(
     (s): s is { $facet: { data: unknown[] } } =>
@@ -84,11 +84,11 @@ describe('getPaginatedPosts — aggregation pipeline', () => {
   });
 });
 
-// 태그 클라우드의 비공개 처리 (#230).
+// Privacy handling in the tag cloud (#230).
 //
-// 비공개 글에 태그를 달아도 **작성자 본인에게조차** 클라우드에 안 나왔다. 개별 태그 페이지
-// (`/tags/[tag]`)는 `privacyMatch(viewerEmail)` 로 본인 비공개 글을 포함하는데, 거기로
-// 데려다줄 클라우드는 세션을 받지도 않고 무조건 제외했다 — 의도가 한쪽에만 반영돼 있었다.
+// Tagging a private post kept it out of the cloud **even for its own author**. The individual tag page
+// (`/tags/[tag]`) includes the author's private posts through `privacyMatch(viewerEmail)`, but the cloud that would
+// take you there never received a session and excluded them outright - the intent lived on only one side.
 describe('__getAllTags — 태그 클라우드 비공개 처리', () => {
   beforeEach(() => {
     (Post.aggregate as Mock).mockClear();
@@ -116,7 +116,7 @@ describe('__getAllTags — 태그 클라우드 비공개 처리', () => {
     ]);
   });
 
-  // 하드 필터가 $or 옆에 남아 있으면 AND 로 묶여 $or 이 무력해진다 — 조용히 안 고쳐진다.
+  // A hard filter left beside the $or is ANDed with it and neuters it - and it does not get fixed quietly.
   it('뷰어가 있을 때 하드 isPrivate 필터가 남아 있으면 안 된다', async () => {
     await __getAllTags('me@x.test');
     expect(firstMatch().isPrivate).toBeUndefined();
@@ -128,10 +128,10 @@ describe('__getAllTags — 태그 클라우드 비공개 처리', () => {
   });
 });
 
-// 메인 화면 제목 검색 (#232).
+// Title search on the main screen (#232).
 //
-// __fetchPosts 는 원래부터 query 로 제목을 걸렀지만 밖으로 노출돼 있지 않았고,
-// **사용자 입력을 정규식으로 그대로** 썼다. 검색창을 붙이는 순간 `(` 하나로 500 이 난다.
+// __fetchPosts always filtered titles by query but was never exposed, and it used
+// **user input directly as a regex**. The moment a search box is attached, a single `(` gives a 500.
 describe('getPaginatedPosts — 제목 검색', () => {
   beforeEach(() => {
     (Post.aggregate as Mock).mockClear();
@@ -154,7 +154,7 @@ describe('getPaginatedPosts — 제목 검색', () => {
     expect(firstMatch().title).toEqual({ $regex: '고양이', $options: 'i' });
   });
 
-  // 이스케이프가 없으면 `(` 하나로 잘못된 정규식이 되어 500 이 난다.
+  // Without escaping, one `(` makes an invalid regex and returns 500.
   it('정규식 특수문자를 이스케이프한다', async () => {
     await getPaginatedPosts(1, 9, 'latest', null, true, null, 'a(b');
     expect((firstMatch().title as { $regex: string }).$regex).toBe('a\\(b');
@@ -165,7 +165,7 @@ describe('getPaginatedPosts — 제목 검색', () => {
     expect((firstMatch().title as { $regex: string }).$regex).toBe('\\.\\*');
   });
 
-  // 검색으로 남의 비공개 글이 새면 안 된다.
+  // Search must not leak someone else's private posts.
   it('검색 중에도 비공개 규칙이 그대로 붙는다', async () => {
     await getPaginatedPosts(1, 9, 'latest', null, true, 'me@x.test', '고양이');
     expect(firstMatch().$or).toEqual([

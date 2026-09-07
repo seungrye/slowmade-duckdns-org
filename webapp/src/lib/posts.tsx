@@ -9,8 +9,9 @@ import { escapeRegex } from "@/lib/utils";
 import { env } from "@/lib/env";
 
 /**
- * 비공개(isPrivate) 글 필터 조각. 비로그인/타인은 공개 글만, 로그인한 작성자는 공개 ∪ 본인 비공개.
- * Mongo match 에 spread 로 병합해 쓴다. 순수 함수(테스트 가능).
+ * The private-post (isPrivate) filter fragment. Logged out or someone else sees public posts only; a logged-in author
+ * sees public plus their own private ones.
+ * Spread into a Mongo match. A pure function (testable).
  */
 export function privacyMatch(viewerEmail?: string | null): Record<string, unknown> {
   return viewerEmail
@@ -42,8 +43,8 @@ async function __fetchPosts(params: SetPostQuery): Promise<{
   }
 
   if (query) {
-    // **반드시 이스케이프한다** (#232). 사용자가 친 글자를 정규식으로 그대로 쓰면
-    // `(` 하나로 잘못된 정규식이 되어 500 이 나고, `.*` 는 와일드카드로 동작한다.
+    // **Always escaped** (#232). Using what the user typed directly as a regex makes one `(` an invalid regex and a 500,
+    // while `.*` would act as a wildcard.
     matchStage.$match.title = { $regex: escapeRegex(query), $options: "i" };
   }
 
@@ -156,16 +157,16 @@ export async function getAllPosts(): Promise<{ id: string; createdAt: Date }[]> 
 }
 
 /**
- * 태그와 그 개수 집계.
+ * Aggregates the tags and their counts.
  *
- * `viewerEmail` 을 주면 **그 사람의 비공개 글 태그도 함께** 센다 (#230). 개별 태그
- * 페이지(`/tags/[tag]`)는 처음부터 그렇게 동작했는데 클라우드만 무조건 제외해서, 주소를
- * 직접 치면 글이 보이는데 거기로 데려다줄 태그는 클라우드에 없는 상태였다.
+ * Given `viewerEmail` it **also counts the tags on that person's private posts** (#230). The individual tag page
+ * (`/tags/[tag]`) worked that way from the start while only the cloud excluded them outright, so typing the address
+ * directly showed the posts while the tag that would take you there was missing from the cloud.
  *
- * **인자는 선택이다.** `lib/tags/suggest-tags.ts` 처럼 뷰어가 없는 배경 작업은 그냥 부르면
- * 되고, 그러면 `privacyMatch(undefined)` = 공개만이라 종전 동작 그대로다.
+ * **The argument is optional.** A background job with no viewer, such as `lib/tags/suggest-tags.ts`, just calls it,
+ * and `privacyMatch(undefined)` = public only, exactly as before.
  *
- * 남의 비공개 글은 어느 경우에도 걸리지 않는다 — `privacyMatch` 가 그렇게 생겼다.
+ * Someone else's private posts never match in any case - that is how `privacyMatch` is built.
  */
 export async function __getAllTags(
   viewerEmail?: string | null,
@@ -181,7 +182,7 @@ export async function __getAllTags(
     { $unwind: '$tags' },
     {
       $group: {
-        // tags 값을 모두 소문자로 변환하여 그룹화
+        // group by tag, lowercased
         _id: { $toLower: '$tags' }, 
         count: { $sum: 1 },
       },
@@ -207,8 +208,8 @@ export async function getAllTags(
 }
 
 /**
- * @param query 제목 검색어 (#232). **맨 뒤 선택 인자**라 기존 호출부는 그대로 둔다.
- *   공백만이면 없는 것으로 친다 — 검색창을 비웠을 때 전체 목록으로 돌아와야 한다.
+ * @param query the title search term (#232). It is **the last, optional argument**, so existing callers are unchanged.
+ *   Whitespace only counts as absent - clearing the search box must return the full list.
  */
 export async function getPaginatedPosts(page: number, limit: number, sort: SortOption = 'latest', userEmail: string | null | undefined = null, withComments: boolean = false, viewerEmail: string | null | undefined = null, query: string | null | undefined = null): Promise<{
   total: number;
@@ -226,9 +227,9 @@ export async function getPaginatedPosts(page: number, limit: number, sort: SortO
   });
 }
 
-// `searchPosts` 는 제거했다 (#232). 부르는 곳이 없는 죽은 코드였고, `getPaginatedPosts`
-// 와 같은 일을 하면서 **viewerEmail 을 받지 않아 작성자 본인의 비공개 글을 못 찾았다.**
-// 남겨 두면 나중에 검색을 붙일 때 이쪽이 배선될 위험이 있다.
+// `searchPosts` was removed (#232). It was dead code with no callers, did the same job as `getPaginatedPosts`, and
+// **took no viewerEmail, so it could not find the author's own private posts.**
+// Leaving it risked it being wired up when search was eventually added.
 
 export async function myPosts(userEmail: string | null | undefined, sort: SortOption = 'latest', page: number, limit: number, withComments: boolean = false): Promise<{
   total: number;
@@ -238,7 +239,7 @@ export async function myPosts(userEmail: string | null | undefined, sort: SortOp
     throw new Error("User email is required to fetch posts.");
   }
 
-  // 작성자 본인 대시보드 — 자기 비공개 글도 보여야 하므로 viewerEmail 도 본인.
+  // The author's own dashboard - their private posts must show, so viewerEmail is themselves.
   return await getPaginatedPosts(page, limit, sort, userEmail, withComments, userEmail);
 }
 
@@ -313,21 +314,21 @@ export async function updatePostViews(_id: string): Promise<void> {
 }
 
 /**
- * 삭제되지 않은 모든 글의 _id 목록. post/view 의 generateStaticParams 에서
- * ISR 정적 생성 대상 경로를 만드는 데 쓴다(빌드 후 작성된 글은 dynamicParams 로 on-demand).
+ * The _ids of every undeleted post. Used by post/view's generateStaticParams to build the paths for ISR static
+ * generation (posts written after the build are handled on demand through dynamicParams).
  */
 export async function getAllPostIds(): Promise<string[]> {
   await connectToDB();
-  // 비공개 글은 정적 생성 대상에서 제외(공개 캐시 유출 방지) — 뷰 페이지가 동적으로 인증 렌더.
+  // Private posts are excluded from static generation (so no public cache leaks) - the view page renders them dynamically, authenticated.
   const posts = await Post.find({ isDeleted: { $ne: true }, isPrivate: { $ne: true } }, '_id').lean();
   return posts.map((p) => String(p._id));
 }
 
 
 /**
- * 특정 태그를 포함하는 모든 게시글을 검색합니다.
- * @param tag 검색할 태그 문자열
- * @returns 해당 태그를 가진 게시글의 배열
+ * Finds every post carrying a given tag.
+ * @param tag the tag string to search for
+ * @returns the posts with that tag
  */
 export async function getPostsByTag(tag: string, viewerEmail?: string | null): Promise<{
   total: number;
@@ -343,7 +344,7 @@ export async function getPostsByTag(tag: string, viewerEmail?: string | null): P
   };
 
   if (tag) {
-    matchStage.$match["tags"] = { $regex: new RegExp(`^${escapeRegex(tag)}$`, 'iu') }; // 대소문자 구분 없이 정확히 일치하는 태그 검색
+    matchStage.$match["tags"] = { $regex: new RegExp(`^${escapeRegex(tag)}$`, 'iu') }; // an exact, case-insensitive tag match
   }
 
   const pipeline: PipelineStage[] = [

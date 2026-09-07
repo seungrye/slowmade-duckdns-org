@@ -1,11 +1,11 @@
-// 알림에서 덧글로 이동 (#241, #243) — 순수 부분.
+// Jumping from a notification to a comment (#241, #243) - the pure part.
 //
-// 처음엔 `#comment-<id>` 로 개별 덧글을 직접 노렸는데, 비공개 글은 클라이언트에서 나중에
-// 그려져 브라우저가 점프할 때 대상이 없었다.
+// It first targeted the individual comment with `#comment-<id>`, but a private post is rendered later on the client,
+// so the target did not exist when the browser tried to jump.
 //
-// 메인 화면의 말풍선(`post-item.tsx`)은 `#comments-section` 으로 간다 — **섹션 앵커**라
-// 렌더 타이밍을 타지 않는다. 알림도 그 방식을 따르고, 덧글 id 는 쿼리로 실어 보내
-// 도착한 뒤 그 덧글까지 한 번 더 스크롤한다. 못 찾아도 섹션에는 이미 도착해 있다.
+// The speech bubble on the main screen (`post-item.tsx`) goes to `#comments-section` - **a section anchor**, so it
+// does not depend on render timing. Notifications follow that, carrying the comment id as a query and scrolling once
+// more to that comment after arriving. Even if it is not found, the section has already been reached.
 import { describe, it, expect } from 'vitest';
 import {
   notificationHref,
@@ -52,11 +52,11 @@ describe('targetCommentId — 쿼리에서 대상 덧글 뽑기', () => {
   });
 });
 
-// 덧글 섹션은 본문 렌더가 끝나면(`richContentRendered`) 해시를 보고 **섹션 맨 위로**
-// 스크롤한다. 그게 CommentAnchor 의 "그 덧글 가운데로" 보다 **나중에** 실행돼 덮어썼다 —
-// 알림을 눌러도 늘 덧글 목록 처음으로 갔던 이유다 (#247).
+// Once the body has rendered (`richContentRendered`), the comment section reads the hash and scrolls to **the top of
+// the section**. That ran **after** CommentAnchor's "centre on that comment" and overwrote it - which is why tapping
+// a notification always landed at the start of the comment list (#247).
 //
-// 갈 곳이 정해져 있으면(`?c=`) 섹션 스크롤은 비켜 준다.
+// With a destination set (`?c=`), the section scroll stands aside.
 describe('shouldScrollToSection — 섹션 맨 위로 갈 것인가', () => {
   it('메인 말풍선처럼 해시만 있으면 섹션으로 간다', () => {
     expect(shouldScrollToSection('#comments-section', '')).toBe(true);
@@ -76,18 +76,18 @@ describe('shouldScrollToSection — 섹션 맨 위로 갈 것인가', () => {
   });
 });
 
-// 어디에 멈출 것인가 (#255).
+// Where to stop (#255).
 //
-// 예전엔 scrollIntoView({ block: 'center' }) 로 **덧글의 가운데**를 화면 중앙에 맞췄다.
-// 덧글이 화면보다 길면 상단이 화면 밖으로 밀린다 — 실측(1680×1000)에서 덧글 높이 1154,
-// 덧글 top -77 이었다. 가운데는 정확히 맞았는데 정작 첫 줄이 화면 위에 있었다.
+// It used to centre **the middle of the comment** with scrollIntoView({ block: 'center' }).
+// A comment taller than the viewport then has its top pushed off screen - measured (1680x1000), the comment was 1154
+// tall with a top of -77. The middle was exact while the first line sat above the screen.
 //
-// 이제 **박스 상단**을 화면 높이의 2/5 지점에 놓는다. 위쪽 40% 로 앞 맥락이 보이고,
-// 덧글은 첫 줄부터 읽힌다.
+// Now **the top of the box** is placed two fifths down the viewport. The upper 40% shows the preceding context, and
+// the comment reads from its first line.
 describe('scrollTopFor — 덧글 상단을 화면 2/5 지점에', () => {
   it('요소 상단이 화면 높이의 40% 지점에 오도록 계산한다', () => {
-    // 화면 안 300px 지점에 있는 요소, 현재 500 스크롤, 화면 1000 →
-    // 문서상 top 800, 목표는 800 - 400 = 400.
+    // An element 300px into the viewport, scrolled to 500, viewport 1000 ->
+    // document top 800, target 800 - 400 = 400.
     expect(scrollTopFor(300, 500, 1000)).toBe(400);
   });
 
@@ -95,13 +95,13 @@ describe('scrollTopFor — 덧글 상단을 화면 2/5 지점에', () => {
     expect(scrollTopFor(400, 500, 1000)).toBe(500);
   });
 
-  // 요소 높이는 인자에 아예 없다 — center 방식이 깨졌던 지점이 바로 높이 의존이었다.
+  // The element's height is not an argument at all - height dependence is exactly where the centre approach broke.
   it('덧글이 아무리 길어도 결과가 달라지지 않는다 (높이를 안 본다)', () => {
     expect(scrollTopFor(600, 1000, 1000)).toBe(1200);
   });
 
   it('문서 맨 위 근처면 0 아래로 내려가지 않는다', () => {
-    // 문서상 top 300, 목표 -100 → 더 올라갈 곳이 없으니 0.
+    // document top 300, target -100 -> nowhere further up, so 0.
     expect(scrollTopFor(300, 0, 1000)).toBe(0);
   });
 

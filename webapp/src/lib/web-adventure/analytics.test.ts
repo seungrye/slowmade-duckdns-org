@@ -1,4 +1,4 @@
-// web-adventure analytics 헬퍼 (#245).
+// The web-adventure analytics helper (#245).
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -24,7 +24,7 @@ describe('logAdvEvent', () => {
     const fakeAnalytics = { app: 'mock' };
     (getFirebaseAnalytics as ReturnType<typeof vi.fn>).mockResolvedValue(fakeAnalytics);
     logAdvEvent('run_started', { ability: 'scholar' });
-    // 마이크로태스크 await
+    // awaiting a microtask
     await new Promise((r) => setTimeout(r, 0));
     expect(logEvent).toHaveBeenCalledWith(fakeAnalytics, 'adv_run_started', { ability: 'scholar' });
   });

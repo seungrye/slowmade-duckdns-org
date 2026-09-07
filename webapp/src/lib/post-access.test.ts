@@ -1,7 +1,7 @@
-// 봇 덧글 권한 (#205).
+// Bot comment permissions (#205).
 //
-// enji·painter 라우트가 글을 **존재만** 확인하고 통과시켰다. 로그인만 했으면 남의 비공개 글에
-// 덧글을 넣을 수 있었고, enji 는 그 본문 3000자를 Gemini 로 보냈다.
+// The enji and painter routes only checked that the post **existed** before letting it through. Merely being logged in
+// allowed commenting on someone else's private post, and enji sent 3000 characters of its body to Gemini.
 import { describe, it, expect } from 'vitest';
 import { canCommentOn } from './post-access';
 
@@ -15,7 +15,7 @@ describe('canCommentOn', () => {
     expect(canCommentOn(post, other)).toBe(true);
   });
 
-  // 이게 뚫렸던 지점이다.
+  // This is where it leaked.
   it('비공개 글은 본인만 — 타인은 거부', () => {
     const post = { isPrivate: true, isDeleted: false, userEmail: owner };
     expect(canCommentOn(post, other)).toBe(false);
@@ -38,7 +38,7 @@ describe('canCommentOn', () => {
     expect(canCommentOn({ userEmail: owner }, null)).toBe(true);
   });
 
-  // 세션 이메일이 비어 있을 때 userEmail 이 비어 있는 문서와 맞아떨어지면 안 된다.
+  // An empty session email must not match a document whose userEmail is empty.
   it('빈 이메일 세션을 소유자로 오인하지 않는다', () => {
     const post = { isPrivate: true, isDeleted: false, userEmail: '' };
     expect(canCommentOn(post, '')).toBe(false);

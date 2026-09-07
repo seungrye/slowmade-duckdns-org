@@ -1,14 +1,14 @@
 /**
- * 라이더-웨이트-스미스(RWS) 타로 78장 — **단일 출처** (#388).
+ * The 78-card Rider-Waite-Smith (RWS) tarot deck - **the single source** (#388).
  *
- * 이 배열이 카드의 정본이다. 뽑기(draw)·풀이(reading)·화면·업로드 스크립트가 전부 여기서
- * id·이름·키워드를 읽는다. 목록이 두 곳에 있으면 어긋난다([[single-source-facts]] 원칙).
+ * This array is the canonical deck. The draw, the reading, the UI and the upload script all read ids, names and
+ * keywords from here. A list in two places drifts apart (the [[single-source-facts]] principle).
  *
- * 구성: 메이저 아르카나 22장(0-21) + 마이너 56장(4수트 × 14랭크). id 0-77 연속.
- * 마이너는 표준 RWS 의미를 **수트 원소 + 랭크 원형**으로 조합해 만든다 — 실제 RWS 마이너가
- * 그렇게 읽힌다(예: 컵 2 = 감정 영역의 결합). 손으로 78벌을 적는 것보다 어긋날 여지가 적다.
+ * Composition: 22 major arcana (0-21) plus 56 minor (4 suits x 14 ranks), with ids 0-77 contiguous. The minors are
+ * built by combining **the suit's element with the rank's archetype** from standard RWS meanings - which is how the
+ * real RWS minors read (Two of Cups = union in the emotional domain). It leaves less room for drift than writing out 78 by hand.
  *
- * 이미지 키는 `tarot/rws/{id}.jpg`(MinIO). 원화는 퍼블릭 도메인(1909, Pamela Colman Smith).
+ * The image key is `tarot/rws/{id}.jpg` (MinIO). The artwork is public domain (1909, Pamela Colman Smith).
  */
 
 export type Arcana = "major" | "wands" | "cups" | "swords" | "pentacles";
@@ -17,17 +17,17 @@ export type Orientation = "up" | "rev";
 export interface TarotCard {
   id: number; // 0-77
   arcana: Arcana;
-  /** 메이저는 0-21, 마이너는 1-14(에이스=1 … 킹=14). */
+  /** Majors are 0-21; minors are 1-14 (ace = 1 ... king = 14). */
   num: number;
   nameEn: string;
   nameKr: string;
   keywordsUp: string[];
   keywordsRev: string[];
-  /** MinIO 이미지 키. */
+  /** The MinIO image key. */
   image: string;
 }
 
-// ── 메이저 아르카나 22 ──────────────────────────────────────────────
+// ── The 22 major arcana ──────────────────────────────────────────────
 const MAJOR: Omit<TarotCard, "id" | "image">[] = [
   { arcana: "major", num: 0, nameEn: "The Fool", nameKr: "바보", keywordsUp: ["새로운 시작", "순수한 모험", "가능성"], keywordsRev: ["무모함", "망설임", "헛디딤"] },
   { arcana: "major", num: 1, nameEn: "The Magician", nameKr: "마법사", keywordsUp: ["의지", "실현", "재능의 집중"], keywordsRev: ["헛된 술수", "미룸", "재능 낭비"] },
@@ -53,7 +53,7 @@ const MAJOR: Omit<TarotCard, "id" | "image">[] = [
   { arcana: "major", num: 21, nameEn: "The World", nameKr: "세계", keywordsUp: ["완성", "통합", "성취"], keywordsRev: ["미완", "마무리 지연", "다음 단계 준비"] },
 ];
 
-// ── 마이너 아르카나 — 수트 원소 + 랭크 원형 ──────────────────────────
+// ── The minor arcana - the suit's element plus the rank's archetype ──────────────────────
 const SUITS: { key: Exclude<Arcana, "major">; kr: string; flavor: string }[] = [
   { key: "wands", kr: "완드", flavor: "열정·행동" },
   { key: "cups", kr: "컵", flavor: "감정·관계" },
@@ -87,7 +87,7 @@ function buildDeck(): TarotCard[] {
         num: r.num,
         nameEn: `${r.en} of ${cap(s.key)}`,
         nameKr: `${s.kr} ${r.kr}`,
-        // 수트 성격을 랭크 원형에 얹는다 — 마지막에 수트 결을 한 조각 더한다.
+        // The suit's character is laid over the rank's archetype - one more note of the suit at the end.
         keywordsUp: [...r.up, s.flavor],
         keywordsRev: [...r.rev],
       });
@@ -100,7 +100,7 @@ function cap(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** 78장 정본. 인덱스 = id. */
+/** The canonical 78. The index is the id. */
 export const TAROT_DECK: readonly TarotCard[] = buildDeck();
 
 export const DECK_SIZE = TAROT_DECK.length; // 78
@@ -109,7 +109,7 @@ export function cardById(id: number): TarotCard | undefined {
   return TAROT_DECK[id];
 }
 
-/** 화면·풀이가 쓰는 방향별 키워드. */
+/** The per-orientation keywords the UI and the reading use. */
 export function keywordsOf(card: TarotCard, orientation: Orientation): string[] {
   return orientation === "up" ? card.keywordsUp : card.keywordsRev;
 }

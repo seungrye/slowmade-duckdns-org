@@ -32,7 +32,7 @@ describe("renderInline — 서식 규약(FORMAT.md) 토큰", () => {
 
   it("혼합 문장 — 희곡체 한 줄", () => {
     const nodes = renderInline('**밀수꾼** *(떨며)* "그건 [[사제단]]의 것이오."');
-    // strong, 공백, em, 공백, 대사 span("그건 " 포함)… 대사 안 [[]] 는 대사 토큰이 먼저 먹는다
+    // strong, a space, em, a space, then the dialogue span - inside dialogue, the dialogue token wins over [[ ]]
     const types = nodes.map((n) => (typeof n === "string" ? "text" : (n as El).type));
     expect(types[0]).toBe("strong");
     expect(types).toContain("em");

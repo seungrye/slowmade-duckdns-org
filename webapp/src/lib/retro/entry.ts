@@ -1,33 +1,33 @@
-// 라이브러리에 늘어놓을 항목 한 벌 (#109).
+// One entry as laid out in the library (#109).
 //
-// 목록에는 성격이 다른 둘이 섞인다 — 저장소에 딸려 오는 **기본 제공 홈브류**와 사용자가
-// **직접 올린 롬**. 화면·검색·필터가 둘을 구분하지 않아도 되도록 여기서 같은 모양으로 만든다.
+// The list mixes two different things - the **bundled homebrew** that ships with the repo, and the ROMs users
+// **uploaded themselves**. They are given the same shape here so the UI, search and filters need not tell them apart.
 
 import { isArcade, platformById, type PlatformId } from './platforms';
 
 export type GameSource = 'builtin' | 'rom';
 
 export interface GameEntry {
-  /** 목록 key — 출처를 포함해 두 목록을 합쳐도 충돌하지 않는다. */
+  /** The list key - it includes the origin, so merging the two lists cannot collide. */
   key: string;
   source: GameSource;
   id: string;
   title: string;
   platform: PlatformId;
-  /** 커버 이미지 경로. 없으면 카드가 폴백 타일을 그린다. */
+  /** The cover image path. Without it the card draws a fallback tile. */
   cover?: string;
-  /** 에뮬레이터가 받아 갈 롬 주소. 반드시 같은 출처(우리 서버)여야 한다. */
+  /** The ROM address the emulator fetches. It must be same-origin (our server). */
   romUrl: string;
   playHref: string;
-  /** 카드 아래 작은 글씨 — 출처 또는 파일 크기. */
+  /** The small print under the card - the source or the file size. */
   subtitle?: string;
-  /** 아래 셋은 업로드 롬에만 있다 (#116) — 카드가 패치 칩과 세이브 점을 그리는 데 쓴다. */
+  /** The three below exist only for uploaded ROMs (#116) - the card uses them to draw the patch chip and the save dot. */
   patch?: RomPatchDto;
   patchEnabled?: boolean;
   hasSave?: boolean;
-  /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. 합치지 않고 따로 둔다 (#148). */
+  /** The parent ROM set addresses to place alongside the core (#143) - arcade split sets. Kept separate rather than merged (#148). */
   parentUrls?: string[];
-  /** 옛 이름(`file.srm`)의 게임 세이브를 되살릴 대상인가 (#175). `ROM_URL_CHANGED_AT` 참고. */
+  /** Whether it is a candidate for restoring a game save under the old name (`file.srm`) (#175). See `ROM_URL_CHANGED_AT`. */
   legacySave?: boolean;
 }
 
@@ -35,11 +35,11 @@ export interface BuiltinGame {
   slug: string;
   title: string;
   platform: PlatformId;
-  /** `public/games/retro/roms/` 안의 파일명. */
+  /** The filename inside `public/games/retro/roms/`. */
   file: string;
-  /** 커버 파일명(`public/games/retro/covers/`). 없으면 폴백 타일. */
+  /** The cover filename (`public/games/retro/covers/`). Without it, a fallback tile. */
   cover?: string;
-  /** 받아온 곳 — 라이선스 확인용으로 화면에 노출한다. */
+  /** Where it came from - shown in the UI so the licence can be checked. */
   source: string;
   license: string;
   description?: string;
@@ -58,31 +58,31 @@ export interface UserRomDto {
   platform: PlatformId;
   size: number;
   createdAt: string;
-  /** 올릴 때의 원본 파일명 — 아케이드는 이 이름으로 게임을 식별한다 (#139). */
+  /** The original filename at upload - arcade identifies the game by this name (#139). */
   filename?: string;
-  /** 살아 있는 패치 — 롬당 최대 하나 (#116). */
+  /** The live patch - at most one per ROM (#116). */
   patch?: RomPatchDto;
-  /** 패치를 적용할지. 카드의 체크박스가 뒤집는다. */
+  /** Whether to apply the patch. The card's checkbox toggles it. */
   patchEnabled?: boolean;
-  /** 서버 세이브가 있는지 — 카드 모서리의 표시. */
+  /** Whether a server save exists - the marker in the card's corner. */
   hasSave?: boolean;
-  /** 사용자가 올린 커버 주소 (#122). 없으면 카드가 폴백 타일을 그린다. */
+  /** The user-uploaded cover's address (#122). Without it the card draws a fallback tile. */
   coverUrl?: string;
-  /** 코어에 함께 놓을 부모 롬셋 이름들 (#143) — 이름이 곧 아카이브 이름이라 그대로 쓴다. */
+  /** The parent ROM set names to place alongside the core (#143) - the name is the archive name, so it is used as is. */
   parentSets?: string[];
 }
 
 /**
- * #137(롬 주소 끝을 `<id>.<확장자>` 로 바꾼 변경)이 배포된 시각 — PR #138 병합 시점.
+ * When #137 (changing the ROM address to end in `<id>.<ext>`) was deployed - the moment PR #138 merged.
  *
- * 이 변경으로 코어가 배터리 세이브를 찾는 이름이 `file.srm` 에서 `<id>.srm` 으로 옮겨 갔다.
- * 그래서 **이 시각 이전에 올린 롬만** 옛 이름의 세이브를 가질 수 있다 — 그 뒤에 올린 롬은
- * 처음부터 새 주소로만 실행됐다. `file.srm` 은 게임끼리 **공유하던 이름**이라, 이 경계가
- * 남의 세이브를 엉뚱한 게임이 끌어가는 것을 막는 자물쇠다.
+ * That change moved the name the core looks for its battery save under from `file.srm` to `<id>.srm`.
+ * So **only ROMs uploaded before this moment** can have a save under the old name - anything after ran on the new
+ * address from the start. `file.srm` was **a name shared between games**, so this boundary is the lock that stops one
+ * game pulling in another's save.
  */
 export const ROM_URL_CHANGED_AT = '2026-08-13T03:21:16.000Z';
 
-/** 옛 이름(`file.srm`)의 세이브가 있을 수 있는 롬인가 (#175). 모르면 false — 모를 땐 안 건드린다. */
+/** Whether this ROM might have a save under the old name (`file.srm`) (#175). Unknown gives false - when unsure, leave it alone. */
 function hasLegacySave(createdAt: string | undefined): boolean {
   const t = Date.parse(createdAt ?? '');
   return Number.isFinite(t) && t < Date.parse(ROM_URL_CHANGED_AT);
@@ -112,10 +112,10 @@ export function romEntry(rom: UserRomDto): GameEntry {
     id: rom.id,
     title: rom.title,
     platform: rom.platform,
-    // 카드는 cover 가 있으면 그림을, 없으면 타일을 그린다 — 분기를 새로 만들 필요가 없다.
+    // The card draws the image when there is a cover and a tile otherwise - no new branch is needed.
     cover: rom.coverUrl,
-    // 공개 /s3/ 경로를 쓰지 않는다 — 주소만 알면 남이 받아 갈 수 있다.
-    // 올린 사람 본인만 통과하는 인증 프록시로만 내려준다.
+    // The public /s3/ path is not used - anyone who knows the address could download it.
+    // It is served only through an authenticated proxy that admits the uploader alone.
     romUrl: romFileUrl(rom),
     playHref: `/games/retro/play/rom/${rom.id}`,
     subtitle: formatBytes(rom.size),
@@ -130,17 +130,17 @@ export function romEntry(rom: UserRomDto): GameEntry {
 }
 
 /**
- * 롬 파일 주소 (#137).
+ * The ROM file address (#137).
  *
- * 끝을 `<id>.<확장자>` 로 맺는다. **EmulatorJS 는 URL 의 마지막 조각을 브라우저 캐시(IndexedDB)
- * 키로 쓴다** — 예전처럼 모두 `.../file` 로 끝나면 키가 하나로 겹쳐, 바이트 크기가 같은 두 롬이
- * 있을 때 엉뚱한 게임이 뜰 수 있다. id 를 넣어 롬마다 키가 갈리게 한다.
- * 확장자는 코어가 쓰는 가상 파일명에도 그대로 붙는다.
+ * It ends in `<id>.<ext>`. **EmulatorJS uses the last segment of the URL as its browser cache (IndexedDB) key** - when
+ * everything ended in `.../file` as before, the keys collided into one, so two ROMs of the same byte size could load
+ * the wrong game. Including the id keeps the keys distinct per ROM.
+ * The extension also carries through to the virtual filename the core uses.
  */
 export function romFileUrl(rom: { id: string; platform: PlatformId; filename?: string }): string {
-  // 아케이드는 **파일명이 곧 게임 이름**이다(ssf2t.zip). 바꾸면 코어가 롬을 못 찾는다.
-  // 그 대신 캐시 키도 파일명으로 갈리는데, 같은 이름·같은 크기를 두 번 올리는 경우에만
-  // 겹치므로 실질적인 위험은 없다.
+  // On arcade **the filename is the game's name** (ssf2t.zip). Change it and the core cannot find the ROM.
+  // The cache key then splits by filename instead, which only collides when the same name and size is uploaded twice,
+  // so there is no real risk.
   if (isArcade(rom.platform) && rom.filename) {
     return `/api/games/retro/roms/${rom.id}/file/${encodeURIComponent(rom.filename)}`;
   }
@@ -152,6 +152,6 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   const mb = bytes / (1024 * 1024);
-  // 1.5 MB 처럼 한 자리까지 — 정수로 반올림하면 0 MB 가 나온다.
+  // One decimal place, as in 1.5 MB - rounding to an integer would show 0 MB.
   return `${mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB`;
 }

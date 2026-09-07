@@ -33,24 +33,24 @@ function tokenize(src: string): Token[] {
   let i = 0;
 
   while (i < src.length) {
-    // 라인 주석
+    // a line comment
     if (src[i] === "/" && src[i + 1] === "/") {
       while (i < src.length && src[i] !== "\n") i++;
       continue;
     }
-    // RON 확장 directive (예: #![enable(implicit_some)]) — 라인 스킵
+    // a RON extension directive (#![enable(implicit_some)], say) - skip the line
     if (src[i] === "#") {
       while (i < src.length && src[i] !== "\n") i++;
       continue;
     }
-    // 공백
+    // whitespace
     if (/\s/.test(src[i])) { i++; continue; }
-    // 문자열
-    // Rust/RON 호환 escape 처리:
-    //   \n \r \t \\ \" \0  → 표준 escape
-    //   \x7F                → 8비트 hex (Rust 호환, 0x7F 까지만 안전)
-    //   \u{XXXX} / \u{XXXXXX} → 유니코드 codepoint (game RON 의 glyph_game_icon 이 사용)
-    //   기타 \?              → ? 를 그대로 (예: 이전 호환 유지)
+    // a string
+    // Rust/RON-compatible escape handling:
+    //   \n \r \t \\ \" \0  -> the standard escapes
+    //   \x7F                -> 8-bit hex (Rust-compatible, safe only up to 0x7F)
+    //   \u{XXXX} / \u{XXXXXX} -> a Unicode code point (used by the game RON's glyph_game_icon)
+    //   any other \?         -> the ? as is (kept for backwards compatibility)
     if (src[i] === '"') {
       let s = "";
       i++;
@@ -65,7 +65,7 @@ function tokenize(src: string): Token[] {
           else if (esc === "\\") { s += "\\"; i++; }
           else if (esc === '"')  { s += '"';  i++; }
           else if (esc === "x") {
-            // \xHH (2 자리 hex)
+            // \xHH (2 hex digits)
             const hh = src.slice(i + 1, i + 3);
             const cp = parseInt(hh, 16);
             if (/^[0-9a-fA-F]{2}$/.test(hh) && Number.isFinite(cp)) {
@@ -76,7 +76,7 @@ function tokenize(src: string): Token[] {
             }
           }
           else if (esc === "u" && src[i + 1] === "{") {
-            // \u{XXXX} — 1~6 자리 hex
+            // \u{XXXX} - 1 to 6 hex digits
             const end = src.indexOf("}", i + 2);
             if (end >= 0) {
               const hex = src.slice(i + 2, end);
@@ -85,7 +85,7 @@ function tokenize(src: string): Token[] {
                 s += String.fromCodePoint(cp);
                 i = end + 1;
               } else {
-                // 잘못된 형식 — escape 를 그대로 보존
+                // a malformed form - the escape is preserved as is
                 s += esc;
                 i++;
               }
@@ -95,7 +95,7 @@ function tokenize(src: string): Token[] {
             }
           }
           else {
-            // 알 수 없는 escape — escape 문자만 보존 (이전 동작 호환)
+            // an unknown escape - only the escaped character is kept (matching the previous behaviour)
             s += esc; i++;
           }
         }
@@ -108,14 +108,14 @@ function tokenize(src: string): Token[] {
       tokens.push({ kind: "str", val: s });
       continue;
     }
-    // 식별자 / 키워드
+    // identifiers and keywords
     if (/[a-zA-Z_]/.test(src[i])) {
       let s = "";
       while (i < src.length && /[\w]/.test(src[i])) s += src[i++];
       tokens.push({ kind: "ident", val: s });
       continue;
     }
-    // 숫자 (음수·소수 포함)
+    // numbers (negatives and decimals included)
     if (/[0-9]/.test(src[i]) || (src[i] === "-" && /[0-9]/.test(src[i + 1] ?? ""))) {
       let s = "";
       if (src[i] === "-") s += src[i++];
@@ -123,7 +123,7 @@ function tokenize(src: string): Token[] {
       tokens.push({ kind: "num", val: Number(s) });
       continue;
     }
-    // 구두점
+    // punctuation
     tokens.push({ kind: "punct", val: src[i++] });
   }
 
@@ -179,7 +179,7 @@ class Parser {
   }
 
   parseOptionString(): string | null {
-    // implicit_some: bare 문자열도 수용
+    // implicit_some: a bare string is accepted too
     if (this.peek()?.kind === "str") return this.parseString();
     const name = this.parseIdent();
     if (name === "None") return null;
@@ -211,9 +211,9 @@ class Parser {
     return [a, b, c];
   }
 
-  // ── ItemDef (4 종) ────────────────────────────────────────────────────────
+  // ── ItemDef (4 kinds) ────────────────────────────────────────────────────────
 
-  // 공통 필드를 def 객체에 채워넣고 미처리 키를 콜백으로 위임
+  // Fills the shared fields into the def object and delegates unhandled keys to the callback
   parseItemCommon(handleKindKey: (key: string) => boolean): {
     id: string; displayName: string;
     glyphAscii: string; glyphGameIcon: string;
@@ -231,8 +231,8 @@ class Parser {
         case "id":              id = this.parseString(); break;
         case "display_name":    displayName = this.parseString(); break;
         case "glyph_ascii":     glyphAscii = this.parseString(); break;
-        // 하위 호환: 옛 RON 의 glyph_unicode 키는 silently 소비 (값 폐기).
-        // 마이그레이션 후 모든 RON 에서 제거되었으나, 캐시된 옛 데이터를 안전하게 흡수.
+        // Backwards compatibility: an old RON's glyph_unicode key is consumed silently (its value discarded).
+        // It was removed from every RON after the migration, but cached old data is absorbed safely.
         case "glyph_unicode":   this.parseString(); break;
         case "glyph_game_icon": glyphGameIcon = this.parseString(); break;
         case "pickup_message":  pickupMessage = this.parseString(); break;
@@ -295,7 +295,7 @@ class Parser {
       return false;
     });
     this.expectPunct(")");
-    // fallback: 둘 중 한쪽만 있어도 다른쪽을 추론 → round-trip 안전성 확보
+    // fallback: with only one of the two present the other is inferred -> round-trip safe
     if (attackPower === undefined) {
       if (attackPowerMin !== undefined && attackPowerMax !== undefined) {
         attackPower = Math.round((attackPowerMin + attackPowerMax) / 2);
@@ -394,11 +394,11 @@ class Parser {
   }
 
   // ── StartLoadout ─────────────────────────────────────────────────────────
-  // 게임 측 Rust StartLoadout: { gold: u32, weapon: Option<String>, armor: Option<String>,
+  // The game's Rust StartLoadout: { gold: u32, weapon: Option<String>, armor: Option<String>,
   //                             items: Vec<String>, consumables: Vec<(String, u32)> }
-  // implicit_some directive 있을 수도 없을 수도 있어 양쪽 다 수용.
+  // The implicit_some directive may or may not be present, so both are accepted.
 
-  /** `("health_potion", 10)` 형식의 (id, count) 튜플. */
+  /** An (id, count) tuple in the `("health_potion", 10)` form. */
   parseConsumableTuple(): { id: string; count: number } {
     this.expectPunct("(");
     const id = this.parseString();
@@ -409,7 +409,7 @@ class Parser {
     return { id, count };
   }
 
-  /** weapon/armor 의 Option<String> — None, Some("x"), 또는 bare "x" (implicit_some). */
+  /** weapon/armor's Option<String> - None, Some("x"), or a bare "x" (implicit_some). */
   parseOptionStringField(): string | null {
     if (this.peek()?.kind === "str") return this.parseString();
     const name = this.parseIdent();
@@ -474,21 +474,21 @@ class Parser {
         case "name":       def.name       = this.parseString(); break;
         case "color":      def.color      = this.parseNumberTuple3(); break;
         case "dialogs":    def.dialogs    = this.parseArray(() => this.parseString()); break;
-        // 하위호환: 구 형식의 quest_id 는 소비 후 무시
+        // Backwards compatibility: the old form's quest_id is consumed and ignored
         case "quest_id":   this.parseOptionString(); break;
         case "speed":      def.speed      = this.parseNumber(); break;
         case "stationary": def.stationary = this.parseBool(); break;
         case "vendor":     def.vendor     = this.parseBool(); break;
-        // home_zone — 게임의 ZoneId 와 동일한 RON 인코딩(parseSpawnZone 재사용).
-        // 누락 시 default = Town (게임 측 #[serde(default)] 와 미러).
+        // home_zone - the same RON encoding as the game's ZoneId (reusing parseSpawnZone).
+        // Absent defaults to Town (mirroring the game's #[serde(default)]).
         case "home_zone":  def.homeZone   = this.parseSpawnZone(); break;
         // home_landmark — PascalCase enum (Random/Road/Inn/Smithy/Temple/Guard/
-        // Market/Manor). 누락 시 default = "random" (게임 측 #[serde(default)] 미러).
+        // Market/Manor). Absent defaults to "random" (mirroring the game's #[serde(default)]).
         case "home_landmark": def.homeLandmark = this.parseHomeLandmark(); break;
-        // free_roam — bool. 누락 시 default = false (게임 측 #[serde(default)] 미러).
+        // free_roam - a bool. Absent defaults to false (mirroring the game's #[serde(default)]).
         case "free_roam":  def.freeRoam   = this.parseBool(); break;
-        // vendor_vision_radius — Option<u32>. None / Some(N) / 누락 모두 허용.
-        // 누락은 game 측 #[serde(default) None] 미러 — undefined 로 둔다.
+        // vendor_vision_radius - Option<u32>. None, Some(N) and absent are all accepted.
+        // Absent mirrors the game's #[serde(default) None] - left as undefined.
         case "vendor_vision_radius": {
           const t = this.peek();
           if (t?.kind === "ident" && t.val === "None") {
@@ -500,7 +500,7 @@ class Parser {
             def.vendorVisionRadius = this.parseNumber();
             this.expectPunct(")");
           } else {
-            // implicit_some — bare 숫자 N → Some(N).
+            // implicit_some - a bare number N becomes Some(N).
             def.vendorVisionRadius = this.parseNumber();
           }
           break;
@@ -566,7 +566,7 @@ class Parser {
     return def;
   }
 
-  /** Some("fire") | None — 몬스터 원소 (poison 포함). */
+  /** Some("fire") | None - the monster's element (poison included). */
   parseMonsterElement(): MonsterElement | null {
     const peek = this.parseIdent();
     if (peek === "None") return null;
@@ -588,8 +588,8 @@ class Parser {
   }
 
   /**
-   * HomeLandmark enum — bare ident (Random | Road | Inn | Smithy | Temple |
-   * Guard | Market | Manor). 게임 측 PascalCase 와 TS lowercase 매핑.
+   * The HomeLandmark enum - a bare ident (Random | Road | Inn | Smithy | Temple |
+   * Guard | Market | Manor). It maps the game's PascalCase to TS lowercase.
    */
   parseHomeLandmark(): HomeLandmark {
     const v = this.parseIdent();
@@ -733,7 +733,7 @@ class Parser {
         return { type: "RemoveItem", itemId };
       }
       case "RemoveItems": {
-        // RemoveItems(item: "x", count: Some(2))  또는  RemoveItems(item: "x")
+        // RemoveItems(item: "x", count: Some(2))  or  RemoveItems(item: "x")
         let itemId = "";
         let count: number | undefined;
         while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
@@ -852,7 +852,7 @@ class Parser {
       case "PlaceTraps": {
         let kind: TrapKind = "Spike";
         let count = 1;
-        // hidden 미지정 시 serde default = true (게임 측 default_trap_hidden)
+        // With hidden unspecified, serde's default is true (the game's default_trap_hidden)
         let hidden = true;
         let zone: SpawnZone | undefined;
         while (!(this.peek()?.kind === "punct" && this.peek()?.val === ")")) {
@@ -902,7 +902,7 @@ class Parser {
       case "SpawnItem": {
         // SpawnItem(item_id: "x", zone: Some(...), landmark: Some(Market),
         //            vendor_distance_min: Some(2), count: Some(1))
-        // 모든 선택 필드는 None / Some / implicit_some / bare 모두 수용.
+        // Every optional field accepts None, Some, implicit_some and bare alike.
         let itemId = "";
         let zone: SpawnZone | undefined;
         let landmark: HomeLandmark | undefined;
@@ -984,7 +984,7 @@ class Parser {
 
   // ── Transition ─────────────────────────────────────────────────────────────
 
-  /** `when:` 값을 파싱한다. bare 조건(implicit_some), Some(..), None 모두 수용. */
+  /** Parses a `when:` value. A bare condition (implicit_some), Some(..) and None are all accepted. */
   parseWhenValue(): Condition | undefined {
     const t = this.peek();
     if (t?.kind === "ident" && (t.val === "Some" || t.val === "None")) {
@@ -1009,9 +1009,9 @@ class Parser {
         case "from":    from = this.parseString(); break;
         case "to":      to = this.parseString(); break;
         case "trigger": {
-          // 변형 두 종류:
+          // Two variant shapes:
           //   1) bare ident: Interact / Auto
-          //   2) 구조체: EnterNpcFov(npc_id: "x") / HoldingItemInNpcFov(npc_id: "x", item_id: "y")
+          //   2) a struct: EnterNpcFov(npc_id: "x") / HoldingItemInNpcFov(npc_id: "x", item_id: "y")
           const v = this.parseIdent();
           if (v === "Interact" || v === "Auto") {
             trigger = v;
@@ -1049,9 +1049,9 @@ class Parser {
 
   parseSpawnZone(): SpawnZone {
     const name = this.parseIdent();
-    // 괄호 없는 단순 변형:
-    //   - `Town` — 새 schema 의 유일한 정적 variant
-    //   - `Forest` / `MountainVillage` / `SeasideHarbor` — 옛 schema 호환 (Named 로 변환)
+    // Simple variants without parentheses:
+    //   - `Town` - the new schema's only static variant
+    //   - `Forest` / `MountainVillage` / `SeasideHarbor` - old-schema compatibility (converted to Named)
     if (!(this.peek()?.kind === "punct" && this.peek()?.val === "(")) {
       if (name === "Town") return { type: "Town" };
       if (name === "Forest")          return { type: "Named", id: "forest" };
@@ -1061,7 +1061,7 @@ class Parser {
     }
     this.expectPunct("(");
     if (name === "Dungeon") {
-      // 옛 schema 호환 — `Dungeon(N)` → `Named("dungeon_N")`.
+      // Old-schema compatibility - `Dungeon(N)` -> `Named("dungeon_N")`.
       const level = this.parseNumber();
       this.expectPunct(")");
       return { type: "Named", id: `dungeon_${level}` };
@@ -1075,15 +1075,15 @@ class Parser {
   }
 
   /**
-   * `Option<ZoneId>` 파싱 — None / Some(<zone>) / (implicit_some 활성 시)<zone> 직접.
+   * Parses an `Option<ZoneId>` - None, Some(<zone>), or (with implicit_some enabled) the <zone> directly.
    *
-   * - `None` → undefined
-   * - `Some(Named("…"))` → { type: "Named", id: "…" }
-   * - `Named("…")` (RON `#![enable(implicit_some)]`) → 직접 zone 파싱.
+   * - `None` -> undefined
+   * - `Some(Named("…"))` -> { type: "Named", id: "…" }
+   * - `Named("…")` (RON `#![enable(implicit_some)]`) -> parsed as a zone directly.
    *
-   * 게임 측 QuestAction 의 zone 필드는 `Option<ZoneId>`(`#[serde(default)] None`).
-   * 기존 RON 의 SpawnGuards/PlaceTraps/SpawnMonster 에 zone 필드 없는 경우는
-   * 호출부에서 키 자체가 없으므로 이 함수가 호출되지 않는다.
+   * The zone field on the game's QuestAction is `Option<ZoneId>` (`#[serde(default)] None`).
+   * When an existing RON's SpawnGuards/PlaceTraps/SpawnMonster has no zone field, the caller has no key at all and
+   * this function is never called.
    */
   parseOptionalZone(): SpawnZone | undefined {
     const tok = this.peek();
@@ -1098,13 +1098,13 @@ class Parser {
       this.expectPunct(")");
       return zone;
     }
-    // implicit_some — zone 값이 바로 옴.
+    // implicit_some - the zone value arrives directly.
     return this.parseSpawnZone();
   }
 
   parseSpawn(): QuestSpawn {
     let phase = "", item = "";
-    // 게임의 새 schema: Town | Named. 기본값은 dungeon_1 (가장 흔한 spawn zone).
+    // The game's new schema: Town | Named. The default is dungeon_1 (the commonest spawn zone).
     let zone: SpawnZone = { type: "Named", id: "dungeon_1" };
     let count: number | undefined;
     let condition: Condition | undefined;
@@ -1323,9 +1323,9 @@ export function parseStartLoadoutDef(src: string): StartLoadoutDef {
 
 function ind(n: number) { return "    ".repeat(n); }
 function q(s: string) {
-  // RON 문자열 직렬화: ASCII 인쇄 가능 문자는 그대로, 비-ASCII 중에서도 BMP 바깥/
-  // PUA(아이콘 폰트 영역) 처럼 가시성이 떨어지거나 깨지기 쉬운 코드포인트는 \u{XXXX}
-  // 로 escape 한다. 인쇄 가능 한글/한자 등 일반 BMP 글리프는 그대로 두어 가독성 유지.
+  // RON string serialisation: printable ASCII is kept as is, while non-ASCII code points that are hard to see or
+  // easily mangled - outside the BMP, or in the PUA (the icon font's range) - are escaped as \u{XXXX}.
+  // Ordinary printable BMP glyphs such as Hangul and hanja stay as they are, keeping it readable.
   let out = '"';
   for (const ch of s) {
     const cp = ch.codePointAt(0)!;
@@ -1338,7 +1338,7 @@ function q(s: string) {
     // 게임의 game-icons.net (PUA U+FF000~U+100005) 폰트 codepoint 가 안정 round-trip.
     else if (
       (cp >= 0xE000 && cp <= 0xF8FF) ||
-      cp >= 0x10000 // 모든 supplementary plane (이모지 등) 도 escape
+      cp >= 0x10000 // every supplementary plane (emoji and so on) is escaped too
     ) {
       out += `\\u{${cp.toString(16).toUpperCase()}}`;
     }
@@ -1399,7 +1399,7 @@ function serializeAction(action: Action, depth: number): string {
     }
     case "OpenZonePortal": {
       // OpenZonePortal(target: <ZoneId>, placement?: <PortalPlacement>)
-      // placement 미지정 시 게임 측 default = Border 가 적용된다. 명시되어 있으면 그대로 직렬화.
+      // With placement unspecified the game's default of Border applies. When stated, it is serialised as is.
       const parts = [`target: ${serializeZone(action.target)}`];
       if (action.placement) parts.push(`placement: ${serializePlacement(action.placement)}`);
       return `${i}OpenZonePortal(${parts.join(", ")})`;
@@ -1446,7 +1446,7 @@ function serializeAction(action: Action, depth: number): string {
 }
 
 function serializeZone(zone: SpawnZone): string {
-  // 단순 schema: Town 만 bare, 나머지는 Named("...").
+  // The simple schema: only Town is bare, everything else is Named("...").
   if (zone.type === "Town") return "Town";
   return `Named(${q(zone.id)})`;
 }
@@ -1476,7 +1476,7 @@ function serializePhase(phaseId: string, phase: QuestPhaseDef, depth: number): s
 function serializeTransition(t: QuestTransition, depth: number): string {
   const i = ind(depth);
   const i1 = ind(depth + 1);
-  // 트리거 직렬화 — bare ident (Interact/Auto) 또는 구조체 (EnterNpcFov/HoldingItemInNpcFov).
+  // Trigger serialisation - a bare ident (Interact/Auto) or a struct (EnterNpcFov/HoldingItemInNpcFov).
   let triggerStr: string = t.trigger;
   if (t.trigger === "EnterNpcFov") {
     const npc = t.triggerNpcId ?? "";
@@ -1489,7 +1489,7 @@ function serializeTransition(t: QuestTransition, depth: number): string {
   const head = `from: ${q(t.from)}, trigger: ${triggerStr}`;
   const whenPart = t.when ? `when: ${serializeCondition(t.when)}` : null;
 
-  // actions 가 없으면 한 줄로
+  // on one line when there are no actions
   if (t.actions.length === 0) {
     const parts = [head];
     if (whenPart) parts.push(whenPart);
@@ -1497,7 +1497,7 @@ function serializeTransition(t: QuestTransition, depth: number): string {
     return `${i}Transition(${parts.join(", ")}),`;
   }
 
-  // actions 가 있으면 여러 줄
+  // across several lines when there are actions
   const headParts = [head];
   if (whenPart) headParts.push(whenPart);
   const lines: string[] = [`${i}Transition(${headParts.join(", ")},`];
@@ -1517,7 +1517,7 @@ function serializeSpawn(s: QuestSpawn): string {
   if (s.count !== undefined) parts.push(`count: ${s.count}`);
   if (s.condition !== undefined) parts.push(`condition: Some(${serializeCondition(s.condition)})`);
   if (s.landmark !== undefined) {
-    // 게임 HomeLandmark enum 은 PascalCase (TS 는 kebab/lowercase).
+    // The game's HomeLandmark enum is PascalCase (TS uses kebab/lowercase).
     const pascal = s.landmark.charAt(0).toUpperCase() + s.landmark.slice(1);
     parts.push(`landmark: Some(${pascal})`);
   }
@@ -1533,8 +1533,8 @@ function serializeVillagerDef(v: VillagerDef): string {
   lines.push(`        id: ${q(v.id)},`);
   lines.push(`        name: ${q(v.name)},`);
   lines.push(`        color: (${v.color[0]}, ${v.color[1]}, ${v.color[2]}),`);
-  // stationary/vendor 는 게임 측 #[serde(default)] 와 호환을 위해 true 일 때만 출력.
-  // false(기본값)는 생략 → 기존 .ron 텍스트와 동일 형태 유지.
+  // stationary/vendor are emitted only when true, for compatibility with the game's #[serde(default)].
+  // false (the default) is omitted, keeping the same shape as the existing .ron text.
   if (v.stationary) lines.push(`        stationary: true,`);
   if (v.vendor)     lines.push(`        vendor: true,`);
   if (v.dialogs.length === 0) {
@@ -1545,30 +1545,30 @@ function serializeVillagerDef(v: VillagerDef): string {
     lines.push(`        ],`);
   }
   lines.push(`        speed: ${v.speed},`);
-  // home_zone — 기본 `Town` 은 생략(`#[serde(default)]` 와 호환). 그 외는 명시.
+  // home_zone - the default `Town` is omitted (compatible with `#[serde(default)]`). Anything else is stated.
   if (v.homeZone && v.homeZone.type !== "Town") {
     lines.push(`        home_zone: ${serializeZone(v.homeZone)},`);
   }
-  // home_landmark — 기본 `Random` 은 생략(게임 측 #[serde(default)] 미러).
-  // 그 외 14 값은 PascalCase enum 으로 명시:
+  // home_landmark - the default `Random` is omitted (mirroring the game's #[serde(default)]).
+  // The other 14 values are stated as PascalCase enum variants:
   //   Road/Inn/Smithy/Temple/Guard/Market/Manor/Tavern/Herbalist/Graveyard/
   //   Jail/Guild/Alchemist/Docks.
   if (v.homeLandmark && v.homeLandmark !== "random") {
     const pascal = v.homeLandmark.charAt(0).toUpperCase() + v.homeLandmark.slice(1);
     lines.push(`        home_landmark: ${pascal},`);
   }
-  // free_roam — 기본 false 는 생략(게임 측 #[serde(default)] 미러). true 만 출력.
+  // free_roam - the default false is omitted (mirroring the game's #[serde(default)]). Only true is emitted.
   if (v.freeRoam) lines.push(`        free_roam: true,`);
-  // vendor_vision_radius — Option<u32>. None (또는 null/undefined) 은 생략 (게임
-  // 측 #[serde(default) None] 미러). 명시값만 Some(N) 으로 출력.
+  // vendor_vision_radius - Option<u32>. None (or null/undefined) is omitted (mirroring the game's
+  // #[serde(default) None]). Only a stated value is emitted as Some(N).
   if (v.vendorVisionRadius !== undefined && v.vendorVisionRadius !== null) {
     lines.push(`        vendor_vision_radius: Some(${v.vendorVisionRadius}),`);
   }
-  // vendor_inventory — Option<Vec<String>>. 게임 측 SHOP_CATALOG fallback 과 명시적
-  // 빈 상점([]) 을 구분해야 하므로 undefined 만 미출력, [] 도 명시적으로 Some([]) 출력.
-  //   undefined → 키 생략   → 게임 측 SHOP_CATALOG fallback (phase 2)
-  //   []        → Some([])  → 명시적 빈 상점
-  //   [...]     → Some([…]) → 그 id 목록만 판매
+  // vendor_inventory - Option<Vec<String>>. The game's SHOP_CATALOG fallback has to be distinguished from an
+  // explicitly empty shop ([]), so only undefined is omitted and [] is emitted explicitly as Some([]).
+  //   undefined -> the key is omitted -> the game's SHOP_CATALOG fallback (phase 2)
+  //   []        -> Some([])          -> an explicitly empty shop
+  //   [...]     -> Some([…])         -> only those ids are sold
   if (v.vendorInventory !== undefined) {
     const ids = v.vendorInventory.map((id) => q(id)).join(", ");
     lines.push(`        vendor_inventory: Some([${ids}]),`);
@@ -1623,7 +1623,7 @@ export function serializeMonstersRon(monsters: MonsterDef[]): string {
   return lines.join("\n") + "\n";
 }
 
-// ── Item serializers (4 종) ──────────────────────────────────────────────────
+// ── Item serializers (4 kinds) ──────────────────────────────────────────────────
 
 function serializeItemCommon(item: ItemDef): string[] {
   const lines = [
@@ -1633,17 +1633,17 @@ function serializeItemCommon(item: ItemDef): string[] {
     `        glyph_game_icon: ${q(item.glyphGameIcon)},`,
     `        pickup_message: ${q(item.pickupMessage)},`,
   ];
-  // hidden 기본값(false/누락) 은 생략 — 게임 측 #[serde(default)] 미러.
+  // The default hidden (false or absent) is omitted - mirroring the game's #[serde(default)].
   if (item.hidden) lines.push(`        hidden: true,`);
   return lines;
 }
 
 /**
- * 상점 가격 필드 (buyPrice/sellPrice) 직렬화. 모든 kind 공통.
- * undefined/null → 키 미출력 (게임 측 `#[serde(default)] None` 미러).
- * 정수 → `Some(N)` 출력.
+ * Serialises the shop price fields (buyPrice/sellPrice). Shared by every kind.
+ * undefined/null -> the key is omitted (mirroring the game's `#[serde(default)] None`).
+ * An integer -> emitted as `Some(N)`.
  *
- * 모든 kind 의 serializer 뒤쪽(공통 끝)에서 동일 형식으로 추가하도록 별도 함수화.
+ * It is a separate function so every kind's serializer can append it in the same form at its shared tail.
  */
 function serializeShopPriceLines(item: ItemDef): string[] {
   const out: string[] = [];
@@ -1678,8 +1678,8 @@ export function serializeQuestItemsRon(items: Extract<ItemDef, { kind: "quest" }
 
 export function serializeWeaponsRon(items: Extract<ItemDef, { kind: "weapon" }>[]): string {
   return arrayWrap("WeaponDef", items.map((i) => {
-    // 게임 RON 형식과 일치: random-stat 모드(min/max + tier) 가 있으면 그것을,
-    // 없으면 단일값(attack_power) 형식만 출력 → round-trip 보존.
+    // Matches the game's RON form: emit the random-stat mode (min/max plus tier) when it exists,
+    // and otherwise only the single-value form (attack_power) -> round-trip preserving.
     const hasRandom = i.attackPowerMin !== undefined && i.attackPowerMax !== undefined;
     const lines = [...serializeItemCommon(i)];
     if (hasRandom) {
@@ -1727,7 +1727,7 @@ export function serializeAccessoriesRon(items: Extract<ItemDef, { kind: "accesso
       ...serializeItemCommon(i),
       `        desc: ${q(i.desc)},`,
     ];
-    // effects 가 정의돼 있을 때만 직렬화 — undefined 면 빈 키도 안 적어서 round-trip 안정.
+    // effects is serialised only when defined - undefined writes no empty key either, so round trips stay stable.
     if (i.effects !== undefined) {
       lines.push(`        effects: [${i.effects.join(", ")}],`);
     }
@@ -1737,10 +1737,10 @@ export function serializeAccessoriesRon(items: Extract<ItemDef, { kind: "accesso
 }
 
 /**
- * StartLoadout 직렬화 — 게임의 assets/items/start_loadout.ron 과 round-trip 호환.
- * - weapon/armor: None / Some("x") 형식.
- * - consumables: ("id", count) 튜플 형식.
- * - items 가 비어있어도 [] 로 명시.
+ * StartLoadout serialisation - round-trip compatible with the game's assets/items/start_loadout.ron.
+ * - weapon/armor: the None / Some("x") form.
+ * - consumables: the ("id", count) tuple form.
+ * - items is stated as [] even when empty.
  */
 export function serializeStartLoadoutRon(def: StartLoadoutDef): string {
   const lines: string[] = [];
@@ -1764,11 +1764,11 @@ export function serializeStartLoadoutRon(def: StartLoadoutDef): string {
 }
 
 /**
- * TownConfig → RON 직렬화 (시작 마을 ZoneId::Town 생성 옵션).
- * 게임 측 `TownOptions` 와 1:1 매핑. enum 변환:
- *   kebab-case (TS) → PascalCase (Rust enum variants).
+ * TownConfig -> RON serialisation (the generation options for the starting town, ZoneId::Town).
+ * A 1:1 mapping with the game's `TownOptions`. Enum conversion:
+ *   kebab-case (TS) -> PascalCase (Rust enum variants).
  *
- * 예:
+ * For example:
  *   TownOptions(
  *       size: Village,
  *       roads: Radial,
@@ -1783,7 +1783,7 @@ export function serializeTownConfigRon(def: TownConfig): string {
   const pascal = (s: string): string =>
     s.split("-").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
 
-  // environment 는 신규 필드 — 누락 시 기본 Plains (하위 호환).
+  // environment is a new field - absent defaults to Plains (backwards compatible).
   const env: TownEnvironment = def.environment ?? "plains";
 
   const lines: string[] = [];
@@ -1806,7 +1806,7 @@ export function serializeTownConfigRon(def: TownConfig): string {
 export function serializeRon(quest: QuestDef): string {
   const lines: string[] = [];
 
-  // when/objective 을 Some() 없이 표기하기 위한 RON 확장 directive
+  // The RON extension directive that lets when/objective be written without Some()
   lines.push(`#![enable(implicit_some)]`);
   lines.push(``);
   lines.push(`QuestDef(`);

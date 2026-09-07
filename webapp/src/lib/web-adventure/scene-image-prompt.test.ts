@@ -1,4 +1,4 @@
-// 엔딩마다 씬 삽화를 한 장 더 만든다 (#158) — 프롬프트 만들기와 씬 추첨.
+// One more scene illustration per ending (#158) - building the prompt and drawing the scene.
 import { describe, it, expect } from 'vitest';
 import { ETERNIA_ART_STYLE, buildScenePrompt, pickSceneForImage } from './scene-image-prompt';
 
@@ -19,7 +19,7 @@ describe('buildScenePrompt', () => {
     expect(p).toContain('에테르');
   });
 
-  // 기존 삽화 3장과 톤이 어긋나면 오히려 품질이 떨어진다. 화풍은 늘 붙는다.
+  // A tone out of step with the existing three illustrations only lowers the quality. The art style is always appended.
   it('화풍 문구가 항상 붙는다', () => {
     expect(buildScenePrompt(SCENE)).toContain(ETERNIA_ART_STYLE);
     expect(buildScenePrompt({ id: 'x', title: '', body: [] })).toContain(ETERNIA_ART_STYLE);
@@ -29,7 +29,7 @@ describe('buildScenePrompt', () => {
     expect(ETERNIA_ART_STYLE).toMatch(/no people|no characters/i);
   });
 
-  // 화풍에 장소를 넣으면 숲 씬에까지 실내를 강제한다. 장소는 본문이 정한다.
+  // Putting a place in the art style would force an interior even onto a forest scene. The body decides the place.
   it('화풍은 장소를 정하지 않는다', () => {
     expect(ETERNIA_ART_STYLE).not.toMatch(/interior|indoor|room|corridor|pipes/i);
   });
@@ -53,7 +53,7 @@ describe('buildScenePrompt', () => {
     expect(p).toContain('무너진 다리');
   });
 
-  // 본문에는 *강조* 같은 서식과 지시문이 섞여 있다. 그림 프롬프트에 그대로 흘리지 않는다.
+  // The body mixes in formatting like *emphasis* and stage directions. Those are not passed into the image prompt.
   it('강조 표시와 줄바꿈을 정리한다', () => {
     const p = buildScenePrompt({ id: 'x', title: 'T', body: ['*링크 하사* 가 온다.\n뒤를 돌아본다.'] });
     expect(p).not.toContain('*');
@@ -70,7 +70,7 @@ describe('pickSceneForImage', () => {
     expect(pickSceneForImage(scenes, { rand: () => 0.5 })?.id).toBe('b');
   });
 
-  // 한 씬만 계속 뽑혀 그림이 수십 장 쌓이는 걸 막는다.
+  // It stops one scene being drawn over and over until dozens of pictures pile up.
   it('이미 충분히 쌓인 씬은 건너뛴다', () => {
     const many = [{ id: 'a', illustrations: Array(99).fill('u') }, { id: 'b' }];
     expect(pickSceneForImage(many, { rand: () => 0, maxPerScene: 8 })?.id).toBe('b');

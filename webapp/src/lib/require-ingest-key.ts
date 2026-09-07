@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { env } from './env';
 
 /**
- * stock-automator 데몬용 /api/ingest 가드.
+ * The /api/ingest guard for the stock-automator daemon.
  *
- * 헤더 `X-Ingest-Key` 가 env.stockIngestKey 와 일치해야 통과.
- * 불일치 또는 env 미설정 시 404 — 존재 자체 비노출 (owner pattern 과 일관).
+ * The `X-Ingest-Key` header must match env.stockIngestKey.
+ * A mismatch, or an unset env, gives 404 - not even existence is revealed (consistent with the owner pattern).
  */
 export function requireIngestKey(req: NextRequest): NextResponse | null {
   const expected = env.stockIngestKey.trim();

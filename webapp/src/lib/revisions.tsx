@@ -3,7 +3,7 @@ import PostRevision from '@/models/post-revision';
 import Post from "@/models/post";
 import mongoose from 'mongoose';
 
-/** 히스토리 페이지에 표시될 각 리비전 항목의 타입 */
+/** The type of each revision entry shown on the history page */
 export interface RevisionListItem {
     _id: string;
     version: number;
@@ -57,8 +57,8 @@ export async function getRevision(
 ): Promise<{ jsonContent: unknown; postId: string } | null> {
     if (!mongoose.Types.ObjectId.isValid(revisionId)) return null;
     await connectToDB();
-    // #168 — postId 를 함께 돌려준다. 이게 없으면 라우트가 "이 리비전이 누구 글의 것인지" 를
-    // 알 수 없어 권한을 판정하지 못한다(그래서 비공개 글 본문이 그대로 샜다).
+    // #168 - postId is returned alongside. Without it the route cannot tell **whose post the revision belongs to** and
+    // cannot judge permission (which is how private post bodies leaked outright).
     const revision = await PostRevision.findById(revisionId)
         .select('jsonContent postId')
         .lean() as { jsonContent: unknown; postId: unknown } | null;

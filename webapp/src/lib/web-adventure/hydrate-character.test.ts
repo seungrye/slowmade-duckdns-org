@@ -1,4 +1,4 @@
-// #289 hydrateCharacterSnapshot 단위 테스트.
+// #289 unit tests for hydrateCharacterSnapshot.
 
 import { describe, it, expect } from "vitest";
 import { hydrateCharacterSnapshot } from "./hydrate-character";
@@ -57,7 +57,7 @@ describe("hydrateCharacterSnapshot (#289)", () => {
     expect(out.stats).toEqual({ str: 5, dex: 5, int: 5, cha: 5, con: 5, wis: 5 });
   });
 
-  // #290 — NaN/Infinity 차단.
+  // #290 - blocking NaN and Infinity.
   it.each([
     ["NaN", NaN],
     ["Infinity", Infinity],

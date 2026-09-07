@@ -11,19 +11,19 @@ export interface PollinationsOptions {
 }
 
 /**
- * Pollinations.AI 이미지 GET URL 빌더 (painter-bot 용).
- * 기본 모델 `flux`, 기본 1024x1024, nologo=true.
+ * Builds the Pollinations.AI image GET URL (for painter-bot).
+ * Model `flux` and 1024x1024 by default, with nologo=true.
  *
- * NOTE: enji-bot 의 동일 함수와 본질적으로 같지만, 명령어 파싱(parseImageCommand)
- * 은 painter-bot 에선 멘션 자체가 트리거이므로 *제거*.
+ * NOTE: essentially the same function as enji-bot's, but command parsing (parseImageCommand) is *removed* -
+ * for painter-bot the mention itself is the trigger.
  */
 export function buildPollinationsUrl(prompt: string, opts: PollinationsOptions): string {
   const width = opts.width ?? 1024;
   const height = opts.height ?? 1024;
   const model = opts.model ?? 'flux';
   const nologo = opts.nologo ?? true;
-  // gen.pollinations.ai 가 새 표준 (API key 인증 지원). image.pollinations.ai 는 legacy 이며
-  // 익명 IP rate limit 에 걸려 402 반환.
+  // gen.pollinations.ai is the new standard (it supports API key auth). image.pollinations.ai is legacy and
+  // returns 402 once the anonymous IP rate limit is hit.
   const base = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}`;
   const params = new URLSearchParams();
   params.set('width', String(width));
@@ -49,9 +49,9 @@ export interface GenerateImageOptions {
   bucket: string;
   endpoint: string;
   pollinations?: PollinationsOptions;
-  /** Pollinations 일시 오류(5xx/429/네트워크) 재시도 횟수. 기본 2 (총 최대 3회 시도). */
+  /** How many times to retry a transient Pollinations error (5xx, 429, network). 2 by default (3 attempts in all). */
   retries?: number;
-  /** 재시도 간 지연(ms). 시도마다 (n+1)배 백오프. 기본 3000. 테스트에선 0. */
+  /** The delay between retries (ms), backing off by (n+1) each attempt. 3000 by default, 0 in tests. */
   retryDelayMs?: number;
 }
 
@@ -62,9 +62,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Pollinations fetch — 일시적 오류(5xx/429/네트워크·타임아웃)면 백오프 후 재시도.
- * pollinations.ai 는 과부하 시 504(gateway timeout)를 자주 반환하므로, 한 번에 실패해
- * "그림 그리기 실패" 로 끝나지 않도록 감싼다. 4xx(재시도 불가)는 즉시 throw. ok 응답만 반환.
+ * The Pollinations fetch - a transient error (5xx, 429, network or timeout) backs off and retries.
+ * pollinations.ai often returns 504 (gateway timeout) under load, so this wraps it rather than failing once and
+ * ending in "drawing failed". A 4xx (not retryable) throws at once. Only an ok response is returned.
  */
 async function fetchPollinationsWithRetry(
   url: string,
@@ -78,7 +78,7 @@ async function fetchPollinationsWithRetry(
     try {
       res = await fetch(url, { headers });
     } catch (e) {
-      lastErr = e; // 네트워크/타임아웃 — 재시도 대상
+      lastErr = e; // network or timeout - retryable
       if (attempt >= retries) throw e;
       if (retryDelayMs > 0) await sleep(retryDelayMs * (attempt + 1));
       continue;
@@ -95,7 +95,7 @@ async function fetchPollinationsWithRetry(
 }
 
 /**
- * Pollinations 에서 이미지를 받아 MinIO 의 painter-images/ prefix 에 업로드, public URL 반환.
+ * Fetches the image from Pollinations, uploads it under MinIO's painter-images/ prefix and returns the public URL.
  */
 export async function generateImage(
   prompt: string,
@@ -121,27 +121,27 @@ export async function generateImage(
 }
 
 export interface TranslateAndGenerateOptions extends GenerateImageOptions {
-  /** Gemini API key — 빈 문자열이면 번역 시도 X (한글이어도 원본 그대로). */
+  /** The Gemini API key - empty means no translation is attempted (Korean is passed through as is). */
   geminiApiKey: string;
 }
 
 export interface TranslateAndGenerateResult {
   key: string;
   url: string;
-  /** 사용자가 입력한 원본 prompt (한국어 가능). */
+  /** The user's original prompt (Korean allowed). */
   originalPrompt: string;
-  /** 번역됐을 때 영문 번역본. 영문 입력 / 번역 실패 시 null. */
+  /** The English translation when translated. null for English input or a failed translation. */
   translatedPrompt: string | null;
-  /** 실제로 Pollinations 에 전달한 prompt (번역됐으면 영문, 실패 시 원본). */
+  /** The prompt actually sent to Pollinations (English when translated, the original on failure). */
   usedPrompt: string;
 }
 
 /**
- * 한글 prompt 자동 영문 번역 + Pollinations 이미지 생성.
+ * Automatic Korean-to-English prompt translation plus Pollinations image generation.
  *
- * - 한글 감지 시 Gemini 번역 시도.
- * - 번역 실패 (Gemini 타임아웃 / 키 없음 / 빈 응답) 시 원본 한글 prompt 로 Pollinations 호출 (fallback).
- * - 영문 입력은 번역 단계 skip.
+ * - Korean detected -> a Gemini translation is attempted.
+ * - A failed translation (Gemini timeout, no key, empty response) calls Pollinations with the original Korean prompt (the fallback).
+ * - English input skips the translation step.
  */
 export async function translateAndGenerate(
   originalPrompt: string,
@@ -153,8 +153,8 @@ export async function translateAndGenerate(
   if (containsKorean(originalPrompt) && opts.geminiApiKey) {
     try {
       const translated = await translateToEnglish(originalPrompt, opts.geminiApiKey);
-      // translateToEnglish 가 영문 입력엔 원본을 그대로 반환하지만,
-      // 여기선 이미 한글 확인 후 호출했으므로 결과는 번역본.
+      // translateToEnglish returns the original for English input, but
+      // it is called here only after Korean was detected, so the result is the translation.
       if (translated && translated !== originalPrompt) {
         translatedPrompt = translated;
         usedPrompt = translated;

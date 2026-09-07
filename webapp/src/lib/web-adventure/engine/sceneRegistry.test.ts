@@ -1,4 +1,4 @@
-// #292 sceneRegistry.getScenes — 일시 네트워크 fail 자동 retry.
+// #292 sceneRegistry.getScenes - automatic retry on a transient network failure.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getScenes, resetSceneCache } from "./sceneRegistry";
@@ -35,7 +35,7 @@ describe("getScenes retry (#292)", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const p = getScenes();
-    // 500ms backoff 진행.
+    // the 500ms backoff runs.
     await vi.advanceTimersByTimeAsync(500);
     const reg = await p;
     expect(reg.ok).toBeTruthy();
@@ -52,6 +52,6 @@ describe("getScenes retry (#292)", () => {
     await vi.advanceTimersByTimeAsync(500 + 1500 + 10);
     const err = await p;
     expect(err).toBeInstanceOf(Error);
-    expect(fetchMock).toHaveBeenCalledTimes(3); // 초기 + 2 retry
+    expect(fetchMock).toHaveBeenCalledTimes(3); // the initial call plus 2 retries
   });
 });

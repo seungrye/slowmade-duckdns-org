@@ -1,5 +1,5 @@
-// #263 — 마법/마법공학 확률 분기의 실패에는 추가 침식 (stigmaDeltaOnFailure) 이
-// 명시되어 있어야 한다. 주문 통제 실패 = 더 큰 신체 부담의 가정.
+// #263 - failing a magic or magitech probability branch must carry extra contamination
+// (stigmaDeltaOnFailure), on the premise that losing control of a spell strains the body more. A content-consistency check.
 
 import { describe, it, expect } from "vitest";
 

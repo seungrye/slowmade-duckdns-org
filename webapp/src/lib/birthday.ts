@@ -1,16 +1,14 @@
 /**
- * 생일 판정 (#326) — 순수 함수만. DB·DOM·네트워크를 모른다.
+ * Birthday evaluation (#326) - pure functions only. It knows nothing of the DB, the DOM or the network.
  *
- * ── 왜 전부 UTC 로 읽고 쓰나 ───────────────────────────────────────────
+ * ── Why everything is read and written in UTC ──────────────────────────
  *
- * 생일은 시각이 아니라 **날짜**다. 그런데 `new Date('1990-3-15')` 처럼 로컬 시간대로
- * 만들면 KST 사용자의 1990-03-15 가 UTC 로 `1990-03-14T15:00Z` 가 되어, 나중에
- * `getUTCDate()` 로 읽는 순간 **하루 밀린다**. 반대로 로컬 게터로 읽으면 서버(UTC)와
- * 브라우저(KST)가 서로 다른 답을 낸다.
+ * A birthday is a **date**, not a moment. But building it in local time, as `new Date('1990-3-15')` does, turns a KST
+ * user's 1990-03-15 into `1990-03-14T15:00Z`, which then reads back **a day early** through `getUTCDate()`. Reading
+ * with local getters instead makes the server (UTC) and the browser (KST) give different answers.
  *
- * 그래서 저장은 `Date.UTC` 로 UTC 자정에 고정하고, 월·일도 UTC 게터로만 읽는다.
- * 시간대가 개입하는 곳은 단 하나 — "오늘이 며칠인가"뿐이고, 그건 `todayInSeoul` 이
- * KST 로 답한다.
+ * So it is stored pinned to UTC midnight via `Date.UTC`, and the month and day are read only with UTC getters.
+ * Exactly one place involves a timezone - "what is today's date" - and `todayInSeoul` answers that in KST.
  */
 
 const TIME_ZONE = 'Asia/Seoul';
@@ -24,10 +22,10 @@ function isLeapYear(year: number): boolean {
 }
 
 /**
- * `<input type="date">` 의 'YYYY-MM-DD' 를 UTC 자정 Date 로. 못 읽으면 null.
+ * Turns an `<input type="date">` 'YYYY-MM-DD' into a UTC-midnight Date, or null if unreadable.
  *
- * 존재하지 않는 날짜(2월 30일 등)를 반드시 걸러야 한다 — `Date.UTC(1990, 1, 30)` 은
- * 오류가 아니라 조용히 3월 2일이 되므로, 그냥 두면 엉뚱한 날에 폭죽이 터진다.
+ * A non-existent date (30 February and the like) must be caught: `Date.UTC(1990, 1, 30)` is not an error but
+ * quietly becomes 2 March, so leaving it would fire the confetti on the wrong day.
  */
 export function parseBirthdayInput(input: string, now: Date = new Date()): Date | null {
   const m = PATTERN.exec(input);
@@ -37,7 +35,7 @@ export function parseBirthdayInput(input: string, now: Date = new Date()): Date 
   if (year < MIN_YEAR) return null;
 
   const date = new Date(Date.UTC(year, month - 1, day));
-  // 넘김(rollover) 감지: 넣은 값과 읽은 값이 다르면 없는 날짜다.
+  // Rollover detection: if what was read back differs from what went in, the date does not exist.
   if (
     date.getUTCFullYear() !== year ||
     date.getUTCMonth() + 1 !== month ||
@@ -46,7 +44,7 @@ export function parseBirthdayInput(input: string, now: Date = new Date()): Date 
     return null;
   }
 
-  // 미래 생일은 받지 않는다. 오늘(KST)까지는 허용.
+  // A future birthday is rejected. Today (KST) is allowed.
   const today = todayInSeoul(now);
   const todayUtc = Date.UTC(today.year, today.month - 1, today.day);
   if (date.getTime() > todayUtc) return null;
@@ -54,7 +52,7 @@ export function parseBirthdayInput(input: string, now: Date = new Date()): Date 
   return date;
 }
 
-/** UTC 자정 Date 를 'YYYY-MM-DD' 로. 없으면 빈 문자열(input 의 value 로 그대로 쓴다). */
+/** A UTC-midnight Date as 'YYYY-MM-DD', or an empty string (used directly as an input's value). */
 export function formatBirthdayInput(date: Date | null | undefined): string {
   if (!date) return '';
   const y = String(date.getUTCFullYear()).padStart(4, '0');
@@ -64,8 +62,8 @@ export function formatBirthdayInput(date: Date | null | undefined): string {
 }
 
 /**
- * KST 기준 오늘. 사용자 기기 시간대가 무엇이든 한국 날짜로 판정하려고 쓴다.
- * 'en-CA' 로케일이 YYYY-MM-DD 를 주므로 파싱이 단순하다.
+ * Today in KST. Used so the judgement is made against the Korean date whatever the user's device timezone is.
+ * The 'en-CA' locale gives YYYY-MM-DD, which keeps the parsing simple.
  */
 export function todayInSeoul(now: Date): SeoulDate {
   const [y, m, d] = new Intl.DateTimeFormat('en-CA', {
@@ -81,8 +79,8 @@ export function todayInSeoul(now: Date): SeoulDate {
 }
 
 /**
- * KST 기준 오늘을 'YYYY-MM-DD' 문자열로. 달력 조회·localStorage 표식이 같은 키를 써야
- * 하루 경계가 어긋나지 않으므로 한 곳에서 만든다.
+ * Today in KST as a 'YYYY-MM-DD' string. The calendar query and the localStorage marker have to use the same key
+ * for the day boundary to line up, so it is produced in one place.
  */
 export function seoulDateKey(now: Date): string {
   const { year, month, day } = todayInSeoul(now);
@@ -90,10 +88,10 @@ export function seoulDateKey(now: Date): string {
 }
 
 /**
- * KST 로 오늘이 생일인가.
+ * Whether today is the birthday, in KST.
  *
- * 2월 29일생은 평년에 생일이 없으므로 **3월 1일**에 축하한다. 윤년에는 2월 29일에만
- * 축하한다 — 윤년에 3월 1일까지 인정하면 같은 해에 두 번 터진다.
+ * Someone born on 29 February has no birthday in a common year, so they are celebrated on **1 March**. In a leap
+ * year they are celebrated only on 29 February - allowing 1 March as well would fire twice in one year.
  */
 export function isBirthdayToday(birthday: Date, now: Date): boolean {
   const month = birthday.getUTCMonth() + 1;
@@ -110,10 +108,10 @@ export function isBirthdayToday(birthday: Date, now: Date): boolean {
 }
 
 /**
- * 폭죽을 띄울까. 생일 당일이면서 **올해 아직 축하하지 않았을 때**만 true.
+ * Whether to fire the confetti. True only on the birthday itself **and** when this year's celebration has not happened yet.
  *
- * `lastCelebratedYear` 는 호출측(localStorage)이 들고 있는 KST 연도 문자열이다.
- * 연도로 세는 덕에 연말 자정을 KST 로 넘겨도 새해 생일이 정상 판정된다.
+ * `lastCelebratedYear` is the KST year string the caller holds (in localStorage). Counting by year means a KST
+ * midnight at the turn of the year still evaluates the new year's birthday correctly.
  */
 export function shouldCelebrate(
   birthday: Date | null | undefined,

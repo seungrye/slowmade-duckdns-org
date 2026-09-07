@@ -1,4 +1,4 @@
-// 침식 체감 파생 변수 (#370).
+// Derived variables for feeling the contamination (#370).
 import { describe, it, expect } from 'vitest';
 import { stigmaTier, stigmaVars } from './stigma-sense';
 import { interpolate } from './script';
@@ -29,7 +29,7 @@ describe('stigmaVars', () => {
     );
   });
 
-  // 이게 이 기능의 전부다 — 같은 문장이 회차마다 다른 무게로 읽혀야 한다.
+  // This is the whole feature - the same sentence must read with a different weight each run.
   it('침식이 오르면 문장이 달라진다', () => {
     const low = stigmaVars(0);
     const high = stigmaVars(100);
@@ -47,7 +47,7 @@ describe('stigmaVars', () => {
     expect(stigmaVars(50)['침식단계']).toBe('2');
   });
 
-  // 실제 쓰임: 본문에 놓은 변수가 그대로 치환된다.
+  // The real use: a variable placed in the body is substituted as it stands.
   it('본문 보간에 그대로 물린다', () => {
     const line = '너는 문고리를 잡는다. {{침식_손}}';
     expect(interpolate(line, stigmaVars(0))).toContain('시리다');

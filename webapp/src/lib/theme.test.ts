@@ -1,4 +1,4 @@
-// 테마 유틸 — 쿠키 SSR → localStorage + inline script 리팩터의 순수/DOM 로직.
+// Theme utilities - the pure and DOM logic of the cookie-SSR -> localStorage + inline script refactor.
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -84,7 +84,7 @@ describe('THEME_INIT_SCRIPT', () => {
     expect(THEME_INIT_SCRIPT).toContain('localStorage');
     expect(THEME_INIT_SCRIPT).toContain('prefers-color-scheme');
     expect(THEME_INIT_SCRIPT).toMatch(/^\(function\(\)\s*\{/);
-    // try/catch 로 감싸 예외를 삼킨다(스토리지 접근 실패해도 렌더 진행).
+    // Wrapped in try/catch to swallow exceptions (rendering proceeds even if storage access fails).
     expect(THEME_INIT_SCRIPT).toContain('catch');
   });
 });

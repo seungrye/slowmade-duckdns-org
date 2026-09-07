@@ -64,7 +64,7 @@ describe("blockValueSeries", () => {
   it("종가가 빠진 날은 직전 종가를 끌어 쓴다 — 가짜 골짜기를 만들지 않는다", () => {
     const out = blockValueSeries({
       trades: [{ ticker: "TQQQ", date: "2026-08-10", action: "buy", qty: 2 }],
-      // 08-11 종가 없음
+      // no close on 08-11
       closes: closes([["TQQQ", "2026-08-10", 50], ["TQQQ", "2026-08-12", 60]]),
       dates,
     });

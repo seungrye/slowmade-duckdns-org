@@ -1,15 +1,15 @@
-// #269 통합 e2e — 실제 mongo content 그래프 + reducer 로 6 엔딩 모두 완주.
+// #269 integration e2e - completing all 6 endings with the real mongo content graph plus the reducer.
 //
-// 기존 e2e-play-through 는 *최소 인공 그래프* 시뮬레이션이라 그래프 구조가 깨져도
-// 통과한다. 본 테스트는 mongo 의 실제 *씬·분기·flag·minStat·probability* 가 결합된
-// 상태로 *각 주인공* 시작 씬에서 *각 엔딩* 까지 도달 가능한지 검증.
+// The existing e2e-play-through simulates a *minimal artificial graph*, so it passes even when the graph structure
+// is broken. This test verifies that with mongo's real *scenes, branches, flags, minStats and probabilities* all in
+// play, *each ending* is reachable from *each protagonist's* starting scene.
 //
-// #353 — 기존엔 (주인공, 엔딩) 마다 choice id 시퀀스를 *하드코딩* 했는데,
-// 씬을 추가/삽입할 때마다 경로가 깨졌다 (kael 추리 시퀀스 삽입이 계기).
-// 이제 *동적 솔버* 로 전환: 각 (주인공, 엔딩) 타겟에 대해 그래프를 DFS 로 탐색해
-// reducer 를 실제로 통과하며 그 엔딩에 도달하는 경로가 존재하는지 확인한다.
-// probability 는 성공/실패 RNG 양쪽을, conditional 은 reducer 평가(무효 시 무변화)를
-// 그대로 따른다. 씬 방문 횟수 제한으로 사이클(추리 허브 왕복 등) 무한루프 차단.
+// #353 - the choice-id sequence used to be *hard-coded* per (protagonist, ending), and every added or inserted
+// scene broke the paths (inserting Kael's deduction sequence was what prompted this).
+// It is now *a dynamic solver*: for each (protagonist, ending) target it searches the graph with DFS and confirms
+// a path exists that reaches that ending while actually passing through the reducer.
+// probability follows both the success and failure RNG, and conditional follows the reducer's evaluation (no change
+// when invalid). A per-scene visit cap blocks infinite loops on cycles (looping through the deduction hub and so on).
 
 import { describe, test, expect, beforeAll, afterAll } from "vitest";
 import type {
@@ -23,8 +23,8 @@ import type {
 import { gameReducer } from "../engine/reducer";
 import { protagonists } from "@/content/web-adventure/protagonists";
 
-// 검증할 (주인공, 엔딩) 매트릭스. petrification 은 *자동 엔딩*(침식 100)이라
-// choice 경로 탐색과 성격이 달라 별도 테스트로 분리.
+// The (protagonist, ending) matrix to verify. petrification is *an automatic ending* (contamination 100) and
+// differs in character from a choice-path search, so it is split into its own test.
 const TARGETS: { protagonist: Protagonist; endingId: EndingId }[] = [
   { protagonist: "kael", endingId: "revolution" },
   { protagonist: "kael", endingId: "ascension" },
@@ -38,18 +38,18 @@ const TARGETS: { protagonist: Protagonist; endingId: EndingId }[] = [
   { protagonist: "solwen", endingId: "harmony" },
   { protagonist: "solwen", endingId: "fall" },
   { protagonist: "solwen", endingId: "sylvan_bond" },
-  // #356 — 옴팔로스 네오엘프 동맹(ally_sylvan)으로 비-솔웬도 sylvan_bond 도달(비선형).
+  // #356 - the Omphalos neo-elf alliance (ally_sylvan) lets non-Solwen reach sylvan_bond too (non-linear).
   { protagonist: "kael", endingId: "sylvan_bond" },
   { protagonist: "rin", endingId: "sylvan_bond" },
-  // #359 — 카엘 각성 루트(옴팔로스 우회 독립 스토리) 전용 엔딩.
+  // #359 - an ending exclusive to Kael's awakening route (an independent story bypassing the Omphalos).
   { protagonist: "kael", endingId: "liberation" },
   { protagonist: "kael", endingId: "usurpation" },
   // #361 — 린 각성 엔딩(liberation/regency/purge/wayfarer)은 분기가 옴팔로스 직전이라
   //   동적 솔버가 거대 그래프 DFS 에 시간을 소진한다. 명시 경로 테스트로 따로 검증(아래).
 ];
 
-const RNG_SUCCESS = () => 0.99; // roll = 20 (probability 성공).
-const RNG_FAIL = () => 0.0; //    roll = 1  (probability 실패).
+const RNG_SUCCESS = () => 0.99; // roll = 20 (the probability succeeds).
+const RNG_FAIL = () => 0.0; //    roll = 1  (the probability fails).
 
 function startState(protagonist: Protagonist, scenes: SceneRegistry): GameState {
   const meta = protagonists[protagonist];
@@ -74,11 +74,11 @@ function startState(protagonist: Protagonist, scenes: SceneRegistry): GameState 
   return state;
 }
 
-// 동적 솔버 — 시작 상태에서 DFS 로 targetEnding 에 도달하는 경로를 탐색.
-//   - probability choice: 성공/실패 RNG 양쪽을 자식으로 전개.
-//   - plain/conditional: reducer 평가. 조건 미충족 등으로 *씬이 안 바뀌면* 무효로 스킵.
-//   - 씬 방문 횟수 제한(MAX_VISITS): 추리 허브 왕복 등 사이클의 무한루프 차단.
-// 도달하면 그 ended GameState 를, 못 찾으면 null 을 반환.
+// The dynamic solver - a DFS from the starting state for a path that reaches targetEnding.
+//   - a probability choice: both the success and failure RNG are expanded as children.
+//   - plain/conditional: the reducer's evaluation. If *the scene does not change* (an unmet condition and so on) it is skipped as invalid.
+//   - a per-scene visit cap (MAX_VISITS): blocks infinite loops on cycles such as looping through the deduction hub.
+// On reaching it, the ended GameState is returned; otherwise null.
 const MAX_DEPTH = 80;
 const MAX_VISITS = 4;
 
@@ -116,11 +116,11 @@ function solve(
           { type: "MAKE_CHOICE", choiceId: choice.id, rng },
           scenes,
         );
-        // probability 는 즉시 전이하지 않고 pendingRoll → CONFIRM_ROLL 로 확정.
+        // probability does not transition at once - it goes through pendingRoll and is confirmed by CONFIRM_ROLL.
         if (next.phase === "playing" && next.pendingRoll) {
           next = gameReducer(next, { type: "CONFIRM_ROLL" }, scenes);
         }
-        // 무효(조건 미충족 등) → 같은 씬에 머무름 → 스킵. probability 는 항상 전이.
+        // Invalid (an unmet condition and so on) -> it stays in the same scene -> skipped. probability always transitions.
         if (
           choice.kind !== "probability" &&
           next.phase === "playing" &&
@@ -182,7 +182,7 @@ describe("통합 e2e — 실제 mongo 그래프 완주 (#269)", () => {
 
   test("Kael — 시작 침식 80 에 마력석 파편 4 사용 → 자동 petrification", () => {
     if (!loaded) return;
-    // 인공 시나리오: Kael 시작 시 파편 4 개 인벤 보유. USE 4 회 누적 → 100 → 자동 ending.
+    // An artificial scenario: Kael starts holding 4 shards. USE four times accumulates -> 100 -> the automatic ending.
     const meta = protagonists.kael;
     const character: Character = {
       stats: meta.baseStats,
@@ -212,8 +212,8 @@ describe("통합 e2e — 실제 mongo 그래프 완주 (#269)", () => {
     }
   });
 
-  // #361 — 린 각성 루트(신념과 타락) 명시 경로. 동적 솔버는 분기가 옴팔로스 직전이라
-  //   거대 그래프 DFS 로 시간을 소진하므로, choiceId 시퀀스로 직접 완주 검증.
+  // #361 - the explicit path for Rin's awakening route (conviction and corruption). The branch sits just before the
+  //   Omphalos, so a DFS over the huge graph would burn time - the run is verified directly by a choiceId sequence.
   test("rin 각성 루트 명시 경로 → liberation/regency/purge/wayfarer (#361)", () => {
     if (!loaded) return;
     const meta = protagonists.rin;
@@ -223,7 +223,7 @@ describe("통합 e2e — 실제 mongo 그래프 완주 (#269)", () => {
       ability: "lunar", protagonist: "rin",
       stigmaErosion: meta.startStigma, inventory: [...meta.startInventory], flags: {}, rerollsLeft: 3,
     });
-    // rin_underground 부터 강제 시작(앞 메인 경로는 기존 TARGETS 가 커버). failAt 의 probability 만 실패.
+    // Forced to start from rin_underground (the earlier main path is covered by the existing TARGETS). Only failAt's probability fails.
     function run(choices: string[], failAt?: string): GameState {
       let state: GameState = { phase: "playing", character: baseChar(), currentScene: "rin_underground", log: [] };
       for (const c of choices) {

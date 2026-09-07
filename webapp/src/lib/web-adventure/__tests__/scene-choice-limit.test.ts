@@ -1,14 +1,14 @@
-// #262 — UX 정책: 한 씬의 선택지는 *최대 3 개*. 사용자가 결정.
+// #262 - a UX policy: *at most 3* choices in one scene. The user's decision.
 //
-// 더 많이 노출되면 화면 인지부하 + 모바일 스크롤. 4+ 분기가 필요한 시점은
-// *접근 방식 선택* + *각 방식의 세부 분기* 로 *2 씬* 분리한다.
+// More on screen means cognitive load and scrolling on mobile. When 4 or more branches are genuinely needed, it is
+// split into *2 scenes* - *choosing an approach* and then *that approach's detailed branches*.
 
 import { describe, it, expect } from "vitest";
 
 describe("씬 선택지 개수 제한 (#262)", () => {
   it("모든 씬의 choices 가 3 개 이하 (mongo content)", async () => {
-    // 정적 fallback 없으므로 mongo 가 단일 소스. 본 테스트는 *프로덕션 또는 로컬* mongo 직접 조회.
-    // 실행 시점에 MONGO_URI 가 있으면 검증, 없으면 skip (CI 안전).
+    // With no static fallback, mongo is the single source. This test queries *production or local* mongo directly.
+    // It verifies when MONGO_URI is present at run time and skips otherwise (safe in CI).
     if (!process.env.MONGO_URI) {
       console.warn("MONGO_URI 없음 — skip");
       return;
@@ -24,10 +24,10 @@ describe("씬 선택지 개수 제한 (#262)", () => {
         id: string;
         choices?: Array<{ hidden?: boolean }>;
       }>;
-      // 세는 것은 *화면에 실제로 뜨는* 선택지다 (#91).
-      //   hidden: true 인 conditional 은 조건을 채운 사람에게만 보인다. 예컨대
-      //   climax_harmony_path 는 성흔별 분기를 넷 달고 있지만 성흔은 하나만 가지므로
-      //   한 사람이 보는 것은 많아야 두셋이다. 그걸 세면 오탐이 난다.
+      // What is counted is the choices that *actually appear on screen* (#91).
+      //   A conditional with hidden: true is visible only to someone who met the condition. climax_harmony_path,
+      //   for instance, carries four stigma-specific branches, but since one only ever has a single stigma,
+      //   a person sees two or three at most. Counting them all would be a false positive.
       const visible = (s: { choices?: Array<{ hidden?: boolean }> }) =>
         (s.choices ?? []).filter((c) => c?.hidden !== true).length;
       const tooMany = all

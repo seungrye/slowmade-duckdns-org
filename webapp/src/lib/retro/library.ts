@@ -1,22 +1,22 @@
-// 기본 제공 홈브류 목록 (#109).
+// The bundled homebrew list (#109).
 //
-// 전부 [retrobrews](https://github.com/retrobrews) 가 모아 둔 **자유 배포 홈브류**다. 상용 롬은
-// 넣지 않는다 — 개인 롬은 사용자가 직접 올려 자기만 보는 쪽(`RetroRom` 모델)으로 처리한다.
+// All of it is **freely distributable homebrew** collected by [retrobrews](https://github.com/retrobrews). Commercial
+// ROMs are not included - personal ROMs are uploaded by users and kept private to them (the `RetroRom` model).
 //
-// 실제 파일은 저장소에 없다. `scripts/games/fetch-emulatorjs.sh` 가 여기 적힌 목록을 보고
-// `public/games/retro/roms|covers/` 로 내려받는다. 그래서 **파일이 없는 항목은 화면에 뜨지 않는다**
-// (`filterExistingBuiltins`) — 링크만 있고 안 돌아가는 카드를 보여 주느니 감추는 게 낫다.
+// The files themselves are not in the repo. `scripts/games/fetch-emulatorjs.sh` reads this list and downloads them
+// into `public/games/retro/roms|covers/`. So **an entry whose file is missing never appears on screen**
+// (`filterExistingBuiltins`) - hiding it beats showing a card that only links and never runs.
 
 import type { BuiltinGame } from './entry';
 
 import gamesJson from './builtin-games.json';
 
 /**
- * 목록은 **JSON 으로 둔다** — `scripts/games/fetch-emulatorjs.sh` 가 같은 파일을 읽어 롬·커버를
- * 내려받기 때문이다. TS 배열이면 셸에서 못 읽어 목록을 두 벌 관리하게 되고, 그러면 어긋난다.
- * 항목을 추가할 때는 JSON 한 곳만 고치면 화면과 내려받기가 함께 따라온다.
+ * The list is **kept as JSON** - `scripts/games/fetch-emulatorjs.sh` reads the same file to download the ROMs and
+ * covers. A TS array could not be read from the shell, so the list would be maintained twice and drift apart.
+ * Adding an entry means editing the JSON alone, and both the UI and the download follow.
  *
- * 내려받는 주소는 `source`(retrobrews 저장소)에서 만든다 — 필드를 따로 두지 않는다.
+ * The download address is built from `source` (the retrobrews repo) - no separate field for it.
  */
 export const BUILTIN_GAMES: BuiltinGame[] = gamesJson as BuiltinGame[];
 
@@ -25,10 +25,10 @@ export function builtinBySlug(slug: string): BuiltinGame | undefined {
 }
 
 /**
- * 롬 파일이 실제로 있는 항목만 남긴다.
+ * Keeps only the entries whose ROM file actually exists.
  *
- * 파일 존재 확인은 **주입받는다**(`exists`) — 이 모듈이 fs 를 직접 잡으면 클라이언트 번들과
- * 테스트가 같이 무거워진다. 서버 컴포넌트가 fs 로 감싼 함수를 넘긴다.
+ * The existence check is **injected** (`exists`) - having this module reach for fs directly would weigh down both the
+ * client bundle and the tests. A server component passes in a function that wraps fs.
  */
 export function filterExistingBuiltins(
   games: BuiltinGame[],
@@ -37,7 +37,7 @@ export function filterExistingBuiltins(
   return games.filter((g) => exists(`roms/${g.file}`));
 }
 
-/** 커버가 실제로 받아졌는지까지 반영한 사본 — 없으면 카드가 폴백 타일을 그린다. */
+/** A copy that also reflects whether the cover was actually downloaded - without it the card draws a fallback tile. */
 export function withExistingCovers(
   games: BuiltinGame[],
   exists: (relativePath: string) => boolean,

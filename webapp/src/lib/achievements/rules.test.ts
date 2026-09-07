@@ -78,7 +78,7 @@ describe('웹어드벤처', () => {
     it('엔딩은 전 종류를 다 봐야 한다', () => {
       const almost = stats({ waEndings: ENDING_IDS.slice(0, ENDING_IDS.length - 1) });
       expect(unlockedKeys(almost)).toContain('WA_ENDING_3');
-      // 하나만 모자라도 안 열린다.
+      // One short and it stays closed.
       expect(unlockedKeys(almost)).not.toContain('WA_ENDING_ALL');
 
       expect(unlockedKeys(stats({ waEndings: [...ENDING_IDS] }))).toContain('WA_ENDING_ALL');
@@ -86,7 +86,7 @@ describe('웹어드벤처', () => {
 
     it('엔딩 진행도는 본 개수 / 전체', () => {
       const e = byKey(stats({ waEndings: ENDING_IDS.slice(0, 4) }))['WA_ENDING_ALL'];
-      // #352 — target 을 숫자로 박아 두면 엔딩이 늘 때 또 어긋난다. 분모는 상수에서.
+      // #352 - hard-coding target as a number would drift again as endings are added. The denominator comes from the constant.
       expect(e).toMatchObject({ current: 4, target: ENDING_IDS.length });
     });
 

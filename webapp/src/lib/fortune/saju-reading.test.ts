@@ -17,7 +17,7 @@ describe("사주 풀이 프롬프트·템플릿 (#390)", () => {
   });
 
   it("템플릿 폴백은 항상 존댓말이다", () => {
-    // 다양한 관계에서 존댓말 가드를 스스로 통과해야 한다.
+    // It must pass the politeness guard on its own across a range of relationships.
     for (const iso of ["1990-01-10", "1985-07-20", "2001-03-03", "1978-11-30"]) {
       const c = sajuContext(computeSaju(new Date(`${iso}T00:00:00.000Z`)), todayIljin(new Date("2026-09-03T03:00:00Z")).pillar);
       expect(isPolite(templateSajuReading(c))).toBe(true);

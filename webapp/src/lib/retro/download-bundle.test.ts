@@ -1,8 +1,8 @@
-// 롬 내려받기 묶음 (#194) — 순수 부분.
+// The ROM download bundle (#194) - the pure part.
 //
-// 조심할 것은 **이름 겹침**이다. 아케이드는 롬과 부모셋이 둘 다 zip 이고, 같은 이름으로
-// 올라와 있을 수 있다(`ddsoma.zip` 을 본체로도 부모로도 쓴 문서가 실제로 있었다).
-// zip 안에서 이름이 겹치면 나중 것이 앞의 것을 덮어써 **파일이 조용히 사라진다.**
+// What to watch for is **name collisions**. On arcade, the ROM and the parent set are both zips and can be uploaded
+// under the same name (a document really did use `ddsoma.zip` as both the main ROM and the parent).
+// Colliding names inside a zip mean the later one overwrites the earlier, and **a file silently disappears.**
 import { describe, it, expect } from 'vitest';
 import { bundleEntryNames, bundleFileName } from './download-bundle';
 
@@ -11,9 +11,9 @@ describe('bundleEntryNames', () => {
     expect(bundleEntryNames({ romName: 'game.sfc' })).toEqual(['game.sfc']);
   });
 
-  // 원래 패치 이름을 그대로 쓰면 어느 게 패치인지 알기 어렵다. 실제로 D&D 는 패치 이름이
-  // 롬과 똑같은 `ddsomu.zip` 이라 겹침 처리가 `ddsomu (2).zip` 을 만들었는데, 받은 사람은
-  // 둘 중 무엇이 패치인지 알 수 없다. **롬 이름 + `-patch`** 로 굳힌다 (#198).
+  // Keeping the patch's original name makes it hard to tell which file is the patch. D&D's patch really was named
+  // `ddsomu.zip`, exactly like the ROM, so collision handling produced `ddsomu (2).zip` - and whoever downloaded it
+  // could not tell which was the patch. It is pinned to **the ROM's name plus `-patch`** (#198).
   it('패치는 롬 이름에 -patch 를 붙여 넣는다', () => {
     expect(bundleEntryNames({ romName: 'game.sfc', patchName: '한글.ips' }))
       .toEqual(['game.sfc', 'game-patch.ips']);
@@ -38,7 +38,7 @@ describe('bundleEntryNames', () => {
       .toEqual(['ddsomu.zip', 'ddsom.zip']);
   });
 
-  // 여기가 핵심이다.
+  // This is the heart of it.
   it('이름이 겹치면 번호를 붙여 갈라 둔다 — 덮어쓰면 파일이 사라진다', () => {
     const names = bundleEntryNames({ romName: 'ddsoma.zip', parentNames: ['ddsoma.zip'] });
     expect(names).toHaveLength(2);

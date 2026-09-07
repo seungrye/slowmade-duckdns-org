@@ -1,29 +1,29 @@
-// 세이브스테이트 키의 접근 권한 확인 (#114).
+// Checking access to a save-state key (#114).
 //
-// 라우트 넷이 같은 검사를 하므로 한 곳에 둔다. 형식·실재는 `parseGameKey` 가 보고,
-// 여기서는 **DB 가 있어야 아는 것**(그 롬이 내 것인지)까지 마저 본다.
+// Four routes make the same check, so it lives in one place. `parseGameKey` covers the format and existence, and this
+// adds **what only the DB can answer** - whether that ROM is mine.
 
 import { connectToDB } from '@/lib/db';
 import RetroRom from '@/models/retro-rom';
 import { parseGameKey } from './game-key';
 
 /**
- * 세이브 하나의 상한 (#114).
+ * The cap on one save (#114).
  *
- * middleware 본문 제한(10MB) 안에 있어야 한다 — 넘기면 본문이 잘려 파싱이 깨진다.
- * 실제로는 메가드라이브 상태가 ~1MB 로 가장 크다.
+ * It must stay inside middleware's body limit (10MB) - exceeding it truncates the body and breaks the parse.
+ * In practice a Mega Drive state is the largest at about 1MB.
  *
- * **라우트 파일이 아니라 여기 두는 이유**: Next 라우트 모듈은 HTTP 메서드와 정해진 설정만
- * export 할 수 있고, 그 밖의 export 가 있으면 프로덕션 빌드가 타입 오류로 막는다
- * (`tsc --noEmit` 만으로는 안 걸린다).
+ * **Why it lives here rather than in the route file**: a Next route module may export only HTTP methods and certain
+ * settings, and any other export makes the production build fail with a type error
+ * (which `tsc --noEmit` alone does not catch).
  */
 export const MAX_STATE_BYTES = 8 * 1024 * 1024;
 
 /**
- * 이 사용자가 이 게임 키를 쓸 수 있는가.
+ * Whether this user may use this game key.
  *
- * - `builtin:` — 매니페스트에 있으면 누구나(로그인 사용자면) 쓸 수 있다
- * - `rom:` — **내가 올린 롬일 때만**. 남의 롬 키로 저장 슬롯을 만들 수 없다
+ * - `builtin:` - anyone (logged in) may use it if it is in the manifest
+ * - `rom:` - **only when it is a ROM I uploaded**. A save slot cannot be made under someone else's ROM key
  */
 export async function canUseGameKey(email: string, key: string | null | undefined): Promise<boolean> {
   const parsed = parseGameKey(key);

@@ -65,7 +65,7 @@ describe('daysForYear', () => {
     mockFetch.mockRejectedValue(new Error('공공데이터포털 점검 중'));
 
     expect(await daysForYear(2026, now)).toEqual(CACHED);
-    // 실패한 결과로 캐시를 덮지 않는다.
+    // A failed result never overwrites the cache.
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 

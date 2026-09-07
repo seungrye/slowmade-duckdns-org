@@ -7,7 +7,7 @@ import {
   shouldCelebrate,
 } from './birthday';
 
-// 판정 기준 시각은 전부 UTC 로 적는다. KST = UTC+9 이므로 UTC 15:00 이 KST 다음날 00:00 이다.
+// Every reference time is written in UTC. KST = UTC+9, so 15:00 UTC is 00:00 the next day in KST.
 const utc = (s: string) => new Date(s);
 
 describe('parseBirthdayInput', () => {
@@ -19,7 +19,7 @@ describe('parseBirthdayInput', () => {
   });
 
   it('로컬 시간대와 무관하게 월·일이 밀리지 않는다', () => {
-    // KST 로컬 생성이었다면 1990-03-14T15:00Z 가 되어 UTC 날짜가 14일로 밀린다.
+    // Built in local time it would have been 1990-03-14T15:00Z, pushing the UTC date back to the 14th.
     const d = parseBirthdayInput('1990-03-15', now)!;
     expect(d.getUTCMonth() + 1).toBe(3);
     expect(d.getUTCDate()).toBe(15);
@@ -172,7 +172,7 @@ describe('shouldCelebrate', () => {
   });
 
   it('연말 KST 경계에서 연도는 KST 기준으로 센다', () => {
-    // UTC 2026-12-31T15:00Z = KST 2027-01-01. 1월 1일생이면 2027 로 축하해야 한다.
+    // 2026-12-31T15:00Z UTC = 2027-01-01 KST. Someone born on 1 January should be celebrated for 2027.
     const newYearBaby = utc('1990-01-01T00:00:00Z');
     expect(shouldCelebrate(newYearBaby, utc('2026-12-31T15:00:00Z'), '2026')).toBe(true);
     expect(shouldCelebrate(newYearBaby, utc('2026-12-31T15:00:00Z'), '2027')).toBe(false);

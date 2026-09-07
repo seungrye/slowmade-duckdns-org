@@ -1,12 +1,12 @@
-// useAutoSave 훅 단위 테스트 (#238).
+// Unit tests for the useAutoSave hook (#238).
 //
-// 자동 저장 흐름:
-//   - 로그인 사용자: state 변경 → 1초 디바운스 → POST /api/web-adventure/save.
-//   - 비로그인: 동일하게 localStorage 에 저장.
-//   - 페이지 진입 시: 로그인이면 GET, 비로그인은 localStorage 읽어 onRestore 콜백.
-//   - phase==="playing" 일 때만 저장. creating/ended 는 skip.
+// The autosave flow:
+//   - a logged-in user: a state change -> a 1-second debounce -> POST /api/web-adventure/save.
+//   - logged out: the same, saved to localStorage.
+//   - on entering the page: a GET when logged in, or reading localStorage and calling onRestore when logged out.
+//   - it saves only while phase === "playing". creating and ended are skipped.
 //
-// 정책: 로그인 시 *둘 다* 저장 (서버 + localStorage backup) — 오프라인 견고함.
+// The policy: when logged in it saves to *both* (the server plus a localStorage backup) - robust offline.
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -52,7 +52,7 @@ describe('useAutoSave — 디바운스 저장', () => {
   it('phase==="playing" + 1초 후 fetch POST 호출', async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ data: null }) });
     renderHook(() => useAutoSave(playingState, { runIndex: 1 }));
-    // 디바운스 시간 못 됐을 때는 POST 호출 안 됨 (GET 은 마운트 시 별도)
+    // before the debounce elapses there is no POST (the GET on mount is separate)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(500);
     });
@@ -61,7 +61,7 @@ describe('useAutoSave — 디바운스 저장', () => {
     );
     expect(postCallsAt500.length).toBe(0);
 
-    // 1초 경과
+    // one second later
     await act(async () => {
       await vi.advanceTimersByTimeAsync(600);
     });
@@ -106,7 +106,7 @@ describe('useAutoSave — 디바운스 저장', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1100);
     });
-    // localStorage 저장은 됨 (오프라인 동작 보장).
+    // the localStorage save still happens (guaranteeing offline behaviour).
     expect(localStorage.getItem(LOCAL_STORAGE_KEY)).not.toBeNull();
   });
 });
@@ -128,7 +128,7 @@ describe('useAutoSave — 마운트 시 복원 (realTimers 사용)', () => {
     });
     const onRestore = vi.fn();
     renderHook(() => useAutoSave({ phase: 'creating' }, { runIndex: 1, onRestore }));
-    // 마운트 useEffect 의 async fetch 완료 대기.
+    // waiting for the mount useEffect's async fetch to finish.
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });

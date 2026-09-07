@@ -1,19 +1,19 @@
 import type { CalendarEvent, EventKind } from './types';
 
 /**
- * 날 이름 → 아이콘·설명 표 (#328) — 순수.
+ * The day-name -> icon and description table (#328) - pure.
  *
- * 특일 정보 API 는 **이름만** 준다(`'설날'`). "무슨 날인지 친절한 설명"은 우리가 쓴다 —
- * 그게 이 기능의 알맹이다.
+ * The special-days API gives **only the name** (`'설날'`). The friendly "what this day is" is ours to write - that is
+ * the substance of the feature.
  *
- * 아이콘은 **서로 겹치지 않게** 고른다(테스트가 강제한다). 아이콘만 보고 무슨 날인지
- * 짐작할 수 있어야 툴팁을 열기 전에도 쓸모가 있다.
+ * Icons are chosen so **none repeat** (the test enforces it). Being able to guess the day from the icon alone makes
+ * it useful before the tooltip is even opened.
  */
 
 type CatalogEntry = { icon: string; description: string };
 
 export const CATALOG: Record<string, CatalogEntry> = {
-  // ── 법정공휴일 ──
+  // ── Statutory holidays ──
   신정: { icon: '🎊', description: '새해 첫날. 한 해의 시작을 축하합니다.' },
   설날: { icon: '🧧', description: '음력 새해 첫날. 차례를 지내고 세배를 합니다.' },
   삼일절: { icon: '✊', description: '1919년 3·1 독립운동을 기리는 날입니다.' },
@@ -27,7 +27,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   기독탄신일: { icon: '🎄', description: '성탄절. 예수의 탄생을 기념하는 날입니다.' },
   대체공휴일: { icon: '🔁', description: '공휴일이 주말과 겹쳐 대신 쉬는 날입니다.' },
 
-  // ── 기념일 ──
+  // ── Observances ──
   제헌절: { icon: '📜', description: '1948년 헌법이 공포된 것을 기리는 날입니다.' },
   식목일: { icon: '🌳', description: '나무를 심고 가꾸는 날입니다.' },
   근로자의날: { icon: '🛠️', description: '일하는 사람들의 노고를 기리는 날입니다.' },
@@ -48,7 +48,7 @@ export const CATALOG: Record<string, CatalogEntry> = {
   장애인의날: { icon: '♿', description: '장애인에 대한 이해를 넓히는 날입니다.' },
   노인의날: { icon: '🧓', description: '어르신을 공경하는 마음을 되새기는 날입니다.' },
 
-  // ── 24절기 ──
+  // ── The 24 solar terms ──
   입춘: { icon: '🌱', description: '봄의 시작을 알리는 절기입니다.' },
   우수: { icon: '💧', description: '눈이 녹아 비가 되는 절기입니다.' },
   경칩: { icon: '🐸', description: '겨울잠 자던 개구리가 깨어나는 절기입니다.' },
@@ -76,25 +76,25 @@ export const CATALOG: Record<string, CatalogEntry> = {
 };
 
 /**
- * API 가 쓰는 이름과 우리가 쓰는 이름이 다른 경우.
- * 예: 신정은 `dateName` 이 `'1월1일'` 로 온다.
+ * Cases where the API's name differs from ours.
+ * New Year's Day, for instance, arrives with `dateName` as `'1월1일'`.
  */
 const ALIAS: Record<string, string> = {
   '1월1일': '신정',
   크리스마스: '기독탄신일',
   석가탄신일: '부처님오신날',
-  // 공휴일 엔드포인트는 '노동절', 기념일 엔드포인트는 '근로자의 날' 로 같은 날을 부른다.
+  // The holiday endpoint calls the same day '노동절' while the observance endpoint calls it '근로자의 날'.
   노동절: '근로자의날',
 };
 
 /**
- * 이름 뒤에 괄호가 붙어 오는 것들. 실측: `대체공휴일(개천절)`·`대체공휴일(광복절)` …
- * 괄호까지 표에 넣으면 매년 조합이 달라져 끝이 없으므로, 앞부분으로 찾고 **표시 이름은
- * 원문 그대로** 둔다 — 어느 공휴일의 대체인지가 정보다.
+ * Names that arrive with a parenthesis appended. Measured: `대체공휴일(개천절)`, `대체공휴일(광복절)` and so on.
+ * Putting the parenthesis in the table would be endless, since the combinations change every year, so the lookup
+ * uses the leading part while **the displayed name stays verbatim** - which holiday it substitutes for is information.
  */
 const PREFIX_KEYS = ['대체공휴일'];
 
-/** 표에 없는 이름도 반드시 보여준다 — 안 그러면 API 가 새 기념일을 줄 때 조용히 샌다. */
+/** A name absent from the table is still shown - otherwise a new observance from the API would silently vanish. */
 export const FALLBACK_ICON: Record<EventKind, string> = {
   holiday: '🎌',
   anniversary: '📌',
@@ -102,19 +102,18 @@ export const FALLBACK_ICON: Record<EventKind, string> = {
 };
 
 /**
- * 공백을 지운다. 실측해 보니 **엔드포인트마다 띄어쓰기가 다르다** — 기념일은 `'어버이 날'`,
- * `'스승의 날'`, `'국군의 날'` 처럼 띄어 쓰고 공휴일은 붙여 쓴다. 표를 두 벌 두는 대신
- * 찾을 때 공백을 지운다.
+ * Strips whitespace. Measured, **the spacing differs per endpoint** - observances are spaced (`'어버이 날'`,
+ * `'스승의 날'`, `'국군의 날'`) while holidays are not. Rather than keep two tables, the lookup strips whitespace.
  */
 function normalize(name: string): string {
   return name.replace(/\s+/g, '');
 }
 
 /**
- * 같은 날 같은 이름이 두 번 오는 것을 합친다.
+ * Merges the same name arriving twice on the same day.
  *
- * 실측(2026): `어린이날`(5/5)·`현충일`(6/6)이 **공휴일과 기념일 응답 양쪽에** 있다. 안 합치면
- * 같은 날이 배지에 두 번 뜬다. 무게가 높은 쪽(공휴일 > 기념일 > 절기)을 남긴다.
+ * Measured (2026): `어린이날` (5/5) and `현충일` (6/6) appear in **both the holiday and the observance responses**.
+ * Without merging, the same day shows twice on the badge. The heavier one wins (holiday > observance > solar term).
  */
 const WEIGHT_ORDER: EventKind[] = ['holiday', 'anniversary', 'season'];
 
@@ -126,7 +125,7 @@ export function dedupeEvents(events: CalendarEvent[]): CalendarEvent[] {
       best.set(event.name, event);
     }
   }
-  // 무게순으로 정렬해 공휴일이 스택 맨 앞에 오게 한다.
+  // Sorted by weight so a holiday comes first in the stack.
   return [...best.values()].sort(
     (a, b) => WEIGHT_ORDER.indexOf(a.kind) - WEIGHT_ORDER.indexOf(b.kind)
   );
@@ -142,7 +141,7 @@ export function decorate(name: string, kind: EventKind): CalendarEvent {
     return { name: key, kind, icon: entry.icon, description: entry.description };
   }
 
-  // `대체공휴일(개천절)` 처럼 괄호가 붙은 것 — 표시 이름은 원문을 살린다.
+  // Ones with a parenthesis, like `대체공휴일(개천절)` - the displayed name keeps the original.
   const prefix = PREFIX_KEYS.find((p) => normalized.startsWith(p));
   if (prefix) {
     const base = CATALOG[prefix];

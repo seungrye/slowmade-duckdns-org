@@ -1,14 +1,14 @@
-// 덧글 알림 (#237).
+// Comment notifications (#237).
 //
-// 내 글에 덧글이 달리거나 내 덧글에 답글이 달려도 알 방법이 없었다. AI 팀 스레드가 전부
-// 덧글로 오가면서 실질적으로 걸렸다 — 밤에 러너가 답글을 남겨도 확인할 길이 없었다.
+// There was no way to know when someone commented on my post or replied to my comment. It became a real problem once
+// the AI team thread ran entirely through comments - a runner replying overnight was simply unknowable.
 //
-// ── 쓸 때 만들지 않고, 읽을 때 계산한다 ─────────────────────────────────
+// ── Computed on read, not created on write ─────────────────────────────────
 //
-// 덧글을 만드는 경로가 **셋**이다: /api/comments, /api/enji, /api/painter.
-// 거기에 "알림 문서도 하나 만들어라"를 넣으면 **네 번째 경로가
-// 생길 때 조용히 빠진다** — 비공개 규칙이 8곳에 흩어져 있다가 샜던 것(#168)과 같은 모양이다.
-// 조회로 계산하면 그 위험이 0 이고, 글 172건 규모면 성능도 충분하다.
+// There are **three** paths that create a comment: /api/comments, /api/enji and /api/painter.
+// Adding "also create a notification document" to each means **a fourth path would silently miss it** - the same
+// shape as the privacy rule scattered across 8 places that eventually leaked (#168).
+// Computing on read removes that risk entirely, and at 172 posts the performance is fine.
 import { Types, type PipelineStage } from 'mongoose';
 import { connectToDB } from '@/lib/db';
 import Comment from '@/models/comment';
@@ -17,19 +17,19 @@ import User from '@/models/user';
 import { truncate } from '@/lib/truncate';
 import { isUnread, notificationPipeline } from '@/lib/notification-read';
 
-/** 목록에 보여 줄 개수. 사라지지 않게 항상 최근 것을 이만큼 준다. */
+/** How many to show in the list. Always this many of the most recent, so nothing disappears. */
 const DEFAULT_LIMIT = 20;
 
 /**
- * 발췌 상한 (#245).
+ * The excerpt cap (#245).
  *
- * **표시 길이를 정하는 값이 아니다** — 화면 폭은 기기마다 다른데 서버는 그걸 모른다.
- * 서버가 어떤 숫자를 고르든 어떤 폭에서는 어긋난다(60자로 잘랐더니 1504px 데스크톱에서
- * 절반도 못 채우고 오른쪽이 텅 비었다).
+ * **It is not the display length** - screen width differs by device and the server does not know it. Whatever number
+ * the server picks is wrong at some width (cutting at 60 characters left a 1504px desktop less than half full, with
+ * the right side empty).
  *
- * 실제로 자르는 것은 화면의 `truncate`(text-overflow: ellipsis)다 — 각 기기의 실제 폭에
- * 맞춰 한 줄로 줄여 준다. 글 제목 줄이 이미 그 방식이다. 여기 값은 **응답 크기 상한**일
- * 뿐이고, 넓은 화면 한 줄을 채우고도 남을 만큼만 넉넉하면 된다.
+ * What actually truncates is the UI's `truncate` (text-overflow: ellipsis), which fits one line to each device's real
+ * width. The post-title line already works that way. This value is only **a response-size cap**, generous enough to
+ * more than fill one line on a wide screen.
  */
 const EXCERPT_LENGTH = 200;
 
@@ -45,13 +45,13 @@ export interface NotificationItem {
 }
 
 /**
- * 내게 온 덧글을 고르는 조건.
+ * The condition that picks the comments addressed to me.
  *
- * 순수 함수로 뗀 이유: 이 기능에서 **가장 틀리기 쉬운 곳**이라 따로 테스트한다.
+ * Why it is a separate pure function: it is **the easiest thing in this feature to get wrong**, so it is tested on its own.
  *
- * `authorId: { $ne }` 가 **null 과 필드 없음까지 포함**한다(실측 확인). 그래서 봇 덧글
- * (`authorId: null`)과 익명 덧글이 정상적으로 걸리고, 내가 쓴 것만 빠진다 —
- * **봇 답글을 아는 게 이 기능의 주 용도다.**
+ * `authorId: { $ne }` **also covers null and a missing field** (measured). That is why bot comments
+ * (`authorId: null`) and anonymous comments still match while my own are excluded -
+ * **knowing about bot replies is this feature's main purpose.**
  */
 export function notificationFilter(
   myId: Types.ObjectId,
@@ -77,7 +77,7 @@ interface CommentRow {
   createdAt?: Date;
 }
 
-/** 내게 온 알림 목록과 안 읽은 수. 비공개 글은 내 것만 걸리므로 남의 것이 샐 구조가 아니다. */
+/** My notifications and the unread count. Private posts only match my own, so there is no structure for someone else's to leak. */
 export async function listNotifications(
   email: string,
   limit: number = DEFAULT_LIMIT,
@@ -105,30 +105,30 @@ export async function listNotifications(
     (myPosts ?? []).map((p) => p._id),
     (myComments ?? []).map((c) => c._id),
   );
-  // 한 번도 안 봤으면 전부 새 것이다.
+  // With nothing ever seen, everything is new.
   const seenAt = me.notificationsSeenAt ?? new Date(0);
-  // 기준선보다 새 것 중 눌러서 처리한 것 (#247).
+  // Among those newer than the baseline, the ones tapped (#247).
   const readIds = new Set(me.notificationsReadIds ?? []);
 
-  // 안 읽은 것을 위로, 그 다음 최신순 (#249). 정렬을 DB 에서 하는 이유는
-  // `notificationPipeline` 주석 참조 — **자르기 전에** 정렬해야 안 읽은 것이 상한 밖으로
-  // 밀려 사라지지 않는다.
+  // Unread first, then newest (#249). For why the sort happens in the DB see the
+  // `notificationPipeline` comment - sorting **before** the slice is what stops unread items being pushed past the
+  // limit and disappearing.
   const rows =
     ((await Comment.aggregate(
-      // 파이프라인은 순수 함수라 mongoose 타입을 모른다(그래야 테스트에서 모양만 본다).
+      // The pipeline is a pure function and knows nothing of mongoose types (which is what lets the test check only its shape).
       notificationPipeline(filter, seenAt, [...readIds], limit) as unknown as PipelineStage[],
     )) as CommentRow[]) ?? [];
 
-  // 안 읽은 수는 따로 센다 — 목록 20건 안에서 세면 그보다 많을 때 실제보다 적게 나온다.
-  // 누른 것은 뺀다 (#247) — 뱃지 숫자가 목록의 표식과 어긋나면 안 된다.
+  // The unread count is measured separately - counting within the 20-item list would under-report when there are more.
+  // Tapped ones are excluded (#247) - the badge must not disagree with the list's markers.
   const unreadCount = await Comment.countDocuments({
     ...filter,
     createdAt: { $gt: seenAt },
     ...(readIds.size > 0 ? { _id: { $nin: [...readIds] } } : {}),
   });
 
-  // 제목은 **결과에 실제로 나온 글**로 다시 조회한다. 내 덧글의 답글은 남의 글에 달렸을
-  // 수도 있어서 내 글 목록만으로는 제목이 비게 된다.
+  // Titles are re-queried from **the posts actually in the result**. A reply to my comment can sit on someone else's
+  // post, so the list of my own posts alone would leave the title empty.
   const postIds = [...new Set(rows.map((r) => String(r.post)))];
   const posts = (await Post.find({ _id: { $in: postIds } })
     .select('_id title')

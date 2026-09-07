@@ -4,15 +4,15 @@ import { fetchSpecialDays } from './source';
 import type { CalendarDay } from './types';
 
 /**
- * 연 단위 캐시 (#328).
+ * The per-year cache (#328).
  *
- * **실패해도 던지지 않는다.** 헤더 배지는 부가 기능이라, 공공데이터포털이 점검 중이거나
- * DB 가 흔들려도 화면이 깨지면 안 된다. 모든 실패는 "있는 것으로 최선"을 돌려준다.
+ * **It never throws on failure.** The header badge is an extra, so the page must not break when the public data
+ * portal is down for maintenance or the DB wobbles. Every failure returns the best of what is already there.
  */
 
 /**
- * 연 1회 수집으로는 부족하다 — **임시공휴일은 연중에 새로 지정**된다. 주 1회면 52회/년이라
- * 유량 걱정이 없으면서 새 지정을 일주일 안에 따라잡는다.
+ * Collecting once a year is not enough - **ad hoc public holidays are designated mid-year**. Weekly is 52 calls a
+ * year, well within quota, and catches a new designation within a week.
  */
 export const STALE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -34,8 +34,8 @@ export async function daysForYear(year: number, now: Date = new Date()): Promise
 
   try {
     const days = await fetchSpecialDays(year);
-    // 빈 결과로 캐시를 덮지 않는다. 키가 없거나 응답이 비었을 때 그 해를 지워버리면,
-    // 다음 조회부터 계속 비어 있게 된다.
+    // An empty result never overwrites the cache. Wiping a year because the key is missing or the response was empty
+    // would leave every later lookup empty too.
     if (days.length === 0) return cached?.days ?? [];
 
     await HolidayCache.findOneAndUpdate(
@@ -45,7 +45,7 @@ export async function daysForYear(year: number, now: Date = new Date()): Promise
     );
     return days;
   } catch {
-    // 수집 실패 — 묵은 캐시라도 쓴다.
+    // Collection failed - use the stale cache rather than nothing.
     return cached?.days ?? [];
   }
 }

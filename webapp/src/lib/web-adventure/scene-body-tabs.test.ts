@@ -1,6 +1,6 @@
-// #79 — 씬 CMS 의 본문 탭 [트리트먼트 | 기본 | 톨킨 풍 | +].
+// #79 - the scene CMS's body tabs [treatment | default | Tolkien style | +].
 //
-// 탭 전환·읽기·쓰기를 순수 함수로 떼어 테스트한다. UI 는 이 함수들을 부르기만 한다.
+// Switching, reading and writing tabs are split out as pure functions and tested. The UI only calls them.
 import { describe, it, expect } from 'vitest';
 import type { TabbedScene } from './scene-body-tabs';
 import {
@@ -72,7 +72,7 @@ describe('writeTab', () => {
     expect(out.variants).toEqual({ hemingway: ['짧게.'] });
   });
 
-  // 원본을 건드리면 폼 상태 관리가 꼬인다.
+  // Touching the original would tangle the form's state management.
   it('입력 객체를 변형하지 않는다', () => {
     const s = scene();
     writeTab(s, 'tolkien', ['바뀜']);

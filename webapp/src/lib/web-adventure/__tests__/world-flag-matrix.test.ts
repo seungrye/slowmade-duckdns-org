@@ -1,12 +1,12 @@
-// #276 6 world flag 매트릭스 — 각 flag 가 *어딘가의 conditional hidden 분기* 에서 활용된다.
+// #276 the 6 world-flag matrix - each flag is used by *a conditional hidden branch somewhere*.
 //
-// 6 world flag 모두가 *실제로 콘텐츠를 변경한다* 는 시스템 보증.
+// A system guarantee that all 6 world flags *actually change the content*.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";
 import { ENDING_TO_WORLD_FLAG } from "../world-flags";
 
-// world flag → 활용되는 (sceneId, choiceId).
+// world flag -> the (sceneId, choiceId) that uses it.
 const MATRIX: Record<string, { sceneId: string; choiceId: string }> = {
   "world.harmony_kept": { sceneId: "climax_revolution_path", choiceId: "echo_of_harmony" },
   "world.world_fell": { sceneId: "omphalos_blackmarket", choiceId: "ashen_informant" },
@@ -14,10 +14,10 @@ const MATRIX: Record<string, { sceneId: string; choiceId: string }> = {
   "world.revolution_won": { sceneId: "omphalos_outskirts", choiceId: "iron_lookout" },
   "world.last_one_fell": { sceneId: "climax_harmony_path", choiceId: "crystal_echo" },
   "world.sylvan_awoke": { sceneId: "climax_sylvan_path", choiceId: "forest_recognized" },
-  // #359 각성 루트 회차 부메랑.
+  // #359 the awakening route's cross-run boomerang.
   "world.truth_freed": { sceneId: "kael_vale_trust", choiceId: "prior_truth" },
   "world.false_god": { sceneId: "kael_awaken_climax", choiceId: "false_god_echo" },
-  // #361 린 각성 루트 회차 부메랑.
+  // #361 Rin's awakening route cross-run boomerang.
   "world.regent_rules": { sceneId: "rin_crossroads", choiceId: "regent_echo" },
   "world.purged": { sceneId: "rin_vale_pursuit", choiceId: "purged_trace" },
   "world.wanderer": { sceneId: "rin_fall_throne", choiceId: "wanderer_echo" },
@@ -68,6 +68,6 @@ describe("world flag 매트릭스 (#276)", () => {
 
   it("6 flag 매트릭스 — 각 flag 가 *서로 다른* (sceneId, choiceId) 에 매핑", () => {
     const pairs = Object.values(MATRIX).map((m) => `${m.sceneId}/${m.choiceId}`);
-    expect(new Set(pairs).size).toBe(pairs.length); // 중복 없음.
+    expect(new Set(pairs).size).toBe(pairs.length); // no duplicates.
   });
 });

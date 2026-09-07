@@ -1,13 +1,13 @@
-// #257 〈에테르니아〉 e2e 풀 플레이 — 3 주인공 × 6 엔딩 매트릭스.
+// #257 a full e2e play-through of Eternia - the 3 protagonists x 6 endings matrix.
 //
-// 콘텐츠는 mongo 가 단일 소스이므로 *정적 fallback* 이 비어 있다. 이 테스트는
-// mongo 의 콘텐츠 *그래프 구조* 가 e2e 플레이 가능함을 검증하기 위해 *최소 sceneRegistry*
-// 를 직접 구성 + reducer 시뮬레이션으로 6 엔딩 모두 도달 가능한지 확인.
+// mongo is the single source for the content, so the *static fallback* is empty. To verify that mongo's
+// content *graph structure* is playable end to end, this test builds a *minimal sceneRegistry* by hand
+// and confirms through a reducer simulation that all 6 endings are reachable.
 //
-// 검증:
-//   1. types 의 EndingId enum 6 종 모두 reducer 가 ended phase 로 전환할 수 있다.
-//   2. probability 의 stigmaDelta + 침식 자동 petrification 동작.
-//   3. world flag conditional 분기 (knowsAscensionPlot, spiritBeastDied).
+// It verifies:
+//   1. the reducer can move to the ended phase for all 6 of types' EndingId enum.
+//   2. probability's stigmaDelta and the automatic petrification from contamination.
+//   3. world-flag conditional branches (knowsAscensionPlot, spiritBeastDied).
 
 import { describe, test, expect } from "vitest";
 import type { Character, EndingId, GameState, Scene, SceneRegistry } from "@/types/web-adventure";
@@ -28,7 +28,7 @@ function makeChar(overrides: Partial<Character> = {}): Character {
   };
 }
 
-/** 각 엔딩에 도달하는 *최소 그래프* — start → ending. */
+/** The *minimal graph* that reaches each ending - start -> ending. */
 function makeMinimalScenes(endingId: EndingId): SceneRegistry {
   const start: Scene = {
     id: "start",
@@ -138,13 +138,13 @@ describe("e2e 풀 플레이 — 6 엔딩 도달 가능", () => {
       },
     };
 
-    // 플래그 없음 → conditional 차단 → state 무변화.
+    // no flag -> the conditional is blocked -> the state is unchanged.
     let state: GameState = { phase: "creating" };
     state = gameReducer(state, { type: "START_GAME", character: makeChar(), startScene: "start" }, scenes);
     const noFlag = gameReducer(state, { type: "MAKE_CHOICE", choiceId: "spirit_swallow" }, scenes);
-    expect(noFlag).toEqual(state); // 무변화.
+    expect(noFlag).toEqual(state); // unchanged.
 
-    // 플래그 있음 → 통과 → sylvan_bond 엔딩.
+    // with the flag -> it passes -> the sylvan_bond ending.
     const charWithFlag = makeChar({ flags: { spiritBeastDied: true } });
     let s2: GameState = { phase: "creating" };
     s2 = gameReducer(s2, { type: "START_GAME", character: charWithFlag, startScene: "start" }, scenes);

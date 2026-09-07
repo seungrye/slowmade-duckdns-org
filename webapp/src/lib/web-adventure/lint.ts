@@ -1,16 +1,16 @@
-// #271 콘텐츠 구조 lint — 순수 함수.
+// #271 content structure lint - pure functions.
 //
-// 규칙:
-//   ORPHAN              — 시작 씬도 아니고 어떤 분기의 target 도 아닌 씬.
-//   DEAD_END            — choices 가 비었는데 isEnding=false (또는 endingId 없음).
-//   TOO_MANY_CHOICES    — choices.length > 6 (저작 pool 상한). 화면엔 회차별 3개만
-//                         랜덤 노출(choiceSample.pickDisplayedChoices) 하므로 pool 은 6까지 허용.
-//   DANGLING_REF        — choice 의 to/onSuccess/onFailure 가 sceneRegistry 에 없는 id.
-//   UNREACHABLE_ENDING  — requiredEndings 의 어떤 endingId 도 시작 씬에서 도달 불가
-//                         (분기 hidden/조건 무시한 *그래프 도달성*. 자격은 e2e 가 별도 검증).
+// The rules:
+//   ORPHAN              - a scene that is neither a starting scene nor any branch's target.
+//   DEAD_END            - choices is empty while isEnding=false (or there is no endingId).
+//   TOO_MANY_CHOICES    - choices.length > 6 (the authoring pool cap). Only 3 per run are shown on screen at
+//                         random (choiceSample.pickDisplayedChoices), so a pool of up to 6 is allowed.
+//   DANGLING_REF        - a choice's to/onSuccess/onFailure names an id absent from the sceneRegistry.
+//   UNREACHABLE_ENDING  - an endingId in requiredEndings is unreachable from any starting scene
+//                         (*graph reachability*, ignoring hidden branches and conditions. Eligibility is verified separately by the e2e tests).
 //
-// 모든 ConditionalChoice 의 hidden=true 도 lint 그래프 도달성에는 *그대로 포함* —
-// 실제 자격은 e2e 가 책임 ; lint 는 *그래프 구조* 책임.
+// Every ConditionalChoice with hidden=true is *included as is* in the lint's graph reachability -
+// actual eligibility is the e2e tests' responsibility; lint's is *the graph structure*.
 
 import type { EndingId, Scene, SceneRegistry } from "@/types/web-adventure";
 
@@ -29,21 +29,20 @@ export interface LintIssue {
 }
 
 export interface LintOptions {
-  /** 시작 씬 id 들 (보통 3 주인공의 startScene). orphan + 도달성 root. */
+  /** The starting scene ids (usually the 3 protagonists' startScene). The roots for orphan and reachability checks. */
   startSceneIds: string[];
-  /** 도달해야 하는 EndingId 목록. 빠뜨리면 UNREACHABLE_ENDING. */
+  /** The EndingIds that must be reachable. A missing one is an UNREACHABLE_ENDING. */
   requiredEndings?: EndingId[];
-  /** 저작 pool 최대 분기 수 (기본 6; 화면은 랜덤 3-of-N). */
+  /** The authoring pool's maximum branches (6 by default; the screen shows a random 3 of N). */
   maxChoices?: number;
   /**
-   * reducer 자동 전환으로 진입하는 ending 씬 id 들 (예: ending_petrification 은
-   * stigma ≥ 100 자동). ORPHAN 검출 + UNREACHABLE_ENDING 검출에서 제외.
+   * The ending scene ids entered through the reducer's automatic transition (ending_petrification, say, fires
+   * automatically at stigma >= 100). Excluded from both the ORPHAN and UNREACHABLE_ENDING checks.
    */
   autoEndingSceneIds?: string[];
   /**
-   * reducer 가 *씬 데이터 없이* 직접 ending 으로 전환하는 endingId 들 (#327 이후
-   * ending_petrification 씬을 삭제했으므로 화이트리스트는 endingId 기반으로도
-   * 필요). UNREACHABLE_ENDING 검출에서 제외.
+   * The endingIds the reducer moves to directly *without scene data* (since #327 deleted the ending_petrification
+   * scene, the whitelist is also needed keyed by endingId). Excluded from the UNREACHABLE_ENDING check.
    */
   autoEndingIds?: EndingId[];
 }
@@ -78,7 +77,7 @@ function bfsReachableEndings(
     if (!scene) continue;
     if (scene.isEnding && scene.endingId) {
       endings.add(scene.endingId as EndingId);
-      continue; // 엔딩 씬은 분기 follow 안 함.
+      continue; // An ending scene's branches are not followed.
     }
     for (const t of collectChoiceTargets(scene)) {
       if (!visited.has(t)) queue.push(t);
@@ -114,7 +113,7 @@ export function lintSceneContent(
   const autoEndings = new Set(options.autoEndingSceneIds ?? []);
   const issues: LintIssue[] = [];
 
-  // 1) Orphan — 시작이 아니고, 어떤 씬의 분기 target 도 아니고, *자동 전환* 도 아닌 id.
+  // 1) Orphan - an id that is not a start, not any scene's branch target, and not *an automatic transition*.
   const reachable = bfsReachableSceneIds(registry, options.startSceneIds);
   for (const id of Object.keys(registry)) {
     if (!reachable.has(id) && !autoEndings.has(id)) {
@@ -144,8 +143,8 @@ export function lintSceneContent(
     }
   }
 
-  // 5) Unreachable endings — autoEndingSceneIds 의 endingId 는 자동 전환이므로
-  //    그래프 도달성 검사에서 제외 (e2e 가 별도 검증).
+  // 5) Unreachable endings - an endingId in autoEndingSceneIds is an automatic transition and so is
+  //    excluded from the graph reachability check (the e2e tests verify it separately).
   if (options.requiredEndings && options.requiredEndings.length > 0) {
     const reached = bfsReachableEndings(registry, options.startSceneIds);
     const autoEndingIds = new Set<EndingId>(options.autoEndingIds ?? []);

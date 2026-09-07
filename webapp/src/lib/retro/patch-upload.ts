@@ -1,22 +1,22 @@
-// 업로드된 패치 파일 검사 (#112) — 순수 함수.
+// Validating an uploaded patch file (#112) - pure functions.
 //
-// 형식 판별은 **`public/games/retro/rom-patch.js` 의 것을 그대로 쓴다.** 실제로 적용할 때와
-// 받아들일 때의 기준이 다르면, 받아 놓고 실행 시점에 "지원하지 않는 형식" 이 되는 일이 생긴다.
+// Format detection **reuses what is in `public/games/retro/rom-patch.js`.** Different criteria for accepting and for
+// applying would let a file be accepted and then turn out to be "an unsupported format" at run time.
 
 import { detectPatchFormat } from '../../../public/games/retro/rom-patch.js';
 
-/** 7z 매직 — 받지는 않지만 **왜 안 되는지** 알려 주려고 구분한다. */
+/** The 7z magic - not accepted, but distinguished so the user is told **why**. */
 function is7z(bytes: Uint8Array): boolean {
   return bytes.length >= 6 && bytes[0] === 0x37 && bytes[1] === 0x7a &&
     bytes[2] === 0xbc && bytes[3] === 0xaf && bytes[4] === 0x27 && bytes[5] === 0x1c;
 }
 
 /**
- * 패치 한 개의 크기 한도.
+ * The size cap for one patch.
  *
- * middleware 의 본문 버퍼 제한(10MB) 안에 있어야 한다 — 넘기면 Next 가 본문을 자르며 파싱이
- * 깨져 사용자에게 이유가 안 보인다. 롬과 달리 matcher 에서 빼지 않는 이유가 이것이다
- * (번역 패치는 보통 수백 KB~수 MB 라 8MB 면 충분하다).
+ * It must stay inside middleware's body buffer limit (10MB) - exceeding it makes Next truncate the body and break the
+ * parse, so the user never sees the reason. That is why, unlike ROMs, it is not excluded from the matcher
+ * (a translation patch is usually a few hundred KB to a few MB, so 8MB is plenty).
  */
 export const MAX_PATCH_BYTES = 8 * 1024 * 1024;
 
@@ -25,7 +25,7 @@ export type PatchFormat = 'ips' | 'bps' | 'ups' | 'zip';
 export interface PatchUploadInput {
   filename: string;
   size: number;
-  /** 형식 판별용 — 앞 8 바이트만 있어도 된다. */
+  /** For format detection - the first 8 bytes are enough. */
   bytes: Uint8Array;
 }
 
@@ -33,7 +33,7 @@ export type PatchValidation =
   | { ok: true; format: PatchFormat; name: string }
   | { ok: false; reason: string };
 
-/** 경로 조각을 지운 표시용 이름. **확장자는 남긴다** — 어떤 형식인지 목록에서 보여야 한다. */
+/** A display name with path segments stripped. **The extension stays** - the list has to show which format it is. */
 export function patchNameFromFilename(filename: string): string {
   const base = (filename.split(/[/\\]/).pop() ?? '').trim();
   if (!base) return '이름 없는 패치';
@@ -49,10 +49,10 @@ export function validatePatchUpload(input: PatchUploadInput): PatchValidation {
     };
   }
 
-  // 확장자가 아니라 내용(매직)으로 본다 — 이름은 얼마든지 바꿀 수 있다.
+  // Judged by content (the magic), not the extension - names can be changed at will.
   const format = detectPatchFormat(input.bytes) as PatchFormat | null;
   if (!format) {
-    // 7z 은 브라우저에서 풀 수단이 없다 — zip 으로 다시 묶으면 그대로 쓸 수 있다.
+    // There is no way to unpack 7z in the browser - repacking it as a zip makes it usable as is.
     if (is7z(input.bytes)) {
       return { ok: false, reason: '7z 은 지원하지 않습니다. zip 으로 다시 묶어 올려 주세요.' };
     }

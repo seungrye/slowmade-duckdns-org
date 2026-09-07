@@ -1,11 +1,11 @@
-// 효과 스탯 — 캐릭터 base stat + passive 아이템 보너스.
+// Effective stats - the character's base stat plus passive item bonuses.
 //
-// reducer / UI 의 확률 판정에서 모두 사용. 패시브 자동 반영을 보장.
+// Used by both the reducer's and the UI's probability checks, guaranteeing passives always apply.
 
 import type { Character, StatKey } from "@/types/web-adventure";
 import { items } from "@/content/web-adventure/items";
 
-/** 패시브 아이템 보유 시 stat 보너스 합계 + base stat. */
+/** The base stat plus the total stat bonus from any passive items held. */
 export function effectiveStat(character: Character, stat: StatKey): number {
   const base = character.stats[stat];
   let bonus = 0;

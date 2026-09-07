@@ -1,4 +1,4 @@
-// #278 사이드 NPC 이름 부여 — 지정 씬에 NPC 이름이 본문에 포함됨.
+// #278 naming the side NPCs - the designated scenes' bodies contain the NPC's name.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";

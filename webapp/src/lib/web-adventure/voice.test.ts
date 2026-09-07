@@ -1,4 +1,4 @@
-// 문체(voice) 변형 — 사건은 treatment 가 정본, 표현만 문체별로 갈린다. (#73)
+// Prose-style (voice) variants - the treatment is canonical for events; only the expression differs per style. (#73)
 import { describe, it, expect } from 'vitest';
 import {
   DEFAULT_VOICE,
@@ -23,7 +23,7 @@ describe('resolveBody', () => {
     expect(resolveBody(s, 'tolkien')).toEqual(['옛적에']);
   });
 
-  // 폴백은 기본 body 로 간다 — treatment(뼈대)가 화면에 나가면 안 된다.
+  // The fallback goes to the default body - the treatment (the skeleton) must never reach the screen.
   it('변형이 없으면 기본 body 로 폴백', () => {
     const s = scene('a', ['기본'], { prose: ['산문'] });
     expect(resolveBody(s, 'tolkien')).toEqual(['기본']);
@@ -85,8 +85,8 @@ describe('listVoices', () => {
 });
 
 describe('pickVoiceFromCoverage', () => {
-  // 클라이언트는 variants 가 제거된 씬을 받으므로 scenes 로는 완비 여부를 알 수 없다.
-  // API 가 주는 coverage 로 골라야 한다 (#79).
+  // The client receives scenes with their variants stripped, so completeness cannot be told from scenes.
+  // It has to choose from the coverage the API provides (#79).
   const cov = {
     tolkien: { filled: 3, total: 3, complete: true },
     prose: { filled: 2, total: 3, complete: false },
@@ -124,12 +124,12 @@ describe('chooseRunVoice', () => {
       .toBe('tolkien');
   });
 
-  // 한 판 안에서 문체가 갈리면 몰입이 깨진다 — 뽑은 값을 유지해야 한다.
+  // A style changing mid-run breaks immersion - the drawn value has to persist.
   it('한 번 뽑은 문체는 그 판 내내 유지된다', () => {
     const s = mem();
     const first = chooseRunVoice({ coverage: cov, storage: s, rnd: () => 0.99 });
     expect(first).toBe('tolkien');
-    // 다음 호출은 난수가 달라도 같은 값이어야 한다.
+    // the next call must give the same value even with different randomness.
     expect(chooseRunVoice({ coverage: cov, storage: s, rnd: () => 0 })).toBe('tolkien');
   });
 
@@ -156,7 +156,7 @@ describe('pickVoice', () => {
     scene('b', ['기'], { tolkien: ['t'] }), // prose 미완비
   ];
 
-  // 완비된 문체만 랜덤 후보 — 섞이면 몰입이 깨지므로.
+  // Only complete styles are random candidates - a mixture breaks immersion.
   it('완비된 문체 중에서 고른다', () => {
     expect(pickVoice(scenes, () => 0.99)).toBe('tolkien');
     expect(pickVoice(scenes, () => 0)).toBe(DEFAULT_VOICE);

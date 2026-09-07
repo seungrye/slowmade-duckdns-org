@@ -1,7 +1,7 @@
 import EnjiImageQuota from '@/models/enji-image-quota';
 
 /**
- * UTC 기준 오늘 날짜 키 (`YYYY-MM-DD`).
+ * Today's date key in UTC (`YYYY-MM-DD`).
  */
 export function todayKey(now: Date = new Date()): string {
   const y = now.getUTCFullYear();
@@ -11,15 +11,15 @@ export function todayKey(now: Date = new Date()): string {
 }
 
 /**
- * 오늘의 이미지 생성 카운트를 원자적으로 +1. 한도(`limit`) 미만일 때만 성공.
+ * Atomically increments today's image-generation count, succeeding only below the limit.
  *
- * 구현:
+ * Implementation:
  * `findOneAndUpdate({ _id: today, count: { $lt: limit } }, { $inc: { count: 1 }, $setOnInsert: { _id: today } }, { upsert: true, new: true })`
  *
- * - 문서가 없으면 upsert (insert with count=0 + inc → count=1).
- * - count 가 limit 미만이면 inc 적용 후 새 문서 반환 → true.
- * - count 가 이미 limit 이상이면 filter 가 매치되지 않아 null → false.
- * - upsert 동시성 경합으로 duplicate key (E11000) 발생 시 false.
+ * - With no document it upserts (insert with count=0 plus the inc -> count=1).
+ * - Below the limit the inc applies and the new document is returned -> true.
+ * - At or above the limit the filter does not match and it returns null -> false.
+ * - A duplicate key (E11000) from a concurrent upsert -> false.
  */
 export async function tryConsumeDailyQuota(limit: number): Promise<boolean> {
   const key = todayKey();
@@ -33,7 +33,7 @@ export async function tryConsumeDailyQuota(limit: number): Promise<boolean> {
   } catch (err: unknown) {
     const code = (err as { code?: number })?.code;
     if (code === 11000) {
-      // upsert 중 다른 인스턴스가 이미 insert 한 직후 count >= limit 인 경우.
+      // When another instance inserted during the upsert and the count is already at the limit.
       return false;
     }
     throw err;

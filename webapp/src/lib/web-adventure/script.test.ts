@@ -58,7 +58,7 @@ describe("parseScript — 표시 텍스트 + << >> 디렉티브 순서 분해", 
     expect(parseScript("<<>>")).toEqual([]);
   });
 
-// #370 — 한국어로 쓰는 이야기라 변수명도 한글이어야 자연스럽다. `\w` 는 ASCII 만 매치했다.
+// #370 - the story is written in Korean, so variable names should be too. `\w` matched ASCII only.
 describe('interpolate — 한글 변수명', () => {
   it('한글 변수명을 치환한다', () => {
     expect(interpolate('손을 뻗는다. {{침식_손}}', { 침식_손: '손끝이 시리다.' }))

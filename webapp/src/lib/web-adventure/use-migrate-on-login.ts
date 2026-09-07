@@ -1,12 +1,12 @@
-// useMigrateOnLogin — 로그인 직후 localStorage 의 save/past_runs 를 서버로 이전 (#240).
+// useMigrateOnLogin - moving localStorage's save and past_runs to the server right after login (#240).
 //
-// session.status==='authenticated' 가 되는 순간 (= 로그인 직후)
-//   - localStorage 의 save / past_runs 확인.
-//   - 둘 다 없으면 skip.
-//   - 있으면 POST /api/web-adventure/migrate-from-local (기본 mode='keep').
-//   - 응답 migrated:true 면 localStorage 의 이전 데이터 정리.
-//   - migrated:false (reason:'server_exists') 면 그대로 유지 (사용자가 별도 force 결정).
-// 이 훅은 *세션당 1 회만* 실행되도록 ref 가드.
+// The moment session.status becomes 'authenticated' (= right after login):
+//   - it checks localStorage's save and past_runs.
+//   - with neither, it is skipped.
+//   - with either, it POSTs /api/web-adventure/migrate-from-local (mode='keep' by default).
+//   - on migrated:true it clears the migrated data from localStorage.
+//   - on migrated:false (reason:'server_exists') it is left alone (the user decides separately whether to force).
+// A ref guard makes this hook run *only once per session*.
 
 'use client';
 

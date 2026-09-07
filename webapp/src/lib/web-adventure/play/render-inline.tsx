@@ -2,17 +2,17 @@ import type { ReactNode } from "react";
 import { interpolate } from "../script";
 
 /**
- * 씬 본문·선택지 인라인 마크업 렌더 — 〈에테르니아의 추락〉 서식 규약.
- * (규약 전문: src/content/web-adventure/FORMAT.md)
+ * Rendering the inline markup of scene bodies and choices - The Fall of Eternia's formatting convention.
+ * (The full convention: src/content/web-adventure/FORMAT.md)
  *
- *   **이름**   인물명 — 굵게
- *   *지문*     무대 지시·서술 강조 — 회색 이탤릭
- *   "대사"     따옴표 대사 — 호박색(가스등 톤). 마크업 불필요, 따옴표만으로 자동 적용
- *   [[명사]]   장소·아이템·고유 개념 — 청록색(괄호는 표시하지 않음)
- *   {{변수}}   동적 텍스트 — vars 로 치환(character.variables). 미정의는 원문 유지.
+ *   **name**   a character's name - bold
+ *   *stage*    stage directions and narrative emphasis - grey italic
+ *   "dialogue" quoted dialogue - amber (a gaslight tone). No markup needed; the quotes alone apply it
+ *   [[noun]]   places, items and proper concepts - teal (the brackets are not shown)
+ *   {{var}}    dynamic text - substituted from vars (character.variables). Undefined keeps the original.
  *
- * 중첩은 지원하지 않는 단순 토크나이저(본문은 평면 사용 — 대사 안 마크업 금지).
- * (`<< 디렉티브 >>` 는 여기서 다루지 않음 — parseScript/SceneRenderer 가 처리.)
+ * A simple tokeniser with no nesting (bodies stay flat - no markup inside dialogue).
+ * (`<< directives >>` are not handled here - parseScript and SceneRenderer do that.)
  */
 export function renderInline(text: string, vars?: Record<string, string | number>): ReactNode[] {
   text = interpolate(text, vars);

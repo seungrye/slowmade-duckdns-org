@@ -1,12 +1,12 @@
 /**
- * 천간·지지 라벨·오행·뜻 — **단일 출처** (#393). 순수·클라이언트 안전(서버 의존 없음).
+ * Heavenly stem and earthly branch labels, elements and meanings - **the single source** (#393). Pure and client-safe (no server dependency).
  *
- * saju.ts(서버)가 오행/한글 맵을 여기서 가져오고, 프로필 사주 패널(클라이언트)이 한자·뜻을
- * 여기서 가져온다. 두 곳에 표를 두면 어긋난다([[single-source-facts]]).
+ * saju.ts (server) takes the element and Hangul maps from here, and the profile's saju panel (client) takes the hanja
+ * and meanings from here. Two tables would drift apart ([[single-source-facts]]).
  */
 export type WuXing = "목" | "화" | "토" | "금" | "수";
 
-/** 천간 10 — 한글·오행·뜻(음양 + 상징 이미지). */
+/** The 10 heavenly stems - Hangul, element and meaning (yin/yang plus its symbolic image). */
 export const GAN: Record<string, { kr: string; el: WuXing; meaning: string }> = {
   甲: { kr: "갑", el: "목", meaning: "양(陽)의 목 — 큰 나무, 곧게 뻗는 기운" },
   乙: { kr: "을", el: "목", meaning: "음(陰)의 목 — 화초·덩굴, 부드럽게 감아 오르는 기운" },
@@ -20,7 +20,7 @@ export const GAN: Record<string, { kr: string; el: WuXing; meaning: string }> = 
   癸: { kr: "계", el: "수", meaning: "음(陰)의 수 — 이슬·시냇물, 스미어 적시는 기운" },
 };
 
-/** 지지 12 — 한글·오행·뜻(띠 + 계절/시간). */
+/** The 12 earthly branches - Hangul, element and meaning (the zodiac animal plus season/hour). */
 export const ZHI: Record<string, { kr: string; el: WuXing; meaning: string }> = {
   子: { kr: "자", el: "수", meaning: "쥐 · 수 — 한밤(23~01시), 겨울의 한가운데" },
   丑: { kr: "축", el: "토", meaning: "소 · 토 — 새벽 전(01~03시), 늦겨울" },
@@ -36,7 +36,7 @@ export const ZHI: Record<string, { kr: string; el: WuXing; meaning: string }> = 
   亥: { kr: "해", el: "수", meaning: "돼지 · 수 — 밤(21~23시), 초겨울" },
 };
 
-/** 파생 맵(saju.ts 가 쓰던 것들). */
+/** Derived maps (the ones saju.ts used to hold). */
 export const GAN_KR: Record<string, string> = Object.fromEntries(Object.entries(GAN).map(([k, v]) => [k, v.kr]));
 export const ZHI_KR: Record<string, string> = Object.fromEntries(Object.entries(ZHI).map(([k, v]) => [k, v.kr]));
 export const GAN_EL: Record<string, WuXing> = Object.fromEntries(Object.entries(GAN).map(([k, v]) => [k, v.el]));
@@ -44,12 +44,12 @@ export const ZHI_EL: Record<string, WuXing> = Object.fromEntries(Object.entries(
 
 export const ELEMENTS: readonly WuXing[] = ["목", "화", "토", "금", "수"] as const;
 
-/** 화면 오행 색(라이트/다크 공용, 사이트 톤). */
+/** The element colours for the UI (shared by light and dark, in the site's tone). */
 export const EL_COLOR: Record<WuXing, string> = {
   목: "#2f8a63", 화: "#c14338", 토: "#b6873a", 금: "#78839a", 수: "#3a58a6",
 };
 
-/** 한자 한 글자의 뜻(천간·지지 어느 쪽이든). 모르면 빈 문자열. */
+/** The meaning of a single hanja character (stem or branch). Empty string when unknown. */
 export function meaningOf(hanja: string): string {
   return GAN[hanja]?.meaning ?? ZHI[hanja]?.meaning ?? "";
 }

@@ -21,7 +21,7 @@ describe('retro/library — 기본 제공 홈브류 목록', () => {
   it('모든 항목이 지원 기종이고 출처·라이선스를 밝힌다', () => {
     for (const g of BUILTIN_GAMES) {
       expect(platformById(g.platform), `${g.slug} platform`).toBeDefined();
-      // 출처를 안 밝힌 롬을 무심코 얹지 못하게 한다 — 저작권은 실수하면 되돌리기 어렵다.
+      // It stops a ROM with no stated source being added carelessly - copyright mistakes are hard to undo.
       expect(g.source, `${g.slug} source`).toMatch(/^https?:\/\//);
       expect(g.license, `${g.slug} license`).toBeTruthy();
     }
@@ -36,7 +36,7 @@ describe('retro/library — 기본 제공 홈브류 목록', () => {
     }
   });
 
-  // #139 — 아케이드(FBNeo)는 자유 배포 롬셋이 없어 기본 제공이 비어 있다. 사용자가 올려서 쓴다.
+  // #139 - arcade (FBNeo) has no freely distributable ROM sets, so the bundled list is empty. Users upload their own.
   it('기종마다 많아야 하나 — 목록이 무심코 불어나지 않게', () => {
     for (const p of PLATFORMS) {
       const n = BUILTIN_GAMES.filter((g) => g.platform === p.id).length;

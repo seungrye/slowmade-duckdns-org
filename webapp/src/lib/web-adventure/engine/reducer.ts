@@ -1,18 +1,18 @@
-// 게임 상태 머신 — phase 별 전환.
+// The game state machine - transitions per phase.
 //
-// 액션:
+// Actions:
 //   START_GAME — creating → playing
-//   MAKE_CHOICE — playing 에서 현재 씬의 choice 처리 (plain/probability/conditional)
-//   USE_ITEM — 인벤 consumable 사용 (HP 회복 + 소모) — 3 주차
-//   REROLL — 직전 probability 판정 재굴림 (rerollsLeft 소모) — 3 주차
-//   END_GAME — playing → ended (강제 종료)
-//   RESET — creating 으로 복귀
+//   MAKE_CHOICE - handles the current scene's choice while playing (plain/probability/conditional)
+//   USE_ITEM - uses a consumable from the inventory (HP restored, item consumed) - week 3
+//   REROLL - rerolls the last probability check (consuming rerollsLeft) - week 3
+//   END_GAME - playing -> ended (a forced end)
+//   RESET - back to creating
 //
-// 규칙:
-//   - 결과 씬이 isEnding=true 면 자동으로 ended phase 로 전환.
-//   - probability 판정은 *effectiveStat* (패시브 포함) 으로 계산.
-//   - 인벤 cap 8 — addItems 초과분 무시.
-//   - rng 인자는 결정적 테스트 주입용.
+// Rules:
+//   - a destination scene with isEnding=true moves automatically to the ended phase.
+//   - a probability check is computed from the *effectiveStat* (passives included).
+//   - the inventory caps at 8 - anything over that in addItems is ignored.
+//   - the rng argument is for injecting determinism in tests.
 
 import type {
   Character,
@@ -40,8 +40,8 @@ export type Action =
   | { type: "RESTORE"; character: Character; currentSceneId: string };
 
 /**
- * 선택지가 남기는 흔적을 캐릭터 flags 에 얹는다 (#89).
- * 기존 flag 는 지우지 않는다. 엔딩으로 넘어간 경우엔 손대지 않는다(더 쓸 데가 없다).
+ * Adds the trace a choice leaves to the character's flags (#89).
+ * Existing flags are not removed. Nothing is touched once it has moved to an ending (there is no further use).
  */
 function applyChoiceFlags(state: GameState, setFlags?: Record<string, boolean>): GameState {
   if (!setFlags || Object.keys(setFlags).length === 0) return state;
@@ -59,7 +59,7 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
     case "hasItem":
       return character.inventory.includes(cond.itemId);
     case "flag": {
-      // 5 주차 (#221) — expect 로 반전 매치. 미정의 시 기본값 true (기존 동작 보존).
+      // Week 5 (#221) - an inverted match through expect. Undefined defaults to true (preserving the existing behaviour).
       const expected = cond.expect ?? true;
       const actual = character.flags[cond.key] === true;
       return actual === expected;
@@ -69,41 +69,41 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       const num = typeof v === "number" ? v : v === true ? 1 : 0;
       return num >= cond.min;
     }
-    // #321 — 4 성흔 (lunar/selene/hecate/none) 별 특수 분기.
+    // #321 - special branches per stigma (lunar/selene/hecate/none).
     case "ability":
       return character.ability === cond.required;
-    // #359 각성 — 침식도 임계.
+    // #359 awakening - a contamination threshold.
     case "stigmaAtLeast":
       return character.stigmaErosion >= cond.min;
-    // #99 — 「표식 없는 맨살」처럼 몸이 성한 것을 전제하는 선택지.
+    // #99 - a choice that presumes an unharmed body, such as "unmarked bare skin".
     case "stigmaAtMost":
       return character.stigmaErosion <= cond.max;
-    // #359 각성 — 복합 AND (모든 하위 조건 충족).
+    // #359 awakening - a composite AND (every sub-condition must hold).
     case "all":
       return cond.conditions.every((c) => evalCondition(c, character));
   }
 }
 
 /**
- * onEnter.addItems 병합 규칙 (#203).
- * - 인벤이 cap 에 도달하면 즉시 중단.
- * - 카탈로그 미정의 id 는 skip.
- * - stackable=false 이고 이미 보유 중이면 skip (재진입 중복 방지).
- * - stackable=true 면 그대로 push (개수 누적).
+ * The onEnter.addItems merge rules (#203).
+ * - Stops at once when the inventory reaches the cap.
+ * - An id not in the catalogue is skipped.
+ * - stackable=false and already held is skipped (preventing duplicates on re-entry).
+ * - stackable=true is pushed as is (accumulating the count).
  */
 function pushItems(inventory: string[], toAdd: string[]): string[] {
   const result = [...inventory];
   for (const id of toAdd) {
-    if (result.length >= INVENTORY_CAP) break; // cap — 초과분 무시.
+    if (result.length >= INVENTORY_CAP) break; // the cap - anything over is ignored.
     const item = items[id];
-    if (!item) continue; // 미정의 id 는 무시.
-    if (!item.stackable && result.includes(id)) continue; // 비-스택 중복 차단.
+    if (!item) continue; // an undefined id is ignored.
+    if (!item.stackable && result.includes(id)) continue; // non-stackable duplicates are blocked.
     result.push(id);
   }
   return result;
 }
 
-/** 씬 onEnter 적용 — setFlags / addItems / incrementCounters / stigmaDelta 를 character 에 반영. */
+/** Applies a scene's onEnter - setFlags, addItems, incrementCounters and stigmaDelta onto the character. */
 function applyOnEnter(character: Character, scene: Scene): Character {
   if (!scene.onEnter) return character;
   const { setFlags, addItems, incrementCounters, stigmaDelta, hpDelta, rerollDelta, setVars } = scene.onEnter as {
@@ -111,9 +111,9 @@ function applyOnEnter(character: Character, scene: Scene): Character {
     addItems?: string[];
     incrementCounters?: string[];
     stigmaDelta?: number;
-    hpDelta?: number; // #318 — HP 변화 (음수=데미지, 양수=회복).
-    rerollDelta?: number; // 재굴림 횟수 변화 (양수=보충).
-    setVars?: Record<string, string | number>; // 동적 텍스트 변수({{키}} 치환 소스).
+    hpDelta?: number; // #318 - the HP change (negative is damage, positive healing).
+    rerollDelta?: number; // the change in rerolls (positive replenishes).
+    setVars?: Record<string, string | number>; // dynamic text variables (the source for {{key}} substitution).
   };
   const flagsChanged = setFlags && Object.keys(setFlags).length > 0;
   const itemsChanged = addItems && addItems.length > 0;
@@ -140,27 +140,27 @@ function applyOnEnter(character: Character, scene: Scene): Character {
     : character.inventory;
   let next: Character = { ...character, flags: nextFlags, inventory: nextInventory };
   if (stigmaChanged) next = applyStigmaDelta(next, stigmaDelta);
-  // #318 — HP 적용 (clamp [0, maxHp]).
+  // #318 - applying HP (clamped to [0, maxHp]).
   if (hpChanged) {
     const safeHp = Math.max(0, Math.min(next.maxHp, next.hp + hpDelta));
     next = { ...next, hp: safeHp };
   }
-  // 재굴림 보충 (음수 방지).
+  // replenishing rerolls (never negative).
   if (rerollChanged) {
     next = { ...next, rerollsLeft: Math.max(0, next.rerollsLeft + rerollDelta) };
   }
-  // 동적 텍스트 변수 병합({{키}} 치환 소스).
+  // merging the dynamic text variables (the source for {{key}} substitution).
   if (varsChanged) {
     next = { ...next, variables: { ...(next.variables ?? {}), ...setVars } };
   }
   return next;
 }
 
-/** 씬으로 이동 — 결과 씬이 isEnding 이면 ended 로 전환. onEnter 적용 후 character 갱신.
+/** Moves to a scene - a destination with isEnding moves to ended. The character is updated after onEnter is applied.
  *
- * #250 — 추가로 *선행 stigmaDelta* (choice 의 stigmaDelta + 성공/실패 별 추가) 도
- *   onEnter 적용 *전* 에 누적. 그 결과 침식도 100 도달 → 자동 petrification 엔딩
- *   (target.isEnding 이 아니어도 우선).
+ * #250 - additionally, *the preceding stigmaDelta* (the choice's stigmaDelta plus any success/failure extra) is
+ *   accumulated *before* onEnter is applied. Contamination reaching 100 as a result gives the automatic
+ *   petrification ending (taking priority even when target.isEnding is false).
  */
 function moveTo(
   prev: Extract<GameState, { phase: "playing" }>,
@@ -170,9 +170,9 @@ function moveTo(
   preStigmaDelta = 0,
 ): GameState {
   const target = scenes[targetSceneId];
-  if (!target) return prev; // 정의 안 된 씬 — 안전하게 무변화.
-  // #348 — 흐름 로그: 선택 라벨 + 다음 씬 의 제목/본문 push.
-  //   EndingScreen 의 *선택 로그* 가 풍부해져 시나리오 연결 검토 가능.
+  if (!target) return prev; // An undefined scene - safely unchanged.
+  // #348 - the flow log: pushes the choice's label plus the next scene's title and body.
+  //   It enriches EndingScreen's *choice log* so the scenario's connections can be reviewed.
   const nextLog = [
     ...prev.log,
     `→ ${logEntry}`,
@@ -182,7 +182,7 @@ function moveTo(
   let character = prev.character;
   if (preStigmaDelta) character = applyStigmaDelta(character, preStigmaDelta);
   character = applyOnEnter(character, target);
-  // #250 — 자동 petrification (명시 isEnding 보다 *후순위* — target.isEnding 이 우선).
+  // #250 - the automatic petrification (*lower priority* than an explicit isEnding - target.isEnding wins).
   if (target.isEnding) {
     return {
       phase: "ended",
@@ -201,7 +201,7 @@ function moveTo(
       log: [...nextLog, "성흔 침식이 한계에 도달했다. 몸이 굳어간다…"],
     };
   }
-  // #318 — HP 0 자동 fall ending. RNG 실패가 즉시 시나리오 ending 아닌 *누적 데미지* 로.
+  // #318 - the automatic fall ending at HP 0. An RNG failure now means *accumulated damage* rather than an immediate scripted ending.
   if (isDead(character)) {
     return {
       phase: "ended",
@@ -223,7 +223,7 @@ function findChoice(scene: Scene, choiceId: string): Choice | undefined {
   return scene.choices.find((c) => c.id === choiceId);
 }
 
-/** 인벤에서 *최초 1 개* 만 제거. */
+/** Removes *only the first one* from the inventory. */
 function removeFirst(arr: string[], target: string): string[] {
   const i = arr.indexOf(target);
   if (i < 0) return arr;
@@ -237,9 +237,9 @@ type ProbabilityChoice = Extract<
 >;
 
 /**
- * probability 판정 → pendingRoll 생성 (씬 전이 *보류*). 결과만 보관하고 currentScene 유지.
- * 사용자가 결과를 보고 재굴림/계속(CONFIRM_ROLL)을 정한다. MAKE_CHOICE/REROLL 공유.
- * stigma delta 는 *확정(CONFIRM_ROLL) 시* 적용되므로 여기선 totalDelta 만 보관.
+ * The probability check -> creating a pendingRoll (the scene transition is *held*). It stores only the result and keeps currentScene.
+ * The user sees the result and decides to reroll or continue (CONFIRM_ROLL). Shared by MAKE_CHOICE and REROLL.
+ * The stigma delta applies *on confirmation (CONFIRM_ROLL)*, so only totalDelta is stored here.
  */
 function buildPendingRoll(
   state: PlayingState,
@@ -281,13 +281,13 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
       if (state.phase !== "creating") return state;
       const startScene = scenes[action.startScene];
       if (!startScene) return state;
-      // onEnter 적용 — 시작 씬에 onEnter 가 있을 수 있음 (3 주차+).
+      // Applying onEnter - a starting scene can have one (week 3 onward).
       const startedCharacter = applyOnEnter(action.character, startScene);
       return {
         phase: "playing",
         character: startedCharacter,
         currentScene: action.startScene,
-        // #348 — 시작 씬 의 제목 + 본문 도 흐름 로그 에 포함.
+        // #348 - the starting scene's title and body go into the flow log too.
         log: [
           `▶ ${startScene.title} (${startScene.id})`,
           ...startScene.body.map((b) => `  ${b}`),
@@ -309,7 +309,7 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
             choice.setFlags,
           );
         case "probability":
-          // 즉시 전이하지 않고 *판정 대기*(pendingRoll). 결과를 보고 재굴림/계속 선택.
+          // It does not transition at once but *waits for the roll* (pendingRoll). The user sees the result and chooses to reroll or continue.
           return buildPendingRoll(state, choice, action.rng);
         case "conditional": {
           if (!evalCondition(choice.condition, state.character)) return state;
@@ -331,14 +331,14 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
       const heal = item.heal ?? 0;
       const stigmaDelta = item.stigmaDelta ?? 0;
       const nextHp = Math.min(state.character.maxHp, state.character.hp + heal);
-      // #258 — items.stigmaDelta 적용 (정제수 -3, 마력석 파편 +5 등).
+      // #258 - applying items.stigmaDelta (refined water -3, a mana stone shard +5 and so on).
       let nextCharacter: Character = {
         ...state.character,
         hp: nextHp,
         inventory: removeFirst(state.character.inventory, action.itemId),
       };
       if (stigmaDelta) nextCharacter = applyStigmaDelta(nextCharacter, stigmaDelta);
-      // 로그: heal / stigma 둘 다 반영.
+      // The log reflects both heal and stigma.
       const logParts: string[] = [];
       if (heal > 0) logParts.push(`+${heal} HP`);
       if (stigmaDelta !== 0) {
@@ -346,7 +346,7 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
       }
       const logEntry = `사용: ${item.displayName}${logParts.length ? ` (${logParts.join(", ")})` : ""}`;
       const nextLog = [...state.log, logEntry];
-      // #258 — 침식 100 도달 시 자동 petrification 엔딩 (씬 이동 없이 즉시 종결).
+      // #258 - contamination reaching 100 gives the automatic petrification ending (ending at once, with no scene move).
       if (isFullyPetrified(nextCharacter)) {
         return {
           phase: "ended",
@@ -356,7 +356,7 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
           log: [...nextLog, "성흔 침식이 한계에 도달했다. 몸이 굳어간다…"],
         };
       }
-      // #318 — HP 0 자동 fall ending (USE_ITEM 의 stigmaDelta +N 후 HP cap 같이 검사).
+      // #318 - the automatic fall ending at HP 0 (checked alongside the HP cap after USE_ITEM's stigmaDelta +N).
       if (isDead(nextCharacter)) {
         return {
           phase: "ended",
@@ -370,7 +370,7 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
     }
 
     case "REROLL": {
-      // 대기 중(pendingRoll) 판정을 *같은 씬*에서 다시 굴린다 (전이 전, 횟수 -1).
+      // Rerolls the pending check *in the same scene* (before transitioning, decrementing the count).
       if (state.phase !== "playing" || !state.pendingRoll) return state;
       if (state.character.rerollsLeft <= 0) return state;
       const scene = scenes[state.currentScene];
@@ -385,11 +385,11 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
     }
 
     case "CONFIRM_ROLL": {
-      // 대기 중 판정을 확정 — 비로소 씬 전이 + stigma/hp 적용.
+      // Confirms the pending check - only now does the scene transition and the stigma/hp apply.
       if (state.phase !== "playing" || !state.pendingRoll) return state;
       const pr = state.pendingRoll;
       const logEntry = `${pr.label} — d20=${pr.roll}+${pr.statValue}(+${pr.bonus}) vs ${pr.difficulty} → ${pr.success ? "성공" : "실패"}`;
-      // pendingRoll 제거한 base 에서 moveTo (전이 + delta).
+      // moveTo from a base with pendingRoll removed (the transition plus the delta).
       const base: PlayingState = {
         phase: "playing",
         character: state.character,
@@ -414,9 +414,9 @@ export function gameReducer(state: GameState, action: Action, scenes: SceneRegis
       return { phase: "creating" };
 
     case "RESTORE": {
-      // #288 — 옛 localStorage save (#258 이전, 〈에테르니아〉 리프래시 이전)
-      //   에 protagonist / stigmaErosion 누락 가능. 안전 기본값 보정.
-      // #290 — `??` 가 NaN 차단 못 함 (NaN 은 nullish 아님). NaN/Infinity 도 0 으로.
+      // #288 - an old localStorage save (from before #258, before the Eternia refresh)
+      //   can be missing protagonist or stigmaErosion. Corrected to safe defaults.
+      // #290 - `??` does not block NaN (NaN is not nullish). NaN and Infinity become 0 too.
       const erosion = action.character.stigmaErosion;
       const safeErosion = typeof erosion === "number" && Number.isFinite(erosion) ? erosion : 0;
       const restored: Character = {

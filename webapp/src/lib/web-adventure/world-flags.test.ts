@@ -1,4 +1,4 @@
-// #256 — world flag 부메랑 단위 테스트.
+// #256 - unit tests for the world-flag boomerang.
 
 import { describe, it, expect } from "vitest";
 import { buildWorldFlags, ENDING_TO_WORLD_FLAG } from "./world-flags";

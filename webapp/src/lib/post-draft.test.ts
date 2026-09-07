@@ -1,9 +1,9 @@
-// 글 작성 임시 저장 (#199) — 순수 부분.
+// Post draft autosave (#199) - the pure part.
 //
-// 저장소도 화면도 모른다. 여기서 지키는 것은 셋이다 —
-//   1. 새 글과 수정 글의 초안이 **서로를 덮지 않는다**.
-//   2. 깨진 값·오래된 값은 **조용히 버린다**(예외를 던져 글쓰기를 막으면 안 된다).
-//   3. 너무 크면 저장하지 않는다(localStorage 는 넘치면 예외가 난다).
+// It knows nothing of the store or the UI. Three things are guaranteed here:
+//   1. a new post's draft and an edit's draft **never overwrite each other**.
+//   2. broken or stale values are **discarded quietly** (throwing must never block writing).
+//   3. anything too large is not stored (localStorage throws when it overflows).
 import { describe, it, expect } from 'vitest';
 import { DRAFT_TTL_MS, MAX_DRAFT_BYTES, draftKey, parseDraft, serializeDraft, type PostDraft } from './post-draft';
 
@@ -43,7 +43,7 @@ describe('serializeDraft / parseDraft', () => {
     expect(parsed!.jsonContent).toEqual(body);
   });
 
-  // 오래된 글이 난데없이 되살아나는 편이 더 나쁘다.
+  // An old post resurfacing out of nowhere is the worse outcome.
   it('14일이 지나면 버린다', () => {
     const old = serializeDraft(draft({ savedAt: NOW - DRAFT_TTL_MS - 1 }))!;
     expect(parseDraft(old, NOW)).toBeNull();
@@ -54,7 +54,7 @@ describe('serializeDraft / parseDraft', () => {
     expect(parseDraft(edge, NOW)).not.toBeNull();
   });
 
-  // 글쓰기를 막으면 안 된다 — 무슨 값이 들어 있어도 조용히 null.
+  // Writing must never be blocked - whatever the value, it quietly returns null.
   it('깨진 값은 예외 없이 null', () => {
     for (const raw of ['', '{', 'null', '[]', '"문자열"', '{"title":1}', '{}']) {
       expect(() => parseDraft(raw, NOW)).not.toThrow();
@@ -87,7 +87,7 @@ describe('serializeDraft / parseDraft', () => {
 });
 
 describe('빈 초안 판별', () => {
-  // 아무것도 안 쓴 상태를 저장해 두면, 다음에 들어올 때 "복원했습니다" 만 뜨고 내용은 없다.
+  // Storing an untouched state means the next visit shows only "restored" with nothing in it.
   it('제목·본문·태그·첨부가 모두 비면 저장할 것이 없다', async () => {
     const { isEmptyDraft } = await import('./post-draft');
     expect(isEmptyDraft(draft({ title: '', tags: [], attachments: [], jsonContent: { type: 'doc', content: [] } }))).toBe(true);

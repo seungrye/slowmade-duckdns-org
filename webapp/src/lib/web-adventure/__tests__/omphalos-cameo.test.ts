@@ -1,4 +1,4 @@
-// #274 옴팔로스 카메오 씬 — 다른 주인공 마주침 (sawOtherProtagonist hidden 해금).
+// #274 the Omphalos cameo scene - meeting another protagonist (unlocking the sawOtherProtagonist hidden branch).
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry, Choice } from "@/types/web-adventure";
@@ -31,7 +31,7 @@ describe("omphalos_cameo (#274)", () => {
     expect(s).toBeTruthy();
     expect(s.choices.length).toBe(3);
     const ids = s.choices.map((c: Choice) => c.id);
-    // #321 — walk_past plain → hecate_illusion ability conditional 로 교체.
+    // #321 - walk_past plain replaced with the hecate_illusion ability conditional.
     expect(ids).toEqual(expect.arrayContaining(["persuade_join", "exchange_intel", "hecate_illusion"]));
   });
 

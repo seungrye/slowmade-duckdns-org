@@ -1,10 +1,10 @@
-// #250 — 성흔 침식 디버프 + 자동 petrification 분기.
+// #250 - the stigma contamination debuff plus the automatic petrification branch.
 //
-// 단계 (외부 AI 기획안 매핑):
-//   0-49 : 정상.
-//   50-79: 디버프 — con/dex 판정 -2. 셀레네(selene) 마법 판정 +3.
-//   80-99: 임계 — 디버프 유지 (UI 경고는 별도).
-//   100+: 자동 petrification 엔딩 전환.
+// The stages (mapping the external AI design):
+//   0-49 : normal.
+//   50-79: debuffed - con/dex checks take -2. Selene's magic checks take +3.
+//   80-99: critical - the debuff continues (the UI warning is separate).
+//   100+ : moves to the automatic petrification ending.
 
 import { describe, it, expect } from 'vitest';
 import { stigmaDebuff, applyStigmaDelta, isFullyPetrified } from './stigma';
@@ -34,7 +34,7 @@ describe('stigmaDebuff', () => {
   it('침식도 50-79: con/dex 판정 -2', () => {
     expect(stigmaDebuff(makeCharacter(50), 'con')).toBe(-2);
     expect(stigmaDebuff(makeCharacter(79), 'dex')).toBe(-2);
-    expect(stigmaDebuff(makeCharacter(60), 'str')).toBe(0); // str 영향 없음
+    expect(stigmaDebuff(makeCharacter(60), 'str')).toBe(0); // str is unaffected
     expect(stigmaDebuff(makeCharacter(60), 'int')).toBe(0);
   });
 
@@ -65,7 +65,7 @@ describe('applyStigmaDelta', () => {
     expect(c.stigmaErosion).toBe(100);
   });
 
-  // #290 — NaN/Infinity 방어.
+  // #290 - guarding against NaN and Infinity.
   it('character.stigmaErosion 이 NaN 이면 0 으로 정규화 (delta 적용)', () => {
     const c = applyStigmaDelta(makeCharacter(NaN), 5);
     expect(c.stigmaErosion).toBe(5);

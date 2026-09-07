@@ -1,7 +1,7 @@
-// #273 게임 핵심 모먼트 analytics 이벤트.
+// #273 analytics events for the game's key moments.
 //
-// 검증 (단위) — page.tsx 의 발화 위치는 통합 테스트가 별도 검증.
-// 본 테스트는 *analytics 헬퍼* 가 새 이벤트명을 prefix 와 함께 올바르게 전송하는지.
+// A unit check - where they fire in page.tsx is verified separately by the integration test.
+// This test covers whether the *analytics helper* sends the new event names correctly, with the prefix.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 

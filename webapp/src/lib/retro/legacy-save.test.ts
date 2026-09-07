@@ -1,17 +1,17 @@
-// 예전 이름으로 남은 게임 세이브(SRAM) 되살리기 (#175).
+// Restoring game saves (SRAM) left under the old name (#175).
 //
-// #137 이전에는 롬 주소가 전부 `/api/games/retro/roms/<id>/file` 로 끝났다. EmulatorJS 는
-// 주소의 **마지막 조각**으로 코어에 줄 파일명을 정하고, 코어는 그 이름으로 배터리 세이브를
-// 남긴다 — 그래서 그 시절 세이브는 전부 `/data/saves/<코어>/file.srm` 한 곳에 쌓였다.
+// Before #137 every ROM address ended in `/api/games/retro/roms/<id>/file`. EmulatorJS decides the filename it gives
+// the core from **the last segment** of the address, and the core writes its battery save under that name - so every
+// save from that era piled up in one place, `/data/saves/<core>/file.srm`.
 //
-// #137 이 주소를 `.../file/<id>.sfc` 로 바꾸면서 코어가 찾는 이름이 `<id>.srm` 이 됐다.
-// 파일은 브라우저(IndexedDB)에 그대로 있는데 이름이 어긋나 게임이 「저장된 데이터 없음」을
-// 띄운다. 실제로 재현했다:
-//   옛 주소 → /data/saves/Snes9x/file.srm 생성
-//   새 주소 → /data/saves/Snes9x/top.srm 을 찾음(없음). file.srm 은 그대로 남아 있음.
+// #137 changed the address to `.../file/<id>.sfc`, making the name the core looks for `<id>.srm`.
+// The file is still there in the browser (IndexedDB) while the name no longer matches, so the game shows "no saved
+// data". It was reproduced:
+//   the old address -> created /data/saves/Snes9x/file.srm
+//   the new address -> looks for /data/saves/Snes9x/top.srm (absent). file.srm is still sitting there.
 //
-// 되살리는 규칙은 **복사**다. 원본 `file.srm` 은 손대지 않는다 — 잘못 짚었을 때 되돌릴 자리가
-// 남아야 한다.
+// The restore rule is **copy**. The original `file.srm` is untouched - there has to be somewhere to go back to when
+// the guess is wrong.
 import { describe, it, expect } from 'vitest';
 import {
   baseFromGameUrl,
@@ -19,8 +19,8 @@ import {
 } from '../../../public/games/retro/legacy-save.js';
 
 describe('baseFromGameUrl', () => {
-  // saveDatabaseLoaded 시점엔 emulator.fileName 이 아직 없다(실측). config.gameUrl 만 있어서
-  // EmulatorJS 와 같은 방식으로 우리가 직접 이름을 뽑는다.
+  // At saveDatabaseLoaded, emulator.fileName does not exist yet (measured). Only config.gameUrl is there, so the name
+  // is derived the same way EmulatorJS does.
   it('주소 마지막 조각에서 확장자를 뗀다', () => {
     expect(baseFromGameUrl('/api/games/retro/roms/6a7c88d9/file/6a7c88d9.sfc')).toBe('6a7c88d9');
     expect(baseFromGameUrl('/games/retro/roms/top.sfc')).toBe('top');
@@ -60,7 +60,7 @@ describe('planLegacySaveRestore', () => {
     ]);
   });
 
-  // 이 게임 이름으로 이미 저장한 게 있으면 그게 최신이다. 덮어쓰면 진짜로 잃는다.
+  // If something is already saved under this game's name, that is the newer one. Overwriting really loses it.
   it('이미 이 게임 세이브가 있으면 아무것도 하지 않는다', () => {
     expect(
       planLegacySaveRestore({ entries: ['file.srm', `${target}.srm`], targetBase: target }),
@@ -72,7 +72,7 @@ describe('planLegacySaveRestore', () => {
     expect(planLegacySaveRestore({ entries: [], targetBase: target })).toEqual([]);
   });
 
-  // 주소가 아직 옛 모양이면 원본과 대상이 같다 — 자기 자신을 덮어쓸 뻔한다.
+  // If the address is still the old shape, the source and target are the same - it would nearly overwrite itself.
   it('대상 이름이 file 이면 하지 않는다', () => {
     expect(planLegacySaveRestore({ entries: ['file.srm'], targetBase: 'file' })).toEqual([]);
   });
@@ -81,7 +81,7 @@ describe('planLegacySaveRestore', () => {
     expect(planLegacySaveRestore({ entries: ['file.srm'], targetBase: '' })).toEqual([]);
   });
 
-  // 코어에 따라 .srm 말고 다른 것도 남는다(예: .rtc — 시계 달린 카트리지).
+  // Depending on the core, things other than .srm are left too (.rtc, say - a cartridge with a clock).
   it('file. 로 시작하는 짝들을 모두 옮긴다', () => {
     expect(
       planLegacySaveRestore({ entries: ['file.srm', 'file.rtc', 'other.srm'], targetBase: target }),
@@ -97,7 +97,7 @@ describe('planLegacySaveRestore', () => {
     ]);
   });
 
-  // 이름이 비슷할 뿐인 남의 파일을 끌어오면 안 된다.
+  // Someone else's file that merely has a similar name must not be pulled in.
   it('filesystem.srm 같은 이름은 짝이 아니다', () => {
     expect(planLegacySaveRestore({ entries: ['filesystem.srm'], targetBase: target })).toEqual([]);
   });

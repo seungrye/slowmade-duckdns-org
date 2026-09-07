@@ -4,14 +4,14 @@ import { decorate } from './catalog';
 import live from './__fixtures__/live-2026.json';
 
 /**
- * 실제 응답 형식 고정 (#328).
+ * Pinning the real response shape (#328).
  *
- * 이 기능은 서비스 키 없이 만들어져 **응답을 못 본 채 파서를 짰다.** 나중에 키를 받아
- * 실측했더니 두 가지가 어긋나 있었다 — 기념일·절기가 전부 `isHoliday: 'N'` 이라 종류가
- * 뭉개졌고, 엔드포인트마다 띄어쓰기가 달라 표가 안 맞았다.
+ * This feature was built without a service key, so **the parser was written without ever seeing a response.** Once a
+ * key arrived and it was measured, two things were wrong - observances and solar terms all carry `isHoliday: 'N'`,
+ * flattening the kinds, and the spacing differs per endpoint, so the table did not match.
  *
- * 그래서 실제 응답에서 대표 항목만 추려 `__fixtures__/live-2026.json` 에 박아 둔다.
- * 목이 아니라 **진짜 응답**이라, 파서를 건드릴 때 같은 실수를 되풀이하면 여기서 걸린다.
+ * So representative items from the real response are pinned in `__fixtures__/live-2026.json`. They are **a genuine
+ * response**, not a mock, so repeating the same mistake while touching the parser is caught here.
  */
 describe('실제 응답(2026) 종단 확인', () => {
   it('공휴일: 실제 응답은 전부 isHoliday=Y 라 모두 공휴일로 남는다', () => {
@@ -20,7 +20,7 @@ describe('실제 응답(2026) 종단 확인', () => {
 
     expect(byName['1월1일'].kind).toBe('holiday');
     expect(byName['광복절'].kind).toBe('holiday');
-    // 제헌절도 2026 응답에서는 Y 다 — "국경일이지만 안 쉰다"는 옛말이라 코드가 단정하면 안 된다.
+    // Constitution Day is Y in the 2026 response too - "a national day you still work" is out of date, and the code must not assume it.
     expect(byName['제헌절'].kind).toBe('holiday');
     expect(byName['설날'].date).toMatch(/^2026-02-1[5-8]$/);
   });

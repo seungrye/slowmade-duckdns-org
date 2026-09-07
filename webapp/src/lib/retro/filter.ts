@@ -1,4 +1,4 @@
-// 라이브러리 목록 거르기 (#109) — 순수 함수. `tags/tag-cloud-search.helpers.ts` 와 같은 방식.
+// Filtering the library list (#109) - pure functions. The same approach as `tags/tag-cloud-search.helpers.ts`.
 
 import type { GameEntry } from './entry';
 import { PLATFORMS, type PlatformId } from './platforms';
@@ -6,9 +6,9 @@ import { PLATFORMS, type PlatformId } from './platforms';
 export type PlatformFilter = PlatformId | 'all';
 
 /**
- * 플랫폼 + 검색어로 거른다.
+ * Filters by platform and search term.
  *
- * 거를 게 없으면 **받은 배열을 그대로 돌려준다** — 참조가 유지되어야 useMemo 가 헛돌지 않는다.
+ * With nothing to filter it **returns the array it was given** - the reference must be preserved so useMemo does not spin needlessly.
  */
 export function filterGames(
   games: GameEntry[],
@@ -26,7 +26,7 @@ export function filterGames(
 
 export type PlatformCounts = Record<PlatformFilter, number>;
 
-/** 사이드바 배지용 — 모든 플랫폼 키가 항상 존재한다(0 이라도). */
+/** For the sidebar badges - every platform key is always present (even at 0). */
 export function countByPlatform(games: GameEntry[]): PlatformCounts {
   const counts = { all: games.length } as PlatformCounts;
   for (const p of PLATFORMS) counts[p.id] = 0;

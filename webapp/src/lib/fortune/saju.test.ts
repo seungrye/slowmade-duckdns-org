@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { computeSaju, todayIljin, elementRelation } from "./saju";
 
-// birthday 는 'YYYY-MM-DD' 를 UTC 자정으로 저장하는 규약(#326).
+// birthday follows the convention of storing 'YYYY-MM-DD' at UTC midnight (#326).
 const bd = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 describe("computeSaju — lunar-javascript 검증 (#390)", () => {
   it("입춘 전이면 연주가 前년(2000-01-15 → 己卯)", () => {
-    // 입춘(2/4) 전이라 사주 연도는 아직 1999(己卯).
+    // Before ipchun (2/4), so the saju year is still 1999 (gi-myo).
     expect(computeSaju(bd("2000-01-15")).pillars.year.ganzhi).toBe("己卯");
   });
 
@@ -39,8 +39,8 @@ describe("computeSaju — lunar-javascript 검증 (#390)", () => {
   });
 
   it("오행 분포 합이 기둥 수 × 2다", () => {
-    const s3 = computeSaju(bd("1993-06-15"));         // 3주 → 6
-    const s4 = computeSaju(bd("1993-06-15"), "12:00"); // 4주 → 8
+    const s3 = computeSaju(bd("1993-06-15"));         // 3 pillars -> 6
+    const s4 = computeSaju(bd("1993-06-15"), "12:00"); // 4 pillars -> 8
     const sum = (e: Record<string, number>) => Object.values(e).reduce((a, b) => a + b, 0);
     expect(sum(s3.elements)).toBe(6);
     expect(sum(s4.elements)).toBe(8);
@@ -49,7 +49,7 @@ describe("computeSaju — lunar-javascript 검증 (#390)", () => {
 
 describe("todayIljin", () => {
   it("오늘 일진을 낸다 (2026-09-03 KST → 庚辰일)", () => {
-    // KST 낮 시각으로 고정.
+    // pinned to a daytime KST hour.
     expect(todayIljin(new Date("2026-09-03T03:00:00Z")).pillar.ganzhi).toBe("庚辰");
   });
 });

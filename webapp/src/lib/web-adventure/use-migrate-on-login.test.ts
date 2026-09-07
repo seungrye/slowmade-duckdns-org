@@ -1,4 +1,4 @@
-// useMigrateOnLogin — 로그인 직후 localStorage 의 save/past_runs 를 서버로 이전 (#240).
+// useMigrateOnLogin - moving localStorage's save and past_runs to the server right after login (#240).
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';

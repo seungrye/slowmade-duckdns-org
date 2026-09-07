@@ -1,9 +1,9 @@
 import type { Condition, SpawnZone } from "@/types/quest";
 
-/** SpawnZone 을 한글 라벨로. */
+/** A SpawnZone as a Korean label. */
 export function zoneLabel(zone: SpawnZone): string {
   if (zone.type === "Town") return "마을";
-  // 표준 Named id 에는 친근한 한글 라벨
+  // Friendly Korean labels for the standard Named ids
   switch (zone.id) {
     case "forest":           return "숲";
     case "mountain_village": return "산속 마을";
@@ -17,8 +17,8 @@ export function zoneLabel(zone: SpawnZone): string {
 }
 
 /**
- * 조건을 사람이 읽을 수 있는 짧은 한글 문구로 요약한다.
- * `undefined` / `Always` / `And([])` 는 "무조건".
+ * Summarises a condition as a short, human-readable Korean phrase.
+ * `undefined`, `Always` and `And([])` all become "무조건".
  */
 export function conditionSummary(cond?: Condition): string {
   if (!cond) return "무조건";
@@ -39,7 +39,7 @@ export function conditionSummary(cond?: Condition): string {
   }
 }
 
-/** 엣지 라벨용: 트리거 + 조건 요약 (길면 말줄임). */
+/** For an edge label: the trigger plus a condition summary (truncated when long). */
 export function transitionLabel(
   trigger: "Interact" | "Auto" | "EnterNpcFov" | "HoldingItemInNpcFov",
   when?: Condition,

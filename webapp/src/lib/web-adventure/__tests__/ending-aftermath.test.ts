@@ -1,11 +1,11 @@
-// #275 엔딩 후일담 — 각 ending 씬 본문이 3 줄 이상 (full epilogue + 후일담).
-// 후일담은 *— 으로 시작하는 줄* 로 끝맺는다 (시각 분리).
+// #275 ending aftermath - each ending scene's body has at least 3 lines (the full epilogue plus the aftermath).
+// The aftermath closes with *a line beginning with an em dash* (a visual separator).
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";
 
-// #327 — ending_petrification 씬은 *reducer 자동 ending* 잔재로 삭제됨.
-//   EndingScreen 이 endingsMeta 만 사용하므로 씬 데이터 불필요.
+// #327 - the ending_petrification scene was deleted as a leftover of the *reducer's automatic ending*.
+//   EndingScreen uses only endingsMeta, so the scene data is unnecessary.
 const ENDING_IDS = [
   "ending_ascension",
   "ending_revolution",

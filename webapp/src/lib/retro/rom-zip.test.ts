@@ -1,6 +1,6 @@
-// zip 읽기·쓰기와 묶음 패치 (#143).
+// Reading and writing zips, and patching a bundle (#143).
 //
-// 배포되는 파일을 그대로 불러 검증한다 — player.html 이 import 하는 것과 같은 하나다.
+// It loads the deployed file as is - the very one player.html imports.
 import { describe, it, expect } from 'vitest';
 import {
   applyBundlePatch,
@@ -13,7 +13,7 @@ import {
 const enc = (s: string) => new Uint8Array(Array.from(s, (c) => c.charCodeAt(0)));
 const bytes = (...n: number[]) => new Uint8Array(n);
 
-/** 간단한 IPS: offset 에 data 를 덮어쓴다. */
+/** A simple IPS: overwrite data at offset. */
 function ips(offset: number, data: number[]): Uint8Array {
   return new Uint8Array([
     ...enc('PATCH'),
@@ -68,7 +68,7 @@ describe('retro/zip', () => {
 
   describe('deflate 로 압축된 zip 도 읽는다', () => {
     it('실제 롬 zip 은 전부 deflate 다 — 못 읽으면 아무것도 안 된다', async () => {
-      // 표준 API 로 deflate 한 뒤, 그걸 담은 zip 을 손으로 만든다.
+      // Deflate through the standard API, then hand-build a zip containing it.
       const raw = new Uint8Array(500).map((_, i) => i & 0xff);
       const cs = new CompressionStream('deflate-raw');
       const w = cs.writable.getWriter();
@@ -107,14 +107,14 @@ describe('retro/zip', () => {
       expect(byName['dd2_06g'][0]).toBe(0xaa);
       expect(byName['dd2_06g'][1]).toBe(0xbb);
       expect(byName['dd2_13m'][4]).toBe(0xcc);
-      // 패치가 없던 칩은 손대지 않는다.
+      // A chip with no patch is left alone.
       expect(Array.from(byName['dd2_99z'])).toEqual(Array(16).fill(0xee));
       expect(out.applied).toBe(2);
       expect(out.total).toBe(2);
     });
 
     it('디렉터리 접두사를 무시하고 짝을 찾는다', async () => {
-      // 패치 안 이름이 `ddsoma/dd2_06g.ips` 라도 롬의 `dd2_06g` 와 맞아야 한다.
+      // Even when the name inside the patch is `ddsoma/dd2_06g.ips`, it must match the ROM's `dd2_06g`.
       const out = await applyBundlePatch(rom(), patch());
       expect(out.applied).toBeGreaterThan(0);
     });
@@ -126,7 +126,7 @@ describe('retro/zip', () => {
       expect(out.applied).toBe(1);
     });
 
-    // #143 의 핵심 — 롬셋이 다르면 조용히 원본을 띄우지 않는다.
+    // The heart of #143 - a mismatched ROM set must not quietly load the original.
     it('하나도 못 맞추면 **양쪽 이름을 담아** 오류를 낸다', async () => {
       const mameStyle = writeZip([
         { name: 'dd2.05g', data: new Uint8Array(4) },
@@ -146,11 +146,11 @@ describe('retro/zip', () => {
     });
   });
 
-  // #151 — MAME/FBNeo 는 `dd2.13m`, 패치는 FBA 표기 `dd2_13m` 으로 **같은 칩**을 부른다.
-  // 구분자만 다른데 짝을 못 지어 한글 패치가 통째로 못 먹었다(13 개 중 0 개).
+  // #151 - MAME/FBNeo calls **the same chip** `dd2.13m` while the patch uses the FBA spelling `dd2_13m`.
+  // Only the separator differs, and failing to pair them meant the translation patch applied to nothing (0 of 13).
   //
-  // **이름은 바꾸지 않는다.** FBNeo 는 patched 아카이브의 롬을 이름으로 찾는데, 그 표기가
-  // 점 쪽(`dd2.13m`)이다. 패치 표기로 개명하면 오히려 못 찾는다.
+  // **The names are not changed.** FBNeo finds a ROM in the patched archive by name, and that spelling
+  // is the dotted one (`dd2.13m`). Renaming to the patch's spelling makes it unfindable instead.
   describe('구분자만 다른 이름 잇기', () => {
     const dotRom = () =>
       writeZip([
@@ -186,7 +186,7 @@ describe('retro/zip', () => {
       const out = await applyBundlePatch(both, writeZip([{ name: 'dd2_13m.ips', data: ips(0, [0xaa]) }]));
       const byName = Object.fromEntries((await readZip(out.rom)).map((e) => [e.name, e.data]));
       expect(byName['dd2_13m'][0]).toBe(0xaa);
-      expect(byName['dd2.13m'][0]).toBe(0xee); // 건드리지 않는다
+      expect(byName['dd2.13m'][0]).toBe(0xee); // left untouched
       expect(out.loose).toBe(0);
     });
 
@@ -200,7 +200,7 @@ describe('retro/zip', () => {
       ).rejects.toThrow();
     });
 
-    // 아케이드 칩은 하드웨어가 크기를 정한다 — 늘어나면 그건 다른 롬이다.
+    // An arcade chip's size is fixed by the hardware - if it grows, it is a different ROM.
     it('칩 크기를 넘기는 패치는 잇지 않는다', async () => {
       const small = writeZip([{ name: 'dd2.13m', data: new Uint8Array(4) }]);
       await expect(
@@ -209,8 +209,8 @@ describe('retro/zip', () => {
     });
   });
 
-  // #148 — 분할 셋은 **합치지 않는다**. FBA 가 부모 아카이브를 따로 찾기 때문에 각각 그대로
-  // 두고, 패치만 아카이브를 가로질러 먹인다.
+  // #148 - split sets are **not merged**. FBA looks for the parent archive separately, so each is left as it is and
+  // only the patch is applied across archives.
   describe('applyBundlePatchToSet — 아카이브를 가로지르는 묶음 패치', () => {
     const parent = () =>
       writeZip([
@@ -237,7 +237,7 @@ describe('retro/zip', () => {
       const c = Object.fromEntries((await readZip(out.roms[1])).map((e) => [e.name, e.data]));
       expect(p['dd2_13m'][0]).toBe(0xaa);
       expect(c['dd2a_03g'][0]).toBe(0xbb);
-      // 짝이 없던 칩은 손대지 않는다.
+      // An unpaired chip is left alone.
       expect(p['dd2_14m'][0]).toBe(0x11);
       expect(c['dd2a_04g'][0]).toBe(0x21);
     });
@@ -255,7 +255,7 @@ describe('retro/zip', () => {
       expect(out.applied).toBe(1);
     });
 
-    // 구분자만 다른 이름은 #151 에서 이어 주므로, 여기선 **아예 다른 롬셋**으로 확인한다.
+    // Names differing only by separator are bridged in #151, so this checks with **an entirely different ROM set**.
     it('전체에서 하나도 못 맞추면 **양쪽 이름을 담아** 오류', async () => {
       const other = writeZip([{ name: 'ssf2t.03', data: new Uint8Array(4) }]);
       await expect(applyBundlePatchToSet([other], bundle())).rejects.toThrow(

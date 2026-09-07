@@ -1,21 +1,21 @@
-// 카드에서 고치는 것들의 검증 (#122) — 순수 함수.
+// Validating what can be edited from the card (#122) - pure functions.
 //
-// 클라이언트(보내기 전에 알려주기)와 API 라우트(진짜 관문)가 **같은 규칙**을 쓰도록 한 곳에 둔다.
-// `patch-upload.ts` 와 같은 구조다.
+// Kept in one place so the client (telling the user before sending) and the API route (the real gate) use **the same rules**.
+// The same structure as `patch-upload.ts`.
 
-/** 제목 길이 상한 — 카드 한 줄에 들어갈 만큼. */
+/** The title length cap - as much as fits one line of the card. */
 export const MAX_TITLE_LENGTH = 120;
 
 /**
- * 커버 이미지 상한.
- * middleware 본문 제한(10MB) 안이어야 한다 — 넘기면 본문이 잘려 파싱이 깨진다.
+ * The cover image cap.
+ * It must stay inside middleware's body limit (10MB) - exceeding it truncates the body and breaks the parse.
  */
 export const MAX_COVER_BYTES = 5 * 1024 * 1024;
 
 /**
- * 화면에 쓸 제목으로 다듬는다. 쓸 수 없으면 null.
+ * Tidies it into a title for the UI. null when unusable.
  *
- * 가운데 공백은 건드리지 않는다 — 제목의 일부다. 개행만 공백으로 바꾼다(한 줄짜리 이름이다).
+ * Inner whitespace is untouched - it is part of the title. Only newlines become spaces (it is a one-line name).
  */
 export function normalizeRomTitle(raw: string | null | undefined): string | null {
   if (typeof raw !== 'string') return null;
@@ -30,16 +30,16 @@ const startsWith = (bytes: Uint8Array, sig: number[], at = 0) =>
 const ascii = (s: string) => Array.from(s, (c) => c.charCodeAt(0));
 
 /**
- * 매직 바이트로 이미지 형식을 가린다. 확장자는 보지 않는다 — 이름은 얼마든지 바꿀 수 있다.
+ * Identifies the image format by magic bytes. The extension is ignored - names can be changed at will.
  *
- * 모르는 형식은 null. 브라우저가 못 그릴 파일을 커버로 앉히면 카드가 깨진 그림이 된다.
+ * An unknown format gives null. Setting a file the browser cannot draw as a cover leaves a broken image on the card.
  */
 export function detectImageFormat(bytes: Uint8Array): string | null {
   if (!bytes || bytes.length < 4) return null;
   if (startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) return 'image/png';
   if (startsWith(bytes, [0xff, 0xd8, 0xff])) return 'image/jpeg';
   if (startsWith(bytes, ascii('GIF87a')) || startsWith(bytes, ascii('GIF89a'))) return 'image/gif';
-  // RIFF 는 wav 도 쓴다 — 8 바이트 뒤의 'WEBP' 까지 봐야 그림이라고 할 수 있다.
+  // RIFF is also used by wav - the 'WEBP' eight bytes in is what makes it an image.
   if (startsWith(bytes, ascii('RIFF')) && startsWith(bytes, ascii('WEBP'), 8)) return 'image/webp';
   return null;
 }

@@ -1,4 +1,4 @@
-// #351/v3 — typewriter-options 단위 테스트.
+// #351/v3 - unit tests for typewriter-options.
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -83,7 +83,7 @@ describe("typewriter-options — 방문 씬 기록", () => {
   it("기존 JSON 손상 시 안전하게 빈 Set", () => {
     window.localStorage.setItem("web-adventure:visited-scenes", "{not-json");
     expect(getVisitedScenes().size).toBe(0);
-    // 손상된 기록 위 mark 정상 동작.
+    // mark works correctly over a corrupted record.
     markSceneVisited("recover");
     expect(isSceneVisited("recover")).toBe(true);
   });

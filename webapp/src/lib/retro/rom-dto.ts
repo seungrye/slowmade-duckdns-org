@@ -1,7 +1,7 @@
-// RetroRom 문서를 클라이언트로 내보낼 모양으로 (#109).
+// A RetroRom document into the shape sent to the client (#109).
 //
-// 라우트 셋(목록·업로드·페이지)이 같은 변환을 쓰므로 한 곳에 둔다. 핵심은
-// **`objectKey` 를 절대 싣지 않는 것** — MinIO 키가 새 나가면 인증 프록시를 우회할 실마리가 된다.
+// Three routes (list, upload and page) use the same conversion, so it lives in one place. The essential part is
+// **never including `objectKey`** - a leaked MinIO key is a lead for bypassing the authenticated proxy.
 
 import type { RomPatchDto, UserRomDto } from './entry';
 import type { PlatformId } from './platforms';
@@ -17,7 +17,7 @@ export interface LeanRom {
   patchEnabled?: boolean;
   coverKey?: string;
   parentSets?: { name: string; size: number; objectKey: string; sha256?: string }[];
-  /** 파일 내용의 sha256 (#188) — netplay 방을 가르는 근거. 옛 문서엔 없다. */
+  /** The file content's sha256 (#188) - the basis for separating netplay rooms. Older documents lack it. */
   sha256?: string;
 }
 
@@ -27,13 +27,13 @@ export interface LeanPatch {
   format: string;
   size: number;
   objectKey?: string;
-  /** 파일 내용의 sha256 (#188). */
+  /** The file content's sha256 (#188). */
   sha256?: string;
   isDeleted?: boolean;
   createdAt?: Date;
 }
 
-/** 화면에 내보내는 패치 한 개 (#112). objectKey 는 여기에도 없다. */
+/** One patch as exposed to the UI (#112). objectKey is absent here too. */
 export interface UserPatchDto {
   id: string;
   name: string;
@@ -52,16 +52,16 @@ export function toPatchDto(doc: LeanPatch): UserPatchDto {
   };
 }
 
-/** 지우지 않은 패치만, 올린 순서대로. */
+/** Only the undeleted patches, in upload order. */
 export function livePatches(doc: { patches?: LeanPatch[] }): UserPatchDto[] {
   return (doc.patches ?? []).filter((p) => !p.isDeleted).map(toPatchDto);
 }
 
 /**
- * 지금 쓰는 패치 하나 (#116).
+ * The patch currently in use (#116).
  *
- * 배열에 살아 있는 게 여럿이어도 **마지막 것**을 쓴다 — 업로드가 교체 방식이라 정상적으로는
- * 하나뿐이지만, 옛 데이터나 경쟁 상태로 여럿 남았을 때 "가장 최근에 올린 것" 이 맞다.
+ * Even with several alive in the array it takes **the last one** - uploading replaces, so normally there is only one,
+ * but when old data or a race leaves several, "the most recently uploaded" is the right answer.
  */
 export function activePatch(doc: { patches?: LeanPatch[] }): RomPatchDto | undefined {
   const last = activeLeanPatch(doc);
@@ -70,8 +70,8 @@ export function activePatch(doc: { patches?: LeanPatch[] }): RomPatchDto | undef
 }
 
 /**
- * 위와 **같은 규칙**으로 고른 원본 패치 — 해시처럼 화면에 내보내지 않는 값이 필요할 때 쓴다 (#188).
- * 고르는 규칙이 둘로 갈리면 netplay 방이 화면과 어긋난다.
+ * The raw patch chosen by **the same rule** as above - for when a value not exposed to the UI, such as the hash, is needed (#188).
+ * Two different selection rules would put the netplay room out of step with the UI.
  */
 export function activeLeanPatch(doc: { patches?: LeanPatch[] }): LeanPatch | undefined {
   const live = (doc.patches ?? []).filter((p) => !p.isDeleted);
@@ -85,24 +85,24 @@ export function toRomDto(doc: LeanRom, extra?: { hasSave?: boolean }): UserRomDt
     platform: doc.platform as PlatformId,
     size: doc.size,
     createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
-    // 아케이드가 게임을 식별하는 데 쓴다 (#139).
+    // Used by arcade to identify the game (#139).
     filename: doc.filename,
     patch: activePatch(doc),
-    // 값이 없던 옛 문서는 켜진 것으로 본다 — 패치를 올려 뒀다면 쓰려던 것이다.
+    // An older document with no value counts as on - having uploaded a patch, it was meant to be used.
     patchEnabled: doc.patchEnabled !== false,
     hasSave: extra?.hasSave ?? false,
-    // 인증 프록시로만 내려준다 — 오브젝트 키는 싣지 않는다.
+    // Served only through the authenticated proxy - the object key is not included.
     coverUrl: doc.coverKey ? `/api/games/retro/roms/${String(doc._id)}/cover` : undefined,
-    // 오브젝트 키가 아니라 **이름만** 내보낸다 — 주소는 이름으로 만든다.
+    // **Only the name** is exposed, not the object key - the address is built from the name.
     parentSets: (doc.parentSets ?? []).map((p) => p.name),
   };
 }
 
 /**
- * mongo ObjectId 모양인가.
+ * Whether it has the shape of a mongo ObjectId.
  *
- * 아무 문자열이나 `findOne({_id})` 에 넣으면 mongoose 가 CastError 를 던져 500 이 난다.
- * 잘못된 id 는 500 이 아니라 404 여야 한다 — 형식 검사로 먼저 걸러 낸다.
+ * Putting any old string into `findOne({_id})` makes mongoose throw a CastError and return 500.
+ * A malformed id should be a 404, not a 500 - so the shape is checked first.
  */
 export function isRomId(id: string): boolean {
   return /^[0-9a-fA-F]{24}$/.test(id);

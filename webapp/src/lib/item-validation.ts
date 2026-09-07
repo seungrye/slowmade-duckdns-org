@@ -64,7 +64,7 @@ export function validateKindFields(body: Record<string, unknown>, kind: ItemKind
       if (body.desc === undefined || body.desc === "") {
         return { ok: false, message: "accessory: desc 필수 (효과 설명)" };
       }
-      // effects 는 optional — 없으면 효과 없는 장식용 액세서리로 허용.
+      // effects is optional - without it, it is allowed as a decorative accessory with no effect.
       if (body.effects !== undefined) {
         if (!Array.isArray(body.effects)) {
           return { ok: false, message: "accessory: effects 는 배열이어야 합니다." };
@@ -81,10 +81,10 @@ export function validateKindFields(body: Record<string, unknown>, kind: ItemKind
 }
 
 /**
- * 무기/방어구 신규 random-stat 필드 검증.
- * - min/max 가 있으면 둘 다 있어야 하고, min ≤ max.
- * - tier 가 있으면 1..=5 정수.
- * 모두 optional 이므로 없으면 ok.
+ * Validates the new random-stat fields on weapons and armour.
+ * - if min or max is present, both must be, with min <= max.
+ * - if tier is present, it is an integer in 1..=5.
+ * All are optional, so absent is fine.
  */
 function validateRandomStatFields(
   body: Record<string, unknown>,

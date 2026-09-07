@@ -1,9 +1,9 @@
-// 조건 선택지 필터 — UI 측에서 disable/툴팁용으로, reducer 측에서도 가드용으로 사용.
+// The conditional choice filter - used by the UI for disabling and tooltips, and by the reducer as a guard.
 //
-// 책임:
-//   - isChoiceAvailable: 선택지가 *지금* 사용 가능한지 (plain/probability 는 무조건 true).
-//   - getUnavailableReason: 사용 불가일 때 사람 친화 라벨 (예: "지혜 8 이상 필요").
-//     사용 가능하거나 plain/probability 면 null.
+// Responsibilities:
+//   - isChoiceAvailable: whether the choice is usable *right now* (plain and probability are always true).
+//   - getUnavailableReason: a human-friendly label when it is not ("wisdom 8 or more required", say).
+//     null when usable, or for plain and probability.
 
 import type { Character, Choice, ChoiceCondition, StatKey } from "@/types/web-adventure";
 import { effectiveStat } from "./stats";
@@ -19,8 +19,8 @@ const STAT_LABEL_KO: Record<StatKey, string> = {
 };
 
 /**
- * flag 키 → 사용자 친화 라벨. 컨텐츠가 늘어나도 fallback (key 그대로) 으로 우아하게 처리.
- * 2 주차 사용 키: hasSecretSnack / caughtBefore.
+ * A flag key -> a user-friendly label. As content grows it degrades gracefully to a fallback (the key itself).
+ * The keys used in week 2: hasSecretSnack / caughtBefore.
  */
 const FLAG_LABEL_KO: Record<string, string> = {
   hasSecretSnack: "비밀 간식",
@@ -34,7 +34,7 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
     case "hasItem":
       return character.inventory.includes(cond.itemId);
     case "flag": {
-      // 5 주차 (#221) — expect 로 반전 매치. 미정의 시 기본값 true (기존 동작 보존).
+      // Week 5 (#221) - an inverted match through expect. Undefined defaults to true (preserving the existing behaviour).
       const expected = cond.expect ?? true;
       const actual = character.flags[cond.key] === true;
       return actual === expected;
@@ -44,10 +44,10 @@ function evalCondition(cond: ChoiceCondition, character: Character): boolean {
       const num = typeof v === "number" ? v : v === true ? 1 : 0;
       return num >= cond.min;
     }
-    // #321 — 4 성흔.
+    // #321 - the 4 stigmata.
     case "ability":
       return character.ability === cond.required;
-    // #359 각성.
+    // #359 awakening.
     case "stigmaAtLeast":
       return character.stigmaErosion >= cond.min;
     case "stigmaAtMost":
@@ -63,13 +63,13 @@ export function isChoiceAvailable(choice: Choice, character: Character): boolean
 }
 
 /**
- * 4 주차 — 조건 선택지의 *완전 숨김 모드*.
- * 5 주차 (#221) — probability 의 hideWhenFlag 지원.
+ * Week 4 - the *fully hidden mode* for conditional choices.
+ * Week 5 (#221) - hideWhenFlag support for probability.
  *
- * - plain → 항상 visible.
- * - probability → hideWhenFlag 지정 시 해당 flag truthy 면 hidden, 아니면 visible.
- * - conditional + hidden=true → 조건 미충족 시 false (UI 에서 렌더 X).
- * - conditional + hidden=false/undefined → 항상 true (회색 + tooltip 처리는 UI 가 한다).
+ * - plain -> always visible.
+ * - probability -> with hideWhenFlag given, hidden when that flag is truthy, otherwise visible.
+ * - conditional with hidden=true -> false when the condition is unmet (not rendered by the UI).
+ * - conditional with hidden=false/undefined -> always true (the UI handles greying out and the tooltip).
  */
 export function isChoiceVisible(choice: Choice, character: Character): boolean {
   if (choice.kind === "plain") return true;
@@ -107,7 +107,7 @@ function reasonForCondition(c: ChoiceCondition, character: Character): string | 
       };
       return `성흔 필요: ${ABILITY_KO[c.required] ?? c.required}`;
     }
-    // #359 각성.
+    // #359 awakening.
     case "stigmaAtLeast":
       return `침식도 ${c.min} 이상 필요`;
     case "stigmaAtMost":

@@ -1,7 +1,7 @@
-// lint.ts 순수 단위 — mongo 없이 직접 (#308).
+// lint.ts pure unit tests - directly, without mongo (#308).
 //
-// 기존 content-lint.test.ts 는 *실 mongo 통합* 검증. 순수 함수 자체의 *규칙별 정합*
-// 은 메모리상 sceneRegistry 만으로 검증 가능.
+// The existing content-lint.test.ts verifies *the real mongo integration*. The pure function's own *per-rule
+// consistency* can be verified with an in-memory sceneRegistry alone.
 
 import { describe, it, expect } from "vitest";
 import type { Scene, SceneRegistry } from "@/types/web-adventure";
@@ -48,7 +48,7 @@ describe("lintSceneContent — DEAD_END", () => {
   it("choices [] + isEnding=false → DEAD_END", () => {
     const reg: SceneRegistry = {
       start: makeScene({ id: "start", choices: [{ kind: "plain", id: "p", label: "x", to: "dead" }] }),
-      dead: makeScene({ id: "dead" /* 빈 choices + isEnding=false */ }),
+      dead: makeScene({ id: "dead" /* empty choices with isEnding=false */ }),
     };
     const r = lintSceneContent(reg, { startSceneIds: ["start"] });
     expect(r.issues.some((i) => i.code === "DEAD_END" && i.sceneId === "dead")).toBe(true);

@@ -1,4 +1,4 @@
-// rollProbability 의 d20 + 스탯 + 어빌리티 보정 단위 테스트.
+// Unit tests for rollProbability's d20 plus stat plus ability bonus.
 
 import { describe, test, expect } from "vitest";
 import { rollProbability } from "./rollDice";

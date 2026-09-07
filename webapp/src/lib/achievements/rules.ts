@@ -2,35 +2,35 @@ import { ACHIEVEMENTS } from './definitions';
 import type { AchievementStats, Evaluation } from './types';
 
 /**
- * 업적 판정 (#333) — **순수**. DB·시계·네트워크를 모른다.
+ * Achievement evaluation (#333) - **pure**. It knows nothing of the DB, the clock or the network.
  *
- * 규칙 하나가 표의 한 줄이다. `value` 가 지금 수치를, `target` 이 목표를 낸다. 그래서
+ * One rule is one row of the table. `value` gives the current figure and `target` the goal, so
  *
- *   - 해금 여부(`current >= target`)와
- *   - 잠긴 화면의 진행도(`174/250`)를
+ *   - whether it unlocks (`current >= target`) and
+ *   - the progress shown while locked (`174/250`)
  *
- * **한 곳에서** 얻는다. 예전처럼 조건식을 따로 두면 진행도를 또 계산해야 하고 둘이 어긋난다.
+ * come from **one place**. Keeping the condition separate, as before, means computing progress twice and having the two drift.
  *
- * 새 업적을 넣으려면 `definitions.ts` 에 한 줄, 여기에 한 줄이면 끝이다.
+ * Adding an achievement is one line in `definitions.ts` and one line here.
  */
 
 /**
- * 웹어드벤처 엔딩 — 수집형 업적의 분모. 목록은 types 가 원본이다 (#352).
+ * Web-adventure endings - the denominator of the collection achievement. The list's source is types (#352).
  *
- * 예전엔 여기에 6종을 손으로 적어 뒀다. 엔딩이 11종이 된 뒤에도 이 값이 6이라
- * 「모든 엔딩」 업적이 실제보다 일찍 열렸다. 다시 어긋나지 않게 다시 내보내기만 한다.
+ * The six kinds used to be written out here by hand. After endings grew to eleven this value stayed 6, so the
+ * "all endings" achievement opened early. It is now only re-exported, so it cannot drift again.
  */
 export { ENDING_IDS } from '@/types/web-adventure';
 import { ENDING_IDS } from '@/types/web-adventure';
 
 /**
- * 주인공 — 수집형 업적의 분모. 목록은 types 가 원본이다 (#354).
- * 엔딩(ENDING_IDS)과 같은 이유로 여기에 따로 적지 않는다.
+ * Protagonists - the denominator of the collection achievement. The list's source is types (#354).
+ * Not written out here, for the same reason as the endings (ENDING_IDS).
  */
 export { PROTAGONIST_IDS as PROTAGONISTS } from '@/types/web-adventure';
 import { PROTAGONIST_IDS as PROTAGONISTS } from '@/types/web-adventure';
 
-/** 판정에 쓰는 전부 0/빈 상태. 테스트와 신규 사용자의 출발점. */
+/** Everything at 0 or empty. The starting point for tests and new users. */
 export function emptyStats(): AchievementStats {
   return {
     postCount: 0,
@@ -53,7 +53,7 @@ export function emptyStats(): AchievementStats {
 
 const yes = (b: boolean) => (b ? 1 : 0);
 
-/** 서로 다른 기능을 몇 가지나 써 봤나. 레트로는 롬이든 세이브든 하나면 쓴 것으로 친다. */
+/** How many distinct features have been tried. For retro, either a ROM or a save counts as having used it. */
 function featuresUsed(s: AchievementStats): number {
   return [
     s.postCount > 0,
@@ -68,7 +68,7 @@ const FEATURE_COUNT = 4;
 type Rule = { key: string; target: number; value: (s: AchievementStats) => number };
 
 const RULES: Rule[] = [
-  // 글
+  // Posts
   { key: 'FIRST_POST', target: 1, value: (s) => s.postCount },
   { key: 'POST_COUNT_10', target: 10, value: (s) => s.postCount },
   { key: 'POST_COUNT_50', target: 50, value: (s) => s.postCount },
@@ -77,7 +77,7 @@ const RULES: Rule[] = [
   { key: 'POST_COUNT_500', target: 500, value: (s) => s.postCount },
   { key: 'POST_COUNT_1000', target: 1000, value: (s) => s.postCount },
 
-  // 덧글
+  // Comments
   { key: 'FIRST_COMMENT', target: 1, value: (s) => s.commentCount },
   { key: 'COMMENT_COUNT_10', target: 10, value: (s) => s.commentCount },
   { key: 'COMMENT_COUNT_50', target: 50, value: (s) => s.commentCount },
@@ -86,13 +86,13 @@ const RULES: Rule[] = [
   { key: 'COMMENT_COUNT_500', target: 500, value: (s) => s.commentCount },
   { key: 'COMMENT_COUNT_1000', target: 1000, value: (s) => s.commentCount },
 
-  // 글이 닿은 정도 — 한 글의 최고치로 본다(여러 글에 나눠 받은 건 개수 사다리가 센다)
+  // How far a post reached - taken as one post's best (a total spread across posts is what the count ladder measures)
   { key: 'POST_10_LIKES', target: 10, value: (s) => s.maxPostLikes },
   { key: 'POST_50_LIKES', target: 50, value: (s) => s.maxPostLikes },
   { key: 'POST_100_VIEWS', target: 100, value: (s) => s.maxPostViews },
   { key: 'POST_1000_VIEWS', target: 1000, value: (s) => s.maxPostViews },
 
-  // 웹어드벤처
+  // Web adventure
   { key: 'WA_FIRST_RUN', target: 1, value: (s) => s.waRunCount },
   { key: 'WA_RUN_10', target: 10, value: (s) => s.waRunCount },
   { key: 'WA_RUN_50', target: 50, value: (s) => s.waRunCount },
@@ -102,25 +102,25 @@ const RULES: Rule[] = [
   { key: 'WA_PROTAGONIST_ALL', target: PROTAGONISTS.length, value: (s) => s.waProtagonists.length },
   { key: 'WA_CLEAN_RUN', target: 1, value: (s) => yes(s.waCleanRun) },
 
-  // 레트로
+  // Retro
   { key: 'RETRO_FIRST_ROM', target: 1, value: (s) => s.retroRomCount },
   { key: 'RETRO_ROM_10', target: 10, value: (s) => s.retroRomCount },
   { key: 'RETRO_FIRST_SAVE', target: 1, value: (s) => s.retroSaveCount },
   { key: 'RETRO_SAVE_10', target: 10, value: (s) => s.retroSaveCount },
 
-  // 함께한 시간
+  // Time together
   { key: 'ANNIVERSARY_1', target: 365, value: (s) => s.memberDays },
   { key: 'ANNIVERSARY_2', target: 730, value: (s) => s.memberDays },
 
-  // 리듬
+  // Rhythm
   { key: 'STREAK_7', target: 7, value: (s) => s.postStreak },
   { key: 'WEEKEND_WRITER', target: 10, value: (s) => s.weekendPostCount },
 
-  // 탐험
+  // Exploration
   { key: 'EXPLORER_3', target: 3, value: featuresUsed },
   { key: 'EXPLORER_ALL', target: FEATURE_COUNT, value: featuresUsed },
 
-  // 숨김
+  // Hidden
   { key: 'NIGHT_OWL', target: 1, value: (s) => s.nightPostCount },
   { key: 'BIRTHDAY_VISIT', target: 1, value: (s) => yes(s.birthdayVisit) },
 ];
@@ -131,13 +131,13 @@ export function evaluate(stats: AchievementStats): Evaluation[] {
     return {
       key,
       unlocked: raw >= target,
-      // 진행도는 목표에서 멈춘다 — 300/250 은 화면에서 이상하게 보인다.
+      // Progress stops at the target - 300/250 looks wrong on screen.
       current: Math.min(raw, target),
       target,
     };
   });
 }
 
-/** 표와 규칙이 어긋나면(한쪽에만 있는 키) 바로 알 수 있게 둔다. 테스트가 이걸 확인한다. */
+/** Exposed so a drift between the table and the rules (a key on only one side) shows up at once. The test checks this. */
 export const RULE_KEYS = RULES.map((r) => r.key);
 export const DEFINITION_KEYS = Object.keys(ACHIEVEMENTS);

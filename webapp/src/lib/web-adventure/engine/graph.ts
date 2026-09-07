@@ -1,36 +1,36 @@
-// graph.ts — Scene[] → ReactFlow nodes/edges 변환 + 자동 레이아웃.
+// graph.ts - converting Scene[] into ReactFlow nodes/edges plus the automatic layout.
 //
-// #222 (6 주차) — /scenes/graph 편집 차트.
-// #347 — dagre → elkjs (더 빠른 layered layout).
+// #222 (week 6) - the /scenes/graph editing chart.
+// #347 - dagre -> elkjs (a faster layered layout).
 //
-// 책임:
+// Responsibilities:
 //   1. buildGraphFromScenes(scenes): Scene[] → { nodes, edges }
-//      - 노드: scene 1 개당 노드 1 개. data 에 title/endingId/isStart/savedPosition.
-//      - 엣지: choice 종류 별 매핑.
+//      - nodes: one node per scene. data carries title/endingId/isStart/savedPosition.
+//      - edges: mapped per choice kind.
 //        · plain → 1 edge (source → target, data.kind='plain')
 //        · probability → 2 edges (success, failure / data.branch)
 //        · conditional → 1 edge (data.kind='conditional', data.hidden=choice.hidden)
-//   2. autoLayout(nodes, edges) [async]: position 없는 노드만 elk LR 로 자동 배치.
-//      - savedPosition 있는 노드는 그 좌표 유지.
-//      - dagre 보다 *큰 그래프 (69 노드)* 에서 빠른 레이아웃 + 더 깔끔한 결과.
+//   2. autoLayout(nodes, edges) [async]: lays out only the nodes without a position, using elk LR.
+//      - a node with a savedPosition keeps those coordinates.
+//      - faster than dagre on *a large graph (69 nodes)* and a cleaner result.
 //
-// 외부 의존성:
+// External dependencies:
 //   - elkjs (0.11+) — layered algorithm, LR direction.
 
-// elkjs main entry — workerless. bundled (web worker) 는 vitest jsdom 환경에서
-// worker 부재로 hang. main 은 동기 알고리즘 모두 포함.
+// The elkjs main entry - workerless. The bundled (web worker) build hangs under vitest's jsdom for want of a
+// worker. main includes every synchronous algorithm.
 import ELK from "elkjs";
 import type { Scene } from "@/types/web-adventure";
 
-// position 필드는 Scene 타입에 아직 정식 추가되지 않았으므로 *확장 타입* 으로 받는다.
-// mongo 문서는 그대로 통과 — 필드가 있으면 사용, 없으면 dagre 자동.
+// The position field is not formally on the Scene type yet, so it is taken through *an extended type*.
+// A mongo document passes through as is - the field is used when present and dagre lays it out automatically otherwise.
 export type SceneWithPosition = Scene & {
   position?: { x: number; y: number };
 };
 
-// #333 — 〈에테르니아〉 3 주인공 화이트리스트.
-// 옛 사극 단일 시작 (town_square_dawn) 잔재 제거.
-// content-lint 의 startSceneIds 와 일관.
+// #333 - the whitelist of Eternia's 3 protagonists.
+// Removing the leftover single start (town_square_dawn) from the old historical-drama era.
+// Consistent with content-lint's startSceneIds.
 export const START_SCENE_IDS = [
   "kael_infirmary",
   "rin_harbor",
@@ -40,9 +40,9 @@ export const START_SCENE_IDS = [
 const START_SCENE_SET = new Set<string>(START_SCENE_IDS);
 
 /**
- * 옛 단일 상수 호환 — 첫 시작 씬 (kael_infirmary) 을 가리킨다.
- * 신규 코드는 `START_SCENE_IDS` 또는 `isStartScene()` 사용.
- * @deprecated 2026-06 이후 제거 예정. START_SCENE_IDS 사용.
+ * Compatibility with the old single constant - it points at the first starting scene (kael_infirmary).
+ * New code uses `START_SCENE_IDS` or `isStartScene()`.
+ * @deprecated to be removed after 2026-06. Use START_SCENE_IDS.
  */
 export const START_SCENE_ID: (typeof START_SCENE_IDS)[number] = START_SCENE_IDS[0];
 
@@ -51,15 +51,15 @@ export function isStartScene(sceneId: string): boolean {
 }
 
 export type GraphNodeData = {
-  /** 표시 라벨 */
+  /** The display label */
   title: string;
-  /** 엔딩 여부 */
+  /** Whether it is an ending */
   isEnding?: boolean;
-  /** 엔딩 ID (6 종) */
+  /** The ending ID (6 kinds) */
   endingId?: string;
-  /** 시작 씬 여부 */
+  /** Whether it is a starting scene */
   isStart?: boolean;
-  /** mongo 에 저장된 좌표 (있을 때만 — 자동 레이아웃 우회) */
+  /** The coordinates stored in mongo (only when present - it bypasses the automatic layout) */
   savedPosition?: { x: number; y: number };
 };
 
@@ -67,7 +67,7 @@ export type GraphNode = {
   id: string;
   position: { x: number; y: number };
   data: GraphNodeData;
-  /** ReactFlow 가 인식하는 옵션. */
+  /** The options ReactFlow recognises. */
   type?: string;
   draggable?: boolean;
 };
@@ -75,11 +75,11 @@ export type GraphNode = {
 export type GraphEdgeData = {
   /** 'plain' | 'probability' | 'conditional' */
   kind: "plain" | "probability" | "conditional";
-  /** probability 의 경우 'success' | 'failure' */
+  /** For probability, 'success' | 'failure' */
   branch?: "success" | "failure";
-  /** conditional 의 경우 hidden 여부 (UI 점선 표시 prop) */
+  /** For conditional, whether it is hidden (the prop that draws it dashed in the UI) */
   hidden?: boolean;
-  /** 라벨 텍스트 (probability stat N% / conditional 조건 텍스트) */
+  /** The label text (probability's stat N% / conditional's condition text) */
   label?: string;
 };
 
@@ -104,7 +104,7 @@ export function buildGraphFromScenes(
     if (savedPosition) data.savedPosition = savedPosition;
     return {
       id: scene.id,
-      // 초기 placeholder — autoLayout 이 덮어쓴다. savedPosition 있으면 그대로.
+      // An initial placeholder - autoLayout overwrites it. A savedPosition is kept as is.
       position: savedPosition ?? { x: 0, y: 0 },
       data,
     };
@@ -160,8 +160,8 @@ export function buildGraphFromScenes(
 }
 
 /**
- * elk 자동 레이아웃 (async). savedPosition 있는 노드는 그대로 유지.
- * #347 — dagre → elkjs. layered algorithm + LR direction.
+ * The elk automatic layout (async). Nodes with a savedPosition keep it.
+ * #347 - dagre -> elkjs. The layered algorithm with LR direction.
  */
 export async function autoLayout(
   nodes: GraphNode[],
@@ -171,10 +171,10 @@ export async function autoLayout(
   const nodeWidth = opts?.nodeWidth ?? 180;
   const nodeHeight = opts?.nodeHeight ?? 60;
 
-  // savedPosition 없는 노드만 layout 대상.
+  // Only nodes without a savedPosition are laid out.
   const layoutTargets = nodes.filter((n) => !n.data.savedPosition);
   if (layoutTargets.length === 0) {
-    // 모두 savedPosition — layout 호출 skip.
+    // all have a savedPosition - the layout call is skipped.
     return nodes.map((n) =>
       n.data.savedPosition
         ? { ...n, position: { ...n.data.savedPosition } }

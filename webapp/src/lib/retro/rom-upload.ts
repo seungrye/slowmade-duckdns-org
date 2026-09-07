@@ -1,25 +1,24 @@
-// 업로드된 롬 파일 검사 (#109) — 순수 함수. 클라이언트(미리 알려주기)와 API 라우트(진짜 관문)가
-// **같은 규칙**을 쓰도록 여기 한 곳에 둔다.
+// Validating an uploaded ROM file (#109) - pure functions. Kept in this one place so the client (warning in advance)
+// and the API route (the real gate) use **the same rules**.
 
 import { platformById, platformForFilename, type PlatformId } from './platforms';
 
 /**
- * 롬 한 개의 크기 상한 (#146 — 50MB).
+ * The size cap for one ROM (#146 - 50MB).
  *
- * **nginx 와 짝을 맞춰야 한다.** 서버 기본값은 16M 이라, 이 값을 쓰려면
- * `location = /api/games/retro/rom-upload { client_max_body_size 50M; }` 가 있어야 한다.
- * **두 도메인 스냅샷 모두**(`scripts/deploy/{slowmade.duckdns.org,handmade.r-e.kr}.nginx`) —
- * 한쪽만 고치면 그 도메인으로 들어온 업로드가 nginx 단에서 413 이 나고, 앱 로그에는
- * 아무것도 안 남아 이유가 안 보인다.
+ * **It must be matched in nginx.** The server default is 16M, so using this value requires
+ * `location = /api/games/retro/rom-upload { client_max_body_size 50M; }`.
+ * In **both domain snapshots** (`scripts/deploy/{slowmade.duckdns.org,handmade.r-e.kr}.nginx`) - fixing only one
+ * makes uploads on that domain 413 at nginx, with nothing in the app log and no visible reason.
  *
- * owner 와 일반 사용자를 나누지 않는다 — nginx 가 어차피 모두를 같은 값으로 막는다.
+ * Owners and ordinary users are not distinguished - nginx blocks everyone at the same value anyway.
  */
 export const MAX_ROM_BYTES = 50 * 1024 * 1024;
 
 export interface RomUploadInput {
   filename: string;
   size: number;
-  /** 사용자가 직접 고른 기종. 확장자 추론보다 우선한다. */
+  /** The system the user picked explicitly. It wins over inference from the extension. */
   platform?: PlatformId | string;
 }
 
@@ -28,15 +27,15 @@ export type RomValidation =
   | { ok: false; reason: string };
 
 /**
- * 파일명에서 확장자를 떼고 경로 조각을 지운 표시용 제목.
+ * A display title with the extension removed and path segments stripped.
  *
- * 밑줄은 공백으로 바꾼다 — 롬 파일명은 `zelda_a_link_to_the_past.sfc` 처럼 밑줄로 띄어쓰기를
- * 대신하는 관행이 굳어 있어서, 그대로 두면 목록이 읽히지 않는다.
+ * Underscores become spaces - ROM filenames have a settled convention of using underscores for spaces
+ * (`zelda_a_link_to_the_past.sfc`), and leaving them makes the list unreadable.
  */
 export function romTitleFromFilename(filename: string): string {
   const base = filename.split(/[/\\]/).pop() ?? '';
   const dot = base.lastIndexOf('.');
-  // dot === 0 은 '.nes' 같은 확장자뿐인 이름 — 줄기가 없다.
+  // dot === 0 means a name that is only an extension, such as '.nes' - there is no stem.
   const stem = (dot > 0 ? base.slice(0, dot) : dot === 0 ? '' : base).replace(/_+/g, ' ').trim();
   if (!stem) return '이름 없는 롬';
   return stem.slice(0, 120);
@@ -49,7 +48,7 @@ export function validateRomUpload(input: RomUploadInput): RomValidation {
     return { ok: false, reason: `파일이 너무 큽니다 (최대 ${mb}MB).` };
   }
 
-  // 사용자가 고른 기종이 있으면 그걸 믿는다 — .bin 처럼 추론이 불가능한 파일 때문에 필요하다.
+  // A system the user picked is trusted - needed for files like .bin where inference is impossible.
   const chosen = input.platform ? platformById(input.platform) : undefined;
   if (input.platform && !chosen) {
     return { ok: false, reason: `지원하지 않는 기종입니다: ${input.platform}` };

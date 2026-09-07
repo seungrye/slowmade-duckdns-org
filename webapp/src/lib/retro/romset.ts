@@ -1,26 +1,26 @@
-// 분할(split) 롬셋 판별 (#143).
+// Identifying split ROM sets (#143).
 //
-// 아케이드 클론 셋은 리전별 파일만 담고 나머지는 부모 zip 에 있다. 여러 zip 을 한 번에 올렸을 때
-// **무엇이 게임(클론)이고 무엇이 부모인지**를 가려야 한다.
+// An arcade clone set holds only the region-specific files, with the rest in the parent zip. When several zips are
+// uploaded at once, **which is the game (the clone) and which is the parent** has to be worked out.
 //
-// 단서는 이름이다. MAME·FBA 는 **클론 이름이 부모 이름으로 시작한다** —
-// `ddsom`(부모) → `ddsoma`·`ddsomu`·`ddsomr1`(클론). 그래서 **앞가지인 쪽이 부모**다.
+// The clue is the name. In MAME and FBA **a clone's name starts with its parent's** -
+// `ddsom` (parent) -> `ddsoma`, `ddsomu`, `ddsomr1` (clones). So **whichever is the prefix is the parent**.
 //
-// 규칙에 안 맞으면 `ambiguous` 로 알린다. 조용히 찍으면 엉뚱한 리전으로 부팅하는데,
-// 그건 알아채기 어려운 종류의 잘못이다.
+// When the rule does not fit it reports `ambiguous`. Guessing quietly boots the wrong region, and that is the kind of
+// mistake that is hard to notice.
 
 export interface RomSetClassification {
-  /** 코어에 넘길 게임 이름 — 이 zip 의 이름이 곧 롬셋 이름이다. */
+  /** The game name to give the core - this zip's name is the ROM set's name. */
   game: string | null;
-  /** 함께 놓을 부모들. **일반적인 것부터** 나열된다 — 코어가 필요할 때 거슬러 찾는다. */
+  /** The parents to place alongside it, listed **from the general upward** - the core walks back through them as needed. */
   parents: string[];
-  /** 이름 규칙으로 못 가렸다 — 화면에서 확인을 받는 편이 좋다. */
+  /** The name rule could not decide - better to confirm in the UI. */
   ambiguous: boolean;
-  /** 화면에 그대로 보여 줄 한 줄. */
+  /** A one-liner to show as is in the UI. */
   summary: string;
 }
 
-/** 확장자를 떼고 소문자로. */
+/** With the extension stripped and lowercased. */
 const base = (name: string) => name.replace(/\.[^.]*$/, '').toLowerCase();
 
 export function classifyRomSet(filenames: string[]): RomSetClassification {
@@ -32,12 +32,12 @@ export function classifyRomSet(filenames: string[]): RomSetClassification {
     return { game: names[0], parents: [], ambiguous: false, summary: `게임: ${names[0]}` };
   }
 
-  // 이름이 짧은 것부터 = 일반적인 것부터. 가장 긴 것이 게임(가장 구체적인 클론).
+  // Shortest name first = most general first. The longest is the game (the most specific clone).
   const sorted = [...names].sort((a, b) => base(a).length - base(b).length);
   const game = sorted[sorted.length - 1];
   const parents = sorted.slice(0, -1);
 
-  // 규칙 확인 — 앞의 것이 뒤의 것의 앞가지여야 한다. 같은 이름이 섞여도 어긋난 것으로 본다.
+  // Checking the rule - each must be a prefix of the next. Duplicate names also count as not fitting.
   const bases = sorted.map(base);
   const ambiguous =
     new Set(bases).size !== bases.length ||

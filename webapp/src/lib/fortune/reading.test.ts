@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { isPolite, templateReading, buildPrompt } from "./reading";
 import { cardById, type TarotCard } from "./tarot-deck";
 
-const star = cardById(17) as TarotCard; // 별
-const tower = cardById(16) as TarotCard; // 탑
+const star = cardById(17) as TarotCard; // The Star
+const tower = cardById(16) as TarotCard; // The Tower
 
 describe("isPolite — 반말/존댓말 가드 (#388)", () => {
   it("존댓말 문장은 통과", () => {
@@ -12,7 +12,7 @@ describe("isPolite — 반말/존댓말 가드 (#388)", () => {
   });
 
   it("실측에서 샜던 반말(별 카드)을 잡는다", () => {
-    // 로컬 LLM 이 실제로 뱉었던 반말 — 존댓말로 시켰는데 새어 나왔다.
+    // Casual speech the local LLM actually produced - it was told to be polite and this slipped through.
     expect(isPolite("별이 너에게 조용한 기운을 보내고 있어. 마음을 가볍게 해보는 게 좋아.")).toBe(false);
   });
 

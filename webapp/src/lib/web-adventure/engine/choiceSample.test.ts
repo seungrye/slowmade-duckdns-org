@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { pickDisplayedChoices } from "./choiceSample";
 import type { Character, Choice } from "@/types/web-adventure";
 
-// 최소 캐릭터 — conditional 조건 평가에 필요한 필드만. 나머지는 캐스팅으로 생략.
+// A minimal character - only the fields the conditional evaluation needs. The rest is omitted through a cast.
 function char(overrides: Partial<Character> = {}): Character {
   return {
     stats: { str: 10, dex: 10, int: 10, cha: 10, con: 10, wis: 10 },
@@ -39,7 +39,7 @@ describe("pickDisplayedChoices", () => {
     const seeds = ["1:s", "2:s", "3:s", "4:s", "5:s"].map((seed) =>
       pickDisplayedChoices(cs, char(), { seed }).map((c) => c.id).join(","),
     );
-    // 최소한 서로 다른 조합이 2가지 이상 나온다.
+    // At least two different combinations come out.
     expect(new Set(seeds).size).toBeGreaterThan(1);
   });
 
@@ -56,7 +56,7 @@ describe("pickDisplayedChoices", () => {
       { ...plain("keepme"), pinned: true },
       plain("a"), plain("b"), plain("c"), plain("d"), plain("e"),
     ];
-    // 여러 seed 로 시도해도 항상 포함
+    // always included, whichever seed is tried
     for (const seed of ["1:s", "2:s", "9:s", "42:s"]) {
       const out = pickDisplayedChoices(cs, char(), { seed }).map((c) => c.id);
       expect(out).toContain("keepme");

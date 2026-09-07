@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { postRhythm } from './rhythm';
 
-// KST = UTC+9. UTC 15:00 이 KST 다음 날 00:00 이다.
+// KST = UTC+9. 15:00 UTC is 00:00 the next day in KST.
 const at = (iso: string) => new Date(iso);
 
 describe('postRhythm — 연속일수', () => {
@@ -24,7 +24,7 @@ describe('postRhythm — 연속일수', () => {
     const dates = [
       at('2026-03-10T03:00:00Z'),
       at('2026-03-11T03:00:00Z'),
-      // 3-12 없음
+      // no 3-12
       at('2026-03-13T03:00:00Z'),
       at('2026-03-14T03:00:00Z'),
       at('2026-03-15T03:00:00Z'),
@@ -51,7 +51,7 @@ describe('postRhythm — 연속일수', () => {
   });
 
   it('KST 로 날짜를 가른다 — UTC 로 세면 하루가 어긋난다', () => {
-    // 둘 다 KST 로는 3-15 다(UTC 3-14 15:00 = KST 3-15 00:00).
+    // Both are 3-15 in KST (14:00... 15:00 UTC on 3-14 = 00:00 KST on 3-15).
     const dates = [at('2026-03-14T15:00:00Z'), at('2026-03-15T05:00:00Z')];
     expect(postRhythm(dates).streak).toBe(1);
   });
@@ -59,7 +59,7 @@ describe('postRhythm — 연속일수', () => {
 
 describe('postRhythm — 주말', () => {
   it('토·일에 쓴 것만 센다 (KST 기준)', () => {
-    // 2026-03-14(토), 03-15(일), 03-16(월)
+    // 2026-03-14 (Sat), 03-15 (Sun), 03-16 (Mon)
     const dates = [
       at('2026-03-14T03:00:00Z'),
       at('2026-03-15T03:00:00Z'),
@@ -69,7 +69,7 @@ describe('postRhythm — 주말', () => {
   });
 
   it('KST 로 넘어가 주말이 되는 것도 센다', () => {
-    // UTC 금요일 2026-03-13 16:00 = KST 토요일 03-14 01:00
+    // Friday 2026-03-13 16:00 UTC = Saturday 03-14 01:00 KST
     expect(postRhythm([at('2026-03-13T16:00:00Z')]).weekend).toBe(1);
   });
 });
@@ -86,7 +86,7 @@ describe('postRhythm — 새벽', () => {
   });
 
   it('세 값을 한 번에 낸다 — 목록을 세 번 훑지 않는다', () => {
-    const r = postRhythm([at('2026-03-14T16:00:00Z')]); // KST 03-15(일) 01:00
+    const r = postRhythm([at('2026-03-14T16:00:00Z')]); // 03-15 (Sun) 01:00 KST
     expect(r).toEqual({ streak: 1, weekend: 1, night: 1 });
   });
 });

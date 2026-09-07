@@ -1,10 +1,10 @@
-// 코어 로그에서 "왜 안 떴는지" 만 추려 낸다 (#153).
+// Extracting only "why it did not start" from the core log (#153).
 //
-// 배포되는 파일을 그대로 불러 검증한다 — player.js 가 import 하는 것과 같은 하나다.
+// It loads the deployed file as is - the very one player.js imports.
 import { describe, it, expect } from 'vitest';
 import { pickLoadErrors } from '../../../public/games/retro/core-log.js';
 
-// 실제로 받아 본 줄들. 손으로 지어내지 않는다 — 형식이 바뀌면 테스트가 알려 줘야 한다.
+// Lines actually received. Nothing is invented by hand - if the format changes, the test must say so.
 const REAL = [
   '[INFO] [Content]: Content loading skipped. Implementation will load it on its own.',
   '[libretro INFO] [FBNeo] Searching all possible locations for romset ddsoma',
@@ -40,7 +40,7 @@ describe('pickLoadErrors', () => {
     expect(pickLoadErrors([line, line]).missing).toEqual(['a.key']);
   });
 
-  // 검색 경로 나열이 수십 줄이라 그대로 보여 주면 정작 중요한 줄이 묻힌다.
+  // The search-path listing runs to dozens of lines, so showing it whole buries the line that matters.
   it('소음은 버린다 — 검색 경로·번역 경고·정상 적재', () => {
     const out = pickLoadErrors(REAL);
     expect(out.lines.join('\n')).not.toMatch(/No romset found|Translation not found|Using ROM with known/);
@@ -66,7 +66,7 @@ describe('pickLoadErrors', () => {
     expect(pickLoadErrors(undefined as unknown as string[]).failed).toBe(false);
   });
 
-  // 화면에 붙일 것이라 무한정 늘어나면 안 된다.
+  // It goes on screen, so it must not grow without bound.
   it('줄 수를 제한한다', () => {
     const many = Array.from({ length: 200 }, (_, i) =>
       `[libretro ERROR] [FBNeo] ROM at index ${i} with name f${i}.bin and CRC 0x1 is required`,

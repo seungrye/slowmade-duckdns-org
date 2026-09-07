@@ -1,10 +1,10 @@
-// 롬 내려받기 묶음 (#194) — 순수 부분.
+// The ROM download bundle (#194) - the pure part.
 //
-// 조심할 것은 **이름 겹침**이다. 아케이드는 롬과 부모셋이 둘 다 zip 이고 같은 이름으로
-// 올라와 있을 수 있다(`ddsoma.zip` 을 본체로도 부모로도 쓴 문서가 실제로 있었다).
-// zip 안에서 이름이 겹치면 나중 것이 앞의 것을 덮어써 **파일이 조용히 사라진다.**
+// What to watch for is **name collisions**. On arcade, the ROM and the parent set are both zips and can be uploaded
+// under the same name (a document really did use `ddsoma.zip` as both the main ROM and the parent).
+// Colliding names inside a zip mean the later one overwrites the earlier, and **a file silently disappears.**
 
-/** zip 안의 이름으로 쓸 수 없는 것들 — 경로 구분자와 제어문자. */
+/** What cannot appear in a name inside a zip - path separators and control characters. */
 function safeName(raw: string, fallback: string): string {
   const cleaned = String(raw ?? '')
     .replace(/[/\\]/g, '_')
@@ -14,19 +14,19 @@ function safeName(raw: string, fallback: string): string {
   return cleaned || fallback;
 }
 
-/** 파일명에서 확장자만(점 포함). 없으면 빈 문자열. */
+/** Just the extension of a filename (the dot included). Empty when there is none. */
 function extOf(name: string): string {
   const dot = name.lastIndexOf('.');
   return dot > 0 ? name.slice(dot) : '';
 }
 
-/** 확장자를 뗀 이름. */
+/** The name with the extension stripped. */
 function baseOf(name: string): string {
   const dot = name.lastIndexOf('.');
   return dot > 0 ? name.slice(0, dot) : name;
 }
 
-/** `a.zip` → `a (2).zip`. 확장자를 살려 둔다 — 안 그러면 열리지 않는다. */
+/** `a.zip` -> `a (2).zip`. The extension is preserved - otherwise it will not open. */
 function numbered(name: string, n: number): string {
   const dot = name.lastIndexOf('.');
   return dot > 0 ? `${name.slice(0, dot)} (${n})${name.slice(dot)}` : `${name} (${n})`;
@@ -34,23 +34,23 @@ function numbered(name: string, n: number): string {
 
 export interface BundleParts {
   romName: string;
-  /** 적용 중인 패치. 없으면 비운다. */
+  /** The patch in use. Empty when there is none. */
   patchName?: string;
-  /** 아케이드 부모 롬셋들 — 이게 없으면 실행이 안 되므로 함께 넣는다. */
+  /** The arcade parent ROM sets - included because it will not run without them. */
   parentNames?: string[];
 }
 
 /**
- * zip 에 넣을 이름들. 순서는 롬 → 패치 → 부모셋.
+ * The names to put in the zip, in the order ROM -> patch -> parent sets.
  *
- * **겹치면 번호를 붙여 갈라 둔다.** 덮어쓰면 받은 사람이 파일 하나를 잃는데, 그걸 알아채기가
- * 어렵다(zip 은 조용히 마지막 것만 남긴다).
+ * **Collisions are numbered apart.** Overwriting costs the recipient a file, and it is hard to notice (a zip quietly
+ * keeps only the last).
  */
 export function bundleEntryNames({ romName, patchName, parentNames }: BundleParts): string[] {
   const rom = safeName(romName, 'rom');
-  // 패치는 **롬 이름 + `-patch`** 로 굳힌다 (#198). 원래 이름을 그대로 쓰면 어느 게 패치인지
-  // 알기 어렵다 — 실제로 롬과 패치 이름이 똑같은 경우가 있었다(`ddsomu.zip`). 확장자는 살려
-  // 형식(ips·bps·zip)이 보이게 한다.
+  // The patch is pinned to **the ROM's name plus `-patch`** (#198). Keeping its original name makes it hard to tell
+  // which file is the patch - a ROM and its patch really did share a name (`ddsomu.zip`). The extension is preserved
+  // so the format (ips, bps, zip) stays visible.
   const patch = patchName ? `${baseOf(rom)}-patch${extOf(safeName(patchName, 'patch'))}` : null;
 
   const wanted = [
@@ -73,8 +73,8 @@ export function bundleEntryNames({ romName, patchName, parentNames }: BundlePart
   });
 }
 
-/** 내려받을 zip 파일 이름. 제목이 곧 이름이라 파일시스템이 싫어하는 것만 걷어낸다. */
+/** The zip's filename. The title is the name, so only what filesystems dislike is stripped. */
 export function bundleFileName(title: string): string {
-  // 100자면 어느 파일시스템에서도 안전하고, 제목을 알아보기에도 충분하다.
+  // 100 characters is safe on any filesystem and still enough to recognise the title.
   return `${safeName(title, 'rom').slice(0, 100)}.zip`;
 }

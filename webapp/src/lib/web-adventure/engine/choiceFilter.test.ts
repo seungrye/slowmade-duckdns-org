@@ -1,4 +1,4 @@
-// choiceFilter — isChoiceAvailable / getUnavailableReason 단위 (#300).
+// choiceFilter - unit tests for isChoiceAvailable / getUnavailableReason (#300).
 
 import { describe, it, expect } from "vitest";
 import { isChoiceAvailable, getUnavailableReason } from "./choiceFilter";
@@ -120,11 +120,11 @@ describe("getUnavailableReason", () => {
   });
 });
 
-// ── #99 stigmaAtMost — 「침식이 적을 것」 조건 ──────────────────────────────
+// ── #99 stigmaAtMost - the "contamination must be low" condition ──────────────────────────────
 //
-// 왜 필요한가: 조건에 하한(stigmaAtLeast)만 있어서 "표식 없는 맨살" 같은 서술을 지킬 수
-// 없었다. 성흔 능력(ability)과 침식도는 별개 축이라, 침식 80 인 카엘도 능력만 「무흔」이면
-// 그 선택지를 골랐다.
+// Why it is needed: with only a lower bound (stigmaAtLeast) there was no way to hold to a description like
+// "unmarked bare skin". The stigma ability and the contamination level are separate axes, so even a Kael at
+// contamination 80 could pick that choice as long as the ability was "unmarked".
 describe("stigmaAtMost (#99)", () => {
   const choice = (max: number): Choice => ({
     kind: "conditional",
@@ -149,7 +149,7 @@ describe("stigmaAtMost (#99)", () => {
     expect(reason).toContain("20");
   });
 
-  // 실제 쓰임 — 무흔 능력이면서 침식도 낮아야 한다.
+  // The real use - the ability must be unmarked *and* the contamination low.
   it("ability=none 과 함께 AND 로 묶인다", () => {
     const both: Choice = {
       kind: "conditional",
@@ -165,7 +165,7 @@ describe("stigmaAtMost (#99)", () => {
       },
     };
     expect(isChoiceAvailable(both, makeChar({ ability: "none", stigmaErosion: 0 }))).toBe(true);
-    // 능력은 무흔인데 몸에는 결정이 돋아 있는 경우 — 종전에는 통과했다.
+    // The ability is unmarked while crystals have grown on the body - this used to pass.
     expect(isChoiceAvailable(both, makeChar({ ability: "none", stigmaErosion: 80 }))).toBe(false);
     expect(isChoiceAvailable(both, makeChar({ ability: "lunar", stigmaErosion: 0 }))).toBe(false);
   });

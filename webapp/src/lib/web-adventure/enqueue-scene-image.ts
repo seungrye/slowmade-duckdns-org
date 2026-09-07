@@ -1,17 +1,17 @@
-// 엔딩 → 씬 삽화 큐 적재 (#158) — end-run(웹)·app-end-run(앱)이 공유.
+// Ending -> queueing a scene illustration (#158) - shared by end-run (web) and app-end-run (the app).
 //
-// 회차를 끝낼 때마다 씬 하나를 무작위로 골라 큐에 넣는다. 실제 생성은 워커가 한다.
-// **실패는 삼킨다** — 엔딩 종결/제출을 그림 때문에 막지 않는다(피드백 노트와 같은 원칙).
+// Each time a run ends, one scene is picked at random and queued. The worker does the actual generation.
+// **Failures are swallowed** - a picture must never block ending or submitting a run (the same principle as the feedback note).
 
 import WebAdventureSceneImage from '@/models/web-adventure-scene-image';
 import WebAdventureScene from '@/models/web-adventure-scene';
 import { buildScenePrompt, pickSceneForImage, type SceneLike } from './scene-image-prompt';
 
-/** 대기/처리 중이 이 수를 넘으면 skip — 느린 단일 워커 큐 폭주 방지(피드백 노트와 같은 값). */
+/** Skipped once queued and processing exceed this - preventing a flood on the slow single-worker queue (the same value as the feedback note). */
 export const MAX_PENDING_SCENE_IMAGES = 20;
 
 interface EnqueueOptions {
-  /** 씬 추첨용 난수. 테스트에서 주입한다. */
+  /** The randomness for drawing a scene. Injected in tests. */
   rand?: () => number;
 }
 

@@ -19,8 +19,8 @@ describe('parseImageCommand', () => {
   it('명령어가 아니면 null 반환', () => {
     expect(parseImageCommand('hello')).toBeNull();
     expect(parseImageCommand('@enji-bot 안녕')).toBeNull();
-    expect(parseImageCommand('/image')).toBeNull(); // prompt 없음
-    expect(parseImageCommand('/image   ')).toBeNull(); // 공백만
+    expect(parseImageCommand('/image')).toBeNull(); // no prompt
+    expect(parseImageCommand('/image   ')).toBeNull(); // whitespace only
   });
 
   it('대소문자 무관하게 /IMAGE, /Image 모두 인식', () => {
@@ -42,7 +42,7 @@ describe('buildPollinationsUrl', () => {
   it('한국어 prompt 도 정확히 URL encode 된다', () => {
     const url = buildPollinationsUrl('한국 마을 광장', {});
     expect(url).toContain(encodeURIComponent('한국 마을 광장'));
-    // 기본 width/height 가 들어 있어야 한다.
+    // the default width and height must be there.
     expect(url).toContain('width=1024');
     expect(url).toContain('height=1024');
   });
@@ -89,12 +89,12 @@ describe('generateImage', () => {
       endpoint: 'cdn.example.com',
     });
 
-    // fetch 가 Pollinations URL 로 호출되었는지
+    // whether fetch was called with the Pollinations URL
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const calledUrl = String(fetchMock.mock.calls[0][0]);
     expect(calledUrl).toMatch(/^https:\/\/gen\.pollinations\.ai\/image\/a%20cat/);
 
-    // putObject 가 올바른 인자로 호출
+    // putObject called with the right arguments
     expect(putObject).toHaveBeenCalledTimes(1);
     const [bucket, key, body, size, meta] = putObject.mock.calls[0];
     expect(bucket).toBe('public');
@@ -103,7 +103,7 @@ describe('generateImage', () => {
     expect(size).toBe(4);
     expect(meta).toEqual({ 'Content-Type': 'image/jpeg' });
 
-    // 결과
+    // the result
     expect(result.key).toMatch(/^enji-images\/.*\.jpg$/);
     expect(result.url).toBe(`https://cdn.example.com/public/${result.key}`);
   });

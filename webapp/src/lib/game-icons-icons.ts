@@ -1,13 +1,13 @@
-// 자동 생성된 game-icons.net 폰트 메타데이터 (seiyria/gameicons-font 빌드, CC BY 3.0)
-// 원본 카탈로그: https://game-icons.net (저작권자: 각 아이콘 페이지 참조).
-// 폰트 codepoint 는 BMP (U+0000~U+FFFF) 영역.
+// Auto-generated game-icons.net font metadata (from the seiyria/gameicons-font build, CC BY 3.0)
+// The original catalogue: https://game-icons.net (for copyright, see each icon's page).
+// The font's code points are in the BMP (U+0000-U+FFFF).
 //
-// 사용 예: <span className="game-icon">{String.fromCodePoint(0xF23C)}</span>
+// Usage: <span className="game-icon">{String.fromCodePoint(0xF23C)}</span>
 
 export interface GameIconsIcon {
-  /** kebab-case 아이콘 이름 (예: "broadsword") */
+  /** The kebab-case icon name ("broadsword", say) */
   name: string;
-  /** BMP 코드포인트 (10진수). 16진수는 toString(16) 으로 \u{XXXXX} 변환. */
+  /** The BMP code point (decimal). toString(16) converts it to the hex \u{XXXXX} form. */
   codepoint: number;
 }
 
@@ -4116,12 +4116,12 @@ export const GAME_ICONS: readonly GameIconsIcon[] = [
   { name: "zipper", codepoint: 0x0005 },
 ];
 
-/** 코드포인트를 게임 RON 호환의 `\u{XXXXX}` 리터럴로 포맷한다. */
+/** Formats a code point as the game's RON-compatible `\u{XXXXX}` literal. */
 export function formatGameIconCodepoint(cp: number): string {
   return `\\u{${cp.toString(16).toUpperCase()}}`;
 }
 
-/** RON 의 `\u{XXXXX}` 표기를 PUA 정수로 파싱한다. 실패 시 null. */
+/** Parses RON's `\u{XXXXX}` notation into a PUA integer. null on failure. */
 export function parseGameIconCodepoint(literal: string): number | null {
   const m = literal.match(/^\\u\{([0-9a-fA-F]+)\}$/);
   if (!m) return null;

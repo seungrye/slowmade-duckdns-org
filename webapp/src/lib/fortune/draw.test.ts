@@ -43,7 +43,7 @@ describe("drawDailyCard — 결정론적 하루 뽑기 (#388)", () => {
       const { cardId } = drawDailyCard(`spread${i}@x.com`, "2026-09-03");
       counts.set(cardId, (counts.get(cardId) ?? 0) + 1);
     }
-    // 780번 뽑아 최소 50종 이상은 나와야(완전 편향 아님)
+    // 780 draws should produce at least 50 distinct cards (so it is not wholly biased)
     expect(counts.size).toBeGreaterThan(50);
   });
 });

@@ -2,10 +2,10 @@ import crypto from 'crypto';
 import { env } from '@/lib/env';
 
 /**
- * `/image <prompt>` 명령어 파싱.
- * - 대소문자 무관 (`/IMAGE`, `/Image` 등 허용)
- * - 앞뒤 공백 허용
- * - prompt 가 비어 있으면 (또는 공백만) null
+ * Parses the `/image <prompt>` command.
+ * - case-insensitive (`/IMAGE`, `/Image` and so on)
+ * - surrounding whitespace allowed
+ * - null when the prompt is empty (or whitespace only)
  */
 export function parseImageCommand(input: string): { prompt: string } | null {
   if (!input) return null;
@@ -25,17 +25,17 @@ export interface PollinationsOptions {
 }
 
 /**
- * Pollinations.AI 이미지 GET URL 빌더.
- * - 기본 모델 `flux`, 기본 1024x1024, nologo=true
+ * Builds the Pollinations.AI image GET URL.
+ * - model `flux` and 1024x1024 by default, with nologo=true
  */
 export function buildPollinationsUrl(prompt: string, opts: PollinationsOptions): string {
   const width = opts.width ?? 1024;
   const height = opts.height ?? 1024;
   const model = opts.model ?? 'flux';
   const nologo = opts.nologo ?? true;
-  // encodeURIComponent 가 ' ' 을 '%20' 으로 변환하고 한국어/특수문자 안전.
-  // gen.pollinations.ai 가 새 표준 (API key 인증 지원). image.pollinations.ai 는 legacy 이며
-  // 익명 IP rate limit 에 걸려 402 반환.
+  // encodeURIComponent turns ' ' into '%20' and is safe for Korean and special characters.
+  // gen.pollinations.ai is the new standard (it supports API key auth). image.pollinations.ai is legacy and
+  // returns 402 once the anonymous IP rate limit is hit.
   const base = `https://gen.pollinations.ai/image/${encodeURIComponent(prompt)}`;
   const params = new URLSearchParams();
   params.set('width', String(width));
@@ -64,7 +64,7 @@ export interface GenerateImageOptions {
 }
 
 /**
- * Pollinations 에서 이미지를 받아 MinIO 에 업로드, public URL 반환.
+ * Fetches the image from Pollinations, uploads it to MinIO and returns the public URL.
  */
 export async function generateImage(
   prompt: string,

@@ -1,4 +1,4 @@
-// #250 — reducer 의 stigmaErosion 통합 단위 테스트.
+// #250 - integration unit tests for the reducer's stigmaErosion.
 
 import { describe, it, expect } from "vitest";
 import type { Character, GameState, Scene, SceneRegistry } from "@/types/web-adventure";
@@ -81,7 +81,7 @@ describe("reducer + stigma", () => {
   it("probability choice 의 stigmaDelta + 성공 시 stigmaDeltaOnSuccess 까지 적용", () => {
     const scenes = makeScenes();
     const state: GameState = { phase: "playing", character: makeChar(0), currentScene: "a", log: [] };
-    // rng 0.99 → 성공.
+    // rng 0.99 -> success.
     let next = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "magic", rng: () => 0.99 },
@@ -121,8 +121,8 @@ describe("reducer + stigma", () => {
       currentScene: "a",
       log: [],
     };
-    // c 로 가는 magic 실패 시 (rng 0.0) → choice stigma+5 (성공시 +2 안 적용)
-    // c 는 일반 씬. 99+5 = 104 → clamp 100 → 자동 petrification (c 가 isEnding 아님).
+    // When the magic leading to c fails (rng 0.0) -> the choice's stigma +5 (the +2 for success does not apply)
+    // c is an ordinary scene. 99 + 5 = 104 -> clamped to 100 -> automatic petrification (c is not isEnding).
     let next = gameReducer(
       state,
       { type: "MAKE_CHOICE", choiceId: "magic", rng: () => 0.0 },
@@ -156,11 +156,11 @@ describe("reducer + stigma", () => {
         ],
       },
     };
-    // stigma 50 + dex 10 → 디버프 -2 → effectiveDex 8.
-    // d20 + 8 vs 18 — d20 9 면 17 → 실패. d20 10 면 18 → 성공.
-    // rng 0.5 → d20 ≈ 11. effectiveDex 8 → 11+8 = 19 → 성공.
-    // 디버프 없으면 11+10 = 21 → 성공. 같음.
-    // 차이 검증 위해 더 엄격하게 — difficulty 21: dex 10+11=21 성공, debuff 후 8+11=19 실패.
+    // stigma 50 with dex 10 -> a -2 debuff -> effectiveDex 8.
+    // d20 + 8 against 18 - a d20 of 9 gives 17 and fails; a 10 gives 18 and succeeds.
+    // rng 0.5 -> d20 is about 11. With effectiveDex 8, 11 + 8 = 19 -> success.
+    // Without the debuff, 11 + 10 = 21 -> success. The same.
+    // To see the difference, something stricter - difficulty 21: dex 10 + 11 = 21 succeeds, 8 + 11 = 19 after the debuff fails.
     const scenesHard: SceneRegistry = {
       ...scenesWithCon,
       a: {
@@ -168,7 +168,7 @@ describe("reducer + stigma", () => {
         choices: [{ ...(scenesWithCon.a.choices[0] as { difficulty: number }), difficulty: 21 }] as Scene["choices"],
       },
     };
-    // stigma 0: 11+10=21 ≥ 21 → 성공 → b.
+    // stigma 0: 11 + 10 = 21 >= 21 -> success -> b.
     const noDebuff = gameReducer(
       { phase: "playing", character: makeChar(0), currentScene: "a", log: [] },
       { type: "MAKE_CHOICE", choiceId: "jump", rng: () => 0.5 },
@@ -177,7 +177,7 @@ describe("reducer + stigma", () => {
     expect(noDebuff.phase).toBe("playing");
     if (noDebuff.phase === "playing") expect(noDebuff.pendingRoll?.target).toBe("b");
 
-    // stigma 50: 11+8=19 < 21 → 실패 → c.
+    // stigma 50: 11 + 8 = 19 < 21 -> failure -> c.
     const debuff = gameReducer(
       { phase: "playing", character: makeChar(50), currentScene: "a", log: [] },
       { type: "MAKE_CHOICE", choiceId: "jump", rng: () => 0.5 },

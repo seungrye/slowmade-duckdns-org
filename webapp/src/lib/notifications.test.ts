@@ -1,10 +1,10 @@
-// 덧글 알림 (#237).
+// Comment notifications (#237).
 //
-// 내 글에 덧글이 달리거나 내 덧글에 답글이 달려도 알 방법이 없었다. AI 팀 스레드가 전부
-// 덧글로 오가면서 실질적으로 걸렸다.
+// There was no way to know when someone commented on my post or replied to my comment. It became a real problem once
+// the AI team thread ran entirely through comments.
 //
-// **쓸 때 만들지 않고 읽을 때 계산한다** — 덧글 생성 경로가 셋이라(comments·enji·
-// painter) 거기에 알림 생성을 심으면 네 번째가 생길 때 조용히 빠진다.
+// **Computed on read rather than created on write** - there are three comment-creation paths (comments, enji and
+// painter), and planting notification creation in them would silently miss the fourth one.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Types } from 'mongoose';
 
@@ -43,8 +43,8 @@ describe('notificationFilter — 무엇이 내게 온 것인가', () => {
     ]);
   });
 
-  // 내가 쓴 덧글이 내 알림으로 오면 안 된다.
-  // ($ne 는 null·필드없음까지 포함한다 — 실측 확인. 봇·익명 덧글은 그래서 걸린다.)
+  // A comment I wrote must not come back as my own notification.
+  // ($ne also covers null and a missing field - measured. That is how bot and anonymous comments still match.)
   it('내가 쓴 것은 제외한다', () => {
     expect(f().authorId).toEqual({ $ne: ME });
   });
@@ -59,7 +59,7 @@ describe('notificationFilter — 무엇이 내게 온 것인가', () => {
   });
 });
 
-/** mongoose 체인 목 */
+/** A mongoose chain mock */
 function chain(result: unknown) {
   const c: Record<string, unknown> = {};
   c.select = vi.fn(() => c);
@@ -77,7 +77,7 @@ describe('listNotifications', () => {
     mockUserFindOne.mockReturnValue(chain({ _id: ME, notificationsSeenAt: SEEN }));
     mockPostFind.mockReturnValue(chain([{ _id: POST_A, title: '내 글' }]));
     mockCommentCount.mockResolvedValue(1);
-    // find 는 '내 덧글' 조회용, 목록 행은 aggregate 가 준다 (#249 — 정렬을 DB 로 내렸다).
+    // find is for looking up 'my comments'; the list rows come from aggregate (#249 - the sort moved to the DB).
     mockCommentFind.mockReturnValue(chain([]));
     mockCommentAggregate.mockResolvedValue([
       {
@@ -106,7 +106,7 @@ describe('listNotifications', () => {
     expect(item.excerpt).toBe('스펙 초안입니다. 두 번째 줄');
   });
 
-  // 이 기능의 주 용도가 AI 답글을 아는 것이다.
+  // Knowing about AI replies is this feature's main purpose.
   it('봇 덧글을 봇으로 표시한다', async () => {
     const [item] = (await listNotifications('me@x.test')).items;
     expect(item.isBot).toBe(true);
@@ -128,7 +128,7 @@ describe('listNotifications', () => {
     expect(item.isUnread).toBe(false);
   });
 
-  // 한 번도 안 봤으면 전부 새 것이다.
+  // With nothing ever seen, everything is new.
   it('seenAt 이 없으면 모두 안 읽음', async () => {
     mockUserFindOne.mockReturnValue(chain({ _id: ME }));
     const [item] = (await listNotifications('me@x.test')).items;
@@ -141,10 +141,10 @@ describe('listNotifications', () => {
     expect(item.id).toBe('507f1f77bcf86cd799439055');
   });
 
-  // ── 눌러서 처리한 것은 읽음 (#247) ────────────────────────────────
+  // ── Tapped means read (#247) ────────────────────────────────
   //
-  // 예전엔 페이지를 여는 것만으로 전부 읽음이 됐다. 이제 기준선보다 새 것이라도
-  // 개별로 눌렀으면 읽음이다.
+  // Opening the page used to mark everything read. Now, even something newer than the baseline counts as read
+  // once it has been tapped individually.
   describe('개별 읽음 (#247)', () => {
     const ID = '507f1f77bcf86cd799439055';
 
@@ -164,7 +164,7 @@ describe('listNotifications', () => {
       expect(item.isUnread).toBe(true);
     });
 
-    // 뱃지가 목록 표식과 어긋나면 안 된다 — 누른 것은 세지 않는다.
+    // The badge must not disagree with the list's markers - what was tapped is not counted.
     it('안 읽은 수도 누른 것을 뺀다', async () => {
       mockUserFindOne.mockReturnValue(
         chain({ _id: ME, notificationsSeenAt: SEEN, notificationsReadIds: [ID] }),
@@ -187,8 +187,8 @@ describe('listNotifications', () => {
     });
   });
 
-  // 안 읽은 것을 위로 (#249). 순서 자체는 DB 가 정한다 — 여기서는 **그 일을 DB 에
-  // 시켰는지**만 본다. 파이프라인의 모양은 notification-read.test 가 검증한다.
+  // Unread first (#249). The DB decides the order itself - this only checks that **the work was handed to the DB**.
+  // The pipeline's shape is verified by notification-read.test.
   describe('안읽음 먼저 정렬 (#249)', () => {
     it('목록을 aggregate 로 가져온다 — 자르기 전에 정렬하려고', async () => {
       await listNotifications('me@x.test');

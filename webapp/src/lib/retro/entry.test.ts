@@ -34,7 +34,7 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
     expect(e.key).toBe('rom:653f1a2b3c4d5e6f70819202');
     expect(e.source).toBe('rom');
     expect(e.playHref).toBe('/games/retro/play/rom/653f1a2b3c4d5e6f70819202');
-    // 공개 /s3/ URL 을 쓰면 링크만으로 남이 받을 수 있다. 반드시 API 경유.
+    // A public /s3/ URL would let anyone with the link download it. It must go through the API.
     expect(e.romUrl).toBe('/api/games/retro/roms/653f1a2b3c4d5e6f70819202/file/653f1a2b3c4d5e6f70819202.sfc');
     expect(e.romUrl).not.toContain('/s3/');
   });
@@ -50,7 +50,7 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
     expect(romEntry(ROM).subtitle).toContain('MB');
   });
 
-  // #137 — EmulatorJS 는 URL 의 마지막 조각을 브라우저 캐시 키로 쓴다.
+  // #137 - EmulatorJS uses the last segment of the URL as the browser cache key.
   describe('롬 주소가 캐시 키를 가른다', () => {
     it('주소 끝이 롬마다 다르다 — 예전엔 모두 "file" 이라 겹쳤다', () => {
       const a = romEntry({ ...ROM, id: '653f1a2b3c4d5e6f70810001' });
@@ -65,7 +65,7 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
     });
   });
 
-  // #139 — 아케이드는 zip 이름이 곧 게임 이름이다. 바꾸면 코어가 못 찾는다.
+  // #139 - on arcade the zip's name is the game's name. Change it and the core cannot find it.
   describe('아케이드(FBNeo)', () => {
     it('원본 파일명을 그대로 주소에 쓴다', () => {
       const e = romEntry({ ...ROM, platform: 'arcade', filename: 'ssf2t.zip' });
@@ -85,8 +85,8 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
     });
   });
 
-  // #141 — 실제로 겪은 사고: 플레이 화면이 filename 을 안 넘겨 주소가 `<id>.zip` 이 됐고,
-  // 아케이드 코어가 롬셋을 못 알아봐 RetroArch 메뉴만 떴다.
+  // #141 - a real incident: the play screen did not pass filename, the address became `<id>.zip`, and the arcade
+  // core could not recognise the ROM set, so only the RetroArch menu appeared.
   describe('아케이드 롬 주소는 파일명을 잃으면 안 된다', () => {
     it('파일명을 주면 반드시 주소 끝에 실린다', () => {
       const e = romEntry({ ...ROM, platform: 'arcade', filename: 'ddsoma.zip' });
@@ -100,8 +100,8 @@ describe('retro/entry — 기본 제공 게임과 업로드 롬을 한 모양으
   });
 });
 
-// #137 이전에 올린 롬만 옛 이름(`file.srm`)의 세이브를 가질 수 있다 (#175).
-// 그 뒤에 올린 롬은 처음부터 새 주소로만 실행됐으니, 남의 세이브를 끌어갈 여지를 없앤다.
+// Only ROMs uploaded before #137 can have a save under the old name (`file.srm`) (#175).
+// Anything uploaded after ran on the new address from the start, so there is no room to pull in someone else's save.
 describe('romEntry — 옛 세이브 복원 대상 판별', () => {
   it('#137 배포 전에 올린 롬은 대상이다', () => {
     expect(romEntry({ ...ROM, createdAt: '2026-08-12T14:53:13.635Z' }).legacySave).toBe(true);

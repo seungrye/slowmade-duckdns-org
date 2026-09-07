@@ -8,7 +8,7 @@ vi.mock('@/auth', () => ({
 import { auth } from '@/auth';
 import { requireAuth } from './require-auth';
 
-// Auth.js v5의 auth는 오버로드 타입이므로 세션 반환 형태로 한정
+// Auth.js v5's auth is an overloaded type, so it is narrowed to the session-returning form
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 
 describe('requireAuth', () => {

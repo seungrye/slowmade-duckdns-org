@@ -1,4 +1,4 @@
-// #288 RESTORE 보정 — 옛 localStorage 데이터 (#258 이전) 호환.
+// #288 RESTORE corrections - compatibility with old localStorage data (from before #258).
 
 import { describe, it, expect } from "vitest";
 import type { Character, GameState, SceneRegistry } from "@/types/web-adventure";
@@ -38,9 +38,9 @@ describe("RESTORE 보정 (#288)", () => {
   });
 
   it("옛 데이터 — protagonist 누락 시 기본 'kael' 보정", () => {
-    // protagonist 가 undefined 인 옛 데이터 시뮬레이션.
+    // Simulating old data where protagonist is undefined.
     const oldChar = makeChar();
-    // @ts-expect-error 강제 옛 데이터 — 옛 localStorage 의 형태 흉내.
+    // @ts-expect-error forcing old data - mimicking the shape in old localStorage.
     delete oldChar.protagonist;
 
     const restored = gameReducer(
@@ -54,7 +54,7 @@ describe("RESTORE 보정 (#288)", () => {
 
   it("옛 데이터 — stigmaErosion 누락 시 기본 0 보정", () => {
     const oldChar = makeChar();
-    // @ts-expect-error 강제 옛 데이터.
+    // @ts-expect-error forcing old data.
     delete oldChar.stigmaErosion;
 
     const restored = gameReducer(

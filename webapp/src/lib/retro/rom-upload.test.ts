@@ -34,7 +34,7 @@ describe('retro/rom-upload', () => {
     });
 
     it('플랫폼을 직접 지정하면 확장자 추론보다 우선한다', () => {
-      // .bin 처럼 추론 못 하는 파일을 위해 필요하다.
+      // Needed for files that cannot be inferred, such as .bin.
       const r = validateRomUpload({ filename: 'game.bin', size: 1024, platform: 'arcade' });
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.platform).toBe('arcade');
@@ -62,7 +62,7 @@ describe('retro/rom-upload', () => {
       expect(validateRomUpload({ filename: 'a.sfc', size: MAX_ROM_BYTES + 1 }).ok).toBe(false);
     });
 
-    // #146 — nginx 의 location 값과 어긋나면 사용자에게 이유가 안 보이는 413 이 난다.
+    // #146 - out of step with nginx's location value it gives a 413 whose reason the user never sees.
     it('상한은 50MB 다 — nginx location 과 같은 값이어야 한다', () => {
       expect(MAX_ROM_BYTES).toBe(50 * 1024 * 1024);
     });

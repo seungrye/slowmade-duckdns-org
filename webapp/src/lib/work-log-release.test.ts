@@ -1,10 +1,10 @@
-// work_log 앱 배포 (#261) — 순수 부분.
+// work_log app distribution (#261) - the pure part.
 //
-// work_log 저장소는 **비공개**라 앱이 GitHub 릴리스 API 를 토큰 없이 못 부른다. APK 에
-// 저장소 읽기 토큰을 심는 건 위험하다(새면 소스 전체가 열린다). 그래서 사이트가 알려 준다.
+// The work_log repo is **private**, so the app cannot call GitHub's releases API without a token. Embedding a repo
+// read token in the APK is dangerous (a leak opens the whole source). So the site tells it instead.
 //
-// 여기서 보는 건 "무엇을 받아들일 것인가" 다. 라우트는 저장소·MinIO 를 만지므로
-// 판단만 떼어 두고 따로 본다.
+// What is checked here is "what to accept". The route touches the repo and MinIO, so the judgement is split out
+// and checked separately.
 import { describe, it, expect } from 'vitest';
 import { parseReleaseUpload, APK_MIME, MAX_APK_BYTES } from './work-log-release';
 
@@ -37,7 +37,7 @@ describe('parseReleaseUpload — 올라온 릴리스를 받아들일까', () => 
     expect(parseReleaseUpload({ versionCode: '3', versionName: '0.3' }, 10)?.notes).toBe('');
   });
 
-  // 실수로 엉뚱한 파일을 올려 앱이 못 쓰는 것을 받는 일이 없게.
+  // So an accidentally uploaded wrong file never has the app downloading something unusable.
   it('파일이 비었으면 거절', () => {
     expect(parseReleaseUpload(ok, 0)).toBeNull();
   });

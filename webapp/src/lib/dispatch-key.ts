@@ -1,20 +1,20 @@
 /**
- * 가상 키 입력 → 실제 `KeyboardEvent` dispatch 유틸.
+ * A utility that dispatches a virtual key press as a real `KeyboardEvent`.
  *
- * 사용처:
- *   - bevy-rogue WASM (winit) 게임용 모바일 가상 키패드.
- *   - 게임 코드 변경 없이 브라우저 KeyboardEvent 로만 입력 전달.
+ * Used by:
+ *   - the mobile virtual keypad for the bevy-rogue WASM (winit) game.
+ *   - passing input through browser KeyboardEvents alone, with no change to the game's code.
  *
- * 동작 원리:
- *   - winit-web 은 `code`/`keyCode` 로 입력을 매핑하므로 둘 다 채워서 dispatch.
- *   - 캔버스에 포커스가 가있지 않아도 `window` 에서 잡을 수 있도록
- *     `target.dispatchEvent` + `window.dispatchEvent` 양쪽으로 동일 이벤트를 발행.
- *   - keyCode 는 deprecated 지만 winit 의 일부 코드 경로에서 fallback 으로 쓰이므로 채운다.
+ * How it works:
+ *   - winit-web maps input by `code` and `keyCode`, so both are filled in before dispatching.
+ *   - So it can be caught on `window` even without the canvas focused, the same event is issued through both
+ *     `target.dispatchEvent` and `window.dispatchEvent`.
+ *   - keyCode is deprecated but is still a fallback on some winit code paths, so it is filled in.
  */
 
-/** 키 → `KeyboardEvent.code` 매핑. 가상 키패드에서 쓰는 키만 등록. */
+/** Key -> `KeyboardEvent.code`. Only the keys the virtual keypad uses are registered. */
 const CODE_MAP: Record<string, string> = {
-  // 알파벳
+  // letters
   w: "KeyW",
   a: "KeyA",
   s: "KeyS",
@@ -25,11 +25,11 @@ const CODE_MAP: Record<string, string> = {
   t: "KeyT",
   y: "KeyY",
   f: "KeyF",
-  // 숫자
+  // digits
   "1": "Digit1",
   "2": "Digit2",
   "3": "Digit3",
-  // 특수
+  // special
   " ": "Space",
   Enter: "Enter",
   Escape: "Escape",
@@ -41,7 +41,7 @@ const CODE_MAP: Record<string, string> = {
   F2: "F2",
 };
 
-/** 키 → `KeyboardEvent.keyCode` (deprecated, fallback). */
+/** Key -> `KeyboardEvent.keyCode` (deprecated, a fallback). */
 const KEYCODE_MAP: Record<string, number> = {
   w: 87,
   a: 65,
@@ -67,7 +67,7 @@ const KEYCODE_MAP: Record<string, number> = {
   F2: 113,
 };
 
-/** 키 → (code, keyCode) 한 번에 조회. 등록 안 된 키는 안전한 폴백 사용. */
+/** Key -> (code, keyCode) in one lookup. An unregistered key uses a safe fallback. */
 export function resolveKeyMeta(key: string): { code: string; keyCode: number } {
   const code = CODE_MAP[key] ?? key;
   const keyCode = KEYCODE_MAP[key] ?? 0;
@@ -75,17 +75,17 @@ export function resolveKeyMeta(key: string): { code: string; keyCode: number } {
 }
 
 /**
- * 합성 `KeyboardEvent` 를 적절한 타겟에 dispatch.
+ * Dispatches a synthetic `KeyboardEvent` to the right target.
  *
- * 동작:
- *   - target 이 있으면 target 에 `bubbles: true` 로 dispatch → DOM 트리를 타고
- *     document/window 까지 자연 버블링. winit-web 이 window/document 에 붙어 있어도 도달.
- *   - target 이 없으면 window 에 직접 dispatch.
+ * Behaviour:
+ *   - With a target, it dispatches there with `bubbles: true`, so it bubbles naturally up the DOM tree to
+ *     document and window. It reaches winit-web even when that listens on window or document.
+ *   - Without a target, it dispatches directly on window.
  *
- * 같은 이벤트가 두 번 들어가지 않도록 한 곳에만 발행하는 것이 핵심.
+ * The point is issuing it in one place only, so the same event never arrives twice.
  *
- * @param target 1차 대상 (보통 `<canvas>`). `null` 이면 window 에 직접 발행.
- * @param key `KeyboardEvent.key` 값 (예 "w", "ArrowUp", "Enter", " ").
+ * @param target the primary target (usually the `<canvas>`). `null` dispatches on window directly.
+ * @param key the `KeyboardEvent.key` value ("w", "ArrowUp", "Enter", " ").
  * @param type "keydown" | "keyup".
  */
 export function dispatchKey(
@@ -100,12 +100,12 @@ export function dispatchKey(
     bubbles: true,
     cancelable: true,
     composed: true,
-    // legacy fields — winit fallback 경로 대비.
+    // legacy fields - for winit's fallback path.
     keyCode,
     which: keyCode,
   };
   const ev = new KeyboardEvent(type, init);
-  // 일부 브라우저는 KeyboardEventInit 의 keyCode/which 를 무시 → defineProperty 로 강제.
+  // Some browsers ignore keyCode/which in KeyboardEventInit, so defineProperty forces them.
   try {
     Object.defineProperty(ev, "keyCode", { get: () => keyCode });
     Object.defineProperty(ev, "which", { get: () => keyCode });
@@ -114,16 +114,16 @@ export function dispatchKey(
   }
 
   if (target) {
-    // target → bubble → document → window 순으로 자연 전파.
+    // Propagates naturally: target -> bubble -> document -> window.
     target.dispatchEvent(ev);
   } else {
     window.dispatchEvent(ev);
   }
 }
 
-/** 토글류 키 — keydown → 짧은 지연 후 keyup 한 쌍. */
+/** Toggle-style keys - a keydown followed by a keyup after a short delay. */
 export function tapKey(target: HTMLElement | null, key: string): void {
   dispatchKey(target, key, "keydown");
-  // 같은 프레임 내 즉시 keyup. winit 은 down/up 시퀀스만 보면 동작.
+  // keyup immediately, in the same frame. winit only needs to see the down/up sequence.
   dispatchKey(target, key, "keyup");
 }

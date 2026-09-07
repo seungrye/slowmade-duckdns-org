@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { assetObjectKey } from './work-log-ink-assets';
 
-// 앱이 준 이름이 그대로 MinIO 키가 되면 `../` 로 남의 객체를 집을 수 있다 (#415).
-// APK 객체를 덮어쓰면 앱이 못 쓰는 것을 받아 설치하려 든다 — 값싼 검사로 막는다.
+// If the name the app sends became the MinIO key as is, `../` could reach someone else's object (#415).
+// Overwriting the APK object would have the app download and try to install something unusable - a cheap check blocks it.
 describe('assetObjectKey', () => {
   it('보통 이름을 자료 칸 아래 키로 바꾼다', () => {
     expect(assetObjectKey('ko_KR.zip')).toBe('work-log/ink-assets/ko_KR.zip');

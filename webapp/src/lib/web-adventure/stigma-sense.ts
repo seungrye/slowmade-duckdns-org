@@ -1,25 +1,25 @@
-// 침식을 몸으로 느끼게 하는 파생 변수 (#370).
+// Derived variables that make the contamination felt in the body (#370).
 //
-// 문제: 침식도(stigmaErosion)는 오르는데 **본문이 그걸 말하지 않는다**. 회차 피드백 노트가
-// 두 번 다른 회차에서 같은 지적을 했다 — "침식도가 100인데 그에 따른 물리적·심리적 영향이
-// 충분히 드러나지 않는다", "각 단계에서의 체감 변화를 구체적으로 묘사해야 한다".
+// The problem: the contamination (stigmaErosion) rises while **the body text never says so**. A run's feedback note
+// made the same point twice, in two different runs - "contamination is at 100 and its physical and psychological
+// effects are not shown enough", "the felt change at each stage should be described concretely".
 //
-// 해법: 본문에서 쓰는 `{{침식_손}}` 같은 변수를 **침식도에서 파생**한다. 작가는 문장 안에
-// 변수를 한 번 놓기만 하면, 같은 문장이 회차마다 다른 무게로 읽힌다.
+// The solution: variables used in the body, such as `{{침식_손}}`, are **derived from the contamination**. The author
+// places the variable in a sentence once, and the same sentence reads with a different weight each run.
 //
-//   "너는 문고리를 잡는다. {{침식_손}}"
-//     침식 0   → "손끝이 조금 시리다."
-//     침식 100 → "굳은 손가락이 접히지 않아, 손등으로 밀어 연다."
+//   "You take hold of the door handle. {{침식_손}}"
+//     contamination 0   -> "Your fingertips are a little cold."
+//     contamination 100 -> "Your stiffened fingers will not bend, so you push it open with the back of your hand."
 //
-// 감각을 손·시야·호흡·마음 넷으로 나눈 이유: 한 가지만 두면 씬마다 같은 문장이 반복돼
-// 금세 벽지처럼 읽힌다. 씬의 결에 맞는 감각을 골라 쓰라고 나눠 둔다.
+// Why the senses split into hand, sight, breath and mind: with only one, the same sentence repeats scene after scene
+// and soon reads like wallpaper. They are split so the sense that matches a scene's grain can be chosen.
 //
-// 렌더러는 손대지 않는다 — `parseScript(body, vars)` 에 넘길 vars 에 얹기만 한다.
+// The renderer is untouched - these are simply added to the vars passed to `parseScript(body, vars)`.
 
-/** 침식 단계 — 0(성한 몸)부터 4(거의 결정)까지. */
+/** The contamination stage - 0 (an unharmed body) to 4 (nearly crystalline). */
 export type StigmaTier = 0 | 1 | 2 | 3 | 4;
 
-/** 침식도 → 단계. 경계는 기존 침식 게이트(#368)가 쓰는 25 간격과 맞춘다. */
+/** Contamination -> stage. The boundaries match the 25-point spacing the existing contamination gates use (#368). */
 export function stigmaTier(erosion: number): StigmaTier {
   const e = Number.isFinite(erosion) ? erosion : 0;
   if (e >= 100) return 4;
@@ -29,9 +29,9 @@ export function stigmaTier(erosion: number): StigmaTier {
   return 0;
 }
 
-/** 단계별 감각. 낮은 쪽은 위화감, 높은 쪽은 통제 불능으로 간다. */
+/** The senses per stage. The low end is unease, the high end loss of control. */
 const SENSES: Record<string, [string, string, string, string, string]> = {
-  // 손 — 결정이 돋은 오른팔. 가장 자주 쓰는 감각이다.
+  // The hand - the crystallised right arm. The most frequently used sense.
   침식_손: [
     '손끝이 조금 시리다.',
     '손목의 결정이 스칠 때마다 잔가시처럼 걸린다.',
@@ -39,7 +39,7 @@ const SENSES: Record<string, [string, string, string, string, string]> = {
     '팔꿈치까지 굳어, 힘을 주면 살갗 아래에서 유리 갈리는 소리가 난다.',
     '굳은 손가락이 접히지 않는다. 손등으로 밀어야 한다.',
   ],
-  // 시야 — 침식이 눈에 닿기 시작하는 단계.
+  // Sight - the stage where the contamination begins to reach the eyes.
   침식_시야: [
     '가스등 불빛이 유난히 파랗게 번진다.',
     '눈꼬리에 푸른 잔상이 한 박자 늦게 따라붙는다.',
@@ -47,7 +47,7 @@ const SENSES: Record<string, [string, string, string, string, string]> = {
     '초점을 옮길 때마다 세상이 반 박자 늦게 따라온다.',
     '보이는 것의 절반이 푸른 결정 너머로 갈라져 보인다.',
   ],
-  // 호흡 — 몸 안쪽의 침식. 조용한 장면에 쓴다.
+  // Breath - the contamination inside the body. Used in quiet scenes.
   침식_숨: [
     '숨을 들이켤 때 쇳내가 옅게 섞인다.',
     '깊게 숨을 쉬면 갈비뼈 안쪽이 서늘하다.',
@@ -55,7 +55,7 @@ const SENSES: Record<string, [string, string, string, string, string]> = {
     '숨 끝마다 가슴 안쪽에서 얼음 밟는 소리가 난다.',
     '숨이 목 앞에서 얼어붙는다. 몸이 숨 쉬는 법을 잊어 간다.',
   ],
-  // 마음 — 심리적 압력. 결정 앞에서 쓴다.
+  // Mind - psychological pressure. Used before a decision.
   침식_마음: [
     '아직은 견딜 만하다고, 너는 생각한다.',
     '몸이 조금씩 남의 것이 되어 간다는 생각을 떨치기 어렵다.',
@@ -66,10 +66,10 @@ const SENSES: Record<string, [string, string, string, string, string]> = {
 };
 
 /**
- * 침식도에서 파생한 `{{변수}}` 값들.
+ * The `{{variable}}` values derived from the contamination.
  *
- * 작가가 놓은 변수만 쓰이므로, 여기 있는 것을 다 쓰지 않아도 된다.
- * 미정의 변수는 `interpolate` 가 원문을 그대로 두므로 오탈자가 감춰지지 않는다.
+ * Only the variables an author placed are used, so there is no need to use all of these.
+ * An undefined variable is left as its original by `interpolate`, so a typo is not hidden.
  */
 export function stigmaVars(erosion: number): Record<string, string> {
   const tier = stigmaTier(erosion);

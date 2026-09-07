@@ -46,8 +46,8 @@ describe('parseSpecialDays', () => {
   });
 
   it('공휴일 목록에 있어도 isHoliday=N 이면 기념일로 낮춘다', () => {
-    // 색 배지는 "쉬는 날"로 읽힌다. 안 쉬는 날이 섞이면 무게를 낮춰야 한다.
-    // (실측 2026 에서는 22건이 전부 Y 라 걸리지 않지만, 지정은 해마다 바뀐다.)
+    // A coloured badge reads as "a day off". If a working day is mixed in, the weight has to drop.
+    // (Measured in 2026 all 22 are Y, so it does not trigger - but designations change yearly.)
     const payload = envelope({
       item: [
         { dateName: '어떤국경일', isHoliday: 'N', locdate: 20260717 },
@@ -61,7 +61,7 @@ describe('parseSpecialDays', () => {
   });
 
   it('기념일·절기는 전부 isHoliday=N 이라 낮추지 않는다 — 낮추면 24절기가 통째로 기념일이 된다', () => {
-    // 실측(2026): getAnniversaryInfo 82건·get24DivisionsInfo 24건이 모두 isHoliday='N'.
+    // Measured (2026): all 82 from getAnniversaryInfo and 24 from get24DivisionsInfo have isHoliday='N'.
     const payload = envelope({
       item: [
         { dateName: '동지', isHoliday: 'N', locdate: 20261222 },

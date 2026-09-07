@@ -1,16 +1,16 @@
-// 씬 CMS 본문 탭 — [트리트먼트 | 기본 | 톨킨 풍 | + 문체추가] (#79).
+// The scene CMS's body tabs - [treatment | default | Tolkien style | + add a style] (#79).
 //
-// 씬 하나에 텍스트 묶음이 셋 있다:
-//   treatment  사건의 뼈대(집필용 정본). **화면에 절대 나가지 않는다.**
-//   body       기본 문체 본문. 변형이 없을 때의 폴백이기도 하다.
-//   variants   문체별 본문 { [voice]: string[] } — 자유 키라 작가를 늘려도 스키마를 안 고친다.
+// One scene has three bundles of text:
+//   treatment  the skeleton of the events (the canonical writing text). **It never reaches the screen.**
+//   body       the default-style body. It is also the fallback when there is no variant.
+//   variants   the per-style bodies { [voice]: string[] } - free-form keys, so adding an author needs no schema change.
 //
-// 읽기/쓰기 규칙만 순수 함수로 떼어 둔다. 폼은 이 함수들을 부르기만 하므로
-// 탭이 늘어나도 UI 코드를 고칠 일이 없다.
+// Only the read and write rules are split out as pure functions. The form just calls them, so
+// adding tabs never means touching the UI code.
 
-/** 트리트먼트 탭의 내부 키 — 문체 이름과 겹치지 않도록 콜론을 쓴다. */
+/** The treatment tab's internal key - it uses a colon so it cannot collide with a style name. */
 export const TREATMENT_TAB = ':treatment';
-/** 기본 본문 탭의 내부 키. */
+/** The default body tab's internal key. */
 export const BODY_TAB = ':body';
 
 export interface TabbedScene {
@@ -19,7 +19,7 @@ export interface TabbedScene {
   variants?: Record<string, string[]>;
 }
 
-/** 사람이 읽는 탭 이름. 모르는 문체는 키를 그대로 쓴다. */
+/** The human-readable tab name. An unknown style uses the key as is. */
 const LABELS: Record<string, string> = {
   [TREATMENT_TAB]: '트리트먼트',
   [BODY_TAB]: '기본',
@@ -32,22 +32,22 @@ export function tabLabel(tab: string): string {
 }
 
 /**
- * 보여 줄 탭 목록. 트리트먼트·기본이 앞, 문체가 이름순으로 뒤.
- * 값이 빈 변형도 탭으로 남긴다 — 작성 중인 문체가 사라지면 안 된다.
+ * The tabs to show. Treatment and default come first, then the styles by name.
+ * A variant with an empty value still gets a tab - a style being written must not disappear.
  */
 export function bodyTabs(scene: TabbedScene): string[] {
   const voices = Object.keys(scene.variants ?? {}).sort();
   return [TREATMENT_TAB, BODY_TAB, ...voices];
 }
 
-/** 그 탭이 담고 있는 문단 배열. 없으면 빈 배열. */
+/** The paragraph array that tab holds. An empty array when absent. */
 export function readTab(scene: TabbedScene, tab: string): string[] {
   if (tab === TREATMENT_TAB) return scene.treatment ?? [];
   if (tab === BODY_TAB) return scene.body ?? [];
   return scene.variants?.[tab] ?? [];
 }
 
-/** 그 탭만 갈아끼운 새 씬을 돌려준다(원본은 건드리지 않는다). */
+/** Returns a new scene with only that tab replaced (the original is untouched). */
 export function writeTab<T extends TabbedScene>(scene: T, tab: string, lines: string[]): T {
   if (tab === TREATMENT_TAB) return { ...scene, treatment: lines };
   if (tab === BODY_TAB) return { ...scene, body: lines };

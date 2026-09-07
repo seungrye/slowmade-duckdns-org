@@ -1,4 +1,4 @@
-// 여러 zip 을 올렸을 때 무엇이 게임(클론)이고 무엇이 부모인지 (#143).
+// Which of several uploaded zips is the game (the clone) and which is the parent (#143).
 import { describe, it, expect } from 'vitest';
 import { classifyRomSet } from './romset';
 
@@ -17,7 +17,7 @@ describe('classifyRomSet', () => {
   it('부모가 여럿이어도 된다 — 긴 것이 게임', () => {
     const r = classifyRomSet(['dd.zip', 'ddsom.zip', 'ddsoma.zip']);
     expect(r.game).toBe('ddsoma.zip');
-    // 병합은 **일반적인 것부터** 쌓아야 구체적인 것이 이긴다.
+    // Merging must stack **from the general upward** so the specific wins.
     expect(r.parents).toEqual(['dd.zip', 'ddsom.zip']);
   });
 
@@ -28,11 +28,11 @@ describe('classifyRomSet', () => {
     expect(r.ambiguous).toBe(false);
   });
 
-  // 규칙에 안 맞으면 조용히 찍지 않는다 — 리전이 엉뚱하게 잡히면 알아채기 어렵다.
+  // If the rule does not fit, nothing is guessed quietly - a wrongly chosen region is hard to notice.
   it('앞가지 관계가 아니면 ambiguous 로 표시한다', () => {
     const r = classifyRomSet(['ssf2t.zip', 'vsav.zip']);
     expect(r.ambiguous).toBe(true);
-    expect(r.game).toBeTruthy(); // 그래도 하나는 고른다(가장 긴 이름)
+    expect(r.game).toBeTruthy(); // it still picks one (the longest name)
   });
 
   it('대소문자·확장자를 가리지 않는다', () => {

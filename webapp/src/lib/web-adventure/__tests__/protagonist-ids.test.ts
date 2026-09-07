@@ -4,10 +4,10 @@ import { PROTAGONIST_ORDER, protagonists } from "@/content/web-adventure/protago
 import { PROTAGONISTS } from "@/lib/achievements/rules";
 
 /**
- * 주인공 목록이 어긋나면 여기서 깨진다 (#354).
+ * When the protagonist list drifts, this is what breaks (#354).
  *
- * 업적의 분모가 따로 적혀 있었다. #352 에서 엔딩이 정확히 이것 때문에 틀렸다 —
- * 「모든 엔딩」이 6종에서 열렸는데 실제로는 11종이었다.
+ * The achievements' denominator was written out separately. In #352 the endings went wrong for exactly this reason -
+ * "all endings" opened at 6 when there were really 11.
  */
 describe("주인공 목록 단일 출처 (#354)", () => {
   it("업적 분모가 실제 주인공 수와 같다", () => {

@@ -1,28 +1,28 @@
 import type { AchievementDefinition } from './types';
 
 /**
- * 업적 표 (#333) — **순수 데이터**. DB·네트워크를 모른다.
+ * The achievement table (#333) - **pure data**. It knows nothing of the DB or the network.
  *
- * ── 왜 개수 사다리만으로는 안 되나 ────────────────────────────────────
+ * ── Why a count ladder alone is not enough ────────────────────────────
  *
- * 개편 전엔 18개가 전부 "글 N개·덧글 N개"였다. 그러면 많이 쓰는 사람만 보상받고, **무엇을
- * 해 볼지는 알려주지 못한다.** 실제로 웹어드벤처를 405번 플레이했는데 업적이 하나도 없었다.
+ * Before the rework all 18 were "N posts, N comments". That rewards only people who write a lot, and **it never
+ * suggests what to try.** In practice someone played the web adventure 405 times with not one achievement.
  *
- * 그래서 결을 섞는다:
+ * So the kinds are mixed:
  *
- *   개수   꾸준함을 센다 (글·덧글·완주 횟수)
- *   품질   한 편이 얼마나 닿았나 (좋아요·조회)
- *   수집   세트를 채운다 (엔딩 6종·주인공 3종) — 다 채워야 열리는 게 요점
- *   시간   함께한 시간 (1·2주년)
- *   습관   리듬 (7일 연속·주말)
- *   탐험   기능을 얼마나 둘러봤나
- *   숨김   우연히 발견하는 것 (새벽 글·무결점 완주·생일 접속)
+ *   count       measures persistence (posts, comments, completions)
+ *   quality     how far one piece reached (likes, views)
+ *   collection  completing a set (6 endings, 3 protagonists) - the point is it opens only when full
+ *   time        time spent together (1st and 2nd anniversaries)
+ *   habit       rhythm (7 days running, weekends)
+ *   exploration how much of the site was tried
+ *   hidden      things found by accident (a small-hours post, a flawless run, a birthday visit)
  *
- * 포인트는 여기 직접 적는다. 예전엔 `ACHIEVEMENT_*_POINTS` env 18개였는데 값이 전부
- * 기본값과 같아 실질적으로 안 쓰이는 설정이었고, 업적을 40개로 늘리면 env 도 40개가 된다.
+ * Points are written here directly. There used to be 18 `ACHIEVEMENT_*_POINTS` env vars whose values all matched the
+ * defaults, making them settings nobody used - and growing to 40 achievements would mean 40 env vars.
  */
 export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
-  // ── 글 ──────────────────────────────────────────────────────────────
+  // ── Posts ──────────────────────────────────────────────────────────
   FIRST_POST: {
     key: 'FIRST_POST',
     name: '첫 글 작성',
@@ -80,7 +80,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'gold',
   },
 
-  // ── 덧글 ────────────────────────────────────────────────────────────
+  // ── Comments ───────────────────────────────────────────────────────
   FIRST_COMMENT: {
     key: 'FIRST_COMMENT',
     name: '첫 덧글',
@@ -138,7 +138,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'gold',
   },
 
-  // ── 글이 닿은 정도 ──────────────────────────────────────────────────
+  // ── How far a post reached ─────────────────────────────────────────
   POST_10_LIKES: {
     key: 'POST_10_LIKES',
     name: '인기 글',
@@ -172,7 +172,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'silver',
   },
 
-  // ── 웹어드벤처 ──────────────────────────────────────────────────────
+  // ── Web adventure ──────────────────────────────────────────────────
   WA_FIRST_RUN: {
     key: 'WA_FIRST_RUN',
     name: '첫 모험',
@@ -239,7 +239,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     hidden: true,
   },
 
-  // ── 레트로 ──────────────────────────────────────────────────────────
+  // ── Retro ──────────────────────────────────────────────────────────
   RETRO_FIRST_ROM: {
     key: 'RETRO_FIRST_ROM',
     name: '오락실 개장',
@@ -273,7 +273,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'silver',
   },
 
-  // ── 함께한 시간 ─────────────────────────────────────────────────────
+  // ── Time together ──────────────────────────────────────────────────
   ANNIVERSARY_1: {
     key: 'ANNIVERSARY_1',
     name: '한 해를 함께',
@@ -291,7 +291,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'gold',
   },
 
-  // ── 리듬 ────────────────────────────────────────────────────────────
+  // ── Rhythm ─────────────────────────────────────────────────────────
   STREAK_7: {
     key: 'STREAK_7',
     name: '이레 연속',
@@ -309,7 +309,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'bronze',
   },
 
-  // ── 탐험 ────────────────────────────────────────────────────────────
+  // ── Exploration ────────────────────────────────────────────────────
   EXPLORER_3: {
     key: 'EXPLORER_3',
     name: '둘러보는 사람',
@@ -327,7 +327,7 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     tier: 'gold',
   },
 
-  // ── 숨김 ────────────────────────────────────────────────────────────
+  // ── Hidden ─────────────────────────────────────────────────────────
   NIGHT_OWL: {
     key: 'NIGHT_OWL',
     name: '새벽의 기록',

@@ -1,6 +1,6 @@
-// Phoenix(복호화) 세트에 필요한 phoenix.key 를 채워 넣는다 (#153).
+// Filling in the phoenix.key that Phoenix (decrypted) sets require (#153).
 //
-// 배포되는 파일을 그대로 불러 검증한다 — player.js 가 import 하는 것과 같은 하나다.
+// It loads the deployed file as is - the very one player.js imports.
 import { describe, it, expect } from 'vitest';
 import {
   PHOENIX_KEY_NAME,
@@ -11,7 +11,7 @@ import {
 import { crc32, readZip, writeZip } from '../../../public/games/retro/rom-patch.js';
 
 describe('phoenixKeyBytes', () => {
-  // FBNeo 가 요구하는 값. CRC 로 못을 박아 둔다 — 틀리면 롬셋이 안 뜬다.
+  // The value FBNeo requires. Pinned by CRC - wrong, and the ROM set does not start.
   it('20바이트 0xFF 이고 CRC 가 0x2cf772b0 이다', () => {
     const k = phoenixKeyBytes();
     expect(k.length).toBe(20);
@@ -64,7 +64,7 @@ describe('ensurePhoenixKey', () => {
     expect(Array.from(byName['dd2.13m'])).toEqual(Array(16).fill(2));
   });
 
-  // 암호화 세트는 `ddsoma.key` 처럼 **제 이름의** 키를 요구한다. 아무 키나 있으면 손대지 않는다.
+  // An encrypted set requires a key of **its own name**, like `ddsoma.key`. With any key already present it is left alone.
   it('이미 .key 가 있으면 건드리지 않는다', async () => {
     const withKey = writeZip([
       { name: 'dd2a.03g', data: new Uint8Array(8) },
@@ -72,7 +72,7 @@ describe('ensurePhoenixKey', () => {
     ]);
     const out = await ensurePhoenixKey(withKey);
     expect(out.added).toBe(false);
-    expect(out.zip).toBe(withKey); // 같은 배열을 그대로 돌려준다 — 복사조차 안 한다
+    expect(out.zip).toBe(withKey); // the very same array is returned - not even copied
   });
 
   it('zip 이 아니면 그대로 돌려준다', async () => {
@@ -82,7 +82,7 @@ describe('ensurePhoenixKey', () => {
     expect(out.zip).toBe(notZip);
   });
 
-  // 실제 롬 zip 은 전부 deflate 다. 다시 묶으면 수십 MB 가 무압축으로 부풀므로 **덧붙인다**.
+  // Real ROM zips are all deflate. Repacking would inflate tens of MB uncompressed, so it **appends** instead.
   it('원본의 압축을 유지한다 — 다시 묶지 않는다', async () => {
     const raw = new Uint8Array(4096).map((_, i) => i & 0xff);
     const cs = new CompressionStream('deflate-raw');
@@ -95,7 +95,7 @@ describe('ensurePhoenixKey', () => {
     const out = await ensurePhoenixKey(packed);
 
     expect(out.added).toBe(true);
-    // 덧붙였으니 원본보다 딱 키 하나만큼만 커진다(무압축으로 부풀지 않는다).
+    // Appending grows it by exactly one key over the original (with no uncompressed bloat).
     expect(out.zip.length).toBeLessThan(packed.length + 300);
     const entries = await readZip(out.zip);
     expect(entries.find((e: { name: string }) => e.name === 'chip')!.data.length).toBe(4096);
