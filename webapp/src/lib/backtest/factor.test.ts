@@ -11,7 +11,7 @@ import {
 } from "./factor";
 import { computeMetrics } from "./metrics";
 
-// n 거래일의 날짜 배열(2020-01-01 부터). new Date(인자) 는 결정적이라 안전.
+// An array of n trading days' dates (from 2020-01-01). new Date(arg) is deterministic and so safe.
 function mkDates(n: number): string[] {
   return Array.from({ length: n }, (_, i) => new Date(2020, 0, 1 + i).toISOString().slice(0, 10));
 }
@@ -21,7 +21,7 @@ function ser(n: number, fn: (i: number) => number): (number | null)[] {
 
 const N = 40;
 const dates = mkDates(N);
-// 테스트용 작은 룩백 파라미터.
+// Small lookback parameters for the tests.
 const P: FactorParams = { quantile: 0.5, volLookback: 20, momLong: 20, momSkip: 3, revLookback: 5, minNames: 1 };
 
 describe("factor — 저변동성 선택", () => {
@@ -35,7 +35,7 @@ describe("factor — 저변동성 선택", () => {
     const sel = selectNames({ dates, closes }, "low_vol", N - 1, P);
     expect(sel).toContain("VOL0");
     expect(sel).toContain("VOL1");
-    expect(sel).not.toContain("VOL3"); // 최고변동은 제외
+    expect(sel).not.toContain("VOL3"); // the most volatile is excluded
   });
 });
 
@@ -78,7 +78,7 @@ describe("factor — 곡선/벤치마크/재기준", () => {
   it("runBuyHold(A) 는 A 의 상승률만큼 오른다", () => {
     const eq = runBuyHold(m, "A");
     expect(eq[0].equity).toBeCloseTo(1, 6);
-    expect(eq[N - 1].equity).toBeGreaterThan(1); // A 상승
+    expect(eq[N - 1].equity).toBeGreaterThan(1); // A rises
   });
 
   it("runEqualWeight 는 모든 상장 종목을 담아 곡선 생성", () => {
@@ -123,7 +123,7 @@ describe("factor — 원금/적립식(금액 시뮬)", () => {
   });
 
   it("원금 스케일은 수익률 지표(%)에 영향 없음(스케일 무관)", () => {
-    const eq1 = runEqualWeight(m); // 기본 principal=1
+    const eq1 = runEqualWeight(m); // principal defaults to 1
     const eqK = runEqualWeight(m, { principal: 10000, contribution: 0, startIdx: 0, endIdx: N - 1 });
     const c1 = computeMetrics(eq1, 1);
     const cK = computeMetrics(eqK, 10000);
@@ -139,7 +139,7 @@ describe("factor — 원금/적립식(금액 시뮬)", () => {
   });
 
   it("runFactorComparison 적립식: 곡선 시작=원금, totalContributed = 원금 + Σ적립", () => {
-    // 적립 횟수 = 창 내 '월초' 중 첫 배치 이후(= 서로 다른 달 수 − 1). 날짜에서 동적 산출(TZ 무관).
+    // Contributions = the month starts inside the window after the first placement (= distinct months - 1). Derived from the dates, so it is tz-independent.
     const months = new Set(dates.map((d) => d.slice(0, 7)));
     const contribCount = months.size - 1;
     const rows = runFactorComparison(m, { from: dates[0], to: dates[N - 1], params: P, principal: 1000, contribution: 100 });

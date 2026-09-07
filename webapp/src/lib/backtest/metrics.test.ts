@@ -11,7 +11,7 @@ describe("backtest metrics — computeMetrics", () => {
   });
 
   it("MDD = peak 대비 최저 낙폭(%)", () => {
-    // peak 100→120, 저점 60 → 60/120-1 = -50%
+    // peak 100 -> 120, trough 60 -> 60/120 - 1 = -50%
     const m = computeMetrics(curve([100, 120, 60, 90]), 100);
     expect(m.mdd).toBeCloseTo(-50, 6);
   });
@@ -37,7 +37,7 @@ describe("backtest metrics — computeMetrics", () => {
   it("Calmar = CAGR / |MDD|", () => {
     const eqs: number[] = Array.from({ length: 252 }, (_, i) => (i === 251 ? 200 : 100));
     const withDip: number[] = [...eqs];
-    withDip[100] = 50; // peak 100 대비 -50% 낙폭 주입
+    withDip[100] = 50; // inject a -50% drawdown from the peak of 100
     const m = computeMetrics(curve(withDip), 100);
     expect(m.mdd).toBeCloseTo(-50, 6);
     expect(m.calmar).toBeCloseTo(m.cagr / 50, 6);
@@ -45,7 +45,7 @@ describe("backtest metrics — computeMetrics", () => {
 
   it("Sharpe: 일간수익 변동 0이면 0, 꾸준한 상승이면 양수", () => {
     const flat = computeMetrics(curve([100, 100, 100, 100]), 100);
-    expect(flat.sharpe).toBe(0); // 수익 변동 없음
+    expect(flat.sharpe).toBe(0); // no change in returns
     const up = computeMetrics(curve([100, 101, 102, 103, 104]), 100);
     expect(up.sharpe).toBeGreaterThan(0);
   });
@@ -53,7 +53,7 @@ describe("backtest metrics — computeMetrics", () => {
 
 describe("computeMetrics — 적립식(TWR) 보정", () => {
   it("기여금 유입을 제거한 시간가중수익(TWR)으로 총수익·MDD 계산", () => {
-    // day0 100 → day1 110(+10%, 무입금) → day2 입금100 후 +10% = (110+100)*1.1 = 231
+    // day0 100 -> day1 110 (+10%, no deposit) -> day2, +10% after a 100 deposit = (110 + 100) * 1.1 = 231
     const c: EquityPoint[] = [
       { date: "2020-01-02", equity: 100 },
       { date: "2020-01-03", equity: 110 },
@@ -62,12 +62,12 @@ describe("computeMetrics — 적립식(TWR) 보정", () => {
     const m = computeMetrics(c, 100, [{ date: "2020-02-03", amount: 100 }]);
     expect(m.final).toBe(231);
     expect(m.totalContributed).toBe(200);
-    expect(m.totalReturnPct).toBeCloseTo(21, 6); // 1.1*1.1-1 (입금 자본은 수익에서 제외)
+    expect(m.totalReturnPct).toBeCloseTo(21, 6); // 1.1 * 1.1 - 1 (deposited capital is excluded from the return)
     expect(m.mdd).toBeCloseTo(0, 6);
   });
 
   it("입금으로 인한 상승은 수익 아님 — 입금 후 하락은 TWR 지수 기준 낙폭", () => {
-    // day1 입금100 후 하락: base 200 → equity 180 (-10%) → TWR index 0.9
+    // A fall after a 100 deposit on day1: base 200 -> equity 180 (-10%) -> TWR index 0.9
     const c: EquityPoint[] = [
       { date: "2020-01-02", equity: 100 },
       { date: "2020-02-02", equity: 180 },
@@ -84,7 +84,7 @@ describe("computeMetrics — 적립식(TWR) 보정", () => {
   });
 
   it("원금 0 + 적립식(순수 적립) 도 TWR 계산됨 (원금 0 이라고 0% 반환하면 버그)", () => {
-    // day0 자산 0(미투자) → day1 입금 100 → day2 +10% = 110
+    // day0 assets 0 (not invested) -> day1 a 100 deposit -> day2 +10% = 110
     const c: EquityPoint[] = [
       { date: "2020-01-02", equity: 0 },
       { date: "2020-02-03", equity: 100 },
@@ -93,10 +93,10 @@ describe("computeMetrics — 적립식(TWR) 보정", () => {
     const m = computeMetrics(c, 0, [{ date: "2020-02-03", amount: 100 }]);
     expect(m.final).toBe(110);
     expect(m.totalContributed).toBe(100);
-    expect(m.totalReturnPct).toBeCloseTo(10, 6); // 입금 자본 제거한 TWR = +10%
+    expect(m.totalReturnPct).toBeCloseTo(10, 6); // TWR with the deposited capital removed = +10%
   });
 
-  // 연환산 변동성 — 위험을 수익과 함께 봐야 "얼마나 흔들리며 벌었나" 를 알 수 있다.
+  // Annualised volatility - risk has to be read alongside return to know "how much shaking bought that".
   describe("연환산 변동성", () => {
     it("한 줄로 오르면 0 — 흔들림이 없다", () => {
       const m = computeMetrics(curve([100, 110, 121, 133.1]), 100);
@@ -104,7 +104,7 @@ describe("computeMetrics — 적립식(TWR) 보정", () => {
     });
 
     it("일간 표준편차 × √252 (%)", () => {
-      // 하루 +10%, 하루 -10% 를 번갈아 — 일간수익 {0.1, -0.1, 0.1, ...}
+      // Alternating +10% and -10% days - daily returns {0.1, -0.1, 0.1, ...}
       const eqs = [100];
       for (let i = 1; i <= 8; i++) eqs.push(i % 2 === 1 ? eqs[i - 1] * 1.1 : eqs[i - 1] * 0.9);
       const m = computeMetrics(curve(eqs), 100);
@@ -132,7 +132,7 @@ describe("computeMetrics — 적립식(TWR) 보정", () => {
     });
 
     it("적립식이면 TWR 기준 — 입금이 변동성으로 잡히지 않는다", () => {
-      // 자산이 100→200 으로 뛰어도 그게 전부 입금이면 흔들린 것이 아니다.
+      // Assets jumping 100 -> 200 is not volatility if all of it was a deposit.
       const m = computeMetrics(
         curve([100, 200, 200]),
         100,

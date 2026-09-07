@@ -7,7 +7,7 @@ const cfg: InfiniteConfig = { principal: 4000, splits: 40, takeProfitPct: 0.1, l
 
 describe("infinite-buying generate", () => {
   it("1회차: 하루예산으로 2주 이상이면 시장가 매수", () => {
-    // price 40, budget 100 → floor(100/40)=2주
+    // price 40, budget 100 -> floor(100/40) = 2 shares
     const state: MarketState = { price: 40, holdingQty: 0, avgPrice: 0, roundNo: 0 };
     const sigs = generate(state, cfg);
     expect(sigs).toHaveLength(1);
@@ -15,7 +15,7 @@ describe("infinite-buying generate", () => {
   });
 
   it("1회차: 하루예산으로 2주 미만이면 매수 안 함", () => {
-    // price 60, budget 100 → floor(100/60)=1주 < 2
+    // price 60, budget 100 -> floor(100/60) = 1 share < 2
     const state: MarketState = { price: 60, holdingQty: 0, avgPrice: 0, roundNo: 0 };
     expect(generate(state, cfg)).toHaveLength(0);
   });
@@ -31,7 +31,7 @@ describe("infinite-buying generate", () => {
     const state: MarketState = { price: 40, holdingQty: 2, avgPrice: 40, roundNo: 1 };
     const buys = generate(state, cfg).filter((s) => s.side === "buy" && s.ordType === "loc");
     expect(buys).toHaveLength(2);
-    expect(buys[0]).toMatchObject({ qty: 1, price: 40, ordType: "loc" }); // 평단 LOC
+    expect(buys[0]).toMatchObject({ qty: 1, price: 40, ordType: "loc" }); // the average-price LOC
     expect(buys[1]).toMatchObject({ qty: 1, price: 44.8, ordType: "loc" }); // 40×1.12=44.8
   });
 

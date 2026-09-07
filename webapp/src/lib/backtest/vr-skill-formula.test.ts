@@ -5,16 +5,16 @@ import {
 import type { ValueRebalancingConfig } from "./types";
 
 /**
- * 실력공식 — 2025 VR 강의 정리 문서의 중계표를 재현한다 (#358).
+ * The skill formula - reproducing the relay tables in the 2025 VR lecture write-up (#358).
  *
- * 여태 구현은 기본공식(`V₁ + Pool/G + CF`)뿐이었고, 주석이 스스로 "실력공식은 수식
- * 미공개라 자리만 예약" 이라 적어 두고 있었다. 문서가 그 수식을 준다.
+ * The implementation only ever had the basic formula (`V1 + Pool/G + CF`), and its own comment said the skill
+ * formula's equation was undocumented and only a placeholder was reserved. The document gives that equation.
  *
- *   V₂ = V₁ + Pool/G + (E − V₁)/(2√G) ± 적립금      (E = 사이클 종료 시 주식 평가금)
+ *   V2 = V1 + Pool/G + (E - V1)/(2 sqrt(G)) +/- the contribution      (E = the stock valuation at the cycle's end)
  *
- * 보정항은 **목표선 V 를 실제 평가금 쪽으로 끌어당긴다.** 하락장에선 V 를 덜 올려 덜 사고
- * (Pool 보존), 상승장에선 더 올려 덜 판다. 기본공식은 시장과 무관하게 V 가 기계적으로
- * 올라가서, 긴 하락장이면 Pool 을 다 태우고 V 가 멈추는 존버모드에 빠진다.
+ * The correction term **pulls the target path V toward the actual valuation.** In a decline it raises V less, so it
+ * buys less and preserves the Pool; in a rise it raises V more, so it sells less. The basic formula raises V
+ * mechanically regardless of the market, so a long decline burns through the Pool and V stalls - the hold-on mode.
  */
 const 중계표 = [
   { 이름: "6기 1주차",  V1: 54.14,   pool: 45.86,  G: 10, E: 54.14,   cf: 100, V2: 158.73,  lo: 134.92,  hi: 182.54 },
@@ -34,7 +34,7 @@ describe("실력공식이 문서 중계표를 재현한다 (#358)", () => {
   });
 
   it("기본공식은 평가금이 목표와 다른 주차를 못 맞춘다", () => {
-    // E = V₁ 인 1주차만 우연히 맞는다. 그래서 여태 안 드러났다.
+    // Only week 1, where E = V1, happens to match. That is why this went unnoticed.
     expect(updateVBasic(54.14, 45.86, 10, 100)).toBeCloseTo(158.73, 1);
     expect(Math.abs(updateVBasic(1897.59, 275.79, 10, 100) - 2009.15)).toBeGreaterThan(15);
   });
@@ -43,7 +43,7 @@ describe("실력공식이 문서 중계표를 재현한다 (#358)", () => {
 describe("보정항의 방향 (#358)", () => {
   it("평가금이 목표보다 낮으면 V 를 덜 올린다 — 하락장에서 Pool 을 아낀다", () => {
     const 기본 = updateVBasic(1000, 200, 10, 0);
-    const 실력 = updateVSkill(1000, 200, 10, 0, 600); // 평가금이 목표보다 400 낮다
+    const 실력 = updateVSkill(1000, 200, 10, 0, 600); // the valuation is 400 below the target
     expect(실력).toBeLessThan(기본);
   });
 
@@ -78,7 +78,7 @@ describe("설정 (#358)", () => {
 
   it("사이클 경계가 평가금을 반영한다", () => {
     const st = { ...seedVR(CFG, 100), V: 1000, pool: 200, qty: 6 };
-    // 평가금 = 6주 × 100 = 600 < V(1000) → 실력공식은 기본보다 V 를 낮게 잡는다.
+    // valuation = 6 shares x 100 = 600 < V (1000) -> the skill formula sets V lower than the basic one.
     const 실력 = advanceCycleVR(st, CFG, 100);
     const 기본 = advanceCycleVR(st, { ...CFG, formula: "basic" }, 100);
     expect(실력.V).toBeLessThan(기본.V);

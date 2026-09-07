@@ -1,35 +1,34 @@
-// 백테스트 성과 지표 — equityCurve(총자산/평가 시계열)에서 순수 계산.
-// site/파이썬 어디에도 CAGR/Sharpe/Calmar 계산이 없어 신설(현재 클라이언트는 MDD·누적수익률만 인라인).
-// 전략 비교(예: 로테이션 일시금 vs 분할매수)에서 수익·방어·위험조정을 한 번에 대조하기 위한 헬퍼.
+// Backtest performance metrics - computed purely from equityCurve (the total-assets time series).
+// Neither the site nor Python had CAGR/Sharpe/Calmar, so this is new (the client currently inlines only MDD and cumulative return).
+// A helper for comparing return, defence and risk-adjustment at once across strategies (rotation lump sum versus accumulating, say).
 
 import type { EquityPoint } from "./types";
 
 export interface BacktestMetrics {
-  final: number; // 최종 자산
-  totalReturnPct: number; // 누적수익률 % (적립식이면 TWR, 아니면 최종/원금 − 1)
-  cagr: number; // 연평균 복리수익률 % (거래일 252 기준, 적립식이면 TWR 기준)
-  mdd: number; // 최대낙폭 % (음수, peak 대비 최저; 적립식이면 TWR 지수 기준)
-  calmar: number; // cagr / |mdd| (방어 대비 수익)
-  sharpe: number; // 일간수익 기반 연율화 샤프(무위험 0)
+  final: number; // final assets
+  totalReturnPct: number; // cumulative return % (TWR when accumulating, otherwise final / principal - 1)
+  cagr: number; // compound annual growth rate % (252 trading days; TWR-based when accumulating)
+  mdd: number; // maximum drawdown % (negative, the trough against the peak; against the TWR index when accumulating)
+  calmar: number; // cagr / |mdd| (return against defence)
+  sharpe: number; // annualised Sharpe from daily returns (risk-free 0)
   /**
-   * 연환산 변동성 % — 일간수익률 표준편차 × √252.
+   * Annualised volatility % - the standard deviation of daily returns x sqrt(252).
    *
-   * 수익만 보면 "얼마나 흔들리며 벌었나" 를 알 수 없다. 같은 CAGR 이라도 변동성이 두 배면
-   * 실제로 들고 있기가 훨씬 어렵다. Sharpe 는 둘을 한 숫자로 눌러 버리므로, 위험 자체를
-   * 따로 보여 준다. 늘 0 이상이다.
+   * Return alone cannot say "how much shaking bought that". At the same CAGR, twice the volatility is far harder to
+   * actually hold. Sharpe crushes the two into one number, so risk is shown on its own. Always 0 or more.
    */
   volatility: number;
-  totalContributed?: number; // 적립식: 초기원금 + Σ입금 (수익률 분모와 별개로 참고 표시)
+  totalContributed?: number; // accumulating: initial principal + total deposits (shown for reference, separate from the return's denominator)
 }
 
 const TRADING_DAYS = 252;
 
-/** equityCurve + 원금 → 성과 지표. 곡선이 비면 0 지표. 순수 함수(테스트 가능).
+/** equityCurve plus the principal -> performance metrics. An empty curve gives zeroes. A pure function (testable).
  *
- *  contributions(적립식 입금 내역)를 주면 유입 자본을 수익에서 제거한 **시간가중수익률(TWR)** 로
- *  총수익·CAGR·MDD·Sharpe 를 계산한다(입금으로 늘어난 자산을 '수익'으로 오인하지 않도록). 지수는
- *  1 에서 시작해 일별 순수익률 (1+r_i) 를 누적곱하며, 입금일의 수익률은 equity_i/(equity_{i-1}+flow_i)−1.
- *  contributions 미지정/빈배열이면 기존(목돈 단일 투입) 계산과 동일. */
+ *  Given contributions (the accumulating deposit schedule), total return, CAGR, MDD and Sharpe are computed as a
+ *  **time-weighted return (TWR)** with the inflowing capital removed (so assets grown by a deposit are not mistaken
+ *  for return). The index starts at 1 and compounds the daily net returns (1 + r_i); on a deposit day the return is
+ *  equity_i / (equity_{i-1} + flow_i) - 1. With contributions absent or empty it matches the original (lump-sum) calculation. */
 export function computeMetrics(
   equityCurve: EquityPoint[],
   principal: number,
@@ -37,8 +36,8 @@ export function computeMetrics(
 ): BacktestMetrics {
   const n = equityCurve.length;
   const hasContrib = !!contributions && contributions.length > 0;
-  // 곡선이 비었거나, 목돈 원금 ≤0 이고 적립도 없으면(자본 없음) 0 지표. 적립식(순수 적립, 원금 0)은
-  // TWR 지수(1 시작, 원금 불필요)로 계산 가능하므로 여기서 걸러 0 을 반환하면 안 된다.
+  // An empty curve, or a lump-sum principal <= 0 with no contributions (no capital), gives zeroes. Pure accumulation
+  // (principal 0) can still be computed from the TWR index (which starts at 1 and needs no principal), so it must not be filtered out here.
   if (n === 0 || (principal <= 0 && !hasContrib)) {
     return { final: n ? equityCurve[n - 1].equity : principal, totalReturnPct: 0, cagr: 0, mdd: 0, calmar: 0, sharpe: 0, volatility: 0 };
   }
@@ -49,7 +48,7 @@ export function computeMetrics(
     ? principal + contributions!.reduce((s, c) => s + c.amount, 0)
     : undefined;
 
-  // 일간 순수익률 — 입금일은 유입액을 base 에 더해 수익에서 제외(TWR).
+  // Daily net returns - on a deposit day the inflow is added to the base and excluded from the return (TWR).
   const rets: number[] = [];
   for (let i = 1; i < n; i++) {
     const flow = hasContrib ? (flowByDate.get(equityCurve[i].date) ?? 0) : 0;
@@ -57,7 +56,7 @@ export function computeMetrics(
     if (base > 0) rets.push(equityCurve[i].equity / base - 1);
   }
 
-  // 평가 지수 — 목돈이면 equity 그대로, 적립식이면 1 시작 TWR 누적곱 곡선.
+  // The valuation index - equity itself for a lump sum, or a TWR curve starting at 1 when accumulating.
   const idx: number[] = new Array(n);
   if (!hasContrib) {
     for (let i = 0; i < n; i++) idx[i] = equityCurve[i].equity;
@@ -74,7 +73,7 @@ export function computeMetrics(
 
   const totalReturnPct = (idxEnd / idxStart - 1) * 100;
 
-  // MDD — 지수 곡선의 peak 대비 최저 낙폭(%)
+  // MDD - the deepest drawdown (%) from the index curve's peak
   let peak = -Infinity;
   let mddFrac = 0;
   for (const v of idx) {
@@ -83,12 +82,12 @@ export function computeMetrics(
   }
   const mdd = mddFrac * 100;
 
-  // CAGR — 거래일 수 → 연수 환산 (지수 기준)
+  // CAGR - trading days converted to years (against the index)
   const years = n / TRADING_DAYS;
   const cagr = years > 0 && idxEnd > 0 ? (Math.pow(idxEnd / idxStart, 1 / years) - 1) * 100 : 0;
 
-  // Sharpe·변동성 — 둘 다 일간수익률의 표준편차에서 나오므로 한 번만 잰다.
-  // 표본이 하루치뿐이면(rets.length <= 1) 표준편차를 낼 수 없어 0 으로 둔다.
+  // Sharpe and volatility - both come from the standard deviation of daily returns, so it is measured once.
+  // With only one day of samples (rets.length <= 1) no standard deviation exists, so it is left at 0.
   let sharpe = 0;
   let volatility = 0;
   if (rets.length > 1) {

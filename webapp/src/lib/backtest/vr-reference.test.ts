@@ -5,37 +5,36 @@ import tqqq from "./__fixtures__/tqqq-2011-2020.json";
 import type { Bar } from "./types";
 
 /**
- * 원문 백테스트 재현 (#345).
+ * Reproducing the source's backtest (#345).
  *
- * 라오어 「VR 5.0 상승률 수치별 비교 백테스트」의 표를 우리 구현이 재현하는지 본다.
- * 조건: **거치식** · TQQQ · 2011~2020 · 밴드 ±15% · **기본공식**
- * (원문 "이 수치는 모두 거치식VR 기준". 공식은 #358 참조 — 이 표는 5.0 시절 것이다).
+ * It checks our implementation against the table in Laoer's "VR 5.0 growth-rate comparison backtest".
+ * Conditions: **lump sum**, TQQQ, 2011-2020, band +/-15%, **the basic formula**
+ * (the source says "these figures are all lump-sum VR"; on the formula see #358 - this table is from the 5.0 era).
  *
- * ⚠️ **이 일치는 "공식이 맞다"의 증명이 아니다.** 실제로 측정해 보니 우리 G=10 결과는 원문
- * G=20 쪽에 더 가깝다(아래 "G 를 가려내지는 못한다" 참조) — 값이 근처에 있을 뿐, G 를
- * 구분할 만큼 정밀하지 않다. 과신하지 말 것.
+ * **This agreement is not proof the formula is right.** Measured, our G = 10 result sits closer to the source's
+ * G = 20 (see "it cannot tell G apart" below) - the values are merely nearby, not precise enough to distinguish G.
+ * Do not over-trust it.
  *
- * 그래도 남겨 두는 이유는, 공식을 건드리면 **눈에 띄게** 벗어나기 때문이다. 측정:
- *   Pool/G 항 제거(G→∞)  CAGR 47.4% → 19.3%,  P/V 0.15 → 2.42
- *   G=1 (Pool 전액)       CAGR 47.4% → 50.3%,  P/V 0.15 → 0.02
- * 반면 원문 미규정 파라미터(초기 주식:Pool)를 50:50~100:0 으로 흔들어도 0.16%p 뿐이다.
- * 즉 **결과를 지배하는 것은 공식이지 자유 파라미터가 아니다.**
+ * It is kept because touching the formula pushes it **visibly** off. Measured:
+ *   removing the Pool/G term (G -> infinity)  CAGR 47.4% -> 19.3%,  P/V 0.15 -> 2.42
+ *   G = 1 (the whole Pool)                    CAGR 47.4% -> 50.3%,  P/V 0.15 -> 0.02
+ * Whereas swinging a parameter the source leaves open (the initial stock:Pool) from 50:50 to 100:0 moves it 0.16pp.
+ * In other words, **the formula dominates the result, not the free parameters.**
  *
- * ── 왜 오차를 허용하나 ──────────────────────────────────────────────────
+ * ── Why an error band is allowed ──────────────────────────────────────────
  *
- * 원문은 **1주씩 지정가 사다리**로 장중 체결하는데(원문 3장 매수표), 우리 백테스트는 종가에
- * 한 번에 체결한다. 그래서 매수가 더 비싸고 매도가 더 싸다 → Pool 을 더 쓴다 → P/V 가 낮다
- * → 상승률이 작다 → 수익↓·낙폭↑. **네 지표가 전부 이 한 가지로 설명되고 방향도 일관된다.**
+ * The source fills intraday through a **one-share limit ladder** (its chapter 3 buy table), while our backtest fills
+ * once at the close. So we buy dearer and sell cheaper -> we spend more Pool -> P/V is lower -> the growth rate is
+ * smaller -> lower return, deeper drawdown. **All four metrics follow from that one thing, consistently.**
  *
- * 즉 우리 백테스트는 **일관되게 보수적으로 과소평가**한다. 사다리를 구현하면 좁혀질 것이다.
- * 그때까지 이 오차 범위가 "설명 가능한 크기" 안에 있는지를 지킨다 — 갑자기 벌어지면 수식이
- * 어딘가 틀어진 것이다.
+ * That is, our backtest **understates consistently and conservatively**. Implementing the ladder should narrow it.
+ * Until then this guards that the gap stays within an explainable size - a sudden widening means the maths slipped.
  *
- * ── 하면 안 되는 것 ────────────────────────────────────────────────────
+ * ── What must not be done ────────────────────────────────────────────────
  *
- * 사이클을 10일 대신 **5일**로 두면 CAGR 49.25% 로 원문(49.47%)에 0.22%p 까지 붙는다.
- * 그렇게 맞추면 안 된다 — 원문은 분명히 "2주"이고, 5일이 잘 맞는 것은 **체결모델의 불리함과
- * 우연히 상쇄**되기 때문이다. 숫자를 맞추려고 규격을 비트는 순간 이 테스트는 뜻을 잃는다.
+ * Setting the cycle to **5 days** instead of 10 brings CAGR to 49.25%, within 0.22pp of the source's 49.47%.
+ * Do not tune it that way - the source clearly says "two weeks", and 5 days fits only because it **happens to cancel
+ * out the fill model's disadvantage**. Bending the spec to match a number empties this test of meaning.
  */
 
 const bars: Bar[] = (tqqq.dates as string[]).map((date, i) => {
@@ -43,7 +42,7 @@ const bars: Bar[] = (tqqq.dates as string[]).map((date, i) => {
   return { date, open: close, high: close, low: close, close };
 });
 
-// 원문 표 (거치식·TQQQ·2011~2020·±15%)
+// The source's table (lump sum, TQQQ, 2011-2020, +/-15%)
 const 원문 = [
   { G: 10, cagr: 49.47, mdd: -58.41, pv: 0.1521 },
   { G: 20, cagr: 46.16, mdd: -55.72, pv: 0.2725 },
@@ -57,18 +56,18 @@ function run(G: number) {
   const r = runValueRebalancingBacktest({ ticker: "TQQQ", bars }, {
     principal: PRINCIPAL, gradient: G, bandPct: 0.15, poolLimitPct: 0.5,
     cycleDays: 10, initStockRatio: 0.85,
-    // **기본공식으로 고정한다** (#358). 이 표는 VR 5.0 시절 문서의 것이고, 실력공식
-    // 수식은 2025 강의 정리에서야 나왔다. 기본값(실력)으로 돌리면 서로 다른 공식의
-    // 결과를 비교하게 돼 이 재현의 뜻이 사라진다.
+    // **Pinned to the basic formula** (#358). This table is from the VR 5.0-era document, and the skill formula's
+    // equation only appeared in the 2025 lecture write-up. Running the default (skill) would compare results from two
+    // different formulas and empty this reproduction of meaning.
     //
-    // 실제로 실력공식으로 돌리면 CAGR 은 원문에 **가까워지고**(47.41→48.78, 원문 49.47)
-    // MDD 는 **멀어진다**(−61.17→−63.46, 원문 −58.41). 5.0 표가 어느 공식으로 만들어진
-    // 것인지 문서에 없어서 이 어긋남을 어느 쪽 탓으로도 돌릴 수 없다 — 사다리 미구현이
-    // 겹쳐 있기도 하다(#345). 그래서 여기서는 판단하지 않고 조건만 맞춘다.
+    // Run with the skill formula, CAGR actually gets **closer** to the source (47.41 -> 48.78 against 49.47) while MDD
+    // gets **further** (-61.17 -> -63.46 against -58.41). The document never says which formula built the 5.0 table, so
+    // the discrepancy cannot be blamed on either - and the missing ladder is tangled up in it too (#345). So no
+    // judgement is made here; only the conditions are matched.
     formula: "basic",
   });
   const m = computeMetrics(r.equityCurve, PRINCIPAL);
-  // P/V = Pool / V. equity = 주식 + Pool, vrBand.stock = 주식.
+  // P/V = Pool / V. equity = stock + Pool, and vrBand.stock is the stock.
   const pv = r.vrBand!.map((b, i) => (b.v > 0 ? (r.equityCurve[i].equity - b.stock) / b.v : 0));
   return { ...m, pv: pv.reduce((s, v) => s + v, 0) / pv.length };
 }
@@ -77,21 +76,21 @@ describe("원문 백테스트 재현 — 거치식 TQQQ 2011~2020", () => {
   it("데이터가 원문과 같다 — TQQQ 올인 MDD −69.92%", () => {
     const 올인 = computeMetrics(
       bars.map((b) => ({ date: b.date, equity: (PRINCIPAL / bars[0].close) * b.close })), PRINCIPAL);
-    // 이게 안 맞으면 종목·기간·분할조정이 원문과 다른 것이라 아래 비교가 무의미해진다.
+    // If this does not match, the symbol, period or split adjustment differs from the source and the comparisons below are meaningless.
     expect(올인.mdd).toBeCloseTo(-69.92, 1);
     expect(올인.cagr).toBeCloseTo(49.68, 0);
   });
 
   it.each(원문)("G=$G — CAGR·MDD·P/V 가 원문 근처", ({ G, cagr, mdd, pv }) => {
     const got = run(G);
-    // 사다리 미구현으로 우리가 낮다. 3%p 이상 벌어지면 다른 원인이 생긴 것이다.
+    // We come in lower because the ladder is not implemented. A gap of 3pp or more means something else has changed.
     expect(Math.abs(got.cagr - cagr), `CAGR ${got.cagr.toFixed(2)} vs ${cagr}`).toBeLessThan(3);
     expect(Math.abs(got.mdd - mdd), `MDD ${got.mdd.toFixed(2)} vs ${mdd}`).toBeLessThan(3);
     expect(Math.abs(got.pv - pv), `P/V ${got.pv.toFixed(4)} vs ${pv}`).toBeLessThan(0.03);
   });
 
   it("차이의 방향이 일관된다 — 우리가 수익 낮고·낙폭 크고·현금 얇다", () => {
-    // 방향이 뒤섞이면 사다리 말고 다른 것이 틀어졌다는 신호다.
+    // Mixed directions would signal that something other than the ladder has slipped.
     for (const e of 원문) {
       const got = run(e.G);
       expect(got.cagr, `G=${e.G} CAGR`).toBeLessThan(e.cagr);
@@ -104,37 +103,37 @@ describe("원문 백테스트 재현 — 거치식 TQQQ 2011~2020", () => {
     const g10 = run(10);
     const g40 = run(40);
     expect(g40.cagr).toBeLessThan(g10.cagr);
-    expect(g40.mdd).toBeGreaterThan(g10.mdd);       // 낙폭이 얕아짐
-    expect(g40.pv).toBeGreaterThan(g10.pv);         // 현금을 두껍게
-    // "위험이 더 빨리 내려간다" — 낙폭이 줄어든 폭이 수익이 줄어든 폭보다 크다.
-    // (측정: G10→G40 에서 CAGR −7.07%p, MDD +9.48%p)
+    expect(g40.mdd).toBeGreaterThan(g10.mdd);       // the drawdown gets shallower
+    expect(g40.pv).toBeGreaterThan(g10.pv);         // with a thicker cash buffer
+    // "risk falls faster" - the drawdown shrinks by more than the return does.
+    // (measured: from G10 to G40, CAGR -7.07pp and MDD +9.48pp)
     expect(Math.abs(g10.mdd) - Math.abs(g40.mdd)).toBeGreaterThan(g10.cagr - g40.cagr);
   });
 
   /**
-   * 이 테스트의 한계를 못 박는다 — **우리 결과로는 원문의 G 를 가려낼 수 없다.**
+   * Pinning this test's limit - **our results cannot tell which G the source used.**
    *
-   * 우리가 일관되게 ~2%p 낮은데 G 한 칸 간격이 2~3%p 라, 우리 G=10 이 원문 G=20 에 더
-   * 가깝다. "원문 표를 재현한다" 를 "공식이 옳음이 증명됐다" 로 읽으면 안 되는 이유다.
-   * 사다리를 구현해 갭이 줄면 이 테스트는 실패할 것이고, 그때 지워야 한다.
+   * We are consistently about 2pp low while one step of G is worth 2-3pp, so our G = 10 lands closer to the source's
+   * G = 20. That is why "it reproduces the source's table" must not be read as "the formula is proven right".
+   * Implementing the ladder will close the gap and make this test fail - and then it should be deleted.
    */
   it("한계: 우리 결과로 원문의 G 를 가려내지는 못한다", () => {
     const 가장가까운 = (our: number) =>
       원문.reduce((b, e) => (Math.abs(our - e.cagr) < Math.abs(our - b.cagr) ? e : b), 원문[0]).G;
 
-    // 우리 G=10 은 원문 /10 이 아니라 /20 에 가깝다.
+    // Our G = 10 is closer to the source's /20 than its /10.
     expect(가장가까운(run(10).cagr)).toBe(20);
     expect(가장가까운(run(20).cagr)).toBe(30);
   });
 
   it("공식을 건드리면 눈에 띄게 벗어난다 — 자유 파라미터로는 못 메운다", () => {
     const 정상 = run(10);
-    // Pool/G 항을 없애면(G→∞) 전혀 다른 전략이 된다.
+    // Removing the Pool/G term (G -> infinity) makes it an entirely different strategy.
     const 항없음 = run(1e9);
     expect(정상.cagr - 항없음.cagr).toBeGreaterThan(20);
     expect(항없음.pv).toBeGreaterThan(2);
 
-    // 반면 원문 미규정 파라미터를 크게 흔들어도 거의 안 움직인다.
+    // Whereas swinging a parameter the source leaves open barely moves it.
     const 반반 = runValueRebalancingBacktest({ ticker: "TQQQ", bars }, {
       principal: PRINCIPAL, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5,
       cycleDays: 10, initStockRatio: 0.5, formula: "basic", // 위 run() 과 같은 조건으로

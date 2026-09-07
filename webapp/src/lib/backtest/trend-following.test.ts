@@ -14,7 +14,7 @@ describe("trend-following sma", () => {
 
 describe("trend-following generate", () => {
   it("골든크로스(어제 단기≤장기, 오늘 단기>장기)에 원금만큼 시장가 진입", () => {
-    // history 최신순 [10,5,5,5,5]: 오늘 st=7.5>lt=6.67(golden), 어제 sy=5=ly=5(not golden) → 크로스
+    // history newest first [10,5,5,5,5]: today st = 7.5 > lt = 6.67 (golden), yesterday sy = 5 = ly = 5 (not golden) -> a crossing
     const state: TrendState = { price: 10, holdingQty: 0, avgPrice: 0, history: [10, 5, 5, 5, 5] };
     const sigs = generate(state, cfg);
     expect(sigs).toHaveLength(1);
@@ -22,7 +22,7 @@ describe("trend-following generate", () => {
   });
 
   it("데드크로스(오늘 단기≤장기)면 보유 전량 시장가 청산", () => {
-    // [5,5,5,10]: 오늘 st=5=lt=5 → not golden, 보유 있음 → 청산
+    // [5,5,5,10]: today st = 5 = lt = 5 -> not golden, and something is held -> liquidate
     const state: TrendState = { price: 5, holdingQty: 1000, avgPrice: 8, history: [5, 5, 5, 10] };
     const sigs = generate(state, cfg);
     expect(sigs).toHaveLength(1);
@@ -31,7 +31,7 @@ describe("trend-following generate", () => {
 
   it("이미 골든이면(어제도 골든) 재진입 안 함", () => {
     const state: TrendState = { price: 12, holdingQty: 0, avgPrice: 0, history: [12, 11, 10, 5] };
-    // 오늘 golden, 어제도 golden → 크로스 아님
+    // golden today and golden yesterday -> not a crossing
     expect(generate(state, cfg)).toHaveLength(0);
   });
 

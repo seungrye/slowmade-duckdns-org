@@ -1,12 +1,12 @@
-// 듀얼 모멘텀(GEM, Gary Antonacci) — 상대 모멘텀(후보 중 1위) + 절대 모멘텀(1위가 방어자산보다
-// 강할 때만 보유, 아니면 방어자산 대피). 재평가주기마다 판정, 전량 in/out(1종목), 복리.
-// rotation 과 달리 SMA 레짐 필터가 없고, "현금" 대신 채권 등 방어자산을 든다.
+// Dual momentum (GEM, Gary Antonacci) - relative momentum (the leader among candidates) plus absolute momentum
+// (held only while the leader beats the defensive asset, otherwise moved into it). Judged each re-evaluation cycle, all in or out (one symbol), compounding.
+// Unlike rotation there is no SMA regime filter, and instead of "cash" it holds a defensive asset such as bonds.
 
 import { momentum, compositeMomentum } from "@/lib/trading/strategies";
 import type { BacktestResult, BtTrade, EquityPoint, DualMomentumV1Config } from "./types";
 import type { RotationCandidate } from "./rotation";
 
-/** 순수 결정: 상대모멘텀 1위 vs 방어자산 절대모멘텀. target 은 후보 또는 방어자산 티커. */
+/** The pure decision: the relative-momentum leader versus the defensive asset's absolute momentum. target is a candidate or the defensive ticker. */
 export function dualMomentumDecide(args: {
   candidates: string[];
   candMom: Record<string, number | null>;
@@ -28,7 +28,7 @@ export function dualMomentumDecide(args: {
   return { target: best, reason: `상대모멘텀 1위 ${best} (${(bestMom * 100).toFixed(1)}%)` };
 }
 
-/** 듀얼 모멘텀 백테스트. candidates=위험자산, defensive=방어자산(채권 등). 시간축은 방어자산 일봉. */
+/** Dual-momentum backtest. candidates are the risk assets, defensive the defensive asset (bonds and the like). The time axis is the defensive asset's daily bars. */
 export function runDualMomentumBacktest(
   candidates: RotationCandidate[],
   defensive: RotationCandidate,
@@ -39,7 +39,7 @@ export function runDualMomentumBacktest(
   const fee = cfg.feeRate && cfg.feeRate > 0 ? cfg.feeRate : 0;
   const all = [...candidates, defensive];
   const closeMaps = all.map((c) => new Map(c.bars.map((b) => [b.date, b.close])));
-  const series: number[][] = all.map(() => []); // 자산별 시간순 종가 축적
+  const series: number[][] = all.map(() => []); // accumulate closes per asset in chronological order
   const idxOf = new Map(all.map((c, i) => [c.ticker, i]));
   const need = cfg.momLookbacks && cfg.momLookbacks.length ? Math.max(...cfg.momLookbacks) : cfg.momDays;
   const momOf = (i: number): number | null => {
@@ -48,11 +48,11 @@ export function runDualMomentumBacktest(
   };
 
   let cash = cfg.principal;
-  let held: string | null = null; // 보유 티커
+  let held: string | null = null; // the ticker held
   let qty = 0;
   let avg = 0;
   let sinceReb = 0;
-  // 적립식(매월 입금) — 항상 투자 상태라 보유 자산에 즉시 증액(현금 드래그 없음).
+  // Accumulating (a monthly deposit) - always invested, so it is added to the holding at once (no cash drag).
   const contribution = cfg.contribution && cfg.contribution > 0 ? cfg.contribution : 0;
   const contributions: { date: string; amount: number }[] = [];
   let prevMonth: string | null = null;
@@ -69,7 +69,7 @@ export function runDualMomentumBacktest(
     cash -= price * q * (1 + fee);
     held = ticker; qty = q; avg = price;
   };
-  // 누적 증액 매수 — 평단 누적 평균(buy 는 덮어쓰기라 적립 top-up 엔 이걸 쓴다).
+  // A cumulative top-up buy - averaging into the existing cost (buy overwrites, so accumulation uses this).
   const addBuy = (date: string, ticker: string, price: number, budget: number) => {
     const q = Math.floor(budget / (price * (1 + fee)));
     if (q < 1) return;
@@ -85,7 +85,7 @@ export function runDualMomentumBacktest(
     const inRange = (!cfg.from || date >= cfg.from) && (!cfg.to || date <= cfg.to);
     if (!inRange) continue;
 
-    // 적립식: 월경계에 현금 유입(리밸런스가 매수하면 그 매수가 흡수, 아니면 아래에서 보유 자산에 증액).
+    // Accumulating: cash arrives at the month boundary (a rebalance buy absorbs it; otherwise it is added to the holding below).
     if (contribution > 0) {
       const ym = date.slice(0, 7);
       if (prevMonth !== null && ym !== prevMonth) { cash += contribution; contributions.push({ date, amount: contribution }); }
@@ -108,7 +108,7 @@ export function runDualMomentumBacktest(
         sinceReb = 0;
       }
     }
-    // 적립식: 리밸런스가 매수하지 않은(hold) 날엔 유휴현금을 보유 자산에 즉시 증액. cash 0 이면 no-op.
+    // Accumulating: on a day the rebalance did not buy (hold), idle cash is added to the holding at once. With 0 cash it is a no-op.
     if (contribution > 0 && held !== null) {
       const hc = closeMaps[idxOf.get(held)!].get(date);
       if (hc !== undefined) addBuy(date, held, hc, cash);

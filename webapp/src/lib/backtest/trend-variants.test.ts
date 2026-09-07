@@ -11,21 +11,21 @@ describe("trend v2 — MA 돌파", () => {
   const cfg: TrendV2Config = { principal: 10000, maPeriod: 2 };
 
   it("종가가 MA 상향 돌파(어제 이하→오늘 초과)에 진입", () => {
-    // [12,8,10]: 오늘 MA2=(12+8)/2=10 <12 ✓, 어제 MA2=(8+10)/2=9 ≥ 어제종가 8 ✓ → 돌파
+    // [12,8,10]: today MA2 = (12+8)/2 = 10 < 12 yes, yesterday MA2 = (8+10)/2 = 9 >= yesterday's close 8 yes -> a breakout
     const sigs = generateV2(st({ price: 12, history: [12, 8, 10] }), cfg);
     expect(sigs).toHaveLength(1);
     expect(sigs[0]).toMatchObject({ side: "buy", qty: 833, ordType: "market" }); // floor(10000/12)
   });
 
   it("보유 중 종가가 MA 아래면 전량 청산(상태 기준 — 돌파일 놓쳐도 청산)", () => {
-    // [8,12,10]: MA2=(8+12)/2=10 > 종가 8 → 이탈
+    // [8,12,10]: MA2 = (8+12)/2 = 10 > the close of 8 -> a breakdown
     const sigs = generateV2(st({ price: 8, holdingQty: 833, avgPrice: 12, history: [8, 12, 10] }), cfg);
     expect(sigs).toHaveLength(1);
     expect(sigs[0]).toMatchObject({ side: "sell", qty: 833 });
   });
 
   it("어제도 MA 위였으면(돌파 아님) 재진입 안 함", () => {
-    // [12,11,10]: 오늘 12>11.5, 어제 11>10.5 → 이미 위
+    // [12,11,10]: today 12 > 11.5 and yesterday 11 > 10.5 -> already above
     expect(generateV2(st({ price: 12, history: [12, 11, 10] }), cfg)).toHaveLength(0);
   });
 
@@ -38,15 +38,15 @@ describe("trend v3 — 추세(기울기) 필터 골든크로스", () => {
   const cfg: TrendV3Config = { principal: 10000, shortMa: 2, longMa: 3, slopeDays: 1 };
 
   it("골든크로스 + 장기MA 상승이면 진입", () => {
-    // [10,5,5,5,5]: 골든크로스(v1 동일) + lt(6.67) > 어제 lt(5) → 상승 ✓
+    // [10,5,5,5,5]: a golden cross (as in v1) plus lt (6.67) > yesterday's lt (5) -> rising, yes
     const sigs = generateV3(st({ price: 10, history: [10, 5, 5, 5, 5] }), cfg);
     expect(sigs).toHaveLength(1);
     expect(sigs[0]).toMatchObject({ side: "buy", qty: 1000 });
   });
 
   it("골든크로스라도 장기MA 하락 중이면 진입 안 함(가짜 크로스 필터)", () => {
-    // [6,4,4,8,8]: 오늘 golden(5>4.67) & 어제 not golden(4<5.33) → 크로스지만
-    // ltPast(5.33) > lt(4.67) → 하락 중 → 필터
+    // [6,4,4,8,8]: golden today (5 > 4.67) and not golden yesterday (4 < 5.33) -> a crossing, but
+    // ltPast (5.33) > lt (4.67) -> still falling -> filtered out
     expect(generateV3(st({ price: 6, history: [6, 4, 4, 8, 8] }), cfg)).toHaveLength(0);
   });
 
@@ -65,7 +65,7 @@ describe("trend v4 — 트레일링 스탑", () => {
   const cfg: TrendV4Config = { principal: 10000, shortMa: 2, longMa: 3, trailPct: 0.3 };
 
   it("골든 유지 중이라도 고점 대비 -30% 이면 트레일링 스탑 청산", () => {
-    // [65,60,20,10]: st=62.5>lt≈48.3(golden 유지) 인데 peak 100 → 65 ≤ 70 → 스탑
+    // [65,60,20,10]: st = 62.5 > lt ~ 48.3 (still golden) but the peak is 100 -> 65 <= 70 -> the stop fires
     const sigs = generateV4(st({ price: 65, holdingQty: 100, avgPrice: 50, peak: 100, history: [65, 60, 20, 10] }), cfg);
     expect(sigs).toHaveLength(1);
     expect(sigs[0].side).toBe("sell");
@@ -73,14 +73,14 @@ describe("trend v4 — 트레일링 스탑", () => {
   });
 
   it("고점 대비 -30% 미만이면 데드크로스로 청산(v1 동일)", () => {
-    // [90,90,90,100]: st=lt=90 → not golden, 90 > 70(peak100) → 데드크로스 사유
+    // [90,90,90,100]: st = lt = 90 -> not golden, and 90 > 70 (peak 100) -> the reason is the dead cross
     const sigs = generateV4(st({ price: 90, holdingQty: 100, avgPrice: 50, peak: 100, history: [90, 90, 90, 100] }), cfg);
     expect(sigs).toHaveLength(1);
     expect(sigs[0].reason).toContain("데드크로스");
   });
 
   it("골든 유지 + 고점 대비 하락폭 작으면 보유 지속", () => {
-    // [95,90,80,50]: golden(92.5>88.3), 95 > 70 → 신호 없음
+    // [95,90,80,50]: golden (92.5 > 88.3) and 95 > 70 -> no signal
     expect(generateV4(st({ price: 95, holdingQty: 100, avgPrice: 50, peak: 100, history: [95, 90, 80, 50] }), cfg)).toHaveLength(0);
   });
 
@@ -96,7 +96,7 @@ describe("runTrendVariantBacktest — peak 추적", () => {
 
   it("매수 후 최고 종가를 추적해 트레일링 스탑이 발동한다", () => {
     const cfg: TrendV4Config = { principal: 10000, shortMa: 2, longMa: 3, trailPct: 0.3 };
-    // 5,5,5 → 10(골든크로스 매수 @10) → 20(peak=20) → 13(≤ 20×0.7=14 → 스탑 매도)
+    // 5,5,5 -> 10 (a golden-cross buy @10) -> 20 (peak = 20) -> 13 (<= 20 x 0.7 = 14 -> the stop sells)
     const bars = [bar("d1", 5), bar("d2", 5), bar("d3", 5), bar("d4", 10), bar("d5", 20), bar("d6", 13)];
     const r = runTrendVariantBacktest(bars, cfg.longMa + 1, (s) => generateV4(s, cfg));
     expect(r.trades).toHaveLength(2);

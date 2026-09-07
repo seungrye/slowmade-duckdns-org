@@ -1,31 +1,31 @@
-// 무한매수법 버전별(v2.1 / v2.2 / v3.0) 백테스트 — 웹 공개 정리본 기반 구현.
-// (v4.0 은 공식 원문 PDF 대조본을 infinite-v4.ts 에 별도 구현 — 리버스모드 포함)
+// Backtests for the infinite-buying versions (v2.1 / v2.2 / v3.0), implemented from the public write-ups.
+// (v4.0 is implemented separately in infinite-v4.ts against the official source PDF, reverse mode included.)
 //
-// 출처(규칙 정리):
+// Sources (rule write-ups):
 //   - v1/v2/v2.1: truedonshow.com "무한매수법 v1, v2, v2.1 원큐정리"
-//   - v2.2(2023 오피셜)/v3.0: quantstack.app/infinite/{v2-2,v3-0}
+//   - v2.2 (the 2023 official) and v3.0: quantstack.app/infinite/{v2-2,v3-0}
 //
-// 공통 골격: 원금을 splits 분할, 매일 1회분을 LOC 로 매수(전반전은 절반씩 두 지정가,
-// 후반전은 전체를 보수적으로), 보유분은 25%/75% 로 나눠 매도(25% 는 별% LOC "쿼터매도",
-// 75% 는 +목표% 지정가). 별% = base − (2×base/splits)×T (T=진행회차; T=splits/2 에서 0).
+// The shared skeleton: split the principal into splits and buy one round a day with LOCs (the first half at two
+// limits, half each; the second half conservatively as one), while the holding is sold 25% / 75% (the 25% a star%
+// LOC, the "quarter sell"; the 75% a +target% limit). star% = base - (2 x base / splits) x T (T is the round; 0 at T = splits/2).
 //
-//   버전   base   기본분할  75%매도   전반전 매수(절반씩)        후반전 매수(전체)
-//   v2.1   +5고정   40      +10%     평단 LOC + 평단+5% LOC     평단 LOC
-//   v2.2   10       40      +10%     평단 LOC + 별% LOC         별% LOC
-//   v3.0   15       20      +15%     별% LOC + 평단 LOC         별% LOC
+//   version  base  default splits  75% sell  first-half buy (half each)      second-half buy (all)
+//   v2.1     +5 fixed  40         +10%      average LOC + average+5% LOC    average LOC
+//   v2.2     10        40         +10%      average LOC + star% LOC         star% LOC
+//   v3.0     15        20         +15%      star% LOC + average LOC         star% LOC
 //
-// 버전별 차이 구현:
-//   - v2.1 매도: 전반 [25% +5% LOC / 75% +10% 지정가], 후반 [25% +0% LOC / 25% +5% 지정가 / 50% +10% 지정가]
-//   - T = 매수누적액 / 1회매수액
+// How the per-version differences are implemented:
+//   - v2.1 sells: first half [25% at a +5% LOC / 75% at a +10% limit], second half [25% at a +0% LOC / 25% at a +5% limit / 50% at a +10% limit]
+//   - T = cumulative buy amount / one-round buy amount
 //
-// 단순화(미구현 — 결과 해석 시 참고):
-//   - RSI 진입 타이밍(v2+), 쿼터손절/쿼터모드(v2.2 의 39<T≤40, v3.0 의 19<T<20), 수익 복리
-//     재투자 리셋(v3.0)은 생략. 첫 매수는 1회분 종가 진입.
-//   - splits 소진(T≥splits) 후엔 매수 중단·매도 대기(v1 과 동일)만 한다.
+// Simplifications (not implemented - keep them in mind when reading the results):
+//   - RSI entry timing (v2+), the quarter stop-loss and quarter mode (39 < T <= 40 in v2.2, 19 < T < 20 in v3.0),
+//     and compounding reinvestment on reset (v3.0) are omitted. The first buy is a one-round entry at the close.
+//   - Once the splits are spent (T >= splits) it only stops buying and waits to sell (as v1 does).
 //
-// 체결 모델(LOC 의 본질 = 종가 단일가 체결 — v1 엔진의 저가터치 근사보다 보수적):
-//   - LOC 매수(P): 종가 ≤ P → 종가 체결 / LOC 매도(P): 종가 ≥ P → 종가 체결
-//   - 지정가 매도(P): 고가 ≥ P → P 체결 / 진입(시장가): 종가 체결
+// The fill model (an LOC really does fill at the single closing price - more conservative than the v1 engine's low-touch approximation):
+//   - Buy LOC (P): close <= P fills at the close / Sell LOC (P): close >= P fills at the close
+//   - Sell limit (P): high >= P fills at P / Entry (market): fills at the close
 
 import type { BacktestResult, Bar, BtTrade, EquityPoint } from "./types";
 
@@ -33,11 +33,11 @@ export type InfiniteVariantVersion = "v2_1" | "v2_2" | "v3_0";
 
 export interface InfiniteVariantConfig {
   principal: number;
-  splits: number; // 분할 수(기본 v2.1/v2.2=40, v3.0=20)
+  splits: number; // split count (40 by default for v2.1/v2.2, 20 for v3.0)
   version: InfiniteVariantVersion;
 }
 
-/** 버전별 상수 — base(별% 시작값), 75% 매도 목표. v4.0 은 공식 원문 기반 별도 엔진(infinite-v4.ts). */
+/** Per-version constants - base (star%'s starting value) and the 75% sell target. v4.0 has its own engine from the official source (infinite-v4.ts). */
 const VER = {
   v2_1: { starBase: 0, sellTarget: 0.10 }, // v2.1 은 별% 대신 +5% 고정 큰수
   v2_2: { starBase: 10, sellTarget: 0.10 },
@@ -59,7 +59,7 @@ export function runInfiniteVariantBacktest(bars: Bar[], cfg: InfiniteVariantConf
 
   let qty = 0;
   let avg = 0;
-  let T = 0; // 진행 회차(매수누적액/1회액; v4 는 이벤트 기반 + 쿼터매도 ×0.75)
+  let T = 0; // the round (cumulative buy amount / one-round amount; v4 is event-based and applies x0.75 on a quarter sell)
   const starPct = (t: number) => (starBase - (2 * starBase * t) / splits) / 100;
 
   const oneShot = () => principal / splits;
@@ -69,13 +69,13 @@ export function runInfiniteVariantBacktest(bars: Bar[], cfg: InfiniteVariantConf
     const half = splits / 2;
 
     if (qty === 0) {
-      // 진입: 1회분 종가 매수(단순화). 다음 바부터 본 규칙.
+      // Entry: buy one round at the close (a simplification). The real rules apply from the next bar.
       const one = oneShot();
       const q = Math.floor(one / bar.close);
       if (q >= 1) orders.push({ side: "buy", kind: "market", price: bar.close, qty: q });
     } else {
       const star = starPct(T);
-      // ── 매도 주문(보유 시 항상) ──
+      // ── Sell orders (whenever anything is held) ──
       const q25 = Math.floor(qty / 4);
       const rest = qty - q25;
       if (version === "v2_1") {
@@ -90,11 +90,11 @@ export function runInfiniteVariantBacktest(bars: Bar[], cfg: InfiniteVariantConf
           if (q50 >= 1) orders.push({ side: "sell", kind: "limit", price: avg * 1.10, qty: q50 });
         }
       } else {
-        // v2.2/v3.0/v4.0 공통: 25% 별% LOC(쿼터매도) + 75% 목표% 지정가
+        // Shared by v2.2, v3.0 and v4.0: 25% at a star% LOC (the quarter sell) plus 75% at a +target% limit
         if (q25 >= 1) orders.push({ side: "sell", kind: "loc", price: avg * (1 + star), qty: q25 });
         if (rest >= 1) orders.push({ side: "sell", kind: "limit", price: avg * (1 + sellTarget), qty: rest });
       }
-      // ── 매수 주문(원금 소진 전) ──
+      // ── Buy orders (before the principal is spent) ──
       if (T < splits) {
         const one = oneShot();
         const h = one / 2;
@@ -107,19 +107,19 @@ export function runInfiniteVariantBacktest(bars: Bar[], cfg: InfiniteVariantConf
             pushBuy(avg, h);
             pushBuy(avg * 1.05, h);
           } else {
-            pushBuy(avg, one); // 후반전: 평단 이하만 전량
+            pushBuy(avg, one); // second half: all of it, only at or below the average
           }
         } else if (T < half) {
           pushBuy(avg, h);
           pushBuy(avg * (1 + star), h);
         } else {
-          pushBuy(avg * (1 + star), one); // 후반전: 별%(음수 → 평단 아래) 전량
+          pushBuy(avg * (1 + star), one); // second half: all of it at star% (negative -> below the average)
         }
       }
     }
 
-    // ── 체결 ──
-    const one = oneShot(); // T 증가 계산용(체결 전 시점 1회액)
+    // ── Fills ──
+    const one = oneShot(); // the one-round amount before the fill, for computing T's increase
     for (const o of orders) {
       let filled: number | null = null;
       if (o.kind === "market") filled = bar.close;

@@ -1,12 +1,12 @@
-// 변동성 타깃 레버리지 — 레버리지 ETF 를 목표 변동성에 맞춰 부분 포지션으로 노출 조절.
-// 노출 f = min(maxLeverage, targetVol / 실현변동성). 변동성이 치솟으면 노출↓(현금 확대) → 낙폭 완화.
-// 시그널(1배 지수) 지정 시 SMA 레짐 이탈이면 f=0(현금). rotation 등과 달리 부분 포지션·일 리밸런스.
+// Volatility-targeted leverage - exposure to a leveraged ETF is adjusted with a partial position to hit a target volatility.
+// Exposure f = min(maxLeverage, targetVol / realised volatility). When volatility spikes, exposure falls (more cash) and the drawdown softens.
+// With a signal (a 1x index) given, breaking the SMA regime sets f = 0 (cash). Unlike rotation it uses partial positions and rebalances daily.
 
 import { smaNewest } from "@/lib/trading/strategies";
 import type { BacktestResult, BtTrade, EquityPoint, VolTargetV1Config } from "./types";
 import type { RotationCandidate } from "./rotation";
 
-/** 실현 연변동성 — 일간수익 모표준편차 × √252. 수익 2개 미만이면 null. */
+/** Realised annual volatility - the population standard deviation of daily returns x sqrt(252). null with fewer than 2 returns. */
 export function realizedVol(dailyReturns: number[], tradingDays = 252): number | null {
   if (dailyReturns.length < 2) return null;
   const mean = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length;
@@ -14,13 +14,13 @@ export function realizedVol(dailyReturns: number[], tradingDays = 252): number |
   return Math.sqrt(variance) * Math.sqrt(tradingDays);
 }
 
-/** 목표 노출 = min(maxLev, targetVol / 실현변동성). 실현변동성 0 이하면 maxLev. 0 이상. */
+/** Target exposure = min(maxLev, targetVol / realised volatility). Realised volatility of 0 or less gives maxLev. Never negative. */
 export function targetExposure(realizedVolAnn: number, targetVolAnn: number, maxLev: number): number {
   if (realizedVolAnn <= 0) return maxLev;
   return Math.max(0, Math.min(maxLev, targetVolAnn / realizedVolAnn));
 }
 
-/** 변동성 타깃 백테스트. target=레버리지 ETF, signal=선택 레짐 시그널(1배 지수). */
+/** The volatility-targeting backtest. target is the leveraged ETF, signal an optional regime signal (a 1x index). */
 export function runVolTargetBacktest(
   target: RotationCandidate,
   cfg: VolTargetV1Config,
@@ -35,11 +35,11 @@ export function runVolTargetBacktest(
 
   let cash = cfg.principal;
   let qty = 0;
-  const rets: number[] = []; // 대상 일간수익
+  const rets: number[] = []; // the target's daily returns
   let prevClose: number | null = null;
   const sigCloses: number[] = [];
-  let regimeOn = true; // 시그널 있을 때만 갱신(히스테리시스)
-  // 적립식(매월 입금) — 입금월엔 드리프트 밴드 무시하고 강제 리밸런스해 f 비율만 투입((1−f)는 완충 유지).
+  let regimeOn = true; // updated only when there is a signal (hysteresis)
+  // Accumulating (a monthly deposit) - in a deposit month the drift band is ignored and it rebalances anyway, investing only the f share ((1 - f) stays as a buffer).
   const contribution = cfg.contribution && cfg.contribution > 0 ? cfg.contribution : 0;
   const contributions: { date: string; amount: number }[] = [];
   let prevMonth: string | null = null;
@@ -61,7 +61,7 @@ export function runVolTargetBacktest(
       prevMonth = ym;
     }
 
-    // 레짐(선택): 시그널 SMA 히스테리시스
+    // Regime (optional): the signal SMA's hysteresis
     if (sigMap && cfg.smaPeriod) {
       const ma = smaNewest([...sigCloses].reverse(), cfg.smaPeriod);
       const sc = sigCloses[sigCloses.length - 1];
@@ -77,7 +77,7 @@ export function runVolTargetBacktest(
     const equity = cash + qty * price;
     const curVal = qty * price;
     const targetVal = f * equity;
-    // 드리프트가 밴드 초과일 때만 리밸런스(거래 절감). 단 입금월엔 강제 리밸런스(입금분 즉시 배분).
+    // Rebalance only when the drift exceeds the band (fewer trades). In a deposit month it rebalances anyway, so the deposit is allocated at once.
     if (equity > 0 && (contributedThisBar || Math.abs(targetVal - curVal) / equity > cfg.rebalanceBand)) {
       const targetQty = price > 0 ? Math.floor(targetVal / price) : 0;
       const delta = targetQty - qty;

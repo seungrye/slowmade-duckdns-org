@@ -1,10 +1,10 @@
-// 무한매수법 백테스트 엔진 — stock-automator-v2 backtest/engine.py 의 run_backtest() 포팅.
-// 일봉을 하루씩 흘려보내며 generate() 신호를 단순 체결 모델로 채운다.
-//   - 시장가 → 종가 체결.
-//   - 매수 지정가/LOC → 당일 저가 <= 지정가면 체결.
-//   - 매도 지정가 → 당일 고가 >= 지정가면 체결.
-//   - 매도는 항상 전량 익절 후 사이클 리셋(보유·평단·회차 0).
-// 수수료/슬리피지/현금제약 없음(원본과 동일한 근사).
+// Infinite-buying backtest engine - a port of run_backtest() from stock-automator-v2's backtest/engine.py.
+// Daily bars are streamed a day at a time and generate()'s signals filled with a simple model.
+//   - Market -> fills at the close.
+//   - Buy limit/LOC -> fills when the day's low is at or below the limit.
+//   - Sell limit -> fills when the day's high is at or above the limit.
+//   - A sell is always a full take profit, resetting the cycle (holding, average and round to 0).
+// No fees, slippage or cash constraints (the same approximation as the original).
 
 import { generate } from "./infinite-buying";
 import type { Bar, InfiniteConfig, Signal, BacktestResult, BtTrade, EquityPoint } from "./types";
@@ -35,7 +35,7 @@ export function runBacktest(bars: Bar[], cfg: InfiniteConfig): BacktestResult {
         roundNo += 1;
         trades.push({ date: bar.date, side: "buy", price: filled, qty: sig.qty, pnl: 0, roundNo });
       } else {
-        // 매도 = 전량 익절
+        // sell = full take profit
         const pnl = (filled - avg) * holdingQty;
         trades.push({ date: bar.date, side: "sell", price: filled, qty: holdingQty, pnl, roundNo });
         holdingQty = 0;

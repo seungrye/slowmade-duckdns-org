@@ -1,26 +1,26 @@
-// 무한매수법 V4.0 백테스트 — **백테스트=실거래 단일코드**.
-// 하루 주문 계획은 lib/trading/v4-plan.ts 의 v4PlanDay()(실거래 엔진과 같은 함수)가 만들고,
-// 여기서는 그 주문을 LOC 체결 규칙으로 채점만 한다(종가를 모르고 주문하는 실전과 동일):
-//   매수 LOC: 종가≤지정가 → 종가 체결 / 매도 LOC: 종가≥지정가 → 종가 체결 /
-//   매도 지정가: 고가≥지정가 → 지정가 체결 / MOC: 종가 체결.
-// T·모드 전이 규칙은 파이썬 strategy/infinite_v4.InfiniteV4Simulator 와 대칭.
+// Infinite buying V4.0 backtest - **one code path for backtest and live**.
+// The day's order plan comes from v4PlanDay() in lib/trading/v4-plan.ts (the same function the live engine uses),
+// and this only scores those orders with the LOC fill rules (exactly as live, where the close is unknown at order time):
+//   buy LOC: close <= limit fills at the close / sell LOC: close >= limit fills at the close /
+//   sell limit: high >= limit fills at the limit / MOC: fills at the close.
+// The T and mode transition rules mirror Python's strategy/infinite_v4.InfiniteV4Simulator.
 
 import { BIG_BUY_PCT, v4PlanDay } from "@/lib/trading/v4-plan";
 import type { BacktestResult, Bar, BtTrade, EquityPoint } from "./types";
 
 export interface InfiniteV4Config {
   principal: number;
-  splits: number; // 20/30/40 (원문 추천). 별%·T 감쇠율이 분할수에 연동된다.
-  // V(변동성 계수, %) — 포스트 Tier-0 원자 팩터. 종목별 고유값(TQQQ 15 / SOXL 20 / KODEX레버리지 8).
-  // 별% base·최종매도 목표(+V%)·리버스 탈출선(−V%)을 전부 구동한다. 미지정/0 이면 §5.3.2 로 자동 유도.
+  splits: number; // 20/30/40 (as the source recommends). star% and T's decay rate are tied to the split count.
+  // V (the volatility coefficient, %) - the post-Tier-0 atomic factor. Per-symbol (TQQQ 15 / SOXL 20 / KODEX Leverage 8).
+  // It drives the star% base, the final sell target (+V%) and the reverse exit line (-V%). Unset or 0 derives it per section 5.3.2.
   v?: number;
 }
 
-/** 포스트 §5.3.2 — 일간 로그수익률 표준편차 σ 로 변동성 계수 V 를 유도한다.
- *  V ≈ 4 × σ(%)  (TQQQ σ≈3.7%→15, SOXL σ≈5.0%→20). 표본 부족·σ=0 시 15(TQQQ) 폴백.
- *  주의: 포스트는 σ 를 "최근 1년·분기 재계산" 하지만, 백테스트는 로드된 전체 구간 σ 로 V 를 1회
- *  산출한다(V±1 엔 둔감한 코스 팩터 — 롤링 재계산은 범위 밖, 소폭 lookahead). ⚠ σ→V 유도 자체는
- *  포스트가 밝힌 미검증 추론(§5.5). */
+/** Source section 5.3.2 - derives the volatility coefficient V from sigma, the standard deviation of daily log returns.
+ *  V is about 4 x sigma(%) (TQQQ sigma ~3.7% -> 15, SOXL sigma ~5.0% -> 20). Too few samples, or sigma = 0, falls back to 15 (TQQQ).
+ *  Note: the source recalculates sigma quarterly over the last year, but the backtest computes V once from the whole
+ *  loaded range (a coarse factor insensitive to V +/- 1 - rolling recalculation is out of scope, and this is a slight
+ *  lookahead). The sigma -> V derivation is itself the source's own unverified inference (section 5.5). */
 export function deriveVFromBars(bars: Bar[]): number {
   const rets: number[] = [];
   for (let i = 1; i < bars.length; i++) {
@@ -36,25 +36,25 @@ export function deriveVFromBars(bars: Bar[]): number {
   return v > 0 ? v : 15;
 }
 
-/** 리버스모드 매도 시 T 감쇠 배수 = 1 − 1/(등분수), 등분수 = splits/2 (포스트 §6.1.1 유도).
- *  40분할→0.95, 20분할→0.90, 30분할→0.9333. (기존 삼항 splits===20?0.9:0.95 는 30분할 오채점.) */
+/** T's decay multiplier on a reverse-mode sell = 1 - 1/(portions), where portions = splits/2 (derived in source 6.1.1).
+ *  40 splits -> 0.95, 20 -> 0.90, 30 -> 0.9333. (The old ternary splits === 20 ? 0.9 : 0.95 mis-scored 30 splits.) */
 export function revSellDecay(splits: number): number {
   return 1 - 1 / (splits / 2);
 }
 
 export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): BacktestResult {
   const { principal, splits } = cfg;
-  const V = cfg.v && cfg.v > 0 ? cfg.v : deriveVFromBars(bars); // 미지정/0 → §5.3.2 자동 유도
-  const planCfg = { splits, starBase: V, sellTarget: V / 100 }; // V 하나가 별%·최종매도를 구동
+  const V = cfg.v && cfg.v > 0 ? cfg.v : deriveVFromBars(bars); // unset or 0 -> derived per section 5.3.2
+  const planCfg = { splits, starBase: V, sellTarget: V / 100 }; // V alone drives star% and the final sell
   const REV_SELL_DECAY = revSellDecay(splits);
-  const RECOVER_PCT = V / 100; // 리버스 탈출선 −V%
+  const RECOVER_PCT = V / 100; // the reverse exit line, -V%
 
   const trades: BtTrade[] = [];
   const equityCurve: EquityPoint[] = [];
   let qty = 0;
   let avg = 0;
   let T = 0;
-  let cash = principal; // 잔금(복리 — 사이클 종료 후에도 유지)
+  let cash = principal; // remaining funds (compounding - carried past the end of a cycle)
   let mode: "normal" | "reverse" = "normal";
   let reverseFirstDay = false;
   let recoverConfirmed = false;
@@ -74,7 +74,7 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
 
   for (const bar of bars) {
     const prev5 = closes.slice(-5);
-    const ref = closes.length ? closes[closes.length - 1] : bar.close; // 참조가 = 전일종가
+    const ref = closes.length ? closes[closes.length - 1] : bar.close; // reference price = the previous close
     closes.push(bar.close);
 
     if (mode === "reverse" && recoverConfirmed) {
@@ -84,7 +84,7 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
 
     const wasEntry = qty === 0 && mode === "normal";
     if (wasEntry && entryLimit === null) {
-      // 새 사이클 첫날: 오늘은 계획만(내일 전일종가+10% LOC)
+      // First day of a new cycle: plan only (tomorrow's LOC at the previous close + 10%)
       entryLimit = bar.close * (1 + BIG_BUY_PCT);
       equityCurve.push({ date: bar.date, equity: 0 });
       continue;
@@ -103,7 +103,7 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
     let revSold = false;
     let revBought = false;
 
-    // 매도 먼저(현행 규칙 순서), 그다음 매수 — 각 주문을 체결모델로 채점
+    // Sells first (the current rule order), then buys - each order scored by the fill model
     for (const o of [...plan].sort((a, b) => (a.side === "sell" ? 0 : 1) - (b.side === "sell" ? 0 : 1))) {
       if (o.side === "sell") {
         if (o.kind === "market") {
@@ -130,19 +130,19 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
       }
     }
 
-    // 상태 전이
+    // State transitions
     if (mode === "normal") {
       if (wasEntry) {
         if (bought > 0) {
           T = bought / entryShot;
           entryLimit = null;
         } else {
-          entryLimit = bar.close * (1 + BIG_BUY_PCT); // 미체결 → 기준 갱신
+          entryLimit = bar.close * (1 + BIG_BUY_PCT); // unfilled -> refresh the reference
         }
       } else if (qty === 0) {
         avg = 0;
         T = 0;
-        entryLimit = null; // 사이클 종료(복리)
+        entryLimit = null; // cycle over (compounding)
       } else {
         if (soldQ75) T *= 0.25;
         else if (soldQ25) T *= 0.75;
@@ -166,7 +166,7 @@ export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): Backt
         mode = "normal";
         entryLimit = null;
       } else if (bar.close > avg * (1 - RECOVER_PCT)) {
-        recoverConfirmed = true; // 회복 확인 → 다음날부터 일반모드(T 연결)
+        recoverConfirmed = true; // recovery confirmed -> normal mode from tomorrow (T carries over)
       }
     }
 

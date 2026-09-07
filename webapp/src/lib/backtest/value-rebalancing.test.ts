@@ -7,7 +7,7 @@ import {
 import type { Bar, ValueRebalancingConfig } from "./types";
 import type { RotationCandidate } from "./rotation";
 
-// ── 순수 헬퍼 ──
+// ── Pure helpers ──
 describe("VR updateVBasic — V₂ = V₁ + Pool/G + CF", () => {
   it("원문 예시: V9000·Pool1000·G10·CF250 → 9350", () => {
     expect(updateVBasic(9000, 1000, 10, 250)).toBe(9350);
@@ -32,15 +32,15 @@ describe("VR bandOf — [V(1−b), V(1+b)]", () => {
 describe("VR rebalanceShares — 밴드 복귀 수량", () => {
   const band = { low: 7225, high: 9775 };
   it("평가금 > 상단 → 매도(음수)", () => {
-    // qty85·price130 → 평가금 11050 > 9775 → floor((11050-9775)/130)=9 매도
+    // qty 85, price 130 -> valuation 11050 > 9775 -> sell floor((11050 - 9775)/130) = 9
     expect(rebalanceShares({ qty: 85, price: 130, ...band, buyBudget: 1000, pool: 1500, fee: 0 })).toBe(-9);
   });
   it("평가금 < 하단 → 매수(양수), 하단까지", () => {
-    // qty85·price80 → 평가금 6800 < 7225 → floor(425/80)=5, 한도/풀 여유 충분
+    // qty 85, price 80 -> valuation 6800 < 7225 -> floor(425/80) = 5, with plenty of limit and pool left
     expect(rebalanceShares({ qty: 85, price: 80, ...band, buyBudget: 750, pool: 1500, fee: 0 })).toBe(5);
   });
   it("매수는 사이클 한도(buyBudget)로 컷", () => {
-    // 원하는 5주지만 buyBudget 200 → floor(200/80)=2 주만
+    // it wants 5 shares, but buyBudget 200 -> floor(200/80) = only 2
     expect(rebalanceShares({ qty: 85, price: 80, ...band, buyBudget: 200, pool: 1500, fee: 0 })).toBe(2);
   });
   it("밴드 안이면 0(무행동)", () => {
@@ -48,7 +48,7 @@ describe("VR rebalanceShares — 밴드 복귀 수량", () => {
   });
 });
 
-// ── 러너 ──
+// ── The runner ──
 const DM = (i: number) => `2020-${String(Math.floor(i / 20) + 1).padStart(2, "0")}-${String((i % 20) + 1).padStart(2, "0")}`;
 const mk = (closes: number[]): Bar[] => closes.map((c, i) => ({ date: DM(i), open: c, high: c, low: c, close: c }));
 const cand = (closes: number[]): RotationCandidate => ({ ticker: "TQQQ", bars: mk(closes) });
@@ -93,7 +93,7 @@ describe("runValueRebalancingBacktest — 러너", () => {
   });
 });
 
-// ── 라이브 공용 순수 함수(백테스트=라이브 단일 소스) ──
+// ── The pure functions shared with live (one source for backtest and live) ──
 const VCFG: ValueRebalancingConfig = { principal: 10000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5, cycleDays: 5, initStockRatio: 0.85 };
 
 describe("VR seedVR — 초기 85:15 분할", () => {
@@ -125,8 +125,8 @@ describe("VR applyVRFill — 체결 장부 반영", () => {
   });
 });
 
-// 이 describe 는 **기본공식**의 원문 예시다. 기본값은 실력공식이므로(#358) 여기서는
-// formula 를 명시해 예시를 그대로 재현한다 — 실력공식 쪽은 vr-skill-formula.test.ts.
+// This describe covers the source's examples for **the basic formula**. The default is the skill formula (#358), so
+// formula is stated explicitly here to reproduce them exactly - the skill side lives in vr-skill-formula.test.ts.
 describe("VR advanceCycleVR — 사이클 경계 V 갱신 (기본공식)", () => {
   it("원문 예시: V9000·Pool1000·G10·CF250 → V9350·Pool1250·budget=u×1250·sinceCycle0", () => {
     const st = { qty: 50, pool: 1000, V: 9000, buyBudget: 111, sinceCycle: 5, cumBuy: 0, cumSell: 0 };
@@ -157,7 +157,7 @@ describe("VR cycleCoverSellQty — 인출 충당 매도", () => {
   });
 });
 
-// ── 차트용 밴드 (#341) ──
+// ── The band, for the chart (#341) ──
 describe("vrBand — 왜 사고팔았는지 그리려면", () => {
   const flat = () => runValueRebalancingBacktest(cand(Array(30).fill(100)), CFG);
 
@@ -175,16 +175,16 @@ describe("vrBand — 왜 사고팔았는지 그리려면", () => {
   });
 
   /**
-   * 밴드가 감싸는 것은 **주식 평가금**이지 총자산이 아니다.
-   * equityCurve.equity 는 qty×price + pool 이라 Pool 현금만큼 늘 위로 떠, 그걸 밴드와
-   * 겹치면 "항상 밴드 밖" 처럼 보인다. 그래서 stock 을 따로 낸다.
+   * What the band wraps is the **stock valuation**, not total assets.
+   * equityCurve.equity is qty x price + pool, so it always floats above by the Pool's cash; overlaying that on the
+   * band makes it look "always outside the band". Hence stock is reported separately.
    */
   it("stock 은 주식 평가금만 — 총자산보다 Pool 만큼 작다", () => {
     const r = flat();
     for (let i = 0; i < r.vrBand!.length; i++) {
       expect(r.vrBand![i].stock).toBeLessThanOrEqual(r.equityCurve[i].equity);
     }
-    // 초기 85:15 분할이라 Pool 이 남아 있다 — 둘이 같으면 안 된다.
+    // The initial 85:15 split leaves a Pool - the two must not be equal.
     expect(r.vrBand![0].stock).toBeLessThan(r.equityCurve[0].equity);
   });
 
@@ -204,7 +204,7 @@ describe("vrBand — 왜 사고팔았는지 그리려면", () => {
     const 바뀐횟수 = r.vrBand!.filter((row, i) => i > 0 && row.v !== r.vrBand![i - 1].v).length;
 
     expect(바뀐횟수).toBeGreaterThan(0);
-    // 매일 바뀌면 계단이 아니다 — cycleDays(5)마다이므로 날 수보다 훨씬 적어야 한다.
+    // Changing daily would not be a staircase - it moves every cycleDays (5), so there must be far fewer than the day count.
     expect(바뀐횟수).toBeLessThan(r.vrBand!.length / 2);
   });
 
@@ -213,7 +213,7 @@ describe("vrBand — 왜 사고팔았는지 그리려면", () => {
   });
 });
 
-// ── 운용 형태에서 기본값 유도 (#345) ──
+// ── Defaults derived from the operating mode (#345) ──
 describe("vrFormOf — CF 부호가 운용 형태를 정한다", () => {
   it("양수는 적립식, 0·미지정은 거치식, 음수는 인출식", () => {
     expect(vrFormOf(250)).toBe("적립식");
@@ -241,9 +241,9 @@ describe("설정이 기본값을 이긴다 — 원문도 \"가이드일 뿐 선�
   const bars = cand(Array(30).fill(100));
 
   it("적으면 그 값을 쓴다", () => {
-    // 적립식이지만 한도를 0.3 으로 적었으면 0.3 이다.
+    // Accumulating, but with the limit written as 0.3, it is 0.3.
     const r = runValueRebalancingBacktest(bars, { ...CFG, cashflow: 250, poolLimitPct: 0.3 });
-    expect(r.trades.length).toBeGreaterThan(0); // 돌기만 하면 된다 — 값 확인은 아래 seedVR 로
+    expect(r.trades.length).toBeGreaterThan(0); // it just has to run - the values are checked through seedVR below
     expect(seedVR({ ...CFG, cashflow: 250, poolLimitPct: 0.3 }, 100).buyBudget)
       .toBeCloseTo(0.3 * seedVR({ ...CFG, cashflow: 250, poolLimitPct: 0.3 }, 100).pool, 6);
   });
@@ -260,10 +260,10 @@ describe("설정이 기본값을 이긴다 — 원문도 \"가이드일 뿐 선�
   });
 });
 
-// ── 실효평단 (#345) ──
+// ── The effective average price (#345) ──
 describe("effectiveAvgPrice — (누적매수 − 누적매도) / 보유수량", () => {
   it("원문 예시: 100만원에 50개 → 30만원어치 10개 매도 → 40개, 1.75만원", () => {
-    // 원문 4.2 그대로. 매도해도 명목평단(2만원)은 안 변하지만 실효평단은 내려간다.
+    // Exactly source 4.2. A sell leaves the nominal average (20,000 won) unchanged, but the effective average falls.
     expect(effectiveAvgPrice({ cumBuy: 1_000_000, cumSell: 300_000, qty: 40 })).toBeCloseTo(17_500, 6);
   });
 

@@ -1,24 +1,24 @@
-// 크로스섹셔널 팩터 백테스트(순수) — 유니버스 다종목을 팩터로 랭킹해 상위/하위 분위를 동일가중
-// 매수, 월 리밸런스. 저변동성·크로스섹셔널 모멘텀·단기 평균회귀 3종 + 벤치마크(동일가중·시장ETF).
-// 가격(종가)만 사용. long-only·동일가중·거래비용 미반영(v1). 지표는 metrics.computeMetrics 재사용.
+// Cross-sectional factor backtest (pure) - ranks a multi-symbol universe by a factor and buys the top or bottom
+// quantile equally weighted, rebalanced monthly. Three factors (low volatility, cross-sectional momentum, short-term
+// mean reversion) plus benchmarks (equal weight, a market ETF). Closes only. Long-only, equally weighted, no transaction costs (v1). Metrics reuse metrics.computeMetrics.
 //
-// ⚠ 생존편향: 입력 유니버스가 '현재' 구성종목이면 상장폐지 종목 제외로 결과가 낙관 편향된다.
+// Survivorship bias: if the input universe is *today's* constituents, excluding delisted symbols biases the result optimistically.
 
 import type { EquityPoint } from "./types";
 import { computeMetrics, type BacktestMetrics } from "./metrics";
 
 export interface FactorMatrix {
-  dates: string[]; // 정렬된 거래일(정합 축) "YYYY-MM-DD"
-  closes: Map<string, (number | null)[]>; // ticker -> dates 정렬 종가(결측 null)
+  dates: string[]; // sorted trading days (the alignment axis), "YYYY-MM-DD"
+  closes: Map<string, (number | null)[]>; // ticker -> closes aligned to dates (null where missing)
 }
 
 export interface FactorParams {
-  quantile: number; // 상위/하위 분위 비율 (0.2 = 20%)
-  volLookback: number; // 저변동성 룩백(거래일)
-  momLong: number; // 모멘텀 룩백(거래일, ~12개월)
-  momSkip: number; // 모멘텀 최근 제외(거래일, ~1개월)
-  revLookback: number; // 평균회귀 룩백(거래일, ~1개월)
-  minNames: number; // 분위 선택 최소 종목 수
+  quantile: number; // top/bottom quantile share (0.2 = 20%)
+  volLookback: number; // low-volatility lookback (trading days)
+  momLong: number; // momentum lookback (trading days, about 12 months)
+  momSkip: number; // momentum's recent exclusion (trading days, about 1 month)
+  revLookback: number; // mean-reversion lookback (trading days, about 1 month)
+  minNames: number; // minimum symbols to pick a quantile
 }
 
 export const DEFAULT_FACTOR_PARAMS: FactorParams = {
@@ -32,9 +32,9 @@ export const DEFAULT_FACTOR_PARAMS: FactorParams = {
 
 export type FactorKind = "low_vol" | "momentum" | "reversal";
 
-// --- 내부 헬퍼 ---
+// --- Internal helpers ---
 
-/** 종가 결측을 직전값으로 전진보간(첫 상장 전은 null 유지). first = 각 종목 첫 유효 인덱스. */
+/** Forward-fills missing closes from the previous value (null stays before a symbol's listing). first is each symbol's first valid index. */
 function forwardFilled(
   closes: Map<string, (number | null)[]>,
   n: number,
@@ -59,7 +59,7 @@ function forwardFilled(
   return { ff, first };
 }
 
-/** 각 달의 첫 거래일 인덱스(월 리밸런스일). */
+/** The first trading-day index of each month (the monthly rebalance day). */
 function monthStarts(dates: string[]): number[] {
   const idx: number[] = [];
   let lm = "";
@@ -73,7 +73,7 @@ function monthStarts(dates: string[]): number[] {
   return idx;
 }
 
-/** 리밸런스 시점 ti 에서 팩터 스코어(적격 종목만). */
+/** The factor score at rebalance point ti (eligible symbols only). */
 function scoresAt(
   kind: FactorKind,
   ff: Map<string, (number | null)[]>,
@@ -85,7 +85,7 @@ function scoresAt(
   for (const [t, arr] of ff) {
     const f = first.get(t) ?? Infinity;
     if (kind === "low_vol") {
-      if (f > ti - p.volLookback) continue; // 충분한 이력 없음
+      if (f > ti - p.volLookback) continue; // not enough history
       let sum = 0;
       let sum2 = 0;
       let cnt = 0;
@@ -121,7 +121,7 @@ function scoresAt(
   return out;
 }
 
-/** 스코어를 정렬해 분위 선택. pickLowest=true 면 낮은 쪽(저변동·최근하락), false 면 높은 쪽(모멘텀). */
+/** Sorts the scores and picks a quantile. pickLowest=true takes the low end (low volatility, recent decliners), false the high end (momentum). */
 function select(scores: Map<string, number>, pickLowest: boolean, q: number, minNames: number): string[] {
   const arr = [...scores.entries()].sort((x, y) => (pickLowest ? x[1] - y[1] : y[1] - x[1]));
   if (arr.length === 0) return [];
@@ -129,33 +129,34 @@ function select(scores: Map<string, number>, pickLowest: boolean, q: number, min
   return arr.slice(0, k).map((e) => e[0]);
 }
 
-/** 시뮬레이션 옵션 — 원금·월적립금·투자 창(인덱스). 기본은 시작=1·목돈·전체 범위(기존 호환). */
+/** Simulation options - principal, monthly contribution and the investment window (as indices). Defaults are start = 1, lump sum and the full range (compatible with before). */
 export interface SimOpts {
-  principal: number; // 초기 원금(현금). 기본 1(= 시작=1 정규화).
-  contribution: number; // 매월 리밸런스일 적립액. 0=목돈.
-  startIdx: number; // 투자 시작 인덱스(이전은 곡선 미출력, 스코어 룩백엔 계속 사용).
-  endIdx: number; // 투자 종료 인덱스(포함).
+  principal: number; // initial principal (cash). 1 by default (= normalised to start at 1).
+  contribution: number; // contribution on each monthly rebalance day. 0 means lump sum.
+  startIdx: number; // the investment start index (earlier days are not plotted but still feed the score lookback).
+  endIdx: number; // the investment end index (inclusive).
 }
 
-/** dates.length 로 기본 옵션(시작=1·목돈·전체 범위). */
+/** Default options from dates.length (start = 1, lump sum, the full range). */
 function defaultOpts(n: number): SimOpts {
   return { principal: 1, contribution: 0, startIdx: 0, endIdx: n - 1 };
 }
 
-/** 창 [startIdx,endIdx] 내 '월초' 리밸런스 인덱스 중 startIdx 이후(적립 유입 시점 = 첫 배치 제외). */
+/** The month-start rebalance indices in [startIdx, endIdx] after startIdx (when contributions arrive; the first placement is excluded). */
 function monthlyRebalances(dates: string[], startIdx: number, endIdx: number): number[] {
   return monthStarts(dates).filter((i) => i > startIdx && i <= endIdx);
 }
 
 /**
- * 포지션 가치 추적으로 일별 equity(금액) 곡선 산출. 선택 종목 동일가중, 월 리밸런스, 사이 드리프트 허용.
- * startIdx 에서 원금을 즉시 배치(초기 리밸런스)하고, 이후 월초에 contribution 을 유입(적립식). 곡선은
- * [startIdx,endIdx] 만. 스코어(selectAt)는 startIdx 이전 데이터를 룩백으로 계속 참조한다(호출측 ff 전체).
+ * Derives the daily equity (money) curve by tracking position values. The selected symbols are equally weighted,
+ * rebalanced monthly, and allowed to drift in between. The principal is placed at startIdx (the initial rebalance),
+ * after which a contribution arrives at each month start (accumulating). The curve covers [startIdx, endIdx] only.
+ * The score (selectAt) keeps referencing data before startIdx as its lookback (the caller passes the whole ff).
  */
 function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt: (ti: number) => string[], opts: SimOpts): EquityPoint[] {
   const { principal, contribution, startIdx, endIdx } = opts;
-  const contribAt = new Set(monthlyRebalances(dates, startIdx, endIdx)); // 적립 유입일
-  const rebalAt = new Set<number>([startIdx, ...contribAt]); // 초기 배치 + 월초
+  const contribAt = new Set(monthlyRebalances(dates, startIdx, endIdx)); // contribution days
+  const rebalAt = new Set<number>([startIdx, ...contribAt]); // the initial placement plus month starts
   let equity = principal;
   let positions: { t: string; shares: number }[] = [];
   const curve: EquityPoint[] = [];
@@ -168,7 +169,7 @@ function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt:
       }
       if (val > 0) equity = val;
     }
-    if (contribution > 0 && contribAt.has(ti)) equity += contribution; // 월 적립 유입(재배치 전)
+    if (contribution > 0 && contribAt.has(ti)) equity += contribution; // the monthly contribution (before reallocating)
     if (rebalAt.has(ti)) {
       const sel = selectAt(ti);
       if (sel.length) {
@@ -185,9 +186,9 @@ function simulate(dates: string[], ff: Map<string, (number | null)[]>, selectAt:
   return curve;
 }
 
-// --- 공개 API ---
+// --- Public API ---
 
-/** 팩터 전략 1종의 equity 곡선. opts 미지정 시 시작=1·목돈·전체 범위(기존 호환). */
+/** One factor strategy's equity curve. Without opts it is start = 1, lump sum and the full range (compatible with before). */
 export function runFactor(matrix: FactorMatrix, kind: FactorKind, params: FactorParams = DEFAULT_FACTOR_PARAMS, opts?: Partial<SimOpts>): EquityPoint[] {
   const o = { ...defaultOpts(matrix.dates.length), ...opts };
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
@@ -196,13 +197,13 @@ export function runFactor(matrix: FactorMatrix, kind: FactorKind, params: Factor
   return simulate(matrix.dates, ff, selectAt, o);
 }
 
-/** 리밸런스 시점 ti 에서 선택되는 종목명(테스트/디버그용). */
+/** The symbols selected at rebalance point ti (for tests and debugging). */
 export function selectNames(matrix: FactorMatrix, kind: FactorKind, ti: number, params: FactorParams = DEFAULT_FACTOR_PARAMS): string[] {
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
   return select(scoresAt(kind, ff, first, ti, params), kind !== "momentum", params.quantile, params.minNames);
 }
 
-/** 벤치마크: 상장된 모든 종목 동일가중(월 리밸런스). opts 미지정 시 시작=1·목돈·전체 범위. */
+/** Benchmark: every listed symbol equally weighted (rebalanced monthly). Without opts, start = 1, lump sum and the full range. */
 export function runEqualWeight(matrix: FactorMatrix, opts?: Partial<SimOpts>): EquityPoint[] {
   const o = { ...defaultOpts(matrix.dates.length), ...opts };
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
@@ -210,7 +211,7 @@ export function runEqualWeight(matrix: FactorMatrix, opts?: Partial<SimOpts>): E
   return simulate(matrix.dates, ff, selectAt, o);
 }
 
-/** 벤치마크: 단일 종목(시장 ETF) 매수후보유(적립식이면 월 매수). opts 미지정 시 시작=1·목돈. */
+/** Benchmark: buy and hold a single symbol (a market ETF), buying monthly when accumulating. Without opts, start = 1 and lump sum. */
 export function runBuyHold(matrix: FactorMatrix, ticker: string, opts?: Partial<SimOpts>): EquityPoint[] {
   const o = { ...defaultOpts(matrix.dates.length), ...opts };
   const { ff, first } = forwardFilled(matrix.closes, matrix.dates.length);
@@ -219,7 +220,7 @@ export function runBuyHold(matrix: FactorMatrix, ticker: string, opts?: Partial<
   return simulate(matrix.dates, ff, selectAt, o);
 }
 
-/** [from,to] 로 잘라 시작=1 로 재기준(룩백 버퍼 제거·비교 정렬). */
+/** Trims to [from, to] and rebases to start at 1 (dropping the lookback buffer so comparisons line up). */
 export function trimAndRebase(curve: EquityPoint[], from: string, to: string): EquityPoint[] {
   const win = curve.filter((p) => p.date >= from && p.date <= to);
   if (!win.length) return [];
@@ -229,15 +230,17 @@ export function trimAndRebase(curve: EquityPoint[], from: string, to: string): E
 
 export interface FactorComparisonRow {
   key: string; // low_vol | momentum | reversal | equal_weight | market
-  name: string; // 표시명
+  name: string; // display name
   metrics: BacktestMetrics;
-  equityCurve: EquityPoint[]; // [from,to] 재기준
+  equityCurve: EquityPoint[]; // rebase to [from, to]
 }
 
 /**
- * 3팩터 + 벤치마크(동일가중·시장ETF)를 같은 기간·같은 원금/적립으로 실행·비교.
- * matrix 는 [from 이전 룩백 버퍼 ~ to] 를 담고, 곡선은 [from,to] 창만 출력(스코어는 버퍼를 룩백으로 참조).
- * principal(기본 1)·contribution(기본 0, 월 적립) 을 주면 실제 금액·적립식 곡선 + TWR 지표를 낸다.
+ * Runs and compares the three factors plus the benchmarks (equal weight, a market ETF) over the same period with
+ * the same principal and contributions. matrix holds [the lookback buffer before from ~ to], and the curves cover
+ * the [from, to] window only (the score uses the buffer as its lookback).
+ * Given principal (1 by default) and contribution (0 by default, monthly), it produces real-money accumulating
+ * curves plus TWR metrics.
  */
 export function runFactorComparison(
   matrix: FactorMatrix,
@@ -248,7 +251,7 @@ export function runFactorComparison(
   const contribution = opts.contribution && opts.contribution > 0 ? opts.contribution : 0;
   const dates = matrix.dates;
 
-  // 투자 창: from 이상 첫 인덱스 ~ to 이하 마지막 인덱스.
+  // The investment window: the first index at or after from, to the last index at or before to.
   let startIdx = dates.findIndex((d) => d >= opts.from);
   if (startIdx < 0) startIdx = 0;
   let endIdx = dates.length - 1;
@@ -258,7 +261,7 @@ export function runFactorComparison(
   if (endIdx < startIdx) endIdx = startIdx;
   const sim: SimOpts = { principal, contribution, startIdx, endIdx };
 
-  // 적립 유입 내역(모든 전략 공통 = 창 내 월초, 첫 배치 제외) → TWR 지표에 사용.
+  // The contribution schedule (shared by every strategy = month starts in the window, the first placement excluded), used for the TWR metrics.
   const contribList = contribution > 0 ? monthlyRebalances(dates, startIdx, endIdx).map((i) => ({ date: dates[i], amount: contribution })) : undefined;
 
   const rows: FactorComparisonRow[] = [];

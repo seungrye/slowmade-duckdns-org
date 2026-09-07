@@ -1,27 +1,27 @@
-// 레짐 모멘텀 v1 — 장기 이동평균 레짐 필터 + 절대 모멘텀 (단일 종목·롱 온리·현금 대피).
+// Regime momentum v1 - a long moving-average regime filter plus absolute momentum (one symbol, long only, cash as the refuge).
 //
-// 근거 문헌:
-//   - Meb Faber, "A Quantitative Approach to Tactical Asset Allocation" (2007) — 장기 SMA(10개월
-//     ≈ 200일) 위에서만 보유하는 타이밍이 수익은 유지하며 MDD 를 절반 이하로 줄인다.
-//   - Gary Antonacci, "Dual Momentum" — 절대 모멘텀(과거 수익률 > 0 일 때만 보유)이 하락장 방어.
-// 조합 규칙:
-//   진입(현금): 종가 > SMA(smaPeriod) × (1+bandPct)  AND  종가 ≥ momDays 일 전 종가
-//   청산(보유): 종가 < SMA(smaPeriod) × (1−bandPct)  OR  종가 ≤ 보유 중 고점 × (1−trailPct)
-//   - 밴드(히스테리시스)가 SMA 부근 왕복 매매(whipsaw)를 줄인다.
-//   - 상태 기반 진입이라 트레일링 스탑 후에도 레짐·모멘텀이 살아 있으면 자동 재진입한다.
-//   - 레버리지 ETF(TQQQ 등)에 얹으면 상승 레짐만 3배 노출 + 하락 레짐 현금 — 이 전략의 의도.
+// Literature:
+//   - Meb Faber, "A Quantitative Approach to Tactical Asset Allocation" (2007) - timing that holds only above a long
+//     SMA (10 months, about 200 days) keeps the return while more than halving the MDD.
+//   - Gary Antonacci, "Dual Momentum" - absolute momentum (holding only when the past return is positive) defends in down markets.
+// The combined rules:
+//   Enter (from cash): close > SMA(smaPeriod) x (1 + bandPct)  AND  close >= the close momDays ago
+//   Exit (while holding): close < SMA(smaPeriod) x (1 - bandPct)  OR  close <= the high while held x (1 - trailPct)
+//   - The band (hysteresis) reduces churn (whipsaw) around the SMA.
+//   - Entry is state-based, so it re-enters automatically after a trailing stop if the regime and momentum still hold.
+//   - Applied to a leveraged ETF (TQQQ and the like) it gives 3x exposure only in an up regime and cash in a down one - the point of the strategy.
 
 import { sma } from "./trend-following";
 import type { RegimeV1Config, Signal, TrendState } from "./types";
 
 export function generateRegimeV1(state: TrendState, cfg: RegimeV1Config): Signal[] {
-  const cl = state.history; // 최신순 (오늘=cl[0])
+  const cl = state.history; // newest first (today = cl[0])
   const need = Math.max(cfg.smaPeriod, cfg.momDays + 1);
   if (cl.length < need) return [];
 
   const ma = sma(cl, cfg.smaPeriod);
   if (ma === null) return [];
-  const momBase = cl[cfg.momDays]; // momDays 일 전 종가
+  const momBase = cl[cfg.momDays]; // the close momDays ago
 
   if (state.holdingQty === 0) {
     const regimeUp = state.price > ma * (1 + cfg.bandPct);

@@ -33,8 +33,8 @@ describe("runBacktest", () => {
     ];
     const r = runBacktest(bars, cfg);
     const buys = r.trades.filter((t) => t.side === "buy");
-    expect(buys.length).toBeGreaterThanOrEqual(2); // 진입 + 2회차 LOC
-    expect(r.trades.some((t) => t.side === "sell")).toBe(false); // 익절 미도달
+    expect(buys.length).toBeGreaterThanOrEqual(2); // entry plus the round 2 LOC
+    expect(r.trades.some((t) => t.side === "sell")).toBe(false); // the take-profit target was not reached
   });
 
   it("빈 일봉이면 거래 없음", () => {
