@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// import 전에 실행되어야 하므로 vi.hoisted 사용
+// It has to run before the imports, so vi.hoisted is used
 const mockPutObject = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.hoisted(() => {

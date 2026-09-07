@@ -39,7 +39,7 @@ vi.mock('@/lib/enji/quota', () => ({
 
 const mockCommentSave = vi.fn();
 
-// 글 문서를 테스트마다 갈아 끼울 수 있게 hoisted 로 뺀다 (#205 비공개 글 케이스).
+// Hoisted so the post document can be swapped per test (#205's private-post case).
 const mockPostLean = vi.hoisted(() => vi.fn());
 
 vi.mock('@/models/post', () => ({
@@ -93,7 +93,7 @@ describe('/api/enji POST', () => {
     mockCommentSave.mockResolvedValue(undefined);
     mockGenerateContent.mockResolvedValue({ text: 'enji 테스트 응답' });
     mockAuth.mockResolvedValue({ user: { name: 'Test', email: 'test@test.com' } });
-    // 기본은 공개 글(isPrivate·userEmail 이 없는 옛 문서 모양 — 스키마 기본값이 공개다).
+    // The default is a public post (an older document with no isPrivate or userEmail - the schema's default is public).
     mockPostLean.mockResolvedValue({
       _id: 'post-id',
       title: '테스트 게시글',
@@ -124,8 +124,8 @@ describe('/api/enji POST', () => {
     expect(res.status).toBe(400);
   });
 
-  // #205 — 로그인만 했으면 남의 비공개 글에 덧글을 넣을 수 있었고,
-  // 그 본문 3000자가 남의 명령으로 Gemini 로 나갔다.
+  // #205 - merely being logged in allowed commenting on someone else's private post,
+  // and 3000 characters of its body went to Gemini on their command.
   it('남의 비공개 글이면 404 — 덧글도 Gemini 호출도 없다', async () => {
     mockPostLean.mockResolvedValueOnce({
       _id: 'post-id',
@@ -166,7 +166,7 @@ describe('/api/enji POST', () => {
   });
 
   it('사용자 댓글을 저장하고 즉시 201 반환', async () => {
-    mockGenerateContent.mockReturnValueOnce(new Promise(() => {})); // Gemini가 늦어도
+    mockGenerateContent.mockReturnValueOnce(new Promise(() => {})); // even when Gemini is slow
 
     const res = await POST(makeRequest({
       postId: 'post-id',
@@ -177,7 +177,7 @@ describe('/api/enji POST', () => {
     expect(res.status).toBe(201);
     const json = await res.json();
     expect(json.data.userComment).toBeTruthy();
-    expect(mockCommentSave).toHaveBeenCalledTimes(1); // userComment만 즉시 저장
+    expect(mockCommentSave).toHaveBeenCalledTimes(1); // only userComment is saved immediately
   });
 
   it('Gemini 응답이 오면 백그라운드에서 enji 댓글 저장', async () => {
@@ -194,12 +194,12 @@ describe('/api/enji POST', () => {
 
     const res = await resPromise;
     expect(res.status).toBe(201);
-    expect(mockCommentSave).toHaveBeenCalledTimes(1); // 아직 userComment만
+    expect(mockCommentSave).toHaveBeenCalledTimes(1); // still only userComment
 
     resolveGemini({ text: 'enji 응답' });
-    await new Promise((r) => setTimeout(r, 10)); // 백그라운드 처리 대기
+    await new Promise((r) => setTimeout(r, 10)); // waiting for the background work
 
-    expect(mockCommentSave).toHaveBeenCalledTimes(2); // enji 댓글도 저장됨
+    expect(mockCommentSave).toHaveBeenCalledTimes(2); // the enji comment is saved too
   });
 
   it('첫 모델이 503 으로 실패하면 fallback 모델로 재시도하여 성공한다', async () => {
@@ -217,7 +217,7 @@ describe('/api/enji POST', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
-    expect(mockCommentSave).toHaveBeenCalledTimes(2); // userComment + enji 응답
+    expect(mockCommentSave).toHaveBeenCalledTimes(2); // userComment plus enji's reply
   });
 
   it('모든 모델이 transient 에러로 실패하면 안내용 enji 댓글을 저장한다', async () => {
@@ -234,9 +234,9 @@ describe('/api/enji POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    // 4개 모델 전부 시도
+    // all 4 models are tried
     expect(mockGenerateContent).toHaveBeenCalledTimes(4);
-    // userComment + 안내 댓글
+    // userComment plus the notice comment
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
@@ -254,9 +254,9 @@ describe('/api/enji POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    // 첫 모델에서 즉시 중단
+    // it stops at the first model
     expect(mockGenerateContent).toHaveBeenCalledTimes(1);
-    // userComment + 안내 댓글
+    // userComment plus the notice comment
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
@@ -288,15 +288,15 @@ describe('/api/enji POST', () => {
 
     await new Promise((r) => setTimeout(r, 10));
 
-    // Gemini 호출 X, generateImage 호출 X, quota 차감 X
+    // no Gemini call, no generateImage call, no quota decrement
     expect(mockGenerateContent).not.toHaveBeenCalled();
     expect(mockGenerateImage).not.toHaveBeenCalled();
     expect(mockTryConsume).not.toHaveBeenCalled();
 
-    // userComment + 마이그레이션 안내 enji 댓글 = 2회
+    // userComment plus the migration notice from enji = 2 calls
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
 
-    // 안내 댓글 본문에 painter-bot 멘션 안내 문구 포함
+    // the notice comment's body mentions the painter-bot mention
     const calls = mockCommentSave.mock.instances;
     const enjiNotice = calls.find((inst) => {
       const data = inst as unknown as { isEnji?: boolean; content?: string };

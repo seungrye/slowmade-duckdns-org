@@ -1,11 +1,11 @@
-// /api/web-adventure/end-run — 엔딩 도달 시 회차 종결 (#239).
+// /api/web-adventure/end-run - ending a run on reaching an ending (#239).
 //
-// 현재 save 의 진행도를 past_run 으로 옮기고 save 의 runIndex+1 + 캐릭터/씬 reset.
-// 클라이언트가 EndingScreen 진입 시 호출. payload: { endingId, finalSceneId }.
+// It moves the current save's progress into a past_run, bumps the save's runIndex and resets the character and scene.
+// The client calls it on entering EndingScreen. The payload: { endingId, finalSceneId }.
 //
-// reset 정책: 다음 회차는 캐릭터 생성 화면(creating) 부터 시작이므로 save 의
-//   character/currentSceneId 는 *유지하지 않고 제거*. mongoose 의 unset 으로 처리.
-//   다음 캐릭터 생성 시 save 가 갱신되며 runIndex 가 인계.
+// The reset policy: the next run starts from the character-creation screen (creating), so the save's
+//   character and currentSceneId are *removed rather than kept*, through mongoose's unset.
+//   The save is updated at the next character creation, carrying runIndex over.
 
 import { NextRequest } from 'next/server';
 import { connectToDB } from '@/lib/db';
@@ -20,20 +20,20 @@ import { rateLimit, clientIp } from '@/lib/rate-limit';
 import { evaluateAndGrant } from '@/lib/achievements';
 
 /**
- * 비로그인 웹 플레이어의 합성 계정 (#253).
+ * The synthetic account for logged-out web players (#253).
  *
- * 예전엔 세션이 없으면 401 이었다. 클라이언트는 비로그인일 때도 이 API 를 부르는데 401 을
- * **조용히 무시**해서, 엔딩 로그·경로·문체가 전부 있는데도 버려졌다 — 피드백 노트가 안 생겼다.
+ * It used to return 401 with no session. The client calls this API when logged out too, and it **silently ignored**
+ * the 401, so the ending log, path and style were all there and thrown away - no feedback note was created.
  *
- * 로그인을 요구할 이유가 없다: 노트의 **소유자는 작가**(`env.ownerEmail`)고, 플레이어는
- * `sourceUserEmail` 로 기록될 뿐이다. 오히려 **남의 플레이 피드백이 이 기능의 목적**이다.
- * 앱(`app-end-run`)이 `app@eternia` 로 이미 같은 일을 하고 있어 그 방식을 그대로 따른다.
+ * There is no reason to require a login: the note's **owner is the author** (`env.ownerEmail`), and the player is
+ * merely recorded as `sourceUserEmail`. **Feedback from other people's play is the point of the feature.**
+ * The app (`app-end-run`) already does the same thing as `app@eternia`, so that approach is followed here.
  */
 const WEB_ANON_USER = 'web@eternia';
 
 /**
- * 익명 제출 한도 — 요청 1건이 LLM 피드백 노트를 큐에 넣으므로 돈이 든다.
- * 한 회차를 끝내는 데 한참 걸리므로 정상 플레이는 이 한도에 걸릴 일이 없다.
+ * The anonymous submission limit - each request queues an LLM feedback note, which costs money.
+ * Finishing a run takes a long time, so normal play never hits this limit.
  */
 const ANON_LIMIT = 10;
 const ANON_WINDOW_MS = 60 * 60_000;
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     return apiError('endingId, finalSceneId 는 필수입니다.', 400);
   }
   const scenePath = capScenePath(body.scenePath);
-  const log = capLog(body.log); // #9 서사 로그 — 피드백 노트 LLM 입력용.
+  const log = capLog(body.log); // #9 the narrative log - the LLM input for the feedback note.
 
   if (!session?.user?.email) {
     return endAnonymousRun(req, body, scenePath, log);
@@ -60,12 +60,12 @@ export async function POST(req: NextRequest) {
     return apiError('진행 중인 save 가 없습니다.', 404);
   }
 
-  // #252 — past_run 적치를 *upsert* 로 변경.
-  //   이전 회차에서 save 갱신이 실패했거나 자동저장 race 로 save.runIndex 가
-  //   기존 past_run.runIndex 와 동일한 상태에 빠지면, create 방식은 unique
-  //   index 충돌(E11000) 로 throw → 400 → save 도 갱신 안 됨 → 새 엔딩이
-  //   갤러리에 안 보임. (userEmail, runIndex) 키로 upsert 하면 *마지막 도달*
-  //   endingId 가 덮어쓰여 일관 유지.
+  // #252 - accumulating the past_run changed to an *upsert*.
+  //   When a previous run's save update failed, or an autosave race left save.runIndex equal to the
+  //   existing past_run.runIndex, the create approach threw on a unique-index collision (E11000)
+  //   -> 400 -> the save was never updated either -> the new ending never appeared in the
+  //   gallery. Upserting on the (userEmail, runIndex) key overwrites with *the last reached*
+  //   endingId and stays consistent.
   let pastRun;
   try {
     pastRun = await WebAdventurePastRun.findOneAndUpdate(
@@ -73,13 +73,13 @@ export async function POST(req: NextRequest) {
       {
         userEmail: session.user.email,
         runIndex: save.runIndex,
-        // #90 — 어떤 문체로 읽었는지 함께 남긴다.
+        // #90 - which prose style it was read in is recorded too.
         voice: typeof body.voice === 'string' ? body.voice.slice(0, 32) : '',
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
         scenePath,
         log,
-        // #289 — 옛 save (#287 schema 적용 전) 의 character 호환.
+        // #289 - compatibility with an old save's character (from before the #287 schema).
         character: hydrateCharacterSnapshot(save.character),
         completedAt: new Date(),
       },
@@ -87,17 +87,17 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : '회차 적치 실패';
-    // #352 — 조용히 응답만 돌려주면 어디에도 안 남는다. 엔딩 5종이 enum 에 빠져 모든 완주가
-    //   버려졌을 때 서버 로그가 비어 있어 2주 넘게 몰랐다. 회차 유실은 반드시 남긴다.
+    // #352 - quietly returning a response leaves no trace anywhere. When 5 endings were missing from the enum and every
+    //   completion was thrown away, the server log was empty and it went unnoticed for over two weeks. A lost run is always logged.
     console.error('[web-adventure] 회차 적치 실패(로그인):', session.user.email, body.endingId, message);
     return apiError(message, 400);
   }
 
-  // 완주는 업적의 큰 축이다(완주 횟수·엔딩 수집·주인공 수집). 실패해도 삼키므로
-  // 업적 때문에 완주 저장이 막히지 않는다.
+  // Completion is a major axis of the achievements (completion count, ending collection, protagonist collection). Failures are
+  // swallowed, so the achievements never block saving a completion.
   await evaluateAndGrant(session.user.email);
 
-  // 2. save 의 runIndex+1 — 캐릭터/씬은 reset (다음 회차는 creating 부터).
+  // 2. Bump the save's runIndex - the character and scene are reset (the next run starts from creating).
   await WebAdventureSave.findOneAndUpdate(
     { userEmail: session.user.email },
     {
@@ -107,23 +107,23 @@ export async function POST(req: NextRequest) {
     { new: true },
   );
 
-  // 3. #9 — 엔딩 시 피드백 노트 자동 생성(큐 적재). 작가 소유, 볼륨 캡·중복 방지.
+  // 3. #9 - a feedback note is created automatically on an ending (queued). Owned by the author, with a volume cap and duplicate prevention.
   await enqueueFeedbackNote(pastRun, session.user.email, log.length);
 
-  // 4. #158 — 엔딩마다 씬 삽화 한 장 추가(큐 적재). 회차를 거듭할수록 그림이 늘어난다.
+  // 4. #158 - one more scene illustration per ending (queued). The pictures grow as the runs accumulate.
   await enqueueSceneImage(pastRun, session.user.email);
 
   return apiSuccess({ nextRunIndex: save.runIndex + 1 });
 }
 
 /**
- * 비로그인 플레이어의 엔딩 (#253) — 회차를 합성 계정에 적치하고 피드백 노트를 큐에 올린다.
+ * A logged-out player's ending (#253) - the run is accumulated on the synthetic account and a feedback note queued.
  *
- * **서버 save 는 건드리지 않는다.** 비로그인은 서버 save 자체가 없고, 진행도는 클라이언트가
- * localStorage 로 이미 관리한다(엔딩 시 runIndex+1·캐릭터 clear 를 클라이언트가 한다).
+ * **The server save is left alone.** A logged-out player has no server save, and the client already manages the
+ * progress in localStorage (bumping runIndex and clearing the character on an ending itself).
  *
- * 씬 삽화는 올리지 않는다 — 회차마다 이미지 생성 비용이 들고, 여기서 고치려는 것은 피드백
- * 노트다. 앱 경로와 다른 점이므로 바꾸려면 따로 결정할 일이다.
+ * No scene illustration is queued - each run costs an image generation, and what is being fixed here is the feedback
+ * note. It differs from the app path, so changing it is a separate decision.
  */
 async function endAnonymousRun(
   req: NextRequest,
@@ -137,8 +137,8 @@ async function endAnonymousRun(
 
   await connectToDB();
 
-  // 익명 플레이가 전부 한 계정에 모이므로 runIndex 가 부딪힌다 — 다시 세어 재시도한다.
-  // (app-end-run 과 같은 방식. 저볼륨이라 count+1 로 충분하다.)
+  // Every anonymous play gathers on one account, so runIndex collides - it recounts and retries.
+  // (The same approach as app-end-run. At this volume, count+1 is enough.)
   let pastRun = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const count = await WebAdventurePastRun.countDocuments({ userEmail: WEB_ANON_USER });
@@ -151,8 +151,8 @@ async function endAnonymousRun(
         finalSceneId: body.finalSceneId,
         scenePath,
         log,
-        // 클라이언트가 보낸 캐릭터. 없으면 hydrate 가 기본값으로 채우지만, 그러면 노트
-        // 서사가 실제 플레이와 어긋나므로 클라이언트가 함께 보낸다.
+        // The character the client sent. Without it, hydrate fills in defaults, but the note's narrative would then
+        // diverge from the actual play, so the client sends it along.
         character: hydrateCharacterSnapshot(body.character),
         completedAt: new Date(),
       });
@@ -161,8 +161,8 @@ async function endAnonymousRun(
       const dup = err instanceof Error && err.message.includes('E11000');
       if (dup && attempt < 2) continue;
       const message = err instanceof Error ? err.message : '회차 적치 실패';
-      // #352 — 위와 같은 이유로 반드시 남긴다. 비로그인은 되돌릴 save 조차 없어 여기서
-      //   놓치면 그 회차는 영영 사라진다.
+      // #352 - always logged, for the reason above. A logged-out player has not even a save to fall back on, so missing it
+      //   here loses that run forever.
       console.error('[web-adventure] 회차 적치 실패(비로그인):', body.endingId, message);
       return apiError(message, 500);
     }

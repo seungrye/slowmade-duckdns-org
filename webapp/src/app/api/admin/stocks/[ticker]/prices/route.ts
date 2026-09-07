@@ -11,7 +11,7 @@ type Params = { params: Promise<{ ticker: string }> };
  * GET /api/admin/stocks/[ticker]/prices
  *   ?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=N
  *
- * owner 전용 일봉 시계열 (date asc).
+ * The owner-only daily-bar time series (date ascending).
  */
 export async function GET(req: NextRequest, { params }: Params) {
   const guard = await requireOwner();

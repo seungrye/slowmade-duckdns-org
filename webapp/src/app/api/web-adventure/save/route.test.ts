@@ -1,8 +1,8 @@
-// /api/web-adventure/save — GET / POST 테스트 (#237).
+// /api/web-adventure/save - GET and POST tests (#237).
 //
-// GET: 로그인된 사용자의 현재 save 반환 (없으면 data: null).
-// POST: 로그인된 사용자의 save 를 upsert (현재 진행도 갱신).
-// 비로그인 → 401.
+// GET: returns the logged-in user's current save (data: null when absent).
+// POST: upserts the logged-in user's save (updating the current progress).
+// Logged out -> 401.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
@@ -108,7 +108,7 @@ describe('POST /api/web-adventure/save', () => {
     expect(res.status).toBe(200);
     const updateFn = WebAdventureSave.findOneAndUpdate as ReturnType<typeof vi.fn>;
     expect(updateFn).toHaveBeenCalled();
-    // upsert: true + userEmail 매칭
+    // upsert: true plus a userEmail match
     const call = updateFn.mock.calls[0];
     expect(call[0]).toEqual({ userEmail: 'tester@example.com' });
     expect(call[2]).toMatchObject({ upsert: true });

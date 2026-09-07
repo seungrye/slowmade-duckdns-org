@@ -1,14 +1,14 @@
-// /api/web-adventure/end-run — 엔딩 도달 시 회차 종결 (#239).
+// /api/web-adventure/end-run - ending a run on reaching an ending (#239).
 //
-// 흐름: 현재 save → past_run insert + save 의 runIndex+1 + 캐릭터/씬 reset.
-// 클라이언트가 EndingScreen 진입 시 호출. payload: { endingId, finalSceneId }.
+// The flow: the current save -> insert a past_run, bump the save's runIndex and reset the character and scene.
+// The client calls it on entering EndingScreen. The payload: { endingId, finalSceneId }.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/achievements', () => ({ evaluateAndGrant: vi.fn().mockResolvedValue([]) }));
 vi.mock('@/lib/web-adventure/enqueue-scene-image', () => ({
-  // #158 — 삽화 큐 적재는 자체 테스트로 검증한다. 여기선 DB 를 안 타게만 한다.
+  // #158 - queueing the illustration is verified by its own tests. Here it is only kept off the DB.
   enqueueSceneImage: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
@@ -24,7 +24,7 @@ vi.mock('@/models/web-adventure-past-run', () => ({
     countDocuments: vi.fn(),
   },
 }));
-// 비로그인 제출은 공개 쓰기 경로다 (#253). 한도 자체는 rate-limit 자체 테스트가 본다.
+// A logged-out submission is a public write path (#253). The limit itself is the rate-limit tests' concern.
 const mockRateLimit = vi.hoisted(() => vi.fn(() => true));
 vi.mock('@/lib/rate-limit', () => ({
   rateLimit: mockRateLimit,
@@ -62,7 +62,7 @@ const sampleCharacter = {
   rerollsLeft: 1,
 };
 
-// 자동 피드백 노트 enqueue 를 위한 기본 mock (개별 테스트에서 덮어씀).
+// The default mock for enqueueing the automatic feedback note (overridden per test).
 function setupAutoEnqueueDefaults() {
   (env as { ownerEmail: string }).ownerEmail = 'owner@x.com';
   asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(0);
@@ -76,14 +76,14 @@ describe('POST /api/web-adventure/end-run', () => {
     setupAutoEnqueueDefaults();
   });
 
-  // ── 비로그인 플레이어의 엔딩 (#253) ─────────────────────────────────
+  // ── A logged-out player's ending (#253) ─────────────────────────────────
   //
-  // 예전엔 여기서 401 이었다. 클라이언트는 비로그인일 때도 이 API 를 부르는데 401 을
-  // 조용히 무시해서, 엔딩 로그가 전부 있는데도 버려졌다 — 피드백 노트가 안 생겼다.
+  // This used to return 401. The client calls this API when logged out too, and it **silently ignored** the 401,
+  // so a complete ending log was thrown away - no feedback note was created.
   //
-  // 로그인을 요구할 이유가 없다: 노트 **소유자는 작가**(ownerEmail)고 플레이어는
-  // sourceUserEmail 로 기록될 뿐이다. 오히려 남의 플레이 피드백이 이 기능의 목적이다.
-  // 앱(app-end-run)이 합성 사용자로 이미 그렇게 하고 있다.
+  // There is no reason to require a login: the note's **owner is the author** (ownerEmail) and the player is merely
+  // recorded as sourceUserEmail. Feedback from other people's play is the point of the feature.
+  // The app (app-end-run) already does exactly this with a synthetic user.
   describe('비로그인 플레이어 (#253)', () => {
     const anonBody = {
       endingId: 'revolution',
@@ -131,7 +131,7 @@ describe('POST /api/web-adventure/end-run', () => {
       expect(note.sourceUserEmail).toBe('web');
     });
 
-    // 비로그인은 서버 save 가 아예 없다. 진행도는 localStorage 가 관리한다.
+    // A logged-out player has no server save at all. localStorage manages the progress.
     it('서버 save 는 건드리지 않는다', async () => {
       await POST(makeRequest(anonBody));
       expect(WebAdventureSave.findOne).not.toHaveBeenCalled();
@@ -156,7 +156,7 @@ describe('POST /api/web-adventure/end-run', () => {
       expect(WebAdventurePastRun.create).not.toHaveBeenCalled();
     });
 
-    // 합성 사용자 하나에 모든 익명 플레이가 모이므로 runIndex 가 부딪힌다.
+    // Every anonymous play gathers on one synthetic user, so runIndex collides.
     it('runIndex 가 부딪히면 다시 세어 재시도한다', async () => {
       asMock(WebAdventurePastRun.create)
         .mockRejectedValueOnce(new Error('E11000 duplicate key'))
@@ -204,7 +204,7 @@ describe('POST /api/web-adventure/end-run', () => {
     );
     expect(res.status).toBe(200);
 
-    // past_run upsert — (userEmail, runIndex) 키 + endingId 갱신.
+    // The past_run upsert - keyed on (userEmail, runIndex), with endingId refreshed.
     const prUpsert = WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>;
     expect(prUpsert).toHaveBeenCalled();
     const prCall = prUpsert.mock.calls[0];
@@ -238,7 +238,7 @@ describe('POST /api/web-adventure/end-run', () => {
     (WebAdventureSave.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({});
 
     const bigLog = Array.from({ length: 6000 }, (_, i) => `line ${i}`);
-    bigLog.push('x'.repeat(9000)); // 초장문 항목
+    bigLog.push('x'.repeat(9000)); // a very long entry
     const res = await POST(
       makeRequest({ endingId: 'main', finalSceneId: 'elder_house_ending', log: bigLog }),
     );
@@ -247,8 +247,8 @@ describe('POST /api/web-adventure/end-run', () => {
     const prCall = (WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
     const savedLog = prCall[1].log as string[];
     expect(Array.isArray(savedLog)).toBe(true);
-    expect(savedLog.length).toBeLessThanOrEqual(5000); // 항목 수 캡
-    expect(savedLog.every((s) => s.length <= 4000)).toBe(true); // 항목 길이 캡
+    expect(savedLog.length).toBeLessThanOrEqual(5000); // the entry-count cap
+    expect(savedLog.every((s) => s.length <= 4000)).toBe(true); // the entry-length cap
   });
 
   it('log 미전달/비배열이면 빈 배열로 저장', async () => {
@@ -270,10 +270,10 @@ describe('POST /api/web-adventure/end-run', () => {
     expect(prCall[1].log).toEqual([]);
   });
 
-  // #252 — 이전 회차에서 *save 갱신 실패* 등으로 runIndex 가 그대로 남은 상태에서
-  //   다시 end-run 호출 시 (= save.runIndex 가 이전 past_run 의 runIndex 와 동일)
-  //   기존 create 방식은 unique index 충돌로 400 → save 갱신 안 됨 → 갤러리에서
-  //   새 엔딩 안 보임 (사용자 보고). upsert 로 *덮어쓰기* 처리해 재발 방지.
+  // #252 - when a previous run left runIndex unchanged (a *failed save update* and the like) and
+  //   end-run is called again (= save.runIndex equals the previous past_run's runIndex),
+  //   the old create approach hit a unique-index collision and returned 400 -> the save was never updated -> the
+  //   new ending never appeared in the gallery (as reported). An upsert *overwrites* instead and prevents a recurrence.
   it('같은 (userEmail, runIndex) 에 다른 endingId 도달 시 upsert 로 덮어쓰기 + save 갱신 정상 (#252)', async () => {
     (auth as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { email: 'a@b.com' } });
     (WebAdventureSave.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -284,7 +284,7 @@ describe('POST /api/web-adventure/end-run', () => {
         currentSceneId: 'ending_shopkeeper',
       }),
     });
-    // findOneAndUpdate 가 *기존 past_run* 의 _id 와 새 endingId 로 반환 — upsert 정상.
+    // findOneAndUpdate returns *the existing past_run's* _id with the new endingId - the upsert worked.
     (WebAdventurePastRun.findOneAndUpdate as ReturnType<typeof vi.fn>).mockResolvedValue({
       _id: 'pr1',
       userEmail: 'a@b.com',
@@ -297,17 +297,17 @@ describe('POST /api/web-adventure/end-run', () => {
       makeRequest({ endingId: 'shopkeeper', finalSceneId: 'ending_shopkeeper' }),
     );
 
-    // 정상 200 — duplicate 충돌 없음.
+    // a normal 200 - no duplicate collision.
     expect(res.status).toBe(200);
 
-    // save 의 runIndex 도 정상 +1.
+    // the save's runIndex is properly +1 too.
     const updateFn = WebAdventureSave.findOneAndUpdate as ReturnType<typeof vi.fn>;
     expect(updateFn).toHaveBeenCalled();
     expect(updateFn.mock.calls[0][1].runIndex).toBe(2);
   });
 });
 
-// #9 — 엔딩 시 피드백 노트 자동 생성(모든 로그인 플레이어, 작가 소유, 볼륨 캡).
+// #9 - a feedback note is created automatically on an ending (for every logged-in player, owned by the author, with a volume cap).
 describe('POST /api/web-adventure/end-run — 피드백 노트 자동 생성', () => {
   beforeEach(() => {
     vi.clearAllMocks();

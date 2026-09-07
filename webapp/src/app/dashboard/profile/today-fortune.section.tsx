@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * 프로필의 '오늘의 운세' 섹션 (#388·#390).
+ * The profile's 'today's fortune' section (#388, #390).
  *
- * 우하단 토스트가 데려오는 곳. 타로/사주 탭. 타로는 카드 뒷면→클릭/해시 진입 시 뒤집힘→풀이.
- * 사주는 생일이 있으면 미니 사주판 + 오늘의 풀이, 없으면 생일 등록 안내.
- * 오늘 확인했으면 다음날까지 뒤집힌 채로 유지(seen). 사이트 스킨 + 보라 액센트.
+ * Where the bottom-right toast leads. Tarot and saju tabs. Tarot shows the card's back, flips on a click or a hash
+ * arrival, then the reading. Saju shows a mini chart plus today's reading when there is a birthday, or a prompt to register one.
+ * Once seen today it stays flipped until the next day (seen). The site's skin with a violet accent.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -30,7 +30,7 @@ type Fortune = {
 
 import { EL_COLOR, ELEMENTS, meaningOf, ZHI_EL } from '@/lib/fortune/saju-labels';
 const ZHI_EL_OF = (z: string) => ZHI_EL[z] ?? '토';
-// 사주 글자 수 — 시주가 있으면 4기둥×2=8, 없으면 3기둥×2=6.
+// The saju's character count - 4 pillars x 2 = 8 with an hour pillar, 3 x 2 = 6 without.
 const sajuTotal = (saju: SajuBlock) => (saju.pillars.time ? 8 : 6);
 
 export default function TodayFortuneSection() {
@@ -51,7 +51,7 @@ export default function TodayFortuneSection() {
         if (cancelled) return;
         const f = res?.data ?? null;
         setData(f);
-        if (f?.seen) setRevealed(true); // 오늘 확인했으면 뒤집힌 채로
+        if (f?.seen) setRevealed(true); // stays flipped once seen today
       })
       .catch(() => { if (!cancelled) setData(null); })
       .finally(() => { if (!cancelled) setLoading(false); });

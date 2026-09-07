@@ -1,7 +1,7 @@
-// 패치 파일 내려주기 (#112) — 롬 파일과 같은 인증 프록시.
+// Serving a patch file (#112) - the same authenticated proxy as the ROM file.
 //
-// 공개 `/s3/` 경로를 쓰지 않는다. 패치만으로는 게임이 되지 않지만, 남의 계정 것이 주소만으로
-// 새 나가면 안 되는 건 마찬가지다.
+// The public `/s3/` path is not used. A patch alone is not a game, but someone else's account's file leaking through
+// the address alone is no more acceptable.
 
 import { NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -23,7 +23,7 @@ const minioClient = new Minio.Client({
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string; patchId: string }> }) {
   const session = await auth();
   const email = session?.user?.email;
-  // 인증 실패도 404 — 401 은 "그 id 는 있다" 는 정보가 된다.
+  // A failed authorisation is a 404 too - a 401 would reveal "that id exists".
   if (!email) return new NextResponse('Not Found', { status: 404 });
 
   const { id, patchId } = await ctx.params;

@@ -1,11 +1,11 @@
-// 매매기록 내보내기 버튼 (#181).
+// The trade-record export buttons (#181).
 //
-// CSV 는 링크 하나면 된다 — 브라우저가 `Content-Disposition` 을 보고 알아서 내려받는다.
-// `download` 속성은 일부러 **빼 뒀다**: 그걸 붙이면 브라우저가 파일명을 URL 에서 짐작하는데,
-// 우리는 서버가 한글 이름(`매매기록-주문로그-20260818.csv`)을 헤더로 실어 보내기 때문이다.
+// CSV needs only a link - the browser sees `Content-Disposition` and downloads it itself.
+// The `download` attribute is **deliberately left off**: with it, the browser guesses the filename from the URL,
+// while our server sends a Korean name (`매매기록-주문로그-20260818.csv`) in the header.
 //
-// 구글 시트 내보내기는 **제거됐다** (#228). GCP 결제 계좌가 필요해 막혀 있었고 방향을 접었다.
-// 그게 빠지면서 상태·에러 표시가 전부 필요 없어져 클라이언트 컴포넌트일 이유도 사라졌다.
+// The Google Sheets export was **removed** (#228). It needed a GCP billing account and was blocked, so the direction was dropped.
+// With that gone, the status and error displays became unnecessary and there was no longer any reason for a client component.
 
 import { DATASETS } from "@/lib/trading/export-datasets";
 

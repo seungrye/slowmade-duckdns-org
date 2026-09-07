@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import BevyRogueClient from "./BevyRogueClient";
 
-// BevyRogueClient 는 "use client" 컴포넌트.
-// wasm 글루는 그 안의 useEffect 에서만 dynamic import 하므로 SSR 단계에서
-// window/document 접근이 일어나지 않는다(빌드도 안전).
+// BevyRogueClient is a "use client" component.
+// The wasm glue is dynamically imported only inside its useEffect, so no window or document
+// access happens during SSR (the build is safe too).
 
 export const metadata: Metadata = {
   title: "Bevy Rogue",

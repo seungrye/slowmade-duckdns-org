@@ -1,21 +1,21 @@
-// /scenes/graph — ReactFlow + dagre 편집 차트 페이지.
+// /scenes/graph - the ReactFlow + dagre editing chart page.
 //
-// #222 (6 주차):
-//   - 30 씬 fetch (/api/web-adventure/content/v1)
-//   - dagre LR 자동 레이아웃 (savedPosition 있는 노드는 유지)
-//   - 노드 클릭 → /scenes/[id] 이동 (편집 페이지) — #226 부터 우측 사이드패널 인라인 편집.
-//   - 노드 드래그 → debounce 500ms PUT (position 만)
-//   - 엔딩 6 색 / 엣지 4 종 시각 구분
+// #222 (week 6):
+//   - fetching the 30 scenes (/api/web-adventure/content/v1)
+//   - dagre LR automatic layout (a node with a savedPosition keeps it)
+//   - a node click -> going to /scenes/[id] (the edit page) - from #226 on, inline editing in the right-hand side panel.
+//   - a node drag -> a 500ms debounced PUT (the position alone)
+//   - 6 ending colours and 4 edge kinds, told apart visually
 //
-// #226 — router.push 제거, SidePanel 로 인라인 편집.
-//   - 클릭 → setSelectedSceneId.
-//   - 저장 콜백 → scenes state 의 해당 씬 교체 → 노드 data (title 등) 즉시 반영.
+// #226 - router.push removed, editing inline through the SidePanel.
+//   - a click -> setSelectedSceneId.
+//   - the save callback -> that scene is replaced in the scenes state -> the node data (title and so on) updates at once.
 //
-// #231 — bevy-rogue quest CMS 패턴 회수.
-//   - 기본 상태(selectedSceneId=null) → SidePanel 미렌더. 그래프가 full-width.
-//   - 노드 클릭 → SidePanel mount + slide-in (CSS transition 300ms).
-//   - 닫기 → onClose → setSelectedSceneId(null) → unmount.
-//   - "노드를 클릭하면 편집" 안내 메시지 제거 (애초에 패널이 안 보임).
+// #231 - reclaiming the bevy-rogue quest CMS pattern.
+//   - the default state (selectedSceneId=null) -> the SidePanel is not rendered. The graph is full-width.
+//   - a node click -> the SidePanel mounts and slides in (a 300ms CSS transition).
+//   - closing -> onClose -> setSelectedSceneId(null) -> unmount.
+//   - the "click a node to edit" hint is gone (the panel is not visible in the first place).
 
 "use client";
 
@@ -46,12 +46,12 @@ import {
 import SceneNode from "./sceneNode";
 import { SidePanel } from "./sidePanel";
 
-// 엣지 4 종 색상.
-// plain → 진한 회색 실선.
-// probability success → 초록 실선.
-// probability failure → 빨강 점선.
-// conditional → 파랑 실선 (hidden=true 면 점선).
-// edgeStyleForKind 는 ./edgeStyle.ts (page 컴포넌트 export 제약 회피).
+// The 4 edge kinds' colours.
+// plain -> a dark grey solid line.
+// probability success -> a green solid line.
+// probability failure -> a red dashed line.
+// conditional -> a blue solid line (dashed when hidden=true).
+// edgeStyleForKind lives in ./edgeStyle.ts (working around the page component's export constraint).
 import { edgeStyleForKind } from "./edgeStyle";
 
 function toReactFlowEdges(edges: GraphEdge[]): Edge[] {
@@ -79,13 +79,13 @@ const NODE_TYPES: NodeTypes = {
   scene: SceneNode as unknown as NodeTypes[string],
 };
 
-// #225 — 드래그 vs 클릭 판정 임계값 (px).
-// dragStart vs dragStop 거리가 이 값 미만이면 click 으로 간주.
-// 이상이면 PUT 으로 위치 저장.
+// #225 - the threshold that tells a drag from a click (px).
+// A dragStart-to-dragStop distance below this counts as a click.
+// At or above it, the position is saved with a PUT.
 const DRAG_CLICK_THRESHOLD_PX = 5;
 
-// #235 — ReactFlowProvider 안에서 useReactFlow 가 동작하도록 본문을 분리.
-// GraphPage 는 단순히 Provider 로 GraphInner 를 wrap.
+// #235 - the body is split out so useReactFlow works inside ReactFlowProvider.
+// GraphPage simply wraps GraphInner in the Provider.
 export default function GraphPage() {
   return (
     <ReactFlowProvider>
@@ -95,41 +95,41 @@ export default function GraphPage() {
 }
 
 function GraphInner() {
-  // #226 — router.push 는 더 이상 사용하지 않지만, useRouter 를 호출해
-  // next/navigation 컨텍스트와 호환을 유지한다 (테스트 mock 호환).
+  // #226 - router.push is no longer used, but useRouter is called to stay
+  // compatible with the next/navigation context (and with the test mocks).
   useRouter();
-  // #341 — /scenes/[id] 의 '차트에서 보기' 버튼이 ?focus=<id> 로 진입.
-  // mount + scenes 로드 후 그 노드 selectedSceneId 설정 + setCenter(zoom: 1.2).
+  // #341 - the 'view in the chart' button on /scenes/[id] arrives with ?focus=<id>.
+  // After mounting and loading the scenes it sets that node as selectedSceneId and calls setCenter(zoom: 1.2).
   const searchParams = useSearchParams();
   const focusParam = searchParams?.get("focus") ?? null;
-  // #235 — 카메라 이동용 setCenter 훅.
-  // #341/fix — getNodes: focus URL 진입의 setTimeout 안에서 *최신* 노드 좌표
-  // 가 필요. closure 의 rfNodes 는 stale (마운트 시점 빈 배열).
+  // #235 - the setCenter hook for moving the camera.
+  // #341/fix - getNodes: the *latest* node coordinates are needed inside the focus-URL entry's
+  // setTimeout. The closure's rfNodes is stale (an empty array at mount time).
   //
-  // #330 은 "선택 시 현재 zoom 유지(확대 금지)" 를 위해 getZoom 을 들여왔으나, #341 에서
-  // focus 진입을 zoom 1.2 고정으로 바꾸면서 쓰이지 않게 됐다(아래 setCenter 참조).
-  // 지금은 zoom 유지 동작이 없다 — 되살리려면 setCenter 의 zoom 을 getZoom() 으로 바꿔야 한다.
+  // #330 brought in getZoom to "keep the current zoom on selection (never zoom in)", but #341 changed
+  // focus entry to a fixed zoom of 1.2 and left it unused (see setCenter below).
+  // There is no zoom-keeping behaviour now - reviving it means changing setCenter's zoom back to getZoom().
   const { setCenter, getNodes, setNodes, setEdges } = useReactFlow();
   const [scenes, setScenes] = useState<SceneWithPosition[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // #226 — 사이드패널 편집 대상 씬 id.
-  // #231 — null 시 SidePanel 자체 미렌더 (mount/unmount + slide-in/out).
+  // #226 - the id of the scene the side panel is editing.
+  // #231 - when null the SidePanel itself is not rendered (mount/unmount plus slide in/out).
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
-  // #341 — focus URL 진입으로 인한 selectedSceneId 인지. 그때만 zoom 1.2 강제.
+  // #341 - whether selectedSceneId came from a focus-URL entry. The zoom is forced to 1.2 only then.
   const initialFocusAppliedRef = useRef(false);
   const debounceRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  // #225 — drag 시작 좌표 기억 (id → {x,y}).
-  // onNodeDragStart 에서 set, onNodeDragStop 에서 비교 후 clear.
+  // #225 - remembering the drag's starting coordinates (id -> {x,y}).
+  // Set in onNodeDragStart, compared and cleared in onNodeDragStop.
   const dragStartRef = useRef<Record<string, { x: number; y: number }>>({});
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // #331 — cache: "no-store" — 드래그한 좌표를 새로고침 시 즉시 받기
-        // 위함. content/v1 의 max-age=60 캐시가 PUT 직후 새로고침을 stale
-        // 데이터로 채우는 문제 차단. graph 페이지는 admin 도구라 매번 fresh
-        // fetch 비용 허용.
+        // #331 - cache: "no-store" - so a dragged coordinate comes back at once on a
+        // refresh. It blocks content/v1's max-age=60 cache filling a refresh right after a PUT
+        // with stale data. Being an admin tool, the graph page can afford a fresh
+        // fetch every time.
         const res = await fetch("/api/web-adventure/content/v1", { cache: "no-store" });
         if (!res.ok) throw new Error(`fetch ${res.status}`);
         const json = (await res.json()) as {
@@ -149,13 +149,13 @@ function GraphInner() {
     };
   }, []);
 
-  // #347 — uncontrolled 패턴: ReactFlow 의 *내부 store* 만 사용.
-  //   외부 useNodesState 시 매 mousemove 마다 외부 state 갱신 → 컴포넌트 re-render
-  //   → 노드 드래그 응답성 큰 부담. setNodes/setEdges 가 internal store 만 갱신.
-  //   ReactFlow 의 `nodes`/`edges` prop 안 줌 → uncontrolled 모드 활성.
+  // #347 - the uncontrolled pattern: ReactFlow's *internal store* alone is used.
+  //   An external useNodesState updates external state on every mousemove -> the component re-renders
+  //   -> a heavy cost to node-drag responsiveness. setNodes/setEdges update the internal store only.
+  //   ReactFlow gets no `nodes`/`edges` prop -> uncontrolled mode is active.
 
-  // scenes 가 fetch 되면 노드/엣지 state 를 초기 배치 (elk autoLayout + savedPosition).
-  // #347 — autoLayout 이 async (elkjs) 로 변경 → useEffect 안에서 await.
+  // Once the scenes are fetched, the node and edge state is laid out initially (elk autoLayout plus savedPosition).
+  // #347 - autoLayout became async (elkjs) -> awaited inside the useEffect.
   useEffect(() => {
     if (!scenes) return;
     let cancelled = false;
@@ -169,8 +169,8 @@ function GraphInner() {
         type: "scene",
         data: n.data as unknown as Record<string, unknown>,
         draggable: true,
-        // focusParam 도 함께 — autoLayout async 완료 시점에 selectedSceneId
-        // closure 가 stale 일 수 있음 (focus URL effect 가 그 사이 setSelectedSceneId 호출).
+        // focusParam comes along too - by the time the async autoLayout finishes, the selectedSceneId
+        // closure can be stale (the focus-URL effect having called setSelectedSceneId meanwhile).
         selected: n.id === selectedSceneId || n.id === focusParam,
       }));
       setNodes(rfn);
@@ -182,16 +182,16 @@ function GraphInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes]);
 
-  // #341 — focus URL param 처리: scenes 가 로드된 후 그 노드를 *선택* + 카메라
-  // 중앙 + zoom 1.2 로 확대. 한 번만 (initialFocusAppliedRef 가드).
-  // selectedSceneId 변경 시 다른 노드 클릭은 #330 정책 (현재 zoom 유지) 그대로.
+  // #341 - handling the focus URL param: once the scenes load, that node is *selected*, the camera
+  // is centred and zoomed to 1.2. Once only (guarded by initialFocusAppliedRef).
+  // When selectedSceneId changes, clicking another node keeps #330's policy (the current zoom) as it was.
   useEffect(() => {
     if (!scenes || !focusParam || initialFocusAppliedRef.current) return;
     const target = scenes.find((s) => s.id === focusParam);
     if (!target) return;
     initialFocusAppliedRef.current = true;
     setSelectedSceneId(focusParam);
-    // 노드 좌표 — scene.position (savedPosition) 또는 autoLayout 후 rfNodes 에서 찾기.
+    // The node's coordinates - scene.position (savedPosition), or found in rfNodes after autoLayout.
     const timer = setTimeout(() => {
       const node = getNodes().find((n) => n.id === focusParam);
       if (!node) return;
@@ -204,9 +204,9 @@ function GraphInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenes, focusParam]);
 
-  // #235/#329/#346 — selectedSceneId 변경 시 noded.selected 필드 동기화.
-  //   - selectedCount > 1 (shift+multi-select) 시 보존 — 깨뜨리지 않음.
-  //   - no-op 시 *동일 reference* 반환 — 무한 루프 차단.
+  // #235/#329/#346 - a changed selectedSceneId syncs the nodes' selected field.
+  //   - preserved when selectedCount > 1 (shift multi-select) - it is not broken.
+  //   - a no-op returns the *same reference* - blocking an infinite loop.
   useEffect(() => {
     setNodes((nodes) => {
       const selectedCount = nodes.filter((n) => n.selected).length;
@@ -225,8 +225,8 @@ function GraphInner() {
     // 의존성에 넣어도 effect 가 다시 돌지 않는다. 테스트로 확인했다.
   }, [selectedSceneId, setNodes]);
 
-  // #334/#347 — 선택 노드의 connected edges 에 노란 drop-shadow glow.
-  // 변경 없는 edge 는 *동일 reference* 반환 — 114 edge 모두 spread 부담 차단.
+  // #334/#347 - a yellow drop-shadow glow on the selected node's connected edges.
+  // An unchanged edge returns the *same reference* - avoiding the cost of spreading all 114 edges.
   useEffect(() => {
     setEdges((edges) => {
       let changed = false;
@@ -236,7 +236,7 @@ function GraphInner() {
           (e.source === selectedSceneId || e.target === selectedSceneId);
         const currentStyle = (e.style ?? {}) as CSSProperties;
         const hasFilter = typeof currentStyle.filter === "string" && currentStyle.filter.includes("drop-shadow");
-        // 동일 상태면 그대로.
+        // The same state is left as it is.
         if (isConnected === hasFilter) return e;
         changed = true;
         const { filter: _drop, ...rest } = currentStyle;
@@ -255,22 +255,22 @@ function GraphInner() {
     // #85 — setEdges 도 setNodes 와 같이 안정적 참조다.
   }, [selectedSceneId, setEdges]);
 
-  // #235 (제거) — 노드 클릭 시 setCenter 카메라 이동 제거.
-  //   #347: 69 노드 + 114 edge 환경에서 *클릭 응답성 저하 주요 원인*.
-  //   focus URL 진입 시 (#341) 만 직접 setCenter — 그것은 *명시 의도* 라 유지.
+  // #235 (removed) - the setCenter camera move on a node click is gone.
+  //   #347: with 69 nodes and 114 edges it was *the main cause of poor click responsiveness*.
+  //   setCenter is called directly only on a focus-URL entry (#341) - that being *explicit intent*, it stays.
 
-  // #225 — 드래그 시작점 저장.
-  // ReactFlow 는 노드 mousedown 시 (이동 없어도) onNodeDragStart 를 발화.
+  // #225 - storing the drag's starting point.
+  // ReactFlow fires onNodeDragStart on a node mousedown (even with no movement).
   const handleNodeDragStart = useCallback<
     (e: React.MouseEvent, node: Node) => void
   >((_e, node) => {
     dragStartRef.current[node.id] = { x: node.position.x, y: node.position.y };
   }, []);
 
-  // #225 / #226 — 노드 드래그 종료 시:
-  //   - 시작점 대비 거리 < 5px → click 으로 처리 → setSelectedSceneId (사이드패널).
-  //   - 거리 ≥ 5px → debounce 500ms PUT (위치 저장).
-  // 라우팅 / PUT 충돌을 방지하기 위해 별도 onNodeClick 핸들러를 두지 않는다.
+  // #225 / #226 - when a node drag ends:
+  //   - a distance from the start below 5px -> treated as a click -> setSelectedSceneId (the side panel).
+  //   - at or above 5px -> a 500ms debounced PUT (saving the position).
+  // No separate onNodeClick handler is kept, to avoid a routing/PUT clash.
   const handleNodeDragStop = useCallback<
     (e: React.MouseEvent, node: Node, nodes: Node[]) => void
   >(
@@ -288,7 +288,7 @@ function GraphInner() {
         return;
       }
 
-      // #346 — 다수 함께 드래그 시 각 노드 별 PUT. nodes 비어있으면 단일 node.
+      // #346 - dragging several together PUTs per node. With nodes empty it is the single node.
       const dragged = nodes && nodes.length > 0 ? nodes : [node];
       for (const n of dragged) {
         const nid = n.id;
@@ -307,8 +307,8 @@ function GraphInner() {
     [],
   );
 
-  // #226 — SidePanel 저장 콜백 → scenes state 의 해당 씬 교체.
-  // ReactFlow 의 rfNodes 가 useMemo 로 scenes 에 의존하므로 자동 재계산 → 노드 data 갱신.
+  // #226 - the SidePanel's save callback -> that scene is replaced in the scenes state.
+  // ReactFlow's rfNodes depends on scenes through useMemo, so it recomputes automatically -> the node data updates.
   const handleSceneSaved = useCallback((updated: Scene) => {
     setScenes((prev) => {
       if (!prev) return prev;
@@ -347,34 +347,34 @@ function GraphInner() {
         >
           <div className="flex-1 min-w-0 h-full">
             <ReactFlow
-              // #347 — uncontrolled: defaultNodes/defaultEdges 빈 배열 명시.
-              //   useReactFlow().setNodes/setEdges 로 비동기 fetch 후 갱신.
-              //   드래그 시 외부 state 갱신 X → 컴포넌트 재 렌더 없음.
+              // #347 - uncontrolled: defaultNodes/defaultEdges are given as explicit empty arrays.
+              //   They are updated after the async fetch through useReactFlow().setNodes/setEdges.
+              //   A drag updates no external state -> the component does not re-render.
               defaultNodes={[]}
               defaultEdges={[]}
               nodeTypes={NODE_TYPES}
               nodesDraggable
               onNodeDragStart={handleNodeDragStart}
               onNodeDragStop={handleNodeDragStop}
-              // #233 — ReactFlow 는 순수 클릭(움직임 0) 시 onNodeDragStart/Stop
-              // 자체를 발화하지 않는다. handleNodeDragStop 의 isClick 분기는 작은
-              // 드래그(< 5px) 에만 도달하므로, 순수 클릭은 onNodeClick 으로 처리.
-              // #346 — multi-select: shift+클릭/drag select. shift 키 안 누른
-              //   클릭만 단일 선택 강제. shift+click 은 ReactFlow 가 알아서 추가
-              //   선택 (multiSelectionKeyCode 기본값="Shift").
+              // #233 - on a pure click (zero movement) ReactFlow does not fire onNodeDragStart/Stop
+              // at all. handleNodeDragStop's isClick branch is reached only by a small
+              // drag (< 5px), so a pure click is handled by onNodeClick.
+              // #346 - multi-select: shift-click or drag select. Only a click without
+              //   the shift key forces a single selection. ReactFlow handles shift-click's
+              //   additive selection itself (multiSelectionKeyCode defaults to "Shift").
               multiSelectionKeyCode="Shift"
               onNodeClick={(e, node) => {
                 if ((e as React.MouseEvent).shiftKey) return;
                 setSelectedSceneId(node.id);
               }}
-              // 2+ 다수 선택 시 SidePanel unmount.
+              // With 2 or more selected the SidePanel unmounts.
               onSelectionChange={({ nodes: selNodes }) => {
                 if (selNodes.length > 1) setSelectedSceneId(null);
               }}
-              // #336 — 캔버스 빈 여백 클릭 → 패널 닫기 + selected 해제 + 엣지
-              // glow 제거. setSelectedSceneId(null) 한 번이면 useEffect 들이
-              // 모두 동기화 — SidePanel unmount + 노드 selected=false + 엣지
-              // filter 제거.
+              // #336 - clicking the canvas's empty space closes the panel, clears the selection and removes the edge
+              // glow. A single setSelectedSceneId(null) syncs every useEffect -
+              // the SidePanel unmounts, the nodes go selected=false and the edge
+              // filter is removed.
               onPaneClick={() => setSelectedSceneId(null)}
               fitView
               minZoom={0.2}
@@ -397,8 +397,8 @@ function GraphInner() {
   );
 }
 
-// #270 〈에테르니아의 추락〉 — 노드/엣지 범례.
-// #335 — 6 엔딩 개별 색 라인 제거. 엔딩 노드는 단일 색 (amber) 으로 통일.
+// #270 The Fall of Eternia - the node and edge legend.
+// #335 - the 6 endings' individual colour lines are gone. Ending nodes are unified in a single colour (amber).
 function Legend() {
   return (
     <div className="text-xs space-y-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded p-2 shadow-sm">

@@ -30,16 +30,16 @@ export const metadata: Metadata = {
   },
 };
 
-// 사이트가 light/dark 를 모두 지원한다고 브라우저에 명시(<meta name="color-scheme">).
-// CSS 보다 먼저 파싱되어 모바일 크롬 자동 다크(force-dark)를 확실히 비활성화한다.
+// Tells the browser the site supports both light and dark (<meta name="color-scheme">).
+// Being parsed before the CSS, it reliably disables mobile Chrome's automatic dark (force-dark).
 export const viewport: Viewport = {
   colorScheme: "light dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // suppressHydrationWarning: THEME_INIT_SCRIPT 가 hydration 전에 html.dark 를 바꾸므로
-    // 서버(테마 미상)와 클라이언트의 class 불일치 경고를 억제한다.
+    // suppressHydrationWarning: THEME_INIT_SCRIPT changes html.dark before hydration, so it suppresses
+    // the class-mismatch warning between the server (which does not know the theme) and the client.
     <html lang="ko" suppressHydrationWarning>
       <head>
         {/* FOUC 방지 — localStorage 테마를 hydration 전에 동기 적용(light/dark/system 3분기). */}

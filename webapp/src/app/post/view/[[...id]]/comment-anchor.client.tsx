@@ -1,19 +1,19 @@
 'use client';
 
-// 알림에서 온 덧글로 스크롤 (#241, #243).
+// Scrolling to the comment a notification came from (#241, #243).
 //
-// 링크 자체는 `#comments-section` 으로 간다 — 메인 말풍선과 같은 **섹션 앵커**라 브라우저가
-// 먼저 그리로 데려다준다. 여기서는 쿼리 `?c=<덧글id>` 를 읽어, 그 덧글이 그려지면 거기까지
-// 한 번 더 스크롤하고 잠깐 강조한다.
+// The link itself goes to `#comments-section` - the same **section anchor** as the main speech bubble, so the browser
+// takes you there first. Here the query `?c=<comment id>` is read and, once that comment is drawn, it scrolls
+// once more to it and highlights it briefly.
 //
-// 못 찾아도 **섹션에는 이미 도착해 있다.** 예전처럼 아무 데도 못 가는 일이 없다.
+// Even when it is not found, **the section has already been reached.** There is no more ending up nowhere as before.
 import { useEffect } from 'react';
 import { targetCommentId, scrollTopFor } from '@/lib/comment-anchor';
 
-/** 덧글이 안 나타날 때 관찰을 접는 상한. 비공개 글은 클라이언트에서 늦게 그려진다. */
+/** The cap on observing when the comment never appears. A private post is drawn late on the client. */
 const MAX_WAIT_MS = 5000;
 
-/** 어디로 갔는지 눈에 띄게 — 잠깐만. */
+/** Making where you landed noticeable - only briefly. */
 const HIGHLIGHT_MS = 1600;
 
 export default function CommentAnchor() {
@@ -23,8 +23,8 @@ export default function CommentAnchor() {
 
     let highlighted = false;
     const go = (el: HTMLElement) => {
-      // 덧글 **상단**을 화면 2/5 지점에 (#255). scrollIntoView({block:'center'}) 는 요소
-      // 가운데를 맞추므로, 화면보다 긴 덧글이면 첫 줄이 화면 위로 밀려 올라간다.
+      // Puts the comment's **top** two fifths down the screen (#255). scrollIntoView({block:'center'}) centres
+      // the element, so a comment longer than the screen has its first line pushed above the top.
       window.scrollTo({
         top: scrollTopFor(el.getBoundingClientRect().top, window.scrollY, window.innerHeight),
         behavior: 'smooth',
@@ -35,8 +35,8 @@ export default function CommentAnchor() {
       setTimeout(() => el.classList.remove('ring-2', 'ring-blue-400', 'rounded-lg'), HIGHLIGHT_MS);
     };
 
-    // 본문 렌더가 끝나면 이미지·리치 콘텐츠가 자리를 잡으면서 레이아웃이 밀린다. 그때 한 번
-    // 더 맞춘다 — 안 그러면 먼저 맞춰 둔 위치가 어긋나 덧글이 화면 밖으로 나간다.
+    // Once the body finishes rendering, images and rich content settle and push the layout. It aligns once
+    // more then - otherwise the position aligned earlier drifts and the comment ends up off screen.
     const reposition = () => {
       const el = document.getElementById(targetId);
       if (el) go(el);

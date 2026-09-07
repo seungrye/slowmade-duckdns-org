@@ -6,7 +6,7 @@ import { UNIVERSES } from "@/lib/trading/universes";
 import { runFactorComparison, DEFAULT_FACTOR_PARAMS, type FactorMatrix } from "@/lib/backtest/factor";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // 유니버스 다종목 로드·연산은 수 초~수십 초 소요될 수 있음
+export const maxDuration = 120; // Loading and computing a multi-symbol universe can take seconds to tens of seconds
 
 const MARKET_MAP: Record<string, { universe: string; etf: string }> = {
   us: { universe: "sp500-us", etf: "SPY" },
@@ -16,7 +16,7 @@ const MARKET_MAP: Record<string, { universe: string; etf: string }> = {
 const SURVIVORSHIP_NOTE =
   "유니버스가 현재 구성종목 기준이라 상장폐지 종목 제외로 결과가 낙관 편향(생존편향). 거래비용·슬리피지 미반영.";
 
-/** from(YYYY-MM-DD) 에서 days 일 이전(룩백 버퍼) 날짜 문자열. */
+/** The date string `days` before from (YYYY-MM-DD) - the lookback buffer. */
 function minusDays(dateStr: string, days: number): string {
   return new Date(new Date(dateStr).getTime() - days * 86400000).toISOString().slice(0, 10);
 }
@@ -24,11 +24,12 @@ function minusDays(dateStr: string, days: number): string {
 /**
  * GET /api/admin/backtest/factor?market=us|kr&from=YYYY-MM-DD&to=YYYY-MM-DD&quantile=0.2&principal=10000&contribution=0
  *
- * 크로스섹셔널 팩터 백테스트(서버측) — 저변동성·모멘텀·평균회귀 3종 + 벤치마크(동일가중·시장ETF)를
- * 같은 기간·같은 원금/적립으로 실행·비교. 유니버스 종가는 Mongo(stockdailyprices)에서 서버가 직접 로드.
+ * The cross-sectional factor backtest (server side) - three factors (low volatility, momentum, mean reversion) plus
+ * the benchmarks (equal weight and a market ETF), run and compared over the same period with the same principal and
+ * contributions. The universe's closes are loaded by the server directly from Mongo (stockdailyprices).
  *
- * 날짜는 다른 전략 탭과 일관: **from 비우면 전체 이력, to 비우면 오늘**. 원금(principal)·월적립금
- * (contribution)을 주면 실제 금액·적립식 곡선 + TWR 지표(computeMetrics)를 낸다.
+ * The dates match the other strategy tabs: **an empty from means the whole history, an empty to means today**. Given
+ * a principal and a monthly contribution it produces real-money accumulating curves plus TWR metrics (computeMetrics).
  */
 export async function GET(req: NextRequest) {
   const guard = await requireOwner();
@@ -39,8 +40,8 @@ export async function GET(req: NextRequest) {
   const cfg = MARKET_MAP[market];
   if (!cfg) return NextResponse.json({ error: "market 은 us|kr" }, { status: 400 });
 
-  const fromRaw = (sp.get("from") ?? "").trim(); // 빈값 = 전체 이력
-  const to = (sp.get("to") ?? "").trim() || new Date().toISOString().slice(0, 10); // 빈값 = 오늘
+  const fromRaw = (sp.get("from") ?? "").trim(); // empty = the whole history
+  const to = (sp.get("to") ?? "").trim() || new Date().toISOString().slice(0, 10); // empty = today
   const quantile = Math.min(0.5, Math.max(0.05, Number(sp.get("quantile") ?? 0.2) || 0.2));
   const principal = Math.max(0, Number(sp.get("principal") ?? 10000) || 0);
   const contribution = Math.max(0, Number(sp.get("contribution") ?? 0) || 0);
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest) {
 
   const syms = UNIVERSES[cfg.universe] ?? [];
   const loadSyms = Array.from(new Set([...syms, cfg.etf]));
-  // from 지정 시 룩백 버퍼(달력일 ~500)만큼 앞을 더 로드. from 비우면 전체 이력 로드(하한 없음).
+  // With from given, an extra lookback buffer (about 500 calendar days) is loaded before it. With from empty it loads the whole history (no lower bound).
   const dateFilter: Record<string, string> = { $lte: to };
   if (fromRaw) dateFilter.$gte = minusDays(fromRaw, 500);
 
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
     { ticker: 1, date: 1, close: 1, _id: 0 },
   ).lean<{ ticker: string; date: string; close: number }[]>();
 
-  // ticker -> (date -> close) + 전체 거래일 축
+  // ticker -> (date -> close) plus the full trading-day axis
   const byTicker = new Map<string, Map<string, number>>();
   const dateSet = new Set<string>();
   for (const r of rows) {
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
   }
   const matrix: FactorMatrix = { dates, closes };
 
-  // from 비우면 유효 시작 = 팩터 룩백 워밍업 후 첫 투자일(momLong 거래일 뒤). 지정 시 그대로.
+  // With from empty, the effective start is the first investment day after the factor lookback warm-up (momLong trading days in). Given, it is used as is.
   const from = fromRaw || (dates.length ? dates[Math.min(params.momLong, dates.length - 1)] : to);
 
   const strategies = runFactorComparison(matrix, {

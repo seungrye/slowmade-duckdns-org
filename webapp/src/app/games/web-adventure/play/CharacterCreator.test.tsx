@@ -1,4 +1,4 @@
-// CharacterCreator — #258 스탯 분배 제거 + 주인공 + 성흔 선택.
+// CharacterCreator - #258, stat allocation removed plus protagonist and stigma selection.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from 'vitest';
@@ -35,7 +35,7 @@ describe('CharacterCreator (#258 스탯 분배 제거)', () => {
     expect(character.protagonist).toBe('kael');
     expect(character.stigmaErosion).toBe(80);
     expect(startScene).toBe('kael_infirmary');
-    // Kael 의 base stats 그대로 (분배 없음).
+    // Kael's base stats as they are (no allocation).
     expect(character.stats.int).toBe(7);
     expect(character.stats.con).toBe(4);
   });
@@ -62,13 +62,13 @@ describe('CharacterCreator (#258 스탯 분배 제거)', () => {
     expect(character.rerollsLeft).toBe(3);
   });
 
-  // #291 — 시작 침식 ≥ 50 시 con/dex 디버프 미리 표시.
+  // #291 - the con/dex debuff is shown in advance when the starting contamination is >= 50.
   it('Kael 선택 → 시작 침식 80 디버프 경고 표시 + 체력/민첩 -2 effective', () => {
     render(<CharacterCreator onComplete={vi.fn()} />);
-    // 기본 Kael — 침식 80 카드 활성.
+    // Kael by default - the contamination 80 card is active.
     expect(screen.getByTestId('stigma-debuff-warning')).toBeInTheDocument();
     expect(screen.getByTestId('stigma-debuff-warning')).toHaveTextContent(/80/);
-    // -2 표시 (체력 4-2 / 민첩 6-2)
+    // shows -2 (constitution 4-2 / dexterity 6-2)
     expect(screen.getByText(/\(4-2\)/)).toBeInTheDocument();
     expect(screen.getByText(/\(6-2\)/)).toBeInTheDocument();
   });

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-// 매매 상세 화면의 표 페이징 (#184).
+// Table paging on the trade detail screen (#184).
 //
-// 계산은 `components/pager.test.ts` 가 본다. 여기서는 **실제로 화면에 25행만 나오는지**,
-// 버튼을 눌러 다음 묶음이 오는지, 그리고 마커로 들어온 날짜가 든 페이지로 열리는지를 본다.
+// The maths is `components/pager.test.ts`'s concern. This checks that **25 rows really appear on screen**,
+// that pressing the button brings the next batch, and that a date arrived at through a marker opens on its page.
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-// 차트는 이 테스트의 관심사가 아니다 — 무겁고 jsdom 에서 캔버스를 못 그린다.
+// The chart is not this test's concern - it is heavy and jsdom cannot draw a canvas.
 vi.mock('echarts-for-react', () => ({ default: () => <div data-testid="chart" /> }));
 vi.mock('@/hooks/use-mobile', () => ({ useMobile: () => false }));
 
@@ -18,7 +18,7 @@ const trade = (i: number, date: string) => ({
   date, strategy: 'infinite_v4',
 });
 
-// 날짜를 하루씩 늘려 60건. 서버는 오름차순으로 주고 화면이 뒤집어 최신을 위로 올린다.
+// 60 records, a day apart. The server sends them ascending and the UI reverses them so the newest is on top.
 const TRADES = Array.from({ length: 60 }, (_, i) =>
   trade(i, `2026-06-${String((i % 28) + 1).padStart(2, '0')}`),
 );
@@ -42,7 +42,7 @@ function renderPage(over: Record<string, unknown> = {}) {
   );
 }
 
-/** 표 하나의 데이터 행 수(머리글 제외). */
+/** The number of data rows in one table (excluding the header). */
 function bodyRows(tableIndex: number): number {
   const table = document.querySelectorAll('table')[tableIndex];
   return table.querySelectorAll('tbody tr').length;
@@ -86,9 +86,9 @@ describe('매매 상세 — 표 페이징', () => {
     expect((screen.getAllByRole('button', { name: /이전/ })[0] as HTMLButtonElement).disabled).toBe(true);
   });
 
-  // 이 화면은 차트 마커를 눌러 들어온다. 무턱대고 1페이지를 보여 주면 누른 매매가 안 보인다.
+  // This screen is reached by clicking a chart marker. Blindly showing page 1 hides the trade that was clicked.
   it('center 날짜가 든 페이지로 연다 — 마커를 눌러 들어온 매매가 보여야 한다', () => {
-    // 최신순으로 뒤집힌 목록에서 25번째 이후에 있는 날짜를 고른다.
+    // A date past the 25th in the newest-first list is chosen.
     const desc = [...TRADES].reverse();
     const target = desc[30].date;
     renderPage({ center: target });
@@ -116,7 +116,7 @@ describe('매매 상세 — 표 페이징', () => {
   });
 });
 
-// #374 — 포트폴리오(블록)별 구분. 미국 계좌에 블록이 둘이라 합쳐 보이면 못 읽는다.
+// #374 - separating by portfolio (block). The US account has two blocks, and combining them is unreadable.
 describe('블록(전략) 구분', () => {
   const BLOCKS = [
     { portfolioId: 'aaaaaaaaaaaaaaaaaaaaaaaa', strategy: 'infinite_v4' },
@@ -162,7 +162,7 @@ describe('블록(전략) 구분', () => {
   });
 });
 
-// #373 — 되살린 행은 보유 평가액만 안다. 나머지를 숫자로 내보이면 거짓말이 된다.
+// #373 - a reconstructed row knows only the holdings value. Showing the rest as numbers would be a lie.
 describe('되살린(backfilled) 행 표시', () => {
   const 되살림 = [
     { dateStr: '2026-07-01', totalValue: 900, cash: 0, holdingsValue: 900, cumulativePnl: 0, backfilled: true },
@@ -173,10 +173,10 @@ describe('되살린(backfilled) 행 표시', () => {
     renderPage({ history: 되살림 });
     const row = screen.getByText('2026-07-01').closest('tr')!;
     const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
-    expect(cells[1]).toBe('—'); // 총재산
-    expect(cells[2]).toBe('—'); // 현금
-    expect(cells[3]).toContain('900'); // 보유 평가액은 실측이라 그대로
-    expect(cells[4]).toBe('—'); // 누적손익
+    expect(cells[1]).toBe('—'); // total assets
+    expect(cells[2]).toBe('—'); // cash
+    expect(cells[3]).toContain('900'); // the holdings value is measured, so it stands
+    expect(cells[4]).toBe('—'); // cumulative P&L
   });
 
   it('라이브 행은 종전대로 숫자가 나온다', () => {
@@ -194,11 +194,11 @@ describe('되살린(backfilled) 행 표시', () => {
   });
 });
 
-// #382 — 실측 재현. 라이브 **블록** 스냅샷에는 cumulativePnl 이 아예 없다.
-//   close-sync 가 블록 행에 totalValue/cash/holdingsValue 만 쓰고(실현손익은 계좌 단위로만
-//   계산된다), getPortfolioData 의 블록 select 도 그 필드를 안 뽑는다.
-//   그 행을 formatMoney 에 그대로 넘겨 `undefined.toLocaleString()` 로 페이지 전체가 죽었다.
-//   /admin/portfolio/detail?...&portfolioId=6a5a1a98... 가 통째로 열리지 않았다.
+// #382 - reproducing what was measured. A live **block** snapshot has no cumulativePnl at all.
+//   close-sync writes only totalValue/cash/holdingsValue on a block row (realized P&L is computed only per
+//   account), and getPortfolioData's block select does not project that field either.
+//   Passing that row straight into formatMoney killed the whole page with `undefined.toLocaleString()`.
+//   /admin/portfolio/detail?...&portfolioId=6a5a1a98... would not open at all.
 describe('모르는 값이 든 스냅샷 행 (#382)', () => {
   const 라이브블록행 = {
     dateStr: '2026-09-01', totalValue: 96379.1577, cash: 51345.201, holdingsValue: 45033.9567,
@@ -213,10 +213,10 @@ describe('모르는 값이 든 스냅샷 행 (#382)', () => {
     renderPage({ history: [라이브블록행] });
     const row = screen.getByText('2026-09-01').closest('tr')!;
     const cells = [...row.querySelectorAll('td')].map((c) => c.textContent);
-    expect(cells[1]).toContain('96,379'); // 총재산 — 있는 값은 그대로
-    expect(cells[2]).toContain('51,345'); // 현금 — 있는 값은 그대로
-    expect(cells[3]).toContain('45,034'); // 보유 평가액 (KRW 는 반올림)
-    expect(cells[4]).toBe('—');           // 누적 손익 — 블록 단위로는 모른다
+    expect(cells[1]).toContain('96,379'); // total assets - a present value stands
+    expect(cells[2]).toContain('51,345'); // cash - a present value stands
+    expect(cells[3]).toContain('45,034'); // the holdings value (KRW is rounded)
+    expect(cells[4]).toBe('—');           // cumulative P&L - unknown per block
   });
 
   it('다른 숫자가 비어도 그 칸만 — 가 되고 나머지는 살아 있다', () => {

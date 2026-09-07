@@ -1,7 +1,7 @@
-// 진단 올리기 라우트 (#409).
+// The diagnostics upload route (#409).
 //
-// **키가 없으면 아무 일도 일어나지 않는지**, 그리고 **최근 것을 남기고 오래된 것만 걷는지** 본다.
-// 뒤엣것이 틀리면 방금 올린 자취가 그 자리에서 지워진다 — 제일 알고 싶은 것을 잃는다.
+// It checks that **nothing happens without a key**, and that **the recent ones are kept while only the old are pruned**.
+// Getting the latter wrong deletes the trail just uploaded, on the spot - losing exactly what we most wanted to know.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockEnv = vi.hoisted(() => ({ appKey: 'secret-key' }));

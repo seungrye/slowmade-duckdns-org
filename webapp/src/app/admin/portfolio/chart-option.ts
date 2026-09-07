@@ -1,10 +1,10 @@
 /**
- * 매매 차트 옵션 조립 — 순수 (#378).
+ * Assembling the trade chart's options - pure (#378).
  *
- * 화면 컴포넌트 안 useMemo 에 있던 것을 떼어냈다. 두 가지 때문이다.
- *   1. 범례가 x 축 날짜를 덮는 문제를 **실제로 렌더해 좌표로 재려면** 옵션만 따로
- *      브라우저에 넘길 수 있어야 한다(e2e/chart-legend-overlap 하네스).
- *   2. 옵션 자체를 단위 테스트할 수 있다 — ECharts 를 목으로 감싸지 않아도 된다.
+ * Lifted out of a useMemo inside the UI component, for two reasons.
+ *   1. **Actually rendering and measuring** the legend covering the x-axis dates requires being able to pass the
+ *      options alone into a browser (the e2e/chart-legend-overlap harness).
+ *   2. The options themselves become unit-testable - with no need to wrap ECharts in a mock.
  */
 import type { EChartsOption } from "echarts";
 
@@ -44,28 +44,28 @@ export type PortfolioResponse = {
   unownedTradesByDate?: Record<string, TradeStats>;
 };
 
-/** 화면이 HTML 로 직접 그리는 범례 항목. */
+/** The legend entries the UI draws directly in HTML. */
 export type LegendItem = {
   name: string;
   color: string;
   dashed?: boolean;
-  /** 선이 없는 마커 전용 계열(「기타 매매」). 범례 표식을 선이 아니라 점으로 낸다. */
+  /** A marker-only series with no line ("other trades"). Its legend mark is a dot rather than a line. */
   markerOnly?: boolean;
 };
 
-/** 마커 하나. 클릭하면 그 블록의 매매 상세로 간다. */
+/** One marker. Clicking it goes to that block's trade detail. */
 export type MarkerItem = {
   value: [string, number];
   symbol: string;
   symbolRotate?: number;
-  /** 채움(매수만) vs 테두리만(매도만·매수+매도) — 형태로 구분 (#399). */
+  /** Filled (buys only) versus outline only (sells only, or buys and sells) - told apart by shape (#399). */
   fill: boolean;
-  /** 어느 블록의 상세로 갈지. 계좌(주인 없음)면 빈 문자열. */
+  /** Which block's detail to go to. An empty string for the account (no owner). */
   portfolioId: string;
   stats: TradeStats;
 };
 
-/** 블록 선 색. 계좌 3선(파랑·초록·주황)과 겹치지 않는 색만 쓴다. */
+/** The block line's colour. Only colours that do not clash with the account's three lines (blue, green, orange). */
 export const BLOCK_COLORS = ["#9333ea", "#0891b2", "#ca8a04", "#db2777", "#4d7c0f"];
 
 export function formatMoney(v: number, currency: Currency): string {
@@ -75,11 +75,11 @@ export function formatMoney(v: number, currency: Currency): string {
   return `${Math.round(v).toLocaleString()}원`;
 }
 
-/** 전략 라벨은 화면에서 주입한다(이 모듈이 전략 목록을 알 필요는 없다). */
+/** The strategy labels are injected by the UI (this module need not know the strategy list). */
 export type BuildArgs = {
   data: PortfolioResponse;
   currency: Currency;
-  /** 처음 보이는 창의 시작 날짜(모바일 30 일·데스크톱 90 일). 없으면 전체. */
+  /** The start date of the initially visible window (30 days on mobile, 90 on desktop). Absent means everything. */
   startValue?: string;
   strategyLabel: (s: string) => string;
 };
@@ -89,9 +89,9 @@ export function buildChartOption(
 ): { option: EChartsOption; legend: LegendItem[] } | null {
   const { data, currency, startValue, strategyLabel } = args;
   if (!data || data.history.length === 0) return null;
-  if (Object.keys(data.tradesByDate ?? {}).length === 0) return null; // 매매 없는 시장 숨김
+  if (Object.keys(data.tradesByDate ?? {}).length === 0) return null; // hide a market with no trades
 
-  // #133 — **자르지 않는다.** 데이터는 전부 넘기고 dataZoom 으로 처음 보이는 창만 잡는다.
+  // #133 - **nothing is trimmed.** All the data is passed and dataZoom sets only the initially visible window.
   const history = data.history;
   const dates = history.map((h) => h.dateStr);
   const tradeMeta = data.tradesByDate;
@@ -101,7 +101,7 @@ export function buildChartOption(
   const series: ESeries = [];
   const legend: LegendItem[] = [];
 
-  // ── 계좌 3선 ────────────────────────────────────────────────
+  // ── The account's three lines ────────────────────────────────────────
   const 계좌선: [string, string, keyof HistoryPoint, boolean][] = [
     ["추정 총 재산", "#2563eb", "totalValue", false],
     ["추정 잔여 현금", "#16a34a", "cash", true],
@@ -120,8 +120,8 @@ export function buildChartOption(
     legend.push({ name, color, dashed });
   }
 
-  // ── 마커 조립 ───────────────────────────────────────────────
-  // 모양이 방향을 말한다 — 매수만 ▲ / 매도만 ▼ / 둘 다 ■.
+  // ── Assembling the markers ───────────────────────────────────────────
+  // The shape says the direction - buys only as a triangle, sells only as an inverted one, both as a square.
   const 마커 = (
     stats: Record<string, TradeStats>,
     값: (dateStr: string) => number | null,
@@ -133,7 +133,7 @@ export function buildChartOption(
       if (!st || (st.buy === 0 && st.sell === 0)) continue;
       const y = 값(h.dateStr);
       if (y === null || !Number.isFinite(y)) continue;
-      // 매수만 = 채운 ▲ / 매도만 = 테두리만 ▽ / 매수+매도 = 테두리만 ▭. (#399)
+      // Buys only = a filled triangle / sells only = an outlined inverted triangle / both = an outlined rectangle. (#399)
       const 둘다 = st.buy > 0 && st.sell > 0;
       const 매도만 = !둘다 && st.sell > 0;
       out.push({
@@ -160,11 +160,11 @@ export function buildChartOption(
     return lines.join("<br/>");
   };
 
-  // 마커 series 는 **그 선과 같은 이름**을 쓴다. ECharts 범례는 이름으로 묶이므로
-  // 범례 항목이 두 배로 늘지 않고, 선을 끄면 마커도 함께 꺼진다.
+  // A marker series uses **the same name as its line**. ECharts' legend groups by name, so the legend entries do not
+  // double, and turning off a line turns off its markers too.
   const pushMarkers = (name: string, items: MarkerItem[], color: string) => {
     if (!items.length) return;
-    // 항목마다 채움/테두리를 다르게 — 색만으로 구분이 어려워 형태로 명확히 (#399).
+    // Fill and outline differ per item - colour alone is hard to tell apart, so shape makes it clear (#399).
     const data = items.map((it) => ({
       value: it.value,
       symbol: it.symbol,
@@ -184,9 +184,9 @@ export function buildChartOption(
     } as never);
   };
 
-  // ── 블록(전략)별 평가액 선 + 그 위의 마커 ──────────────────
-  // 블록이 하나뿐이어도 그린다. 계좌 「보유 평가액」과 겹쳐 보일 수는 있어도,
-  // 전략 선이 시장마다 있다 없다 하면 그게 더 헷갈린다(국장에서 실제로 그랬다).
+  // ── The per-block (strategy) valuation line and its markers ──────────────────
+  // It is drawn even with only one block. It may overlap the account's "holdings value", but
+  // a strategy line appearing on one market and not another is more confusing (which is what happened on KRX).
   blocks.forEach((b, i) => {
     const color = BLOCK_COLORS[i % BLOCK_COLORS.length];
     const name = `${strategyLabel(b.strategy)} 평가액`;
@@ -194,10 +194,10 @@ export function buildChartOption(
     series.push({
       type: "line",
       name,
-      // 계좌 곡선과 x 축을 맞춘다. 그 블록이 아직 없던 날은 빈 값으로 둔다.
+      // Aligned to the account curve's x axis. Days before that block existed are left empty.
       data: dates.map((d) => 값.get(d) ?? null),
       connectNulls: false,
-      // 점이 하나뿐이면 선이 안 그려진다 — 그때만 점을 보인다.
+      // With only one point no line is drawn - only then is the point itself shown.
       showSymbol: b.history.length < 2,
       symbolSize: 6,
       lineStyle: { color, width: 1.5 },
@@ -207,8 +207,8 @@ export function buildChartOption(
     pushMarkers(name, 마커(b.tradesByDate ?? {}, (d) => 값.get(d) ?? null, b.portfolioId), color);
   });
 
-  // 어느 블록에도 안 붙은 매매(폐기된 전략의 기록)만 계좌 선에 남긴다 —
-  // 안 그러면 같은 매매가 블록 선과 계좌 선에 두 번 찍힌다.
+  // Only the trades attached to no block (records from retired strategies) stay on the account line -
+  // otherwise the same trade is marked twice, on the block line and the account line.
   const 계좌값 = new Map(history.map((h) => [h.dateStr, h.totalValue]));
   const 기타 = blocks.length
     ? 마커(data.unownedTradesByDate ?? {}, (d) => 계좌값.get(d) ?? null, "")
@@ -221,9 +221,9 @@ export function buildChartOption(
 
   const option: EChartsOption = {
     animation: false,
-    // 범례는 화면이 HTML 로 그린다 (#378). ECharts 범례는 캔버스 안에 얹혀 x 축 날짜를
-    // 덮었다 — 항목이 늘면 줄이 늘어나는데 grid.bottom 은 고정이라 구조적으로 겹친다.
-    // show:false 로 두면 모델은 남아 legendToggleSelect 가 그대로 동작한다.
+    // The legend is drawn in HTML by the UI (#378). ECharts' legend sits inside the canvas and covered the x-axis
+    // dates - more entries mean more rows while grid.bottom is fixed, so it overlaps structurally.
+    // Leaving show:false keeps the model, so legendToggleSelect still works.
     legend: { show: false },
     grid: { left: 24, right: 16, top: 16, bottom: 28 },
     tooltip: {
@@ -239,8 +239,8 @@ export function buildChartOption(
         const date = String(params[0].axisValue ?? "");
         const lines = [`<b>${date}</b>`];
         for (const p of params) {
-          // 마커(scatter)는 축 툴팁에서 중복 노출 회피 — 이름이 아니라 종류로 가른다
-          // (마커가 선과 같은 이름을 쓰기 때문).
+          // Markers (scatter) avoid appearing twice in the axis tooltip - told apart by type rather than name
+          // (because a marker shares its line's name).
           if (p.seriesType === "scatter") continue;
           const raw = p.value;
           const v = Array.isArray(raw) ? Number(raw[1]) : Number(raw);

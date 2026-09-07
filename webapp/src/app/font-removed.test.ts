@@ -3,15 +3,15 @@ import { readFile, access } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 /**
- * #232 — Nanum Gothic Coding 폰트 *전체 되돌리기*.
+ * #232 - *reverting all of* the Nanum Gothic Coding font work.
  *
- * #228 / #230 / #232 에서 추가된 모든 폰트 관련 변경(layout.tsx 의 Google Fonts
- * CDN link / preconnect, globals.css 의 .nanum-gothic-coding-* 클래스,
- * paragraph-node.scss · code-block-node.scss 의 "Nanum Gothic Coding"
- * font-family 명시)을 *원본 상태* 로 되돌린다.
+ * Every font-related change added in #228, #230 and #232 (layout.tsx's Google Fonts
+ * CDN link and preconnect, globals.css's .nanum-gothic-coding-* classes, and the
+ * "Nanum Gothic Coding" font-family declarations in paragraph-node.scss and
+ * code-block-node.scss) is reverted to *its original state*.
  *
- * 본 테스트는 *제거된 흔적이 없음* 을 검증한다 — RED 단계에서는 변경 전이라
- * 모두 fail, GREEN 단계에서는 모두 pass 한다.
+ * This test verifies that *no trace remains* - in the RED phase everything fails, since it is
+ * before the change, and in the GREEN phase everything passes.
  */
 
 const projectRoot = resolve(__dirname, '../..');

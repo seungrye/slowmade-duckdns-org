@@ -16,20 +16,20 @@ type Currency = "KRW" | "USD";
 
 export default function PortfolioChartClient({ initialData, envs = ["paper", "real"], tabs }:
   { initialData?: PortfolioResponse; envs?: string[]; tabs?: { env: string; currency: Currency }[] }) {
-  // 탭 조합 — tabs(숨김 아닌 기록이 실존하는 (env,currency)) 우선. 없으면 envs × [KRW,USD] 폴백(하위호환).
+  // The tab combinations - tabs (the (env, currency) pairs with unhidden records) win. Without them it falls back to envs x [KRW, USD] (for compatibility).
   const combos = tabs && tabs.length
     ? tabs
     : envs.flatMap((e) => (["KRW", "USD"] as const).map((c) => ({ env: e, currency: c })));
   const router = useRouter();
   const [env, setEnv] = useState<Env>(initialData?.env ?? combos[0]?.env ?? "paper");
   const tabScroll = useDragScrollX<HTMLDivElement>();
-  // #95/#97 — 차트는 최근 구간만 그린다(모바일 30 일 · 데스크톱 90 일).
-  //   요약 수치는 전체 기준을 유지한다.
+  // #95/#97 - the chart draws only the recent range (30 days on mobile, 90 on desktop).
+  //   The summary figures stay based on everything.
   const isMobile = useMobile();
   const [currency, setCurrency] = useState<Currency>(initialData?.currency ?? combos[0]?.currency ?? "KRW");
   const [data, setData] = useState<PortfolioResponse | null>(initialData ?? null);
   const [loading, setLoading] = useState(false);
-  // SSR(page.tsx)로 기본(paper,KRW) 데이터가 주입되면 첫 fetch 를 건너뛴다. 이후 탭 변경은 fetch.
+  // With the default (paper, KRW) data injected by SSR (page.tsx), the first fetch is skipped. Later tab changes fetch.
   const skipNextFetch = useRef(!!initialData);
 
   useEffect(() => {
@@ -57,8 +57,8 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     };
   }, [env, currency]);
 
-  // 해당 (env,currency)에 매매가 한 건이라도 있는지. 매매 없는 시장은 라인을 숨긴다
-  // (포트폴리오 스냅샷은 매매와 무관하게 매일 쌓이므로, 매매 0건이면 차트가 의미 없다).
+  // Whether that (env, currency) has even one trade. A market with no trades has its lines hidden
+  // (portfolio snapshots accumulate daily regardless of trading, so with 0 trades the chart is meaningless).
   const hasTrades = !!data && Object.keys(data.tradesByDate ?? {}).length > 0;
 
   const built = useMemo(
@@ -75,24 +75,24 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
   );
   const option = built?.option ?? null;
   const legendItems = built?.legend ?? [];
-  // 범례를 HTML 로 그린다 (#378). ECharts 범례는 캔버스 안에 얹혀 항목이 늘면 줄이 늘고,
-  // grid.bottom 은 고정이라 x 축 날짜를 덮었다(모바일에서 실제로 겹쳤다).
-  // 여기서는 일반 흐름에 놓이므로 구조적으로 겹칠 수 없다.
+  // The legend is drawn in HTML (#378). ECharts' legend sits inside the canvas, and more entries mean more rows while
+  // grid.bottom is fixed, so it covered the x-axis dates (it really overlapped on mobile).
+  // Here it sits in normal flow, so it cannot overlap structurally.
   const chartRef = useRef<{ getEchartsInstance: () => { dispatchAction: (p: unknown) => void } } | null>(null);
   const [off, setOff] = useState<Record<string, boolean>>({});
-  // 탭을 바꾸면 계열 이름이 달라지므로 토글 상태를 비운다.
+  // Changing tabs changes the series names, so the toggle state is cleared.
   useEffect(() => setOff({}), [env, currency]);
   const toggleLegend = (name: string) => {
     chartRef.current?.getEchartsInstance().dispatchAction({ type: "legendToggleSelect", name });
     setOff((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
-  // 차트 클릭 → 그 날 매매 종목 list 가 있으면 종목 차트로 이동.
-  // currency 에 따라 market (KR/US) 자동 분기. center 쿼리로 그 날짜 중앙 표시.
+  // A chart click -> if there is a list of symbols traded that day, it goes to the symbol chart.
+  // The market (KR/US) branches automatically on the currency. The center query centres that date.
   const handleChartClick = (params: { name?: string; value?: unknown; data?: unknown }) => {
     if (!data) return;
-    // params.name 은 category axis 라벨 (dateStr) — line series click 시 사용.
-    // scatter series 는 data 가 { value: [date, y], portfolioId } 객체다 (#373).
+    // params.name is the category axis label (dateStr) - used when a line series is clicked.
+    // A scatter series' data is a { value: [date, y], portfolioId } object (#373).
     const item = params.data as { value?: unknown; portfolioId?: string } | undefined;
     let date: string | null = null;
     if (Array.isArray(item?.value) && typeof item.value[0] === "string") date = item.value[0];
@@ -104,7 +104,7 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     if (!stats) return;
     const tickers = Array.from(new Set([...stats.buyTickers, ...stats.sellTickers]));
     if (tickers.length === 0) return;
-    // 매매 상세 페이지로 이동. 블록 마커를 눌렀으면 그 블록만 보여준다 (#374).
+    // Goes to the trade detail page. Clicking a block marker shows that block alone (#374).
     const q = new URLSearchParams({ env, currency, center: date });
     if (item?.portfolioId) q.set("portfolioId", item.portfolioId);
     router.push(`/admin/portfolio/detail?${q.toString()}`);

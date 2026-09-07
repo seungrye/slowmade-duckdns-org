@@ -1,4 +1,4 @@
-// /api/internal/netplay-check — nginx auth_request 게이트 (#186).
+// /api/internal/netplay-check - the nginx auth_request gate (#186).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/require-auth', () => ({ requireAuth: vi.fn() }));
@@ -14,8 +14,8 @@ describe('GET /api/internal/netplay-check', () => {
     expect((await GET()).status).toBe(200);
   });
 
-  // nginx auth_request 는 401/403 만 "인가 실패"로 다룬다. 404 를 주면 500 으로 취급해
-  // 게이트가 통째로 깨진다.
+  // nginx's auth_request treats only 401 and 403 as "authorisation failed". A 404 is treated as a 500 and breaks
+  // the gate entirely.
   it('아니면 401 — 404 가 아니다', async () => {
     const { NextResponse } = await import('next/server');
     vi.mocked(requireAuth).mockResolvedValue(NextResponse.json({ message: 'Not found' }, { status: 404 }));

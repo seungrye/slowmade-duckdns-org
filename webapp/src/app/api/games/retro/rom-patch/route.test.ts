@@ -54,7 +54,7 @@ function form(file: File | null, romId: string | null): FormData {
   return f;
 }
 
-/** findOneAndUpdate(...).lean() 체인 흉내. */
+/** Mimics the findOneAndUpdate(...).lean() chain. */
 function updateReturns(doc: unknown) {
   mockFindOneAndUpdate.mockReturnValue({ lean: () => Promise.resolve(doc) });
 }
@@ -135,7 +135,7 @@ describe('POST /api/games/retro/rom-patch', () => {
     expect(mockRemoveObject.mock.calls[0][1]).toBe(mockPutObject.mock.calls[0][1]);
   });
 
-  // #116 — 롬당 패치 하나. 새로 올리면 교체한다.
+  // #116 - one patch per ROM. Uploading a new one replaces it.
   describe('교체 의미', () => {
     it('기존 패치를 먼저 soft delete 한다', async () => {
       await POST(request(form(patchFile('new.ips'), ROM_ID)));
@@ -143,7 +143,7 @@ describe('POST /api/games/retro/rom-patch', () => {
       const [filter, update, opts] = mockUpdateOne.mock.calls[0];
       expect(filter).toMatchObject({ _id: ROM_ID, userEmail: 'me@test.com' });
       expect(update).toEqual({ $set: { 'patches.$[live].isDeleted': true } });
-      // 살아 있는 것만 골라 접는다 — 이미 지운 걸 또 건드리지 않는다.
+      // Only the live ones are folded away - what is already deleted is left alone.
       expect(opts).toEqual({ arrayFilters: [{ 'live.isDeleted': { $ne: true } }] });
     });
 

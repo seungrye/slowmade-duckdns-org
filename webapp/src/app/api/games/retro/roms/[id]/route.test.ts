@@ -47,7 +47,7 @@ describe('DELETE /api/games/retro/roms/[id]', () => {
     expect(mockUpdateOne).not.toHaveBeenCalled();
   });
 
-  // #116 — 카드의 체크박스.
+  // #116 - the card's checkbox.
   describe('PATCH — 패치 적용 토글', () => {
     const body = (v: unknown) =>
       new Request('http://x', { method: 'PATCH', body: JSON.stringify({ patchEnabled: v }) });
@@ -77,7 +77,7 @@ describe('DELETE /api/games/retro/roms/[id]', () => {
       expect(mockUpdateOne).not.toHaveBeenCalled();
     });
 
-    // #122 — 제목도 카드에서 고친다.
+    // #122 - the title is edited from the card too.
     describe('제목', () => {
       const withTitle = (v: unknown) =>
         new Request('http://x', { method: 'PATCH', body: JSON.stringify({ title: v }) });

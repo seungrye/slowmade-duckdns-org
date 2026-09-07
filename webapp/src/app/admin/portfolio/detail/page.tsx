@@ -14,10 +14,10 @@ import PortfolioDetailClient from "./portfolio-detail-client";
 export const dynamic = "force-dynamic";
 
 /**
- * /admin/portfolio/detail?env=&currency=&center= — 매매 차트 마커 클릭 시 이동하는 상세 페이지.
+ * /admin/portfolio/detail?env=&currency=&center= - the detail page a trade chart marker links to.
  *
- * 그 (env, currency)의 매매 종목 주가 라인 + 매수/매도 마커 차트와,
- * 매매 기록 + 날짜별 포트폴리오(총재산/현금/평가액) 표를 함께 보여준다.
+ * It shows a chart of that (env, currency)'s traded symbols' price lines with buy and sell markers,
+ * plus the trade records and a per-date portfolio table (total assets, cash and valuation).
  */
 export default async function PortfolioDetailPage(props: {
   searchParams: Promise<{ env?: string; currency?: string; center?: string; portfolioId?: string }>;
@@ -29,12 +29,12 @@ export default async function PortfolioDetailPage(props: {
   const env: Env = typeof sp.env === "string" && /^[a-z0-9][a-z0-9-]{0,40}$/.test(sp.env) ? sp.env : "paper";
   const currency: Currency = sp.currency === "USD" ? "USD" : "KRW";
   const center = sp.center ?? null;
-  // 24자리 hex 만 통과시킨다 — 아니면 mongoose 캐스팅이 던진다.
+  // Only 24 hex characters pass - anything else makes mongoose's cast throw.
   const portfolioId = /^[0-9a-f]{24}$/.test(sp.portfolioId ?? "") ? sp.portfolioId! : null;
 
   await connectToDB();
 
-  // 블록 탭 — 이 계정·시장의 살아있는 블록들 (#374).
+  // The block tabs - this account and market's live blocks (#374).
   const market = currency === "KRW" ? "kr" : "us";
   const account = await TradingAccount.findOne({ envKey: env, isDeleted: { $ne: true } })
     .select({ _id: 1 }).lean();
@@ -43,7 +43,7 @@ export default async function PortfolioDetailPage(props: {
         .select({ strategy: 1 }).lean()
     : [];
   const blocks = blockDocs.map((b) => ({ portfolioId: String(b._id), strategy: String(b.strategy ?? "") }));
-  // 없는 블록을 가리키면 전체로 되돌린다(링크가 낡았을 때 빈 화면 대신).
+  // Pointing at a block that does not exist falls back to all (rather than a blank page from a stale link).
   const selected = blocks.some((b) => b.portfolioId === portfolioId) ? portfolioId : null;
 
   const tradeDocs = await StockTrade.find({
@@ -66,10 +66,10 @@ export default async function PortfolioDetailPage(props: {
 
   const tickers = Array.from(new Set(trades.map((t) => t.ticker)));
 
-  // 주가는 최근 1년 조회. **처음 보이는 창은 여전히 데스크톱 90일·모바일 30일**이고
-  // (아래 dataZoom), 데이터를 넉넉히 넘겨야 밀어서 1년까지 볼 수 있다 (#133).
-  // SMA60 warmup 도 자연히 포함된다. 렌더는 선택 1종목뿐이라 부담 작다.
-  // date 는 "YYYY-MM-DD" 문자열이라 사전순 비교($gte)가 날짜순과 일치.
+  // Prices are queried for the last year. **The initially visible window is still 90 days on desktop and 30 on mobile**
+  // (the dataZoom below), and enough data has to be passed for a drag to reach a year (#133).
+  // The SMA60 warm-up comes along naturally. Only one selected symbol is rendered, so the cost is small.
+  // date is a "YYYY-MM-DD" string, so a lexical comparison ($gte) matches date order.
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 365);
   const fromDate = cutoff.toISOString().slice(0, 10);
@@ -89,10 +89,10 @@ export default async function PortfolioDetailPage(props: {
     : [];
   const names: Record<string, string> = {};
   for (const n of nameDocs) names[n.ticker as string] = n.name as string;
-  // stocks 에 없는 지수/레버리지 ETF(예: 069500=KODEX 200)는 ETF_NAMES 로 보완 — DB 이름 우선.
+  // Index and leveraged ETFs absent from stocks (069500 = KODEX 200, say) are filled in from ETF_NAMES - a DB name wins.
   for (const tk of tickers) if (!names[tk] && ETF_NAMES[tk]) names[tk] = ETF_NAMES[tk];
 
-  // 블록을 고르면 그 블록의 스냅샷을, 아니면 계좌 스냅샷을 보여준다 (#374).
+  // With a block selected it shows that block's snapshot, otherwise the account's (#374).
   const { history, blocks: series } = await getPortfolioData(env, currency);
   const shown = selected
     ? (series.find((b) => b.portfolioId === selected)?.history ?? [])

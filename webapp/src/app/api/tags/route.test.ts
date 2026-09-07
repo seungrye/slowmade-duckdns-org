@@ -1,7 +1,7 @@
-// 태그 자동완성의 비공개 처리 배선 (#230).
+// The wiring of privacy handling in tag autocomplete (#230).
 //
-// 규칙 자체(`privacyMatch`)는 lib/posts.test.ts 가 본다. 여기서는 **라우트가 세션을 읽어
-// 그 규칙에 넘기는지**만 확인한다 — 규칙을 두 벌로 적어 두면 갈라진다.
+// The rule itself (`privacyMatch`) is lib/posts.test.ts's concern. This checks only **that the route reads the
+// session and passes it to that rule** - writing the rule twice would let the copies diverge.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -10,7 +10,7 @@ vi.mock('@/auth', () => ({ auth: mockAuth }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 
 const mockGetAllTags = vi.hoisted(() => vi.fn());
-// 실제 규칙 대신 표식을 돌려준다 — 그 표식이 $match 에 실려 가는지로 배선을 본다.
+// A marker is returned in place of the real rule - the wiring is checked by whether that marker reaches the $match.
 const mockPrivacyMatch = vi.hoisted(() => vi.fn(() => ({ __privacy: 'marker' })));
 vi.mock('@/lib/posts', () => ({
   __getAllTags: mockGetAllTags,
@@ -53,7 +53,7 @@ describe('GET /api/tags — 비공개 태그 처리', () => {
     expect(match.__privacy).toBe('marker');
   });
 
-  // 하드 필터가 규칙 옆에 남아 있으면 AND 로 묶여 규칙이 무력해진다.
+  // A hard filter left beside the rule is ANDed with it and neuters it.
   it('q 검색에 하드 isPrivate 필터가 남아 있으면 안 된다', async () => {
     await GET(req('ai'));
     const pipeline = mockAggregate.mock.calls[0][0] as Record<string, unknown>[];

@@ -32,9 +32,9 @@ const INFINITE_VARIANT_VER: Partial<Record<Strategy, InfiniteVariantVersion>> = 
 };
 type FullResult = BacktestResult & { bars: Bar[]; principal: number; strategy: Strategy };
 
-// 표시 순서 = 추천 순(위험조정수익·강건성 기준). 로테이션 계열 상위(v2 분할매수가 백테스트
-// 검증상 최고 — Calmar↑·MDD↓·수수료/시그널/파라미터에 강건), 방어형 모멘텀(LRS·레짐·트레일링
-// 추세) 중위, 무한매수(주기적 물타기 — v4 가 가장 완성형) 하위.
+// The display order is the recommended order (by risk-adjusted return and robustness). The rotation family is at
+// the top (v2 with DCA is the best in backtesting - higher Calmar, lower MDD, robust to fees, signals and parameters),
+// defensive momentum (LRS, regime, trailing trend) in the middle, and infinite buying (periodic averaging down - v4 is the most complete) at the bottom.
 const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
   ["compare", "비교"],
   ["factor_momentum", "팩터: 모멘텀(12-1)"],
@@ -58,7 +58,7 @@ const STRATEGY_TABS: readonly (readonly [Strategy, string])[] = [
   ["infinite_v1", "무한매수 v1"],
 ];
 
-// 팩터 개별 탭 → factor.ts 팩터 종류. factor_compare 는 여기 없음(비교 모드 = focus undefined).
+// The individual factor tabs -> factor.ts's factor kinds. factor_compare is not here (comparison mode = focus undefined).
 const FACTOR_FOCUS: Partial<Record<Strategy, FactorKind>> = {
   factor_momentum: "momentum",
   factor_low_vol: "low_vol",
@@ -105,72 +105,72 @@ const STRATEGY_DESC: Record<Strategy, string> = {
 };
 
 export default function BacktestClient() {
-  const [strategy, setStrategy] = useState<Strategy>("rotation_v2"); // 기본=추천 1순위
-  const [compare, setCompare] = useState<Partial<Record<Strategy, CompareEntry>>>({}); // 범용 비교에 담긴 전략들
+  const [strategy, setStrategy] = useState<Strategy>("rotation_v2"); // the default is the top recommendation
+  const [compare, setCompare] = useState<Partial<Record<Strategy, CompareEntry>>>({}); // the strategies held in the general comparison
   const tabScroll = useDragScrollX<HTMLDivElement>();
-  // 공통
+  // shared
   const [ticker, setTicker] = useState("");
   const [principal, setPrincipal] = useState(4000);
-  const [monthlyContribution, setMonthlyContribution] = useState(0); // 적립식: 매월 입금액(0=목돈). rotation/dual/vol 만 지원.
+  const [monthlyContribution, setMonthlyContribution] = useState(0); // Accumulating: the monthly deposit (0 = lump sum). Supported only by rotation, dual and vol.
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  // 무한매수
+  // infinite buying
   const [splits, setSplits] = useState(40);
   const [takeProfitPct, setTakeProfitPct] = useState(10);
   const [locPremiumPct, setLocPremiumPct] = useState(12);
-  const [iv4V, setIv4V] = useState(0); // v4 변동성 계수 V(%). 0=비움 → §5.3.2 자동 유도
-  // 추세추종 v1·v3·v4 공통(MA 크로스) / v2 는 단일 MA
+  const [iv4V, setIv4V] = useState(0); // v4's volatility coefficient V (%). 0 or empty derives it per section 5.3.2
+  // shared by trend v1, v3 and v4 (an MA cross); v2 uses a single MA
   const [shortMa, setShortMa] = useState(20);
   const [longMa, setLongMa] = useState(60);
   const [maPeriod, setMaPeriod] = useState(20); // v2
   const [slopeDays, setSlopeDays] = useState(5); // v3
   const [trailPct, setTrailPct] = useState(30); // v4 (%)
-  // 레짐 모멘텀 v1
+  // regime momentum v1
   const [regSma, setRegSma] = useState(200);
   const [regBand, setRegBand] = useState(2); // %
   const [regMom, setRegMom] = useState(60);
   const [regTrail, setRegTrail] = useState(25); // %
-  // 모멘텀 로테이션 v1 / v2(분할매수)
+  // momentum rotation v1 / v2 (with DCA)
   const [rotCandidates, setRotCandidates] = useState("TQQQ,SOXL,UPRO,TECL");
   const [rotMom, setRotMom] = useState(126);
   const [rotReb, setRotReb] = useState(63);
-  const [rotDca, setRotDca] = useState(15); // v2 분할매수 K(슬라이스)
-  const [rotComposite, setRotComposite] = useState(false); // 복합 모멘텀(멀티 룩백 평균)
-  // 듀얼 모멘텀 GEM
+  const [rotDca, setRotDca] = useState(15); // v2's DCA K (the slices)
+  const [rotComposite, setRotComposite] = useState(false); // composite momentum (an average over several lookbacks)
+  // dual momentum, GEM
   const [dmCandidates, setDmCandidates] = useState("TQQQ,SOXL,UPRO,TECL");
   const [dmDefensive, setDmDefensive] = useState("IEF");
   const [dmMom, setDmMom] = useState(252);
   const [dmReb, setDmReb] = useState(21);
-  const [dmComposite, setDmComposite] = useState(false); // 복합 모멘텀
-  // 변동성 타깃 레버리지
+  const [dmComposite, setDmComposite] = useState(false); // composite momentum
+  // volatility-targeted leverage
   const [vtTargetVol, setVtTargetVol] = useState(25);
   const [vtLookback, setVtLookback] = useState(20);
   const [vtMaxLev, setVtMaxLev] = useState(1.0);
-  const [vtBand, setVtBand] = useState(5); // 드리프트 %p
-  const [vtSignal, setVtSignal] = useState("QQQ"); // 레짐 시그널(선택)
+  const [vtBand, setVtBand] = useState(5); // drift, in percentage points
+  const [vtSignal, setVtSignal] = useState("QQQ"); // the regime signal (optional)
   const [vtSma, setVtSma] = useState(200);
-  // 밸류리밸런싱 VR
-  const [vrG, setVrG] = useState(10); // 위험 다이얼(적립·거치 10 / 인출 20)
-  const [vrBand, setVrBand] = useState(15); // 밴드폭 % (±15)
-  const [vrPoolLimit, setVrPoolLimit] = useState(50); // 사이클당 Pool 매수 한도 % (거치 50 / 적립 75 / 인출 25)
-  const [vrCycleDays, setVrCycleDays] = useState(10); // 사이클 거래일(2주)
-  const [vrInitStock, setVrInitStock] = useState(85); // 초기 주식 비중 %
-  const [vrCashflow, setVrCashflow] = useState(0); // 사이클당 현금흐름(+적립/−인출/0거치)
-  const [vrFee, setVrFee] = useState(0); // 편도 수수료 %
-  // 레버리지 로테이션 v1
+  // value rebalancing, VR
+  const [vrG, setVrG] = useState(10); // the risk dial (10 for accumulating and lump sum, 20 for withdrawing)
+  const [vrBand, setVrBand] = useState(15); // the band width % (+/-15)
+  const [vrPoolLimit, setVrPoolLimit] = useState(50); // the Pool's per-cycle buying limit % (lump sum 50, accumulating 75, withdrawing 25)
+  const [vrCycleDays, setVrCycleDays] = useState(10); // the cycle in trading days (2 weeks)
+  const [vrInitStock, setVrInitStock] = useState(85); // the initial stock share %
+  const [vrCashflow, setVrCashflow] = useState(0); // the cash flow per cycle (+ accumulating, - withdrawing, 0 lump sum)
+  const [vrFee, setVrFee] = useState(0); // the one-way fee %
+  // leveraged rotation v1
   const [lrsSignal, setLrsSignal] = useState("QQQ");
   const [lrsSma, setLrsSma] = useState(200);
   const [lrsBand, setLrsBand] = useState(1); // %
-  const [lrsTrail, setLrsTrail] = useState(0); // % (0=미사용)
+  const [lrsTrail, setLrsTrail] = useState(0); // % (0 = unused)
 
   const [result, setResult] = useState<FullResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // rotation 강건성 스캔: mom×재평가 그리드 결과 [momDays, rebDays, 수익률%, MDD%]
+  // The rotation robustness scan: the mom x re-evaluation grid's results, as [momDays, rebDays, return %, MDD %]
   const [scan, setScan] = useState<[number, number, number, number][] | null>(null);
   const [scanning, setScanning] = useState(false);
 
-  // rotation 후보 확정 — 입력이 비면 시드 자동선발 모드(시그널 6자리=국장 시드, 아니면 미장).
+  // Fixing the rotation candidates - an empty input means seed auto-selection (a 6-digit signal is the KRX seed, otherwise the US one).
   const resolveRotation = (): { list: string[]; autoSeed?: SeedEntry[]; error?: string } => {
     const list = rotCandidates.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
     if (list.length === 1) return { list, error: "후보를 2개 이상 입력하거나, 비워서 자동선발을 쓰세요." };
@@ -180,7 +180,7 @@ export default function BacktestClient() {
     return { list: seed.map((s) => s.ticker), autoSeed: seed };
   };
 
-  // rotation 전용 — mom×재평가 그리드를 일괄 백테스트해 파라미터 민감도(강건성)를 본다.
+  // rotation only - it backtests the whole mom x re-evaluation grid at once to see parameter sensitivity (robustness).
   const runRobustnessScan = async () => {
     const rot = resolveRotation();
     if (rot.error) { setError(rot.error); return; }
@@ -208,7 +208,7 @@ export default function BacktestClient() {
             rebalanceDays: rb, from: from || undefined, to: to || undefined,
             autoSeed: rot.autoSeed, dcaSlices: strategy === "rotation_v2" ? rotDca : undefined,
             contribution: monthlyContribution || undefined });
-          // 적립식·원금0 대응 — finalV/principal(0 나눗셈) 대신 computeMetrics(TWR) 사용.
+          // Handling accumulating and a principal of 0 - it uses computeMetrics (TWR) instead of finalV/principal (a division by zero).
           const rm = computeMetrics(rr.equityCurve, principal, rr.contributions);
           out.push([m, rb, rm.totalReturnPct, rm.mdd]);
         }
@@ -222,7 +222,7 @@ export default function BacktestClient() {
   };
 
   const run = async () => {
-    // rotation·듀얼모멘텀은 후보 필드가 종목 입력을 대신 → 단일 종목 코드 불필요
+    // For rotation and dual momentum the candidate field replaces the symbol input -> no single symbol code needed
     const noSingleTicker = strategy.startsWith("rotation") || strategy === "dual_momentum_v1";
     if (!noSingleTicker && !ticker.trim()) {
       setError("종목 코드를 입력하세요.");
@@ -249,7 +249,7 @@ export default function BacktestClient() {
     setError(null);
     try {
       if (strategy.startsWith("rotation") && rot) {
-        // 후보 전체 + 시그널을 전체 이력으로 조회(지표 워밍업), 매매 구간은 from/to 로 제한
+        // Every candidate plus the signal is fetched over the whole history (for indicator warm-up), while trading is limited to from/to
         const rotList = rot.list;
         const fetchBars = async (t: string): Promise<Bar[]> => {
           const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(t)}`);
@@ -271,7 +271,7 @@ export default function BacktestClient() {
         setResult({ ...rr, bars: rangeSig, principal, strategy });
         return;
       }
-      // 듀얼 모멘텀 GEM — 후보(위험) + 방어자산을 전체 이력으로 조회, 매매 구간은 from/to
+      // Dual momentum GEM - the candidates (risk) plus the defensive asset over the whole history, with trading limited to from/to
       if (strategy === "dual_momentum_v1") {
         const candList = dmCandidates.split(",").map((t) => t.trim().toUpperCase()).filter(Boolean);
         const defTicker = dmDefensive.trim().toUpperCase();
@@ -296,7 +296,7 @@ export default function BacktestClient() {
         setResult({ ...dr, bars: rangeBars, principal, strategy });
         return;
       }
-      // 변동성 타깃 — 대상 ETF 전체 이력 + 레짐 시그널(선택). from/to 는 러너 내부에서 제한.
+      // Volatility targeting - the target ETF's whole history plus an optional regime signal. from/to is applied inside the runner.
       if (strategy === "vol_target_v1") {
         const fetchBars = async (t: string): Promise<Bar[]> => {
           const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(t)}`);
@@ -320,7 +320,7 @@ export default function BacktestClient() {
         setResult({ ...vr, bars: rangeBars, principal, strategy });
         return;
       }
-      // 밸류리밸런싱 VR — 대상 ETF 전체 이력. from/to 는 러너 내부에서 제한.
+      // Value rebalancing VR - the target ETF's whole history. from/to is applied inside the runner.
       if (strategy === "value_rebalancing") {
         const tgt = ticker.trim().toUpperCase();
         const res0 = await fetch(`/api/admin/backtest/prices?ticker=${encodeURIComponent(tgt)}`);
@@ -349,7 +349,7 @@ export default function BacktestClient() {
         setResult(null);
         return;
       }
-      // LRS: 시그널 종목(기본 QQQ, 비우면 대상 종목) 일봉을 전체 이력으로 별도 조회(SMA 워밍업).
+      // LRS: the signal symbol's bars (QQQ by default, or the target when empty) are fetched separately over the whole history (SMA warm-up).
       let signalBars: Bar[] = bars;
       if (strategy === "lrs_v1") {
         const sigTicker = (lrsSignal.trim() || ticker.trim()).toUpperCase();
@@ -399,7 +399,7 @@ export default function BacktestClient() {
       else delete n[s];
       return n;
     });
-  // 브라우저 전략 결과 → 비교 항목(재기준 시작=1). 지표는 computeMetrics 재사용.
+  // A browser strategy's result -> a comparison entry (rebased to start at 1). The metrics reuse computeMetrics.
   const entryFromResult = (fr: FullResult): CompareEntry => {
     const base = fr.equityCurve[0]?.equity || 1;
     const isPortfolio =
@@ -412,7 +412,7 @@ export default function BacktestClient() {
       metrics: computeMetrics(fr.equityCurve, fr.principal, fr.contributions),
     };
   };
-  // 담긴 전략을 재실행하면 새 결과로 비교 항목 갱신.
+  // Re-running a held strategy refreshes its comparison entry with the new result.
   useEffect(() => {
     if (result && compare[result.strategy]) setCompareEntry(result.strategy, entryFromResult(result));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -431,7 +431,7 @@ export default function BacktestClient() {
       {/* 전략 탭 */}
       <div {...tabScroll} className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
         {STRATEGY_TABS.map(([s, label]) => {
-          const disabled = s === "compare" && compareCount < 2; // 담긴 전략 2개 미만이면 비교 탭 비활성
+          const disabled = s === "compare" && compareCount < 2; // The comparison tab is disabled with fewer than 2 strategies held
           return (
             <button
               key={s}
@@ -722,8 +722,8 @@ export default function BacktestClient() {
   );
 }
 
-/** rotation 강건성 히트맵 — mom×재평가 그리드의 수익률(셀 색)과 MDD.
- *  읽는 법: 넓은 영역이 고르게 진하면(고원) 강건, 한 셀만 진하면(뾰족) 과최적화 의심. */
+/** The rotation robustness heatmap - the mom x re-evaluation grid's return (the cell colour) and MDD.
+ *  How to read it: a broad area evenly dark (a plateau) means robust; one dark cell (a spike) suggests overfitting. */
 function RobustnessHeatmap({ scan, curMom, curReb }: { scan: [number, number, number, number][]; curMom: number; curReb: number }) {
   const moms = [...new Set(scan.map(([m]) => m))].sort((a, b) => a - b);
   const rebs = [...new Set(scan.map(([, r]) => r))].sort((a, b) => a - b);
@@ -776,7 +776,7 @@ function fmt(v: number): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
-// "비교" 탭 — 담긴 전략들의 재기준 자산곡선 오버레이 + 지표표. 2개 미만이면 안내.
+// The "compare" tab - the held strategies' rebased asset curves overlaid plus a metrics table. A note when fewer than 2.
 function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, CompareEntry>>; onRemove: (s: Strategy) => void }) {
   const entries = (Object.entries(compare) as [Strategy, CompareEntry | undefined][]).filter(
     (e): e is [Strategy, CompareEntry] => !!e[1],
@@ -794,7 +794,7 @@ function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, 
   const dates = [...dateSet].sort();
   const option: EChartsOption = {
     tooltip: { trigger: "axis" },
-    // 범례는 위 표(전략명=선 색상)가 대신하므로 차트엔 두지 않는다(중복·겹침 제거, 세로 공간 확보).
+    // The table above (strategy name = line colour) serves as the legend, so none is put on the chart (removing duplication and overlap, and freeing vertical space).
     grid: { left: 8, right: 14, top: 12, bottom: 8, containLabel: true },
     xAxis: { type: "category", data: dates, boundaryGap: false, axisLabel: { color: "#888", hideOverlap: true } },
     yAxis: { type: "value", scale: true, axisLabel: { color: "#888" } },
@@ -858,7 +858,7 @@ function CompareView({ compare, onRemove }: { compare: Partial<Record<Strategy, 
   );
 }
 
-/** totalPnl 이 "최종자산 − 투입원금"(평가손익 포함)인 전략 — 나머지는 매도 실현손익 합계. */
+/** The strategies whose totalPnl is "final assets - capital invested" (unrealized P&L included) - the rest are the sum of realized P&L on sells. */
 const TOTAL_PNL_STRATEGIES = new Set(["value_rebalancing", "vol_target_v1"]);
 
 function Result({ result }: { result: FullResult }) {
@@ -867,9 +867,9 @@ function Result({ result }: { result: FullResult }) {
   const invested = buys.reduce((s, t) => s + t.price * t.qty, 0);
   const returnPct = result.principal > 0 ? (result.totalPnl / result.principal) * 100 : 0;
   const finalEquity = result.equityCurve.at(-1)?.equity ?? 0;
-  // 적립식이면 유입 자본을 제거한 시간가중수익(TWR)로 수익률 표기(원금 대비 %는 왜곡되므로).
-  // 지표는 늘 계산한다 — 적립식이 아니어도 CAGR·변동성·MDD 는 보여 줘야 한다.
-  // (예전엔 적립식일 때만 계산해, 목돈 백테스트는 위험 지표가 아예 안 보였다.)
+  // When accumulating, the return is shown as a time-weighted return (TWR) with the inflowing capital removed (a % against the principal would be distorted).
+  // The metrics are always computed - CAGR, volatility and MDD must be shown even when not accumulating.
+  // (They used to be computed only when accumulating, so a lump-sum backtest showed no risk metrics at all.)
   const perf = computeMetrics(result.equityCurve, result.principal, result.contributions);
   const twr = result.totalContributed ? perf : null;
   const wins = sells.filter((t) => t.pnl > 0).length;
@@ -877,17 +877,17 @@ function Result({ result }: { result: FullResult }) {
   const maxRound = result.trades.reduce((m, t) => Math.max(m, t.roundNo), 0);
 
   const isRotation = result.strategy.startsWith("rotation");
-  // 총자산(현금+보유) 곡선으로 표시할 전략 — 로테이션 계열 + 듀얼모멘텀(다종목) + 변동성타깃(부분 포지션)
+  // The strategies shown as a total-assets (cash + holdings) curve - the rotation family plus dual momentum (multi-symbol) and volatility targeting (partial positions)
   const isPortfolio = isRotation || result.strategy === "dual_momentum_v1" || result.strategy === "vol_target_v1" || result.strategy === "value_rebalancing";
-  // VR 밴드 (#341, #343) — **총자산 차트 안에** 그린다.
+  // The VR band (#341, #343) - drawn **inside the total-assets chart**.
   //
-  // 처음엔 차트를 따로 뒀는데, 그러면 매매가 왜 일어났는지와 자산이 어떻게 움직였는지를
-  // 두 그림을 오가며 봐야 한다. 한 그림에 합치되, 밴드가 감싸는 것이 **주식 평가금**
-  // (qty×종가)이지 총자산(주식+Pool)이 아니라는 점을 지킨다 — 그래서 주식 평가금 선을
-  // 함께 그린다. 밴드만 총자산 위에 얹으면 Pool 만큼 늘 위로 떠 "항상 밴드 밖" 으로 보인다.
+  // It started as a separate chart, but that means looking between two pictures to see why a trade happened and how
+  // the assets moved. They are combined into one, while keeping the point that the band wraps **the stock valuation**
+  // (qty x close), not total assets (stock + Pool) - which is why the stock valuation line is drawn alongside.
+  // Laying the band over total assets alone floats it above by the Pool and makes it look "always outside the band".
   //
-  // ECharts 에 밴드 영역이 없어 **쌓기**로 만든다 — 하단선을 투명하게 깔고 그 위에
-  // (상단−하단)을 쌓아 거기에만 areaStyle 을 준다.
+  // ECharts has no band area, so it is built by **stacking** - a transparent lower line with
+  // (upper - lower) stacked on top, and areaStyle given only to that.
   const band = result.vrBand ?? [];
   const stockAt = new Map(band.map((r) => [r.date, r.stock]));
   const vrSeries = band.length === 0 ? [] : [
@@ -901,8 +901,8 @@ function Result({ result }: { result: FullResult }) {
     { name: "주식 평가금", type: "line" as const, showSymbol: false,
       lineStyle: { width: 1.2, color: "#6b7280" }, data: band.map((r) => r.stock), z: 3 },
   ];
-  // 매매는 그날의 **주식 평가금** 위에 찍는다 — 밴드 판정이 일어난 축이다.
-  // 예전엔 이 차트가 로테이션용이라 매도만 "교체/청산" 으로 찍고 매수는 아예 없었다 (#343).
+  // Trades are marked on that day's **stock valuation** - the axis the band decision happened on.
+  // This chart used to be rotation's, so only sells were marked as "switch/liquidate" and buys were absent entirely (#343).
   const vrMarkers = band.length === 0 ? [] : [
     { name: "매수", type: "scatter" as const, symbol: "triangle", symbolSize: 9, itemStyle: { color: "#dc2626" },
       data: buys.map((t) => [t.date, stockAt.get(t.date) ?? null]), z: 5 },
@@ -912,7 +912,7 @@ function Result({ result }: { result: FullResult }) {
 
   const option: EChartsOption = isPortfolio
     ? {
-        // 다중 종목 로테이션 — 단일 가격축 대신 총자산(현금+보유) 곡선으로 표시
+        // Multi-symbol rotation - shown as a total-assets (cash + holdings) curve instead of a single price axis
         tooltip: { trigger: "axis" },
         legend: {
           data: band.length
@@ -927,8 +927,8 @@ function Result({ result }: { result: FullResult }) {
         series: [
           { name: "총자산", type: "line", showSymbol: false, data: result.equityCurve.map((e) => e.equity), lineStyle: { width: 1.5 } },
           ...vrSeries,
-          // VR 은 단일 종목이라 매수·매도를 따로 찍는다. 로테이션은 종목이 바뀌므로
-          // 총자산 위의 "교체/청산" 한 종류만 뜻이 있다.
+          // VR is a single symbol, so buys and sells are marked separately. Rotation's symbol changes, so only
+          // the one "switch/liquidate" kind on total assets means anything.
           ...(band.length
             ? vrMarkers
             : [{ name: "교체/청산", type: "scatter" as const, symbol: "triangle", symbolRotate: 180, symbolSize: 9, itemStyle: { color: "#2563eb" },
@@ -958,7 +958,7 @@ function Result({ result }: { result: FullResult }) {
           label={TOTAL_PNL_STRATEGIES.has(result.strategy) ? "총손익 (평가포함)" : "실현손익"}
           value={fmt(result.totalPnl)} accent={result.totalPnl >= 0 ? "pos" : "neg"} />
         {result.effectiveAvg != null && (
-          // 원문 4.2 — 명목평단과 달리 매도가 쌓이면 내려간다. 마이너스면 "원금 ZERO 상태".
+          // Source 4.2 - unlike the nominal average, it falls as sales accumulate. Negative means the "zero principal" state.
           <Metric label="실효평단" value={fmt(result.effectiveAvg)}
                   accent={result.effectiveAvg < 0 ? "pos" : undefined} />
         )}

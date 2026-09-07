@@ -1,5 +1,5 @@
-// 옛 quest CMS 패턴 — /scenes/[id]/revisions 별도 페이지.
-// 정적 코드 검사 — RevisionHistorySection 재사용 + 페이지 헤더 + 씬 편집 복귀 링크.
+// The old quest CMS pattern - a separate /scenes/[id]/revisions page.
+// A static code check - reusing RevisionHistorySection plus the page header and the link back to scene editing.
 
 import { describe, test, expect } from "vitest";
 import fs from "node:fs";
@@ -12,13 +12,13 @@ describe("/scenes/[id]/revisions — 별도 리비전 페이지", () => {
   );
 
   test("RevisionHistorySection 컴포넌트 import + 재사용", () => {
-    // import 패턴 — 위치는 graph 디렉토리.
+    // The import pattern - it lives in the graph directory.
     expect(code).toMatch(/RevisionHistorySection/);
     expect(code).toMatch(/revisionHistorySection/);
   });
 
   test("sceneId prop 으로 id 전달", () => {
-    // sceneId={id} 또는 sceneId={...} 패턴.
+    // The sceneId={id} or sceneId={...} pattern.
     expect(code).toMatch(/sceneId=\{[^}]+\}/);
   });
 
@@ -27,7 +27,7 @@ describe("/scenes/[id]/revisions — 별도 리비전 페이지", () => {
   });
 
   test("'씬 편집' 으로 돌아가는 링크 존재 (/scenes/[id])", () => {
-    // /scenes/${id} 또는 /scenes/${...} 패턴 (revisions 미포함).
+    // The /scenes/${id} or /scenes/${...} pattern (without revisions).
     expect(code).toMatch(/\/scenes\/\$\{[^}]+\}(?![^`'"]*\/revisions)/);
   });
 });

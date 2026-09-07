@@ -1,4 +1,4 @@
-// /api/web-adventure/past-runs — 회차 history (#239 / #293 limit).
+// /api/web-adventure/past-runs - the run history (#239 / #293 limit).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -47,7 +47,7 @@ describe('GET /api/web-adventure/past-runs', () => {
     expect(WebAdventurePastRun.find).toHaveBeenCalledWith({ userEmail: 'a@b.com' });
   });
 
-  // #293 페이지네이션.
+  // #293 pagination.
   it('limit 미지정 → 기본 500', async () => {
     (auth as ReturnType<typeof vi.fn>).mockResolvedValue({ user: { email: 'a@b.com' } });
     const { limitMock } = mockChain([]);

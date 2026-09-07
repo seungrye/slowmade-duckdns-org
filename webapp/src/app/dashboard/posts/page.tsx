@@ -22,16 +22,16 @@ export default async function MyUploadsPage({ searchParams }: Props) {
   }
 
   const params = await searchParams;
-  const rawSort = params.sort as string | undefined; // 쿼리 파라미터에서 sort 값 가져오기
+  const rawSort = params.sort as string | undefined; // Reads the sort value from the query parameters
   // console.log("rawSort", rawSort);
 
   const sortOption: SortOption = isValidSortOption(rawSort) ? rawSort : 'latest';
-  const page = parseInt(params.page as string) || 1; // 쿼리 파라미터에서 page 값 가져오기
-  const pageSize = parseInt(params.pageSize as string) || 12; // 페이지당 게시글 수
+  const page = parseInt(params.page as string) || 1; // Reads the page value from the query parameters
+  const pageSize = parseInt(params.pageSize as string) || 12; // Posts per page
 
-  const { total, posts } = await myPosts(session?.user.email, sortOption, page, pageSize, true); // 정렬 기준에 따라 게시글 불러오기
+  const { total, posts } = await myPosts(session?.user.email, sortOption, page, pageSize, true); // Loads the posts by the sort order
 
-  const endPage = Math.ceil(total / pageSize); // 전체 페이지 수 계산
+  const endPage = Math.ceil(total / pageSize); // Computes the total page count
 
   return (
     <main className="mx-auto px-4 py-6">

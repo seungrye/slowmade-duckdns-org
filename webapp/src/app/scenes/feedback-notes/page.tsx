@@ -1,5 +1,5 @@
-// /scenes/feedback-notes — 작가(owner) 전용 피드백 노트 목록. (#9, #11)
-// 노트는 엔딩 시 자동 생성된다(수동 생성 없음). 이 페이지는 열람·삭제만.
+// /scenes/feedback-notes - the author's (owner's) feedback note list. (#9, #11)
+// Notes are generated automatically at an ending (there is no manual creation). This page only views and deletes.
 
 import { notFound } from 'next/navigation';
 import { NextResponse } from 'next/server';

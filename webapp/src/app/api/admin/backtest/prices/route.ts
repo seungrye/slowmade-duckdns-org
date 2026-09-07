@@ -8,10 +8,10 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/admin/backtest/prices?ticker=TQQQ&from=YYYY-MM-DD&to=YYYY-MM-DD
  *
- * 단일 종목 OHLC 일봉 — 브라우저 백테스트 입력용(연산은 클라이언트에서).
- * open/high/low 가 없는 소스(close 만 저장된 경우)는 close 로 대체한다.
+ * A single symbol's OHLC daily bars - the input for the browser backtest (which computes on the client).
+ * A source without open/high/low (where only the close is stored) substitutes the close.
  *
- * 반환: { ticker, bars: [{date, open, high, low, close, volume}, ...] }
+ * Returns: { ticker, bars: [{date, open, high, low, close, volume}, ...] }
  */
 export async function GET(req: NextRequest) {
   const guard = await requireOwner();

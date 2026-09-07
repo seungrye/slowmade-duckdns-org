@@ -1,8 +1,8 @@
-// /api/games/retro/roms/[id]/download — 롬 내려받기 (#194).
+// /api/games/retro/roms/[id]/download - ROM download (#194).
 //
-// 이름 짓기는 `download-bundle.test.ts` 가 본다. 여기서는 인가·묶을지 말지·실제로 열리는
-// zip 인지를 본다. **되읽기 검증**이 핵심이다 — 우리가 쓴 zip 을 같은 파일의 `readZip` 으로
-// 다시 풀어 항목 이름과 바이트가 그대로인지 확인한다.
+// Naming is `download-bundle.test.ts`'s concern. This checks authorisation, whether to bundle, and that the zip
+// really opens. **Reading it back is the point** - the zip we wrote is unpacked again with the same file's `readZip`
+// to confirm the entry names and bytes are intact.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
@@ -79,7 +79,7 @@ describe('GET /api/games/retro/roms/[id]/download', () => {
     expect(decodeURIComponent(res.headers.get('Content-Disposition') ?? '')).toContain('테일즈');
 
     const entries = await readZip(new Uint8Array(await res.arrayBuffer()));
-    // 패치는 롬 이름 + `-patch` 로 들어간다 (#198) — 어느 게 패치인지 한눈에 보이게.
+    // The patch goes in as the ROM's name plus `-patch` (#198) - so which file is the patch is obvious at a glance.
     expect(entries.map((e: { name: string }) => e.name)).toEqual(['game.sfc', 'game-patch.ips']);
     expect(entries[0].data).toEqual(bytes(16, 1));
     expect(entries[1].data).toEqual(bytes(8, 2));
@@ -101,7 +101,7 @@ describe('GET /api/games/retro/roms/[id]/download', () => {
     const entries = await readZip(new Uint8Array(await (await GET(req(), { params })).arrayBuffer()));
     expect(entries).toHaveLength(2);
     expect(new Set(entries.map((e: { name: string }) => e.name)).size).toBe(2);
-    // 바이트가 서로 다른 파일이라는 것까지 확인 — 덮어썼다면 같아진다.
+    // It even confirms the files' bytes differ - an overwrite would make them identical.
     expect(entries[0].data).not.toEqual(entries[1].data);
   });
 

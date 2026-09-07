@@ -5,7 +5,7 @@ import { useSession } from 'next-auth/react';
 import { Theme, storeTheme, applyTheme } from '@/lib/theme';
 
 /**
- * 설정 폼을 렌더링하고, 설정 값을 불러오고 저장하는 로직을 담당합니다.
+ * Renders the settings form and handles loading and saving the settings values.
  */
 function SettingsForm() {
     const [theme, setTheme] = useState<Theme>('system');
@@ -14,7 +14,7 @@ function SettingsForm() {
     const [isSaving, setIsSaving] = useState(false);
     const [message, setMessage] = useState('');
 
-    // 컴포넌트가 마운트될 때 현재 사용자 설정을 불러옵니다.
+    // Loads the current user's settings when the component mounts.
     useEffect(() => {
         fetch('/api/user/settings')
             .then(res => {
@@ -34,7 +34,7 @@ function SettingsForm() {
             .finally(() => setIsLoading(false));
     }, []);
 
-    // '저장' 버튼을 클릭했을 때 실행될 함수
+    // The function that runs when 'save' is clicked
     const handleSave = async (e: FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -53,8 +53,8 @@ function SettingsForm() {
             }
 
             const savedSettings = await res.json();
-            setInitialTheme(savedSettings.data?.theme); // 저장 후 현재 상태를 초기 상태로 업데이트
-            // localStorage 를 원본으로 갱신하고 즉시 화면에 반영(다음 SSR 대기 없이).
+            setInitialTheme(savedSettings.data?.theme); // After saving, the current state becomes the initial state
+            // localStorage is updated as the source and applied to the UI at once (with no wait for the next SSR).
             storeTheme(theme);
             applyTheme(theme);
             setMessage('✅ 설정이 저장되었습니다.');
@@ -63,11 +63,11 @@ function SettingsForm() {
             setMessage(`❌ 설정 저장에 실패했습니다: ${errorMessage}`);
         } finally {
             setIsSaving(false);
-            setTimeout(() => setMessage(''), 3000); // 3초 후 메시지 숨김
+            setTimeout(() => setMessage(''), 3000); // Hides the message after 3 seconds
         }
     };
 
-    // 데이터를 불러오는 동안 로딩 스켈레톤 UI를 보여줍니다.
+    // Shows a loading skeleton while the data loads.
     if (isLoading) {
         return (
             <div className="bg-white p-6 rounded-lg shadow animate-pulse">
@@ -121,7 +121,7 @@ function SettingsForm() {
     );
 }
 
-/** 테마 설정 섹션 — 로그인 필수(미로그인 리디렉션)·세션 로딩 스켈레톤 포함. */
+/** The theme settings section - requires a login (redirecting when logged out) and includes a session loading skeleton. */
 export default function SettingsFormSection() {
     const { status } = useSession({ required: true });
     if (status === 'loading') {

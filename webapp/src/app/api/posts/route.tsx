@@ -11,19 +11,19 @@ export async function GET(req: Request) {
   const limit = Math.min(parseInt(searchParams.get('limit') || '9', 10), 50);
   const email = searchParams.get('email') || null;
 
-  const rawSort = searchParams.get('sort') || 'latest'; // 기본값 'latest'로 설정
+  const rawSort = searchParams.get('sort') || 'latest'; // defaults to 'latest'
   const parseResult = SortOptionSchema.safeParse(rawSort);
   console.assert(parseResult.success, `Invalid sort option: ${rawSort}. Expected one of: latest, popular, commented.`);
   const order = parseResult.data;
 
   const withComments = true;
 
-  // 제목 검색 (#232). 메인 화면은 9건씩 무한스크롤이라 **불러온 것만 거르면 안 된다** —
-  // "검색했는데 없다"가 거짓이 되므로 전체에서 서버가 찾는다.
-  // 공백만이면 검색어로 치지 않는다: 검색창을 비우면 전체 목록으로 돌아와야 한다.
+  // Title search (#232). The main screen infinite-scrolls 9 at a time, so **filtering only what is loaded is wrong** -
+  // "searched and found nothing" would be a lie, so the server searches everything.
+  // Whitespace alone does not count as a search term: clearing the search box must return the full list.
   const q = searchParams.get('q')?.trim() || null;
 
-  // 로그인한 작성자는 자기 비공개 글도 목록에 보인다(viewer=세션 email).
+  // A logged-in author sees their own private posts in the list too (viewer = the session email).
   const session = await auth();
   const posts = await getPaginatedPosts(page, limit, order, email, withComments, session?.user?.email ?? null, q);
   return apiSuccess(posts);

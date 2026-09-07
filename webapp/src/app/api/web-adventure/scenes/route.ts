@@ -1,7 +1,7 @@
-// /api/web-adventure/scenes — 씬 목록 + 생성.
+// /api/web-adventure/scenes - the scene list plus creation.
 //
-// Phase B 기준 (사용자 결정): admin 권한 없이 전체 공개.
-// Phase F (사이트 노출 + 정식 admin UI) 시점에 권한 강제 예정.
+// As of Phase B (the user's decision): fully public, with no admin permission.
+// Permissions are to be enforced at Phase F (site exposure plus a proper admin UI).
 
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
@@ -18,17 +18,17 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const authed = await requireOwner(); // 씬 생성은 작성자만 (#179)
+  const authed = await requireOwner(); // Creating a scene is the author's alone (#179)
   if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const body = await req.json();
 
-  // 필수 필드 검증
+  // Validating the required fields
   if (!body.id || !body.title || !body.illustration || !Array.isArray(body.body)) {
     return apiError("id, title, illustration, body 는 필수입니다.", 400);
   }
 
-  // id 는 unique — 살아있으면 409, 소프트 삭제된 문서면 재사용(undelete + 새 내용으로 덮어씀).
+  // id is unique - a live one gives 409, and a soft-deleted document is reused (undeleted and overwritten with the new content).
   const existing = await WebAdventureScene.findOne({ id: body.id });
   if (existing && !existing.isDeleted) {
     return apiError(`이미 존재하는 씬 ID 입니다: ${body.id}`, 409);
@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
 
   try {
     if (existing) {
-      // 소프트 삭제된 씬 재사용 — 새 내용으로 덮어쓰고 undelete. 배리에이션 이미지는
-      // 옛 것이 남지 않도록 초기화(재생성=깨끗). position 은 그래프 좌표라 유지.
+      // Reusing a soft-deleted scene - overwritten with the new content and undeleted. The variation images are
+      // cleared so none of the old ones remain (recreating means starting clean). position is kept, being a graph coordinate.
       existing.set({
         title: body.title, illustration: body.illustration, body: body.body,
         choices: body.choices ?? [], onEnter: body.onEnter,

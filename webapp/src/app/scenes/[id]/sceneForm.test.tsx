@@ -48,7 +48,7 @@ describe('SceneForm — onEnter setFlags', () => {
   it('setFlags 토글 추가 가능', () => {
     const fn = vi.fn();
     render(<SceneForm scene={baseScene} onChange={fn} />);
-    // 새 플래그 추가 입력
+    // entering a new flag
     const flagInput = screen.getByPlaceholderText('새 flag 키') as HTMLInputElement;
     fireEvent.change(flagInput, { target: { value: 'visited' } });
     fireEvent.click(screen.getByText('+ 플래그'));

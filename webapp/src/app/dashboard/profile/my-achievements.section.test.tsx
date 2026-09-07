@@ -108,7 +108,7 @@ describe('MyAchievements', () => {
       render(<MyAchievements session={session} />);
 
       expect(await screen.findByText('???')).toBeInTheDocument();
-      // 진행도까지 보여주면 조건이 새어 나간다.
+      // Showing the progress too would leak the condition.
       expect(screen.queryByText('0 / 1')).toBeNull();
     });
   });
@@ -122,7 +122,7 @@ describe('MyAchievements', () => {
 
     expect(gold?.getAttribute('data-tier')).toBe('gold');
     expect(silver?.getAttribute('data-tier')).toBe('silver');
-    // 등급 표시는 아이콘 테두리 색이다 — 카드 자체는 같은 모양을 유지한다.
+    // The tier shows as the icon's border colour - the card itself keeps the same shape.
     expect(gold?.className).not.toBe(silver?.className);
   });
 

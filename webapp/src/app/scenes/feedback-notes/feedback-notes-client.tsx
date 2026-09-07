@@ -1,6 +1,6 @@
 "use client";
 
-// 피드백 노트 목록 UI (owner 전용). 노트는 엔딩 시 자동 생성 — 이 화면은 열람/상태/삭제 + 폴링. (#9, #11)
+// The feedback note list UI (owner only). Notes are generated automatically at an ending - this screen only views, shows status, deletes and polls. (#9, #11)
 
 import { useCallback, useEffect, useState } from "react";
 import { endingLabel } from "@/content/web-adventure/endings";
@@ -39,7 +39,7 @@ export default function FeedbackNotesClient({ initialNotes }: { initialNotes: No
     }
   }, []);
 
-  // 생성 중(queued/processing) 노트가 있으면 주기적으로 상태 갱신.
+  // While a note is being generated (queued/processing), the status is refreshed periodically.
   useEffect(() => {
     const pending = notes.some((n) => n.status === "queued" || n.status === "processing");
     if (!pending) return;

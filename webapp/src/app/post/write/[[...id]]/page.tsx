@@ -1,5 +1,5 @@
 import React from 'react';
-import { Toaster } from "react-hot-toast"; // ✅ 토스트 추가
+import { Toaster } from "react-hot-toast"; // toast added
 import type { Metadata } from 'next';
 import PostWriterForm from './writer-form.section';
 

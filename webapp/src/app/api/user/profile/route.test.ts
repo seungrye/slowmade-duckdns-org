@@ -14,7 +14,7 @@ const mockFindOneAndUpdate = User.findOneAndUpdate as ReturnType<typeof vi.fn>;
 
 const signedIn = () => mockAuth.mockResolvedValue({ user: { email: 'me@test.com' }, expires: '' });
 
-// GET 은 findOne(...).select(...) 체인을 쓴다.
+// The GET uses a findOne(...).select(...) chain.
 const stubProfile = (doc: unknown) =>
   mockFindOne.mockReturnValue({ select: vi.fn().mockResolvedValue(doc) });
 
@@ -44,7 +44,7 @@ describe('GET /api/user/profile', () => {
 
     expect(res.status).toBe(200);
     expect(new Date(data.birthday).toISOString()).toBe('1990-03-15T00:00:00.000Z');
-    // select 목록에 birthday 가 빠지면 폼이 항상 비어 보인다.
+    // Leaving birthday out of the select list makes the form always look empty.
     expect(mockFindOne.mock.results[0].value.select).toHaveBeenCalledWith(
       expect.stringContaining('birthday'),
     );
@@ -83,7 +83,7 @@ describe('PUT /api/user/profile', () => {
       mockFindOneAndUpdate.mockClear();
       const res = await PUT(putRequest(body));
       expect(res.status).toBe(200);
-      // 생일을 지우면 사주 근거가 없어지므로 태어난 시도 함께 지운다 (#390).
+      // Clearing the birthday removes the basis for the saju, so the birth time is cleared with it (#390).
       expect(mockFindOneAndUpdate.mock.calls[0][1]).toEqual({ $unset: { birthday: 1, birthTime: 1 } });
     }
   });

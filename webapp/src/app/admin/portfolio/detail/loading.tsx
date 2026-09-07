@@ -1,6 +1,6 @@
-// 매매 상세(SSR) 로딩 중 즉시 표시되는 스켈레톤.
-// 미장처럼 매매 종목이 많으면 데이터 로드가 몇 초 걸리는데, 그 사이 빈 대기 대신
-// detail 레이아웃과 비슷한 형태의 placeholder 를 보여준다(Next.js loading.tsx 규약).
+// The skeleton shown immediately while the trade detail (SSR) loads.
+// With many traded symbols, as on the US market, the data takes seconds to load, and rather than an empty wait
+// it shows a placeholder shaped like the detail layout (the Next.js loading.tsx convention).
 export default function Loading() {
   return (
     <main className="mx-auto px-4 py-8">

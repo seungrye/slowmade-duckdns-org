@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 type PageProps = { params: Promise<{ ticker: string }> };
 
 /**
- * 단일 종목 페이지 → 멀티 차트 페이지로 redirect (단일 종목 1개 선택 상태).
- * 기존 북마크/링크 호환 + UX 통일.
+ * The single-symbol page redirects to the multi-chart page (with that one symbol selected).
+ * It keeps existing bookmarks and links working and unifies the UX.
  */
 export default async function StockDetailPage({ params }: PageProps) {
   const guard = await requireOwner();

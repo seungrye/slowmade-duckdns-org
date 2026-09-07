@@ -13,7 +13,7 @@ const MY_ROMS: UserRomDto[] = [
   { id: '653f1a2b3c4d5e6f70819202', title: '내가 올린 롬', platform: 'arcade', size: 2 * 1024 * 1024, createdAt: '2026-08-12T00:00:00.000Z' },
 ];
 
-/** 사이드바·칩이 둘 다 렌더되므로(CSS 로만 감춤) 사이드바 쪽 버튼을 집어 쓴다. */
+/** Both the sidebar and the chips render (hidden by CSS alone), so the sidebar's buttons are the ones used. */
 function sidebarButton(label: string) {
   return within(screen.getByRole('navigation', { name: '기종' })).getByRole('button', { name: new RegExp(`^${label}`) });
 }
@@ -84,13 +84,13 @@ describe('RetroLibrary', () => {
       expect(screen.queryByRole('button', { name: 'Nomolos 삭제' })).not.toBeInTheDocument();
     });
 
-    // #155 — 카드의 삭제 버튼은 손이 스치기 쉬운 자리에 있다. 한 번 누르면 끝나면 안 된다.
+    // #155 - the card's delete button sits where a hand easily brushes it. One press must not be the end of it.
     it('버튼을 눌러도 **바로 지우지 않는다** — 먼저 확인을 받는다', async () => {
       render(<RetroLibrary builtins={BUILTINS} initialRoms={MY_ROMS} />);
       fireEvent.click(screen.getByRole('button', { name: '내가 올린 롬 삭제' }));
 
       expect(fetch).not.toHaveBeenCalled();
-      // 확인 창에도 이름이 실리므로 목록 쪽으로 범위를 좁혀 본다.
+      // The confirmation dialog carries the name too, so the search is narrowed to the list.
       const grid = screen.getByRole('list', { name: '게임 목록' });
       expect(within(grid).getByText('내가 올린 롬')).toBeInTheDocument();
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -136,7 +136,7 @@ describe('RetroLibrary', () => {
     });
   });
 
-  // #116 — 관리가 카드로 옮겨 왔다.
+  // #116 - management moved onto the card.
   describe('카드에서 패치 다루기', () => {
     const PATCHED: UserRomDto[] = [
       { ...MY_ROMS[0], patch: { id: 'p1', name: 'ko.ips', format: 'ips', size: 4096 }, patchEnabled: true },
@@ -153,7 +153,7 @@ describe('RetroLibrary', () => {
         target: { files: [new File([new Uint8Array(8)], 'new.ips')] },
       });
 
-      // 파일명은 화면에 적지 않는다 — 버튼 툴팁으로만 확인한다 (#122).
+      // The filename is not written on screen - it is only in the button's tooltip (#122).
       await waitFor(() =>
         expect(screen.getByRole('button', { name: '내가 올린 롬 패치 교체' }).getAttribute('title'))
           .toContain('new.ips'),
@@ -174,7 +174,7 @@ describe('RetroLibrary', () => {
       });
 
       expect(await screen.findByRole('alert')).toHaveTextContent('IPS·BPS·UPS');
-      // 실패했으니 여전히 "올리기" 상태다.
+      // It failed, so it is still in the "upload" state.
       expect(screen.getByRole('button', { name: '내가 올린 롬 패치 올리기' })).toBeInTheDocument();
     });
 
@@ -190,8 +190,8 @@ describe('RetroLibrary', () => {
           expect.objectContaining({ method: 'PATCH' }),
         ),
       );
-      // **가라앉은 뒤** 본다. 요청이 도는 동안엔 busy 로 잠겨 있어, 곧바로 재면 CI 부하에서
-      // 중간 상태를 잡는다(실제로 그렇게 깨졌다).
+      // Checked **after it settles**. It is locked as busy while the request is in flight, so measuring immediately
+      // catches an intermediate state under CI load (which really did break it).
       await waitFor(() => {
         const box = screen.getByRole('checkbox');
         expect(box).toBeEnabled();
@@ -206,7 +206,7 @@ describe('RetroLibrary', () => {
       fireEvent.click(screen.getByRole('checkbox'));
 
       expect(await screen.findByRole('alert')).toBeInTheDocument();
-      // 되돌림도 요청이 끝난 뒤에 일어난다 — 가라앉은 상태를 본다.
+      // The revert also happens after the request finishes - the settled state is what is checked.
       await waitFor(() => {
         const box = screen.getByRole('checkbox');
         expect(box).toBeEnabled();
@@ -215,11 +215,11 @@ describe('RetroLibrary', () => {
     });
   });
 
-  // 분할 셋은 파일을 여럿 골라야 한다 (#143).
+  // A split set needs several files selected (#143).
   describe('롬 업로드 파일 선택', () => {
     it('여러 파일을 고를 수 있다', () => {
       render(<RetroLibrary builtins={BUILTINS} initialRoms={[]} />);
-      // 데스크톱 사이드바·모바일 아래쪽 둘 다 렌더되므로 첫 번째를 본다.
+      // Both the desktop sidebar and the mobile footer render, so the first is used.
       const input = screen.getAllByLabelText('롬 파일')[0];
       expect(input).toHaveAttribute('multiple');
     });

@@ -1,9 +1,9 @@
-// SceneRenderer — 본문 <<set>> 이 문단별 보간에 실제로 물렸는지 (#371).
+// SceneRenderer - whether the body's <<set>> really feeds the per-paragraph interpolation (#371).
 // @vitest-environment jsdom
 //
-// 테스트 환경은 skipSequential 이 참이라 문단이 한꺼번에 그려진다. 그래서 문단별 값이
-// 그대로 눈에 보인다. (<<wait>> 은 그 스킵 때문에 여기서 잴 수 없다 —
-// revealSchedule 순수 함수 테스트가 덮는다.)
+// The test environment has skipSequential true, so the paragraphs are drawn all at once. So the per-paragraph values
+// are visible as they are. (<<wait>> cannot be measured here because of that skip -
+// the revealSchedule pure-function tests cover it.)
 
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
@@ -31,7 +31,7 @@ const SCENE: Scene = {
   choices: [{ kind: "plain", id: "p", label: "다음으로", to: "next" }],
 };
 
-/** 본문 영역의 문단 텍스트를 순서대로. 문단 번호와 보이는 값을 짝지어 보기 위함. */
+/** The body area's paragraph texts, in order. So a paragraph number can be paired with the value shown. */
 function bodyParagraphs(container: HTMLElement): string[] {
   return Array.from(container.querySelectorAll("[data-typewriter-area] p")).map(
     (el) => el.textContent ?? "",
@@ -49,7 +49,7 @@ describe("SceneRenderer — 문단별 <<set>> 보간", () => {
         "{{이름}} · {{별명}}",
       ],
     };
-    // 별명은 character.variables 에 이미 있다 — 문단 1 의 <<set>> 이 이걸 덮어야 한다.
+    // The nickname is already in character.variables - paragraph 1's <<set>> has to override it.
     const char: Character = { ...SAMPLE_CHAR, variables: { 별명: "무명" } };
 
     const { container } = render(

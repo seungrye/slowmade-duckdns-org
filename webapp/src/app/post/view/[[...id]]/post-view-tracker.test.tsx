@@ -1,5 +1,5 @@
-// PostViewTracker: 뷰 페이지 마운트 시 조회수 API 를 1회 호출하는 client 컴포넌트.
-// 렌더에서 조회수 write 를 분리해 page 를 ISR 캐싱 가능하게 만드는 축.
+// PostViewTracker: the client component that calls the view-count API once when the view page mounts.
+// The axis that separates the view-count write from the render so the page can be ISR-cached.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';

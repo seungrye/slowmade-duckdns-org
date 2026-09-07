@@ -20,21 +20,21 @@ type Props = {
   scene: Scene;
   character: Character;
   onChoose: (choiceId: string) => void;
-  /** 회차 — 배리에이션 이미지 선택 seed (회차마다 다른 그림). */
+  /** The run - the seed for choosing a variation image (a different picture each run). */
   runIndex?: number;
-  /** probability 판정 대기 — 있으면 ChoiceList 대신 결과+재굴림/계속 표시. */
+  /** A pending probability roll - when present, the result plus reroll/continue replaces the ChoiceList. */
   pendingRoll?: PendingRoll;
   rerollsLeft?: number;
   onReroll?: () => void;
   onConfirm?: () => void;
-  /** 오디오 재생 버스 주입(테스트 seam). 미지정 시 내부 인스턴스 사용. */
+  /** Injecting the audio playback bus (a test seam). Unset, an internal instance is used. */
   audioBus?: AudioBus;
 };
 
-/** 문단 사이 간격 (ms). */
+/** The gap between paragraphs (ms). */
 const STEP_MS = 700;
 
-/** 문자열 → 32bit 정수 해시 (배리에이션 결정적 선택용). */
+/** A string -> a 32-bit integer hash (for choosing a variation deterministically). */
 function hashString(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
@@ -44,20 +44,20 @@ function hashString(s: string): number {
 }
 
 /**
- * 씬 렌더러 — 본문 *문단별 순차 fade-in* (#351/v4).
+ * The scene renderer - the body fades in *paragraph by paragraph, in sequence* (#351/v4).
  *
- * 이전 타이프라이터(글자 단위 + onComplete 체인)는 콜백 누락 시 다음 문단이
- * 멈추는 버그가 있어, *타이머 기반* 문단 reveal 로 교체. 콜백 의존 없음.
+ * The previous typewriter (per character with an onComplete chain) had a bug where a missing
+ * callback stalled the next paragraph, so it was replaced by a *timer-based* paragraph reveal. No callback dependency.
  *
- * 동작:
- *   - 문단을 STEP_MS 간격으로 한 줄씩 추가 (각 문단 fade-in).
- *   - 본문 영역 클릭 = 전체 즉시 표시 (skipAll).
- *   - 모든 문단 표시 후 ChoiceList fade-in (그 전엔 미렌더 → 공간 미점유).
+ * How it works:
+ *   - paragraphs are added one at a time at STEP_MS intervals (each fading in).
+ *   - clicking the body area shows everything at once (skipAll).
+ *   - once every paragraph is shown the ChoiceList fades in (before that it is not rendered and takes no space).
  *
- * 즉시 표시 조건 (= skipSequential):
- *   - vitest / playwright / SSR — 자동 환경.
- *   - 사용자 OFF (옵션).
- *   - 방문 자동 skip ON + 이전 방문 기록.
+ * When it shows immediately (= skipSequential):
+ *   - vitest, playwright and SSR - detected automatically.
+ *   - the user switched it off (an option).
+ *   - automatic skipping of visited scenes is on and there is a prior visit record.
  */
 export default function SceneRenderer({
   scene,
@@ -72,14 +72,14 @@ export default function SceneRenderer({
 }: Props) {
   const total = scene.body.length;
 
-  // 오디오 버스 — SceneRenderer 는 씬 전환에 remount 되지 않으므로(부모가 key 미지정) ref 가
-  // 유지돼 BGM 이 씬 전환에도 이어진다. 언마운트(플레이 종료) 시 dispose 로 정지.
+  // The audio bus - SceneRenderer is not remounted on a scene change (the parent sets no key), so the ref
+  // persists and the BGM carries across scenes. Unmounting (leaving play) disposes and stops it.
   const internalBusRef = useRef<AudioBus | null>(null);
   if (!audioBus && !internalBusRef.current) internalBusRef.current = new AudioBus();
   const bus = audioBus ?? (internalBusRef.current as AudioBus);
 
-  // 배리에이션 선택 — (회차 + 씬 id) 결정적 해시. 같은 회차 같은 씬은 항상 같은 그림,
-  // 회차가 바뀌면 변화. 랜덤이 아니라 hydration 안전. illustrations 없으면 단일 fallback.
+  // Choosing the variation - a deterministic hash of (run + scene id). The same scene in the same run always gets the
+  // same picture, and it changes with the run. Deterministic rather than random, so it is hydration-safe. With no illustrations, a single fallback.
   const chosenIllustration = useMemo(() => {
     const arr =
       scene.illustrations && scene.illustrations.length > 0
@@ -89,9 +89,9 @@ export default function SceneRenderer({
     return arr[hashString(`${runIndex}:${scene.id}`) % arr.length];
   }, [scene.id, scene.illustration, scene.illustrations, runIndex]);
 
-  // 선택지 추림 — 씬 pool 이 3개를 넘으면 (회차 + 씬 id) 결정적 추첨으로 3개만.
-  // 같은 회차·씬은 항상 같은 조합(안정), 회차가 바뀌면 다른 조합(반복 플레이). pinned·
-  // conditional·probability 는 항상 노출. character 상태 변화 시 재평가하되 추첨은 seed 안정.
+  // Narrowing the choices - when the scene's pool exceeds 3, a deterministic draw on (run + scene id) keeps 3.
+  // The same run and scene always give the same combination (stable), and a different run a different one (replayability). Pinned,
+  // conditional and probability choices are always shown. It re-evaluates as the character changes while the draw's seed stays stable.
   const displayedChoices = useMemo(
     () => pickDisplayedChoices(scene.choices, character, { seed: `${runIndex}:${scene.id}` }),
     [scene.choices, scene.id, character, runIndex],
@@ -101,8 +101,8 @@ export default function SceneRenderer({
   const [choicesReady, setChoicesReady] = useState(false);
   const [skipAll, setSkipAll] = useState(false);
 
-  // 화면효과 <<fx …>> — 문단 리빌 시 1회 발동. 발동 지점까지 처리한 문단 인덱스(firedRef)를
-  // 넘어선 문단의 fx 만 실행 → 재렌더에도 중복 발동 안 함. 씬 바뀌면 리셋.
+  // Screen effects <<fx …>> - fired once as the paragraph reveals. Only the fx of paragraphs beyond the index
+  // already handled (firedRef) run, so a re-render never fires them twice. Reset on a scene change.
   type Fx = { effect: string; ms: number; nonce: number };
   const [fx, setFx] = useState<Fx | null>(null);
   const firedRef = useRef(0);
@@ -118,7 +118,7 @@ export default function SceneRenderer({
     return false;
   }, [scene.id]);
 
-  // 씬 진입 — fade + 방문 기록.
+  // Entering a scene - the fade plus the visit record.
   useEffect(() => {
     setOpacity(0);
     const id = window.setTimeout(() => setOpacity(100), 16);
@@ -126,33 +126,33 @@ export default function SceneRenderer({
     return () => window.clearTimeout(id);
   }, [scene.id]);
 
-  // 씬 기본 BGM — 진입 시 재생. 같은 트랙이면 이어 재생(재시작 X), 미지정 씬은 이전 BGM 유지.
+  // The scene's default BGM - played on entry. The same track continues (never restarts), and a scene with none keeps the previous BGM.
   useEffect(() => {
     if (scene.bgm?.src) {
       bus.playBgm(scene.bgm.src, { loop: scene.bgm.loop, volume: scene.bgm.volume });
     }
   }, [scene.id, scene.bgm?.src, scene.bgm?.loop, scene.bgm?.volume, bus]);
 
-  // 언마운트(플레이 종료) 시 BGM 정지.
+  // The BGM stops on unmounting (leaving play).
   useEffect(() => () => bus.dispose(), [bus]);
 
-  // 문단이 열릴 시각 — <<wait>> 을 반영한 누적 일정 (#321).
+  // When each paragraph opens - a cumulative schedule that accounts for <<wait>> (#321).
   const 일정 = useMemo(() => revealSchedule(scene.body, STEP_MS), [scene.body]);
 
-  // 문단 순차 reveal — 타이머 기반.
+  // The sequential paragraph reveal - timer-based.
   useEffect(() => {
     if (skipAll || skipSequential || total === 0) {
       setRevealCount(total);
       return;
     }
-    // 등간격이 아니라 **문단별 일정**으로 연다 (#321). <<wait 600>> 이 있으면 그 문단
-    // 뒤부터 600ms 씩 밀린다 — 예전엔 setInterval 고정이라 wait 이 무시됐다.
+    // They open on **a per-paragraph schedule** rather than at even intervals (#321). A <<wait 600>> pushes
+    // everything after that paragraph back by 600ms - the old fixed setInterval ignored wait entirely.
     setRevealCount(1);
     const ids = 일정.slice(1).map((at, j) => window.setTimeout(() => setRevealCount(j + 2), at));
     return () => ids.forEach((id) => window.clearTimeout(id));
   }, [scene.id, skipSequential, skipAll, total, 일정]);
 
-  // ChoiceList 표시 — 모든 문단 노출 후 한 박자 뒤.
+  // Showing the ChoiceList - one beat after every paragraph is visible.
   useEffect(() => {
     if (skipAll || skipSequential || total === 0) {
       setChoicesReady(true);
@@ -165,16 +165,16 @@ export default function SceneRenderer({
     setChoicesReady(false);
   }, [scene.id, revealCount, skipAll, skipSequential, total]);
 
-  // <<fx …>> 발동 — 새로 노출된 문단(firedRef..revealCount)의 fx 디렉티브 실행.
-  // #370 — 침식 체감 변수를 본문 보간에 얹는다. 침식도가 오르면 `{{침식_손}}` 같은 문장이
-  // 저절로 무거워진다. 작가가 setVars 로 같은 이름을 직접 정했다면 그쪽이 이긴다.
+  // Firing <<fx …>> - running the fx directives of the newly revealed paragraphs (firedRef..revealCount).
+  // #370 - the contamination-sense variables are laid over the body's interpolation. As the contamination rises, a
+  // sentence like `{{침식_손}}` grows heavier by itself. An author's own setVars of the same name wins.
   const bodyVars = useMemo(
     () => ({ ...stigmaVars(character.stigmaErosion), ...(character.variables ?? {}) }),
     [character.stigmaErosion, character.variables],
   );
 
-  // 문단별 변수 묶음 — bodyVars 를 밑에 깔고 본문 <<set>> 을 문단마다 누적한다 (#321).
-  // set 이 든 문단 **자신부터** 새 값이다. 씬이 바뀌면 본문도 바뀌므로 scene.body 의존.
+  // The per-paragraph variable bundles - bodyVars underneath, with the body's <<set>> accumulated per paragraph (#321).
+  // The new value applies from **the paragraph containing the set**. A scene change changes the body, hence the scene.body dependency.
   const varsByPara = useMemo(() => varsByParagraph(scene.body, bodyVars), [scene.body, bodyVars]);
 
   useEffect(() => {
@@ -183,8 +183,8 @@ export default function SceneRenderer({
       firedRef.current = 0;
     }
     for (let idx = firedRef.current; idx < revealCount; idx++) {
-      // 이 효과는 디렉티브(fx/sfx)만 읽는다. vars 는 표시 텍스트에만 쓰이므로 넘기지 않는다
-      // — 넘기면 침식도가 바뀔 때마다 효과가 다시 걸릴 위험만 생긴다.
+      // This effect reads only the directives (fx/sfx). vars is not passed, being used solely in the display text
+      // - passing it would only risk the effects re-firing whenever the contamination changes.
       const segs = parseScript(scene.body[idx] ?? "");
       for (const s of segs) {
         if (s.kind !== "directive" || !s.args[0]) continue;
@@ -209,7 +209,7 @@ export default function SceneRenderer({
     firedRef.current = revealCount;
   }, [scene.id, revealCount, scene.body, character.variables, bus]);
 
-  // 효과 지속시간 뒤 오버레이/셰이크 정리 (재발동은 nonce 로 키가 바뀌어 애니메이션 재시작).
+  // Clearing the overlay and shake after the effect's duration (a re-fire changes the key through the nonce and restarts the animation).
   useEffect(() => {
     if (!fx) return;
     const id = window.setTimeout(() => setFx(null), fx.ms);
@@ -260,9 +260,9 @@ export default function SceneRenderer({
         style={{ cursor: revealCount < total ? "pointer" : undefined }}
       >
         {scene.body.slice(0, revealCount).map((p, i) => {
-          // {{변수}} 치환 + << 디렉티브 >> 분리. 표시 텍스트는 <p>, <<img>> 는 블록 삽화로.
-          // (오디오/화면효과 디렉티브 재생은 후속 태스크 — 여기선 표시에 영향 없음.)
-          // #321 — 문단별 varsByPara[i] 로 본문 <<set>> 이 그 문단부터 보이게.
+          // {{variable}} substitution plus splitting out << directives >>. Display text becomes a <p>, and <<img>> a block illustration.
+          // (Playing the audio and screen-effect directives is a follow-up task - it does not affect display here.)
+          // #321 - the per-paragraph varsByPara[i] makes the body's <<set>> visible from that paragraph on.
           const segs = parseScript(p, varsByPara[i]);
           const texts = segs.filter((s) => s.kind === "text");
           const imgs = segs.filter((s) => s.kind === "directive" && s.cmd === "img");
@@ -278,7 +278,7 @@ export default function SceneRenderer({
               {imgs.map((s, j) => {
                 if (s.kind !== "directive") return null;
                 const impact = s.args.includes("impact");
-                // 인라인=본문폭 삽화, 임팩트=full-bleed(패딩 밖) 컷. 에셋 이름/URL 은 그대로 src(추후 키→URL 해석).
+                // Inline is a body-width illustration, impact a full-bleed (outside the padding) cut. An asset name or URL is used as the src directly (key -> URL resolution comes later).
                 return (
                   <div
                     key={`img-${j}`}

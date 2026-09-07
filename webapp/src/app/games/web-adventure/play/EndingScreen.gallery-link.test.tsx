@@ -1,9 +1,9 @@
-// EndingScreen 의 갤러리 진입 링크 검증 (#239/#244 후속).
+// Verifying EndingScreen's gallery entry link (following #239/#244).
 //
-// 의심: 사용자가 엔딩 도달 후 갤러리에 가려면 *어디로 클릭* 해야 하는가?
-//   - play page 의 MobileDrawer 안 '🏆 엔딩 갤러리' 링크는 playing phase 에만 마운트.
-//   - ended phase 진입 시 drawer 자체 안 보임 → EndingScreen 에 갤러리 링크 필요.
-//   - 현재 EndingScreen 에 그 링크 없음 → RED.
+// The suspicion: after reaching an ending, *where does the user click* to get to the gallery?
+//   - the 'ending gallery' link inside the play page's MobileDrawer mounts only in the playing phase.
+//   - entering the ended phase hides the drawer itself -> EndingScreen needs a gallery link.
+//   - EndingScreen currently has no such link -> RED.
 //
 // @vitest-environment jsdom
 

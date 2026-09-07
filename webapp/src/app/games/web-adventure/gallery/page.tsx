@@ -1,11 +1,11 @@
 'use client';
 
-// /games/web-adventure/gallery — 엔딩 갤러리 페이지 (#244).
+// /games/web-adventure/gallery - the ending gallery page (#244).
 //
-// 데이터 흐름:
-//   1. GET /api/web-adventure/past-runs 시도. 200 + 배열이면 사용.
-//   2. 401 또는 실패 시 localStorage 의 'web-adventure:past-runs:v1' 읽기.
-//   3. 둘 다 없으면 빈 배열 (모두 미도달 → 0/6).
+// The data flow:
+//   1. try GET /api/web-adventure/past-runs. Use it on a 200 with an array.
+//   2. on a 401 or a failure, read localStorage's 'web-adventure:past-runs:v1'.
+//   3. with neither, an empty array (nothing reached -> 0/6).
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -24,13 +24,13 @@ interface PastRun {
 export default function GalleryPage() {
   const [pastRuns, setPastRuns] = useState<PastRun[] | null>(null);
 
-  // #245 — adv_gallery_view (마운트 시 1회).
+  // #245 - adv_gallery_view (once on mount).
   useEffect(() => {
     logAdvEvent('gallery_view');
   }, []);
 
-  // #250 — 서버 응답이 200 이라도 localStorage 의 최신 도달분(race 또는 비로그인
-  //   write) 을 *합집합* 으로 표시. dedup 은 runIndex 기준, 서버 우선.
+  // #250 - even on a 200, localStorage's most recent endings (from the race or a logged-out
+  //   write) are shown as a *union*. Deduplication is by runIndex, with the server winning.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -57,7 +57,7 @@ export default function GalleryPage() {
         /* parse 실패 — 무시 */
       }
 
-      // dedup by runIndex (server 우선).
+      // deduplicated by runIndex (the server wins).
       const serverIdx = new Set(serverList.map((r) => r.runIndex));
       const merged = [
         ...serverList,
@@ -98,13 +98,13 @@ export default function GalleryPage() {
   );
 }
 
-// #280 — 다음 회차에 적용될 world flag 명시. 회차 부메랑 시스템 *가시화*.
+// #280 - states the world flags that will apply to the next run. It makes the cross-run boomerang system *visible*.
 function WorldFlagBanner({ pastRuns }: { pastRuns: Array<{ endingId: string }> }) {
   const flags = buildWorldFlags(pastRuns);
   const activeKeys = Object.keys(flags).filter((k) => flags[k]);
   if (activeKeys.length === 0) return null;
 
-  // flag → 어느 엔딩에서 왔는지 역매핑.
+  // flag -> the reverse mapping of which ending it came from.
   const REVERSE: Record<string, EndingId> = Object.fromEntries(
     (Object.entries(ENDING_TO_WORLD_FLAG) as Array<[EndingId, string]>).map(([e, f]) => [f, e]),
   );

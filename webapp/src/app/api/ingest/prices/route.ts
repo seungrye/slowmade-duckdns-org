@@ -20,8 +20,8 @@ type PriceRecord = {
  *   header: X-Ingest-Key
  *   body:   { records: [{ticker, date, open, high, low, close, volume}, ...] }
  *
- * stock-automator 가 사이클 끝/buffer flush 시 호출.
- * 최대 5000 record 까지. 더 크면 chunk 분할 권장.
+ * Called by stock-automator at the end of a cycle or on a buffer flush.
+ * Up to 5000 records. Anything larger should be split into chunks.
  */
 const MAX = 5000;
 

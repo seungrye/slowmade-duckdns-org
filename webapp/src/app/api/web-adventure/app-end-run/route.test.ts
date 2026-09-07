@@ -1,10 +1,10 @@
-// /api/web-adventure/app-end-run — 앱 엔딩 제출 (#33)
+// /api/web-adventure/app-end-run - the app's ending submission (#33)
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/web-adventure/enqueue-scene-image', () => ({
-  // #158 — 삽화 큐 적재는 자체 테스트로 검증한다. 여기선 DB 를 안 타게만 한다.
+  // #158 - queueing the illustration is verified by its own tests. Here it is only kept off the DB.
   enqueueSceneImage: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
@@ -42,7 +42,7 @@ describe('app-end-run', () => {
     asMock(WebAdventureFeedbackNote.findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
     asMock(WebAdventureFeedbackNote.create).mockResolvedValue({ _id: 'note1' });
     asMock(WebAdventurePastRun.countDocuments).mockResolvedValue(4);
-    asMock(WebAdventurePastRun.findOne).mockResolvedValue(null); // 기본: 같은 회차 없음
+    asMock(WebAdventurePastRun.findOne).mockResolvedValue(null); // the default: no such run exists
     asMock(WebAdventurePastRun.create).mockResolvedValue({
       _id: 'pr1', runIndex: 5, endingId: 'harmony', finalSceneId: 's',
     });
@@ -90,8 +90,8 @@ describe('app-end-run', () => {
     expect(WebAdventureFeedbackNote.create).not.toHaveBeenCalled();
   });
 
-  // 앱의 재시도 큐(#61)는 응답을 못 받으면 다시 보낸다. 서버가 도달한 적 있는 회차를
-  // 걸러내지 않으면 같은 플레이가 두 번 쌓인다. (#63)
+  // The app's retry queue (#61) resends when it gets no response. Without the server filtering out a run it has
+  // already received, the same play accumulates twice. (#63)
   describe('clientRunId 멱등', () => {
     it('이미 저장된 clientRunId 면 새로 만들지 않고 200', async () => {
       asMock(WebAdventurePastRun.findOne).mockResolvedValue({ _id: 'pr-existing', runIndex: 3 });
@@ -124,7 +124,7 @@ describe('app-end-run', () => {
     });
 
     it('저장 중 clientRunId 가 겹치면(경쟁) 중복으로 보고 200', async () => {
-      // 조회 시점엔 없었는데 그 사이 다른 요청이 먼저 넣은 경우.
+      // It was absent at query time and another request inserted it in between.
       asMock(WebAdventurePastRun.findOne)
         .mockResolvedValueOnce(null)
         .mockResolvedValue({ _id: 'pr-race' });

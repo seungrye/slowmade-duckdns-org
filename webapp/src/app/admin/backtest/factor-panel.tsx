@@ -6,9 +6,9 @@ import type { EChartsOption } from "echarts";
 import type { BacktestMetrics } from "@/lib/backtest/metrics";
 import { Field } from "./field";
 
-// 크로스섹셔널 팩터 백테스트 개별 탭 패널. 서버 라우트가 유니버스를 로드·연산.
-// 선택 팩터(focus) + 벤치마크(동일가중·시장ETF)를 표·차트로. "비교에 추가" 체크 시 focus 팩터를
-// 상위(backtest-client)의 범용 비교 맵에 담는다. 원금/월적립금은 다른 탭과 공유(부모 state).
+// The individual tab panel for the cross-sectional factor backtest. The server route loads the universe and computes.
+// It shows the selected factor (focus) plus the benchmarks (equal weight and a market ETF) as a table and a chart. Ticking "add to comparison"
+// puts the focus factor into the parent's (backtest-client's) general comparison map. The principal and monthly contribution are shared with the other tabs (parent state).
 
 interface Metrics {
   final: number;
@@ -18,7 +18,7 @@ interface Metrics {
   volatility: number;
   calmar: number;
   sharpe: number;
-  totalContributed?: number; // 적립식일 때 원금 + Σ적립
+  totalContributed?: number; // when accumulating, the principal plus the total contributions
 }
 interface Strat {
   key: string;
@@ -41,7 +41,7 @@ interface Resp {
 
 export type FactorKind = "low_vol" | "momentum" | "reversal";
 
-// 범용 비교 항목(브라우저/팩터 공통). curve.v 는 시작=1 재기준값.
+// A general comparison entry (shared by browser strategies and factors). curve.v is rebased to start at 1.
 export interface CompareEntry {
   label: string;
   sub: string;
@@ -79,8 +79,8 @@ export default function FactorPanel({
   onMonthly: (n: number) => void;
 }) {
   const [market, setMarket] = useState("us");
-  const [from, setFrom] = useState(defaultFrom || ""); // 빈값 = 전체 이력(라우트가 처리)
-  const [to, setTo] = useState(defaultTo || ""); // 빈값 = 오늘
+  const [from, setFrom] = useState(defaultFrom || ""); // empty = the whole history (the route handles it)
+  const [to, setTo] = useState(defaultTo || ""); // empty = today
   const [quantile, setQuantile] = useState(0.2);
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<Resp | null>(null);
@@ -110,11 +110,11 @@ export default function FactorPanel({
     }
   };
 
-  // focus 팩터 + 벤치마크(동일가중·시장ETF)만 표시.
+  // Shows only the focus factor plus the benchmarks (equal weight and a market ETF).
   const shown = data ? data.strategies.filter((s) => s.key === focus || s.key === "equal_weight" || s.key === "market") : [];
   const focusStrat = data?.strategies.find((s) => s.key === focus);
 
-  // focus 팩터의 비교 항목(곡선은 시작=1 재기준 — 브라우저 entryFromResult 와 동일).
+  // The focus factor's comparison entry (the curve rebased to start at 1 - the same as the browser's entryFromResult).
   const buildEntry = (d: Resp, fs: Strat): CompareEntry => {
     const base = fs.equityCurve[0]?.equity || 1;
     const extra = d.contribution > 0 ? ` · 월적립 ${d.contribution.toLocaleString()}` : "";
@@ -127,7 +127,7 @@ export default function FactorPanel({
   };
   const entry: CompareEntry | null = focusStrat && data ? buildEntry(data, focusStrat) : null;
 
-  // 재실행(데이터 갱신) 시 담겨 있으면 새 결과로 갱신.
+  // On a re-run (refreshed data), a held entry is refreshed with the new result.
   useEffect(() => {
     if (inCompare && focusStrat && data) onSetCompare(buildEntry(data, focusStrat));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -136,7 +136,7 @@ export default function FactorPanel({
   const chart: EChartsOption | null = shown.length
     ? {
         tooltip: { trigger: "axis" },
-        // 범례는 위 표(전략명=선 색상)가 대신하므로 차트엔 두지 않는다(중복·겹침 제거).
+        // The table above (strategy name = line colour) serves as the legend, so none is put on the chart (removing duplication and overlap).
         grid: { left: 8, right: 14, top: 12, bottom: 8, containLabel: true },
         xAxis: { type: "category", data: shown[0].equityCurve.map((p) => p.date), boundaryGap: false, axisLabel: { color: "#888", hideOverlap: true } },
         yAxis: { type: "value", scale: true, axisLabel: { color: "#888" } },

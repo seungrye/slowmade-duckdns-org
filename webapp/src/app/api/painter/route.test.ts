@@ -40,7 +40,7 @@ vi.mock('@/lib/painter/quota', () => ({
 
 const mockCommentSave = vi.fn();
 
-// 글 문서를 테스트마다 갈아 끼울 수 있게 hoisted 로 뺀다 (#205 비공개 글 케이스).
+// Hoisted so the post document can be swapped per test (#205's private-post case).
 const mockPostLean = vi.hoisted(() => vi.fn());
 
 vi.mock('@/models/post', () => ({
@@ -79,7 +79,7 @@ describe('/api/painter POST', () => {
     vi.clearAllMocks();
     mockCommentSave.mockResolvedValue(undefined);
     mockAuth.mockResolvedValue({ user: { name: 'Test', email: 'test@test.com' } });
-    // 기본은 공개 글(isPrivate·userEmail 이 없는 옛 문서 모양 — 스키마 기본값이 공개다).
+    // The default is a public post (an older document with no isPrivate or userEmail - the schema's default is public).
     mockPostLean.mockResolvedValue({
       _id: 'post-id',
       title: '테스트 게시글',
@@ -89,7 +89,7 @@ describe('/api/painter POST', () => {
       key: 'painter-images/test.jpg',
       url: 'https://cdn.example.com/public/painter-images/test.jpg',
     });
-    // 기본은 영문 입력 — translatedPrompt null
+    // The default is English input - translatedPrompt is null
     mockTranslateAndGenerate.mockImplementation(async (prompt: string) => ({
       key: 'painter-images/test.jpg',
       url: 'https://cdn.example.com/public/painter-images/test.jpg',
@@ -116,7 +116,7 @@ describe('/api/painter POST', () => {
     expect(res.status).toBe(400);
   });
 
-  // #205 — 로그인만 했으면 남의 비공개 글에 덧글을 넣을 수 있었다.
+  // #205 - merely being logged in allowed commenting on someone else's private post.
   it('남의 비공개 글이면 404 — 덧글을 만들지 않는다', async () => {
     mockPostLean.mockResolvedValueOnce({
       _id: 'post-id',
@@ -168,10 +168,10 @@ describe('/api/painter POST', () => {
     expect(mockTryConsume).toHaveBeenCalledTimes(1);
     expect(mockTranslateAndGenerate).toHaveBeenCalledTimes(1);
     const [promptArg] = mockTranslateAndGenerate.mock.calls[0];
-    // @painter-bot 멘션 부분은 제거되고 나머지가 prompt
+    // the @painter-bot mention is stripped and the rest is the prompt
     expect(promptArg).toBe('한국 마을 광장 도트');
 
-    // userComment + painter 이미지 댓글 = 2회
+    // userComment plus painter's image comment = 2 calls
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
@@ -203,7 +203,7 @@ describe('/api/painter POST', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(mockTranslateAndGenerate).not.toHaveBeenCalled();
-    // userComment + 안내 댓글
+    // userComment plus the notice comment
     expect(mockCommentSave).toHaveBeenCalledTimes(2);
   });
 
@@ -264,7 +264,7 @@ describe('/api/painter POST', () => {
     }));
     await new Promise((r) => setTimeout(r, 10));
 
-    // 두 번째 mockCommentSave 호출 = painter 댓글
+    // the second mockCommentSave call is painter's comment
     const calls = mockCommentSave.mock.instances;
     const painterComment = calls.find((inst) => {
       const data = inst as unknown as { author?: string };
@@ -299,7 +299,7 @@ describe('/api/painter POST', () => {
     }) as unknown as { content: string } | undefined;
     expect(painterComment).toBeTruthy();
     expect(painterComment!.content).toContain('a cat on the moon');
-    // 화살표 표기는 번역됐을 때만
+    // the arrow notation appears only when it was translated
     expect(painterComment!.content).not.toMatch(/↓|→/);
   });
 });

@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// import 전에 실행되어야 하므로 vi.hoisted 사용
+// It has to run before the imports, so vi.hoisted is used
 const mockPutObject = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockRemoveObject = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
@@ -99,8 +99,8 @@ describe('POST /api/upload', () => {
 
   it('썸네일 업로드 실패 시 원본 파일을 삭제하고 500을 반환한다', async () => {
     mockPutObject
-      .mockResolvedValueOnce(undefined)           // 원본 업로드 성공
-      .mockRejectedValueOnce(new Error('fail'));   // 썸네일 업로드 실패
+      .mockResolvedValueOnce(undefined)           // the original uploads successfully
+      .mockRejectedValueOnce(new Error('fail'));   // the thumbnail upload fails
 
     const formData = new FormData();
     formData.append('file', new File(['content'], 'photo.jpg', { type: 'image/jpeg' }));

@@ -7,13 +7,13 @@ import { achievementIconMap } from '@/components/icons';
 import type { AchievementView, LockedView, Tier, UnlockedView } from '@/lib/achievements';
 
 /**
- * 내 업적 (#333).
+ * My achievements (#333).
  *
- * 예전엔 **달성한 것만** 보여줬다. 그래서 무엇을 노릴지 알 길이 없었고, 업적이 있다는 사실
- * 자체를 모르는 기능이 많았다(웹어드벤처를 405번 했는데 업적이 0개였던 것처럼).
+ * It used to show **only what was earned**. So there was no way to know what to aim for, and many features were not
+ * even known to have achievements (as when the web adventure was played 405 times with zero achievements).
  *
- * 이제 「도전 중」을 함께 보여준다. 진행도가 보여야 다음 목표가 생기고, 등급 색이 있어야
- * 쉬운 것과 어려운 것이 구분된다. 숨김 업적은 서버가 이미 `???` 로 가려 보낸다.
+ * Now "in progress" is shown alongside. Visible progress creates a next goal, and the tier colours separate the easy
+ * from the hard. Hidden achievements already arrive masked as `???` from the server.
  */
 
 const TIER_STYLE: Record<Tier, { icon: string; ring: string; label: string }> = {

@@ -1,4 +1,4 @@
-// /api/web-adventure/migrate-from-local — 비로그인 → 로그인 시 localStorage 데이터 서버 이전 (#240).
+// /api/web-adventure/migrate-from-local - moving localStorage data to the server on logging in (#240).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';

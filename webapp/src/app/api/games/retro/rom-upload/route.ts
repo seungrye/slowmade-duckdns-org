@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
 import { pickInheritablePatch } from '@/lib/retro/inherit-patch';
-// 롬 올리기 (#109).
+// ROM upload (#109).
 //
-// 목록(`../roms`)과 **경로를 나눈 이유**: 이 라우트는 `src/middleware.ts` 의 matcher 에서 빠져야
-// 한다. middleware 가 매칭되면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한해 큰 롬이 잘린다.
-// 그런데 접두사로 빼면 `roms/[id]/file`(내려받기)까지 딸려 빠져 보안 헤더가 사라진다. 그래서
-// 업로드만 다른 경로에 둔다 — `api/attachment/upload` 가 같은 이유로 분리돼 있다.
+// **Why the path is separate from the list (`../roms`)**: this route has to be excluded from `src/middleware.ts`'s
+// matcher. When middleware matches, Next buffers the request body and caps it at 10MB by default, truncating a large ROM.
+// But excluding by prefix would drag `roms/[id]/file` (the download) out with it and lose its security headers. So
+// upload alone lives on a separate path - `api/attachment/upload` is split for the same reason.
 //
-// 올린 롬은 **올린 사람만** 보고 실행할 수 있다. 공개 `/s3/` URL 을 만들지 않고, 파일은
-// `roms/[id]/file` 인증 프록시로만 내려준다.
+// An uploaded ROM can be seen and run **only by whoever uploaded it**. No public `/s3/` URL is created, and the file
+// is served only through the authenticated `roms/[id]/file` proxy.
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   if (authed instanceof NextResponse) return authed;
 
   const formData = await req.formData();
-  // 아케이드 분할 셋은 부모·클론을 함께 올린다 (#143). 어느 쪽이 게임인지는 이름으로 가른다.
+  // An arcade split set uploads the parent and clone together (#143). Which is the game is decided by name.
   const all = formData.getAll('file').filter((f): f is File => f instanceof File);
   if (all.length === 0) return apiError('롬 파일이 없습니다.', 400);
 
@@ -55,27 +55,27 @@ export async function POST(req: NextRequest) {
     platform: typeof platform === 'string' && platform ? platform : undefined,
   });
   if (!check.ok) {
-    // 크기 초과만 413 — nginx·브라우저가 내는 413 과 의미를 맞춰 클라이언트가 한 갈래로 처리한다.
+    // Only an over-size gives 413 - matching what nginx and the browser return, so the client handles one case.
     return apiError(check.reason, check.reason.includes('너무 큽니다') ? 413 : 400);
   }
 
-  // 아케이드가 아닌데 여러 개를 올린 건 실수일 가능성이 크다 — 조용히 버리지 않는다.
+  // Uploading several outside arcade is most likely a mistake - it is not discarded quietly.
   if (parents.length > 0 && !isArcade(check.platform)) {
     return apiError('이 기종은 파일을 하나만 올립니다.', 400);
   }
 
   const safeName = file.name.replace(/[/\\]/g, '_').slice(0, 200) || 'rom';
-  const key = `${KEY_PREFIX}/${randomUUID()}-${safeName}`; // 랜덤 프리픽스 — 키 추측 방지
+  const key = `${KEY_PREFIX}/${randomUUID()}-${safeName}`; // A random prefix - it prevents key guessing
   const parentSets: { name: string; size: number; objectKey: string; sha256: string }[] = [];
-  // netplay 방을 가르는 근거 (#188) — 바이트가 다르면 락스텝 동기화가 조용히 어긋난다.
-  // 어차피 업로드하려고 바이트를 들고 있으니 여기서 떠 두면 비용이 없다.
+  // The basis for separating netplay rooms (#188) - differing bytes silently break lockstep synchronisation.
+  // The bytes are in hand for the upload anyway, so hashing here costs nothing.
   let romSha = '';
 
   try {
     const romBuf = Buffer.from(await file.arrayBuffer());
     romSha = createHash('sha256').update(romBuf).digest('hex');
     await minioClient.putObject(env.minio.bucket, key, romBuf);
-    // 부모는 **일반적인 것부터** 저장한다 — 실행할 때 코어 파일시스템에 그 순서로 놓는다.
+    // The parents are stored **from the general upward** - they are placed into the core's filesystem in that order at run time.
     for (const name of picked.parents) {
       const pf = parents.find((f) => f.name === name);
       if (!pf) continue;
@@ -106,13 +106,13 @@ export async function POST(req: NextRequest) {
       sha256: romSha,
       parentSets,
     });
-    // 같은 롬을 이미 올린 사람이 있고 거기 패치가 붙어 있으면 물려준다 (#190).
-    // **문서를 만든 뒤에** 한다 — 편의 기능이 업로드 자체를 실패시키면 안 된다.
+    // When someone has already uploaded the same ROM with a patch attached, it is inherited (#190).
+    // It happens **after the document is created** - a convenience must not fail the upload itself.
     const inherited = await inheritPatchIfAny(romSha, authed.email, String(doc._id));
     await evaluateAndGrant(authed.email);
     return apiSuccess(toRomDto((inherited ?? doc) as unknown as LeanRom), 201);
   } catch (err) {
-    // 기록이 안 됐으면 파일만 남아 아무도 못 찾는 고아가 된다 — 되돌린다.
+    // If the record failed, the file is left orphaned where nobody can find it - so it is rolled back.
     console.error('rom record failed, rolling back objects:', err);
     for (const k of [key, ...parentSets.map((p) => p.objectKey)]) {
       try {
@@ -125,21 +125,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** 물려받은 패치를 담을 자리 — `rom-patch` 라우트와 같은 프리픽스를 쓴다. */
+/** Where an inherited patch is stored - the same prefix the `rom-patch` route uses. */
 const PATCH_KEY_PREFIX = 'retro-patches';
 
 /**
- * 같은 롬(바이트 동일)을 이미 올린 **다른 사람**의 살아 있는 패치를 물려준다 (#190).
+ * Inherits the live patch of **someone else** who already uploaded the same ROM (byte-identical) (#190).
  *
- * IPS 는 자체 체크섬이 없어 파일만으로는 대상 롬을 알 수 없다. 먼저 올린 사람이 **정확히 그
- * 해시의 롬**에 붙였다는 사실이 곧 호환성 근거다.
+ * IPS has no checksum of its own, so the file alone cannot say which ROM it targets. The fact that whoever uploaded
+ * first attached it to **exactly that hash of a ROM** is itself the evidence of compatibility.
  *
- * **바이트를 복사한다.** 원본을 참조만 하면 그쪽이 패치를 지우는 순간 이쪽 게임 내용이 조용히
- * 바뀐다 — 화면도, 넷플레이 방 번호도. `copyObject` 는 서버측 복사라 내려받지 않는다.
+ * **The bytes are copied.** Merely referencing the original would silently change this game's content the moment they
+ * delete their patch - the screen and the netplay room number alike. `copyObject` is a server-side copy, so nothing is downloaded.
  *
- * **실패는 삼킨다.** 편의 기능이고 업로드는 이미 끝났다.
+ * **Failures are swallowed.** It is a convenience, and the upload is already done.
  *
- * @returns 패치를 붙였으면 갱신된 문서, 아니면 null(호출측이 원래 문서를 쓴다).
+ * @returns the updated document when a patch was attached, or null (the caller then uses the original document).
  */
 async function inheritPatchIfAny(romSha: string, email: string, romId: string) {
   if (!romSha) return null;
@@ -156,7 +156,7 @@ async function inheritPatchIfAny(romSha: string, email: string, romId: string) {
     const picked = pickInheritablePatch(candidates);
     if (!picked) return null;
 
-    // 복사본은 이 사용자 것이다 — 키를 새로 뽑는다.
+    // The copy belongs to this user - a new key is generated.
     const destKey = `${PATCH_KEY_PREFIX}/${randomUUID()}-${picked.name}`;
     await minioClient.copyObject(
       env.minio.bucket,
@@ -164,8 +164,8 @@ async function inheritPatchIfAny(romSha: string, email: string, romId: string) {
       `/${env.minio.bucket}/${picked.objectKey}`,
     );
 
-    // 모양을 rom-patch 라우트가 만드는 것과 같게 둔다 — 갈리면 나중에 한쪽만 고치게 된다.
-    // patchEnabled 는 스키마 기본값(켜짐) 그대로 — 원치 않으면 카드에서 한 번 끄면 된다.
+    // The shape matches what the rom-patch route creates - diverging would mean fixing only one of them later.
+    // patchEnabled keeps the schema's default (on) - anyone who does not want it can switch it off once on the card.
     return await RetroRom.findByIdAndUpdate(
       romId,
       { $push: { patches: {

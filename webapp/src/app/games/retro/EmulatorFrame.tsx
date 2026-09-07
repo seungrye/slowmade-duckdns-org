@@ -5,31 +5,31 @@ import { buildPlayerUrl } from "@/lib/retro/player-url";
 
 interface Props {
   core: string;
-  /** 같은 출처의 절대경로 또는 blob: URL. */
+  /** A same-origin absolute path or a blob: URL. */
   rom: string;
   name?: string;
-  /** 적용할 패치 주소 (#112). 합치기는 iframe 안에서 일어난다. */
+  /** The address of the patch to apply (#112). Merging happens inside the iframe. */
   patch?: string;
-  /** SFC 512 바이트 헤더 처리 — 지정하지 않으면 플레이어가 판단한다. */
+  /** How to handle the SFC 512-byte header - the player decides when unset. */
   stripHeader?: boolean;
-  /** 세이브를 매달 게임 키 (#114). 주면 Save/Load 버튼이 서버를 쓴다. */
+  /** The game key the save hangs on (#114). Given it, the Save/Load buttons use the server. */
   saveKey?: string;
-  /** 코어에 함께 놓을 부모 롬셋 주소들 (#143) — 아케이드 분할 셋. */
+  /** The parent ROM set addresses to place alongside the core (#143) - arcade split sets. */
   parents?: string[];
-  /** 옛 이름으로 남은 게임 세이브를 되살릴지 (#175). 판단은 서버 몫. */
+  /** Whether to restore a game save left under the old name (#175). The server decides. */
   legacySave?: boolean;
-  /** 함께 하기(netplay)로 열지 (#186). */
+  /** Whether to open in play-together (netplay) mode (#186). */
   netplay?: boolean;
-  /** netplay 방을 가르는 게임 키 — 두 PC 가 같은 값을 써야 같은 방이 된다. */
+  /** The game key that separates netplay rooms - both PCs must use the same value to share a room. */
   gameKeyForNetplay?: string;
 }
 
 /**
- * EmulatorJS 를 담는 iframe (#109).
+ * The iframe holding EmulatorJS (#109).
  *
- * 이 컴포넌트가 하는 일은 주소를 만들어 iframe 에 꽂는 것뿐이다. 에뮬레이터의 생명주기 관리는
- * 하지 않는다 — 화면을 떠나면 React 가 iframe 을 지우고, 그때 안의 전역·워커·오디오가 함께
- * 사라진다. 그게 iframe 을 쓰는 이유다.
+ * All this component does is build the address and put it in the iframe. It does not manage the emulator's
+ * lifecycle - leaving the screen has React remove the iframe, and the globals, workers and audio inside go with
+ * it. That is the reason for using an iframe.
  */
 export default function EmulatorFrame({ core, rom, name, patch, stripHeader, saveKey, parents, legacySave, netplay, gameKeyForNetplay }: Props) {
   const src = useMemo(() => {
@@ -43,11 +43,11 @@ export default function EmulatorFrame({ core, rom, name, patch, stripHeader, sav
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
   /**
-   * iframe 에 포커스를 준다 (#123).
+   * Focuses the iframe (#123).
    *
-   * 포커스가 바깥 문서에 있으면 방향키가 **페이지를 스크롤한다** — 게임을 하는 중에 화면이
-   * 밀려 올라간다. 키 이벤트는 iframe 경계를 넘지 않으므로, 안으로 포커스를 넣어 주는 것이
-   * 해법이다. 불러오기가 끝난 뒤와 사용자가 화면을 누를 때 둘 다 챙긴다.
+   * With focus on the outer document, the arrow keys **scroll the page** - the view slides up mid-game. Key events
+   * do not cross an iframe boundary, so putting focus inside is the fix. It happens both after loading finishes and
+   * when the user taps the screen.
    */
   const focusFrame = useCallback(() => {
     frameRef.current?.focus();
@@ -68,15 +68,15 @@ export default function EmulatorFrame({ core, rom, name, patch, stripHeader, sav
       className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-black shadow-lg"
     >
       <iframe
-        // key 를 src 로 두면 다른 게임(또는 다른 패치)으로 넘어갈 때 iframe 이 새로 만들어진다.
-        // 같은 iframe 을 재사용하면 EmulatorJS 가 이전 게임 상태를 물고 있다.
+        // Using src as the key rebuilds the iframe when moving to another game (or another patch).
+        // Reusing the same iframe leaves EmulatorJS holding the previous game's state.
         key={src}
         ref={frameRef}
         src={src}
         onLoad={focusFrame}
         title={name ?? "레트로 플레이어"}
         className="absolute inset-0 h-full w-full border-0"
-        // gamepad — 이걸 안 주면 iframe 안에서 게임패드가 잡히지 않는다(Permissions Policy).
+        // gamepad - without it, a gamepad is not detected inside the iframe (Permissions Policy).
         allow="gamepad *; fullscreen"
         allowFullScreen
       />

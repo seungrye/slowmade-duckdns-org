@@ -33,7 +33,7 @@ describe('GET /api/my-achievements', () => {
     expect(res.status).toBe(200);
     expect(mockView).toHaveBeenCalledWith('me@test.com');
     expect(data.unlocked).toHaveLength(1);
-    // 예전엔 달성한 것만 줬다. 잠긴 목록이 있어야 다음 목표가 보인다.
+    // It used to return only what was earned. A locked list is what shows the next goal.
     expect(data.locked[0]).toMatchObject({ current: 174, target: 250 });
   });
 

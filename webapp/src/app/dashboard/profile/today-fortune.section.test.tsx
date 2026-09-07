@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// 오늘 이미 확인한 타로는 다음날까지 뒤집힌 채로 유지된다 (#388 후속).
+// A tarot card already seen today stays flipped until the next day (following #388).
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, fireEvent } from '@testing-library/react';
 
@@ -62,11 +62,11 @@ describe('사주 탭 — 한자 병기·뜻 (#393)', () => {
     render(<TodayFortuneSection />);
     await act(async () => {});
     fireEvent.click(screen.getByRole('button', { name: '사주' }));
-    // 일주의 한자(丁)와 한글(정)이 함께
+    // the day pillar's hanja and Hangul together
     expect(screen.getAllByText('丁').length).toBeGreaterThan(0);
     expect(screen.getAllByText('정').length).toBeGreaterThan(0);
     expect(screen.getByText('오늘은 성취의 기운이 도는 하루예요.')).toBeInTheDocument();
-    // 오행 분포 라벨 + 칩 툴팁
+    // the element-distribution label plus the chip tooltip
     expect(screen.getByText('오행 분포')).toBeInTheDocument();
     expect(screen.getByText(/사주 6글자 중 목 기운이 1개/)).toBeInTheDocument();
   });

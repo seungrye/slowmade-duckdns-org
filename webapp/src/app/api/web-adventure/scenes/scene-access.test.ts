@@ -1,11 +1,11 @@
-// 씬 열람 인가 (#177) — 침투 테스트에서 나온 두 지점.
+// Scene read authorisation (#177) - the two points a penetration test found.
 //
-// 1) 공개 재생 API(`content/v1`)와 씬 목록은 `isDeleted` 를 거르는데 **단건 GET 은 안 걸렀다**.
-//    이 저장소는 모든 삭제를 soft-delete 로 하므로, 씬을 지워도 id 만 알면 계속 읽혔다.
-// 2) 리비전 목록·본문은 인가가 아예 없었다. 작성 도구의 메타데이터인데 누구나 읽었다.
-//    글 리비전에서 이미 같은 문제를 고쳤다(#168) — 같은 계열이다.
+// 1) The public play API (`content/v1`) and the scene list filter `isDeleted`, but **the single GET did not**.
+//    Every deletion in this repo is a soft delete, so a deleted scene stayed readable to anyone who knew its id.
+// 2) The revision list and body had no authorisation at all. They are the authoring tool's metadata and anyone could read them.
+//    The same problem was already fixed for post revisions (#168) - the same family.
 //
-// 씬 id 는 `kael_infirmary` 같은 슬러그라 열거가 쉽다는 점이 위험을 키운다.
+// Scene ids are slugs like `kael_infirmary`, so being easy to enumerate raises the risk.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
@@ -15,7 +15,7 @@ describe('씬 단건 GET — 삭제된 씬은 없는 것으로 본다', () => {
   const src = read('scenes/[id]/route.ts');
 
   it('GET 이 isDeleted 를 거른다', () => {
-    // findOne 호출에 삭제 필터가 함께 들어가야 한다.
+    // The deletion filter must go into the findOne call.
     const get = src.slice(src.indexOf('export async function GET'), src.indexOf('export async function PUT'));
     expect(get).toMatch(/isDeleted/);
   });
@@ -56,7 +56,7 @@ describe('app-end-run — 유량 제한', () => {
     expect(src).toMatch(/429/);
   });
 
-  // import 줄이 아니라 **호출 지점**과 비교해야 의미가 있다.
+  // It has to be compared against **the call site**, not the import line, to mean anything.
   it('유량 제한이 큐 적재보다 먼저 온다', () => {
     expect(src.indexOf('rateLimit(`')).toBeLessThan(src.indexOf('await enqueueFeedbackNote('));
   });
@@ -66,9 +66,9 @@ describe('app-end-run — 유량 제한', () => {
   });
 });
 
-// #179 — 씬 **쓰기**가 `requireAuth` 였다. 이 사이트는 가입이 열려 있어(구글 계정이면 누구나),
-// 가입만 하면 남이 게임 내용을 만들고 고치고 지울 수 있었다. 씬은 사이트가 퍼블리싱하는
-// 콘텐츠이므로 작성자(owner)만 손대야 한다.
+// #179 - scene **writes** used `requireAuth`. This site has open sign-up (anyone with a Google account),
+// so merely signing up let someone create, edit and delete the game's content. Scenes are content the site
+// publishes, so only the author (the owner) should touch them.
 describe('씬 쓰기 — 작성자만 (#179)', () => {
   const writes: [string, string][] = [
     ['생성 POST', 'scenes/route.ts'],
@@ -79,7 +79,7 @@ describe('씬 쓰기 — 작성자만 (#179)', () => {
   it.each(writes)('%s 는 requireOwner 를 쓴다', (_label, path) => {
     const src = read(path);
     expect(src).toMatch(/requireOwner/);
-    // 로그인만 하면 되는 requireAuth 로 남아 있으면 안 된다.
+    // It must not be left as requireAuth, which merely needs a login.
     expect(src).not.toMatch(/requireAuth/);
   });
 
@@ -91,7 +91,7 @@ describe('씬 쓰기 — 작성자만 (#179)', () => {
   });
 });
 
-// 작성 도구 화면 자체도 작성자만 — 씬 편집기·그래프·피드백 노트가 누구에게나 열려 있었다.
+// The authoring screens themselves are author-only too - the scene editor, the graph and the feedback notes were open to anyone.
 describe('/scenes 작성 도구 화면 (#179)', () => {
   it('레이아웃이 requireOwner 로 막는다', () => {
     const src = readFileSync('src/app/scenes/layout.tsx', 'utf8');

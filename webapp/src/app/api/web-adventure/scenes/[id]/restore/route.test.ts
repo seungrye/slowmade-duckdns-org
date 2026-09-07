@@ -1,15 +1,15 @@
-// /api/web-adventure/scenes/[id]/restore — POST { version } 테스트.
+// /api/web-adventure/scenes/[id]/restore - POST { version } tests.
 //
-// 동작:
-//   - 그 version 의 snapshot 으로 *현재 씬 덮어쓰기*.
-//   - 덮어쓰기 직전 *현재* 상태를 새 revision 으로 백업 (PUT 패턴 동일).
+// What it does:
+//   - *overwrites the current scene* with that version's snapshot.
+//   - backs up the *current* state as a new revision just before overwriting (the same pattern as PUT).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
-// #179 — 씬 쓰기는 작성자 전용이 됐다(가입만 하면 남이 고칠 수 있었다). 인가는 목으로 갈아 끼운다.
+// #179 - scene writes became author-only (merely signing up let anyone edit them). Authorisation is swapped for a mock.
 vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
@@ -49,7 +49,7 @@ describe('POST /api/web-adventure/scenes/[id]/restore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
-    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // 기본 작성자
+    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // the author by default
   });
 
   it('작성자가 아니면 404 (복원는 작성자만 — #179)', async () => {
@@ -93,7 +93,7 @@ describe('POST /api/web-adventure/scenes/[id]/restore', () => {
       revisionCount: 7,
     };
 
-    // findOne 두 곳을 mock — revision findOne + scene findOne.
+    // Two findOne calls are mocked - the revision's and the scene's.
     (WebAdventureSceneRevision.findOne as ReturnType<typeof vi.fn>)
       // 1) 복원 대상 revision 조회.
       .mockReturnValueOnce({
@@ -115,7 +115,7 @@ describe('POST /api/web-adventure/scenes/[id]/restore', () => {
     const res = await POST(makeRequest({ version: 2 }), { params });
     expect(res.status).toBe(200);
 
-    // findOneAndUpdate 1 번 — $set + $inc 합쳐 호출.
+    // One findOneAndUpdate - $set and $inc are called together.
     const updateMock = WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>;
     expect(updateMock).toHaveBeenCalledOnce();
     const updateQuery = updateMock.mock.calls[0]![1] as {
@@ -125,7 +125,7 @@ describe('POST /api/web-adventure/scenes/[id]/restore', () => {
     expect(updateQuery.$set.title).toBe('복원 대상');
     expect(updateQuery.$inc.revisionCount).toBe(1);
 
-    // revision create — 새 commit (snapshot = restored, version = restored.revisionCount).
+    // The revision create - a new commit (snapshot = restored, version = restored.revisionCount).
     const createMock = WebAdventureSceneRevision.create as ReturnType<typeof vi.fn>;
     expect(createMock).toHaveBeenCalledOnce();
     const created = createMock.mock.calls[0]![0] as {

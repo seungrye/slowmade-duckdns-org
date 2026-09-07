@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-// env 토큰='secret' 로 목킹, next/cache.revalidatePath 목.
+// The env token is mocked as 'secret', and next/cache.revalidatePath is mocked.
 vi.mock("@/lib/env", () => ({ env: { revalidateToken: "secret" } }));
 const revalidatePath = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: (...a: unknown[]) => revalidatePath(...a) }));

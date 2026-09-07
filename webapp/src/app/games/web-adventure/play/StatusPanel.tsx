@@ -1,17 +1,17 @@
 'use client';
 
-// StatusPanel — Web Adventure 의 통합 사이드 상태 패널 (#241).
+// StatusPanel - the Web Adventure's combined side status panel (#241).
 //
-// 표시 항목:
-//   - 6 스탯 (str/dex/int/cha/con/wis) 라벨 + 값 + 막대 그래프 (max 18 기준).
-//   - HP 진행도 + maxHp.
-//   - 어빌리티 이름 + 한 줄 설명.
-//   - 인벤토리 (그룹 + consumable "사용" 버튼).
-//   - 재굴림 (canReroll + rerollsLeft>0 시 버튼).
-//   - 회차 (runIndex).
+// What it shows:
+//   - the 6 stats (str/dex/int/cha/con/wis) as a label, a value and a bar (out of 18).
+//   - HP progress plus maxHp.
+//   - the ability's name plus a one-line description.
+//   - the inventory (grouped, with a "use" button for consumables).
+//   - rerolls (a button when canReroll and rerollsLeft > 0).
+//   - the run (runIndex).
 //
-// 데스크탑은 사이드, 모바일은 MobileDrawer 안에 마운트 (#242 에서).
-// 기존 InventoryStrip 의 인벤/HP/재굴림 로직 흡수 — 상위 컴포넌트는 이 패널 하나만 마운트.
+// On desktop it is the sidebar; on mobile it mounts inside MobileDrawer (from #242).
+// It absorbs InventoryStrip's inventory, HP and reroll logic - the parent component mounts this panel alone.
 
 import type { Character, StatKey } from '@/types/web-adventure';
 import { stigmaTier, stigmaVars } from "@/lib/web-adventure/stigma-sense";
@@ -37,10 +37,10 @@ export interface StatusPanelProps {
   onUseItem: (itemId: string) => void;
 }
 
-// 성흔 침식 시각화 — stigma-sense(#370)를 단일 출처로 (#397).
-// 예전엔 여기(#259)에 3단계 하드코딩 flavor 2줄이 따로 있었는데, 나중에 같은 피드백 때문에
-// 만든 stigma-sense(5단계·4감각)와 어긋났다. 항상 보이는 이 패널이 낡은 채로 남아 침식이
-// '수치'로만 읽혔다. 이제 씬 본문과 같은 감각을 패널도 쓴다 — 신체(손)·심리(마음)로 체감.
+// Visualising the stigma contamination - stigma-sense (#370) as the single source (#397).
+// This used to hold its own two lines of hard-coded 3-stage flavour (#259), which then diverged from the
+// stigma-sense (5 stages, 4 senses) built later for the same feedback. This always-visible panel stayed stale and left
+// contamination reading as 'a number'. The panel now uses the same senses as the scene body - felt through the body (hand) and the mind.
 const TIER_BAR: Record<number, string> = {
   0: "bg-sky-400/60",
   1: "bg-sky-500/70",
@@ -59,7 +59,7 @@ export default function StatusPanel({
   const hpPct = Math.max(0, Math.min(100, (character.hp / character.maxHp) * 100));
   const stigma = character.stigmaErosion;
   const tier = stigmaTier(stigma);
-  const sense = stigmaVars(stigma); // { 침식_손, 침식_마음, … } — 씬 본문과 같은 감각
+  const sense = stigmaVars(stigma); // { 침식_손, 침식_마음, … } - the same senses as the scene body
   const stigmaPct = Math.max(0, Math.min(100, stigma));
 
   return (

@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
             return apiError('리비전을 찾을 수 없습니다.', 404);
         }
 
-        // #168 — 본문을 내주기 전에 원본 글의 공개 여부를 본다. 이 검사가 없어 비공개 글의
-        // jsonContent 전문이 비로그인에게 그대로 나갔다.
+        // #168 - the original post's visibility is checked before the body is served. Without this check, a private post's
+        // full jsonContent went straight out to anyone logged out.
         await connectToDB();
         const post = await Post.findById(revision.postId)
             .select('isPrivate isDeleted userEmail')

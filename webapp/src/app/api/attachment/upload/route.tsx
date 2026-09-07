@@ -6,9 +6,9 @@ import { apiSuccess, apiError } from '@/lib/api-response';
 import { requireAuth } from '@/lib/require-auth';
 import { isOwner } from '@/lib/require-owner';
 
-// 다운로드 첨부 업로드 — 이미지 전용 /api/upload 와 분리(비이미지 허용, 썸네일 없음).
-// MinIO 오브젝트 키만 반환하고 public URL 은 노출하지 않는다(비공개 글 첨부 보호 —
-// 다운로드는 /api/attachment/[postId] 인증 프록시가 담당).
+// Downloadable attachment upload - separate from the image-only /api/upload (non-images allowed, no thumbnails).
+// It returns only the MinIO object key and never exposes a public URL (protecting private posts' attachments -
+// downloads go through the authenticated /api/attachment/[postId] proxy).
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -18,7 +18,7 @@ const minioClient = new Minio.Client({
   secretKey: env.minio.secretKey,
 });
 
-// 문서·압축·데이터 파일 허용(다운로드 전용). 스크립트/HTML/SVG 등 실행 위험류는 배제.
+// Document, archive and data files are allowed (download only). Executable risks such as scripts, HTML and SVG are excluded.
 const ALLOWED_MIME = new Set([
   'application/pdf',
   'application/zip', 'application/x-zip-compressed', 'application/x-7z-compressed',
@@ -29,16 +29,16 @@ const ALLOWED_MIME = new Set([
   'text/plain', 'text/csv', 'text/markdown', 'application/json',
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', // 이미지도 다운로드 첨부로 허용
 ]);
-// 일반 유저: nginx server 기본 client_max_body_size(16M) 이내.
+// Ordinary users: within nginx's server-level default client_max_body_size (16M).
 const DEFAULT_MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
-// owner(관리자) 전용 상향: nginx `location = /api/attachment/upload` 의 client_max_body_size(100M) 와 짝.
+// Raised for the owner (admin): matched to the client_max_body_size (100M) on nginx's `location = /api/attachment/upload`.
 const OWNER_MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
 export async function POST(req: NextRequest) {
   const auth = await requireAuth();
   if (auth instanceof NextResponse) return auth;
 
-  // owner 면 100MB, 일반 로그인 유저는 15MB. isOwner 는 boolean(비-owner 도 정상 업로드).
+  // 100MB for the owner, 15MB for an ordinary logged-in user. isOwner is a boolean (a non-owner still uploads normally).
   const maxBytes = (await isOwner()) ? OWNER_MAX_ATTACHMENT_BYTES : DEFAULT_MAX_ATTACHMENT_BYTES;
 
   const formData = await req.formData();
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
 
   const bucket = env.minio.bucket;
   const safeName = file.name.replace(/[/\\]/g, '_').slice(0, 200) || 'file';
-  const key = `attachments/${randomUUID()}-${safeName}`; // 랜덤 프리픽스 — 키 추측 방지
+  const key = `attachments/${randomUUID()}-${safeName}`; // A random prefix - it prevents key guessing
 
   try {
     const buf = Buffer.from(await file.arrayBuffer());

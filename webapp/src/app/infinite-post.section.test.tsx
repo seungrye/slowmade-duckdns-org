@@ -1,13 +1,13 @@
-// 홈 초기 목록 SSR화: InfinitPostList 가 서버(page.tsx)에서 SSR 로드한 initialPosts 를
-// 받으면 첫 페이지 CSR fetch(/api/posts?page=1) 를 건너뛰고 즉시 렌더한다. initialPosts 가
-// 없으면 기존대로 마운트 시 첫 페이지를 fetch 한다(하위호환).
+// Making the home page's initial list SSR: given initialPosts loaded on the server (page.tsx), InfinitPostList
+// skips the first page's CSR fetch (/api/posts?page=1) and renders at once. Without initialPosts
+// it fetches the first page on mount as before (backwards compatible).
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import { GetPostType } from "@/types/posts.d";
 
-// jsdom 미제공 — 무한스크롤/topmost 추적이 마운트 시 참조. 콜백 미발화 stub 이면 충분.
+// Not provided by jsdom - infinite scroll and topmost tracking reference it on mount. A stub whose callback never fires is enough.
 class StubIntersectionObserver {
   constructor(_cb: unknown) {}
   observe(): void {}
@@ -16,7 +16,7 @@ class StubIntersectionObserver {
 }
 vi.stubGlobal("IntersectionObserver", StubIntersectionObserver);
 
-// PostItem 은 렌더 의존성 격리를 위해 최소 stub — 이 테스트는 fetch 계약만 검증.
+// PostItem is a minimal stub to isolate render dependencies - this test verifies the fetch contract alone.
 vi.mock("../components/post-item", () => ({
   default: ({ post }: { post: GetPostType }) => (
     <div data-testid={`post-${post._id}`}>{post.title}</div>
@@ -41,10 +41,10 @@ describe("InfinitPostList — SSR initialPosts 주입", () => {
 
     render(<InfinitPostList initialPosts={mkPosts(9)} />);
 
-    // SSR 주입분이 스켈레톤 없이 즉시 보인다.
+    // The SSR-injected posts are visible at once, with no skeleton.
     expect(screen.getByTestId("post-p0")).toBeInTheDocument();
     expect(screen.queryByTestId("skeleton")).toBeNull();
-    // render 는 useEffect 까지 flush 하므로, 이 시점에 첫 페이지 fetch 가 없어야 한다.
+    // render flushes useEffect too, so there must be no first-page fetch at this point.
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -65,7 +65,7 @@ describe("InfinitPostList — SSR initialPosts 주입", () => {
     render(<InfinitPostList initialPosts={mkPosts(3)} />);
 
     expect(screen.getByTestId("post-p0")).toBeInTheDocument();
-    // 잠깐 흘려보내도 fetch 는 발생하지 않는다(hasMore=false).
+    // Letting a moment pass still produces no fetch (hasMore=false).
     await new Promise((r) => setTimeout(r, 20));
     expect(fetchSpy).not.toHaveBeenCalled();
   });

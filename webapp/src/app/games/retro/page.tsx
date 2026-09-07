@@ -14,11 +14,11 @@ import RetroLibrary from "./RetroLibrary";
 export const metadata: Metadata = {
   title: "고전 게임",
   description: "브라우저에서 바로 즐기는 고전 게임 — 홈브류 모음과 내가 올린 롬.",
-  // 로그인해야 보이는 화면이라 색인할 것이 없다.
+  // The screen requires a login, so there is nothing to index.
   robots: { index: false, follow: false },
 };
 
-// 내 롬 목록이 사람마다 다르고 자산 배치 여부도 런타임에 바뀐다.
+// My ROM list differs per person, and whether the assets are deployed changes at run time.
 export const dynamic = "force-dynamic";
 
 async function myRoms(email: string): Promise<UserRomDto[]> {
@@ -27,7 +27,7 @@ async function myRoms(email: string): Promise<UserRomDto[]> {
     .sort({ createdAt: -1 })
     .lean()) as unknown as LeanRom[];
 
-  // 세이브 유무는 **한 번에** 조회한다 — 카드마다 요청하면 롬 수만큼 왕복이 생긴다 (#116).
+  // Whether a save exists is queried **all at once** - one request per card would mean a round trip per ROM (#116).
   const keys = docs.map((d) => romKey(String(d._id)));
   const saved = keys.length
     ? await RetroSaveState.find({ userEmail: email, gameKey: { $in: keys } })
@@ -55,7 +55,7 @@ export default async function RetroGamesPage() {
 
       {email ? (
         <RetroLibrary
-          // 롬 파일이 실제로 받아진 것만 보여 준다. 커버는 없으면 카드가 폴백 타일을 그린다.
+          // Only ROMs whose file was actually downloaded are shown. Without a cover the card draws a fallback tile.
           builtins={withExistingCovers(
             filterExistingBuiltins(BUILTIN_GAMES, retroAssetExists),
             retroAssetExists,

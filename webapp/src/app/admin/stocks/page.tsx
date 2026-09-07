@@ -8,13 +8,13 @@ import MultiChartClient from "./multi-chart-client";
 export const dynamic = "force-dynamic";
 
 /**
- * /admin/stocks — owner 전용 멀티 종목 종가 line chart.
+ * /admin/stocks - the owner-only multi-symbol closing-price line chart.
  *
- * server component 가 종목 메타 (716 종목) 전부 load → client 에 prop 전달
- * → 자동완성 검색을 클라이언트 즉시 처리. 일봉은 사용자가 종목 선택 시
- * /api/admin/stocks/prices 로 fetch.
+ * The server component loads every symbol's metadata (716 symbols) and passes it to the client
+ * as a prop, so autocomplete is handled instantly on the client. Daily bars are fetched from
+ * /api/admin/stocks/prices when the user selects a symbol.
  *
- * URL ?tickers=AAPL,005930 형식으로 종목 공유/북마크 가능.
+ * Symbols can be shared or bookmarked through the URL as ?tickers=AAPL,005930.
  */
 export default async function StocksMultiChartPage() {
   const guard = await requireOwner();
@@ -26,7 +26,7 @@ export default async function StocksMultiChartPage() {
     .sort({ market: 1, ticker: 1 })
     .lean();
 
-  // Mongoose lean 결과 → 평면 plain object 로 직렬화 (client component 전달용)
+  // The Mongoose lean result -> serialised into flat plain objects (to pass to the client component)
   const stockMeta = stocks.map((s) => ({
     ticker: s.ticker,
     name: s.name,

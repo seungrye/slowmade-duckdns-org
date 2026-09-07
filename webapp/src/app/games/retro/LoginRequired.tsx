@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 /**
- * 로그인해야 볼 수 있는 화면의 안내 (#109).
+ * The notice for a screen that requires a login (#109).
  *
- * 리다이렉트 대신 안내를 띄운다 — 무엇을 위해 로그인하는지 보이는 편이 낫고, 뒤로 가기로
- * 튕겨 나오는 일도 없다.
+ * A notice rather than a redirect - it is better to see what one is logging in for, and there is no being bounced
+ * back out by the back button.
  */
 export default function LoginRequired({ what }: { what: string }) {
   return (

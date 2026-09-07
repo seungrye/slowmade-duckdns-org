@@ -1,4 +1,4 @@
-// #278 — hidden conditional 분기 edge 의 opacity 약화 검증.
+// #278 - verifying the weakened opacity of a hidden conditional branch's edge.
 
 import { describe, it, expect } from "vitest";
 

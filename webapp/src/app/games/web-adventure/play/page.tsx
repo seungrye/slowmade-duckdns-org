@@ -19,23 +19,23 @@ import EndingScreen from "./EndingScreen";
 import StatusPanel from "./StatusPanel";
 import MobileDrawer from "./MobileDrawer";
 
-// CSR 플레이 화면 — reducer 기반 상태 머신.
+// The CSR play screen - a reducer-based state machine.
 //
-// Phase D 변경: 정적 import 된 scenes 대신 `/api/web-adventure/content/v1` 에서
-// mongo 컨텐츠를 fetch 한 뒤 reducer 에 주입한다. 로딩 중 / fetch 실패 / 정상
-// 3 가지 UI 상태를 가진다.
+// The Phase D change: instead of statically imported scenes, the mongo content is fetched from
+// `/api/web-adventure/content/v1` and injected into the reducer. It has three UI states:
+// loading, a failed fetch, and normal.
 //
-// phase 별 렌더:
+// The render per phase:
 //   creating → CharacterCreator
-//   playing  → 상단 상태(HP/인벤/재굴림) + SceneRenderer
+//   playing  -> the top status (HP, inventory, rerolls) plus SceneRenderer
 //   ended    → EndingScreen
 
 const initialState: GameState = { phase: "creating" };
 
 /**
- * 문체 지정 — /play?voice=tolkien (#73).
+ * Choosing the prose style - /play?voice=tolkien (#73).
  *
- * useSearchParams 대신 location 을 직접 읽어 Suspense 경계를 늘리지 않는다.
+ * It reads location directly rather than using useSearchParams, so no extra Suspense boundary is needed.
  */
 function readVoice(): string | undefined {
   if (typeof window === "undefined") return undefined;
@@ -43,11 +43,11 @@ function readVoice(): string | undefined {
 }
 
 /**
- * 이번 판의 문체를 정해 씬을 받아온다 (#79).
+ * Decides this run's prose style and fetches the scenes (#79).
  *
- * 클라이언트가 받는 씬에는 variants 가 없어 완비 여부를 알 수 없으므로, 우선 한 번 받아
- * 커버리지를 확보한 뒤 문체를 고른다. 고른 값은 sessionStorage 에 남겨 한 판 안에서는
- * 씬마다 문체가 갈리지 않게 한다. `?voice=` 를 준 경우엔 그것이 우선한다.
+ * The scenes the client receives have no variants, so completeness cannot be told from them; it fetches once to get
+ * the coverage and then picks a style. The chosen value is kept in sessionStorage so the style does not vary
+ * scene by scene within a run. A given `?voice=` wins.
  */
 async function loadScenesForRun(force = false): Promise<SceneRegistry> {
   const override = readVoice();
@@ -62,7 +62,7 @@ async function loadScenesForRun(force = false): Promise<SceneRegistry> {
   return getScenes({ force, voice });
 }
 
-/** 이번 판에 쓰인 문체 — end-run 에 함께 보낸다 (#90). 없으면 기본 문체로 본다. */
+/** The style used in this run - sent along with end-run (#90). Absent, it counts as the default style. */
 function readRunVoice(): string {
   if (typeof window === "undefined") return DEFAULT_VOICE;
   try {
@@ -140,25 +140,25 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     initialState,
   );
 
-  // #240 — 로그인 직후 localStorage 의 save/past_runs → 서버 이전 (한 번만).
+  // #240 - right after login, localStorage's save and past_runs migrate to the server (once only).
   useMigrateOnLogin();
 
-  // #238 — 자동 저장 + 마운트 시 복원.
-  // #239 — 회차 시스템: ended 진입 시 end-run API 호출 + runIndex +1.
-  // #256 — world flag 부메랑: 이전 회차 endingId → world.* flags 주입.
+  // #238 - autosave plus restoring on mount.
+  // #239 - the run system: entering ended calls the end-run API and bumps runIndex.
+  // #256 - the world-flag boomerang: the previous run's endingId injects world.* flags.
   const [runIndex, setRunIndex] = useState(1);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [worldFlags, setWorldFlags] = useState<Record<string, boolean>>({});
-  // 엔딩 진입 1회만 end-run 을 보내기 위한 가드. sentKey 에 runIndex 를 넣던 방식은
-  // 성공 시 setRunIndex(n+1) 로 runIndex 가 바뀌면 키가 달라져 effect 가 재발화 → end-run
-  // 무한 루프(회차/피드백노트 폭주, #17)를 유발했다. phase 전이 기반 boolean 가드로 교체.
+  // The guard that sends end-run only once on entering an ending. Putting runIndex in sentKey meant that on
+  // success setRunIndex(n+1) changed runIndex, changed the key and re-fired the effect -> an infinite end-run
+  // loop (a flood of runs and feedback notes, #17). It was replaced by a boolean guard on the phase transition.
   const endRunHandledRef = useRef(false);
-  // #273 — 침식 80 첫 도달 트래킹 (회차당 1 회). useRef 로 sentinel.
+  // #273 - tracking the first time contamination reaches 80 (once per run). A useRef sentinel.
   const stigmaCriticalSentRef = useRef<number | null>(null);
-  // 거쳐간 씬 시퀀스 추적 (경로 분포 통계용) — end-run 시 서버로 전송.
+  // Tracking the sequence of scenes passed through (for path-distribution statistics) - sent to the server with end-run.
   const scenePathRef = useRef<string[]>([]);
 
-  // #256 — 마운트 시 past_runs fetch → worldFlags 계산.
+  // #256 - past_runs is fetched on mount to compute worldFlags.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -190,7 +190,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     };
   }, []);
 
-  // #273 — 침식이 80 (critical) 처음 도달한 회차에 한 번만 발화.
+  // #273 - fires once, in the run where contamination first reaches 80 (critical).
   useEffect(() => {
     if (state.phase !== "playing") return;
     if (state.character.stigmaErosion < 80) return;
@@ -203,9 +203,9 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     });
   }, [state, runIndex]);
 
-  // 경로 추적 — playing 중 currentScene 이 바뀌면 시퀀스에 append.
-  //   creating(회차 시작 전)으로 돌아오면 초기화. RESTORE(이어하기)는 중간부터라
-  //   경로가 불완전할 수 있으나 대부분 새 모험이라 허용.
+  // Path tracking - a changed currentScene while playing appends to the sequence.
+  //   Returning to creating (before a run starts) resets it. RESTORE (continuing) starts mid-way, so
+  //   the path can be incomplete, but most sessions are new adventures so it is accepted.
   useEffect(() => {
     if (state.phase === "playing") {
       const path = scenePathRef.current;
@@ -231,26 +231,26 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
     },
   });
 
-  // #239 — ended 진입 시 한 번만 end-run POST → save 의 runIndex+1 + past_run 적치.
-  //   같은 runIndex 중복 전송 방지.
-  // #253 — 비로그인도 서버가 받는다(합성 계정 past-run + 피드백 노트). 예전엔 401 이라
-  //   조용히 버려져서, 로그인 안 한 플레이의 엔딩은 피드백 노트가 아예 안 생겼다.
-  // #245 — adv_ending_reached 도 같이 발화.
-  // #250 — 서버 응답과 무관하게 localStorage 에 *동기 append* (이슈 #250).
-  //   비로그인이면 갤러리 fallback 만 의지. 로그인이면 race 보호 (end-run insert
-  //   가 끝나기 전 갤러리 진입해도 localStorage 의 최신 도달분이 보임). dedup
-  //   runIndex 기준.
+  // #239 - entering ended POSTs end-run once, bumping the save's runIndex and accumulating a past_run.
+  //   Duplicate sends for the same runIndex are prevented.
+  // #253 - the server accepts a logged-out player too (a synthetic account's past-run plus a feedback note). It used to
+  //   be a 401 and be quietly discarded, so a logged-out play's ending produced no feedback note at all.
+  // #245 - adv_ending_reached fires with it.
+  // #250 - a *synchronous append* to localStorage regardless of the server's response (issue #250).
+  //   Logged out, only the gallery fallback depends on it. Logged in, it guards the race (entering the
+  //   gallery before the end-run insert finishes still shows the most recent ending from localStorage). Deduplicated
+  //   by runIndex.
   useEffect(() => {
-    // 엔딩 phase 를 벗어나면(새 회차 시작) 가드 리셋 → 다음 엔딩에서 다시 1회 발화.
+    // Leaving the ending phase (starting a new run) resets the guard -> it fires once again at the next ending.
     if (state.phase !== "ended") {
       endRunHandledRef.current = false;
       return;
     }
-    // 이미 이 엔딩을 처리했으면 재발화(runIndex 변경 등) 무시 → end-run 1회만.
+    // Once this ending is handled, a re-fire (a changed runIndex and so on) is ignored -> end-run happens once.
     if (endRunHandledRef.current) return;
     endRunHandledRef.current = true;
 
-    // localStorage 의 past-runs 에 append (dedup by runIndex).
+    // Appends to localStorage's past-runs (deduplicated by runIndex).
     if (typeof window !== "undefined") {
       try {
         const raw = window.localStorage.getItem(LOCAL_STORAGE_PAST_RUNS_KEY);
@@ -263,13 +263,13 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
           endingId: state.endingId,
           runIndex,
           finalSceneId: state.finalSceneId,
-          // #289 — character snapshot 제거. EndingGallery/buildWorldFlags 모두
-          //   endingId 만 사용. character 포함 시 1 회차 ~260B 누적 → 만 회차에
-          //   quota 5MB 절반 차지 → 운영 시 silent skip.
-          //   진짜 snapshot 은 *서버 past-runs* 에만 보관.
+          // #289 - the character snapshot is removed. EndingGallery and buildWorldFlags both use
+          //   the endingId alone. Including the character accumulated about 260B per run, so ten thousand runs
+          //   filled half of the 5MB quota and silently skipped in production.
+          //   The real snapshot is kept in *the server's past-runs* alone.
           completedAt: new Date().toISOString(),
         });
-        // 최근 200 회차만 유지 — buildWorldFlags 는 *unique endingId* 만 필요.
+        // Only the most recent 200 runs are kept - buildWorldFlags needs only the *unique endingIds*.
         const trimmed = filtered.slice(-200);
         window.localStorage.setItem(
           LOCAL_STORAGE_PAST_RUNS_KEY,
@@ -279,10 +279,10 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         /* quota/private 모드 — 무시 */
       }
 
-      // #251 — localStorage save 의 진행 데이터 clear (= 회차 종결).
-      //   서버 end-run 의 character/currentSceneId unset 과 대칭.
-      //   다음 마운트 시 useAutoSave 의 onRestore 가 currentSceneId 없으면
-      //   RESTORE skip → creating phase (= '새 모험').
+      // #251 - clears the progress data in localStorage's save (= ending the run).
+      //   Symmetrical with the server end-run's unset of character and currentSceneId.
+      //   On the next mount, useAutoSave's onRestore finds no currentSceneId and
+      //   skips RESTORE -> the creating phase (= 'a new adventure').
       try {
         const rawSave = window.localStorage.getItem(LOCAL_STORAGE_SAVE_KEY);
         if (rawSave) {
@@ -303,8 +303,8 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
       protagonist: state.character.protagonist,
       stigma_erosion: state.character.stigmaErosion,
     });
-    // #273 — 자동 petrification (stigma ≥ 100 자동 전환) 별도 트래킹.
-    //   현재 콘텐츠에 petrification 으로의 *분기* 가 없어 *항상* 자동.
+    // #273 - automatic petrification (the automatic transition at stigma >= 100) is tracked separately.
+    //   The current content has no *branch* into petrification, so it is *always* automatic.
     if (state.endingId === "petrification") {
       logAdvEvent("petrification_auto", {
         protagonist: state.character.protagonist,
@@ -318,13 +318,13 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         endingId: state.endingId,
         finalSceneId: state.finalSceneId,
         scenePath: scenePathRef.current,
-        // #9 — 엔딩 시점의 풍부한 서사 로그를 서버로. 피드백 노트 LLM 입력용.
+        // #9 - the rich narrative log at the ending goes to the server. Input for the feedback note's LLM.
         log: state.log,
-        // #90 — 어떤 문체로 읽은 회차인지. 노트가 인용한 문장의 출처를 추적할 수 있다.
+        // #90 - which prose style this run was read in. It lets a note's quoted sentence be traced to its source.
         voice: readRunVoice(),
-        // #253 — 비로그인은 서버 save 가 없어 캐릭터를 서버가 알 수 없다. 안 보내면
-        //   기본값(kael·hp10)으로 채워져 노트 서사가 실제 플레이와 어긋난다.
-        //   로그인 사용자는 서버가 save 의 캐릭터를 쓰므로 이 값은 무시된다.
+        // #253 - a logged-out player has no server save, so the server cannot know the character. Not sending it
+        //   fills in the defaults (kael, hp 10) and the note's narrative diverges from the actual play.
+        //   For a logged-in user the server uses the save's character, so this value is ignored.
         character: state.character,
       }),
     })
@@ -333,10 +333,10 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
           setRunIndex((n) => n + 1);
           return;
         }
-        // #352 — **실패를 삼키지 않는다.** 예전엔 `if (res.ok)` 뿐이라 서버가 거절해도
-        //   아무 흔적이 없었다. 실제로 엔딩 5종이 스키마 enum 에 빠져 전부 500 이었는데
-        //   플레이어에게도 로그에도 안 남아 2주 넘게 몰랐다. 회차 기록이 사라지면
-        //   피드백 노트·갤러리·업적이 통째로 날아간다.
+        // #352 - **failures are not swallowed.** This used to be `if (res.ok)` alone, so a server rejection
+        //   left no trace. In practice 5 endings were absent from the schema enum and all returned 500, and
+        //   with nothing shown to the player and nothing in the log it went unnoticed for over two weeks. A lost run record
+        //   takes the feedback note, the gallery and the achievements with it.
         const detail = await res.json().catch(() => null);
         const reason = detail?.message ?? `HTTP ${res.status}`;
         console.error("[web-adventure] 회차 저장 실패 — 기록이 남지 않았다:", reason);
@@ -348,7 +348,7 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
         });
       })
       .catch((err) => {
-        // 네트워크 단절 — 여기서만은 회복 가능성이 있다(다음 게임 시작 시 save 갱신).
+        // A network drop - here alone there is a chance of recovery (the save refreshes at the next game start).
         console.error("[web-adventure] 회차 저장 요청 자체가 실패했다:", err);
         logAdvEvent("ending_save_failed", {
           ending_id: state.endingId,
@@ -378,12 +378,12 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                 protagonist: character.protagonist,
                 run_index: runIndex,
               });
-              // #256 — world flag 주입 (이전 회차의 endingId 기반).
+              // #256 - injecting the world flags (based on the previous run's endingId).
               const charWithFlags = {
                 ...character,
                 flags: { ...character.flags, ...worldFlags },
               };
-              // #273 — 부메랑 flag 가 *실제 적용* 된 회차 트래킹.
+              // #273 - tracking the runs where a boomerang flag *actually applied*.
               const appliedFlags = Object.keys(worldFlags).filter((k) => worldFlags[k]);
               if (appliedFlags.length > 0) {
                 logAdvEvent("world_flag_applied", {
@@ -420,8 +420,8 @@ function PlayInner({ scenes }: { scenes: SceneRegistry }) {
                   onReroll={() => dispatch({ type: "REROLL" })}
                   onConfirm={() => dispatch({ type: "CONFIRM_ROLL" })}
                   onChoose={(choiceId) => {
-                    // #245 — adv_choice_made. #285: protagonist + stigma_erosion 추가.
-                    //   회차/시한부 분석을 위해 그 시점의 *주인공/침식* 캡처.
+                    // #245 - adv_choice_made. #285: protagonist and stigma_erosion added.
+                    //   The *protagonist and contamination* at that moment are captured for run and time-limit analysis.
                     if (state.phase === "playing") {
                       const choice = scenes[state.currentScene]?.choices.find((c) => c.id === choiceId);
                       logAdvEvent("choice_made", {

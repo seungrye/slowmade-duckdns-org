@@ -1,4 +1,4 @@
-// TagInput — 한글 IME/콤마 태그 입력 (끝 글자 남는 버그 회귀 방지).
+// TagInput - Korean IME and comma tag entry (guarding against the trailing-character regression).
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -6,7 +6,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import TagInput from "./tag-input.section";
 
 beforeEach(() => {
-  // 마운트 시 /api/tags 조회 — 빈 목록으로 목킹(제안은 테스트 대상 아님).
+  // /api/tags is queried on mount - mocked with an empty list (suggestions are not under test).
   vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => ({ data: [] }) })));
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -18,7 +18,7 @@ describe("TagInput — 콤마/한글 IME", () => {
     const input = screen.getByRole("textbox") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "우리집," } });
     expect(onTagsChange).toHaveBeenCalledWith(["우리집"]);
-    expect(input.value).toBe(""); // 끝 글자('집')가 남지 않는다
+    expect(input.value).toBe(""); // no trailing character ('집') is left behind
   });
 
   it("IME 조합 중 Enter 는 태그를 추가하지 않는다(조합 확정용)", () => {

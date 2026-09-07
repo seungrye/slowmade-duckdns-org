@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     return apiError("Upload failed", 500);
   }
 
-  // public URL 은 publicHost(apex 경로) 기반 — 서버 연결은 endpoint(host) 그대로.
+  // The public URL is based on publicHost (the apex path) - the server connection still uses the endpoint (host).
   const url = buildPublicUrl(env.minio.publicHost, bucket, fileName);
   const thumbnailUrl = buildPublicUrl(env.minio.publicHost, bucket, `thumbnails/${fileName}`);
 

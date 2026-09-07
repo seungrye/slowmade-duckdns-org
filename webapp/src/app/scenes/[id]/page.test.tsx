@@ -1,5 +1,5 @@
-// #341 — /scenes/[id] 에 '차트에서 보기' 버튼 (graph?focus=<id>).
-// 정적 코드 검사 — 마운트 의존성 없이 패턴만 검증.
+// #341 - a 'view in the chart' button on /scenes/[id] (graph?focus=<id>).
+// A static code check - verifying the pattern alone, with no mount dependency.
 
 import { describe, test, expect } from "vitest";
 import fs from "node:fs";
@@ -24,7 +24,7 @@ describe("/scenes/[id] — #341 '차트에서 보기' 버튼", () => {
   });
 });
 
-// 옛 quest CMS 패턴 — '리비전 보기' 링크 (/scenes/[id]/revisions 로 이동).
+// The old quest CMS pattern - a 'view revisions' link (going to /scenes/[id]/revisions).
 describe("/scenes/[id] — 리비전 보기 링크", () => {
   const code = fs.readFileSync(
     path.resolve("src/app/scenes/[id]/page.tsx"),
@@ -36,7 +36,7 @@ describe("/scenes/[id] — 리비전 보기 링크", () => {
   });
 
   test("/scenes/[id]/revisions 경로 링크 존재", () => {
-    // /scenes/${...}/revisions 패턴.
+    // The /scenes/${...}/revisions pattern.
     expect(code).toMatch(/\/scenes\/\$\{[^}]+\}\/revisions/);
   });
 });

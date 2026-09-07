@@ -1,7 +1,7 @@
-// /api/web-adventure/content/v1 — Web MUD 클라이언트 전용 통합 컨텐츠 엔드포인트.
+// /api/web-adventure/content/v1 - the combined content endpoint for the Web MUD client.
 //
-// 모든 씬을 한 번에 반환하여 라이트한 CDN 캐시 (max-age=60) 로 서비스한다.
-// 버전 prefix (v1) 는 컨텐츠 형식 호환 단절 시 v2 로 갈 수 있도록 준비.
+// It returns every scene at once and serves it with a light CDN cache (max-age=60).
+// The version prefix (v1) leaves room to move to v2 should the content format break compatibility.
 
 import { NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
@@ -9,7 +9,7 @@ import WebAdventureScene from "@/models/web-adventure-scene";
 import { DEFAULT_VOICE, resolveBody, voiceCoverage } from "@/lib/web-adventure/voice";
 import { items, INVENTORY_CAP } from "@/content/web-adventure/items";
 
-// 공개 read-only 컨텐츠 — 앱(Capacitor WebView, cross-origin)도 소비하므로 CORS 허용.
+// Public read-only content - the app (a Capacitor WebView, cross-origin) consumes it too, so CORS is allowed.
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
@@ -22,9 +22,9 @@ type SceneDoc = Record<string, unknown> & {
 };
 
 /**
- * @param req ?voice= 로 문체를 고른다. 없으면 기본 문체.
- *   랜덤 선택은 **클라이언트 몫**이다 — 서버가 매번 랜덤을 돌리면 응답을 캐시할 수 없다.
- *   클라이언트는 함께 내려주는 voices(완비율)를 보고 고른 뒤 그 값으로 다시 요청한다. (#73)
+ * @param req ?voice= picks the prose style. Without it, the default style.
+ *   The random choice is **the client's job** - a server drawing randomly every time could not cache its response.
+ *   The client picks using the voices (coverage) sent alongside and then requests again with that value. (#73)
  */
 export async function GET(req: Request) {
   await connectToDB();
@@ -33,17 +33,17 @@ export async function GET(req: Request) {
   const requested = req?.url ? new URL(req.url).searchParams.get("voice") : null;
   const voice = requested || DEFAULT_VOICE;
 
-  // treatment(뼈대)·variants 는 클라이언트로 내보내지 않는다 — 노출 금지 + 페이로드 절감.
+  // The treatment (the skeleton) and variants are not sent to the client - they must not be exposed, and it saves payload.
   const scenes = docs.map((doc) => {
     const { treatment: _t, variants: _v, ...rest } = doc;
     void _t; void _v;
     return { ...rest, body: resolveBody(doc, voice) };
   });
 
-  // #103 — 아이템 카탈로그도 함께 내려보낸다. 앱이 가방 모달에서 이름·설명·효과를 그리고
-  //   사용 가능 여부(kind === "consumable")를 판단하는 데 쓴다. 앱에 미러를 박지 않는 이유는
-  //   이중 관리로 어긋나기 때문이다 — 문체 규칙을 양쪽에 둔 탓에 표기가 갈린 전례가 있다.
-  //   정적 데이터라 캐시 정책(아래 60 초)에도 영향이 없다.
+  // #103 - the item catalogue is sent down too. The app uses it to draw names, descriptions and effects in the bag
+  //   modal and to decide usability (kind === "consumable"). A mirror is not embedded in the app because
+  //   maintaining it twice lets the copies diverge - keeping the prose rules on both sides already split the notation once.
+  //   Being static data, it does not affect the cache policy (the 60 seconds below).
   return NextResponse.json(
     {
       success: true,
@@ -59,7 +59,7 @@ export async function GET(req: Request) {
   );
 }
 
-// CORS preflight — 앱 WebView 의 cross-origin fetch 대비.
+// The CORS preflight - for the app WebView's cross-origin fetch.
 export function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }

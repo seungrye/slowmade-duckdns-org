@@ -1,13 +1,13 @@
 'use client';
 
-// MobileDrawer — #242. 모바일 사이드 패널 + 햄버거 메뉴.
+// MobileDrawer - #242. The mobile side panel plus the hamburger menu.
 //
-// 우측 slide-in drawer + 어두운 오버레이. open=false 시 translate-x-full + aria-hidden=true.
-// 닫기: 닫기 버튼, 오버레이 클릭, Escape.
+// A right-hand slide-in drawer with a dark overlay. With open=false it is translate-x-full plus aria-hidden=true.
+// Closing: the close button, clicking the overlay, or Escape.
 //
-// 사용처 (play page 5주차):
-//   - 햄버거 버튼은 외부에서 렌더 (page 측 상단). MobileDrawer 자체는 *열린 상태 UI* 만.
-//   - children 에 StatusPanel 등 임의 콘텐츠.
+// Where it is used (the week 5 play page):
+//   - the hamburger button is rendered outside (at the top of the page). MobileDrawer itself is *the open-state UI* only.
+//   - children hold arbitrary content, such as StatusPanel.
 
 import { useEffect, useRef, type ReactNode } from 'react';
 
@@ -18,13 +18,13 @@ export interface MobileDrawerProps {
 }
 
 export default function MobileDrawer({ open, onClose, children }: MobileDrawerProps) {
-  // #296 — 열림 시 닫기 버튼으로 자동 focus + escape 처리.
+  // #296 - focus moves automatically to the close button on opening, and escape is handled.
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const previousActiveRef = useRef<Element | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    // 이전 focused element 기억 + 닫기 버튼으로 focus 이동.
+    // Remembers the previously focused element and moves focus to the close button.
     previousActiveRef.current = document.activeElement;
     closeBtnRef.current?.focus();
     const handler = (e: KeyboardEvent) => {
@@ -33,7 +33,7 @@ export default function MobileDrawer({ open, onClose, children }: MobileDrawerPr
     window.addEventListener('keydown', handler);
     return () => {
       window.removeEventListener('keydown', handler);
-      // 닫힐 때 이전 focus 복원.
+      // Restores the previous focus on closing.
       if (previousActiveRef.current instanceof HTMLElement) {
         previousActiveRef.current.focus();
       }

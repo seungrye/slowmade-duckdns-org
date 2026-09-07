@@ -12,7 +12,7 @@ export async function GET(req: Request) {
 
   if (!_id) return apiError('Post ID (_id) is required', 400);
 
-  // 비공개 글은 작성자 본인만 로드(편집). 세션 email 을 뷰어로 전달.
+  // A private post loads (for editing) only for its author. The session email is passed as the viewer.
   const session = await auth();
   const { post } = await getPost(_id, session?.user?.email ?? null) || { post: null };
   return apiSuccess(post);

@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// import 전에 실행되어야 하므로 vi.hoisted 사용
+// It has to run before the imports, so vi.hoisted is used
 const mockPutObject = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.hoisted(() => {
@@ -9,10 +9,10 @@ vi.hoisted(() => {
   process.env.MINIO_ACCESSKEY = 'test-key';
   process.env.MINIO_SECRETKEY = 'test-secret';
   process.env.MINIO_BUCKET = 'test-bucket';
-  process.env.OWNER_EMAIL = 'owner@test.com'; // isOwner 비교 기준(실제 env.ts·isOwner 사용)
+  process.env.OWNER_EMAIL = 'owner@test.com'; // The comparison basis for isOwner (using the real env.ts and isOwner)
 });
 
-// requireAuth·isOwner 둘 다 내부에서 auth() 를 호출 → auth 만 목하면 실제 구현으로 분기 검증.
+// Both requireAuth and isOwner call auth() internally -> mocking auth alone verifies the branching through the real implementation.
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
 vi.mock('minio', () => ({
   Client: class {
@@ -26,14 +26,14 @@ import { auth } from '@/auth';
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const MB = 1024 * 1024;
 
-// 멀티파트 왕복 없이 file.size 를 지정하려고 fake req 사용(round-trip 하면 재파싱된 File 의 size 가 실제 바이트로 바뀜).
+// A fake req is used to set file.size without a multipart round trip (a round trip re-parses the File and its size becomes the real bytes).
 function makeReq(file: unknown): NextRequest {
   return {
     formData: async () => ({ get: (k: string) => (k === 'file' ? file : null) }),
   } as unknown as NextRequest;
 }
 
-// 실제 File(instanceof 통과) + size 만 오버라이드. arrayBuffer 는 3바이트(putObject 는 목이라 무관).
+// A real File (so instanceof passes) with only size overridden. arrayBuffer is 3 bytes (irrelevant, since putObject is mocked).
 function fileOf(size: number, type = 'application/pdf', name = 'f.pdf'): File {
   const f = new File([new Uint8Array([1, 2, 3])], name, { type });
   Object.defineProperty(f, 'size', { value: size, configurable: true });
@@ -43,7 +43,7 @@ function fileOf(size: number, type = 'application/pdf', name = 'f.pdf'): File {
 describe('POST /api/attachment/upload — owner 100MB / 일반 15MB', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.mockResolvedValue({ user: { email: 'user@test.com' } }); // 기본: 비-owner 로그인
+    mockAuth.mockResolvedValue({ user: { email: 'user@test.com' } }); // the default: logged in as a non-owner
     mockPutObject.mockResolvedValue(undefined);
   });
 

@@ -1,12 +1,12 @@
-// /api/web-adventure/save — 현재 진행도 저장/불러오기 (#237).
+// /api/web-adventure/save - saving and loading the current progress (#237).
 //
-// 5주차 milestone — 자동 저장 + 로그인/비로그인 통합.
-// GET  → 로그인된 사용자의 save (없으면 data:null).
-// POST → upsert: { userEmail, runIndex, character, currentSceneId } 갱신.
-// 비로그인 → 401 (클라이언트가 localStorage fallback 사용).
+// The week 5 milestone - autosave unified across logged-in and logged-out.
+// GET  -> the logged-in user's save (data:null when absent).
+// POST -> an upsert of { userEmail, runIndex, character, currentSceneId }.
+// Logged out -> 401 (the client uses its localStorage fallback).
 //
-// 입력 character 의 flags 는 client JSON object 이며, mongoose Map 으로
-// 자동 직렬화된다 (mongoose 가 plain object → Map 변환을 지원).
+// The incoming character's flags is a client JSON object, serialised automatically into a mongoose
+// Map (mongoose supports converting a plain object into a Map).
 
 import { NextRequest } from 'next/server';
 import { flagsForStore } from '@/lib/web-adventure/flags';
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   }
   const body = await req.json();
 
-  // 필수 필드 검증
+  // Validating the required fields
   if (
     typeof body.runIndex !== 'number' ||
     !body.character ||
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
       {
         userEmail: session.user.email,
         runIndex: body.runIndex,
-        // #356 — flags 의 점 든 키(world.*) 때문에 저장이 통째로 실패했다.
+        // #356 - the dotted keys in flags (world.*) made saving fail outright.
         character: { ...(body.character as Record<string, unknown>), flags: flagsForStore((body.character as { flags?: unknown }).flags) },
         currentSceneId: body.currentSceneId,
       },

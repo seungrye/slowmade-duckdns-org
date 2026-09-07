@@ -1,8 +1,8 @@
-// /scenes/[id] 페이지 — 저장 시 PUT 응답으로 scene 갱신 검증.
+// The /scenes/[id] page - verifying that saving updates the scene from the PUT response.
 //
-// 사용자 보고 — 저장 후 '리비전 보기 (n개)' 의 n 이 갱신되지 않음.
-// 원인: handleSave 가 응답 body 의 scene (revisionCount 포함) 을 setScene 하지 않음.
-// fix: setScene(json.data) 로 갱신 → revisionCount 라벨 즉시 반영.
+// Reported by a user - the n in 'view revisions (n)' did not update after saving.
+// The cause: handleSave never setScene'd the response body's scene (which carries revisionCount).
+// The fix: setScene(json.data) -> the revisionCount label updates at once.
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -16,7 +16,7 @@ import SceneEditPage from "./page";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
-// 초기 GET 응답 — revisionCount = 5.
+// The initial GET response - revisionCount = 5.
 const initialScene = {
   _id: "abc123",
   id: "kael_infirmary",
@@ -26,7 +26,7 @@ const initialScene = {
   choices: [],
   revisionCount: 5,
 };
-// PUT 응답 — revisionCount = 6 으로 증가.
+// The PUT response - revisionCount up to 6.
 const updatedScene = {
   _id: "abc123",
   id: "kael_infirmary",
@@ -76,17 +76,17 @@ describe("/scenes/[id] — 저장 시 PUT 응답으로 scene 갱신 (revisionCou
       const { unmount: u } = render(<SceneEditPage params={params} />);
       unmount = u;
     });
-    // 초기 로딩 완료 — '리비전 보기 (5개)' 라벨 노출.
+    // The initial load has finished - the 'view revisions (5)' label is shown.
     await waitFor(() => {
       expect(screen.getByText(/리비전 보기 \(5개\)/)).toBeTruthy();
     });
 
-    // 저장 버튼 클릭.
+    // Clicking the save button.
     const saveBtn = screen.getByRole("button", { name: /^저장$/ });
     await act(async () => {
       fireEvent.click(saveBtn);
     });
-    // PUT 응답 처리 완료 후 — 라벨이 (6개) 로 갱신.
+    // Once the PUT response is handled - the label updates to (6).
     await waitFor(() => {
       expect(screen.getByText(/리비전 보기 \(6개\)/)).toBeTruthy();
     });

@@ -4,32 +4,32 @@ import { useCallback, useRef, useState } from "react";
 import { dispatchKey, tapKey } from "@/lib/dispatch-key";
 
 /**
- * bevy-rogue 모바일 가상 키패드.
+ * The bevy-rogue mobile virtual keypad.
  *
- * 게임 코드(Bevy/winit) 는 그대로 두고, 합성 `KeyboardEvent` 를
- * 캔버스/window 에 dispatch 하는 방식으로 입력을 전달한다.
+ * The game's code (Bevy/winit) is left alone and input is delivered by dispatching synthetic
+ * `KeyboardEvent`s to the canvas and window.
  *
- * 가시성:
- *   - Tailwind `md:hidden` 으로 모바일에서만 노출, 데스크탑에서는 숨김.
+ * Visibility:
+ *   - shown on mobile only through Tailwind's `md:hidden`, hidden on desktop.
  *
- * 레이아웃:
- *   - 행 1: D-pad (상/하/좌/우, 8방향 아님 — 게임은 4방향 그리드).
- *   - 행 2: 핵심 액션 (Enter / Space / Esc).
- *   - 행 3: 패널 토글 (장비 E / 저널 J / 도감 F2 / 맵 F1).
- *   - 행 4: 카테고리 토글로 펼치는 [스킬 1/2/3] · [함정 T/Y] · [원거리 F].
+ * The layout:
+ *   - row 1: the D-pad (up/down/left/right, not 8-way - the game is a 4-way grid).
+ *   - row 2: the core actions (Enter / Space / Esc).
+ *   - row 3: the panel toggles (equipment E / journal J / bestiary F2 / map F1).
+ *   - row 4: [skills 1/2/3], [traps T/Y] and [ranged F], expanded by a category toggle.
  *
- * Hold vs Tap:
- *   - D-pad: 누른 동안 keydown, 떼면 keyup → 캐릭터 연속 이동.
- *   - 그 외(액션·토글·스킬): tap = keydown→keyup 한 쌍.
+ * Hold versus tap:
+ *   - the D-pad: keydown while held, keyup on release -> continuous movement.
+ *   - everything else (actions, toggles, skills): a tap is one keydown/keyup pair.
  */
 
-/** 부모로부터 받을 캔버스 ref — `KeyboardEvent` dispatch 대상. */
+/** The canvas ref received from the parent - the `KeyboardEvent` dispatch target. */
 type Props = {
-  /** 게임 캔버스. 포커스 회복 + 1차 dispatch target. */
+  /** The game canvas. It restores focus and is the primary dispatch target. */
   getCanvas: () => HTMLCanvasElement | null;
 };
 
-/** 공통 버튼 베이스 클래스 (다크모드, 44px 최소 터치 영역). */
+/** The shared button base class (dark mode, a 44px minimum touch target). */
 const BTN_BASE =
   "min-w-[44px] min-h-[44px] px-3 py-2 rounded-md bg-gray-700 text-gray-200 " +
   "text-sm font-medium select-none touch-none " +
@@ -37,8 +37,8 @@ const BTN_BASE =
   "disabled:opacity-50";
 
 /**
- * Hold 버튼 — pointerdown/up/cancel/leave 로 keydown/keyup 페어 보장.
- * pointerEvents 만 사용하여 mouse/touch/pen 통합 처리.
+ * A hold button - pointerdown/up/cancel/leave guarantee a keydown/keyup pair.
+ * It uses pointer events only, handling mouse, touch and pen uniformly.
  */
 function HoldButton({
   label,
@@ -53,7 +53,7 @@ function HoldButton({
   getCanvas: () => HTMLCanvasElement | null;
   className?: string;
 }) {
-  // 같은 버튼에 여러 번 down 이 들어와도 한 번만 keydown 처리.
+  // Several downs on the same button still produce one keydown.
   const downRef = useRef(false);
 
   const down = useCallback(
@@ -61,7 +61,7 @@ function HoldButton({
       e.preventDefault();
       if (downRef.current) return;
       downRef.current = true;
-      // pointer capture → 손가락이 버튼 밖으로 미끄러져도 이 버튼이 끝까지 추적.
+      // Pointer capture - the button keeps tracking even if the finger slides off it.
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -96,7 +96,7 @@ function HoldButton({
       onPointerUp={up}
       onPointerCancel={up}
       onPointerLeave={(e) => {
-        // pointer capture 가 안 잡힌 경우의 보험 — 버튼 밖으로 나가면 keyup.
+        // Insurance for when pointer capture did not take - leaving the button gives a keyup.
         if (downRef.current) up(e);
       }}
       onContextMenu={(e) => e.preventDefault()}
@@ -106,7 +106,7 @@ function HoldButton({
   );
 }
 
-/** Tap 버튼 — pointerdown 한 번에 keydown→keyup 페어 발행. */
+/** A tap button - one pointerdown issues a keydown/keyup pair. */
 function TapButton({
   label,
   ariaLabel,
@@ -142,7 +142,7 @@ function TapButton({
 }
 
 export default function VirtualKeypad({ getCanvas }: Props) {
-  // 카테고리 펼침/접힘 상태 — 한 화면에 모든 키 다 안 나오므로 묶음 토글.
+  // The category expand/collapse state - not every key fits one screen, so they toggle in groups.
   const [openCat, setOpenCat] = useState<null | "skills" | "trap" | "ranged">(null);
 
   const toggle = (k: typeof openCat) =>
@@ -150,9 +150,9 @@ export default function VirtualKeypad({ getCanvas }: Props) {
 
   return (
     <div
-      // 모바일 전용 (md 이상 숨김). 캔버스 아래에 자연스럽게 배치.
+      // Mobile only (hidden at md and above). Placed naturally below the canvas.
       className="md:hidden w-full mt-3 p-3 bg-gray-900 rounded-lg flex flex-col gap-3 text-gray-200 select-none"
-      // 키패드 안 터치는 페이지 스크롤/줌 트리거 X.
+      // A touch inside the keypad triggers no page scroll or zoom.
       style={{ touchAction: "none" }}
       aria-label="모바일 가상 키패드"
       role="group"

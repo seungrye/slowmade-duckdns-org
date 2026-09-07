@@ -1,11 +1,11 @@
-// /api/web-adventure/scenes/[id]/revisions — 목록 GET 테스트.
+// /api/web-adventure/scenes/[id]/revisions - list GET tests.
 //
-// snapshot 은 *제외* (가벼움). 목록 표시용 최소 필드 (_id, version, createdAt, author).
+// The snapshot is *excluded* (keeping it light). Only the minimum fields for the list (_id, version, createdAt, author).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// #177 — 리비전은 작성자 전용이 됐다. 인가는 목으로 갈아 끼운다(next-auth 를 안 태운다).
+// #177 - revisions became author-only. Authorisation is swapped for a mock (next-auth is not exercised).
 vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/web-adventure-scene-revision', () => ({
@@ -27,7 +27,7 @@ function makeRequest(): NextRequest {
 describe('GET /api/web-adventure/scenes/[id]/revisions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // 기본은 작성자 — 아래 개별 케이스에서만 비작성자로 바꾼다.
+    // The author by default - only the individual cases below switch to a non-author.
     vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@x.test' });
   });
 
@@ -59,11 +59,11 @@ describe('GET /api/web-adventure/scenes/[id]/revisions', () => {
     const body = await res.json();
     expect(body.data).toHaveLength(3);
     expect(body.data[0].version).toBe(3);
-    // snapshot 키가 없는지 확인.
+    // Confirms there is no snapshot key.
     expect(body.data[0].snapshot).toBeUndefined();
   });
 
-  // #177 — 침투 테스트에서 이 라우트가 비인증 200 이었다. 리비전은 작성 도구의 메타데이터다.
+  // #177 - a penetration test found this route returning 200 unauthenticated. A revision is the authoring tool's metadata.
   it('작성자가 아니면 404 — 씬 존재 여부도 알려주지 않는다', async () => {
     const { NextResponse } = await import('next/server');
     vi.mocked(requireOwner).mockResolvedValue(NextResponse.json({ message: 'Not found' }, { status: 404 }));

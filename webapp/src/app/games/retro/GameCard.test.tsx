@@ -21,7 +21,7 @@ const rom = (over: Partial<UserRomDto> = {}) => romEntry({ ...ROM_BASE, ...over 
 
 const PATCH = { id: 'p1', name: '한글패치.ips', format: 'ips', size: 4096 };
 
-/** 카드 위 조작이 플레이 링크로 새지 않는지 — 클릭이 삼켜졌는가. */
+/** Whether a control on the card leaks into the play link - was the click swallowed. */
 function clickInside(el: Element) {
   const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
   el.dispatchEvent(ev);
@@ -61,7 +61,7 @@ describe('GameCard', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
       const icon = screen.getByLabelText('저장된 상태 있음');
       expect(icon).toBeInTheDocument();
-      // 점이 아니라 아이콘이다.
+      // It is an icon, not a dot.
       expect(icon.tagName.toLowerCase()).toBe('svg');
     });
 
@@ -72,7 +72,7 @@ describe('GameCard', () => {
       expect(row).toContainElement(screen.getByLabelText('저장된 상태 있음'));
     });
 
-    // #120 — 뜻이 다르니 배지는 따로. 다만 높이가 어긋나면 지저분하다.
+    // #120 - they mean different things, so the badges stay separate. But mismatched heights look untidy.
     it('기종 배지와 **높이가 같다** — 글자와 아이콘은 줄 높이가 달라 고정해야 맞는다', () => {
       render(<GameCard game={rom({ hasSave: true })} />);
       const platform = screen.getByText('FBNeo');
@@ -100,7 +100,7 @@ describe('GameCard', () => {
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
-    // #127 — 감추는 대신 비활성. 패치를 올려도 버튼 위치가 밀리지 않는다.
+    // #127 - disabled rather than hidden. Uploading a patch does not shift the buttons.
     it('패치가 없으면 체크박스가 자리는 지키되 비활성이다', () => {
       render(<GameCard game={rom()} {...handlers()} />);
       expect(screen.getByRole('button', { name: '내 롬 패치 올리기' })).toBeInTheDocument();
@@ -109,12 +109,12 @@ describe('GameCard', () => {
       expect(box).not.toBeChecked();
     });
 
-    // #122 — 파일명을 늘 보여 줄 이유는 없다. 다만 #125 — 아이콘만 두면 무슨 버튼인지 모른다.
+    // #122 - there is no reason to always show the filename. But per #125, an icon alone leaves the button's purpose unclear.
     it('긴 파일명 대신 **형식**을 적는다', () => {
       render(<GameCard game={rom({ patch: PATCH, patchEnabled: true })} {...handlers()} />);
       expect(screen.queryByText('한글패치.ips')).not.toBeInTheDocument();
       expect(screen.getByText('IPS')).toBeInTheDocument();
-      // 전체 이름은 툴팁에 남는다.
+      // The full name remains in the tooltip.
       expect(screen.getByRole('button', { name: '내 롬 패치 교체' }).getAttribute('title'))
         .toContain('한글패치.ips');
     });
@@ -139,7 +139,7 @@ describe('GameCard', () => {
       expect(box).toBeChecked();
     });
 
-    // #127 — w-6 이 글자 있는 버튼까지 24px 로 묶어 오른쪽이 잘렸다.
+    // #127 - w-6 pinned even the labelled buttons to 24px and clipped their right side.
     it('글자가 있는 버튼은 너비를 고정하지 않는다 — 글자가 넘쳐 여백이 사라진다', () => {
       render(<GameCard game={rom({ patch: PATCH })} {...handlers()} />);
       const cls = screen.getByRole('button', { name: '내 롬 패치 교체' }).className;
@@ -169,7 +169,7 @@ describe('GameCard', () => {
       expect(h.onPatchUpload).toHaveBeenCalledWith(game, file);
     });
 
-    // 카드 전체가 플레이 링크라, 여기서 새면 패치를 만지려다 게임이 뜬다.
+    // The whole card is the play link, so a leak here launches the game while reaching for the patch.
     it('버튼을 눌러도 플레이 링크로 새지 않는다', () => {
       const h = handlers();
       render(<GameCard game={rom({ patch: PATCH })} {...h} />);
@@ -198,7 +198,7 @@ describe('GameCard', () => {
       expect(onDelete).toHaveBeenCalledWith(game);
     });
 
-    // #118 — 세이브 표시가 좌상단으로 옮겨 가 우상단이 비었다. 자리를 비킬 일이 없다.
+    // #118 - the save marker moved to the top left, leaving the top right free. Nothing has to move aside.
     it('세이브 유무와 관계없이 우상단에 그대로 있다', () => {
       const { rerender } = render(<GameCard game={rom()} onDelete={vi.fn()} />);
       expect(screen.getByRole('button', { name: '내 롬 삭제' }).className).toContain('right-2');
@@ -208,7 +208,7 @@ describe('GameCard', () => {
     });
   });
 
-  // #122 — 카드 그림과 제목을 직접 고친다.
+  // #122 - the card's picture and title are edited directly.
   describe('커버 그림', () => {
     it('기본 제공 게임에는 버튼이 없다', () => {
       render(<GameCard game={WITH_COVER} onCoverUpload={vi.fn()} />);
@@ -236,7 +236,7 @@ describe('GameCard', () => {
       expect(clickInside(screen.getByRole('button', { name: '내 롬 카드 그림' }))).toBe(true);
     });
 
-    // #127 — 그림 아이콘은 그 자체로 뜻이 통한다. 글자는 패치 버튼에만.
+    // #127 - a picture icon speaks for itself. Text belongs only on the patch button.
     it('글자 없이 아이콘만 둔다', () => {
       render(<GameCard game={rom()} onCoverUpload={vi.fn()} />);
       expect(screen.queryByText('그림')).not.toBeInTheDocument();
@@ -301,26 +301,26 @@ describe('GameCard', () => {
 
     it('연필과 입력 모두 플레이 링크로 새지 않는다', () => {
       render(<GameCard game={rom()} onRename={vi.fn()} />);
-      // fireEvent 는 preventDefault 되면 false 를 돌려준다. 이걸 써야 편집 진입이 함께 반영된다.
+      // fireEvent returns false when preventDefault was called. Using it is what also covers entering the editor.
       expect(fireEvent.click(screen.getByRole('button', { name: '내 롬 이름 바꾸기' }))).toBe(false);
       expect(fireEvent.click(screen.getByLabelText('제목'))).toBe(false);
     });
   });
 
-  // #125 — 실제로 버튼을 눌렀을 때 파일 선택창이 열리는가.
-  // 지금까지는 숨은 input 에 change 를 쏴서 검증해 **버튼 클릭 경로를 한 번도 안 봤다.**
+  // #125 - does the file picker actually open when the button is pressed?
+  // Until now it was verified by firing change on the hidden input, so **the button-click path was never exercised.**
   describe('버튼이 파일 선택을 연다', () => {
     /**
-     * `input.click()` 을 진짜와 같게 흉내 낸다 — **버블링되고 취소 가능한** 클릭.
-     * 위에서 누가 preventDefault 하면 브라우저는 파일 선택창을 열지 않는다.
-     * 단순히 `click` 이 불렸는지만 보면 이 사고를 놓친다(실제로 놓쳤다).
+     * Mimics `input.click()` faithfully - **a bubbling, cancelable** click.
+     * If anything above calls preventDefault, the browser does not open the file picker.
+     * Merely checking that `click` was called misses this incident (as it really did).
      */
     function pickerOpens(buttonName: string, inputLabel: string): boolean {
       const input = screen.getByLabelText(inputLabel) as HTMLInputElement;
       let opened = false;
       vi.spyOn(input, 'click').mockImplementation(() => {
         const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
-        opened = input.dispatchEvent(ev); // preventDefault 되면 false
+        opened = input.dispatchEvent(ev); // false when preventDefault was called
       });
       fireEvent.click(screen.getByRole('button', { name: buttonName }));
       return opened;
@@ -337,7 +337,7 @@ describe('GameCard', () => {
     });
   });
 
-  // #145 — `.ips,.bps,.ups` 만 받아 zip 묶음 패치를 고를 수 없었다.
+  // #145 - accepting only `.ips,.bps,.ups` made a zip bundle patch unselectable.
   describe('패치 파일 선택 (#145)', () => {
     it('확장자 accept 를 걸지 않는다 — zip 묶음 패치도 고를 수 있어야 한다', () => {
       render(<GameCard game={rom()} onPatchUpload={vi.fn()} onCoverUpload={vi.fn()} />);
@@ -352,8 +352,8 @@ describe('GameCard', () => {
   });
 });
 
-// 내려받기 (#194) — 앵커로 두면 이 영역의 `swallow`(preventDefault)가 다운로드를 취소해
-// **아무 일도 일어나지 않았다** (#196). 버튼으로 두고 직접 주소로 보낸다.
+// Download (#194) - as an anchor, this area's `swallow` (preventDefault) cancelled the download and
+// **nothing happened at all** (#196). It is a button that navigates to the address directly.
 describe('내려받기 버튼', () => {
   const originalLocation = window.location;
   beforeEach(() => {

@@ -1,4 +1,4 @@
-// /api/web-adventure/server-status — owner 게이팅 + shim 프록시 (#19)
+// /api/web-adventure/server-status - owner gating plus the shim proxy (#19)
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextResponse } from 'next/server';
@@ -31,7 +31,7 @@ describe('server-status route', () => {
     expect(res.status).toBe(200);
     expect(body.data.system).toMatchObject({ cpu: { overall: 12 } });
     expect(body.data.state).toMatchObject({ active: 'm1' });
-    // /v1 은 root 로 치환돼 /api/system 호출
+    // /v1 is replaced by the root, calling /api/system
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:8848/api/system', expect.anything());
     vi.unstubAllGlobals();
   });

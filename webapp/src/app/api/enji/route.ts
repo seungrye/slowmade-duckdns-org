@@ -28,11 +28,11 @@ function isAllowedOrigin(req: NextRequest): boolean {
   return origin.startsWith(siteUrl) || referer.startsWith(siteUrl);
 }
 
-// 모델 fallback chain.
-// - 첫 번째 모델이 503(과부하)/429(쿼터)/네트워크 타임아웃으로 실패하면 다음 모델로 재시도.
-// - enji 는 *대화 품질* 우선 → Gemma 4 31B(dense, knowledge 벤치 61 vs 26B 49)를
-//   먼저. 둘 다 RPD 1,500 이라 한도는 동일하고, 31B 는 느리지만 대화엔 품질이 중요.
-//   (painter 는 배치 속도 위해 26B 우선 — 거긴 작업이 단순.) 이후 신세대 Gemini 폴백.
+// The model fallback chain.
+// - When the first model fails with a 503 (overloaded), a 429 (quota) or a network timeout, the next is tried.
+// - enji prioritises *conversation quality* -> Gemma 4 31B (dense; knowledge benchmark 61 against 26B's 49)
+//   comes first. Both have an RPD of 1,500, so the limit is the same, and 31B is slower but quality matters in conversation.
+//   (painter puts 26B first for batch speed - its work is simpler.) The newer Gemini models follow as fallbacks.
 const GEMINI_MODEL_CHAIN = [
   'gemma-4-31b-it',
   'gemma-4-26b-a4b-it',
@@ -42,7 +42,7 @@ const GEMINI_MODEL_CHAIN = [
 
 function isTransientGeminiError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
-  // 503 UNAVAILABLE, 429 RESOURCE_EXHAUSTED, fetch failed, headers timeout 등은 재시도 가치 있음.
+  // A 503 UNAVAILABLE, a 429 RESOURCE_EXHAUSTED, a fetch failure, a headers timeout and the like are worth retrying.
   return /\b(503|429|UNAVAILABLE|RESOURCE_EXHAUSTED|fetch failed|HEADERS_TIMEOUT|ETIMEDOUT|ECONNRESET|ENOTFOUND)\b/i.test(msg);
 }
 
@@ -58,7 +58,7 @@ async function callGemini(contextMessage: string): Promise<string> {
       });
       const text = result.text ?? '';
       if (!text.trim()) {
-        // 빈 응답도 재시도 대상 (응답이 비면 사용자에게 의미가 없음).
+        // An empty response is retried too (an empty response means nothing to the user).
         lastError = new Error(`Empty response from model ${model}`);
         continue;
       }
@@ -68,7 +68,7 @@ async function callGemini(contextMessage: string): Promise<string> {
       const msg = err instanceof Error ? err.message : String(err);
       console.warn(`[enji] model=${model} failed:`, msg.slice(0, 200));
       if (!isTransientGeminiError(err)) {
-        // 비-transient 에러(예: 400 invalid request)는 fallback 해도 동일 결과이므로 즉시 중단.
+        // A non-transient error (a 400 invalid request, say) gives the same result on a fallback, so it stops at once.
         break;
       }
     }
@@ -97,9 +97,9 @@ async function saveEnjiComment(
 }
 
 /**
- * (deprecated) `/image <prompt>` 마이그레이션 안내.
- * #201 부터 이미지 생성은 painter-bot 으로 이전됨.
- * 1주일간 기존 사용자에게 안내 메시지를 enji 댓글로 등록.
+ * (deprecated) The `/image <prompt>` migration notice.
+ * From #201, image generation moved to painter-bot.
+ * For a week, existing users get a notice posted as an enji comment.
  */
 async function handleImageMigrationNotice(
   postId: string,
@@ -137,9 +137,9 @@ export async function POST(req: NextRequest) {
 
   await connectToDB();
 
-  // #205 — 존재만 확인하고 통과시키면 남의 비공개 글에 덧글이 들어가고,
-  // 아래에서 그 본문 3000자가 남의 명령으로 Gemini 에 실려 나간다.
-  // 없을 때와 같은 404 로 답해 존재 여부를 알려 주지 않는다.
+  // #205 - letting it through on existence alone puts a comment on someone else's private post,
+  // and below, 3000 characters of its body go to Gemini on their command.
+  // It answers with the same 404 as an absent post, so existence is not revealed.
   const post = await Post.findById(postId).lean();
   if (!post || !canCommentOn(post, session.user.email)) {
     return apiError('게시글을 찾을 수 없습니다.', 404);
@@ -173,8 +173,8 @@ export async function POST(req: NextRequest) {
   const userComment = new Comment({ post: postId, parent: parentId, content, author, authorId });
   await userComment.save();
 
-  // `/image <prompt>` 명령어는 #201 부터 painter-bot 으로 이전됨.
-  // 마이그레이션 1주일간 안내 댓글 표시 (Gemini/quota/generateImage 호출 X).
+  // The `/image <prompt>` command moved to painter-bot in #201.
+  // A notice comment is shown for a week during the migration (no Gemini, quota or generateImage call).
   const imageCmd = parseImageCommand(content);
   if (imageCmd) {
     void handleImageMigrationNotice(postId, String(userComment._id));
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
       }
       if (cause) console.error('[enji] cause:', cause);
 
-      // 사용자가 영원히 폴링하지 않도록, 실패 안내를 enji-bot 댓글로 등록.
+      // A failure notice is posted as an enji-bot comment, so the user does not poll forever.
       try {
         await saveEnjiComment(
           postId,

@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
-// Phase D RED — play/page.tsx 가 getScenes() 로 mongo 컨텐츠를 로드,
-// loading / error / 정상 phase 를 UI 로 보여준다.
+// Phase D RED - play/page.tsx loads the mongo content through getScenes(),
+// showing the loading, error and normal phases in the UI.
 
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { act } from "react";
 
-// next/font 가 jsdom 에서 깨지지 않도록 stub.
-// #240 — useMigrateOnLogin 이 useSession 호출. 테스트는 SessionProvider 없음 → mock.
+// Stubbed so next/font does not break under jsdom.
+// #240 - useMigrateOnLogin calls useSession. The tests have no SessionProvider -> mocked.
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ status: "unauthenticated", data: null }),
 }));
@@ -48,7 +48,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
         .mockResolvedValue({ ok: false, status: 500, json: async () => ({}) }),
     );
     render(<PlayPage />);
-    // #292 — getScenes 가 retry (500 + 1500ms backoff). 총 ~2 초 후 error 표시.
+    // #292 - getScenes retries (a 500ms then 1500ms backoff). The error shows after about 2 seconds in all.
     await waitFor(() => expect(screen.getByText(/오류/)).toBeInTheDocument(), {
       timeout: 5000,
     });
@@ -74,7 +74,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
   });
 
   test("재시도 버튼 클릭 시 fetch 재호출", async () => {
-    // #292 — 첫 *3 호출 모두 fail* (retry 다 소진) → 사용자가 재시도 → 4번째 호출 성공.
+    // #292 - *all of the first 3 calls fail* (the retries are spent) -> the user retries -> the 4th succeeds.
     const mockFetch = vi
       .fn()
       .mockResolvedValueOnce({ ok: false, status: 500, json: async () => ({}) })
@@ -90,7 +90,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     render(<PlayPage />);
-    // 첫 retry batch (3 호출) 모두 fail → 재시도 버튼.
+    // The first retry batch (3 calls) all fail -> the retry button.
     await waitFor(
       () => expect(screen.getByRole("button", { name: /재시도/ })).toBeInTheDocument(),
       { timeout: 5000 },
@@ -100,7 +100,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
     await waitFor(() =>
       expect(screen.getByText(/너의 운명을 선택하라/)).toBeInTheDocument(),
     );
-    // #292 — content fetch 카운트: 첫 batch 3 (retry 모두 fail) + 재시도 1 = 4.
+    // #292 - the content fetch count: the first batch of 3 (every retry failing) plus 1 retry = 4.
     const contentCalls = mockFetch.mock.calls.filter((args: unknown[]) =>
       String(args[0]).includes('/content/v1'),
     );
@@ -108,7 +108,7 @@ describe("WebAdventurePlayPage — Phase D 동적 fetch UI", () => {
   }, 10000);
 });
 
-// #220 — InventoryStrip 인벤 표시 시 같은 아이템 갯수 묶기.
+// #220 - InventoryStrip groups identical items by count when showing the inventory.
 describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
   test("인벤에 medical_bandage 2 + ether_refined_water 1 → '빵 × 2', '횃불' 표시 + '빵 × 1' 비포함", () => {
     render(
@@ -174,7 +174,7 @@ describe("InventoryStrip — #220 인벤 그룹화 표시", () => {
       />,
     );
     const useButtons = screen.getAllByRole("button", { name: /사용/ });
-    // medical_bandage(group), ether_refined_water 각각 한 번씩 — 총 2 개.
+    // medical_bandage (grouped) and ether_refined_water once each - 2 in all.
     expect(useButtons).toHaveLength(2);
     act(() => {
       fireEvent.click(useButtons[0]);

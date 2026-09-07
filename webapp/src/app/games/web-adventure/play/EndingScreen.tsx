@@ -7,15 +7,15 @@ import { getEndingMeta } from "@/lib/web-adventure/engine/endingResolver";
 import { protagonists } from "@/content/web-adventure/protagonists";
 import { renderInline } from "@/lib/web-adventure/play/render-inline";
 
-// 엔딩 화면 — 제목/에필로그/최종 스탯/선택 로그/다시 시작.
-// state.phase === "ended" 일 때만 렌더된다.
-// 4 주차: 엔딩별 icon + 엔딩 종류별 색감 분기 (light tinting).
+// The ending screen - the title, epilogue, final stats, choice log and restart.
+// It renders only when state.phase === "ended".
+// Week 4: a per-ending icon plus a colour branch by ending kind (light tinting).
 
 type Props = {
   endingId: string;
   character: Character;
   log: string[];
-  /** 마지막 씬 — *발각/죽음 전환 씬*(id 가 ending_ 아님)이면 본문을 엔딩 위에 표시. */
+  /** The last scene - a *discovery or death transition scene* (whose id is not ending_) has its body shown above the ending. */
   finalScene?: Scene;
   onRestart: () => void;
 };
@@ -32,8 +32,8 @@ const STAT_LABELS: Record<StatKey, string> = {
 const STAT_ORDER: StatKey[] = ["str", "dex", "int", "cha", "con", "wis"];
 
 /**
- * 엔딩별 톤. `Record<EndingId, …>` 라 엔딩을 더하면 여기서 타입 에러가 난다 (#352).
- * 예전엔 `Record<string, …>` 라 새 엔딩 5종이 조용히 기본 색으로 떨어졌다.
+ * The per-ending tone. Being a `Record<EndingId, …>`, adding an ending gives a type error here (#352).
+ * It used to be a `Record<string, …>`, so the 5 new endings quietly fell back to the default colour.
  */
 const ENDING_TONE: Record<EndingId, string> = {
   ascension: "bg-indigo-100/70 border-indigo-300",
@@ -51,10 +51,10 @@ const ENDING_TONE: Record<EndingId, string> = {
 
 export default function EndingScreen({ endingId, character, log, finalScene, onRestart }: Props) {
   const meta = getEndingMeta(endingId);
-  // endingId 는 저장된 문자열이라 타입이 안 좁혀진다. 맵의 완전성은 Record<EndingId,…>
-  // 가 지키므로, 모르는 값(옛 데이터)만 기본 톤으로 떨어진다.
+  // endingId is a stored string and so is not narrowed by the type. The map's completeness is guaranteed by
+  // Record<EndingId, …>, so only an unknown value (old data) falls back to the default tone.
   const tone = ENDING_TONE[endingId as EndingId] ?? "bg-amber-100/70 border-amber-300";
-  // ending_* 씬은 본문=epilogue 라 생략. 발각/죽음 전환 씬만 본문을 엔딩 위에 표시.
+  // An ending_* scene's body is the epilogue, so it is omitted. Only a discovery or death transition scene shows its body above the ending.
   const transitionBody =
     finalScene && !finalScene.id.startsWith("ending_") && finalScene.body?.length
       ? finalScene.body
@@ -146,7 +146,7 @@ export default function EndingScreen({ endingId, character, log, finalScene, onR
         {/* #348 — 흐름 로그: prefix 별 시각 구분 */}
         <ul className="mt-2 space-y-1 max-h-[60vh] overflow-y-auto pr-2">
           {log.map((entry, i) => {
-            // ▶ 씬 진입 (제목) — 강조.
+            // Entering a scene (the title) - emphasised.
             if (entry.startsWith("▶ ")) {
               return (
                 <li key={i} className="font-semibold text-amber-900 pt-2 first:pt-0">
@@ -154,7 +154,7 @@ export default function EndingScreen({ endingId, character, log, finalScene, onR
                 </li>
               );
             }
-            // → 선택 라벨 — 이탤릭.
+            // The choice's label - italic.
             if (entry.startsWith("→ ")) {
               return (
                 <li key={i} className="italic text-amber-700 pl-3">
@@ -162,7 +162,7 @@ export default function EndingScreen({ endingId, character, log, finalScene, onR
                 </li>
               );
             }
-            // "  " (들여쓰기) — 씬 본문 — 회색.
+            // "  " (indented) - the scene body - grey.
             if (entry.startsWith("  ")) {
               return (
                 <li key={i} className="text-gray-700 dark:text-gray-300 pl-3 whitespace-pre-line">
@@ -170,7 +170,7 @@ export default function EndingScreen({ endingId, character, log, finalScene, onR
                 </li>
               );
             }
-            // 기타 (사건 — 침식 한계, HP 0, 종료 등) — 빨강.
+            // Anything else (an event - the contamination limit, HP 0, the end) - red.
             return (
               <li key={i} className="text-red-700 dark:text-red-400 pl-3">
                 {entry}

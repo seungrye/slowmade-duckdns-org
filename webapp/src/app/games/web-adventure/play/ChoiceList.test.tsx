@@ -1,4 +1,4 @@
-// ChoiceList — 분기 종류별 렌더 + hidden 필터 + 클릭 콜백 (#301).
+// ChoiceList - rendering per branch kind, the hidden filter and the click callback (#301).
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from "vitest";
@@ -31,7 +31,7 @@ describe("ChoiceList", () => {
       difficulty: 12, onSuccess: "ok", onFailure: "fail",
     };
     render(<ChoiceList choices={[c]} character={makeChar()} onChoose={onChoose} />);
-    // 라벨 = '[확률 N%]'. 옛 '[힘 N%]' 같은 stat 명 부재.
+    // The label is '[chance N%]'. The old stat name, as in '[strength N%]', is gone.
     expect(screen.getByText(/\[확률 \d+%\]/)).toBeInTheDocument();
     expect(screen.queryByText(/\[힘 \d+%\]/)).toBeNull();
     fireEvent.click(screen.getByText(/치기/));
@@ -69,7 +69,7 @@ describe("ChoiceList", () => {
       condition: { kind: "minStat", stat: "int", min: 20 }, to: "x",
     };
     render(<ChoiceList choices={[c]} character={makeChar()} onChoose={vi.fn()} />);
-    // 미숨김 conditional — 라벨 보임 (사유는 UI 표시 여부 별도).
+    // A non-hidden conditional - the label shows (whether the reason is displayed is separate).
     expect(screen.getByText(/조건/)).toBeInTheDocument();
   });
 

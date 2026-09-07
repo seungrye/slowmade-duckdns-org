@@ -1,11 +1,11 @@
 "use client";
 
-// 인벤토리 1 줄 표시 — 3 주차 간단 UI. 본격 사이드 패널은 5 주차.
+// The one-line inventory display - a simple week 3 UI. A proper side panel comes in week 5.
 //
-// #220 — 같은 id 의 아이템은 한 항목으로 묶어 "이름 × N" 으로 표시.
-// "사용" 버튼도 그룹된 id 기준으로 한 번만 렌더.
+// #220 - items with the same id are grouped into one entry shown as "name x N".
+// The "use" button is rendered once per grouped id too.
 //
-// Next.js app router 의 page.tsx 는 default export 만 허용하므로 별도 파일로 분리.
+// A Next.js app router page.tsx allows only a default export, so this lives in its own file.
 
 import { items } from "@/content/web-adventure/items";
 import {

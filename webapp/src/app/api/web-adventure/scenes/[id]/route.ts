@@ -1,16 +1,16 @@
-// /api/web-adventure/scenes/[id] — 단일 씬 GET / PUT / DELETE.
+// /api/web-adventure/scenes/[id] - a single scene's GET, PUT and DELETE.
 //
-// id 는 비즈니스 id (scene.id) — mongo _id 가 아니다.
+// id is the business id (scene.id), not the mongo _id.
 //
-// #revision — 모든 commit (insert/PUT 모두) 을 revision 으로 백업 (git-like).
-//   - 매 mongo state change → revision 1 개.
-//   - snapshot = *그 commit 후* mongo 상태 (= updated).
+// #revision - every commit (both inserts and PUTs) is backed up as a revision (git-like).
+//   - every mongo state change -> one revision.
+//   - the snapshot is the mongo state *after* that commit (= updated).
 //   - version = updated.revisionCount.
-//     예) 시드/insert 시 → revision { v: 0, snapshot: state A }
-//         1차 PUT (B 로 변경) → revision { v: 1, snapshot: state B }
-//         2차 PUT (C 로 변경) → revision { v: 2, snapshot: state C }
-//   - UI: v0 = "최초 작성" (diff 없음). v_N (N>=1) = v_{N-1} → v_N diff.
-//   - 'v_N 으로 복원' = mongo = v_N snapshot + 새 commit (v_{last+1}).
+//     e.g. a seed or insert -> revision { v: 0, snapshot: state A }
+//          the 1st PUT (changing to B) -> revision { v: 1, snapshot: state B }
+//          the 2nd PUT (changing to C) -> revision { v: 2, snapshot: state C }
+//   - UI: v0 is "the first draft" (no diff). v_N (N >= 1) is the v_{N-1} -> v_N diff.
+//   - 'restore to v_N' = mongo becomes the v_N snapshot plus a new commit (v_{last+1}).
 
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
@@ -24,38 +24,38 @@ type Params = { params: Promise<{ id: string }> };
 export async function GET(_req: NextRequest, { params }: Params) {
   await connectToDB();
   const { id } = await params;
-  // 삭제된 씬은 없는 것으로 본다 (#177). 목록·`content/v1` 과 같은 조건 —
-  // 여기만 빠져 있어서, 지운 씬도 id 만 알면 계속 읽혔다(모든 삭제가 soft-delete 다).
+  // A deleted scene is treated as absent (#177). The same condition as the list and `content/v1` -
+  // only this was missing, so a deleted scene stayed readable to anyone who knew its id (every deletion is a soft delete).
   const scene = await WebAdventureScene.findOne({ id, isDeleted: { $ne: true } }).lean();
   if (!scene) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
   return apiSuccess(scene);
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
-  const authed = await requireOwner(); // 씬 수정은 작성자만 (#179)
+  const authed = await requireOwner(); // Editing a scene is the author's alone (#179)
   if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const { id } = await params;
   const body = await req.json();
 
-  // 1. 현재 mongo 의 *기존 씬* snapshot (덮어쓰기 전 상태).
+  // 1. A snapshot of the *existing scene* in mongo (the state before overwriting).
   const existing = await WebAdventureScene.findOne({ id }).lean();
 
-  // 2. id 는 URL 경로 기준 — body 의 id 는 무시 (또는 동일성 강제).
+  // 2. The id comes from the URL path - the body's id is ignored (or forced to match).
   const update = { ...body };
   delete update.id;
-  // revisionCount 는 서버가 $inc 로 관리 — 클라이언트 입력 무시.
+  // revisionCount is managed by the server through $inc - client input is ignored.
   delete update.revisionCount;
 
-  // 그래프 카드 위치(position x,y) *만* 바뀐 커밋은 버저닝하지 않는다 — 노드를
-  // 드래그할 때마다 리비전이 쌓이는 것을 막는다(내용 변경이 아니라 레이아웃일 뿐).
-  // content 필드가 하나라도 함께 바뀌면 종전대로 revision + revisionCount++.
+  // A commit changing *only* the graph card's position (x, y) is not versioned - it stops a revision
+  // piling up with every node drag (a layout change, not a content one).
+  // If even one content field changes with it, a revision and revisionCount++ happen as before.
   const changedKeys = Object.keys(update);
   const positionOnly =
     changedKeys.length > 0 && changedKeys.every((k) => k === "position");
 
-  // 옛 quest CMS 패턴 — 기존 씬이 있을 때만 revisionCount 를 $inc 1.
-  // 첫 생성 (existing=null) 분기에서는 $set 만 (revisionCount default 0 유지).
+  // The old quest CMS pattern - revisionCount is $inc'd by 1 only when the scene already exists.
+  // On the first creation (existing=null) it is $set alone (keeping revisionCount's default of 0).
   const updateQuery: Record<string, unknown> = { $set: update };
   if (existing && !positionOnly) {
     updateQuery.$inc = { revisionCount: 1 };
@@ -69,8 +69,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   if (!updated) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
 
-  // 3. content 변경 커밋만 revision 생성(위치만 바뀐 커밋은 스킵). 첫 생성도 v0 백업.
-  //    snapshot = updated (= 그 commit 후 상태). version = updated.revisionCount.
+  // 3. A revision is created only for a content commit (a position-only commit is skipped). The first creation is backed up as v0 too.
+  //    snapshot = updated (the state after that commit). version = updated.revisionCount.
   if (!positionOnly) {
     const commitVersion =
       (updated as { revisionCount?: number }).revisionCount ?? 0;
@@ -87,12 +87,12 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 export async function DELETE(_req: NextRequest, { params }: Params) {
-  const authed = await requireOwner(); // 씬 삭제는 작성자만 (#179)
+  const authed = await requireOwner(); // Deleting a scene is the author's alone (#179)
   if (authed instanceof NextResponse) return authed;
   await connectToDB();
   const { id } = await params;
-  // 하드 삭제하지 않고 소프트 삭제 — 문서·리비전 이력을 보존하고 isDeleted 로 숨긴다.
-  // 같은 id 로 다시 만들면(POST) 이 문서를 재사용(undelete)한다.
+  // A soft delete rather than a hard one - the document and its revision history are preserved and hidden by isDeleted.
+  // Creating the same id again (POST) reuses (undeletes) this document.
   const deleted = await WebAdventureScene.findOneAndUpdate(
     { id, isDeleted: { $ne: true } },
     { $set: { isDeleted: true, deletedAt: new Date() } },

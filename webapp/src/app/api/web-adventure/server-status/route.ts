@@ -1,8 +1,8 @@
-// /api/web-adventure/server-status — owner 전용 서버 상태 프록시 (#19).
+// /api/web-adventure/server-status - the owner-only server status proxy (#19).
 //
-// webapp 은 시스템을 직접 건드리지 않는다. 로컬 shim 의 read-only /api/system(CPU·RAM·
-// 디스크·업타임·부하)·/api/state(활성 모델)를 내부(127.0.0.1)로 프록시해 반환만 한다.
-// 상태 페이지 클라이언트가 수 초마다 폴링해 게이지를 실시간 갱신.
+// The webapp never touches the system directly. It proxies the local shim's read-only /api/system (CPU, RAM,
+// disk, uptime, load) and /api/state (the active model) internally (127.0.0.1) and returns them.
+// The status page's client polls every few seconds to keep the gauges live.
 
 import { NextResponse } from 'next/server';
 import { requireOwner } from '@/lib/require-owner';

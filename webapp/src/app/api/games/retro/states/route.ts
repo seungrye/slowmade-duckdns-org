@@ -1,9 +1,9 @@
-// 서버 세이브스테이트 — 저장(PUT) · 메타 조회(GET) · 삭제(DELETE) (#114).
+// Server save states - save (PUT), read metadata (GET) and delete (DELETE) (#114).
 //
-// EmulatorJS 의 네이티브 Save/Load 버튼이 `EJS_onSaveState`/`EJS_onLoadState` 를 통해 여기로
-// 온다(`public/games/retro/player.html`). 새 UI 를 만들지 않고 저장 위치만 서버로 돌린 것이다.
+// EmulatorJS's native Save/Load buttons arrive here through `EJS_onSaveState`/`EJS_onLoadState`
+// (`public/games/retro/player.html`). Rather than build a new UI, only the storage location moved to the server.
 //
-// `gameKey` 에 `:` 가 들어가므로 경로가 아니라 **쿼리**로 받는다.
+// `gameKey` contains a `:`, so it is taken as **a query** rather than a path segment.
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     .select('size shotKey updatedAt')
     .lean<LeanState | null>();
 
-  // 없는 것은 오류가 아니다 — 아직 저장 안 했을 뿐이다.
+  // Absent is not an error - it simply has not been saved yet.
   if (!doc) return apiSuccess(null);
   return apiSuccess({
     size: doc.size,
@@ -66,7 +66,7 @@ export async function PUT(req: NextRequest) {
     return apiError(`상태가 너무 큽니다 (최대 ${Math.floor(MAX_STATE_BYTES / (1024 * 1024))}MB).`, 413);
   }
 
-  // 키에 uuid 를 넣어 매번 새 오브젝트로 쓴다 — 덮어쓰기 중 실패해도 이전 것이 온전하다.
+  // A uuid in the key writes a new object every time - a failure mid-overwrite leaves the previous one intact.
   const stateKey = `${KEY_PREFIX}/${randomUUID()}.state`;
   let shotKey: string | undefined;
 
@@ -119,8 +119,8 @@ export async function DELETE(req: NextRequest) {
   if (!(await canUseGameKey(authed.email, gameKey))) return apiError('찾을 수 없습니다.', 404);
 
   await connectToDB();
-  // 여기만 진짜 삭제다 — 플래그를 세우면 같은 (user, game) 로 다시 저장할 때 유니크
-  // 인덱스와 부딪힌다. MinIO 오브젝트는 남겨 되살릴 여지를 둔다.
+  // This is the one real deletion - setting a flag would collide with the unique index when saving again
+  // for the same (user, game). The MinIO object is kept, leaving room to restore.
   const res = await RetroSaveState.deleteOne({ userEmail: authed.email, gameKey });
   if (!res.deletedCount) return apiError('저장된 세이브가 없습니다.', 404);
   return apiSuccess({ deleted: true });

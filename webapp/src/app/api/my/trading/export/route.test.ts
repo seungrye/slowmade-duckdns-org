@@ -1,14 +1,14 @@
-// /api/my/trading/export — 라우트 테스트 (#181).
+// /api/my/trading/export - route tests (#181).
 //
-// 매매 내역은 owner 만 본다. 변환 자체는 `export-csv` 쪽에서 검증했으니, 여기서는
-// 인가·대상 검증·응답 헤더에 집중한다.
+// Only the owner sees the trade history. The conversion itself is verified on the `export-csv` side, so this
+// concentrates on authorisation, target validation and the response headers.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 
-// vi.mock 은 호이스팅돼 파일 맨 위에서 돈다 — 목이 쓰는 값도 함께 끌어올린다.
+// vi.mock is hoisted and runs at the top of the file - the values the mock uses are hoisted with it.
 const h = vi.hoisted(() => {
   const chain = (rows: unknown[]) => ({
     find: () => ({ sort: () => ({ limit: () => ({ lean: async () => rows }) }) }),
@@ -71,14 +71,14 @@ describe('GET /api/my/trading/export', () => {
     expect(res.headers.get('Content-Type')).toContain('text/csv');
     const cd = res.headers.get('Content-Disposition') ?? '';
     expect(cd).toContain('attachment');
-    // 한글 파일명은 RFC 5987 로 실린다.
+    // A Korean filename travels as RFC 5987.
     expect(cd).toContain("filename*=UTF-8''");
     expect(decodeURIComponent(cd)).toContain('매매기록-주문로그-');
   });
 
   it('실제 바이트가 UTF-8 BOM 으로 시작한다 — 엑셀 한글 깨짐 방지', async () => {
-    // `Response.text()` 는 표준적으로 선행 BOM 을 벗겨낸다. 그래서 글자가 아니라
-    // **바이트**를 본다 — 안 그러면 BOM 이 빠져도 테스트가 통과한다.
+    // `Response.text()` conventionally strips a leading BOM. So it inspects **the bytes** rather than the
+    // characters - otherwise the test would pass even with the BOM missing.
     const buf = new Uint8Array(await (await GET(makeRequest('?dataset=orders'))).arrayBuffer());
     expect([buf[0], buf[1], buf[2]]).toEqual([0xef, 0xbb, 0xbf]);
   });
@@ -97,7 +97,7 @@ describe('GET /api/my/trading/export', () => {
   it('행 수를 헤더로 알려준다 — 받은 파일이 온전한지 대조할 수 있게', async () => {
     const res = await GET(makeRequest('?dataset=orders'));
     expect(res.headers.get('X-Export-Rows')).toBe('1');
-    // 상한에 안 닿았으면 잘림 표시가 없어야 한다.
+    // Below the cap there must be no truncation marker.
     expect(res.headers.get('X-Export-Truncated')).toBeNull();
   });
 

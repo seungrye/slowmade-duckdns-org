@@ -5,17 +5,17 @@ import { requireInternalToken } from "@/lib/require-internal-token";
 export const dynamic = "force-dynamic";
 
 /**
- * 서버 내부 self-call 전용 캐시 무효화 엔드포인트.
+ * The cache-invalidation endpoint for the server's internal self-calls only.
  *
- * 배경: 백그라운드 작업(예: AI 태그 추천, suggest-tags.generateAndUpdateTags)은 HTTP 응답 종료 뒤라
- * request scope 밖 → 거기서 부른 revalidatePath 는 무효(삼켜짐). 그래서 그 작업이 이 라우트 핸들러를
- * self-fetch 하면, 핸들러는 정상 request scope 라 revalidatePath 가 실제로 캐시를 무효화한다.
+ * Background: a background job (AI tag suggestions, suggest-tags.generateAndUpdateTags) runs after the HTTP response
+ * has ended and so outside the request scope -> a revalidatePath called there is ineffective (swallowed). When that
+ * job self-fetches this route handler, the handler is in a proper request scope and revalidatePath really invalidates the cache.
  *
- * 가드: 헤더 X-Internal-Token 이 env.revalidateToken 과 일치해야 통과(불일치/미설정 → 404 비노출).
- * 경로는 allowlist 로 제한(임의 경로 무효화 남용 방지).
+ * The guard: the X-Internal-Token header must match env.revalidateToken (a mismatch or an unset env gives a 404, revealing nothing).
+ * Paths are restricted by an allowlist (preventing abuse through invalidating arbitrary paths).
  */
 
-// 무효화 허용 경로 — 글 상세, 태그 목록만.
+// The paths that may be invalidated - post detail and the tag list only.
 const ALLOW = [/^\/post\/view\/[A-Za-z0-9_-]+$/, /^\/tags$/];
 
 function isAllowed(path: string): boolean {

@@ -1,11 +1,11 @@
-// /api/web-adventure/scenes — GET (목록), POST (생성) 테스트.
+// /api/web-adventure/scenes - GET (list) and POST (create) tests.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
-// #179 — 씬 쓰기는 작성자 전용이 됐다(가입만 하면 남이 고칠 수 있었다). 인가는 목으로 갈아 끼운다.
+// #179 - scene writes became author-only (merely signing up let anyone edit them). Authorisation is swapped for a mock.
 vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
@@ -51,8 +51,8 @@ describe('GET /api/web-adventure/scenes', () => {
 describe('POST /api/web-adventure/scenes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } }); // 기본 로그인 상태
-    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // 기본 작성자
+    asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } }); // logged in by default
+    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // the author by default
   });
 
   it('작성자가 아니면 404 (씬 생성는 작성자만 — #179)', async () => {

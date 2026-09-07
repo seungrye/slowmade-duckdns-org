@@ -48,12 +48,12 @@ export default function MyProfile({session}: { session: Session | null }) {
         if(session) fetchProfile();
     }, [session]);
 
-    // 사주 패널의 '생일 등록하러 가기' 링크(#birthday-card)로 오면 편집을 자동으로 연다.
+    // Arriving from the saju panel's 'register a birthday' link (#birthday-card) opens the editor automatically.
     useEffect(() => {
         if (typeof window !== 'undefined' && window.location.hash === '#birthday-card') setEditing(true);
     }, []);
 
-    // 생일을 저장하면 표식을 지운다 — 오늘이 생일인데 방금 등록한 경우 바로 폭죽이 터지도록.
+    // Saving a birthday clears the marker - so the confetti fires at once when today is the birthday just registered.
     const saveBirthday = async () => {
         setSaving(true);
         setMessage('');

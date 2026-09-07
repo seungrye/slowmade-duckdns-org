@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache";
 
 const POINTS_FOR_NEW_POST = env.points.newPost;
 
-// 첨부 메타 정리 — 클라가 보낸 임의 객체 대신 허용 필드만(mass-assignment 방지). 최대 20개.
+// Tidying the attachment metadata - only the allowed fields rather than whatever object the client sent (preventing mass assignment). At most 20.
 function sanitizeAttachments(raw: unknown): { id: string; name: string; key: string; size: number; mimeType: string }[] {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     let pointsGained = 0;
 
     if (payload._id) {
-      // --- 게시글 수정 ---
+      // --- Editing a post ---
       const existingPost = await Post.findById(payload._id);
       if (!existingPost) {
         return apiError("게시글을 찾을 수 없습니다.", HttpStatusCode.NotFound);
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
         createdAt: existingPost.updatedAt,
       });
 
-      // 2. 원본 게시글 업데이트 및 버전 증가
+      // 2. Update the original post and bump the version
       const { title, htmlContent, jsonContent, tags } = payload;
       existingPost.set({
         title, htmlContent, jsonContent, tags,
@@ -85,11 +85,11 @@ export async function POST(req: Request) {
       existingPost.version += 1;
 
       await existingPost.save();
-      // 공개 글은 정적 생성돼 있으므로 수정 반영을 위해 해당 뷰 경로를 무효화(revalidate 제거 대체).
+      // A public post is statically generated, so its view path is invalidated for the edit to show (replacing the removed revalidate).
       revalidatePath(`/post/view/${payload._id}`);
     } else {
-      // Mass Assignment 방지 — 허용 필드만. author/userEmail 은 서버가 강제(클라 위조 차단),
-      // likes/views/version/isDeleted 는 스키마 기본값 사용(클라가 못 정함).
+      // Preventing mass assignment - allowed fields only. author and userEmail are forced by the server (blocking client forgery),
+      // and likes, views, version and isDeleted use the schema's defaults (the client cannot set them).
       const authorUser = await User.findOne({ email: auth.email }).lean<{ username?: string } | null>();
       const userTags = Array.isArray(payload.tags) ? payload.tags : [];
       const created = await Post.create({
@@ -104,8 +104,8 @@ export async function POST(req: Request) {
         author: authorUser?.username ?? auth.email,
       });
 
-      // 신규 글: 제목·본문 **그리고 첨부 이미지**로 AI 태그를 백그라운드 추천·추가
-      // (리비전 없이). 응답을 막지 않는다(fire-and-forget).
+      // A new post: AI tags are suggested and added in the background from the title, the body **and the attached images**
+      // (with no revision). It does not block the response (fire and forget).
       void generateAndUpdateTags(created._id.toString(), {
         title: payload.title,
         htmlContent: payload.htmlContent,
@@ -118,7 +118,7 @@ export async function POST(req: Request) {
       pointsGained = POINTS_FOR_NEW_POST;
       console.log(`+${pointsGained} points granted for new post.`);
 
-      // 전부 다시 판정한다 — 글 업적뿐 아니라 연속일수·탐험처럼 글쓰기로 바뀌는 것이 여럿이다.
+      // Everything is re-evaluated - writing changes more than the post achievements (streaks, exploration and so on).
       unlockedAchievements = await evaluateAndGrant(payload.userEmail);
     }
 

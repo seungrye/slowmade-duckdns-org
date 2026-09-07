@@ -1,6 +1,6 @@
-// web-adventure 오디오(BGM/SFX) 업로드 검증·키 생성 — 순수 함수.
-// /api/upload(이미지·썸네일 필수)와 분리: 단일 오디오 파일 + public URL 반환.
-// public URL 조립은 /api/upload 의 buildPublicUrl 을 재사용(라우트에서 import).
+// Validating a web-adventure audio (BGM/SFX) upload and building its key - pure functions.
+// Separate from /api/upload (which requires an image and a thumbnail): a single audio file, returning a public URL.
+// Assembling the public URL reuses /api/upload's buildPublicUrl (imported by the route).
 
 export const ALLOWED_AUDIO_MIME = [
   'audio/mpeg', // mp3
@@ -9,7 +9,7 @@ export const ALLOWED_AUDIO_MIME = [
   'audio/mp4', 'audio/aac', 'audio/x-m4a',
   'audio/webm',
 ];
-// nginx client_max_body_size(16M) 이내.
+// Within nginx's client_max_body_size (16M).
 export const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
 
 export type AudioValidationResult = { ok: true; file: File } | { ok: false; error: string };
@@ -28,7 +28,7 @@ export function validateAudioFormData(formData: FormData): AudioValidationResult
   return { ok: true, file };
 }
 
-/** MinIO 오브젝트 키 — `web-adventure/audio/<ts>-<안전한 파일명>`. 경로 구분자는 제거. */
+/** The MinIO object key - `web-adventure/audio/<ts>-<safe filename>`. Path separators are stripped. */
 export function buildAudioKey(timestamp: number, originalName: string): string {
   const safe = originalName.replace(/[/\\]/g, '_').slice(0, 200) || 'audio';
   return `web-adventure/audio/${timestamp}-${safe}`;

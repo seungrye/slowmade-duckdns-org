@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// 키 유무를 둘 다 시험해야 해서 고정 리터럴 대신 가변 객체를 쓴다.
-// vi.mock 팩토리는 최상단으로 끌어올려지므로 vi.hoisted 로 만들어야 참조할 수 있다.
+// Both the presence and absence of a key must be exercised, so a mutable object is used instead of a fixed literal.
+// A vi.mock factory is hoisted to the top, so it can only reference something created with vi.hoisted.
 const { env } = vi.hoisted(() => ({ env: { holidayApiKey: 'test-key' } }));
 vi.mock('@/lib/env', () => ({ env }));
 vi.mock('@/lib/calendar/cache', () => ({ daysForYear: vi.fn() }));
@@ -12,7 +12,7 @@ import type { CalendarDay } from '@/lib/calendar/types';
 
 const mockDays = daysForYear as ReturnType<typeof vi.fn>;
 
-// 2026-08-15(광복절)로 시계를 고정한다. KST 기준이라 UTC 로는 전날 15:00.
+// The clock is pinned to 2026-08-15 (Liberation Day). It is KST-based, so 15:00 the previous day in UTC.
 const onLiberationDay = new Date('2026-08-14T15:00:00Z');
 
 const YEAR_2026: CalendarDay[] = [
@@ -36,7 +36,7 @@ describe('GET /api/calendar/today', () => {
 
     expect(res.status).toBe(200);
     expect((await res.json()).data.events).toEqual([]);
-    // 키가 없으면 캐시·네트워크를 아예 건드리지 않는다.
+    // With no key it touches neither the cache nor the network.
     expect(mockDays).not.toHaveBeenCalled();
   });
 
@@ -48,14 +48,14 @@ describe('GET /api/calendar/today', () => {
     const { data } = await body();
 
     expect(mockDays).toHaveBeenCalledWith(2026, expect.any(Date));
-    expect(data.events).toHaveLength(2); // 08-16 은 빠진다
+    expect(data.events).toHaveLength(2); // 08-16 drops out
     expect(data.events[0]).toEqual({
       name: '광복절',
       kind: 'holiday',
       icon: '🎗️',
       description: expect.stringContaining('1945'),
     });
-    // 무게순 정렬 — 공휴일이 앞, 절기가 뒤. 스택 맨 앞이 가장 중요한 날이어야 한다.
+    // Sorted by weight - holidays first, solar terms last. The front of the stack must be the most important day.
     expect(data.events[1].name).toBe('입추');
   });
 
@@ -73,12 +73,12 @@ describe('GET /api/calendar/today', () => {
 
     expect(names).toContain('처음 보는 임시공휴일');
     expect(names).toContain('조달의 날');
-    // 설명이 없을 뿐, 아이콘은 종류별 기본값으로 반드시 붙는다.
+    // Only the description is missing; an icon is always attached, defaulting by kind.
     for (const e of data.events) expect(e.icon).toBeTruthy();
   });
 
   it('같은 날 같은 이름이 두 종류로 와도 한 번만 내려준다', async () => {
-    // 실측: 어린이날·현충일이 공휴일·기념일 응답 양쪽에 있다.
+    // Measured: Children's Day and Memorial Day appear in both the holiday and observance responses.
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-05T15:00:00Z')); // KST 2026-06-06
     mockDays.mockResolvedValue([
@@ -108,7 +108,7 @@ describe('GET /api/calendar/today', () => {
     const { data } = await body();
 
     expect(mockDays).toHaveBeenCalledWith(2027, expect.any(Date));
-    expect(data.events[0].name).toBe('신정'); // 별칭으로 정규화된다
+    expect(data.events[0].name).toBe('신정'); // normalised through the alias
   });
 
   it('캐시 계층이 던져도 500 대신 빈 배열 — 헤더가 깨지면 안 된다', async () => {

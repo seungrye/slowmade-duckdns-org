@@ -18,7 +18,7 @@ interface Props {
   onChange: (c: ChoiceCondition) => void;
 }
 
-// dnd-kit listener 가 부모에 부착되어 있어도 input 의 focus 가 유지되도록.
+// So the input keeps focus even with the dnd-kit listener attached to the parent.
 const stopPropagation = (e: React.PointerEvent) => e.stopPropagation();
 
 function emptyForKind(kind: ChoiceCondition["kind"]): ChoiceCondition {

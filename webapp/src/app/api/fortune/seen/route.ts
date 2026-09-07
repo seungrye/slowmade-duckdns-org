@@ -1,8 +1,8 @@
-// /api/fortune/seen — 오늘의 운세 열람 표시 (#388).
+// /api/fortune/seen - marking today's fortune as read (#388).
 //
-// POST: 오늘(KST) 문서의 seenAt 을 기록(멱등). 우하단 토스트가 열리거나 닫힐 때 호출한다.
-//   seenAt 이 **하루 1회 판정의 서버 필드** — 이 값이 있으면 토스트가 다시 뜨지 않는다.
-// 로그인 스코프라 남의 문서를 건드릴 수 없다.
+// POST: records seenAt on today's (KST) document (idempotent). Called when the bottom-right toast opens or closes.
+//   seenAt is **the server field for the once-a-day decision** - with it set, the toast does not appear again.
+// Scoped to the logged-in user, so nobody else's document can be touched.
 
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { connectToDB } from "@/lib/db";
@@ -19,7 +19,7 @@ export async function POST() {
 
   await connectToDB();
   const dateKey = seoulDateKey(new Date());
-  // 이미 본 경우는 덮어쓰지 않는다(처음 본 시각을 보존) — seenAt: null 조건으로 멱등.
+  // An already-seen document is not overwritten (preserving the first time it was seen) - idempotent through the seenAt: null condition.
   await DailyFortune.updateOne(
     { userEmail: email, dateKey, seenAt: null },
     { $set: { seenAt: new Date() } },

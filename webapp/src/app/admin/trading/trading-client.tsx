@@ -4,8 +4,8 @@ import { useCallback, useState } from "react";
 import { LIVE_STRATEGY_IDS, LIVE_STRATEGY_LABEL, isLiveStrategy, type LiveStrategyId } from "@/types/trading";
 
 /**
- * 자동매매 설정 — 계정(다수)·포트폴리오 블록·wire 토글·실행 이력.
- * 시크릿은 서버에서 마스킹돼 내려오고, 수정 시 새 값을 입력한 필드만 교체된다.
+ * The trading settings - accounts (several), portfolio blocks, the wire toggle and the run history.
+ * Secrets arrive masked from the server, and on an edit only the fields given a new value are replaced.
  */
 
 type Account = {
@@ -17,7 +17,7 @@ type Portfolio = {
   weekdaysOnly: boolean; enabled: boolean; config: Record<string, unknown>;
   state: Record<string, unknown>; reservedCash?: number;
 };
-// 설정 이력 한 줄 (#350) — 보기 전용.
+// One line of the settings history (#350) - read only.
 type Revision = {
   version: number; action: "create" | "update" | "delete";
   changed: string[]; snapshot: Record<string, unknown>; createdAt: string;
@@ -39,8 +39,8 @@ const CRED_FIELDS: Record<string, { key: string; label: string; required: boolea
     { key: "accountSeq", label: "TOSS_ACCOUNT_SEQ (생략 시 자동)", required: false },
   ],
 };
-// #354 — Record<LiveStrategyId, …> 라 전략을 더하면 여기서 컴파일이 깨진다.
-//   예전엔 Record<string, …> 라 빠뜨려도 조용히 빈 config 가 됐다.
+// #354 - being a Record<LiveStrategyId, …>, adding a strategy breaks the build here.
+//   It used to be Record<string, …>, so an omission quietly gave an empty config.
 const DEFAULT_CONFIG: Record<LiveStrategyId, object> = {
   lrs_v1: { signal: "QQQ", target: "TQQQ", sma: 200, band: 1 },
   rotation_v1: { signal: "QQQ", sma: 200, band: 1, mom: 126, rebalance: 63 },
@@ -59,24 +59,24 @@ const DEFAULT_RUN_AT: Record<LiveStrategyId, { kr: string; us: string }> = {
 type InitialData = { accounts: Account[]; portfolios: Portfolio[]; liveAllowed: boolean };
 
 export default function TradingSettingsClient({ initial }: { initial: InitialData }) {
-  // SSR 주입 초기값 — 마운트 후 재조회 없음(변이 시에만 reload). ISR 은 부적합:
-  // owner 전용 개인 데이터 + wire 토글 등 실시간 상태라 캐시 금지(force-dynamic SSR).
+  // The initial values injected by SSR - no re-fetch after mount (a reload only on a mutation). ISR is unsuitable:
+  // this is owner-only personal data plus live state such as the wire toggle, so caching is off (force-dynamic SSR).
   const [accounts, setAccounts] = useState<Account[]>(initial.accounts);
   const [portfolios, setPortfolios] = useState<Portfolio[]>(initial.portfolios);
   const [liveAllowed, setLiveAllowed] = useState(initial.liveAllowed);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // 계정 추가 폼
+  // the add-account form
   const [nBroker, setNBroker] = useState<"kis" | "toss">("kis");
   const [nEnv, setNEnv] = useState("paper");
   const [nName, setNName] = useState("");
   const [nCreds, setNCreds] = useState<Record<string, string>>({});
 
-  // 포트폴리오 편집 폼
+  // the portfolio edit form
   const [pAccount, setPAccount] = useState("");
   const [pMarket, setPMarket] = useState<"kr" | "us">("us");
-  // 전략 상태를 처음부터 좁혀 둔다 (#354) — 화면 곳곳에서 캐스팅하지 않으려고.
+  // The strategy state is narrowed from the start (#354) - to avoid casting all over the UI.
   const [pStrategy, setPStrategy] = useState<LiveStrategyId>("lrs_v1");
   const [pRunAt, setPRunAt] = useState("09:35");
   const [pConfig, setPConfig] = useState(JSON.stringify(DEFAULT_CONFIG.lrs_v1, null, 2));
@@ -131,7 +131,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     await reload();
   };
 
-  // 편집 중인 블록 (#339). null 이면 "새로 추가" — 예전엔 이 구분이 없어 저장이 곧 교체였다.
+  // The block being edited (#339). null means "add new" - without that distinction, saving used to mean replacing.
   const [pEditing, setPEditing] = useState<string | null>(null);
   const [pReserved, setPReserved] = useState("");
 
@@ -139,7 +139,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     setPEditing(p.id);
     setPAccount(p.accountId);
     setPMarket(p.market);
-    // DB 에서 온 문자열 — 경계에서 한 번만 좁힌다. 모르는 값이면 기본 전략으로.
+    // A string from the DB - narrowed once at the boundary. An unknown value falls back to the default strategy.
     setPStrategy(isLiveStrategy(p.strategy) ? p.strategy : "lrs_v1");
     setPRunAt(p.runAt);
     setPConfig(JSON.stringify(p.config, null, 2));
@@ -153,7 +153,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     setMsg("");
   };
 
-  // 설정 이력 (#350) — 블록별로 접었다 편다. 열 때만 불러온다.
+  // The settings history (#350) - expanded and collapsed per block. Loaded only when opened.
   const [openHistory, setOpenHistory] = useState<string | null>(null);
   const [history, setHistory] = useState<Record<string, Revision[]>>({});
   const [openSnapshot, setOpenSnapshot] = useState<string | null>(null);
@@ -166,7 +166,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     setHistory((h) => ({ ...h, [id]: d.revisions ?? [] }));
   };
 
-  /** 활성/비활성 토글. 저장과 같은 길목을 지나므로 이 변경도 이력에 한 줄 남는다. */
+  /** The active/inactive toggle. It goes through the same path as saving, so this change leaves a line in the history too. */
   const toggleEnabled = async (p: Portfolio) => {
     setBusy(true);
     await fetch("/api/my/trading/portfolios", {
@@ -178,7 +178,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
         enabled: !p.enabled,
       }),
     });
-    setHistory((h) => { const n = { ...h }; delete n[p.id]; return n; }); // 이력 다시 불러오게
+    setHistory((h) => { const n = { ...h }; delete n[p.id]; return n; }); // so the history reloads
     await reload();
     setBusy(false);
   };
@@ -201,8 +201,8 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
           accountId: pAccount, market: pMarket, strategy: pStrategy,
           runAt: pRunAt, config,
           reservedCash: Number(pReserved) || 0,
-          // 지금 상태를 그대로 실어 보낸다. 안 보내면 API 기본값(true)이 먹어서
-          // **값만 고치려고 저장해도 비활성이 몰래 켜졌다.** 켜고 끄는 건 토글 버튼만 한다.
+          // The current state is sent along. Without it the API's default (true) wins, so
+          // **saving merely to change a value quietly switched an inactive block on.** Only the toggle button turns it on and off.
           enabled: pEditing ? (portfolios.find((x) => x.id === pEditing)?.enabled ?? true) : true,
         }),
       });
@@ -314,7 +314,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
         <ul className="space-y-2 mb-4">
           {portfolios.map((p) => {
             const acct = accounts.find((a) => a.id === p.accountId);
-            // 유효 모드 = 계정 LIVE 토글 × 서버 게이트 — 스케줄 실행이 실제 주문을 내는지.
+            // The effective mode = the account's LIVE toggle x the server gate - whether a scheduled run places real orders.
             const effectiveLive = Boolean(acct?.liveEnabled) && liveAllowed;
             return (
               <li key={p.id} className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
@@ -411,7 +411,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
               <option value="kr">국장</option>
             </select>
             <select value={pStrategy} onChange={(e) => {
-              const st = e.target.value as LiveStrategyId; // 목록이 단일 출처라 항상 유효하다
+              const st = e.target.value as LiveStrategyId; // the list is the single source, so it is always valid
               setPStrategy(st);
               setPConfig(JSON.stringify(DEFAULT_CONFIG[st] ?? {}, null, 2));
               setPRunAt(DEFAULT_RUN_AT[st]?.[pMarket] ?? "09:35");

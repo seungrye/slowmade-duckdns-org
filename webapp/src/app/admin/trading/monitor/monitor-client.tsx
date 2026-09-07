@@ -5,7 +5,7 @@ import { formatMoney } from "@/lib/format";
 import ExportButtons from "./export-buttons";
 import Pager from "@/components/pager";
 
-/** 자동매매 모니터링 — 실행 이력·주문 로그(30초 자동 갱신, 계정 필터). */
+/** Trading monitoring - the run history and order log (refreshed every 30 seconds, filtered by account). */
 
 type Run = {
   id: string; portfolioId: string; dateKey: string; phase?: string; status: string;
@@ -22,7 +22,7 @@ type Account = { id: string; envKey: string };
 const RUNS_SIZE = 15;
 const ORDERS_SIZE = 25;
 
-/** 섹션 페이지 네비게이터 — 이전/다음 + "n / m". 범위 밖이면 비활성. */
+/** The section pager - previous/next plus "n / m". Disabled outside the range. */
 export default function TradingMonitorClient() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);

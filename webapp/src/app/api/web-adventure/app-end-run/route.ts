@@ -1,8 +1,8 @@
-// /api/web-adventure/app-end-run — 안드로이드 앱(로그인 없음) 엔딩 제출 → AI 피드백 노트. (#33)
+// /api/web-adventure/app-end-run - the Android app's (login-free) ending submission -> an AI feedback note. (#33)
 //
-// 앱은 next-auth 세션·서버 save 가 없어 end-run 을 못 쓴다. 대신 공유 앱 키(x-app-key)로
-// 인증하고, 합성 사용자(app@eternia) past-run 을 만들어 피드백 노트를 큐에 적재한다.
-// 노트 소유는 작가(owner), sourceUserEmail='app'. 앱은 cross-origin 이라 CORS 필요.
+// The app has no next-auth session and no server save, so it cannot use end-run. Instead it authenticates with a
+// shared app key (x-app-key), and a synthetic user's (app@eternia) past-run is created to queue a feedback note.
+// The note belongs to the author (the owner), with sourceUserEmail='app'. The app is cross-origin, so CORS is needed.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
@@ -13,7 +13,7 @@ import { enqueueFeedbackNote, capScenePath, capLog } from '@/lib/web-adventure/e
 import { enqueueSceneImage } from '@/lib/web-adventure/enqueue-scene-image';
 import { rateLimit, clientIp } from '@/lib/rate-limit';
 
-const APP_USER = 'app@eternia'; // 앱발 익명 플레이어 합성 계정.
+const APP_USER = 'app@eternia'; // The synthetic account for anonymous players from the app.
 
 const CORS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -37,9 +37,9 @@ export async function POST(req: NextRequest) {
   if (!key) return json({ message: 'app 제출 비활성(APP_KEY 미설정)' }, 503);
   if (req.headers.get('x-app-key') !== key) return json({ message: 'unauthorized' }, 401);
 
-  // 요청 1건마다 LLM 피드백 노트 + 이미지 생성이 큐에 쌓인다 — 둘 다 돈이 든다 (#177).
-  // 인증이 앱에 박히는 정적 키 하나뿐이라, 키가 APK 에서 추출되면 무제한으로 돌릴 수 있다.
-  // 정상 플레이는 한 회차를 끝내는 데 한참 걸리므로 이 한도에 걸릴 일이 없다.
+  // Every request queues an LLM feedback note plus an image generation - both cost money (#177).
+  // The only authentication is one static key embedded in the app, so extracting it from the APK would allow unlimited runs.
+  // Normal play takes a long time to finish a run, so this limit is never hit.
   if (!rateLimit(`app-end-run:${clientIp(req)}`, 10, 60 * 60_000)) {
     return json({ message: '요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.' }, 429);
   }
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
   }
   const scenePath = capScenePath(body.scenePath);
   const log = capLog(body.log);
-  // 앱 재시도 큐(#61)가 같은 회차를 다시 보낼 수 있다. 멱등 키로 중복 적치를 막는다. (#63)
+  // The app's retry queue (#61) can resend the same run. An idempotency key prevents duplicate accumulation. (#63)
   const clientRunId = typeof body.clientRunId === 'string' ? body.clientRunId.slice(0, 64) : '';
 
   await connectToDB();
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     if (already) return json({ ok: true, duplicate: true }, 200);
   }
 
-  // 합성 사용자 past-run 생성. runIndex 는 count+1(저볼륨), 동시성 충돌 시 재count 재시도.
+  // Creates the synthetic user's past-run. runIndex is count+1 (low volume), retried by recounting on a concurrency collision.
   let pastRun = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     const count = await WebAdventurePastRun.countDocuments({ userEmail: APP_USER });
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       pastRun = await WebAdventurePastRun.create({
         userEmail: APP_USER,
         runIndex: count + 1,
-        // #90 — 어떤 문체로 읽었는지 함께 남긴다.
+        // #90 - which prose style it was read in is recorded too.
         voice: typeof body.voice === 'string' ? body.voice.slice(0, 32) : '',
         endingId: body.endingId,
         finalSceneId: body.finalSceneId,
@@ -81,21 +81,21 @@ export async function POST(req: NextRequest) {
       break;
     } catch (err) {
       const dup = err instanceof Error && err.message.includes('E11000');
-      // 조회 후 저장 사이에 다른 요청이 같은 회차를 먼저 넣은 경우 — 중복으로 본다.
+      // Another request inserted the same run between the query and the save - treated as a duplicate.
       if (dup && clientRunId) {
         const raced = await WebAdventurePastRun.findOne({ userEmail: APP_USER, clientRunId });
         if (raced) return json({ ok: true, duplicate: true }, 200);
       }
-      if (dup && attempt < 2) continue; // runIndex 충돌 → 재count 후 재시도.
+      if (dup && attempt < 2) continue; // A runIndex collision -> recount and retry.
       const message = err instanceof Error ? err.message : '회차 적치 실패';
       return json({ message }, 500);
     }
   }
 
-  // 피드백 노트 큐 적재(작가 소유, sourceUserEmail='app', 볼륨 캡·중복 방지·로그 있을 때만).
+  // Queues the feedback note (owned by the author, sourceUserEmail='app', with the volume cap, duplicate prevention, and only when there is a log).
   await enqueueFeedbackNote(pastRun, 'app', log.length);
 
-  // #158 — 엔딩마다 씬 삽화 한 장 추가(큐 적재). 앱 회차도 그림을 늘린다.
+  // #158 - one more scene illustration per ending (queued). An app run grows the pictures too.
   await enqueueSceneImage(pastRun, 'app');
 
   return json({ ok: true }, 200);

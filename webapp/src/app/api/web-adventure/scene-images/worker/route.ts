@@ -1,12 +1,12 @@
-// /api/web-adventure/scene-images/worker — 씬 삽화 큐 워커 (#158).
+// /api/web-adventure/scene-images/worker - the scene illustration queue worker (#158).
 //
-// 한 번 호출될 때마다 큐에서 **한 개**만 처리한다. host cron 이 주기적으로 호출해 드레인한다.
-// 구조는 피드백 노트 워커(#9)와 같다 — stale 복구 → 순차 보장 → 원자적 claim → 생성 → 반영.
+// Each call processes **one** item from the queue. A host cron calls it periodically to drain it.
+// The structure matches the feedback-note worker (#9) - stale recovery, sequential ordering, an atomic claim, generation, then applying it.
 //
-// 인증: 내부 키(x-worker-key = env.llmWorkerKey) 또는 owner 세션. 그 외 404.
+// Authentication: an internal key (x-worker-key = env.llmWorkerKey) or an owner session. Anything else gets 404.
 //
-// 생성은 painter 와 같은 경로를 탄다: 한글 프롬프트 → Gemini 영역 → Pollinations(flux) →
-// MinIO 저장. 성공하면 그 씬의 `illustrations[]` 에 **바로** 더한다(작가 승인 단계 없음).
+// Generation takes the same path as painter: a Korean prompt -> Gemini translation -> Pollinations (flux) ->
+// stored in MinIO. On success it is added **straight** to that scene's `illustrations[]` (with no author approval step).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
@@ -19,10 +19,10 @@ import WebAdventureSceneImage from '@/models/web-adventure-scene-image';
 import WebAdventureScene from '@/models/web-adventure-scene';
 
 const MAX_ATTEMPTS = 3;
-/** 이 시간 넘게 processing 이면 배포 등으로 끊긴 것으로 본다. */
+/** Processing for longer than this is taken as cut off by a deploy or the like. */
 const STALE_MS = 10 * 60 * 1000;
 
-// 이미지 생성은 수십 초 걸린다. 넉넉히 둔다(nginx 를 우회해 직접 호출되므로 안전).
+// Image generation takes tens of seconds. It is generous (safe, since it is called directly, bypassing nginx).
 export const maxDuration = 300;
 
 async function authorize(req: NextRequest): Promise<boolean> {
@@ -38,18 +38,18 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
 
-  // 1) stale 복구 — 결과를 기록하지 못한 시도는 시도로 치지 않는다(피드백 워커 #101 과 같은 이유).
+  // 1) Stale recovery - an attempt that never recorded its outcome does not count as an attempt (the same reason as the feedback worker's #101).
   await WebAdventureSceneImage.updateMany(
     { status: 'processing', claimedAt: { $lt: new Date(Date.now() - STALE_MS) }, attempts: { $gt: 0 } },
     { $set: { status: 'queued', claimedAt: null }, $inc: { attempts: -1 } },
   );
 
-  // 2) 순차 보장 — 살아있는 processing 있으면 skip.
+  // 2) Guaranteeing order - skipped while a live processing item exists.
   if ((await WebAdventureSceneImage.countDocuments({ status: 'processing' })) > 0) {
     return apiSuccess({ state: 'busy' });
   }
 
-  // 3) 가장 오래된 queued 를 원자적으로 claim.
+  // 3) Atomically claim the oldest queued item.
   const item = await WebAdventureSceneImage.findOneAndUpdate(
     { status: 'queued' },
     { status: 'processing', claimedAt: new Date(), $inc: { attempts: 1 } },
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       geminiApiKey: env.geminiApiKey,
     });
 
-    // 씬에 바로 더한다. $addToSet 이라 같은 주소가 두 번 들어가지 않는다.
+    // Added straight to the scene. Being $addToSet, the same address never goes in twice.
     const updated = await WebAdventureScene.updateOne(
       { id: item.sceneId, isDeleted: { $ne: true } },
       { $addToSet: { illustrations: result.url } },

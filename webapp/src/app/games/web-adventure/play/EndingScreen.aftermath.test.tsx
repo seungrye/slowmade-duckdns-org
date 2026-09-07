@@ -1,4 +1,4 @@
-// #275 EndingScreen 의 후일담 분리 표시.
+// #275 EndingScreen showing the aftermath separately.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from "vitest";
@@ -34,7 +34,7 @@ describe("EndingScreen 후일담 (#275)", () => {
     );
     const after = screen.queryByTestId("ending-aftermath");
     expect(after).toBeTruthy();
-    // 후일담은 *—* 으로 시작.
+    // The aftermath begins with an em dash.
     expect(after?.textContent?.startsWith("—")).toBe(true);
   });
 
@@ -47,7 +47,7 @@ describe("EndingScreen 후일담 (#275)", () => {
     }
   });
 
-  // #294 — 최종 침식 표시 (시한부 톤).
+  // #294 - showing the final contamination (in a terminal tone).
   it("최종 침식 표시 — 침식 80 미만 일반 톤", () => {
     render(
       <EndingScreen

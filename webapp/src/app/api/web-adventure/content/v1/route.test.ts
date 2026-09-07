@@ -1,4 +1,4 @@
-// /api/web-adventure/content/v1 — 전 씬 통합 GET + 캐시 헤더.
+// /api/web-adventure/content/v1 - the combined GET of every scene plus the cache headers.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -54,8 +54,8 @@ describe('GET /api/web-adventure/content/v1', () => {
   });
 });
 
-// 문체 변형 (#73) — 사건은 treatment 가 정본, 표현만 갈린다.
-// 랜덤 선택은 클라이언트가 한다(서버가 매번 랜덤이면 캐시를 못 쓴다). 서버는 메타만 준다.
+// Prose-style variants (#73) - the treatment is canonical for events; only the expression differs.
+// The random choice belongs to the client (a server choosing randomly every time could not be cached). The server provides only the metadata.
 describe('문체(voice) 선택', () => {
   const scenes = [
     { id: 'a', title: 'A', body: ['기본 A'], choices: [], treatment: ['뼈대 A'], variants: { prose: ['산문 A'] } },

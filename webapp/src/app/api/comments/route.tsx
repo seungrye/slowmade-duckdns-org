@@ -13,13 +13,13 @@ import { rateLimit, clientIp } from '@/lib/rate-limit';
 
 const POINTS_FOR_NEW_COMMENT = env.points.newComment;
 
-// 익명 ID를 base62에서 base5로 변환하는 함수
+// Converts an anonymous ID from base62 to base5
 function __anonidObfuscated(anonid: string): string {
     const charset = ['i', 'l', 'I', '|', '!']; // base-5
-  // base 문자셋 정의
+  // the base character sets
   const baseChars = '_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
-  // Step 1: base 문자열 → 하나의 큰 숫자로 변환
+  // Step 1: the base string -> one large number
   let num = BigInt(0);
   for (const char of anonid) {
     const value = baseChars.indexOf(char);
@@ -27,7 +27,7 @@ function __anonidObfuscated(anonid: string): string {
     num = num * BigInt(62) + BigInt(value);
   }
 
-  // Step 2: 그 숫자를 base-5로 인코딩
+  // Step 2: encode that number in base 5
   let result = '';
   const base = BigInt(charset.length); // = 5
   while (num > 0) {
@@ -36,11 +36,11 @@ function __anonidObfuscated(anonid: string): string {
     num = num / base;
   }
 
-  return result || charset[0]; // num === 0 일 때
+  return result || charset[0]; // when num === 0
 }
 
 export async function POST(req: NextRequest) {
-    // 스팸/DoS 완화 — IP당 분당 10건(무인증 익명 댓글이 주 위험).
+    // Blunting spam and DoS - 10 per minute per IP (unauthenticated anonymous comments are the main risk).
     if (!rateLimit(`comment:${clientIp(req)}`, 10, 60_000)) {
         return apiError("요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.", 429);
     }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
         const user = await User.findOne({ email: userEmail });
         if (user) authorId = user._id;
     } else {
-        // 익명 — anonid 필수·유효성 검증(미전달 시 500 대신 400).
+        // Anonymous - anonid is required and validated (a 400 rather than a 500 when absent).
         if (typeof anonid !== "string" || anonid.length === 0) {
             return apiError("익명 식별자가 필요합니다.", 400);
         }
@@ -116,11 +116,11 @@ export async function GET(req: NextRequest) {
 
     await connectToDB();
 
-    // 무인증 조회 허용(공개). 세션은 "내 댓글" 소유판정(isOwn)에만 쓰고, 이메일(PII)은 응답에서 제거.
+    // Unauthenticated reads are allowed (public). The session is used only to decide ownership (isOwn), and the email (PII) is stripped from the response.
     const session = await auth();
     const myEmail = session?.user?.email ?? null;
 
-    // 비공개 글의 댓글은 작성자 본인에게만 노출(글 본문은 숨겨도 댓글로 새는 것 차단).
+    // A private post's comments are shown only to its author (stopping them leaking through comments while the body is hidden).
     const owner = await Post.findById(postId).select('isPrivate userEmail').lean<{ isPrivate?: boolean; userEmail?: string } | null>();
     if (owner?.isPrivate && owner.userEmail !== myEmail) {
       return apiSuccess([]);
@@ -128,23 +128,23 @@ export async function GET(req: NextRequest) {
 
     const commentsFromDB = await Comment.find ({
         post: new mongoose.Types.ObjectId(postId),
-    }) // isDeleted 필터를 제거하여 삭제된 댓글도 함께 조회합니다.
+    }) // The isDeleted filter is removed so deleted comments are fetched too.
         .populate({
             path: 'authorId',
-            select: 'email name' // email 은 서버 소유판정용 — 응답엔 name 만 남김
+            select: 'email name' // The email is for the server's ownership check - only the name is kept in the response
         })
         .populate({
             path: 'parent',
-            select: 'author' // 부모 댓글의 작성자 이름만 가져옴
+            select: 'author' // Only the parent comment's author name is fetched
         })
         .sort({ createdAt: 1 })
         .lean();
 
-    // 이메일(PII) 제거 + 소유판정(isOwn) 부여. 삭제된 댓글은 내용/작성자 마스킹.
+    // The email (PII) is stripped and ownership (isOwn) attached. A deleted comment's content and author are masked.
     const comments = commentsFromDB.map(comment => {
         const a = comment.authorId as { email?: string; name?: string } | null | undefined;
         const isOwn = !!myEmail && !!a && typeof a === 'object' && a.email === myEmail;
-        const authorId = a && typeof a === 'object' ? { name: a.name } : a; // email 노출 차단
+        const authorId = a && typeof a === 'object' ? { name: a.name } : a; // blocks exposing the email
         const base = { ...comment, authorId, isOwn };
         if (comment.isDeleted) {
             return { ...base, content: '삭제된 댓글입니다.', author: '알 수 없음' };

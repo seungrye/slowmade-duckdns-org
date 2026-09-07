@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// 무중단 배포 헬스체크 — deploy.sh 가 새 인스턴스 기동 후 폴링한다.
-// #282 — ?deep=true 시 mongo 핑까지 (deploy.sh 가 사용).
+// The zero-downtime deploy health check - deploy.sh polls it after starting a new instance.
+// #282 - with ?deep=true it pings mongo too (which deploy.sh uses).
 
 const mockPing = vi.fn();
 vi.mock('@/lib/db', () => ({

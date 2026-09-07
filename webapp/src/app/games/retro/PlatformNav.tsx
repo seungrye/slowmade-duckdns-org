@@ -8,10 +8,10 @@ interface Props {
   counts: PlatformCounts;
   onChange: (next: PlatformFilter) => void;
   /**
-   * sidebar — 데스크톱 세로 목록. chips — 모바일 가로 스크롤.
+   * sidebar - the vertical desktop list. chips - a horizontal scroll on mobile.
    *
-   * 화면 폭 감지를 JS 로 하지 않고 둘 다 렌더한 뒤 CSS 로 하나만 보인다. matchMedia 를 쓰면
-   * 서버 렌더 결과와 어긋나 첫 화면이 한 번 튄다.
+   * The screen width is not detected in JS; both are rendered and CSS shows one. Using matchMedia would diverge
+   * from the server render and make the first paint jump.
    */
   variant: "sidebar" | "chips";
 }

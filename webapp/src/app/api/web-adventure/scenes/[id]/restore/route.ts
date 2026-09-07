@@ -1,11 +1,11 @@
 // /api/web-adventure/scenes/[id]/restore — POST { version }.
 //
-// 동작:
-//   - 그 version 의 snapshot 으로 *현재 씬 덮어쓰기* (findOneAndUpdate).
-//   - 덮어쓰기 직전 *현재* 상태를 새 revision 으로 자동 백업 (PUT 패턴 동일).
+// What it does:
+//   - *overwrites the current scene* with that version's snapshot (findOneAndUpdate).
+//   - automatically backs up the *current* state as a new revision just before overwriting (the same pattern as PUT).
 //
-// PUT 의 로직을 직접 호출하지 않고 동일 흐름을 반복 — body 가 snapshot 자체이므로
-// id 등 metadata 가 섞이지 않도록 명시적으로 처리.
+// It repeats the same flow rather than calling PUT's logic directly - the body is the snapshot itself, so it is
+// handled explicitly to keep metadata such as the id from mixing in.
 
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDB } from "@/lib/db";
@@ -17,27 +17,27 @@ import WebAdventureSceneRevision from "@/models/web-adventure-scene-revision";
 type Params = { params: Promise<{ id: string }> };
 
 export async function POST(req: NextRequest, { params }: Params) {
-  const authed = await requireOwner(); // 리비전 복원은 작성자만 (#179)
+  const authed = await requireOwner(); // Restoring a revision is the author's alone (#179)
   if (authed instanceof NextResponse) return authed;
   const { id } = await params;
   const body = (await req.json().catch(() => ({}))) as { version?: number };
   const version = Number(body.version);
-  // version 은 0-based (snapshot 시점의 revisionCount). 음수만 거부.
+  // version is 0-based (the revisionCount at the snapshot). Only a negative is rejected.
   if (!Number.isFinite(version) || version < 0) {
     return apiError("version 이 필요합니다.", 400);
   }
 
   await connectToDB();
 
-  // 1. 복원 대상 revision fetch.
+  // 1. Fetch the revision to restore.
   const target = await WebAdventureSceneRevision.findOne({
     sceneId: id,
     version,
   }).lean();
   if (!target) return apiError(`리비전을 찾을 수 없습니다: ${id} v${version}`, 404);
 
-  // 2. snapshot 으로 현재 씬 덮어쓰기.
-  //    snapshot 의 mongo metadata 키는 제거 (id 는 URL 경로 기준 보존).
+  // 2. Overwrite the current scene with the snapshot.
+  //    The snapshot's mongo metadata keys are stripped (the id is kept from the URL path).
   const snapshot = (target as { snapshot: Record<string, unknown> }).snapshot ?? {};
   const update: Record<string, unknown> = { ...snapshot };
   delete update.id;
@@ -46,8 +46,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   delete update.updatedAt;
   delete update.__v;
 
-  // 3. snapshot 으로 update + revisionCount $inc 1 (복원도 새 commit).
-  //    소프트 삭제된 씬을 복원하면 되살린다(isDeleted 해제 — 옛 스냅샷에 필드가 없어도 보장).
+  // 3. Update from the snapshot and $inc revisionCount by 1 (a restore is a new commit too).
+  //    Restoring a soft-deleted scene revives it (clearing isDeleted - guaranteed even when an old snapshot lacks the field).
   const restored = await WebAdventureScene.findOneAndUpdate(
     { id },
     { $set: { ...update, isDeleted: false, deletedAt: null }, $inc: { revisionCount: 1 } },
@@ -55,8 +55,8 @@ export async function POST(req: NextRequest, { params }: Params) {
   ).lean();
   if (!restored) return apiError(`씬을 찾을 수 없습니다: ${id}`, 404);
 
-  // 4. 새 commit 의 revision 생성 — snapshot = restored, version = restored.revCount.
-  //    옛 current 는 *이미 이전 commit (v_{current.revCount})* 으로 백업되어 있음.
+  // 4. Create the new commit's revision - snapshot = restored, version = restored.revCount.
+  //    The old current is *already backed up as the previous commit (v_{current.revCount})*.
   const restoredVersion =
     (restored as { revisionCount?: number }).revisionCount ?? 0;
   await WebAdventureSceneRevision.create({

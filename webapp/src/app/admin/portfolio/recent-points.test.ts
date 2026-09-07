@@ -1,6 +1,6 @@
-// #95 — 모바일에서 매매 차트를 최근 N 일로 본다.
-// #129 — **날짜로** 잡는다. 개수로 세면 거래일만 쌓이는 스냅샷에서 30 점이 6 주가 된다.
-// #133 — **자르지 않는다.** 데이터는 다 두고 처음 보이는 창만 잡는다.
+// #95 - viewing the trade chart over the last N days on mobile.
+// #129 - measured **by date**. Counting points makes 30 points six weeks in snapshots that accumulate on trading days only.
+// #133 - **nothing is trimmed.** All the data stays and only the initially visible window is set.
 import { describe, it, expect } from 'vitest';
 import {
   windowAround,
@@ -10,7 +10,7 @@ import {
   DESKTOP_CHART_DAYS,
 } from './recent-points';
 
-/** 하루 한 점씩, 마지막이 base 인 날짜 배열. */
+/** An array of dates, one a day, ending at base. */
 function daily(n: number, base = '2026-08-12'): string[] {
   const end = new Date(`${base}T00:00:00Z`);
   return Array.from({ length: n }, (_, i) => {
@@ -20,7 +20,7 @@ function daily(n: number, base = '2026-08-12'): string[] {
   });
 }
 
-/** 주말을 뺀(거래일만) 날짜 배열 — 실제 스냅샷이 이렇게 쌓인다. */
+/** An array of dates excluding weekends (trading days only) - how real snapshots accumulate. */
 function tradingDays(n: number, base = '2026-08-12'): string[] {
   const out: string[] = [];
   const d = new Date(`${base}T00:00:00Z`);
@@ -32,7 +32,7 @@ function tradingDays(n: number, base = '2026-08-12'): string[] {
   return out;
 }
 
-/** 시작일부터 마지막 날까지 달력 일수. */
+/** The calendar days from the start date to the last. */
 const spanFrom = (start: string, dates: string[]) =>
   Math.round((Date.parse(dates[dates.length - 1]) - Date.parse(start)) / 86_400_000) + 1;
 
@@ -56,14 +56,14 @@ describe('windowStartDate', () => {
     expect(spanFrom(windowStartDate(dates, false)!, dates)).toBe(DESKTOP_CHART_DAYS);
   });
 
-  // #129 의 핵심 — 개수로 세던 시절엔 이게 41 일이었다.
+  // The heart of #129 - back when it counted points, this was 41 days.
   it('거래일만 쌓인 데이터도 **달력 기준**으로 한 달', () => {
-    const dates = tradingDays(33); // 운영에서 실제로 33 점 / 45 일이었다
+    const dates = tradingDays(33); // in production it really was 33 points across 45 days
     expect(spanFrom(dates[0], dates)).toBeGreaterThan(MOBILE_CHART_DAYS);
     expect(spanFrom(windowStartDate(dates, true)!, dates)).toBe(MOBILE_CHART_DAYS);
   });
 
-  // #133 — 데이터를 자르지 않으므로 창 밖의 옛 기간이 남아 있고, 밀어서 볼 수 있다.
+  // #133 - since the data is not trimmed, the older range outside the window remains and can be reached by dragging.
   it('창 시작일이 데이터의 첫 날보다 뒤다 — 이전 기간이 남아 있다는 뜻', () => {
     const dates = daily(100);
     expect(Date.parse(windowStartDate(dates, true)!)).toBeGreaterThan(Date.parse(dates[0]));
@@ -95,7 +95,7 @@ describe('windowStartDate', () => {
   });
 });
 
-// #135 — 매매 마커를 눌러 종목 상세로 넘어왔을 때. 그 날짜가 보이면서 창 길이는 그대로.
+// #135 - arriving at the symbol detail through a trade marker. That date is visible and the window length is unchanged.
 describe('windowAround', () => {
   const lenOf = (w: { startValue: string; endValue: string }) =>
     Math.round((Date.parse(w.endValue) - Date.parse(w.startValue)) / 86_400_000) + 1;
@@ -142,17 +142,17 @@ describe('windowAround', () => {
 });
 
 /**
- * 창의 경계는 **축에 실제로 있는 날짜**여야 한다 (#370).
+ * The window's boundaries must be **dates that actually exist on the axis** (#370).
  *
- * `startValue` 는 달력 날짜(마지막 날 −29일)로 계산되는데 x 축 카테고리는 **거래일**뿐이다.
- * 그 날이 주말·휴장일이면 축에 없는 값이 되고, ECharts 는 카테고리 축에서 못 찾은 값을
- * 무시해 **창이 안 잡힌 채 전체가 보인다.**
+ * `startValue` is computed as a calendar date (the last day minus 29), while the x-axis categories are **trading
+ * days** only. If that day is a weekend or holiday it is a value absent from the axis, and ECharts ignores a value
+ * it cannot find on a category axis - so **the window is never applied and everything shows.**
  *
- * 메인 차트(/admin/portfolio)는 스냅샷이 46일뿐이라 대개 "이미 창 안" 으로 빠져 이 경로를
- * 안 탔다. 몇 년치 일봉을 그리는 매매 상세에서만 드러났다.
+ * The main chart (/admin/portfolio) has only 46 days of snapshots, so it usually short-circuits as "already inside
+ * the window" and never took this path. It only surfaced on the trade detail, which draws years of daily bars.
  */
 describe("창 경계는 축에 있는 날짜여야 한다 (#370)", () => {
-  // 주말을 뺀 거래일만 — 실제 일봉과 같은 모양.
+  // Trading days only, weekends excluded - the same shape as real daily bars.
   const 거래일 = (n: number): string[] => {
     const out: string[] = [];
     for (let i = 0; out.length < n; i++) {
@@ -162,7 +162,7 @@ describe("창 경계는 축에 있는 날짜여야 한다 (#370)", () => {
     return out;
   };
 
-  // 끝나는 날을 하루씩 옮겨 가며 본다 — 한 경우만 보면 우연히 평일에 걸려 통과한다.
+  // The end date is shifted a day at a time - checking one case alone could pass by landing on a weekday by luck.
   it("startValue 는 언제나 목록에 있는 날짜다 (끝 날짜 60가지)", () => {
     const 전체 = 거래일(400);
     const 어긋난것: string[] = [];

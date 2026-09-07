@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
  * GET /api/admin/stocks/trades
  *   ?tickers=AAPL,005930&env=paper&from=YYYY-MM-DD&to=YYYY-MM-DD
  *
- * 다중 종목 매매 — 차트 마커 (▲ 매수 / ▼ 매도).
- * env 미지정 시 paper + real 모두 포함.
+ * Multi-symbol trades - the chart markers (a triangle for a buy, an inverted one for a sell).
+ * Without env it includes both paper and real.
  *
- * 반환: { byTicker: { ticker: [{date, time, action, price, qty, env}, ...] } }
+ * Returns: { byTicker: { ticker: [{date, time, action, price, qty, env}, ...] } }
  */
 const MAX_TICKERS = 20;
 

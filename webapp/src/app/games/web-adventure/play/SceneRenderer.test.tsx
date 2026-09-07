@@ -1,4 +1,4 @@
-// SceneRenderer — 본문/이미지/분기 렌더 + fade (#307).
+// SceneRenderer - rendering the body, images and branches, plus the fade (#307).
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from "vitest";
@@ -7,7 +7,7 @@ import SceneRenderer from "./SceneRenderer";
 import type { AudioBus } from "./audio-bus";
 import type { Character, Scene } from "@/types/web-adventure";
 
-// 목 버스 — vi.fn 핸들을 그대로 노출(assert 용). 전달 시점에만 AudioBus 로 캐스팅.
+// The mock bus - the vi.fn handles are exposed as they are (for assertions). It is cast to AudioBus only when passed.
 function makeMockBus() {
   return {
     playBgm: vi.fn(), stopBgm: vi.fn(), pauseBgm: vi.fn(), resumeBgm: vi.fn(),

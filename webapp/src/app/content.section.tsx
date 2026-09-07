@@ -8,13 +8,13 @@ export default function ContentSection({ initialPosts = [] }: { initialPosts?: G
   const listRef = useRef<InfinitPostListRef>(null);
   const [topmostPostId, setTopmostPostId] = useState<string | null>(null);
 
-  // 제목 검색 (#232). 제목이나 돋보기를 누르면 그 자리가 검색창으로 바뀐다.
+  // Title search (#232). Tapping the title or the magnifier turns that spot into a search box.
   const [searchOpen, setSearchOpen] = useState(false);
   const [rawQuery, setRawQuery] = useState('');
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // 글자마다 서버를 때리지 않는다 — 입력이 멎고 250ms 뒤에 한 번 보낸다.
+  // The server is not hit on every keystroke - one request is sent 250ms after the typing stops.
   useEffect(() => {
     const timer = setTimeout(() => setQuery(rawQuery.trim()), 250);
     return () => clearTimeout(timer);
@@ -22,11 +22,11 @@ export default function ContentSection({ initialPosts = [] }: { initialPosts?: G
 
   const openSearch = useCallback(() => {
     setSearchOpen(true);
-    // 열자마자 바로 칠 수 있어야 한다. 렌더 뒤에 포커스를 준다.
+    // It must be typeable the moment it opens. Focus is given after the render.
     requestAnimationFrame(() => inputRef.current?.focus());
   }, []);
 
-  // 닫으면 검색어를 비운다 — 닫았는데 걸러진 목록이 남아 있으면 고장으로 보인다.
+  // Closing clears the search term - a filtered list left behind after closing reads as a bug.
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
     setRawQuery('');
@@ -50,7 +50,7 @@ export default function ContentSection({ initialPosts = [] }: { initialPosts?: G
       const prevPostElement = document.getElementById(prevPostId);
       if (prevPostElement) {
         requestAnimationFrame(() => {
-          // 'block: start' 옵션으로 엘리먼트의 상단이 뷰포트의 상단에 오도록 스크롤합니다.
+          // 'block: start' scrolls so the element's top meets the viewport's top.
           prevPostElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
       }
@@ -79,7 +79,7 @@ export default function ContentSection({ initialPosts = [] }: { initialPosts?: G
       const nextPostElement = document.getElementById(nextPostId);
       if (nextPostElement) {
         requestAnimationFrame(() => {
-          // 'block: start' 옵션으로 엘리먼트의 상단이 뷰포트의 상단에 오도록 스크롤합니다.
+          // 'block: start' scrolls so the element's top meets the viewport's top.
           nextPostElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
       }

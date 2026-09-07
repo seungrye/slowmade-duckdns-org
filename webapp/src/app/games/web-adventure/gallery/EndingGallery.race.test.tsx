@@ -1,17 +1,17 @@
-// 이슈 검증: 로그인 사용자라도 end-run POST 완료 전 갤러리 진입 시 빈 화면.
+// Verifying the issue: even a logged-in user gets a blank screen when entering the gallery before the end-run POST completes.
 //
-// 가설 (보조): play page 의 ended useEffect 가 *void fetch* — 비동기.
-// 클라이언트가 즉시 갤러리 페이지 진입하면 *past_run insert 전* GET → 빈 목록.
-// 해결책으로는 localStorage 가 *동기적으로* update 되면 즉시 반영 가능.
+// The (secondary) hypothesis: the play page's ended useEffect is a *void fetch* - asynchronous.
+// A client entering the gallery page at once GETs *before the past_run insert* -> an empty list.
+// A localStorage update, being *synchronous*, could show it immediately as the solution.
 //
-// 이 테스트는 *localStorage 의 past-runs 가 동기 write 됐을 때* 갤러리 페이지가
-// 즉시 반영하는지 검증. 현재 갤러리 페이지의 fallback 코드는 *401 시* 만 동작 —
-// 200+빈배열일 경우 localStorage 안 봄. 사용자 진짜 시나리오에서는:
-//   - 비로그인: 매번 401 → localStorage fallback. localStorage 가 비어있으면 0/6.
-//   - 로그인 + race: 200 + 빈 배열 → localStorage 무시. *최근 도달 안 보임*.
+// This test verifies that the gallery page reflects *a synchronous write of past-runs to localStorage*
+// immediately. The gallery page's current fallback runs *only on a 401* -
+// a 200 with an empty array never looks at localStorage. In the user's real scenarios:
+//   - logged out: always a 401 -> the localStorage fallback. With localStorage empty it is 0/6.
+//   - logged in with the race: a 200 plus an empty array -> localStorage ignored. *The recent ending is invisible*.
 //
-// 이 테스트는 *로그인 사용자도 localStorage 의 최근 도달분이 있으면 합쳐서 표시*
-// 하는 동작을 기대 — 현재는 *서버 응답이 200* 이면 localStorage 무시. RED.
+// This test expects *a logged-in user's recent endings in localStorage to be merged in and shown*
+// - currently localStorage is ignored whenever *the server responds 200*. RED.
 
 // @vitest-environment jsdom
 
@@ -30,7 +30,7 @@ describe('이슈 #250 — 갤러리 race condition (RED)', () => {
   });
 
   it('서버가 200 + 빈배열 + localStorage 에 최근 past_run 있으면 합쳐서 표시', async () => {
-    // 서버 GET past-runs → 200 + 빈 배열 (end-run insert 가 아직 안 끝남).
+    // The server GET past-runs -> 200 plus an empty array (the end-run insert has not finished).
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -40,7 +40,7 @@ describe('이슈 #250 — 갤러리 race condition (RED)', () => {
       }),
     );
 
-    // localStorage 에 최근 도달분 1 (main).
+    // One recent ending in localStorage (main).
     localStorage.setItem(
       LOCAL_STORAGE_PAST_RUNS_KEY,
       JSON.stringify([
@@ -55,7 +55,7 @@ describe('이슈 #250 — 갤러리 race condition (RED)', () => {
 
     render(<GalleryPage />);
 
-    // 도달률 1 / 6 표시 기대 (서버 빈 배열 + localStorage 1 → 합쳐서 1).
+    // A completion rate of 1 / 6 is expected (the server's empty array plus localStorage's 1, merged to 1).
     await waitFor(() => {
       const progress = screen.getByTestId('gallery-progress');
       expect(progress).toHaveTextContent('1 / 6');

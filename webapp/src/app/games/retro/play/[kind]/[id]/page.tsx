@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 interface Params {
-  /** builtin — 기본 제공 홈브류, rom — 내가 올린 롬. */
+  /** builtin - bundled homebrew; rom - my uploaded ROM. */
   kind: string;
   id: string;
 }
@@ -31,7 +31,7 @@ type LeanRom = {
   _id: unknown; title: string; platform: string; core: string; size: number;
   createdAt?: Date; filename?: string; patches?: LeanPatch[]; patchEnabled?: boolean;
   parentSets?: { name: string; size: number; objectKey: string; sha256?: string }[];
-  /** 파일 내용의 sha256 (#188) — netplay 방을 가르는 근거. 옛 문서엔 없다. */
+  /** The file content's sha256 (#188) - the basis for separating netplay rooms. Older documents lack it. */
   sha256?: string;
 };
 
@@ -62,20 +62,20 @@ export default async function PlayPage({
   if (!game) notFound();
 
   const meta = platformById(game.entry.platform);
-  // 시그널링 서버가 떠 있어야 의미가 있으므로, 꺼져 있으면 진입 자체를 감춘다.
+  // It only means anything with the signalling server running, so the entry is hidden when it is off.
 
-  // 패치는 주소가 아니라 **롬에 저장된 설정**으로 정한다 (#116) — 카드의 체크박스가 그 값을 쥔다.
+  // The patch is decided by **the setting stored on the ROM**, not the address (#116) - the card's checkbox holds that value.
   const patchUrl = game.patch
     ? `/api/games/retro/roms/${game.entry.id}/patches/${game.patch.id}/file`
     : undefined;
-  // 지정이 없으면 undefined 로 둔다 — 플레이어가 형식에 맞게 판단한다.
+  // Unset it stays undefined - the player decides based on the format.
   const stripHeader = strip === "1" ? true : strip === "0" ? false : undefined;
 
-  // 세이브를 매달 키 — 기본 제공 게임과 올린 롬을 한 방식으로 다룬다 (#114).
+  // The key the save hangs on - bundled games and uploaded ROMs are handled the same way (#114).
   const gameKey = kind === "builtin" ? builtinKey(game.entry.id) : romKey(game.entry.id);
 
-  // 콘텐츠 키가 없으면(해시 백필 전 문서) netplay 를 열지 않는다 — 엉뚱한 방에 붙어
-  // 조용히 desync 나느니 안 되는 편이 낫다. 기본 제공 게임은 모두 같은 파일이라 키가 필요 없다.
+  // Without a content key (a document from before the hash backfill) netplay is not offered - joining the wrong
+  // room and silently desyncing is worse than not connecting. Bundled games are all the same file and need no key.
   const netplayKey = kind === "builtin" ? gameKey : game.netplayKey ?? null;
   const netplayEnabled = env.netplay.enabled && !!netplayKey;
 
@@ -127,7 +127,7 @@ export default async function PlayPage({
         </div>
 
         {netplayEnabled && (
-          // 조작 박스와 같은 모양으로 둔다 — 화면 위 토글이 아니라 설명으로 (#192).
+          // Kept in the same shape as the controls box - explained rather than a toggle on screen (#192).
           <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
             <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
               함께 하기
@@ -145,8 +145,8 @@ export default async function PlayPage({
         )}
 
         {patchUrl && (
-          // IPS 는 헤더 기준을 파일만으로 알 수 없다. 어긋나면 글자가 깨지는데, 이 줄이 없으면
-          // 손쓸 방법이 사라진다. 패치가 걸렸을 때만 조용히 놓아 둔다.
+          // IPS cannot say from the file alone what header convention it assumes. Getting it wrong mangles the text, and
+          // without this line there would be no recourse. It is left alone quietly, only when a patch is applied.
           <p className="text-xs text-gray-400 dark:text-gray-500">
             글자가 깨지나요?{" "}
             <Link
@@ -187,22 +187,22 @@ async function loadBuiltin(slug: string) {
     description: game.description,
     patch: undefined,
     sourceLabel: `출처 ${game.source} · ${game.license}`,
-    // 기본 제공 게임은 저장소에서 같은 파일이 나가므로 콘텐츠 키가 필요 없다 (#188).
+    // A bundled game serves the same file from the repo and so needs no content key (#188).
     netplayKey: null as string | null,
   };
 }
 
 async function loadMyRom(id: string, email: string) {
-  // 형식부터 본다 — 아무 문자열이나 넘기면 mongoose 가 CastError 를 던져 500 이 된다.
+  // The format is checked first - any old string makes mongoose throw a CastError and return 500.
   if (!isRomId(id)) return null;
   await connectToDB();
-  // userEmail 을 조건에 넣어 남의 롬은 애초에 걸리지 않게 한다 — 없는 것과 같은 404 가 된다.
+  // userEmail goes into the condition so someone else's ROM never matches - giving the same 404 as an absent one.
   const doc = (await RetroRom.findOne({ _id: id, userEmail: email, isDeleted: { $ne: true } })
     .select("title platform core size createdAt filename patches patchEnabled parentSets sha256")
     .lean()) as LeanRom | null;
   if (!doc) return null;
 
-  // 적용이 꺼져 있으면 아예 없는 것으로 본다 — 플레이 화면엔 선택 UI 가 없다.
+  // With applying switched off it is treated as absent - the play screen has no selection UI.
   const patchInUse = doc.patchEnabled === false ? undefined : activePatch(doc);
 
   return {
@@ -212,19 +212,19 @@ async function loadMyRom(id: string, email: string) {
       platform: doc.platform as never,
       size: doc.size,
       createdAt: (doc.createdAt ?? new Date(0)).toISOString(),
-      // **아케이드는 이게 없으면 게임을 못 찾는다** (#141) — zip 이름이 곧 롬셋 이름이라,
-      // 빠지면 주소가 `<id>.zip` 이 되고 코어가 내용을 못 알아봐 RetroArch 메뉴만 뜬다.
+      // **Without this, arcade cannot find the game** (#141) - the zip's name is the ROM set's name, so omitting it
+      // makes the address `<id>.zip`, the core cannot recognise the contents, and only the RetroArch menu appears.
       filename: doc.filename,
       parentSets: (doc.parentSets ?? []).map((p) => p.name),
     }),
     core: doc.core,
     description: undefined,
-    // 적용이 꺼져 있으면 아예 없는 것으로 본다 — 플레이 화면엔 선택 UI 가 없다.
+    // With applying switched off it is treated as absent - the play screen has no selection UI.
     patch: doc.patchEnabled === false ? undefined : activePatch(doc),
     sourceLabel: "내가 올린 롬 — 나만 볼 수 있습니다",
-    // netplay 방을 가르는 키 (#188). 문서 id 가 아니라 **코어가 실제로 읽는 바이트**로 묶는다 —
-    // 그래야 다른 계정이 올린 같은 롬과 같은 방이 되고, 패치 설정이 다르면 애초에 안 만난다.
-    // 해시가 아직 없으면 null 이고, 그때는 netplay 진입을 감춘다.
+    // The key that separates netplay rooms (#188). It is tied to **the bytes the core actually reads**, not the document id -
+    // that is what puts the same ROM uploaded by another account in the same room, while differing patch settings never meet.
+    // Without a hash yet it is null, and netplay's entry is then hidden.
     netplayKey: contentKeyOf({
       romHash: doc.sha256,
       patchHash: patchInUse ? activeLeanPatch(doc)?.sha256 : undefined,

@@ -8,52 +8,52 @@ import { platformById } from "@/lib/retro/platforms";
 import { normalizeRomTitle } from "@/lib/retro/rom-edit";
 
 /**
- * 커버 위 배지의 **공통 모양** (#120).
+ * The **shared shape** of the badges over the cover (#120).
  *
- * 높이를 값으로 고정한 이유: 안에 든 것이 글자(10px)냐 아이콘(11px)이냐에 따라 줄 높이가 달라져,
- * 패딩만 맞춰서는 나란히 놓았을 때 한 픽셀씩 어긋난다. 가로 여백만 각자 정한다.
+ * Why the height is a fixed value: the line height differs depending on whether the content is text (10px) or an
+ * icon (11px), so matching the padding alone leaves them a pixel out when placed side by side. Only the horizontal padding varies.
  */
 const BADGE =
   "inline-flex h-[18px] items-center rounded bg-black/60 text-[10px] font-semibold leading-none tracking-wide text-white";
 
-/** 커버 아래쪽 조작 버튼 — 어두운 그림 위에서도 보이도록 반투명 배경을 깐다. */
+/** The control buttons below the cover - a translucent background keeps them visible over a dark picture. */
 const TOOL =
   "inline-flex h-6 items-center justify-center rounded bg-black/65 text-white/90 backdrop-blur-sm transition hover:bg-black/85 hover:text-white disabled:opacity-50";
 
 /**
- * 아이콘만 있는 버튼 — 정사각형.
+ * An icon-only button - square.
  *
- * **글자가 있는 버튼에는 쓰지 말 것.** 너비를 24px 로 묶어 버려 글자가 오른쪽으로 넘치고
- * 여백이 없어 보인다(#127 에서 실제로 그랬다).
+ * **Never use it for a button with text.** It pins the width to 24px, so the text overflows to the right
+ * and looks cramped (which is exactly what happened in #127).
  */
 const TOOL_ICON = `${TOOL} w-6`;
 
-/** 아이콘 + 글자 — 너비는 내용에 맡기고 좌우 여백만 준다. */
+/** Icon plus text - the width follows the content and only the horizontal padding is set. */
 const TOOL_LABEL = `${TOOL} gap-1 px-1.5`;
 
 interface Props {
   game: GameEntry;
-  /** 업로드한 롬에만 준다 — 기본 제공 게임은 지울 수 없다. */
+  /** Given only for uploaded ROMs - a bundled game cannot be deleted. */
   onDelete?: (game: GameEntry) => void;
-  /** 패치 파일을 고르면 부른다. 올리면 기존 패치를 교체한다. */
+  /** Called when a patch file is chosen. Uploading replaces the existing patch. */
   onPatchUpload?: (game: GameEntry, file: File) => void;
-  /** 체크박스 — 패치를 실제로 적용할지. */
+  /** The checkbox - whether to actually apply the patch. */
   onPatchToggle?: (game: GameEntry, enabled: boolean) => void;
-  /** 카드 그림을 바꾼다. */
+  /** Changes the card's picture. */
   onCoverUpload?: (game: GameEntry, file: File) => void;
-  /** 제목을 고친다. */
+  /** Edits the title. */
   onRename?: (game: GameEntry, title: string) => void;
   busy?: boolean;
 }
 
 /**
- * 라이브러리의 커버 카드 (#109, 카드에서 관리 #116·#122).
+ * The library's cover card (#109, managed from the card in #116 and #122).
  *
- * 커버가 없으면 기종 색 그라디언트에 제목 첫 글자를 얹은 타일을 그린다. 홈브류는 공식 박스아트가
- * 없는 경우가 흔하고, 올린 롬은 직접 넣기 전까지 없다.
+ * With no cover it draws a tile of the title's first character over the system's colour gradient. Homebrew often has
+ * no official box art, and an uploaded ROM has none until one is added.
  *
- * **관리 요소는 카드 안에서 끝낸다.** 카드 전체가 플레이 링크라, 이것들을 누를 때 링크로 새지
- * 않게 막는다(`preventDefault` + `stopPropagation`).
+ * **The management controls stay inside the card.** The whole card is the play link, so pressing them is stopped
+ * from leaking into it (`preventDefault` plus `stopPropagation`).
  */
 export default function GameCard({
   game,
@@ -77,7 +77,7 @@ export default function GameCard({
     if (editing) titleRef.current?.select();
   }, [editing]);
 
-  /** 카드 위에 얹힌 조작 — 클릭이 플레이 링크로 새지 않게 삼킨다. */
+  /** The controls laid over the card - clicks are swallowed so they do not leak into the play link. */
   function swallow(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -86,7 +86,7 @@ export default function GameCard({
   function commitTitle() {
     const next = normalizeRomTitle(titleRef.current?.value);
     setEditing(false);
-    // 빈 이름이거나 그대로면 아무 일도 하지 않는다.
+    // An empty or unchanged name does nothing.
     if (next && next !== game.title) onRename?.(game, next);
   }
 
@@ -98,8 +98,8 @@ export default function GameCard({
       >
         <div className="relative aspect-[3/4] overflow-hidden rounded-xl bg-gray-100 shadow-sm ring-1 ring-gray-200 transition duration-200 group-hover:-translate-y-1 group-hover:shadow-lg dark:bg-gray-800 dark:ring-gray-700">
           {game.cover ? (
-            // next/image 를 쓰지 않는다 — 기본 제공 커버는 로컬 public 파일이고, 올린 커버는
-            // 인증이 필요한 사설 경로라 최적화 서버가 대신 받아 올 수 없다.
+            // next/image is not used - a bundled cover is a local public file, and an uploaded cover is a private path
+            // requiring authentication, which the optimisation server cannot fetch on our behalf.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={game.cover} alt="" loading="lazy" className="h-full w-full object-cover" />
           ) : (
@@ -125,8 +125,8 @@ export default function GameCard({
           </div>
 
           {canManage && (
-            // 좌하단 패치 · 우하단 커버. 모바일엔 hover 가 없으므로 **항상 보인다**.
-            // 숨은 file input 은 여기 두지 않는다 — 아래 주석 참고.
+            // The patch bottom left, the cover bottom right. Mobile has no hover, so they are **always visible**.
+            // The hidden file input does not live here - see the comment below.
             <div onClick={swallow} className="absolute inset-x-2 bottom-2 flex items-end justify-between gap-1">
               <div className="flex items-center gap-1">
                 {/*
@@ -257,9 +257,9 @@ export default function GameCard({
           <input
             ref={patchRef}
             type="file"
-            // accept 를 걸지 않는다 (#145). `.ips,.bps,.ups` 만 받고 있어 **zip 묶음
-            // 패치(#143)를 아예 고를 수 없었다.** 목록을 늘리는 대신 떼었다 — 형식 검사는
-            // 어차피 매직 바이트로 하고, 모바일 선택기는 확장자 필터를 잘 못 다룬다.
+            // No accept is set (#145). Accepting only `.ips,.bps,.ups` made **a zip bundle patch (#143)
+            // entirely unselectable.** Rather than extend the list it was removed - the format check happens
+            // through the magic bytes anyway, and mobile pickers handle extension filters poorly.
             aria-label={`${game.title} 패치 파일`}
             className="hidden"
             onChange={(e) => {

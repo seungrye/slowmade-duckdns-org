@@ -23,11 +23,11 @@ const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const ROM_ID = '653f1a2b3c4d5e6f70819202';
 
 function ctx(id: string) {
-  // name 은 캐시 키를 가르는 용도라 핸들러가 쓰지 않는다 (#137).
+  // name exists to separate cache keys and is not used by the handler (#137).
   return { params: Promise.resolve({ id, name: `${id}.sfc` }) };
 }
 
-/** findOne().select().lean() 체인 흉내. */
+/** Mimics the findOne().select().lean() chain. */
 function findOneReturns(doc: unknown) {
   mockFindOne.mockReturnValue({ select: () => ({ lean: () => Promise.resolve(doc) }) });
 }

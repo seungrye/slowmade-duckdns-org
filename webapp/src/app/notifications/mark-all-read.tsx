@@ -1,11 +1,11 @@
 'use client';
 
-// [모두 읽음] (#247).
+// [mark all read] (#247).
 //
-// 예전엔 페이지를 여는 것만으로 이 동작이 자동 실행됐다(`MarkSeen`). 그래서 "안 읽음"
-// 표시가 첫 렌더 한 번만 살아있었다. 이제 **누를 때만** 한다 — 한꺼번에 정리하고 싶을 때.
+// This used to run automatically just from opening the page (`MarkSeen`), so the "unread"
+// marking survived only the first render. Now it happens **only on a press** - for clearing everything at once.
 //
-// 안 읽은 것이 없으면 아예 그리지 않는다. 누를 이유가 없는 버튼을 둘 필요가 없다.
+// With nothing unread it is not drawn at all. There is no need for a button with no reason to press it.
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { emitNotificationsAllRead } from '@/lib/notification-events';
@@ -20,8 +20,8 @@ export default function MarkAllRead({ unreadCount }: { unreadCount: number }) {
     setBusy(true);
     try {
       await fetch('/api/notifications/seen', { method: 'POST' });
-      // 목록은 refresh 로 다시 그려지지만 벨은 navbar 에 있어 그대로다 (#259).
-      // 실측: 목록이 0 이 됐는데 뱃지는 3 이 남아 있었다.
+      // The list is redrawn by refresh, but the bell lives in the navbar and stays as it was (#259).
+      // Measured: the list went to 0 while the badge still read 3.
       emitNotificationsAllRead();
       router.refresh();
     } catch {

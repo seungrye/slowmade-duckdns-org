@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 /**
  * GET /api/admin/portfolio?env=paper&currency=KRW
  *
- * 반환: { env, currency, history, tradesByDate } — 조회·집계는 lib/portfolio.getPortfolioData.
- * 같은 로직을 /admin/portfolio server component 가 SSR 초기 로드에 재사용한다.
+ * Returns: { env, currency, history, tradesByDate } - the query and aggregation are lib/portfolio.getPortfolioData.
+ * The /admin/portfolio server component reuses the same logic for its SSR initial load.
  */
 export async function GET(req: NextRequest) {
   const guard = await requireOwner();

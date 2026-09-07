@@ -19,12 +19,12 @@ interface PostData {
   jsonContent: unknown;
   likes: number;
   tags: string[];
-  aiTags?: string[]; // tags 중 AI(Gemini)가 붙인 것 — 표시색 구분용(사용자=파랑, AI=회색)
+  aiTags?: string[]; // Which of the tags the AI (Gemini) added - for the display colour (user = blue, AI = grey)
   userEmail: string;
   author: string;
   createdAt: string;
   isPrivate?: boolean;
-  // 첨부는 본문↔태그 사이 전용 섹션에 칩으로 렌더. 비어 있으면 섹션 미표시.
+  // Attachments render as chips in a dedicated section between the body and the tags. Empty, the section is hidden.
   attachments?: { id: string; name: string; size: number; mimeType: string }[];
 }
 
@@ -104,7 +104,7 @@ export default function PostViewContainer({ post }: { post: PostData }) {
           <div className="p-3 text-sm text-gray-600 dark:text-gray-400 border-t border-t-gray-200 dark:border-t-gray-700">
             <div className="flex flex-wrap items-center gap-3">
               {post.tags.map((tag: string) => {
-                // AI(Gemini)가 붙인 태그는 회색 ✨, 사용자 태그는 파랑 #.
+                // Tags added by the AI (Gemini) are a grey sparkle, user tags a blue hash.
                 const isAi = (post.aiTags ?? []).some((a) => a.toLowerCase() === tag.toLowerCase());
                 return (
                   <Link href={`/tags/${encodeURIComponent(tag)}`} key={tag}>

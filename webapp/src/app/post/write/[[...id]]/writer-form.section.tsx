@@ -8,7 +8,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { SetPostType } from '@/types/api/submit.d';
 import { draftKey, isEmptyDraft, parseDraft, serializeDraft, type PostDraft } from '@/lib/post-draft';
 
-/** localStorage 는 프라이빗 모드 등에서 통째로 막힐 수 있다 — 읽기 실패가 글쓰기를 막지 않게. */
+/** localStorage can be blocked wholesale (private mode and so on) - a failed read must not block writing. */
 function safeGet(key: string): string | null {
     try { return localStorage.getItem(key); } catch { return null; }
 }
@@ -27,45 +27,45 @@ export default function PostWriterForm() {
     const editorRef = useRef<RichWebEditorHandle>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [title, setTitle] = useState('');
-    const [tags, setTags] = useState<string[]>([]); // 태그 입력을 위한 상태
-    const [isPrivate, setIsPrivate] = useState(false); // 비공개(작성자만 열람). 기본 공개. 제목 옆 자물쇠로 토글.
-    const [attachments, setAttachments] = useState<AttachmentMeta[]>([]); // 본문 하단 전용 첨부 영역(태그처럼). 툴바 클립 → 칩 추가.
-    const [pending, setPending] = useState<{ tempId: string; name: string; size: number; mimeType: string; progress: number }[]>([]); // 업로드 진행 중 첨부(진행 칩).
+    const [tags, setTags] = useState<string[]>([]); // The state for tag entry
+    const [isPrivate, setIsPrivate] = useState(false); // Private (readable by the author alone). Public by default. Toggled by the padlock next to the title.
+    const [attachments, setAttachments] = useState<AttachmentMeta[]>([]); // A dedicated attachment area below the body (like tags). The toolbar's clip adds a chip.
+    const [pending, setPending] = useState<{ tempId: string; name: string; size: number; mimeType: string; progress: number }[]>([]); // Attachments still uploading (progress chips).
     const [loading, setLoading] = useState(false);
     const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
     const isMobile = useMobile();
 
-    // 데스크톱에서만: 에디터(제목·본문·태그·제출 전체)를 뷰포트에 고정하고 본문을 내부
-    // 스크롤(editor.scss). 모바일은 플로팅 툴바가 페이지 스크롤을 전제하므로 고정하지 않고
-    // 원래대로 페이지가 늘어나게 둔다(내부 스크롤 미적용).
-    // ── 임시 저장 (#199)
+    // Desktop only: the editor (the title, body, tags and submit together) is pinned to the viewport and the body scrolls
+    // internally (editor.scss). Mobile's floating toolbar assumes the page scrolls, so it is not pinned and
+    // the page is left to grow as before (no internal scrolling).
+    // -- draft autosave (#199)
     //
-    // 글을 쓰다 페이지를 벗어나거나 새로고침하면 전부 사라졌다. 브라우저에 담아 뒀다 되살린다.
+    // Leaving the page or refreshing mid-write used to lose everything. It is kept in the browser and restored.
     //
-    // **본문은 "떠나는 순간"에만 담는다.** `getContent()` 가 마크다운 모드에서 에디터를
-    // 건드리므로(내부 setContent) 타이핑 중에 계속 부를 수는 없다. 제목·태그처럼 평범한
-    // 상태는 바뀔 때마다(디바운스) 담는다.
+    // **The body is stored only "at the moment of leaving".** `getContent()` touches the editor in markdown mode
+    // (an internal setContent), so it cannot be called continuously while typing. Ordinary state such as the title
+    // and tags is stored on every change (debounced).
     const storageKey = draftKey(typeof _id === 'string' ? _id : undefined);
     const [restoredAt, setRestoredAt] = useState<number | null>(null);
-    // 수정 글은 서버에서 불러온 **뒤에** 초안을 얹는다 — 초안이 더 최근 작업이다.
+    // For an edit the draft is laid over **after** the server load - the draft is the more recent work.
     const [serverLoaded, setServerLoaded] = useState(!_id);
     const restoredRef = useRef(false);
-    // 수정 글에서 '저장본으로 되돌리기' 를 누르면 다시 불러오게 하는 방아쇠.
+    // The trigger that refetches when 'revert to the saved version' is pressed on an edit.
     const [reloadToken, setReloadToken] = useState(0);
 
-    // 제출에 성공했으면 더는 담지 않는다 (#257).
+    // Once the submit succeeds nothing more is stored (#257).
     //
-    // 삭제만으로는 부족하다 — 아래 정리 훅이 **화면을 벗어날 때** 초안을 담으므로, 지워도
-    // 홈으로 이동하는 순간 방금 제출한 내용이 다시 기록된다. 실제로 그랬다: 정상 제출 후
-    // 글쓰기에 들어가면 올린 글이 "작성 중이던 내용" 으로 되살아났다.
+    // Deleting alone is not enough - the cleanup hook below stores the draft **when leaving the screen**, so even after deleting,
+    // navigating home records what was just submitted again. That is what happened: after a normal submit,
+    // entering the writer brought the published post back as "what you were writing".
     const submittedRef = useRef(false);
 
     const saveDraft = useCallback(() => {
         if (submittedRef.current) return;
-        // **에디터가 아직 없으면 본문을 건드리지 않는다** (#201).
-        // `immediatelyRender: false` 라 첫 렌더에는 내부 editor 가 없고, 그때 `getContent()` 는
-        // 빈 값을 준다. 그대로 담으면 멀쩡히 저장돼 있던 본문을 `null` 로 덮어 **초안에서
-        // 본문만 사라진다** — 되살릴 방법이 없는 손실이다.
+        // **The body is left alone while the editor is absent** (#201).
+        // With `immediatelyRender: false` the inner editor is absent on the first render, and `getContent()` then
+        // returns empty. Storing that overwrites a perfectly saved body with `null` and **the body alone disappears
+        // from the draft** - a loss with no way back.
         const ready = editorRef.current?.isReady() === true;
         const content = ready ? editorRef.current?.getContent() : undefined;
         let jsonContent = content?.jsonContent ?? null;
@@ -82,29 +82,29 @@ export default function PostWriterForm() {
             savedAt: Date.now(),
         };
         try {
-            // 빈 상태를 담아 두면 다음에 "복원했습니다" 만 뜨고 내용은 없다 — 지운다.
+            // Storing an empty state would later show only "restored" with no content - so it is deleted.
             if (isEmptyDraft(draft)) return localStorage.removeItem(storageKey);
             const raw = serializeDraft(draft);
             if (!raw) return console.warn('임시 저장본이 너무 커서 건너뜁니다.');
             localStorage.setItem(storageKey, raw);
         } catch (err) {
-            // 저장 실패가 글쓰기를 막으면 안 된다(용량 초과·프라이빗 모드 등).
+            // A failed save must not block writing (a quota overrun, private mode and so on).
             console.warn('임시 저장에 실패했습니다.', err);
         }
     }, [storageKey, title, tags, isPrivate, attachments]);
 
-    // 리스너는 한 번만 건다 — 최신 함수는 ref 로 넘긴다.
+    // The listener is attached once - the latest function is passed through a ref.
     const saveRef = useRef(saveDraft);
     useEffect(() => { saveRef.current = saveDraft; }, [saveDraft]);
 
-    // 평범한 필드가 바뀌면 잠시 뒤 담는다.
+    // A changed ordinary field is stored a moment later.
     useEffect(() => {
-        if (!restoredRef.current) return; // 복원 전에는 빈 값으로 덮지 않는다
+        if (!restoredRef.current) return; // Nothing is overwritten with an empty value before the restore
         const t = setTimeout(() => saveRef.current(), 1200);
         return () => clearTimeout(t);
     }, [title, tags, isPrivate, attachments]);
 
-    // 떠나는 순간 — 새로고침·탭 닫기(pagehide), 탭 숨김, 화면 이탈(언마운트).
+    // The moment of leaving - a refresh or tab close (pagehide), the tab hiding, and leaving the screen (unmount).
     useEffect(() => {
         const onHide = () => saveRef.current();
         const onVisibility = () => { if (document.hidden) saveRef.current(); };
@@ -117,7 +117,7 @@ export default function PostWriterForm() {
         };
     }, []);
 
-    // 복원 — 새 글은 바로, 수정 글은 서버 글을 불러온 뒤.
+    // Restoring - immediately for a new post, and after the server post loads for an edit.
     useEffect(() => {
         if (!serverLoaded || restoredRef.current) return;
         restoredRef.current = true;
@@ -125,7 +125,7 @@ export default function PostWriterForm() {
         try {
             draft = parseDraft(localStorage.getItem(storageKey), Date.now());
         } catch {
-            return; // 저장소를 못 읽어도 글쓰기는 계속돼야 한다
+            return; // Writing must continue even when the store cannot be read
         }
         if (!draft) return;
         setTitle(draft.title);
@@ -134,9 +134,9 @@ export default function PostWriterForm() {
         setAttachments(draft.attachments as typeof attachments);
         setRestoredAt(draft.savedAt);
 
-        // 본문은 **에디터가 생긴 뒤에** 넣는다 (#201). `immediatelyRender: false` 라 첫 렌더에는
-        // 내부 editor 가 없고, 그때 `setContent` 는 조용히 무시된다 — 제목만 되살아나고 본문은
-        // 사라진 것처럼 보였던 원인이다.
+        // The body goes in **after the editor exists** (#201). With `immediatelyRender: false` the inner editor is absent
+        // on the first render, and `setContent` is then silently ignored - the cause of the title coming back while the body
+        // appeared to have vanished.
         const body = draft.jsonContent;
         if (!body) return;
         let tries = 0;
@@ -145,22 +145,22 @@ export default function PostWriterForm() {
                 editorRef.current.setContent(body as never, draft.uploadImageUrls as never);
                 return;
             }
-            if (tries++ < 60) setTimeout(put, 50); // 최대 3초 — 그 이상이면 에디터가 안 뜬 것이다
+            if (tries++ < 60) setTimeout(put, 50); // 3 seconds at most - beyond that the editor has not come up
         };
         put();
     }, [serverLoaded, storageKey]);
 
     /**
-     * 초안을 버린다.
+     * Discards the draft.
      *
-     * 새 글이면 비우면 그만이다. **수정 글은 비우면 안 된다** — 서버에 저장된 글까지 날아간
-     * 것처럼 보인다. 그래서 수정 글에서는 저장본을 다시 불러온다 (#201).
+     * For a new post, clearing is all there is. **An edit must not be cleared** - it would look as though the
+     * post saved on the server had gone too. So on an edit the saved version is fetched again (#201).
      */
     const discardDraft = () => {
         try { localStorage.removeItem(storageKey); } catch { /* 무시 */ }
         setRestoredAt(null);
         if (_id) {
-            // 서버 저장본으로 되돌린다 — 초안이 계속 되살아나 갇히는 일도 이걸로 풀린다.
+            // Reverts to the server's saved version - it is also the way out of being stuck with a draft that keeps returning.
             setServerLoaded(false);
             restoredRef.current = false;
             setReloadToken((n) => n + 1);
@@ -182,7 +182,7 @@ export default function PostWriterForm() {
             const el = containerRef.current;
             if (!el) return;
             const top = el.getBoundingClientRect().top;
-            // top 은 부모 py-6 상단여백 포함. 하단 py-6(24px) 여백도 빼 페이지 스크롤 방지.
+            // top includes the parent's py-6 top margin. The bottom py-6 (24px) is subtracted too, to prevent page scrolling.
             setMaxHeight(Math.max(320, window.innerHeight - top - 24));
         };
         update();
@@ -205,14 +205,14 @@ export default function PostWriterForm() {
                 }
 
                 const { data: post } = await res.json();
-                const { jsonContent, title, urls, tags: fetchedTags, isPrivate: fetchedPrivate, attachments: fetchedAttachments } = post; // API로부터 태그를 받아옵니다.
+                const { jsonContent, title, urls, tags: fetchedTags, isPrivate: fetchedPrivate, attachments: fetchedAttachments } = post; // Fetches the tags from the API.
                 if (jsonContent) {
-                    // 에디터에 내용 설정
+                    // Sets the content in the editor
                     console.assert(typeof jsonContent !== 'undefined', "jsonContent should not be undefined");
                     console.assert(typeof title === 'string', "jsonContent should be a string");
                     console.assert(Array.isArray(urls), "urls should be an array");
                     if (fetchedTags) {
-                        // 수정 모드일 때만 태그가 있을 수 있으므로, 배열인지 확인합니다.
+                        // Tags can exist only in edit mode, so it is checked for being an array.
                         console.assert(Array.isArray(fetchedTags), "tags should be an array");
                     }
                     console.assert(editorRef.current, "editorRef.current should not be null");
@@ -220,7 +220,7 @@ export default function PostWriterForm() {
                     setTitle(title);
                     setTags(fetchedTags || []);
                     setIsPrivate(!!fetchedPrivate);
-                    // 기존 첨부는 전용 영역 칩으로 복원(본문 삽입 아님).
+                    // Existing attachments are restored as chips in the dedicated area (not inserted into the body).
                     setAttachments(Array.isArray(fetchedAttachments) ? fetchedAttachments : []);
                 } else {
                     toast.error("게시글을 불러오는 데 실패했습니다.");
@@ -237,7 +237,7 @@ export default function PostWriterForm() {
     const handleSubmit = async (e: React.FormEvent<HTMLButtonElement>) => {
         e.preventDefault();
 
-        // 에디터에서 값 가져오기(본문·이미지). 첨부는 별도 state(전용 영역).
+        // Takes the values from the editor (the body and images). Attachments are separate state (the dedicated area).
         const { htmlContent, jsonContent, uploadImageUrls: urls } = editorRef.current?.getContent() || { jsonContent: null, htmlContent: null, uploadImageUrls: [] };
         if (!title.trim() || !jsonContent) {
             return toast.error("제목과 내용을 입력해주세요.");
@@ -260,7 +260,7 @@ export default function PostWriterForm() {
         };
 
         if (_id) {
-            postData._id = _id as string; // 수정하는 경우 ID 추가
+            postData._id = _id as string; // The ID is added when editing
             console.log("게시글 수정 데이터:", postData);
         }
 
@@ -273,8 +273,8 @@ export default function PostWriterForm() {
 
             if (response.ok) {
                 const result = await response.json();
-                // 올라갔으니 초안은 역할이 끝났다 (#257). 담는 것부터 멈추고 지운다 —
-                // 순서가 중요하다. 먼저 지우면 이어지는 정리 훅이 다시 써 버린다.
+                // It is published, so the draft's job is done (#257). Storing stops first, then it is deleted -
+                // the order matters. Deleting first lets the cleanup hook that follows write it again.
                 submittedRef.current = true;
                 try { localStorage.removeItem(storageKey); } catch { /* 무시 */ }
                 toast.success(_id ? "게시글이 성공적으로 수정되었습니다!" : "게시글이 성공적으로 작성되었습니다!");
@@ -283,8 +283,8 @@ export default function PostWriterForm() {
 
                 setTimeout(() => {
                     router.push("/");
-                    router.refresh(); // Router Cache 무효화 — 방금 작성한 글이 홈 최신 목록에 즉시 반영되도록
-                }, 1000); // 1초 후 홈으로 이동
+                    router.refresh(); // Invalidates the Router Cache - so the just-written post appears at once in the home page's latest list
+                }, 1000); // Goes home after a second
             } else {
                 toast.error("업로드에 실패했습니다.");
                 setLoading(false);
@@ -346,7 +346,7 @@ export default function PostWriterForm() {
                     className={`rich-web-editor-wrapper cursor-text ${isMobile ? "min-h-[480px]" : "flex-1 min-h-0"} ${attachments.length === 0 && pending.length === 0 ? "rounded-b-lg" : ""}`}
                     onClick={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
                     onFocus={(e) => { if (e.target === e.currentTarget) editorRef.current?.focus() }}
-                    tabIndex={0} // 키보드 네비게이션으로 포커스를 받을 수 있도록 설정
+                    tabIndex={0} // Set so it can take focus through keyboard navigation
                     aria-label="Post content editor, click or press enter to start writing"
                 >
                     <RichWebEditor

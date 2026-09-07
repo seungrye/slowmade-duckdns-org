@@ -33,7 +33,7 @@ const inputCls = "w-full border rounded px-2 py-1 text-xs bg-white dark:bg-gray-
 
 const stopPropagation = (e: React.PointerEvent) => e.stopPropagation();
 
-// ── reorder helper (테스트 export) ──────────────────────────────────────────────
+// -- reorder helper (exported for the tests) --------------------------------------------------
 export function reorderChoices(items: Choice[], from: number, to: number): Choice[] {
   if (from === to) return items;
   return arrayMove(items, from, to);
@@ -75,7 +75,7 @@ function SceneSelect({
   ariaLabel: string;
   sceneIds: string[];
 }) {
-  // 현재 값이 후보에 없으면 추가하여 표시 (편집 중 임시 상태)
+  // If the current value is not among the candidates it is added so it shows (a temporary state while editing)
   const options = sceneIds.includes(value) || !value ? sceneIds : [value, ...sceneIds];
   return (
     <select

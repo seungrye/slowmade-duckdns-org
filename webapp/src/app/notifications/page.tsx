@@ -1,14 +1,14 @@
 export const dynamic = 'force-dynamic';
 
-// 알림 목록 (#237).
+// The notification list (#237).
 //
-// 항목을 누르면 메인 말풍선과 같은 섹션 앵커로 간 뒤, CommentAnchor 가 그 덧글까지 더
-// 스크롤한다 (#243).
+// Pressing an item goes to the same section anchor as the main speech bubble, and CommentAnchor then scrolls
+// on to that comment (#243).
 //
-// **읽음은 "봤다"가 아니라 "처리했다"다 (#247).** 예전엔 페이지를 여는 것만으로 전부 읽음이
-// 돼서(`MarkSeen`), 안 읽음 표시가 새 덧글이 온 뒤 첫 렌더 한 번만 살아있고 새로고침하면
-// 사라졌다 — 표식을 진하게 해 봐야 정작 볼 때는 볼 것이 없었다. 이제 항목을 눌렀을 때
-// 그것만 읽음이 되고, 한꺼번에 정리하려면 [모두 읽음] 을 누른다.
+// **Read means "handled", not "seen" (#247).** Opening the page used to mark everything read
+// (`MarkSeen`), so the unread marking survived only the first render after a new comment and vanished
+// on a refresh - however bold the marking, there was nothing left to see by the time you looked. Now pressing an item
+// marks that one alone, and [mark all read] clears them together.
 
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
@@ -30,11 +30,11 @@ export default async function NotificationsPage() {
   const now = new Date();
 
   return (
-    // 루트 레이아웃이 이미 <main> 으로 감싸므로 여기선 div (main 중첩 금지, #239).
+    // The root layout already wraps this in a <main>, so a div is used here (no nested main, #239).
     //
-    // 헤더·홈과 같은 사이트 표준 폭 (#243). max-w-3xl 을 주면 데스크톱에서도 모바일 폭으로
-    // 좁게 나온다. 예전에 상한을 빼자 항목이 화면을 가로지른 적이 있는데(#241) 그 원인은
-    // 폭이 아니라 시각의 ml-auto 였고 이미 고쳤다.
+    // The site's standard width, as on the header and home (#243). max-w-3xl would make it as narrow as
+    // mobile even on desktop. Removing the cap once let an item stretch across the screen (#241), but that was caused by
+    // the timestamp's ml-auto rather than the width, and it is already fixed.
     <div className="lg:container mx-auto px-4 py-8">
       {/* 눌러서 읽은 뒤 돌아오면 목록을 다시 받아온다 (#259). */}
       <RefreshOnReturn />
@@ -63,9 +63,9 @@ export default async function NotificationsPage() {
                 href={notificationHref(n.postId, n.id)}
                 id={n.id}
                 isUnread={n.isUnread}
-                // 안 읽음은 배경 틴트 + 왼쪽 파란 띠로 구분한다 (#247). 점·굵은 글씨만으로는
-                // 훑을 때 눈에 안 들어왔다. 읽은 항목도 같은 두께의 투명 띠를 둬서 글이
-                // 좌우로 밀리지 않게 한다.
+                // Unread is distinguished by a background tint plus a blue bar on the left (#247). A dot and bold text alone
+                // did not register while scanning. Read items get a transparent bar of the same width so the text
+                // does not shift sideways.
                 className={`flex gap-3 border-l-2 py-3 pl-3 pr-2 transition-colors ${
                   n.isUnread
                     ? 'border-blue-500 bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20'

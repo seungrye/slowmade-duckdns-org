@@ -4,10 +4,10 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import VirtualKeypad from "./VirtualKeypad";
 
 /**
- * VirtualKeypad 단위 테스트.
+ * VirtualKeypad unit tests.
  *
- * 게임 코드 변경 없이 `KeyboardEvent` dispatch 로 키 입력을 전달한다는
- * 핵심 계약을 검증한다.
+ * They verify the core contract: input is delivered by dispatching a `KeyboardEvent`,
+ * with no change to the game's code.
  */
 
 describe("VirtualKeypad — 기본 렌더링", () => {
@@ -41,7 +41,7 @@ describe("VirtualKeypad — 기본 렌더링", () => {
     expect(screen.getByLabelText("함정 묶음 펼치기")).toBeInTheDocument();
     expect(screen.getByLabelText("원거리 묶음 펼치기")).toBeInTheDocument();
 
-    // 처음에는 스킬 1~3 / 함정 / 원거리 버튼이 보이지 않음.
+    // At first the skill 1-3, trap and ranged buttons are not visible.
     expect(screen.queryByLabelText("스킬 1")).toBeNull();
     expect(screen.queryByLabelText("함정 설치 (T)")).toBeNull();
     expect(screen.queryByLabelText("원거리 모드 (F)")).toBeNull();

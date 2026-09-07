@@ -1,4 +1,4 @@
-// InventoryStrip — HP/재굴림/인벤 그룹화 표시 (#301).
+// InventoryStrip - showing HP, rerolls and the grouped inventory (#301).
 // @vitest-environment jsdom
 
 import { describe, it, expect } from "vitest";
@@ -10,7 +10,7 @@ describe("InventoryStrip", () => {
     render(<InventoryStrip hp={8} maxHp={10} rerollsLeft={2} inventory={[]} onUseItem={() => {}} onReroll={() => {}} canReroll={false} />);
     expect(screen.getByText(/8/)).toBeInTheDocument();
     expect(screen.getByText(/\/ 10/)).toBeInTheDocument();
-    // 재굴림 숫자 (2 가 있는 span)
+    // the reroll count (the span containing 2)
     const rerollHits = screen.getAllByText(/2/);
     expect(rerollHits.length).toBeGreaterThan(0);
   });

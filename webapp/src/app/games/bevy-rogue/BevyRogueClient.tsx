@@ -3,50 +3,50 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import VirtualKeypad from "./VirtualKeypad";
 
-// bevy-rogue WASM glue 의 default export 타입.
-// (실제 .d.ts 는 site repo 에 없음 — wasm-bindgen --no-typescript.)
-// 새 wasm-bindgen API: 단일 옵션 객체. 위치 인자는 deprecation 경고.
+// The type of the bevy-rogue WASM glue's default export.
+// (The real .d.ts is not in the site repo - wasm-bindgen --no-typescript.)
+// The new wasm-bindgen API: a single options object. Positional arguments give a deprecation warning.
 type WasmInit = (opts?: { module_or_path?: string | URL | Request | Response }) => Promise<unknown>;
-// wasm 측 명시 진입점 — bevy-rogue/src/lib.rs `pub fn start(content_json: Option<String>)`.
-// `null` 이면 wasm 측이 임베드 폴백으로 진행.
+// The wasm side's explicit entry point - bevy-rogue/src/lib.rs's `pub fn start(content_json: Option<String>)`.
+// With `null` the wasm side proceeds on its embedded fallback.
 type WasmStart = (contentJson: string | null) => void;
 
 /**
- * bevy-rogue WASM 게임 클라이언트.
+ * The bevy-rogue WASM game client.
  *
- * 구조:
- *   - <canvas id="bevy-canvas"/> 를 마운트 → Bevy 가 이걸 잡아서 winit 캔버스로 사용.
- *   - useEffect 에서 /games/bevy-rogue/bevy_rogue.js 를 dynamic import →
- *     default(initWasmUrl) 호출로 wasm 초기화.
- *   - 초기화 중엔 한국어 로더, 실패 시 한국어 에러 메시지.
+ * The structure:
+ *   - it mounts a <canvas id="bevy-canvas"/>, which Bevy picks up as its winit canvas.
+ *   - a useEffect dynamically imports /games/bevy-rogue/bevy_rogue.js and initialises the
+ *     wasm by calling default(initWasmUrl).
+ *   - a Korean loader shows during initialisation, and a Korean error message on failure.
  *
- * SSR 회피:
- *   - 이 파일은 "use client" 클라이언트 컴포넌트.
- *   - page.tsx 가 next/dynamic({ ssr: false }) 로 import 한다.
+ * Avoiding SSR:
+ *   - this file is a "use client" client component.
+ *   - page.tsx imports it through next/dynamic({ ssr: false }).
  */
-// 캔버스의 native 해상도 — Bevy/winit 이 attribute 로 관리하는 값과 동일.
+// The canvas's native resolution - the same value Bevy and winit manage as an attribute.
 const CANVAS_NATIVE_WIDTH = 640;
 const CANVAS_NATIVE_HEIGHT = 496;
 
 export default function BevyRogueClient() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // 외부 래퍼 — 실제 보이는 박스 (반응형). 너비를 측정해 scale 계산.
+  // The outer wrapper - the visible box (responsive). Its width is measured to compute the scale.
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  // 로더 단계 — wasm 다운로드 → 콘텐츠 동기화 → 초기화 순서로 진행.
-  // 사용자에게 무엇이 진행 중인지 한 줄로 보여준다.
+  // The loader's stages - downloading the wasm, syncing the content, then initialising.
+  // It shows the user in one line what is in progress.
   const [loadingStage, setLoadingStage] = useState<"wasm" | "content" | "init">("wasm");
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
     let cancelled = false;
-    // import 가 끝나기 전에 unmount 되면 Bevy 가 캔버스를 찾지 못해도 무해.
+    // Unmounting before the import finishes is harmless even if Bevy cannot find the canvas.
 
     (async () => {
       try {
-        // wasm 글루는 public/games/bevy-rogue/ 에 있어야 한다(publish-to-site.sh).
-        // /* @vite-ignore */ /* webpackIgnore: true */ 둘 다 줘서
-        // Next.js (turbopack/webpack) 가 번들에 포함시키지 않고 런타임 fetch 만 수행.
+        // The wasm glue has to be in public/games/bevy-rogue/ (publish-to-site.sh).
+        // Both /* @vite-ignore */ and /* webpackIgnore: true */ are given so
+        // Next.js (turbopack/webpack) keeps it out of the bundle and only fetches at run time.
         const glueUrl = "/games/bevy-rogue/bevy_rogue.js";
         const mod = (await import(/* webpackIgnore: true */ /* @vite-ignore */ glueUrl)) as {
           default: WasmInit;
@@ -54,18 +54,18 @@ export default function BevyRogueClient() {
         };
         if (cancelled) return;
 
-        // wasm 바이너리 URL — 글루의 default 에 명시 전달해서
-        // 글루 내부의 상대 경로 추측을 피한다(Next.js 라우트와 분리).
-        // 새 wasm-bindgen 은 단일 옵션 객체 시그니처를 요구(위치 인자는 deprecation).
+        // The wasm binary's URL - passed explicitly to the glue's default so
+        // the glue does not guess a relative path internally (keeping it separate from Next.js routing).
+        // The new wasm-bindgen requires the single-options-object signature (positional arguments are deprecated).
         await mod.default({ module_or_path: "/games/bevy-rogue/bevy_rogue_bg.wasm" });
         if (cancelled) return;
 
-        // REMOTE 콘텐츠 fetch 정책:
-        //   - 진행 중 게임 (localStorage 에 'progress.ron' 있음) → SKIP.
-        //     진행 중 게임은 저장된 town_config / 카탈로그 상태를 그대로 유지.
-        //     site 옵션이 바뀌어도 그 게임에는 반영 안 됨. 신규 게임은 fetch 후 적용.
-        //   - 신규 게임 → /api/game/content/v1 fetch → mod.start 로 install.
-        //   - ?live=0 → 강제 임베드 모드 (디버그용).
+        // The REMOTE content fetch policy:
+        //   - a game in progress ('progress.ron' in localStorage) -> SKIP.
+        //     A game in progress keeps its saved town_config and catalogue state as they are.
+        //     A changed site option does not reach that game. A new game fetches and applies it.
+        //   - a new game -> fetch /api/game/content/v1 -> install through mod.start.
+        //   - ?live=0 -> force embedded mode (for debugging).
         setLoadingStage("content");
         let contentJson: string | null = null;
         const url = new URL(window.location.href);
@@ -87,22 +87,22 @@ export default function BevyRogueClient() {
         }
         if (cancelled) return;
 
-        // 명시적 진입점 호출 — wasm 측이 콘텐츠 install 후 게임 루프 시작.
+        // Calling the explicit entry point - the wasm side installs the content then starts the game loop.
         setLoadingStage("init");
         mod.start(contentJson);
 
         setStatus("ready");
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        // winit 이 wasm 에서 EventLoop 를 시작할 때 던지는 "Using exceptions for
-        // control flow" 는 정상 동작 신호 — Bevy 가 실행 루프에 들어갔다는 뜻.
-        // 실제 에러가 아니므로 ready 처리.
+        // The "Using exceptions for control flow" winit throws when starting the EventLoop in wasm is
+        // a sign of normal operation - it means Bevy has entered its run loop.
+        // It is not a real error, so it is treated as ready.
         if (/Using exceptions for control flow/.test(msg)) {
           if (cancelled) return;
           setStatus("ready");
           return;
         }
-        // 사용자엔 한국어 오버레이, 개발자엔 원본 에러를 콘솔에.
+        // A Korean overlay for the user, the original error in the console for the developer.
         console.error("[bevy-rogue] wasm 초기화 실패:", e);
         if (cancelled) return;
         setErrorMessage(msg);
@@ -115,8 +115,8 @@ export default function BevyRogueClient() {
     };
   }, []);
 
-  // 모바일 반응형 — 부모 래퍼의 실제 폭을 측정해서 캔버스에 transform: scale 적용.
-  // canvas attribute/CSS 는 그대로 두고(winit 경합 회피) 부모 측정값만으로 시각 사이즈 조절.
+  // Mobile responsiveness - the parent wrapper's real width is measured and a transform: scale applied to the canvas.
+  // The canvas attributes and CSS are left alone (avoiding a fight with winit) and only the parent's measurement drives the visual size.
   useEffect(() => {
     const wrapper = wrapperRef.current;
     const canvas = canvasRef.current;
@@ -125,7 +125,7 @@ export default function BevyRogueClient() {
     const applyScale = () => {
       const w = wrapper.clientWidth;
       if (w <= 0) return;
-      // 부모가 native 보다 작을 때만 축소, 크면 native 유지(1배).
+      // It shrinks only when the parent is smaller than native; larger keeps native (1x).
       const scale = w < CANVAS_NATIVE_WIDTH ? w / CANVAS_NATIVE_WIDTH : 1;
       canvas.style.transform = scale === 1 ? "none" : `scale(${scale})`;
       canvas.style.transformOrigin = "top left";
@@ -133,7 +133,7 @@ export default function BevyRogueClient() {
 
     applyScale();
 
-    // ResizeObserver 로 폭 변화 추적 — orientation change, 창 리사이즈, 부모 레이아웃 변화 모두 커버.
+    // A ResizeObserver tracks width changes - covering orientation changes, window resizes and parent layout changes alike.
     const ro = new ResizeObserver(() => applyScale());
     ro.observe(wrapper);
 
@@ -142,7 +142,7 @@ export default function BevyRogueClient() {
     };
   }, []);
 
-  // 가상 키패드에 캔버스 ref 를 안정적으로 노출 — 매 렌더마다 새 함수 만들지 않도록 useCallback.
+  // The canvas ref is exposed stably to the virtual keypad - useCallback avoids creating a new function every render.
   const getCanvas = useCallback(() => canvasRef.current, []);
 
   return (

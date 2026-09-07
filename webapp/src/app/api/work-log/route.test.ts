@@ -1,7 +1,7 @@
-// work_log 앱 배포 API (#261).
+// The work_log app distribution API (#261).
 //
-// 판단(무엇을 받아들일까)은 lib/work-log-release.test.ts 가 본다. 여기서는 **키가 없으면
-// 아무 일도 일어나지 않는지**, 올린 것이 최신으로 갈아 끼워지는지를 본다.
+// The judgement (what to accept) is lib/work-log-release.test.ts's concern. This checks that **nothing happens
+// without a key**, and that an upload is swapped in as the latest.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockEnv = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ vi.mock('@/models/work-log-release', () => ({
 import { POST } from './release/route';
 import { GET as LATEST } from './latest/route';
 
-/** lean() 까지 이어지는 mongoose 체인 흉내. */
+/** Mimics the mongoose chain down to lean(). */
 function chain(result: unknown) {
   return { sort: () => ({ lean: async () => result }) };
 }
@@ -57,7 +57,7 @@ describe('POST /api/work-log/release', () => {
     expect(mockPut).not.toHaveBeenCalled();
   });
 
-  // 키를 안 정해 뒀는데 열려 있으면 아무나 APK 를 갈아 끼울 수 있다.
+  // Left open with no key configured, anyone could swap the APK.
   it('APP_KEY 가 비어 있으면 503 — 열어 두지 않는다', async () => {
     mockEnv.appKey = '';
     const res = await POST(uploadReq({ versionCode: '2', versionName: '0.2' }));
@@ -80,7 +80,7 @@ describe('POST /api/work-log/release', () => {
     expect(doc.size).toBe(1234);
   });
 
-  // 한 벌만 둔다 — 안 지우면 옛 기록이 쌓이고 최신이 뭔지 흐려진다.
+  // Only one is kept - without deleting, old records pile up and which is latest gets murky.
   it('올릴 때 이전 기록을 지운다', async () => {
     await POST(uploadReq({ versionCode: '7', versionName: '0.7' }));
     expect(mockDeleteMany).toHaveBeenCalled();
@@ -100,7 +100,7 @@ describe('GET /api/work-log/latest', () => {
     expect((await LATEST(req('wrong-key'))).status).toBe(401);
   });
 
-  // 아직 아무것도 안 올렸다고 앱이 오류를 띄울 이유가 없다.
+  // There is no reason for the app to raise an error just because nothing has been uploaded yet.
   it('올라온 것이 없으면 오류가 아니라 available:false', async () => {
     mockFindOne.mockReturnValue(chain(null));
     const res = await LATEST(req());

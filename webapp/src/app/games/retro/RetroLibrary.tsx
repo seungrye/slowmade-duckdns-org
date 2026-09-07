@@ -11,29 +11,29 @@ import { countByPlatform, filterGames, type PlatformFilter } from "@/lib/retro/f
 interface Props {
   builtins: BuiltinGame[];
   initialRoms: UserRomDto[];
-  /** 에뮬레이터 자산이 서버에 배치되지 않았다 — 목록 위에 설치 안내를 띄운다. */
+  /** The emulator assets are not deployed on the server - an install notice is shown above the list. */
   assetsMissing?: boolean;
 }
 
 /**
- * 고전 게임 라이브러리 (#109).
+ * The retro game library (#109).
  *
- * 기본 제공 홈브류와 내가 올린 롬을 **한 목록**으로 보여 준다. 둘의 차이는 카드에 삭제 버튼이
- * 붙는지뿐 — 검색·기종 필터는 구분 없이 걸린다(`lib/retro/entry.ts` 가 모양을 맞춰 준다).
+ * It shows the bundled homebrew and my uploaded ROMs as **one list**. The only difference is whether the card has a
+ * delete button - search and the system filter apply without distinction (`lib/retro/entry.ts` aligns their shapes).
  */
 export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: Props) {
   const [roms, setRoms] = useState<UserRomDto[]>(initialRoms);
   const [platform, setPlatform] = useState<PlatformFilter>("all");
   const [query, setQuery] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
-  // 지울지 물어보는 중인 롬 (#155). 카드의 삭제 버튼은 손이 스치기 쉬운 자리라
-  // 한 번 누르면 끝나면 안 된다 — 되돌릴 수 없는 일이다.
+  // The ROM awaiting a delete confirmation (#155). The card's delete button sits where a hand easily brushes it,
+  // so one press must not be the end of it - it cannot be undone.
   const [pendingDelete, setPendingDelete] = useState<GameEntry | null>(null);
-  // 패치 업로드·토글이 도는 동안 그 카드만 잠근다.
+  // Only that card is locked while a patch upload or toggle is in flight.
   const [working, setWorking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 내가 올린 것을 앞에 둔다 — 방금 올린 롬이 스크롤 없이 보여야 한다.
+  // My uploads come first - a just-uploaded ROM must be visible without scrolling.
   const entries = useMemo<GameEntry[]>(
     () => [...roms.map(romEntry), ...builtins.map(builtinEntry)],
     [roms, builtins],
@@ -42,7 +42,7 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
   const counts = useMemo(() => countByPlatform(entries), [entries]);
   const visible = useMemo(() => filterGames(entries, platform, query), [entries, platform, query]);
 
-  /** 카드의 삭제 버튼 — 바로 지우지 않고 확인부터 받는다 (#155). */
+  /** The card's delete button - it asks for confirmation rather than deleting at once (#155). */
   function handleDelete(game: GameEntry) {
     if (game.source !== "rom") return;
     setPendingDelete(game);
@@ -61,7 +61,7 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
     }
   }
 
-  /** 패치를 올린다 — 서버가 기존 것을 교체하고 적용을 켠다. */
+  /** Uploads a patch - the server replaces the existing one and turns applying on. */
   async function handlePatchUpload(game: GameEntry, file: File) {
     setError(null);
     setWorking(game.id);
@@ -88,7 +88,7 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
   async function handlePatchToggle(game: GameEntry, enabled: boolean) {
     setError(null);
     setWorking(game.id);
-    // 먼저 화면을 바꾸고, 실패하면 되돌린다 — 체크박스는 즉각 반응해야 한다.
+    // The UI updates first and reverts on failure - a checkbox has to respond immediately.
     setRoms((prev) => prev.map((r) => (r.id === game.id ? { ...r, patchEnabled: enabled } : r)));
     try {
       const res = await fetch(`/api/games/retro/roms/${game.id}`, {
@@ -105,7 +105,7 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
     }
   }
 
-  /** 카드 그림을 바꾼다. 주소는 그대로이고 내용만 바뀌므로 캐시를 깨는 값을 붙인다. */
+  /** Changes the card's picture. The address stays the same while the content changes, so a cache-busting value is appended. */
   async function handleCoverUpload(game: GameEntry, file: File) {
     setError(null);
     setWorking(game.id);
@@ -134,7 +134,7 @@ export default function RetroLibrary({ builtins, initialRoms, assetsMissing }: P
     setError(null);
     setWorking(game.id);
     const before = game.title;
-    // 먼저 화면을 바꾸고, 실패하면 되돌린다.
+    // The UI updates first and reverts on failure.
     setRoms((prev) => prev.map((r) => (r.id === game.id ? { ...r, title } : r)));
     try {
       const res = await fetch(`/api/games/retro/roms/${game.id}`, {

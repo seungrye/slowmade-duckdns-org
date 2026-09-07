@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import PostViewContainer from './post-view-container';
 
 /**
- * 비공개(또는 존재하지 않는) 글을 클라이언트에서 인증 로드한다. 서버 페이지가 auth() 를 호출하지
- * 않아 공개 글의 정적 캐시가 유지되고, 비공개 글은 여기서 /api/post(세션 기반 privacy 필터)로 받아
- * **작성자 본인에게만** 렌더한다. 못 받으면(타인·비로그인·없는 글) '찾을 수 없음'.
+ * Loads a private (or non-existent) post on the client, authenticated. The server page never calls auth(),
+ * so a public post's static cache holds, while a private one is fetched here through /api/post (a session-based privacy filter)
+ * and rendered **for the author alone**. When it cannot be fetched (someone else, logged out, or absent) it is 'not found'.
  */
 type Loaded = {
   _id: string; title: string; jsonContent: unknown; likes?: number; tags?: string[]; aiTags?: string[];
@@ -32,9 +32,9 @@ export default function PrivatePostGate({ id }: { id: string }) {
     return () => { alive = false; };
   }, [id]);
 
-  // 비공개 글은 서버 generateMetadata 가 제목을 못 준다(공개만 로드 → "Post Not Found | Slowmade").
-  // 작성자 본인이 클라에서 로드에 성공하면 실제 제목으로 탭 제목을 세팅(접미사는 layout 템플릿과 동일).
-  // 다른 페이지로 이동하면 Next 메타데이터가 재설정하므로 cleanup 불필요.
+  // The server's generateMetadata cannot give a private post's title (it loads public only -> "Post Not Found | Slowmade").
+  // When the author loads it successfully on the client, the tab title is set to the real title (the suffix matching the layout template).
+  // Navigating elsewhere makes Next reset the metadata, so no cleanup is needed.
   useEffect(() => {
     if (state === 'ok' && post?.title) document.title = `${post.title} | Slowmade`;
   }, [state, post]);

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@/lib/posts', () => ({ getPaginatedPosts: vi.fn() }));
-vi.mock('@/auth', () => ({ auth: vi.fn(() => Promise.resolve(null)) })); // 비로그인 뷰어 기본
+vi.mock('@/auth', () => ({ auth: vi.fn(() => Promise.resolve(null)) })); // the default is a logged-out viewer
 
 import { GET } from './route';
 import { getPaginatedPosts } from '@/lib/posts';
@@ -48,7 +48,7 @@ describe('GET /api/posts', () => {
   it('유효하지 않은 sort는 undefined로 처리된다', async () => {
     (getPaginatedPosts as ReturnType<typeof vi.fn>).mockResolvedValue({ posts: [], total: 0 });
     await GET(makeRequest({ sort: 'invalid' }));
-    // SortOptionSchema.safeParse 실패 시 data=undefined → getPaginatedPosts에 undefined 전달
+    // A failed SortOptionSchema.safeParse gives data=undefined -> undefined is passed to getPaginatedPosts
     expect(getPaginatedPosts).toHaveBeenCalledWith(1, 9, undefined, null, true, null, null);
   });
 
@@ -65,7 +65,7 @@ describe('GET /api/posts', () => {
   });
 });
 
-// 메인 화면 제목 검색 (#232) — 전체 글에서 찾아야 하므로 서버로 넘긴다.
+// Title search on the main screen (#232) - it has to search every post, so it goes to the server.
 describe('GET /api/posts — q(제목 검색)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,7 +77,7 @@ describe('GET /api/posts — q(제목 검색)', () => {
     expect(getPaginatedPosts).toHaveBeenCalledWith(1, 9, 'latest', null, true, null, '고양이');
   });
 
-  // 검색창을 비우면 전체 목록으로 돌아와야 한다.
+  // Clearing the search box must return the full list.
   it('공백만이면 검색어로 치지 않는다', async () => {
     await GET(makeRequest({ q: '   ' }));
     expect(getPaginatedPosts).toHaveBeenCalledWith(1, 9, 'latest', null, true, null, null);

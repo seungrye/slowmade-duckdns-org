@@ -20,9 +20,9 @@ function isAllowedOrigin(req: NextRequest): boolean {
 }
 
 /**
- * @painter-bot 멘션을 제거하여 순수 prompt 만 추출.
- * - 멘션 없으면 전체 content 를 prompt 로 사용.
- * - 양 끝 공백/멘션 흔적 제거.
+ * Strips the @painter-bot mention to extract the prompt alone.
+ * - With no mention, the whole content is the prompt.
+ * - Surrounding whitespace and mention remnants are removed.
  */
 function extractPrompt(content: string): string {
   return content.replace(/@painter-bot/gi, '').trim();
@@ -49,9 +49,9 @@ async function savePainterComment(
 }
 
 /**
- * painter-bot 의 이미지 생성 백그라운드 처리.
- * - quota 체크 → Pollinations 호출 → MinIO 업로드 → 댓글 저장.
- * - 실패 시 안내 댓글 등록.
+ * painter-bot's background image generation.
+ * - Check the quota -> call Pollinations -> upload to MinIO -> save the comment.
+ * - On failure it posts a notice comment.
  */
 async function handlePainterRequest(
   prompt: string,
@@ -76,8 +76,8 @@ async function handlePainterRequest(
       geminiApiKey: env.geminiApiKey,
     });
 
-    // 번역됐을 때: 원본 + 영문 번역본을 모두 표기.
-    // 영문 / 번역 실패 시: 기존 단일 형식 유지.
+    // When translated: both the original and the English translation are shown.
+    // For English input, or a failed translation: the existing single form stands.
     const commentText = result.translatedPrompt
       ? `🎨 "${result.originalPrompt}"\n↓\n"${result.translatedPrompt}"\n생성 완료`
       : `🎨 "${result.originalPrompt}" 생성 완료`;
@@ -120,8 +120,8 @@ export async function POST(req: NextRequest) {
 
   await connectToDB();
 
-  // #205 — 존재만 확인하고 통과시키면 남의 비공개 글에 덧글이 들어간다.
-  // 없을 때와 같은 404 로 답해 존재 여부를 알려 주지 않는다.
+  // #205 - letting it through on existence alone puts a comment on someone else's private post.
+  // It answers with the same 404 as an absent post, so existence is not revealed.
   const post = await Post.findById(postId).lean();
   if (!post || !canCommentOn(post, session.user.email)) {
     return apiError('게시글을 찾을 수 없습니다.', 404);
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
   const userComment = new Comment({ post: postId, parent: parentId, content, author, authorId });
   await userComment.save();
 
-  // painter-bot 은 *모든 content 가 prompt*. 명령어 파싱 X.
+  // For painter-bot *all the content is the prompt*. There is no command parsing.
   const prompt = extractPrompt(content);
   const finalPrompt = prompt || '아무거나 멋진 그림';
 

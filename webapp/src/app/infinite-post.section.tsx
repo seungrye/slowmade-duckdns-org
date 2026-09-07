@@ -13,13 +13,13 @@ export interface InfinitPostListRef {
 
 interface InfinitPostListProps {
   onTopmostVisiblePostChange?: (postId: string | null) => void;
-  // 서버(page.tsx)에서 SSR 로드한 첫 페이지. 있으면 초기 CSR fetch 를 건너뛴다.
+  // The first page SSR-loaded on the server (page.tsx). When present, the initial CSR fetch is skipped.
   initialPosts?: GetPostType[];
   /**
-   * 제목 검색어 (#232). 값이 바뀌면 목록을 처음부터 다시 받는다.
+   * The title search term (#232). A changed value refetches the list from the start.
    *
-   * **불러온 것만 거르지 않는다** — 9건씩 무한스크롤이라 그러면 "검색했는데 없다"가
-   * 거짓이 된다. 서버가 전체에서 찾는다.
+   * **It does not filter only what was loaded** - with infinite scroll 9 at a time that would make
+   * "I searched and it is not there" false. The server searches the whole set.
    */
   query?: string;
 }
@@ -27,22 +27,22 @@ interface InfinitPostListProps {
 // The component is wrapped in forwardRef to receive a ref from its parent.
 const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ onTopmostVisiblePostChange, initialPosts = [], query = '' }, ref) => {
   const [posts, setPosts] = useState<GetPostType[]>(initialPosts);
-  // 각 PostItem 엘리먼트에 대한 ref를 저장합니다.
+  // Stores a ref for each PostItem element.
   const postItemRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-  // SSR 로 첫 페이지가 채워졌으면 다음 무한스크롤은 2페이지부터. 없으면 기존대로 1부터.
+  // If SSR filled the first page, infinite scroll continues from page 2. Otherwise from 1, as before.
   const [page, setPage] = useState<number>(initialPosts.length > 0 ? 2 : 1);
-  // 초기값이 limit(9) 미만이면 더 없음. 없거나 9건이면 추가 로드 여지 있음.
+  // Fewer initial items than the limit (9) means there are no more. Absent, or 9, leaves room to load more.
   const [hasMore, setHasMore] = useState(initialPosts.length === 0 || initialPosts.length >= 9);
-  const [isLoading, setIsLoading] = useState(false); // 1. 로딩 상태 추가
+  const [isLoading, setIsLoading] = useState(false); // 1. the loading state
   const loaderRef = useRef<HTMLDivElement>(null);
 
-  // 열려있는 게시물의 ID를 관리하는 상태
+  // The state tracking which posts are open.
   const [openedPostIds, setOpenedPostIds] = useState<Set<string>>(new Set());
-  // 전체 게시물의 열림/닫힘 상태를 제어하는 모드
+  // The mode controlling the open/closed state of every post.
   const [expansionMode, setExpansionMode] = useState<'expand' | 'collapse' | 'individual'>('individual');
 
   const fetchPosts = useCallback(async (page: number) => {
-    // 1. 로딩 중이거나 더 이상 게시물이 없으면 중복 실행 방지
+    // 1. Prevents a duplicate run while loading or when there are no more posts.
     if (isLoading || !hasMore) return;
 
     setIsLoading(true);
@@ -55,18 +55,18 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
       return;
     }
     
-    // 기존 게시물은 최신 정보로 업데이트하고, 새 게시물은 추가합니다.
-    // 이 방식은 데이터의 최신 상태를 유지하면서 'key' 중복 오류를 방지하는 가장 안정적인 방법입니다.
+    // Existing posts are updated with the latest information and new ones appended.
+    // This is the most reliable way to keep the data current while avoiding duplicate 'key' errors.
     setPosts((prev) => {
       const postsMap = new Map(prev.map(p => [p._id, p]));
       newPosts.forEach((post: GetPostType) => {
         postsMap.set(post._id, post);
       });
-      // Map의 순서를 유지하면서 배열로 변환합니다.
+      // Converts to an array while keeping the Map's order.
       return Array.from(postsMap.values());
     });
 
-    // expansionMode에 따라 새로 로드된 게시물의 열림 상태를 결정합니다.
+    // expansionMode decides the open state of the newly loaded posts.
     if (expansionMode === 'expand') {
       setOpenedPostIds(prev => {
         const newSet = new Set(prev);
@@ -77,13 +77,13 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     setPage(page + 1);
   }, [hasMore, isLoading, expansionMode, query]);
 
-  // 검색어가 바뀌면 목록을 **통째로 갈아 끼운다** (#232).
+  // A changed search term **replaces the list wholesale** (#232).
   //
-  // fetchPosts 를 재사용하지 않는 이유: 그쪽은 isLoading/hasMore 로 중복을 막고 결과를
-  // 기존 목록에 **합친다**. 새 검색은 합치면 안 되고, 상태 초기화 직후엔 그 가드가 아직
-  // 옛 값을 보고 있어 호출이 삼켜진다.
+  // Why fetchPosts is not reused: it blocks duplicates through isLoading/hasMore and **merges** its result
+  // into the existing list. A new search must not merge, and right after the state reset those guards still
+  // hold the old values, so the call is swallowed.
   //
-  // `cancelled` 는 빠르게 타이핑할 때 **늦게 온 옛 응답이 새 결과를 덮는 것**을 막는다.
+  // `cancelled` stops **a late old response overwriting a newer result** while typing quickly.
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
@@ -107,18 +107,18 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     return () => { cancelled = true; };
   }, [query]);
 
-  // 2. 초기 데이터 로딩을 위한 useEffect
+  // 2. the useEffect for the initial data load
   useEffect(() => {
-    // 뒤로가기 등으로 컴포넌트가 다시 마운트될 때, posts가 이미 있다면 초기 로딩을 건너뜁니다.
+    // When the component remounts (going back and so on), the initial load is skipped if posts already exist.
     if (posts.length === 0) {
-      fetchPosts(1); // 첫 페이지 로드
+      fetchPosts(1); // loading the first page
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // 컴포넌트 마운트 시 한 번만 실행
+  }, []); // runs once, on component mount
 
-  // 현재 화면 상단의 게시물을 추적하기 위한 useEffect
+  // The useEffect that tracks the post currently at the top of the screen
   useEffect(() => {
-    // onTopmostVisiblePostChange prop이 없으면 옵저버를 설정하지 않습니다.
+    // Without an onTopmostVisiblePostChange prop no observer is set up.
     if (!onTopmostVisiblePostChange) return;
 
     const observer = new IntersectionObserver(
@@ -133,14 +133,14 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
         }
       },
       {
-        // 뷰포트 상단에서 0px, 하단에서 -90% 떨어진 지점을 기준으로 교차 여부를 판단합니다.
-        // 즉, 게시물이 화면 상단 10% 영역에 들어올 때 감지합니다.
+        // Intersection is judged against a line 0px from the viewport's top and -90% from its bottom.
+        // That is, a post is detected as it enters the top 10% of the screen.
         rootMargin: '0px 0px -90% 0px',
         threshold: 0,
       }
     );
 
-    // posts가 업데이트 될 때마다 ref가 있는 모든 post item을 관찰합니다.
+    // Every post item with a ref is observed whenever posts updates.
     const currentRefs = postItemRefs.current;
     currentRefs.forEach((el) => {
       if (el) observer.observe(el);
@@ -153,14 +153,14 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     };
   }, [posts, onTopmostVisiblePostChange]);
 
-  // 3. Intersection Observer를 위한 useEffect
+  // 3. the useEffect for the Intersection Observer
   useEffect(() => {
     const currentLoader = loaderRef.current;
     if (!currentLoader || !hasMore) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // 화면에 보이고, 로딩 중이 아닐 때만 다음 페이지 로드
+        // The next page loads only when it is on screen and nothing is loading
         if (entries[0].isIntersecting && !isLoading) {
           fetchPosts(page);
         }
@@ -173,10 +173,10 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     return () => {
       if (currentLoader) observer.unobserve(currentLoader);
     };
-  }, [fetchPosts, hasMore, isLoading, page]); // isLoading을 의존성에 추가
+  }, [fetchPosts, hasMore, isLoading, page]); // isLoading added to the dependencies
 
   const togglePost = useCallback((id: string) => {
-    setExpansionMode('individual'); // 사용자가 개별적으로 토글하면 'individual' 모드로 변경
+    setExpansionMode('individual'); // An individual toggle by the user switches to 'individual' mode
     setOpenedPostIds((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -188,7 +188,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     });
   }, []);
 
-  // 게시물 ID를 기반으로 이전 게시물의 ID를 찾는 함수
+  // Finds the previous post's id from a post id
   const getPrevPostId = useCallback((currentPostId: string): string | null => {
     const currentIndex = posts.findIndex(post => post._id === currentPostId);
     if (currentIndex > 0) {
@@ -197,7 +197,7 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     return null;
   }, [posts]);
 
-    // 게시물 ID를 기반으로 다음 게시물의 ID를 찾는 함수
+    // Finds the next post's id from a post id
   const getNextPostId = useCallback((currentPostId: string): string | null => {
     const currentIndex = posts.findIndex(post => post._id === currentPostId);
     if (currentIndex > -1 && currentIndex < posts.length - 1) {
@@ -225,19 +225,19 @@ const InfinitPostList = forwardRef<InfinitPostListRef, InfinitPostListProps>(({ 
     collapseAll,
   }));
 
-  // 초기 로딩 상태를 명확히 정의
+  // The initial loading state, defined explicitly
   const isInitialLoading = isLoading && posts.length === 0;
 
   return (
     <>
       <div className="grid grid-cols-1 gap-6">
         {isInitialLoading ? (
-          // 초기 로딩 시 스켈레톤 UI 렌더링
+          // Renders the skeleton UI during the initial load
           Array.from({ length: 9 }).map((_, index) => <PostItemSkeleton key={index} />)
         ) : (
           posts.map((post) => {
             const isOpen = openedPostIds.has(post._id);
-            // PostItem을 div로 감싸 id와 ref를 부여합니다.
+            // PostItem is wrapped in a div to carry the id and ref.
             return (
               <div
                 key={post._id}

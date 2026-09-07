@@ -5,9 +5,9 @@ import { env } from "@/lib/env";
 import { auth } from "@/auth";
 
 export const metadata: Metadata = {
-  // 키워드(유머·이야기·Slowmade)를 제목에 담아 검색엔진 주제 인식을 돕는다.
+  // Keywords (humour, stories, Slowmade) in the title help search engines recognise the topic.
   title: 'Slowmade — 느리게 제대로 만드는 유머와 이야기',
-  // 150~220자 권장(SEO). 키워드를 자연스럽게 분산.
+  // 150-220 characters recommended (SEO). Keywords spread naturally.
   description:
     '느리게, 하지만 제대로. Slowmade 는 손으로 고른 최신 유머 글과 일상 이야기를 한곳에 모아 보여주는 공간입니다. 매일 새로 올라오는 유머와 짧은 생각, 소소한 이야기를 부담 없이 둘러보고, 마음에 드는 글에는 좋아요와 댓글을 남기며 함께 즐겨보세요.',
   alternates: { canonical: '/' },
@@ -19,17 +19,17 @@ export const metadata: Metadata = {
   },
 };
 
-// 홈 최신 목록은 자주 바뀌므로 요청마다 SSR(첫 화면 데이터를 서버에서 렌더).
+// The home page's latest list changes often, so it is SSR per request (the first screen's data rendered on the server).
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
-  // 초기 9건을 서버에서 미리 로드해 InfinitPostList 초기값으로 주입(첫 페이지 CSR fetch 제거).
-  // 파라미터는 /api/posts route 와 동일하게 맞춘다(sort=latest, withComments=true).
-  // 로그인한 작성자는 자기 비공개 글도 피드에 보인다(viewer=본인 email).
+  // The first 9 are preloaded on the server and injected as InfinitPostList's initial value (removing the first page's CSR fetch).
+  // The parameters match the /api/posts route (sort=latest, withComments=true).
+  // A logged-in author sees their own private posts in the feed too (viewer = their own email).
   const session = await auth();
   const { posts } = await getPaginatedPosts(1, 9, 'latest', null, true, session?.user?.email ?? null);
 
-  // 홈 구조화 데이터(WebSite) — 검색엔진의 주제·사이트 이해를 돕는다.
+  // The home page's structured data (WebSite) - it helps search engines understand the topic and the site.
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',

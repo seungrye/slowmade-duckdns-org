@@ -1,15 +1,15 @@
-// /api/web-adventure/feedback-notes/worker — 피드백 노트 큐 워커. (#9)
+// /api/web-adventure/feedback-notes/worker - the feedback-note queue worker. (#9)
 //
-// 한 번 호출될 때마다 큐에서 **한 개**만 순차 처리한다(shim 단일 슬롯). host cron 이
-// 주기적으로(예: 1분) 호출해 큐를 드레인한다. 재시작으로 끊긴 processing 은 되살린다.
+// Each call processes **one** item from the queue, in order (the shim has a single slot). A host cron
+// calls it periodically (every minute, say) to drain the queue. A processing item cut off by a restart is revived.
 //
-// 인증: 내부 키(x-worker-key = env.llmWorkerKey, cron 용) 또는 owner 세션. 그 외 404.
+// Authentication: an internal key (x-worker-key = env.llmWorkerKey, for cron) or an owner session. Anything else gets 404.
 //
-// 흐름:
-//   1) stale processing(claimedAt 오래됨) → queued 복구 (재시작 유실 방지)
-//   2) 살아있는 processing 있으면 no-op 반환 (한 번에 하나 = 순차)
-//   3) 가장 오래된 queued 원자적 claim(→processing)
-//   4) past-run 입력으로 LLM 생성 → 성공: ready 채움 / 실패: 재시도 or failed
+// The flow:
+//   1) a stale processing item (an old claimedAt) -> returned to queued (preventing loss on a restart)
+//   2) with a live processing item, return a no-op (one at a time = sequential)
+//   3) atomically claim the oldest queued item (-> processing)
+//   4) generate with the LLM from the past-run input -> on success fill in ready; on failure retry or mark failed
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
@@ -25,7 +25,7 @@ import { STALE_MS, GEN_TIMEOUT_MS } from '@/lib/web-adventure/feedback-worker-ti
 
 const MAX_ATTEMPTS = 3;
 
-// 이 라우트는 생성 대기로 오래 걸릴 수 있음.
+// This route can take a long time waiting for the generation.
 export const maxDuration = 2820;
 
 async function authorize(req: NextRequest): Promise<boolean> {
@@ -41,23 +41,23 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
 
-  // 1) stale 복구 — 실행 결과를 기록하지 못한 시도는 **시도로 치지 않는다** (#101).
-  //    배포로 인스턴스가 죽으면 catch 도 돌지 못해 processing 인 채 남는다. 종전에는 claim
-  //    시점에 올려 둔 attempts 가 그대로여서, 배포 세 번이면 사람이 손대야 하는 failed 가
-  //    됐다(2026-08-12 사고). 되돌릴 때 attempts 를 함께 깎는다.
+  // 1) Stale recovery - an attempt that never recorded its outcome **does not count as an attempt** (#101).
+  //    When a deploy kills the instance, even the catch cannot run and it is left processing. Previously the attempts
+  //    raised at claim time stayed as they were, so three deploys made it a failed note needing manual
+  //    intervention (the 2026-08-12 incident). Returning it also decrements attempts.
   const staleCutoff = new Date(Date.now() - STALE_MS);
   await WebAdventureFeedbackNote.updateMany(
     { status: 'processing', claimedAt: { $lt: staleCutoff }, attempts: { $gt: 0 } },
     { $set: { status: 'queued', claimedAt: null }, $inc: { attempts: -1 } },
   );
 
-  // 2) 순차 보장 — 살아있는 processing 있으면 skip.
+  // 2) Guaranteeing order - skipped while a live processing item exists.
   const processing = await WebAdventureFeedbackNote.countDocuments({ status: 'processing' });
   if (processing > 0) {
     return apiSuccess({ state: 'busy' });
   }
 
-  // 3) 가장 오래된 queued 를 원자적으로 claim.
+  // 3) Atomically claim the oldest queued item.
   const note = await WebAdventureFeedbackNote.findOneAndUpdate(
     { status: 'queued' },
     { status: 'processing', claimedAt: new Date(), $inc: { attempts: 1 } },
@@ -67,13 +67,13 @@ export async function POST(req: NextRequest) {
     return apiSuccess({ state: 'idle' });
   }
 
-  // 4) 입력(past-run) 로드 → 생성.
+  // 4) Load the input (the past-run) and generate.
   try {
     const run = await WebAdventurePastRun.findById(note.pastRunId).lean();
     if (!run) throw new Error('원천 회차(past-run)를 찾을 수 없습니다.');
 
-    // #163 — 전체 씬 목록(제목만)을 함께 준다. 노트는 한 회차의 로그만 보므로, 이게 없으면
-    //   그 회차가 안 지난 장면을 "없다" 라고 단정한다.
+    // #163 - the full scene list (titles only) is sent along. A note sees one run's log alone, so without this it
+    //   declares scenes that run did not pass "absent".
     const sceneIndex = (await WebAdventureScene.find({ isDeleted: { $ne: true } })
       .select('id title')
       .lean()) as unknown as Array<{ id: string; title?: string }>;
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       { signal: AbortSignal.timeout(GEN_TIMEOUT_MS) },
     );
 
-    // AI 는 작가 노트(제안/개선안)만 생성. 서사는 엔딩 원본 로그를 그대로, 제목은 엔딩명.
+    // The AI writes only the author's note (suggestions and improvements). The narrative is the ending's original log as it stands, and the title the ending's name.
     note.authorNote = result.authorNote;
     note.narrative = (run.log ?? []).join('\n');
     note.title = `${endingLabel(run.endingId)} 회차 #${run.runIndex}`;
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     return apiSuccess({ state: 'done', id: String(note._id) });
   } catch (err) {
     const message = (err instanceof Error ? err.message : '생성 실패').slice(0, 500);
-    // 재시도 가능하면 queued 로 되돌리고, 한도 초과면 failed.
+    // If a retry is possible it returns to queued; past the limit it is failed.
     if (note.attempts >= MAX_ATTEMPTS) {
       note.status = 'failed';
       note.error = message;

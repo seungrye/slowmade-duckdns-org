@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-/** 백테스트 옵션 폼의 라벨+힌트 래퍼. 라벨(작은 굵은 글씨) 위, 입력 가운데, 힌트(연회색) 아래.
- *  브라우저 전략 탭과 팩터 탭이 같은 폼 디자인을 공유하도록 별도 모듈로 분리. */
+/** The label-plus-hint wrapper for the backtest option form. The label (small bold) on top, the input in the middle, the hint (light grey) below.
+ *  Split into its own module so the browser-strategy tab and the factor tab share one form design. */
 export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1">

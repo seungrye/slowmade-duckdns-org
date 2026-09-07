@@ -1,7 +1,7 @@
-// 내 롬 목록 (#109).
+// My ROM list (#109).
 //
-// 올리기는 `../rom-upload` 에 따로 있다 — middleware 의 10MB 본문 제한을 피하려면 그 경로만
-// matcher 에서 빼야 하는데, 여기까지 접두사로 빼면 `[id]/file` 응답의 보안 헤더가 사라진다.
+// Uploading lives separately at `../rom-upload` - dodging middleware's 10MB body limit means excluding that path
+// from the matcher, and excluding this far by prefix would strip the security headers from `[id]/file`'s response.
 
 import { NextResponse } from 'next/server';
 import { apiSuccess } from '@/lib/api-response';

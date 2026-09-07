@@ -11,7 +11,7 @@ import ReactECharts from "echarts-for-react";
 import Pager, { pageOfIndex, pageSlice } from "@/components/pager";
 import type { EChartsOption } from "echarts";
 
-/** 한 페이지에 보여줄 행 수. monitor 화면의 주문 로그와 같은 값으로 맞춘다 (#184). */
+/** Rows per page. Matched to the order log on the monitor screen (#184). */
 const PAGE_SIZE = 25;
 
 type Env = string;
@@ -30,15 +30,15 @@ type Trade = {
 type HistoryPoint = {
   dateStr: string;
   /**
-   * 블록 스냅샷에는 **없는 값이 있다** (#382). close-sync 는 블록 행에
-   * totalValue/cash/holdingsValue 만 쓴다 — 실현손익은 계좌 단위로만 계산되기 때문이다.
-   * 그래서 전부 optional 이다. 없는 값을 0 으로 꾸미지 않고 `—` 로 낸다.
+   * A block snapshot **has missing values** (#382). close-sync writes only
+   * totalValue/cash/holdingsValue on a block row - realized P&L is computed only per account.
+   * So everything is optional. A missing value is shown as `—` rather than dressed up as 0.
    */
   totalValue?: number;
   cash?: number;
   holdingsValue?: number;
   cumulativePnl?: number;
-  /** 매매기록·일봉으로 되살린 행 (#373). 현금·총재산·누적손익은 모르는 값이라 `—` 로 낸다. */
+  /** A row reconstructed from trades and daily bars (#373). Cash, total assets and cumulative P&L are unknown and shown as `—`. */
   backfilled?: boolean;
 };
 
@@ -50,13 +50,13 @@ type Props = {
   pricesByTicker: Record<string, { date: string; close: number }[]>;
   names: Record<string, string>;
   history: HistoryPoint[];
-  /** 이 계정·시장의 블록들 — 상단 탭 (#374). */
+  /** This account and market's blocks - the tabs at the top (#374). */
   blocks?: { portfolioId: string; strategy: string }[];
-  /** 지금 고른 블록. null 이면 전체. */
+  /** The currently selected block. null means all. */
   portfolioId?: string | null;
 };
 
-// 종목별 색 팔레트 — 종가/20일선/60일선을 같은 색으로, 선 스타일로 구분.
+// The per-symbol colour palette - the close, the 20-day and the 60-day MA share a colour and differ by line style.
 const PALETTE = [
   "#5470c6", "#91cc75", "#fac858", "#ee6666", "#73c0de",
   "#3ba272", "#fc8452", "#9a60b4", "#ea7ccc", "#c14953",
@@ -65,17 +65,17 @@ const PALETTE = [
 ];
 
 /**
- * 스냅샷 칸 하나. 값이 없거나 숫자가 아니면 `—`.
+ * One snapshot cell. `—` when the value is missing or not a number.
  *
- * 예전엔 그대로 formatMoney 에 넘겨 `undefined.toLocaleString()` 로 **페이지 전체가**
- * 죽었다(#382 — 블록별 매매 상세가 통째로 안 열렸다). 한 칸이 비었다고 화면이 사라지면
- * 안 되고, 0 으로 채우면 "손익이 0" 이라는 거짓말이 된다.
+ * It used to be passed straight into formatMoney, killing **the whole page** with
+ * `undefined.toLocaleString()` (#382 - the per-block trade detail would not open at all). One empty cell must not
+ * make the screen disappear, and filling it with 0 would be a lie meaning "the P&L is zero".
  */
 function money(v: number | undefined, currency: Currency): string {
   return typeof v === "number" && Number.isFinite(v) ? formatMoney(v, currency) : "—";
 }
 
-/** 수량처럼 통화가 아닌 숫자. 없으면 `—`. */
+/** A non-currency number, such as a quantity. `—` when absent. */
 function num(v: number | undefined): string {
   return typeof v === "number" && Number.isFinite(v) ? v.toLocaleString() : "—";
 }
@@ -87,7 +87,7 @@ function formatMoney(v: number, currency: Currency): string {
   return `${Math.round(v).toLocaleString()}원`;
 }
 
-/** 단순이동평균(SMA) — window 거래일 미만 구간은 null(라인 시작 전). */
+/** The simple moving average (SMA) - null before `window` trading days (the line has not started). */
 function sma(closes: number[], window: number): (number | null)[] {
   return closes.map((_, i) => {
     if (i < window - 1) return null;
@@ -114,7 +114,7 @@ export default function PortfolioDetailClient({
   const label = (tk: string) => names[tk] ?? tk;
   const tickers = Object.keys(pricesByTicker);
 
-  // center 날짜에 매매된 종목만 기본 표시(legend on), 나머지는 꺼둠.
+  // Only the symbols traded on the center date are shown by default (legend on); the rest are off.
   const centerTickers = useMemo(
     () => new Set(center ? trades.filter((t) => t.date === center).map((t) => t.ticker) : []),
     [center, trades],
@@ -123,9 +123,9 @@ export default function PortfolioDetailClient({
   const tickerLabelSet = useMemo(() => new Set(tickers.map((tk) => label(tk))), [pricesByTicker, names]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const option = useMemo<EChartsOption>(() => {
-    // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
-    // 전체 종목의 날짜 union — 모든 종가/이동평균을 같은 x축에 정렬.
-    // **자르지 않는다** (#133) — 처음 보이는 창만 아래 dataZoom 에서 잡는다.
+    // The union of every symbol's dates - aligning all the closes and moving averages to one x axis.
+    // The union of every symbol's dates - aligning all the closes and moving averages to one x axis.
+    // **Nothing is trimmed** (#133) - only the initially visible window is set by the dataZoom below.
     const allDates = Array.from(
       new Set(Object.values(pricesByTicker).flatMap((rows) => rows.map((r) => r.date))),
     ).sort();
@@ -151,12 +151,12 @@ export default function PortfolioDetailClient({
       const nameClose = label(tk);
       const name20 = `${label(tk)}·20`;
       const name60 = `${label(tk)}·60`;
-      // 범례엔 종목명만 노출 — 20/60일선은 legendselectchanged 에서 종가와 함께 토글(아래 onEvents).
+      // Only symbol names appear in the legend - the 20- and 60-day lines toggle with the close in legendselectchanged (the onEvents below).
       legendNames.push(nameClose);
       selected[nameClose] = isOn(tk);
 
-      // 매매 마커 — 종가 series 의 markPoint 로 붙여, 종가 legend 토글 시 함께 켜지고 꺼짐.
-      // 가격이 없는 체결은 마커를 찍을 y 좌표가 없다 — 넣으면 undefined 가 coord 로 들어간다 (#382).
+      // Trade markers are attached as the close series' markPoint, so they turn on and off with the close's legend toggle.
+      // A fill with no price has no y coordinate to mark - including it puts undefined into coord (#382).
       const tks = trades.filter(
         (t): t is typeof t & { price: number } =>
           t.ticker === tk && typeof t.price === "number" && Number.isFinite(t.price),
@@ -208,13 +208,13 @@ export default function PortfolioDetailClient({
       grid: { left: 16, right: 16, top: 24, bottom: 48, containLabel: true },
       xAxis: { type: "category", data: allDates },
       yAxis: { type: "value", scale: true, axisLabel: { show: false } },
-      // 하단 슬라이더(브러시)는 감추고 휠/드래그 줌(inside)만 — center 면 최근 구간을 확대.
+      // The bottom slider (the brush) is hidden and only wheel/drag zoom (inside) is used - with center, the recent range is zoomed.
       dataZoom: [
-        // 창 길이는 늘 같다(모바일 30 일·데스크톱 90 일). center 가 있으면 그 날짜를 품도록
-        // 자리만 옮긴다 (#135).
+        // The window length is always the same (30 days on mobile, 90 on desktop). With a center it only
+        // shifts position to contain that date (#135).
         //
-        // 예전엔 center 일 때 `start: 60, end: 100`(전체의 뒤 40%)이었는데, 마커로 들어오면
-        // center 가 **항상** 붙으므로 그 예외가 늘 이겨 30 일 창이 한 번도 적용되지 않았다.
+        // It used to be `start: 60, end: 100` (the last 40% of everything) whenever there was a center, and since arriving
+        // through a marker **always** attaches one, that exception always won and the 30-day window never applied.
         {
           type: "inside",
           ...((center && windowAround(allDates, center, isMobile)) ?? {
@@ -226,20 +226,20 @@ export default function PortfolioDetailClient({
     };
   }, [pricesByTicker, trades, names, center, isMobile]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 범례엔 종목명만 있으므로, 종목 종가를 켜고/끌 때 그 종목의 20/60일선도 같이 토글.
+  // The legend holds symbol names only, so turning a symbol's close on or off toggles its 20- and 60-day lines too.
   const handleLegendToggle = (
     params: { name?: string; selected?: Record<string, boolean> },
     chart: ChartInstance,
   ) => {
     const name = params.name;
-    if (!name || !tickerLabelSet.has(name)) return; // 종목명 항목만 처리(재귀 방지)
+    if (!name || !tickerLabelSet.has(name)) return; // only symbol-name entries are handled (preventing recursion)
     const on = params.selected?.[name] ?? false;
     const type = on ? "legendSelect" : "legendUnSelect";
     chart.dispatchAction({ type, name: `${name}·20` });
     chart.dispatchAction({ type, name: `${name}·60` });
   };
 
-  // 초기: 기본 꺼진(center 아닌) 종목의 20/60일선을 숨긴다(범례엔 없어 selected 로 못 잡음).
+  // Initially: hide the 20- and 60-day lines of symbols off by default (not the center ones) - they are not in the legend, so selected cannot catch them.
   const handleChartReady = (chart: ChartInstance) => {
     tickers.forEach((tk) => {
       if (isOn(tk)) return;
@@ -249,12 +249,12 @@ export default function PortfolioDetailClient({
   };
 
   const marketLabel = `${envLabel(env)} · ${currency === "KRW" ? "국장" : "미장"}`;
-  const tradesDesc = [...trades].reverse(); // 최신 매매가 위로
+  const tradesDesc = [...trades].reverse(); // the newest trades on top
   const historyDesc = [...history].reverse();
 
-  // 이 화면은 차트 마커를 눌러 `?center=<날짜>` 로 들어온다. 페이징을 넣으면서 무턱대고
-  // 1페이지를 보여 주면 **누른 마커의 매매가 안 보인다** — 있던 기능이 사라지는 셈이다.
-  // 그 날짜가 든 페이지로 연다(없으면 첫 페이지).
+  // This screen is reached by clicking a chart marker, arriving as `?center=<date>`. Blindly showing page 1 when
+  // paging was added would mean **the clicked marker's trade is not visible** - an existing feature lost.
+  // It opens on the page containing that date (the first page when absent).
   const [tradesPage, setTradesPage] = useState(() =>
     pageOfIndex(center ? tradesDesc.findIndex((t) => t.date === center) : -1, PAGE_SIZE),
   );

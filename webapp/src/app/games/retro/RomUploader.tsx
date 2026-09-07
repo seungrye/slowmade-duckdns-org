@@ -11,11 +11,11 @@ interface Props {
 }
 
 /**
- * 내 롬 올리기 (#109).
+ * Uploading my ROM (#109).
  *
- * 올린 롬은 **올린 사람만** 보고 실행할 수 있다. 검사는 서버가 다시 하지만
- * (`api/games/retro/roms`), 같은 순수 함수를 여기서도 돌려 **보내기 전에** 알려 준다 —
- * 20MB 짜리를 다 올리고 나서 "너무 큽니다" 를 보는 건 시간 낭비다.
+ * An uploaded ROM can be seen and run **only by whoever uploaded it**. The server validates again
+ * (`api/games/retro/roms`), but the same pure functions run here so the user is told **before sending** -
+ * uploading 20MB only to be told "too large" is a waste of time.
  */
 export default function RomUploader({ onUploaded }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -28,7 +28,7 @@ export default function RomUploader({ onUploaded }: Props) {
     setError(null);
     setNotice(null);
 
-    // 아케이드 분할 셋은 부모·클론을 함께 고른다 (#143). 무엇이 게임인지는 이름으로 가른다.
+    // An arcade split set selects the parent and clone together (#143). Which is the game is decided by name.
     const picked = classifyRomSet(files.map((f) => f.name));
     const main = files.find((f) => f.name === picked.game) ?? files[0];
 
@@ -40,7 +40,7 @@ export default function RomUploader({ onUploaded }: Props) {
     if (files.length > 1) setNotice(picked.summary);
 
     const form = new FormData();
-    // 게임을 먼저, 부모를 뒤에 — 서버도 이름으로 다시 가리지만 순서를 맞춰 둔다.
+    // The game first, the parents after - the server sorts them by name again, but the order is set here.
     form.append("file", main);
     for (const f of files) if (f !== main) form.append("file", f);
     if (platform) form.set("platform", platform);
@@ -49,7 +49,7 @@ export default function RomUploader({ onUploaded }: Props) {
     try {
       const res = await fetch("/api/games/retro/rom-upload", { method: "POST", body: form });
       if (!res.ok) {
-        // nginx 가 막으면 본문이 JSON 이 아니라 HTML 이다 — 파싱을 시도하다 죽지 않게 감싼다.
+        // When nginx blocks it the body is HTML, not JSON - it is wrapped so parsing does not kill it.
         const message = await res
           .json()
           .then((b) => b?.message as string | undefined)

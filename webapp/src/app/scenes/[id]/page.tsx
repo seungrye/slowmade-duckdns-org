@@ -64,8 +64,8 @@ export default function SceneEditPage({ params }: Props) {
         const json = await res.json().catch(() => ({}));
         setError(json.message ?? "저장 실패");
       } else {
-        // 응답 body 의 갱신된 scene 으로 state 갱신 — revisionCount UI 즉시 반영.
-        // 사용자 보고 #revisionCount-stale fix.
+        // The state is updated from the response body's updated scene - the revisionCount UI reflects it at once.
+        // The user-reported #revisionCount-stale fix.
         const json = (await res.json().catch(() => ({}))) as { data?: Scene };
         if (json.data) setScene(json.data);
         setSavedAt(new Date().toLocaleTimeString("ko-KR"));

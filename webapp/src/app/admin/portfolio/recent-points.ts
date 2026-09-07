@@ -1,31 +1,31 @@
-// 매매 차트의 표시 구간 (#95 · 날짜 기준 정정 #129 · 자르지 않고 창만 잡기 #133).
+// The trade chart's visible range (#95, corrected to date-based in #129, and windowed rather than trimmed in #133).
 //
-// /admin/portfolio 는 기간 선택이 없어 쌓인 스냅샷 전체를 그린다. 날이 갈수록 포인트가
-// 늘어 좁은 화면에서는 선이 뭉개지고 매매 마커도 겹친다.
+// /admin/portfolio has no period picker and draws every accumulated snapshot. As the days pass the points
+// multiply, the lines smear on a narrow screen and the trade markers overlap.
 //
-// **데이터는 자르지 않는다.** 전부 넘기고 `dataZoom` 의 처음 보이는 창만 최근 N 일로 잡는다 —
-// 그래야 밀거나 당겨서 이전 기간을 볼 수 있다. 잘라 버리면 나머지를 볼 방법이 없다.
+// **The data is not trimmed.** All of it is passed and only `dataZoom`'s initially visible window is set to the last
+// N days - that is what lets an earlier period be reached by dragging. Trimming would leave no way to see the rest.
 
-/** 모바일에서 처음 보여줄 일수. */
+/** The days shown initially on mobile. */
 export const MOBILE_CHART_DAYS = 30;
-/** 데스크톱에서 처음 보여줄 일수 — 최근 3 개월. */
+/** The days shown initially on desktop - the last 3 months. */
 export const DESKTOP_CHART_DAYS = 90;
 
 /**
- * `at` 이후(포함)로 **목록에 실제로 있는** 첫 날. 없으면 마지막 날.
+ * The first day in the list at or after `at`. The last day when there is none.
  *
- * 카테고리 축의 `dataZoom` 은 **축에 없는 값을 못 알아본다**. 그런데 창 경계는 달력으로
- * 계산되고(마지막 날 −29일) 축은 **거래일**뿐이라, 그 날이 주말·휴장일이면 값이 축에
- * 없어 ECharts 가 통째로 무시한다 — 창이 안 잡히고 전체가 보인다 (#370).
+ * A category axis's `dataZoom` **cannot recognise a value absent from the axis**. But the window boundary is computed
+ * on the calendar (the last day minus 29) while the axis holds **trading days** only, so a weekend or holiday is a
+ * value absent from the axis and ECharts ignores it outright - the window is never applied and everything shows (#370).
  *
- * 메인 차트는 스냅샷이 46일뿐이라 대개 "이미 창 안" 으로 빠져 이 경로를 안 탔다.
- * 몇 년치 일봉을 그리는 매매 상세에서만 드러났다.
+ * The main chart has only 46 days of snapshots, so it usually short-circuits as "already inside the window" and never
+ * took this path. It only surfaced on the trade detail, which draws years of daily bars.
  */
 function snapForward(dates: string[], at: string): string {
   return dates.find((d) => d >= at) ?? dates[dates.length - 1];
 }
 
-/** `at` 이전(포함)으로 목록에 있는 마지막 날. 없으면 첫 날. */
+/** The last day in the list at or before `at`. The first day when there is none. */
 function snapBack(dates: string[], at: string): string {
   for (let i = dates.length - 1; i >= 0; i--) if (dates[i] <= at) return dates[i];
   return dates[0];
@@ -36,16 +36,16 @@ export function windowDays(isMobile: boolean, days?: number): number {
 }
 
 /**
- * 처음 보여줄 창의 **시작 날짜**. `dataZoom` 의 `startValue` 로 그대로 쓴다.
+ * The **start date** of the initially visible window. Used directly as `dataZoom`'s `startValue`.
  *
- * **개수가 아니라 날짜로 잡는다.** 처음엔 "스냅샷은 하루 한 점이니 개수가 곧 일수" 로 보고
- * 마지막 N 개를 남겼는데, 스냅샷은 **거래일에만** 쌓인다. 운영 데이터가 33 점에 달력 45 일이라
- * 모바일에서도 6 주가 보였다(#129).
+ * **Measured by date, not by count.** It began as "a snapshot is one point a day, so the count is the day count" and
+ * kept the last N points, but snapshots accumulate **only on trading days**. Production data had 33 points across 45
+ * calendar days, so mobile showed six weeks (#129).
  *
- * 기준은 오늘이 아니라 **데이터의 마지막 날**이다. 오늘로 재면 며칠 쉬는 사이 창이 비어 버린다.
+ * The reference is **the data's last day**, not today. Measuring from today empties the window over a few quiet days.
  *
- * @returns 창을 잡을 필요가 없으면(데이터가 이미 그 안이거나 날짜를 못 읽으면) undefined —
- *   호출측은 `startValue` 를 주지 않아 전체가 보이게 둔다.
+ * @returns undefined when no window is needed (the data is already inside it, or the dates cannot be read) -
+ *   the caller then passes no `startValue` and leaves everything visible.
  */
 export function windowStartDate(
   dates: string[],
@@ -56,24 +56,24 @@ export function windowStartDate(
 
   const newest = Date.parse(dates[dates.length - 1]);
   const oldest = Date.parse(dates[0]);
-  // 날짜를 못 읽으면 손대지 않는다 — 잘못 잡아 감추느니 다 보여 주는 편이 낫다.
+  // Unreadable dates are left alone - showing everything beats hiding it by getting the window wrong.
   if (Number.isNaN(newest) || Number.isNaN(oldest)) return undefined;
 
-  // 마지막 날을 포함해 `window` 일 — 30 일이면 마지막 날부터 29 일 전까지.
+  // `window` days including the last one - 30 days means the last day back through 29 days earlier.
   const cutoff = newest - (windowDays(isMobile, days) - 1) * 86_400_000;
-  if (oldest >= cutoff) return undefined; // 이미 창 안이다
+  if (oldest >= cutoff) return undefined; // already inside the window
 
-  // 축에 실제로 있는 날로 맞춘다 — 없는 값을 주면 ECharts 가 무시한다 (#370).
+  // Snapped to a day that actually exists on the axis - a value that does not is ignored by ECharts (#370).
   return snapForward(dates, new Date(cutoff).toISOString().slice(0, 10));
 }
 
 /**
- * 특정 날짜를 **품는** 창 (#135) — 매매 마커를 눌러 종목 상세로 넘어왔을 때.
+ * A window that **contains** a given date (#135) - for arriving at the symbol detail through a trade marker.
  *
- * 그 날짜를 가운데 두되 길이는 평소와 같다(모바일 30 일·데스크톱 90 일). 데이터 끝을 넘으면
- * 길이를 유지한 채 안으로 민다 — 창이 데이터 밖으로 나가 절반이 비는 걸 막는다.
+ * It centres that date while keeping the usual length (30 days on mobile, 90 on desktop). Past the end of the data it
+ * slides inward keeping the length - stopping the window running off the data and leaving half of it empty.
  *
- * center 를 읽을 수 없으면 undefined 를 돌려준다 — 호출측이 최근 창으로 되돌아가면 된다.
+ * When center cannot be read it returns undefined - the caller falls back to the recent window.
  */
 export function windowAround(
   dates: string[],
@@ -92,7 +92,7 @@ export function windowAround(
   let start = mid - Math.floor(span / 2);
   let end = start + span;
 
-  // 데이터 밖으로 나가면 길이를 지킨 채 안으로 민다.
+  // Past the end of the data it slides inward keeping the length.
   if (end > newest) {
     end = newest;
     start = end - span;
@@ -103,6 +103,6 @@ export function windowAround(
   }
 
   const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
-  // 양끝도 축에 있는 날로 (#370). 안쪽으로 맞춰 창이 데이터 밖으로 안 나가게 한다.
+  // Both ends are snapped to days on the axis (#370). Snapped inward, so the window never runs off the data.
   return { startValue: snapForward(dates, iso(start)), endValue: snapBack(dates, iso(end)) };
 }

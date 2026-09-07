@@ -5,7 +5,7 @@ import Stock from "@/models/stock";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/admin/stocks — owner 전용 종목 리스트 (JSON). */
+/** GET /api/admin/stocks - the owner-only symbol list (JSON). */
 export async function GET() {
   const guard = await requireOwner();
   if (guard instanceof NextResponse) return guard;

@@ -1,15 +1,15 @@
 'use client';
 
-// EndingGallery — Web Adventure 의 엔딩 카드 그리드 (#244).
+// EndingGallery - the Web Adventure's ending card grid (#244).
 //
-// 도달한 엔딩: icon + title + epilogue + 도달 카운트.
-// 미도달: ❓ + ???. 전체 도달률 표시.
-// 모바일 1열 / sm 2열 / md 3열.
+// A reached ending: icon, title, epilogue and the number of times reached.
+// Unreached: a question mark and ???. The overall completion rate is shown.
+// One column on mobile, two at sm, three at md.
 
 import { endingsMeta, type EndingId } from '@/content/web-adventure/endings';
 
-// 엔딩 전시 순서 (좋음 → 나쁨 흐름). 목록이 빠지면 그 엔딩 카드가 갤러리에 아예 안 나오므로
-// __tests__/ending-ids.test.ts 가 ENDING_IDS 와의 일치를 지킨다 (#352).
+// The endings' display order (from good to bad). An ending missing from the list never appears in the gallery at all,
+// so __tests__/ending-ids.test.ts keeps it in step with ENDING_IDS (#352).
 export const ENDING_ORDER: EndingId[] = [
   'harmony',
   'ascension',
@@ -33,7 +33,7 @@ export interface EndingGalleryProps {
 }
 
 export default function EndingGallery({ pastRuns }: EndingGalleryProps) {
-  // 엔딩 별 도달 카운트.
+  // The number of times each ending was reached.
   const counts: Record<string, number> = {};
   for (const r of pastRuns) {
     counts[r.endingId] = (counts[r.endingId] ?? 0) + 1;

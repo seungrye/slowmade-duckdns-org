@@ -1,4 +1,4 @@
-// #351/v3 — PlayOptionsSection UI 테스트.
+// #351/v3 - PlayOptionsSection UI tests.
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -29,7 +29,7 @@ describe("PlayOptionsSection", () => {
     act(() => { sw.click(); });
     expect(getTypewriterEnabled()).toBe(false);
     expect(sw.getAttribute("data-checked")).toBe("false");
-    // 다시 ON
+    // ON again
     act(() => { sw.click(); });
     expect(getTypewriterEnabled()).toBe(true);
     expect(sw.getAttribute("data-checked")).toBe("true");

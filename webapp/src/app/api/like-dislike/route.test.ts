@@ -14,7 +14,7 @@ import User from '@/models/user';
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const mockPostFindByIdAndUpdate = Post.findByIdAndUpdate as ReturnType<typeof vi.fn>;
 const mockPostFindById = Post.findById as ReturnType<typeof vi.fn>;
-// findById(...).select(...).lean() 체인 목 — 비공개 가드가 참조.
+// A mock of the findById(...).select(...).lean() chain - referenced by the privacy guard.
 const stubPost = (post: unknown) =>
   mockPostFindById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(post) }) });
 const mockUserFindOne = User.findOne as ReturnType<typeof vi.fn>;
@@ -103,7 +103,7 @@ describe('POST /api/like-dislike', () => {
     mockAuth.mockResolvedValue({ user: { email: 'user@test.com' }, expires: '' });
     mockPostFindByIdAndUpdate.mockResolvedValue({ likes: 1 });
     mockUserFindOneAndUpdate.mockResolvedValue({});
-    stubPost({ isPrivate: false, userEmail: 'someone@test.com' }); // 기본: 공개글(가드 통과)
+    stubPost({ isPrivate: false, userEmail: 'someone@test.com' }); // the default: a public post (the guard passes)
   });
 
   it('인증되지 않으면 401을 반환한다', async () => {
@@ -123,20 +123,20 @@ describe('POST /api/like-dislike', () => {
   });
 
   it('게시글이 없으면 404를 반환한다', async () => {
-    stubPost(null); // 가드 단계에서 없음
+    stubPost(null); // absent at the guard stage
     const res = await POST(makePostRequest({ _id: 'post123', likeChecked: true }));
     expect(res.status).toBe(404);
   });
 
   it('비공개 글은 작성자가 아니면 404(좋아요 조작 차단)', async () => {
-    stubPost({ isPrivate: true, userEmail: 'author@test.com' }); // 뷰어(user@test.com)는 작성자 아님
+    stubPost({ isPrivate: true, userEmail: 'author@test.com' }); // the viewer (user@test.com) is not the author
     const res = await POST(makePostRequest({ _id: 'post123', likeChecked: true }));
     expect(res.status).toBe(404);
     expect(mockPostFindByIdAndUpdate).not.toHaveBeenCalled();
   });
 
   it('비공개 글이라도 작성자 본인이면 좋아요 가능', async () => {
-    stubPost({ isPrivate: true, userEmail: 'user@test.com' }); // 본인
+    stubPost({ isPrivate: true, userEmail: 'user@test.com' }); // the author themselves
     const res = await POST(makePostRequest({ _id: 'post123', likeChecked: true }));
     expect(res.status).toBe(200);
   });

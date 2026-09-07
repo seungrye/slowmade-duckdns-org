@@ -1,5 +1,5 @@
-// 분기 kind 별 edge 스타일 (#278 hidden 분기 약화 — dimmed 점선 + opacity).
-// page.tsx 는 Next Page 제약으로 named export 불가 → 별도 파일.
+// The edge style per branch kind (#278, weakening a hidden branch - a dimmed dashed line plus opacity).
+// page.tsx cannot have a named export under Next's Page constraint -> a separate file.
 
 import type { GraphEdge } from "@/lib/web-adventure/engine/graph";
 

@@ -1,7 +1,7 @@
 import SettingsFormSection from "./settings-form";
 
-// 개인 설정(테마) 전용. 자동매매 설정은 owner 전용이라 주식 메뉴 아래
-// /admin/trading 으로 분리했다. (#47)
+// Personal settings (the theme) only. The trading settings are owner-only and were split out under
+// the stocks menu at /admin/trading. (#47)
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {

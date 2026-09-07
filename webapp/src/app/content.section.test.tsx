@@ -1,14 +1,14 @@
 // @vitest-environment jsdom
 //
-// 메인 화면 '최신 유머' 제목 검색 토글 (#232).
+// The main screen's 'latest humour' title search toggle (#232).
 //
-// 목록 자체는 InfinitPostList 가 그리고 서버가 찾는다. 여기서는 **토글과 디바운스**만 본다 —
-// 제목·돋보기 둘 다로 열리는지, Escape 로 닫히는지, 입력이 검색어로 내려가는지.
+// The list itself is drawn by InfinitPostList and searched by the server. This checks **the toggle and the debounce** only -
+// that it opens from both the title and the magnifier, closes on Escape, and passes the input down as the search term.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { forwardRef } from 'react';
 
-// 목록은 검색어를 받았는지만 확인하면 된다.
+// The list only has to confirm it received the search term.
 vi.mock('@/app/infinite-post.section', () => ({
   default: forwardRef(function MockList(
     { query = '' }: { query?: string },
@@ -59,14 +59,14 @@ describe('ContentSection — 제목 검색 토글', () => {
     fireEvent.click(screen.getByLabelText('검색 열기'));
     fireEvent.change(screen.getByLabelText('제목으로 검색'), { target: { value: '고양이' } });
 
-    // 아직 250ms 가 안 지났으면 내려가지 않는다 — 글자마다 서버를 때리지 않는다.
+    // Before 250ms have passed nothing is sent - the server is not hit on every keystroke.
     expect(listQuery()).toBe('');
 
     act(() => { vi.advanceTimersByTime(250); });
     expect(listQuery()).toBe('고양이');
   });
 
-  // 닫았는데 걸러진 목록이 남아 있으면 고장으로 보인다.
+  // A filtered list left behind after closing reads as a bug.
   it('닫으면 검색어도 비워진다', () => {
     render(<ContentSection />);
     fireEvent.click(screen.getByLabelText('검색 열기'));

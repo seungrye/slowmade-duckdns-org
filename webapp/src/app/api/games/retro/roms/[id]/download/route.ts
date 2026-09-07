@@ -1,13 +1,13 @@
-// /api/games/retro/roms/[id]/download — 올린 롬 내려받기 (#194).
+// /api/games/retro/roms/[id]/download - downloading an uploaded ROM (#194).
 //
-// 화면에서 다시 받을 방법이 없었다. 기기를 옮기거나 백업하려면 원본을 다시 구해야 했다.
+// There was no way to get it back from the UI. Moving devices or making a backup meant finding the original again.
 //
-// **묶을 것이 없으면 묶지 않는다.** 패치도 부모셋도 없으면 롬을 그대로 흘려보낸다 —
-// 쓸데없는 zip 도, 메모리에 통째로 올리는 일도 없다(롬은 최대 50MB).
+// **With nothing to bundle, nothing is bundled.** With no patch and no parent sets the ROM is streamed as it is -
+// no pointless zip and nothing loaded whole into memory (a ROM is up to 50MB).
 //
-// 묶을 때는 `writeZip`(`public/games/retro/rom-patch.js`)을 **그대로 재사용**한다.
-// 플레이어가 패치본을 만들 때 쓰는 바로 그 코드라 결과가 어긋날 일이 없고, 새 zip 작성기를
-// 들일 이유도 없다(무압축 저장 방식 — 롬·부모셋은 이미 압축돼 있어 손해가 없다).
+// When bundling it **reuses `writeZip`** (`public/games/retro/rom-patch.js`) as it stands.
+// It is the very code the player uses to build a patched ROM, so the results cannot diverge, and there is no reason
+// to bring in a new zip writer (it stores uncompressed - ROMs and parent sets are already compressed, so nothing is lost).
 
 import { NextResponse } from 'next/server';
 import { Readable } from 'node:stream';
@@ -29,10 +29,10 @@ const minioClient = new Minio.Client({
 });
 
 /**
- * 묶을 때 메모리에 올리는 총량 상한.
+ * The cap on the total held in memory while bundling.
  *
- * 아케이드 부모셋이 17MB 인 사례가 있어 합이 커질 수 있다. 넘으면 **이유를 알려 주고 멈춘다** —
- * 조용히 메모리를 먹다 죽는 것보다 낫다.
+ * An arcade parent set has been 17MB, so the sum can grow. Over it, **it stops and says why** -
+ * better than quietly eating memory until it dies.
  */
 const MAX_BUNDLE_BYTES = 200 * 1024 * 1024;
 
@@ -46,7 +46,7 @@ type LeanRom = {
   parentSets?: { name: string; size: number; objectKey: string }[];
 };
 
-/** RFC 5987 — 한글 파일명을 헤더에 싣는다. ASCII 폴백은 옛 클라이언트용. */
+/** RFC 5987 - carries a Korean filename in the header. The ASCII fallback is for older clients. */
 function disposition(name: string, asciiFallback: string): string {
   return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
@@ -61,7 +61,7 @@ async function readObject(objectKey: string): Promise<Uint8Array> {
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const email = session?.user?.email;
-  // 인증 실패도 404 — 401 은 "그 id 는 있다" 는 정보가 된다(기존 파일 라우트와 같은 규칙).
+  // A failed authorisation is a 404 too - a 401 would reveal "that id exists" (the same rule as the existing file routes).
   if (!email) return new NextResponse('Not Found', { status: 404 });
 
   const { id } = await ctx.params;
@@ -73,13 +73,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .lean<LeanRom | null>();
   if (!rom) return new NextResponse('Not Found', { status: 404 });
 
-  // 패치 고르는 규칙은 한 곳에서만 — 화면·넷플레이·다운로드가 다른 패치를 가리키면 안 된다.
+  // The patch-selection rule lives in one place only - the UI, netplay and download must never point at different patches.
   const patch = rom.patchEnabled === false ? undefined : activeLeanPatch(rom);
   const parents = rom.parentSets ?? [];
   const romName = rom.filename || 'rom.bin';
 
   try {
-    // ── 묶을 것이 없으면 원본 그대로.
+    // ── With nothing to bundle, the original as it is.
     if (!patch && !parents.length) {
       const stream = await minioClient.getObject(env.minio.bucket, rom.objectKey);
       const body = Readable.toWeb(stream) as unknown as ReadableStream<Uint8Array>;

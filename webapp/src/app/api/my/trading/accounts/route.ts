@@ -11,8 +11,8 @@ import { maskedCreds } from "@/lib/trading/settings-data";
 export const dynamic = "force-dynamic";
 
 /**
- * 자동매매 계정 CRUD — 마이페이지>설정. owner 전용.
- * 보안: credentials 는 AES-256-GCM 암호화 저장, GET 은 마스킹 값만 반환(평문 미노출).
+ * Trading account CRUD - my page > settings. Owner only.
+ * Security: credentials are stored AES-256-GCM encrypted, and GET returns only masked values (never plaintext).
  */
 
 const CRED_FIELDS: Record<string, string[]> = {
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
   await connectToDB();
   const envKey = `${env}-${name}`;
-  // envKey 는 unique — 소프트 삭제된 같은 envKey 문서가 있으면 재사용(undelete), 살아있으면 409.
+  // envKey is unique - a soft-deleted document with the same envKey is reused (undeleted); a live one gives 409.
   const dup = await TradingAccount.findOne({ envKey });
   if (dup && !dup.isDeleted) {
     return NextResponse.json({ error: `envKey 중복: ${envKey}` }, { status: 409 });
@@ -96,7 +96,7 @@ export async function PUT(req: NextRequest) {
   if (!acct) return NextResponse.json({ error: "계정 없음" }, { status: 404 });
   if (typeof body.liveEnabled === "boolean") acct.liveEnabled = body.liveEnabled;
   if (typeof body.memo === "string") acct.memo = body.memo;
-  // 자격증명 갱신은 전달된 필드만 덮어쓴다(마스킹 값 재전송 방지를 위해 빈 값 무시).
+  // A credential update overwrites only the fields provided (empty values are ignored, so masked values need not be re-sent).
   for (const f of CRED_FIELDS[acct.broker] ?? []) {
     const v = body[f];
     if (typeof v === "string" && v.trim() && !v.includes("…")) {
@@ -116,10 +116,10 @@ export async function DELETE(req: NextRequest) {
   const acct = await TradingAccount.findById(id);
   if (!acct) return NextResponse.json({ error: "계정 없음" }, { status: 404 });
   const now = new Date();
-  // 소프트 삭제 — 하드 삭제 없이 숨긴다. 실행/주문 로그(runs/orderlogs)는 그대로 보존한다.
+  // A soft delete - hidden rather than hard deleted. The run and order logs (runs/orderlogs) are preserved.
   await Promise.all([
     TradingPortfolio.updateMany({ accountId: acct._id }, { $set: { isDeleted: true, deletedAt: now } }),
-    // 이 계정(envKey)의 매매 차트도 함께 숨김(양 통화).
+    // This account's (envKey's) trade charts are hidden too (both currencies).
     StockTrade.updateMany({ env: acct.envKey }, { $set: { hidden: true } }),
     PortfolioHistory.updateMany({ env: acct.envKey }, { $set: { hidden: true } }),
   ]);

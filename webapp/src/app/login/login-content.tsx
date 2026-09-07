@@ -25,7 +25,7 @@ export default function LoginContent() {
 
                 <button
                     onClick={() => {
-                        signIn("google", { callbackUrl: "/" }); // 로그인 후 홈으로 이동
+                        signIn("google", { callbackUrl: "/" }); // Goes home after logging in
                     }}
                     className="flex items-center justify-center w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 shadow-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition mb-3"
                     aria-label="Google 로그인"

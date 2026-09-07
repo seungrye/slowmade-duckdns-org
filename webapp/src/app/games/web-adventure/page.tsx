@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-// web-adventure 진입 카드 — 서버 컴포넌트.
-// 사이트 메뉴엔 노출하지 않으며 직접 URL 로만 접근(1 주차 PoC).
+// The web-adventure entry card - a server component.
+// It is not in the site menu and is reached only by URL (the week 1 PoC).
 
 export const metadata: Metadata = {
   title: "Web Adventure (PoC)",

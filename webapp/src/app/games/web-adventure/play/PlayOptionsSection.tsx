@@ -1,17 +1,17 @@
 "use client";
 
-// PlayOptionsSection — #351/v3 플레이 옵션 토글.
+// PlayOptionsSection - the #351/v3 play option toggles.
 //
-// StatusPanel 안 *접이식* (<details>) 옵션. 데스크탑 사이드 + 모바일 drawer
-// 둘 다 같은 컴포넌트 마운트 → 한 곳 수정으로 양쪽 적용.
+// A *collapsible* (<details>) options block inside StatusPanel. The desktop sidebar and the mobile drawer
+// mount the same component, so one edit applies to both.
 //
-// 옵션:
-//   1) 타이프라이터 효과 — ON/OFF.
-//   2) 방문 씬 자동 skip — ON/OFF (회차 누적).
-//   3) 방문 기록 초기화 — destructive 액션 (confirm).
+// The options:
+//   1) the typewriter effect - on/off.
+//   2) automatically skipping visited scenes - on/off (accumulated across runs).
+//   3) clearing the visit record - a destructive action (confirmed).
 //
-// 각 토글 즉시 localStorage 반영. *현재 씬* 에는 적용 안 되고
-// *다음 씬* 부터 적용 (SceneRenderer 의 skipSequential useMemo([scene.id])).
+// Each toggle reaches localStorage at once. It does not apply to *the current scene* but
+// from *the next* one (SceneRenderer's skipSequential useMemo([scene.id])).
 
 import { useEffect, useState } from "react";
 import {
@@ -36,7 +36,7 @@ function Toggle({
   onChange: (next: boolean) => void;
   testid: string;
 }) {
-  // 전체 영역 = button (role=switch). 라벨/힌트/스위치 모두 클릭 가능.
+  // The whole area is the button (role=switch). The label, hint and switch are all clickable.
   return (
     <button
       type="button"
@@ -71,7 +71,7 @@ function Toggle({
 }
 
 export default function PlayOptionsSection() {
-  // SSR safe — 초기엔 default, mount 후 실제 값 동기화.
+  // SSR-safe - the default initially, synced to the real value after mounting.
   const [mounted, setMounted] = useState(false);
   const [typewriterOn, setTypewriterOn] = useState(true);
   const [skipVisitedOn, setSkipVisitedOn] = useState(false);
@@ -84,7 +84,7 @@ export default function PlayOptionsSection() {
     setVisitedCount(getVisitedScenes().size);
   }, []);
 
-  // details open 시 *현재 카운트* 다시 평가 — 게임 진행 중 갱신.
+  // Opening the details re-evaluates *the current count* - refreshed mid-game.
   function refreshCount() {
     setVisitedCount(getVisitedScenes().size);
   }

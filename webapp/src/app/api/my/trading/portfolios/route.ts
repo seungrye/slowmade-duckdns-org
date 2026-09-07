@@ -10,12 +10,12 @@ import { snapshotOf, changedKeys } from "@/lib/trading/portfolio-revision";
 import { LIVE_STRATEGY_IDS, isLiveStrategy } from "@/types/trading";
 
 /**
- * 설정이 바뀐 순간의 값을 한 줄 남긴다 (#350).
+ * Records one line with the values at the moment the settings changed (#350).
  *
- * #348 에서 전략을 갈아타자 예전 config 가 통째로 덮여 사라졌다. 백업도 oplog 도 없어
- * 주문로그·체결에서 역산해야 했고, 그러고도 원금은 구간까지만 좁혀졌다.
+ * In #348, switching strategy overwrote the old config wholesale and lost it. With no backup and no oplog it had to be
+ * reverse-engineered from the order log and the fills, and even then the principal was only narrowed to a band.
  *
- * **기록 실패는 삼킨다** — 이력 때문에 설정 저장이 실패하면 안 된다(원장·메일과 같은 원칙).
+ * **A failed record is swallowed** - the history must never fail a settings save (the same principle as the ledger and mail).
  */
 async function recordRevision(
   portfolioId: unknown, accountId: unknown,
@@ -35,15 +35,15 @@ async function recordRevision(
   }
 }
 
-/** 포트폴리오의 (env, currency) 로 매매기록·이력 숨김/복구 토글 — 소프트 삭제.
- *  (env,currency) 단위라 그 통화의 기록을 통째로 가린다. 계정·시장에 블록이 여럿일 수
- *  있으므로(#339) **마지막 블록이 지워질 때만** 부른다 — 호출측 DELETE 참조. */
+/** Toggles hiding and restoring the trade records and history for the portfolio's (env, currency) - a soft delete.
+ *  Being per (env, currency), it hides that currency's records wholesale. An account and market can hold several
+ *  blocks (#339), so this is called **only when the last block is deleted** - see the caller's DELETE. */
 async function setHidden(accountId: unknown, market: string, hidden: boolean): Promise<void> {
   const acct = await TradingAccount.findById(accountId).select({ envKey: 1 }).lean();
   const env = (acct as { envKey?: string } | null)?.envKey;
   if (!env) return;
   const currency = market === "kr" ? "KRW" : "USD";
-  // 복구(hidden=false)는 숨겨진 것만 대상, 숨김(true)은 전체 대상.
+  // Restoring (hidden=false) targets only what is hidden; hiding (true) targets everything.
   const filter = hidden ? { env, currency } : { env, currency, hidden: true };
   await Promise.all([
     StockTrade.updateMany(filter, { $set: { hidden } }),
@@ -53,7 +53,7 @@ async function setHidden(accountId: unknown, market: string, hidden: boolean): P
 
 export const dynamic = "force-dynamic";
 
-/** 포트폴리오 블록(계정×시장×전략) CRUD — owner 전용. */
+/** Portfolio block (account x market x strategy) CRUD - owner only. */
 
 export async function GET(req: NextRequest) {
   const owner = await requireOwner();
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   if (!["kr", "us"].includes(market)) {
     return NextResponse.json({ error: "market 은 kr|us" }, { status: 400 });
   }
-  // #354 — 목록과 에러 메시지가 각각 문자열을 들고 있었다. 이제 둘 다 단일 출처에서 나온다.
+  // #354 - the list and the error message each held their own strings. Both now come from one source.
   if (!isLiveStrategy(strategy)) {
     return NextResponse.json({ error: `strategy 는 ${LIVE_STRATEGY_IDS.join("|")}` }, { status: 400 });
   }
@@ -109,14 +109,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "value_rebalancing 은 config.symbol·principal(양수)·gradient(양수) 필수" }, { status: 400 });
     }
   }
-  // 계정·시장에 블록을 **여럿** 둘 수 있다 (#339).
+  // An account and market can hold **several** blocks (#339).
   //
-  // 예전엔 (accountId, market) 로 upsert 해서, 포트폴리오를 "추가" 하면 기존 것이 조용히
-  // 교체됐다(실제로 그렇게 설정 하나를 잃었다). 이제 **portfolioId 가 오면 그것만 수정**,
-  // 없으면 **새로 만든다.**
+  // It used to upsert on (accountId, market), so "adding" a portfolio quietly replaced the existing one
+  // (which really did lose one configuration). Now **a portfolioId means editing that one**,
+  // and its absence means **creating a new one.**
   //
-  // 편집이면 state(진행 중 사이클)를 보존하고, 신규일 때만 비운다 — 그래야 새 블록이 옛
-  // V4 사이클(T·장부현금)을 물려받지 않는다.
+  // An edit preserves state (the running cycle) and only a new one clears it - so a new block never inherits an old
+  // V4 cycle (its T and ledger cash).
   const portfolioId = typeof body.portfolioId === "string" ? body.portfolioId : null;
   const prev = portfolioId
     ? await TradingPortfolio.findOne({ _id: portfolioId, accountId: body.accountId })
@@ -136,12 +136,12 @@ export async function POST(req: NextRequest) {
     weekdaysOnly: body.weekdaysOnly !== false,
     enabled: body.enabled !== false,
     config: body.config ?? {},
-    // 이 블록이 쓸 현금. 0 이면 전액 — 블록이 하나뿐이면 예전과 똑같이 돈다.
+    // The cash this block may use. 0 means everything - with a single block it runs exactly as before.
     reservedCash,
-    // 소프트 삭제됐던 문서를 되살릴 때를 위해.
+    // For when a soft-deleted document is revived.
     isDeleted: false, deletedAt: null,
   };
-  if (isRecreate) setFields.state = {}; // 재생성/신규 — 사이클 상태 초기화
+  if (isRecreate) setFields.state = {}; // Recreated or new - the cycle state is reset
   const doc = portfolioId
     ? await TradingPortfolio.findOneAndUpdate(
         { _id: portfolioId, accountId: body.accountId },
@@ -152,16 +152,16 @@ export async function POST(req: NextRequest) {
   if (!doc) {
     return NextResponse.json({ error: "포트폴리오를 찾을 수 없습니다" }, { status: 404 });
   }
-  // 값이 바뀐 경우에만 리비전 한 줄 (#350). **안 바뀌면 안 남긴다** — 저장 버튼만 눌러도
-  // 여기를 지나므로, 그러지 않으면 같은 값이 도배돼 이력이 쓸모없어진다.
+  // One revision line only when a value actually changed (#350). **Unchanged writes nothing** - a mere save-button
+  // press passes through here, and without this the same value would fill the history and make it useless.
   const after = snapshotOf({ market, ...setFields });
   const changed = prev ? changedKeys(snapshotOf(prev as Record<string, unknown>), after) : [];
   if (!prev || changed.length > 0) {
     await recordRevision(doc._id, body.accountId, prev ? "update" : "create", after, changed);
   }
-  // 재생성 시 옛 기록을 자동 복구하지 않는다 — 지운 포트폴리오를 같은 계정·시장으로 다시
-  // 만들면 '깨끗한 새 차트'를 기대하므로(#피드백). 숨김은 삭제 시점에 고정되고, 복구가
-  // 필요하면 수동으로 hidden 을 되돌린다.
+  // Recreating does not automatically restore the old records - recreating a deleted portfolio on the same account and
+  // market means expecting 'a clean new chart' (per the feedback). Hiding is fixed at deletion time, and a restore
+  // means reverting hidden by hand.
   return NextResponse.json({ id: String(doc._id) });
 }
 
@@ -174,19 +174,19 @@ export async function DELETE(req: NextRequest) {
     accountId: 1, market: 1, strategy: 1, runAt: 1,
     weekdaysOnly: 1, enabled: 1, reservedCash: 1, config: 1,
   }).lean();
-  // 하드 삭제하지 않고 소프트 삭제 — 문서는 남기고 isDeleted 로 숨긴다(스케줄러·목록에서 제외).
+  // A soft delete rather than a hard one - the document stays and isDeleted hides it (excluded from the scheduler and the lists).
   await TradingPortfolio.updateOne({ _id: id }, { $set: { isDeleted: true, deletedAt: new Date() } });
-  // 지워질 때의 값을 남긴다 (#350) — 지운 블록의 설정을 나중에 다시 볼 수 있게.
+  // The values at deletion are recorded (#350) - so a deleted block's settings remain readable later.
   if (pf) {
     const p = pf as Record<string, unknown>;
     await recordRevision(id, p.accountId, "delete", snapshotOf(p), []);
   }
-  // 매매기록·이력도 하드 삭제하지 않고 숨김. 재생성해도 자동 복구되지 않으며(POST 참조),
-  // 복구가 필요하면 수동으로 hidden 을 되돌린다.
+  // The trade records and history are hidden rather than hard deleted. Recreating does not restore them (see POST),
+  // and a restore means reverting hidden by hand.
   if (pf) {
     const p = pf as { accountId: unknown; market: string };
-    // 숨김은 (env, currency) 단위라, 블록이 여럿이면 **마지막 하나가 지워질 때만** 숨긴다
-    // (#339). 안 그러면 두 블록 중 하나만 지워도 그 통화의 매매기록이 통째로 사라진다.
+    // Hiding is per (env, currency), so with several blocks it hides **only when the last one is deleted**
+    // (#339). Otherwise deleting one of two blocks would wipe that currency's trade records wholesale.
     const left = await TradingPortfolio.countDocuments({
       accountId: p.accountId, market: p.market, isDeleted: { $ne: true },
     });

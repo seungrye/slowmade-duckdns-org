@@ -1,7 +1,7 @@
-// work_log APK 내려주기 (#261) — 앱이 업데이트를 받을 때.
+// Serving the work_log APK (#261) - when the app fetches an update.
 //
-// MinIO 에서 흘려보낸다. **공개 URL 을 만들지 않는다** — 여기를 거쳐야 키를 확인할 수 있고,
-// 보관 위치가 바뀌어도 앱이 보는 주소는 그대로다.
+// It streams from MinIO. **No public URL is created** - going through here is what lets the key be checked, and
+// the address the app sees stays the same even if the storage location changes.
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
@@ -24,12 +24,12 @@ export async function GET(req: NextRequest) {
 
   const stream = await getMinioClient().getObject(env.minio.bucket, latest.objectKey);
 
-  // 통째로 메모리에 올리지 않고 흘려보낸다 — APK 가 수십 MB 다.
+  // It streams rather than loading the whole thing into memory - an APK is tens of MB.
   return new NextResponse(stream as unknown as ReadableStream, {
     headers: {
       'Content-Type': APK_MIME,
       'Content-Length': String(latest.size),
-      // 안드로이드가 파일 이름을 알아야 설치 화면이 제대로 뜬다.
+      // Android needs the filename for the install screen to appear properly.
       'Content-Disposition': `attachment; filename="work-log-${latest.versionName}.apk"`,
       'Cache-Control': 'no-store',
     },

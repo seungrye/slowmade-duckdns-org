@@ -4,17 +4,17 @@ import { requireOwner } from "@/lib/require-owner";
 import { loadTradingSettings } from "@/lib/trading/settings-data";
 import TradingSettingsClient from "./trading-client";
 
-// 실시간 상태(wire 토글 등)라 캐시 금지, 매 요청 SSR. 초기 데이터는 서버에서 주입
-// (클라이언트 마운트 fetch 왕복·깜빡임 제거).
+// Live state (the wire toggle and so on), so no caching - SSR on every request. The initial data is injected on the
+// server (removing a client-mount fetch round trip and the flicker).
 export const dynamic = "force-dynamic";
 
 /**
- * /admin/trading — owner 전용 자동매매 설정.
+ * /admin/trading - the owner-only trading settings.
  *
- * 예전엔 마이페이지 설정(/dashboard/settings) 안의 한 섹션이었다. owner 전용 설정이
- * 일반 사용자용 개인 설정 페이지에 얹혀 있었고, 모니터링을 보다가 파라미터를 고치려면
- * 메뉴를 벗어나야 했다. 주식 메뉴 아래로 떼어냈다. (#47)
- * 모니터링도 /dashboard/trading 에서 이 아래(/admin/trading/monitor)로 합쳤다. (#53)
+ * They used to be one section inside my-page settings (/dashboard/settings). Owner-only settings sat on a personal
+ * settings page meant for ordinary users, and adjusting a parameter while watching the monitor meant leaving the
+ * menu. They were split out under the stocks menu. (#47)
+ * Monitoring moved from /dashboard/trading to below this one (/admin/trading/monitor) too. (#53)
  */
 export default async function TradingSettingsPage() {
     const guard = await requireOwner();

@@ -25,10 +25,10 @@ export async function GET() {
 }
 
 /**
- * 생일 등록·수정·삭제 (#326).
+ * Registering, editing and deleting a birthday (#326).
  *
- * 빈 값(`null`·`''`)은 오류가 아니라 **삭제**다 — 한 번 넣은 생일을 지울 길이 없으면
- * 폭죽을 끌 방법이 없어진다. 그 외 형식·범위 오류는 400 으로 돌려보내고 저장하지 않는다.
+ * An empty value (`null` or `''`) is not an error but **a deletion** - with no way to remove a birthday once entered,
+ * there would be no way to turn off the confetti. Other format or range errors return a 400 and store nothing.
  */
 export async function PUT(request: Request) {
   const auth = await requireAuth();
@@ -52,7 +52,7 @@ export async function PUT(request: Request) {
     return apiError("생일이 올바르지 않습니다. 1900년 이후의 지난 날짜여야 합니다.", 400);
   }
 
-  // 태어난 시(선택) — "HH:mm" 또는 비움. 사주 시주 계산용. (#390)
+  // The birth time (optional) - "HH:mm" or empty. For computing the saju's hour pillar. (#390)
   const rawTime = body.birthTime;
   const clearingTime = rawTime === null || rawTime === '' || rawTime === undefined;
   let birthTime: string | null = null;
@@ -65,7 +65,7 @@ export async function PUT(request: Request) {
 
   try {
     await connectToDB();
-    // 생일이 지워지면 태어난 시도 함께 지운다(사주 근거가 없어지므로).
+    // Clearing the birthday clears the birth time too (the basis for the saju is gone).
     const set: Record<string, unknown> = {};
     const unset: Record<string, unknown> = {};
     if (birthday) set.birthday = birthday; else unset.birthday = 1;

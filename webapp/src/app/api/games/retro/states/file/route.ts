@@ -1,6 +1,6 @@
-// 세이브스테이트 바이트 내려주기 (#114) — 인증 프록시.
+// Serving a save state's bytes (#114) - the authenticated proxy.
 //
-// 롬·패치와 같은 원칙: 공개 `/s3/` 경로를 만들지 않고, 본인 세션일 때만 흘려보낸다.
+// The same principle as ROMs and patches: no public `/s3/` path, streamed only to the owner's own session.
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -22,7 +22,7 @@ const minioClient = new Minio.Client({
 export async function GET(req: NextRequest) {
   const session = await auth();
   const email = session?.user?.email;
-  // 인증 실패도 404 — 401 은 "그 세이브는 있다" 는 정보가 된다.
+  // A failed authorisation is a 404 too - a 401 would reveal "that save exists".
   if (!email) return new NextResponse('Not Found', { status: 404 });
 
   const gameKey = new URL(req.url).searchParams.get('game');
@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
       headers: {
         'Content-Type': 'application/octet-stream',
         'Content-Length': String(doc.size),
-        // 세이브는 자주 바뀐다 — 캐시하면 방금 저장한 걸 못 불러온다.
+        // A save changes often - caching it would mean not loading what was just saved.
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',
       },

@@ -9,7 +9,7 @@ import { runPortfolioCycle } from "@/lib/trading/engines";
 
 export const dynamic = "force-dynamic";
 
-/** 실행 이력·주문 로그 조회 + 수동 실행(run-now, 테스트용 dry). owner 전용. */
+/** Reading the run history and order log, plus a manual run (run-now, a dry run for testing). Owner only. */
 
 export async function GET(req: NextRequest) {
   const owner = await requireOwner();
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const accountId = url.searchParams.get("accountId");
   const numParam = (k: string, def: number, max: number) =>
     Math.min(Math.max(0, Number(url.searchParams.get(k) ?? def) || 0), max);
-  // 실행 이력·주문 로그를 각각 독립 페이징(page 0-based).
+  // The run history and the order log are paged independently (page is 0-based).
   const runsPage = numParam("runsPage", 0, 100000);
   const ordersPage = numParam("ordersPage", 0, 100000);
   const runsSize = Math.max(1, numParam("runsSize", 15, 50));
@@ -49,8 +49,8 @@ export async function GET(req: NextRequest) {
   });
 }
 
-/** 수동 1회 실행 — 멱등 키를 "manual-{ts}" 로 별도 발급(당일 정규 실행과 충돌 없음).
- *  설정 검증용이므로 **항상 dry-run 으로 강제**한다(liveEnabled 와 무관). */
+/** A single manual run - it takes its own idempotency key, "manual-{ts}" (never colliding with the day's scheduled run).
+ *  Being for verifying the settings, it is **always forced to a dry run** (regardless of liveEnabled). */
 export async function POST(req: NextRequest) {
   const owner = await requireOwner();
   if (owner instanceof NextResponse) return owner;
@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
   const logs: string[] = [];
   const log = (line: string) => logs.push(`${new Date().toISOString()} ${line}`);
   try {
-    // 수동 실행은 라이브 게이트를 우회하지 않도록 liveEnabled 를 강제로 끈 사본으로 돈다.
+    // A manual run uses a copy with liveEnabled forced off, so it cannot bypass the live gate.
     const dryAccount = { ...account, liveEnabled: false };
     const summary = await runPortfolioCycle(
       dryAccount as never, portfolio as never, run._id as never, log,

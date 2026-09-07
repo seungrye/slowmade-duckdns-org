@@ -1,10 +1,10 @@
-// /api/web-adventure/past-runs — 회차 history 조회 (#239).
+// /api/web-adventure/past-runs - reading the run history (#239).
 //
-// 자기 user 의 past_run 목록 (runIndex 내림차순). 갤러리/통계용.
+// One's own user's past_run list (runIndex descending). For the gallery and the statistics.
 //
-// #293 — 페이지네이션 (limit). 운영에서 3000+ 회차 누적 시 826KB 응답 = 모바일
-//   부담. 갤러리/buildWorldFlags 는 *unique endingId* 만 필요. 기본 limit 500 이면
-//   *충분* (모든 endingId 다양성 보존). 호출자가 명시적으로 더 큰 값 가능.
+// #293 - pagination (limit). In production, 3000+ accumulated runs made an 826KB response - crushing on mobile
+//   at 826KB. The gallery and buildWorldFlags need only the *unique endingIds*. A default limit of 500 is
+//   *ample* (preserving every endingId's variety). A caller may request more explicitly.
 
 import { NextRequest } from 'next/server';
 import { connectToDB } from '@/lib/db';
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     return apiError('로그인이 필요합니다.', 401);
   }
 
-  // limit 파싱 — 1 이상, MAX_LIMIT 이하. 기본 500.
+  // Parsing limit - at least 1, at most MAX_LIMIT. 500 by default.
   const url = new URL(req.url);
   const rawLimit = url.searchParams.get('limit');
   let limit = DEFAULT_LIMIT;

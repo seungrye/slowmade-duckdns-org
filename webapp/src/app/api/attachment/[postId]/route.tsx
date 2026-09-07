@@ -5,8 +5,8 @@ import { connectToDB } from '@/lib/db';
 import Post from '@/models/post';
 import { auth } from '@/auth';
 
-// 첨부 다운로드 프록시 — MinIO 오브젝트를 서버가 인증 검사 후 스트리밍.
-// 공개 글 첨부는 누구나, 비공개 글 첨부는 작성자 본인만(정적 public URL 노출 안 함).
+// The attachment download proxy - the server checks authorisation and streams the MinIO object.
+// A public post's attachment is open to anyone; a private post's only to its author (no static public URL is exposed).
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ postId: str
     .lean<{ isPrivate?: boolean; userEmail?: string; attachments?: AttMeta[] } | null>();
   if (!post) return new NextResponse('Not Found', { status: 404 });
 
-  // 비공개 글 첨부는 작성자 본인만(글이 안 보이면 파일도 안 보인다).
+  // A private post's attachment is the author's alone (if the post is invisible, so is the file).
   if (post.isPrivate) {
     const session = await auth();
     if (session?.user?.email !== post.userEmail) {
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ postId: str
     const stream = await minioClient.getObject(env.minio.bucket, att.key);
     const chunks: Buffer[] = [];
     for await (const c of stream) chunks.push(c as Buffer);
-    const body = Buffer.concat(chunks); // 최대 15MB — 버퍼링 허용
+    const body = Buffer.concat(chunks); // up to 15MB - buffering allowed
     const filename = encodeURIComponent(att.name || 'download');
     return new NextResponse(body, {
       headers: {

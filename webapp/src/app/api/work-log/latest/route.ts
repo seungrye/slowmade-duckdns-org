@@ -1,7 +1,7 @@
-// work_log 최신 버전 (#261) — 앱이 시작할 때 묻는다.
+// work_log's latest version (#261) - the app asks at startup.
 //
-// **새 버전인지 판단하는 것은 앱이다.** 여기서는 최신값만 알려 준다 — 사이트가 "당신은
-// 구버전"이라고 정하면 앱 버전을 매번 올려 보내야 하고, 그 값을 못 믿을 이유도 없다.
+// **The app decides whether it is a new version.** This only reports the latest value - if the site declared
+// "you are out of date", the app would have to send its version every time, and there is no reason to distrust that value.
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
     .sort({ versionCode: -1 })
     .lean<{ versionCode: number; versionName: string; notes: string; size: number } | null>();
 
-  // 아직 올린 것이 없으면 404 가 아니라 "없음"으로 답한다 — 앱이 오류로 보고
-  // 사용자에게 뭔가 잘못됐다고 알릴 이유가 없다.
+  // With nothing uploaded yet it answers "none" rather than 404 - there is no reason for the app to treat it
+  // as an error and tell the user something is wrong.
   if (!latest) return NextResponse.json({ available: false });
 
   return NextResponse.json({

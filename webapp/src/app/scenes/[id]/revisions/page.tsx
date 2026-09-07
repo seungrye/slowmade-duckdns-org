@@ -1,10 +1,10 @@
-// 옛 quest CMS 패턴 — 씬 리비전 전용 페이지.
+// The old quest CMS pattern - a page dedicated to scene revisions.
 //
 // /scenes/[id]/revisions
-//   - 헤더: '리비전 — <id>' + '← 씬 편집으로' 복귀 링크.
-//   - 본문: <RevisionHistorySection sceneId={id} onRestore={...} defaultOpen={true} />.
-//   - 복원 콜백 — 단순 reload (페이지가 리비전 전용이므로 새 상태 즉시 반영).
-//   - diff 는 *v_{N-1} → v_N* 비교 (각 commit 의 변경).
+//   - the header: 'Revisions - <id>' plus a '<- back to scene editing' link.
+//   - the body: <RevisionHistorySection sceneId={id} onRestore={...} defaultOpen={true} />.
+//   - the restore callback - a plain reload (the page being revisions-only, the new state shows at once).
+//   - the diff compares *v_{N-1} -> v_N* (each commit's change).
 
 "use client";
 
@@ -19,7 +19,7 @@ interface Props {
 export default function SceneRevisionsPage({ params }: Props) {
   const { id } = use(params);
 
-  // 복원 후 — 페이지 reload (단순 처리).
+  // After restoring - a page reload (kept simple).
   function handleRestore() {
     if (typeof window !== "undefined") {
       window.location.reload();

@@ -1,4 +1,4 @@
-// 패치 지우기 (#112) — soft delete. 배열에서 빼지 않고 플래그만 세운다.
+// Deleting a patch (#112) - a soft delete. It sets a flag rather than removing it from the array.
 
 import { NextResponse } from 'next/server';
 import { apiSuccess, apiError } from '@/lib/api-response';
@@ -12,12 +12,12 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string;
   if (authed instanceof NextResponse) return authed;
 
   const { id, patchId } = await ctx.params;
-  // 형식부터 본다 — 아무 문자열이나 넘기면 mongoose 가 CastError 로 500 을 낸다.
+  // The format is checked first - any old string makes mongoose throw a CastError and return 500.
   if (!isRomId(id) || !isRomId(patchId)) return apiError('패치를 찾을 수 없습니다.', 404);
 
   await connectToDB();
   const res = await RetroRom.updateOne(
-    // userEmail 을 조건에 함께 넣어 남의 롬은 애초에 걸리지 않게 한다.
+    // userEmail is put in the condition so someone else's ROM never matches in the first place.
     { _id: id, userEmail: authed.email, isDeleted: { $ne: true }, 'patches._id': patchId },
     { $set: { 'patches.$.isDeleted': true } },
   );

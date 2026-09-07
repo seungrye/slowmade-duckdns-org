@@ -1,4 +1,4 @@
-// EndingGallery — #244. 6 엔딩 카드 + 도달/미도달 + 카운트.
+// EndingGallery - #244. The 6 ending cards, reached and unreached, plus the counts.
 // @vitest-environment jsdom
 
 import { describe, it, expect } from 'vitest';
@@ -19,26 +19,26 @@ describe('EndingGallery', () => {
     render(<EndingGallery pastRuns={noRuns} />);
     const cards = screen.getAllByTestId(/^ending-card-/);
     expect(cards).toHaveLength(ENDING_IDS.length);
-    // 모두 미도달 — 전부 ??? 마스킹.
+    // none reached - everything masked as ???.
     expect(screen.getAllByText('???').length).toBe(ENDING_IDS.length);
   });
 
   it('도달한 엔딩만 제목 + epilogue 노출 + 도달 카운트', () => {
     render(<EndingGallery pastRuns={someRuns} />);
-    // ascension 2 회
+    // ascension twice
     const ascensionCard = screen.getByTestId('ending-card-ascension');
     expect(ascensionCard).toHaveTextContent('승천');
     expect(ascensionCard).toHaveTextContent(/2\s*회/);
-    // revolution / fall 1 회씩
+    // revolution and fall once each
     expect(screen.getByTestId('ending-card-revolution')).toHaveTextContent(/1\s*회/);
     expect(screen.getByTestId('ending-card-fall')).toHaveTextContent(/1\s*회/);
-    // 미도달 (harmony / petrification / sylvan_bond) — ???
+    // unreached (harmony, petrification, sylvan_bond) - ???
     expect(screen.getByTestId('ending-card-harmony')).toHaveTextContent('???');
   });
 
   it('전체 도달률 (n/6) 표시', () => {
     render(<EndingGallery pastRuns={someRuns} />);
-    // someRuns 의 unique endingId = {ascension, revolution, fall} = 3 종
+    // someRuns' unique endingIds = {ascension, revolution, fall} = 3 kinds
     expect(screen.getByTestId('gallery-progress')).toHaveTextContent('3 / 6');
   });
 

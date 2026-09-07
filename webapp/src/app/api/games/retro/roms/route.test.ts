@@ -11,7 +11,7 @@ import { auth } from '@/auth';
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 
-/** find().sort().lean() 체인 흉내. */
+/** Mimics the find().sort().lean() chain. */
 function findReturns(docs: unknown[]) {
   mockFind.mockReturnValue({ sort: () => ({ lean: () => Promise.resolve(docs) }) });
 }
@@ -43,7 +43,7 @@ describe('GET /api/games/retro/roms — 내 롬 목록', () => {
         size: 4096,
         objectKey: 'retro-roms/secret-key.gba',
         createdAt: new Date(0),
-        // #143 — 부모 셋에도 오브젝트 키가 있다. 이쪽으로도 새면 안 된다.
+        // #143 - the parent sets have object keys too. They must not leak this way either.
         parentSets: [{ name: 'ddsom.zip', size: 10, objectKey: 'retro-roms/secret-parent.zip' }],
       },
     ]);
@@ -54,10 +54,10 @@ describe('GET /api/games/retro/roms — 내 롬 목록', () => {
       platform: 'gba',
       size: 4096,
       createdAt: '1970-01-01T00:00:00.000Z',
-      // #116 — 카드가 쓰는 값들. 목록 API 는 세이브 유무를 모르므로 false.
+      // #116 - the values the card uses. The list API does not know whether a save exists, so it is false.
       patchEnabled: true,
       hasSave: false,
-      // 이름만 나가고 오브젝트 키는 빠진다.
+      // only the name goes out; the object key does not.
       parentSets: ['ddsom.zip'],
     });
     expect(JSON.stringify(body)).not.toContain('secret-key');

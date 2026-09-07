@@ -1,5 +1,5 @@
-// /api/web-adventure/feedback-notes/[id] — 단건 조회(GET) + 소프트 삭제(DELETE). (#9)
-// owner 전용.
+// /api/web-adventure/feedback-notes/[id] - reading one (GET) plus a soft delete (DELETE). (#9)
+// Owner only.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';

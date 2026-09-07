@@ -32,7 +32,7 @@ export default function Comments({ postId }: Props) {
     fetchComments();
   }, [fetchComments]);
 
-  // 삭제된 최상위 댓글의 자식들은 기본 접힘 — 사용자가 펼치면 볼 수 있음(최초 로드 1회).
+  // The children of a deleted top-level comment are collapsed by default - the user can expand to see them (once, on the initial load).
   useEffect(() => {
     if (collapseInitDone.current || comments.length === 0) return;
     collapseInitDone.current = true;
@@ -46,9 +46,9 @@ export default function Comments({ postId }: Props) {
 
   useEffect(() => {
     const handleRenderComplete = () => {
-      // 알림에서 왔으면(`?c=<덧글id>`) 갈 곳이 이미 정해져 있다 — CommentAnchor 가 그 덧글
-      // 가운데로 보낸다. 여기서 섹션 맨 위로 다시 스크롤하면 **그걸 덮어써서** 늘 덧글
-      // 목록 처음으로 가 버린다 (#247).
+      // Coming from a notification (`?c=<comment id>`) the destination is already decided - CommentAnchor centres
+      // that comment. Scrolling back to the top of the section here **overrides it** and always lands at the start
+      // of the comment list (#247).
       if (!shouldScrollToSection(window.location.hash, window.location.search)) return;
       const element = document.getElementById('comments-section');
       if (element) {
@@ -71,7 +71,7 @@ export default function Comments({ postId }: Props) {
 
   const handleReplySubmit = useCallback(async (parentId: string, content: string) => {
     const parent = comments.find(c => c._id === parentId);
-    // parent 가 봇(enji-bot / painter-bot) 이면 author 명을 그대로 넘겨 라우팅 결정.
+    // When the parent is a bot (enji-bot / painter-bot) the author name is passed through to decide the routing.
     const parentBotAuthor = parent?.isEnji ? parent.author : undefined;
     const ok = await submitComment(parentId, content, parentBotAuthor);
     if (ok) {
@@ -111,7 +111,7 @@ export default function Comments({ postId }: Props) {
     return comments
       .filter(c => (c.parent ? c.parent._id : null) === parentId)
       .map((c: Comment) => {
-        // 최상위 댓글에만 접기 — "답글 N개" 는 *스레드 전체 후손 수*.
+        // Only top-level comments collapse - "N replies" is *the whole thread's descendant count*.
         const countDescendants = (id: string): number => {
           const kids = comments.filter((cc) => (cc.parent ? cc.parent._id : null) === id);
           return kids.reduce((sum, k) => sum + 1 + countDescendants(k._id), 0);

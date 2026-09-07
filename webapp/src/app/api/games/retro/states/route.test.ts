@@ -75,7 +75,7 @@ describe('/api/games/retro/states', () => {
     it('기본 제공 게임 키로 저장한다', async () => {
       const res = await PUT(req('PUT', '', stateForm(BUILTIN)));
       expect(res.status).toBe(200);
-      // 상태 + 스크린샷 둘 다 올라간다.
+      // both the state and the screenshot are uploaded.
       expect(mockPutObject).toHaveBeenCalledTimes(2);
       expect(mockPutObject.mock.calls[0][1]).toMatch(/^retro-states\/[0-9a-f-]{36}\.state$/);
 

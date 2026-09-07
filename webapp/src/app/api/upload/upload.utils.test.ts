@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { buildFileName, buildPublicUrl, validateUploadFormData, MAX_FILE_BYTES, MAX_THUMB_BYTES } from './upload.utils';
 
 describe('buildFileName', () => {
-  // 타임스탬프와 원본 파일명을 하이픈으로 연결한다
+  // It joins the timestamp and the original filename with a hyphen
   it('타임스탬프와 원본 파일명을 조합한다', () => {
     expect(buildFileName(1700000000000, 'photo.jpg')).toBe('1700000000000-photo.jpg');
   });
 });
 
 describe('buildPublicUrl', () => {
-  // endpoint, bucket, fileName으로 HTTPS URL을 조립한다
+  // It assembles an HTTPS URL from the endpoint, bucket and fileName
   it('endpoint, bucket, fileName으로 공개 URL을 생성한다', () => {
     expect(buildPublicUrl('storage.example.com', 'my-bucket', '123-photo.jpg'))
       .toBe('https://storage.example.com/my-bucket/123-photo.jpg');
@@ -30,7 +30,7 @@ describe('buildPublicUrl', () => {
       .toBe('https://storage.example.com/my-bucket/thumbnails/123-my%20photo.jpg');
   });
 
-  // apex 경로(A안): host 에 경로(/s3)가 포함돼도 올바른 apex URL 을 만든다.
+  // The apex path (option A): it builds the right apex URL even when the host includes a path (/s3).
   // MINIO_PUBLIC_HOST=slowmade.duckdns.org/s3 → https://slowmade.duckdns.org/s3/<bucket>/<key>
   it('host 에 경로(/s3)가 포함되면 apex 경로 URL 을 만든다', () => {
     expect(buildPublicUrl('slowmade.duckdns.org/s3', 'handmade-site', '123-photo.jpg'))
@@ -39,7 +39,7 @@ describe('buildPublicUrl', () => {
 });
 
 describe('validateUploadFormData', () => {
-  // file과 thumbnail 존재 여부 및 MIME 타입을 검증한다
+  // It validates the presence and MIME type of the file and the thumbnail
   it('file과 thumbnail이 모두 있으면 ok: true를 반환한다', () => {
     const formData = new FormData();
     formData.append('file', new File(['content'], 'photo.jpg', { type: 'image/jpeg' }));

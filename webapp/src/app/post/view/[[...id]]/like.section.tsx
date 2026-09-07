@@ -23,7 +23,7 @@ export default function LikeSection({
                 .then(r => r.json())
                 .then(({ data }) => setLikeChecked(data.isLiked))
                 .catch(() => {
-                    // DB 조회 실패 시 localStorage fallback
+                    // The localStorage fallback when the DB lookup fails
                     const likedStatus = parseInt(localStorage.getItem(`liked_${_id}`) || '0');
                     setLikeChecked(likedStatus > 0);
                 });
@@ -51,7 +51,7 @@ export default function LikeSection({
             setLikes(likes);
             setLikeChecked(likeChecked);
 
-            // 비로그인 사용자는 localStorage에도 저장
+            // A logged-out user is stored in localStorage too
             if (!session?.user?.email) {
                 if (likeChecked) {
                     localStorage.setItem(`liked_${_id}`, '1');

@@ -12,9 +12,9 @@ export type ValidationFailure = { ok: false; error: string };
 export type ValidationResult = ValidationSuccess | ValidationFailure;
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-// 업로드 크기 상한(스토리지/대역폭 DoS 방지). nginx client_max_body_size(16M) 이내.
-export const MAX_FILE_BYTES = 8 * 1024 * 1024; // 원본 8MB
-export const MAX_THUMB_BYTES = 4 * 1024 * 1024; // 썸네일 4MB
+// The upload size cap (preventing storage and bandwidth DoS). Within nginx's client_max_body_size (16M).
+export const MAX_FILE_BYTES = 8 * 1024 * 1024; // 8MB for the original
+export const MAX_THUMB_BYTES = 4 * 1024 * 1024; // 4MB for the thumbnail
 
 export function validateUploadFormData(formData: FormData): ValidationResult {
   const file = formData.get("file");

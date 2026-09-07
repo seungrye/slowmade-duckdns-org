@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 //
-// 매매 상세 차트가 **모바일에서 정말 30일 창으로 열리는지** (#370).
+// Whether the trade detail chart **really opens with a 30-day window on mobile** (#370).
 //
-// 코드에는 `windowStartDate(allDates, isMobile)` 이 있는데 실제로는 더 넓게 보인다는
-// 신고가 있었다. 의도만 있고 안 먹는 자리를 짚으려고 옵션을 직접 들여다본다.
+// The code has `windowStartDate(allDates, isMobile)`, yet it was reported as showing wider in practice.
+// The options are inspected directly to pin the place where the intent exists but does not take effect.
 import { describe, it, expect, vi } from "vitest";
 import { render } from "@testing-library/react";
 
-/** ReactECharts 에 넘어간 option 을 그대로 붙잡는다. */
+/** Captures the option passed to ReactECharts as it stands. */
 const 받은옵션: Record<string, unknown>[] = [];
 vi.mock("echarts-for-react", () => ({
   default: (p: { option: Record<string, unknown> }) => {
@@ -19,7 +19,7 @@ vi.mock("@/hooks/use-mobile", () => ({ useMobile: () => true }));
 
 import PortfolioDetailClient from "./portfolio-detail-client";
 
-/** 2년치 일봉 — 창을 안 잡으면 2년이 통째로 보인다. */
+/** Two years of daily bars - without a window, all two years are visible. */
 const 날짜들 = Array.from({ length: 500 }, (_, i) => {
   const d = new Date(Date.UTC(2025, 0, 1) + i * 86_400_000);
   return d.toISOString().slice(0, 10);

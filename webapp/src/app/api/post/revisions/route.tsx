@@ -16,15 +16,15 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // #168 — 비공개·삭제된 글의 이력은 작성자만 본다. 이 검사가 없어 비로그인에게 제목·
-        // 작성자·시각이 그대로 나갔고, 거기서 얻은 id 로 본문까지 받아 갈 수 있었다.
+        // #168 - a private or deleted post's history is the author's alone. Without this check, the title, author and time
+        // went out to anyone logged out, and the id obtained there fetched the body as well.
         await connectToDB();
         const post = await Post.findById(postId)
             .select('isPrivate isDeleted userEmail')
             .lean<{ isPrivate?: boolean; isDeleted?: boolean; userEmail?: string } | null>();
         const session = await auth();
         if (!canReadPostHistory(post, session?.user?.email ?? null)) {
-            // 존재 여부도 알려 주지 않는다 — 첨부 라우트와 같은 원칙.
+            // Existence is not revealed either - the same principle as the attachment routes.
             return apiError("게시글을 찾을 수 없습니다.", HttpStatusCode.NotFound);
         }
 

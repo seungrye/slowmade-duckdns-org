@@ -14,24 +14,24 @@ type Params = Promise<{ id: string[] }>
 const siteUrl = env.siteUrl;
 
 /**
- * 공개 글만 서버에서 로드한다(공개 필터). **auth()(쿠키)를 절대 호출하지 않아** 정적 생성/캐시가
- * 유지된다(generateStaticParams + revalidate 와 충돌 없음 → DYNAMIC_SERVER_USAGE 회피).
- * 공개로 못 찾으면(비공개 or 없음) 서버는 판단하지 않고, 클라이언트 게이트(PrivatePostGate)가
- * 인증 API(/api/post)로 작성자 본인인지 확인해 렌더한다.
+ * Only public posts are loaded on the server (a public filter). It **never calls auth() (cookies)**, so static
+ * generation and caching hold (no clash with generateStaticParams + revalidate -> DYNAMIC_SERVER_USAGE avoided).
+ * When it is not found as public (private or absent) the server makes no judgement, and the client gate (PrivatePostGate)
+ * checks through the authenticated API (/api/post) whether the viewer is the author, then renders.
  */
 async function loadPublicPost(_id: string) {
   const pub = await getPost(_id);
   return pub?.post ?? null;
 }
 
-// generateStaticParams(공개 글)로 빌드 시 정적 생성 → 공개 글은 캐시된 정적 렌더로 빠르다.
-// revalidate(시간 ISR)는 제거: 비공개 글은 정적 대상에서 빠져 on-demand 로 렌더되는데, 그때
-// 작성자 판정을 위해 auth()(쿠키)를 읽으므로 revalidate 와 공존하면 DYNAMIC_SERVER_USAGE 로
-// 터진다. revalidate 를 빼면 공개 글은 정적 유지·비공개 글은 동적(인증) 렌더가 가능하다.
-// 공개 글 '수정' 반영은 submit 라우트의 revalidatePath('/post/view/{id}') 로 처리한다.
+// generateStaticParams (public posts) generates statically at build time -> a public post is fast, from a cached static render.
+// revalidate (time-based ISR) is removed: a private post falls outside the static set and renders on demand, and it then
+// reads auth() (cookies) to judge authorship, so coexisting with revalidate blows up with
+// DYNAMIC_SERVER_USAGE. Dropping revalidate keeps public posts static while private ones render dynamically (authenticated).
+// Reflecting an 'edit' of a public post is handled by the submit route's revalidatePath('/post/view/{id}').
 
-// dynamic route([[...id]])는 generateStaticParams 가 있어야 정적 생성된다.
-// 기존 공개 글은 빌드 시 정적 생성, 그 외(신규·비공개)는 dynamicParams(기본 true)로 on-demand.
+// A dynamic route ([[...id]]) needs generateStaticParams to be generated statically.
+// Existing public posts are generated at build time; the rest (new or private) come on demand through dynamicParams (true by default).
 export async function generateStaticParams() {
     const ids = await getAllPostIds();
     return ids.map((id) => ({ id: [id] }));
@@ -43,7 +43,7 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
 
     if (!_id) return { title: 'Post Not Found' };
 
-    const post = await loadPublicPost(_id); // 공개 글만 메타 노출(비공개는 클라 게이트가 렌더)
+    const post = await loadPublicPost(_id); // Metadata is exposed for public posts only (a private one is rendered by the client gate)
     if (!post) return { title: 'Post Not Found' };
 
     return buildPostMetadata({
@@ -65,8 +65,8 @@ export default async function PostViewer(props: { params: Params }) {
     if (!_id) notFound();
 
     const post = await loadPublicPost(_id);
-    // 공개로 못 찾으면 비공개일 수 있으니 클라 게이트로(작성자 본인만 인증 렌더). 없는 글도 게이트가 '찾을 수 없음'.
-    // 비공개 글도 앵커로 스크롤돼야 한다 — 알림의 주 대상이 비공개(AI 팀) 글이다 (#241).
+    // Not found as public may mean private, so the client gate takes over (rendering, authenticated, for the author alone). A missing post also gets 'not found' from the gate.
+    // A private post has to scroll to the anchor too - notifications mostly target private (AI team) posts (#241).
     if (!post) return <><CommentAnchor /><PrivatePostGate id={_id} /></>;
 
     const url = `${siteUrl}/post/view/${_id}`;

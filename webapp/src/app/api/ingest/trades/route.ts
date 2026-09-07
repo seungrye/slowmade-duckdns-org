@@ -10,9 +10,9 @@ type TradeRecord = {
   env: "paper" | "real";
   ticker: string;
   action: "buy" | "sell";
-  strategy?: string; // "infinite" | "trend" 등. 전략 구분(옵션).
+  strategy?: string; // "infinite" | "trend" and so on. Distinguishes the strategy (optional).
   qty: number;
-  cumulativeQty?: number; // 체결 후 누적 보유 수량(옵션).
+  cumulativeQty?: number; // The running quantity held after the fill (optional).
   price: number;
   amount?: number;
   currency?: string;

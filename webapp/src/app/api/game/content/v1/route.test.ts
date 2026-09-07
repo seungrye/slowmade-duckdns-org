@@ -26,7 +26,7 @@ import {
 
 type FindMock = ReturnType<typeof vi.fn>;
 
-// 헬퍼: Model.find().sort().lean() 체이닝을 한 번에 모킹한다.
+// A helper that mocks the Model.find().sort().lean() chain in one go.
 function mockChain(model: { find: FindMock }, docs: unknown[]) {
   model.find.mockReturnValue({
     sort: vi.fn().mockReturnValue({
@@ -35,7 +35,7 @@ function mockChain(model: { find: FindMock }, docs: unknown[]) {
   });
 }
 
-// StartLoadout.findById("default").lean() 모킹. doc=null → DB 미존재(폴백).
+// Mocks StartLoadout.findById("default").lean(). doc=null means absent from the DB (the fallback).
 type FindByIdMock = ReturnType<typeof vi.fn>;
 function mockStartLoadout(doc: Record<string, unknown> | null) {
   (StartLoadout as unknown as { findById: FindByIdMock }).findById.mockReturnValue({
@@ -43,14 +43,14 @@ function mockStartLoadout(doc: Record<string, unknown> | null) {
   });
 }
 
-// TownConfig.findById("default").lean() 모킹. doc=null → DB 미존재(폴백).
+// Mocks TownConfig.findById("default").lean(). doc=null means absent from the DB (the fallback).
 function mockTownConfig(doc: Record<string, unknown> | null) {
   (TownConfig as unknown as { findById: FindByIdMock }).findById.mockReturnValue({
     lean: vi.fn().mockResolvedValue(doc),
   });
 }
 
-// 게임이 기대하는 quest 한 건(round-trip 가능한 최소 형태).
+// One quest as the game expects it (the minimal round-trippable shape).
 function sampleQuestDoc() {
   return {
     id: "infiltration_quest",
@@ -134,7 +134,7 @@ describe("GET /api/game/content/v1", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
 
     const body = await res.json();
-    // v2 — town_config 키 추가.
+    // v2 - the town_config key added.
     expect(body).toHaveProperty("version", 2);
     expect(body).toHaveProperty("generated_at");
     expect(body).toHaveProperty("quests");
@@ -142,7 +142,7 @@ describe("GET /api/game/content/v1", () => {
     expect(body).toHaveProperty("villagers");
     expect(body).toHaveProperty("monsters");
     expect(body).toHaveProperty("town_config");
-    // generated_at 은 ISO8601 형태
+    // generated_at is in ISO8601 form
     expect(() => new Date(body.generated_at).toISOString()).not.toThrow();
   });
 
@@ -185,10 +185,10 @@ describe("GET /api/game/content/v1", () => {
     expect(parsed).toHaveLength(1);
     expect(parsed[0].id).toBe("eternal_gem");
     expect(parsed[0].displayName).toBe("영원의 보석");
-    // start_loadout 은 게임 기본값과 동일한 StartLoadout 래퍼 문자열
+    // start_loadout is the same StartLoadout wrapper string as the game's default
     expect(body.items["start_loadout.ron"]).toContain("StartLoadout(");
     expect(body.items["start_loadout.ron"]).toContain("gold: 50");
-    // accessories 는 비어있어도 키와 빈 배열 직렬화 형태가 들어 있어야 한다.
+    // accessories must carry the key and the empty-array serialisation even when empty.
     expect(body.items["accessories.ron"]).toContain("[]");
   });
 
@@ -213,9 +213,9 @@ describe("GET /api/game/content/v1", () => {
   });
 
   it("villager 의 vendorVisionRadius/freeRoam 가 RON 응답에 round-trip 된다", async () => {
-    // 회귀 — 과거 toVillagerDef 가 mongo 의 vendorVisionRadius/freeRoam 을
-    // 누락해, 라이브에서 market_owner 가 vendor_vision_radius: 2 를 받지 못하고
-    // 게임 측 fallback (6) 으로 동작한 버그 방지.
+    // A regression - toVillagerDef used to drop mongo's vendorVisionRadius and freeRoam, so in production
+    // market_owner never received vendor_vision_radius: 2 and ran on the game's
+    // fallback (6). This guards against that.
     const marketOwner = {
       id: "market_owner",
       name: "구두쇠 박씨",
@@ -238,12 +238,12 @@ describe("GET /api/game/content/v1", () => {
 
     const res = await GET();
     const body = await res.json();
-    // RON 문자열에 snake_case 키가 직접 보여야 한다 (parser 가 OK 해도 직렬화 누락이면
-    // 게임은 못 받는다 — 문자열 매칭으로 명시 검증).
+    // The snake_case keys must appear directly in the RON string (even if the parser is fine, a serialisation omission
+    // means the game never receives it - verified explicitly by string matching).
     expect(body.villagers).toContain("vendor_vision_radius: Some(2)");
-    // free_roam 은 기본 false → 출력 안 함 (게임 측 #[serde(default)]).
+    // free_roam defaults to false -> not emitted (the game's #[serde(default)]).
     expect(body.villagers).not.toContain("free_roam");
-    // round-trip 한 결과에 vendorVisionRadius=2 가 남아 있다.
+    // the round-tripped result still carries vendorVisionRadius=2.
     const parsed = parseVillagersRon(body.villagers);
     expect(parsed).toHaveLength(1);
     expect(parsed[0].id).toBe("market_owner");
@@ -288,7 +288,7 @@ describe("GET /api/game/content/v1", () => {
     expect(body.items["weapons.ron"]).toBe("[]\n");
     expect(body.items["armors.ron"]).toBe("[]\n");
     expect(body.items["consumables.ron"]).toBe("[]\n");
-    // start_loadout 은 항상 게임 기본값 RON (빈 DB 여도 동일).
+    // start_loadout is always the game's default RON (the same even with an empty DB).
     expect(body.items["start_loadout.ron"]).toContain("StartLoadout(");
     expect(body.villagers).toBe("[]\n");
     expect(body.monsters).toBe("[]\n");
@@ -297,7 +297,7 @@ describe("GET /api/game/content/v1", () => {
   it("quests 는 id 사전순으로 정렬되어 반환된다", async () => {
     const a = { ...sampleQuestDoc(), id: "alpha_quest" };
     const b = { ...sampleQuestDoc(), id: "beta_quest" };
-    // DB 응답 순서가 뒤집혀 있어도, 라우트가 sort({id:1}) 로 조회하므로 sort 호출이 일어남을 검증.
+    // Even with the DB's order reversed, the route queries with sort({id:1}), so the sort call is verified.
     mockChain(Quest as unknown as { find: FindMock }, [a, b]);
     mockChain(Item as unknown as { find: FindMock }, []);
     mockChain(Villager as unknown as { find: FindMock }, []);
@@ -497,22 +497,22 @@ describe("GET /api/game/content/v1", () => {
     const ron = body.town_config;
     expect(ron).toContain("size: Village,");
     expect(ron).toContain("roads: Radial,");
-    // landmarks 의 unknown 은 필터링됨
+    // an unknown landmark is filtered out
     expect(ron).toContain("landmarks: [Inn, Smithy],");
   });
 
-  // ── HoldingItemInNpcFov / EnterNpcFov 트리거 회귀 ────────────────────────────
+  // ── HoldingItemInNpcFov / EnterNpcFov trigger regression ────────────────────────────
   //
-  // 회귀: 라이브에서 `elder_tintham_quest` 의 `HoldingItemInNpcFov` fail transition
-  // 자체가 DB 에 들어 있지 않아 시장 주인 시야에 걸려도 아무 일도 일어나지 않았다.
+  // The regression: in production, `elder_tintham_quest`'s `HoldingItemInNpcFov` fail transition was not in the DB at
+  // all, so nothing happened even when caught in the market owner's field of view.
   //
-  // 이 테스트는 *mongo doc 형태 그대로* (JS object: trigger=string, triggerNpcId/
-  // triggerItemId 필드) 가 `/api/game/content/v1` 응답의 RON 에 게임-파서 호환
-  // 형식(`HoldingItemInNpcFov(npc_id: ..., item_id: ...)`) 으로 *직렬화* 되는지
-  // 확인한다. 또 round-trip 도 검증(parseRon → triggerNpcId/triggerItemId 보존).
+  // This test checks that *the mongo doc shape as it is* (a JS object with trigger=string plus triggerNpcId/
+  // triggerItemId fields) is *serialised* into the game-parser-compatible form
+  // (`HoldingItemInNpcFov(npc_id: ..., item_id: ...)`) in the `/api/game/content/v1` response's RON.
+  // It also verifies the round trip (parseRon preserving triggerNpcId/triggerItemId).
   //
-  // 의도: 새 TriggerKind variant 가 추가될 때 같은 누락 패턴(toQuestDef 가 doc 을
-  // 통째로 통과시키는데 serializer/parser 중 하나가 미지원) 을 끝-끝 단에서 잡는다.
+  // The intent: catch the same omission pattern end to end when a new TriggerKind variant is added (toQuestDef passes
+  // the doc through wholesale while one of the serializer or parser does not support it).
   it("HoldingItemInNpcFov fail transition 이 mongo doc → RON 응답에 정확히 직렬화된다", async () => {
     const questDoc = {
       id: "elder_tintham_quest",
@@ -525,9 +525,9 @@ describe("GET /api/game/content/v1", () => {
         accepted: { dialog: ["들키지 말게."], objective: "훔쳐오라" },
         failed: { dialog: ["허허..."], objective: "재시도" },
       },
-      // mongo subdoc 형태 — trigger=string + triggerNpcId/triggerItemId 별도 필드.
-      // toQuestDef 가 그대로 통과시키고 serializeRon 이 새 trigger variant 를
-      // 처리해야 한다.
+      // The mongo subdoc shape - trigger=string plus separate triggerNpcId/triggerItemId fields.
+      // toQuestDef passes it through and serializeRon has to handle the new trigger
+      // variant.
       transitions: [
         {
           from: "accepted",
@@ -556,16 +556,16 @@ describe("GET /api/game/content/v1", () => {
     expect(body.quests).toHaveLength(1);
     const ron: string = body.quests[0].ron;
 
-    // 1) RON 텍스트에 trigger 의 구조체 변형이 그대로 보여야 한다 (snake_case 필드명 포함).
-    //    parser 가 OK 해도 serializer 가 누락하면 게임은 받지 못한다 — 문자열 매칭으로 명시 검증.
+    // 1) The trigger's struct variant must appear in the RON text as it stands (snake_case field names included).
+    //    Even if the parser is fine, a serializer omission means the game never receives it - verified explicitly by string matching.
     expect(ron).toContain(
       'trigger: HoldingItemInNpcFov(npc_id: "market_owner", item_id: "super_tintham_cracker")',
     );
-    // 2) action 들도 game RON 형식으로 직렬화 (TeleportToNpcHome / RemoveItems).
+    // 2) The actions are serialised in the game's RON form too (TeleportToNpcHome / RemoveItems).
     expect(ron).toContain('TeleportToNpcHome(npc_id: "elder")');
     expect(ron).toContain('RemoveItems(item: "super_tintham_cracker", count: Some(1))');
 
-    // 3) round-trip — parseRon 으로 다시 파싱했을 때 trigger 메타가 모두 보존.
+    // 3) The round trip - re-parsing with parseRon preserves every piece of the trigger's metadata.
     const parsed = parseRon(ron);
     expect(parsed.transitions).toHaveLength(1);
     const t = parsed.transitions[0];
@@ -581,12 +581,12 @@ describe("GET /api/game/content/v1", () => {
     ]);
   });
 
-  // ── SpawnItem action 회귀 ──────────────────────────────────────────────────
+  // ── SpawnItem action regression ──────────────────────────────────────────────────
   //
-  // 정책: 잠입 실패 후 재시도 (failed → accepted Interact transition) 에서
-  // 사라진 quest item 을 데이터-주도로 다시 spawn. mongo doc 의 `SpawnItem`
-  // 액션이 게임 RON 호환 형식 (`SpawnItem(item_id: ..., landmark: ..., ...)`) 으로
-  // 직렬화되어야 한다.
+  // The policy: on a retry after a failed infiltration (a failed -> accepted Interact transition), the vanished quest
+  // item is spawned again, data-driven. The mongo doc's `SpawnItem`
+  // action must serialise into the game's RON-compatible form (`SpawnItem(item_id: ..., landmark: ..., ...)`).
+  //
   it("SpawnItem mongo doc → RON 응답에 itemId / landmark / vendor_distance_min / count 모두 직렬화된다", async () => {
     const questDoc = {
       id: "elder_tintham_quest",
@@ -598,7 +598,7 @@ describe("GET /api/game/content/v1", () => {
         accepted: { dialog: ["다시 가져와라."], objective: "재시도" },
         failed: { dialog: ["허허…"], objective: "재시도" },
       },
-      // 핵심: failed → accepted Interact transition 의 actions 에 SpawnItem.
+      // The key part: SpawnItem in the actions of the failed -> accepted Interact transition.
       transitions: [
         {
           from: "failed",
@@ -630,12 +630,12 @@ describe("GET /api/game/content/v1", () => {
     expect(body.quests).toHaveLength(1);
     const ron: string = body.quests[0].ron;
 
-    // 1) SpawnItem 의 4 개 인스턴스 필드 모두 직렬화 (snake_case 필드명 + PascalCase enum).
+    // 1) All 4 of SpawnItem's instance fields are serialised (snake_case field names plus PascalCase enums).
     expect(ron).toContain(
       'SpawnItem(item_id: "super_tintham_cracker", landmark: Some(Market), vendor_distance_min: Some(2), count: Some(1))',
     );
 
-    // 2) round-trip — parseRon 으로 다시 파싱했을 때 모든 필드 보존.
+    // 2) The round trip - re-parsing with parseRon preserves every field.
     const parsed = parseRon(ron);
     expect(parsed.transitions).toHaveLength(1);
     const t = parsed.transitions[0];
@@ -654,7 +654,7 @@ describe("GET /api/game/content/v1", () => {
     ]);
   });
 
-  // ── 상점 시스템 (buyPrice/sellPrice/vendorInventory) end-to-end ────────────────
+  // ── The shop system (buyPrice/sellPrice/vendorInventory) end to end ────────────────
   it("vendor 가 vendorInventory 가지면 RON 에 vendor_inventory: Some([...]) + weapon 의 buy_price 직렬화", async () => {
     const shopkeeperDoc = {
       id: "shopkeeper",
@@ -687,11 +687,11 @@ describe("GET /api/game/content/v1", () => {
     const res = await GET();
     const body = await res.json();
 
-    // villagers RON 에 vendor_inventory: Some(["iron_sword"]) 직렬화
+    // the villagers RON serialises vendor_inventory: Some(["iron_sword"])
     expect(body.villagers).toContain('vendor_inventory: Some([');
     expect(body.villagers).toContain('"iron_sword"');
 
-    // weapons RON 에 buy_price: Some(100) + sell_price: Some(70) 직렬화
+    // the weapons RON serialises buy_price: Some(100) plus sell_price: Some(70)
     expect(body.items["weapons.ron"]).toContain("buy_price: Some(100)");
     expect(body.items["weapons.ron"]).toContain("sell_price: Some(70)");
   });
@@ -742,7 +742,7 @@ describe("GET /api/game/content/v1", () => {
   });
 
   it("EnterNpcFov 트리거도 mongo doc → RON 응답에 정확히 직렬화된다", async () => {
-    // HoldingItemInNpcFov 의 동기 variant. 같은 누락 패턴 회귀를 한 번에 막는다.
+    // HoldingItemInNpcFov's sibling variant. It blocks a regression of the same omission pattern in one go.
     const questDoc = {
       id: "fov_quest",
       title: "FOV 테스트",

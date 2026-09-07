@@ -28,10 +28,10 @@ type Trade = {
   date: string;
   time: string;
   action: "buy" | "sell";
-  strategy?: string; // "infinite_v1" | "trend_v1" 등. 전략 구분(마커 모양).
+  strategy?: string; // "infinite_v1" | "trend_v1" and so on. Distinguishes the strategy (the marker shape).
   price: number;
   qty: number;
-  cumulativeQty?: number; // 체결 후 누적 보유 수량.
+  cumulativeQty?: number; // The running quantity held after the fill.
   env: string;
 };
 
@@ -66,7 +66,7 @@ function sma(series: SeriesPoint[], window: number): Array<[string, number | nul
 
 type Market = "KR" | "US";
 
-// 기간 프리셋 — months: 조회 창, tick: 자동 틱(일 D / 주 W / 월 M). 기본 월(1M).
+// The period presets - months is the query window and tick the automatic tick (daily D, weekly W, monthly M). Monthly (1M) by default.
 type RangeKey = "1M" | "3M" | "1Y" | "3Y" | "5Y" | "10Y";
 type Tick = "D" | "W" | "M";
 const RANGES: { key: RangeKey; label: string; months: number; tick: Tick }[] = [
@@ -78,8 +78,8 @@ const RANGES: { key: RangeKey; label: string; months: number; tick: Tick }[] = [
   { key: "10Y", label: "10년", months: 120, tick: "M" },
 ];
 
-// SMA60(60거래일) warmup — 이동평균은 항상 일봉 60거래일 기준이라 틱과 무관하게 고정.
-// 60거래일 ≈ 3개월, 휴장 여유로 4개월.
+// The SMA60 (60 trading days) warm-up - a moving average is always over 60 trading days of daily bars, fixed regardless of the tick.
+// 60 trading days is about 3 months, or 4 with slack for holidays.
 const SMA_WARMUP_MONTHS = 4;
 
 function ymd(d: Date): string {
@@ -92,12 +92,12 @@ function addMonths(dateStr: string, delta: number): string {
   return ymd(d);
 }
 
-// 일봉을 틱 버킷의 마지막 값으로 다운샘플(실제 날짜 보존). 주봉=월요일 키, 월봉=YYYY-MM.
+// Downsamples the daily bars to each tick bucket's last value (keeping the real date). Weekly keys on Monday, monthly on YYYY-MM.
 function bucketKey(date: string, tick: Tick): string {
   if (tick === "D") return date;
   if (tick === "M") return date.slice(0, 7);
   const d = new Date(date + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // 주 시작(월)
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // the week's start (Monday)
   return ymd(d);
 }
 
@@ -105,7 +105,7 @@ function downsample(series: SeriesPoint[], tick: Tick): SeriesPoint[] {
   if (tick === "D") return series;
   const sorted = series.slice().sort((a, b) => a.date.localeCompare(b.date));
   const lastByBucket = new Map<string, SeriesPoint>();
-  for (const p of sorted) lastByBucket.set(bucketKey(p.date, tick), p); // 버킷 마지막 값
+  for (const p of sorted) lastByBucket.set(bucketKey(p.date, tick), p); // the bucket's last value
   return Array.from(lastByBucket.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -113,9 +113,9 @@ export default function MultiChartClient({ stocks }: Props) {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // 시장별 분리된 선택 — KR 과 US 는 통화 다름. 한 차트에 섞으면 의미 없음.
-  // URL: ?kr=AAPL,005930&us=... (각 시장 ticker 자체로 자연 구분되나 명시).
-  // ticker → market 빠른 조회 (legacy ?tickers= 분리용)
+  // The selections are split per market - KR and US use different currencies. Mixing them in one chart is meaningless.
+  // URL: ?kr=AAPL,005930&us=... (the tickers themselves distinguish the markets, but it is stated explicitly).
+  // A quick ticker -> market lookup (for splitting the legacy ?tickers=)
   const marketOf = useMemo(() => {
     const m: Record<string, Market> = {};
     for (const s of stocks) m[s.ticker] = s.market;
@@ -132,7 +132,7 @@ export default function MultiChartClient({ stocks }: Props) {
   const [selectedKr, setSelectedKr] = useState<string[]>(() => {
     const explicit = parseTickersFromUrl(sp.get("kr"));
     if (explicit.length) return explicit;
-    // legacy ?tickers= 호환 — 시장별 자동 분류
+    // Legacy ?tickers= compatibility - sorted into markets automatically
     const legacy = parseTickersFromUrl(sp.get("tickers"));
     return legacy.filter((t) => marketOf[t] === "KR");
   });
@@ -148,8 +148,8 @@ export default function MultiChartClient({ stocks }: Props) {
   const [normalize, setNormalize] = useState(false);
   const [showMA, setShowMA] = useState(true);
   const [showTrades, setShowTrades] = useState(true);
-  const [range, setRange] = useState<RangeKey>("1M"); // 기본 월 보기
-  const [anchorEnd, setAnchorEnd] = useState<string>(() => ymd(new Date())); // 창 우측 끝(이동 기준)
+  const [range, setRange] = useState<RangeKey>("1M"); // the monthly view by default
+  const [anchorEnd, setAnchorEnd] = useState<string>(() => ymd(new Date())); // the window's right edge (the reference for moving)
   const [byTicker, setByTicker] = useState<Record<string, SeriesPoint[]>>({});
   const [tradesByTicker, setTradesByTicker] = useState<Record<string, Trade[]>>({});
   const [missing, setMissing] = useState<string[]>([]);
@@ -164,7 +164,7 @@ export default function MultiChartClient({ stocks }: Props) {
     return m;
   }, [stocks]);
 
-  // 자동완성 — 현재 active market 의 종목만
+  // Autocomplete - only symbols from the currently active market
   const suggestions = useMemo(() => {
     const q = input.trim().toLowerCase();
     if (!q) return [];
@@ -182,7 +182,7 @@ export default function MultiChartClient({ stocks }: Props) {
 
   useEffect(() => {
     const params = new URLSearchParams(sp.toString());
-    // legacy ?tickers= 정리
+    // tidying up the legacy ?tickers=
     params.delete("tickers");
     if (selectedKr.length === 0) params.delete("kr");
     else params.set("kr", selectedKr.join(","));
@@ -206,12 +206,12 @@ export default function MultiChartClient({ stocks }: Props) {
     let cancelled = false;
     setLoading(true);
     const enc = encodeURIComponent(selected.join(","));
-    // 기간 → 조회 창(from/to). anchorEnd 가 우측 끝(chevron 이동 기준).
-    // limit 은 일봉 기준 창 크기를 덮도록(API 가 5000 캡).
+    // The period -> the query window (from/to). anchorEnd is the right edge (the reference for the chevrons).
+    // limit is set to cover the window size in daily bars (the API caps it at 5000).
     const cfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
     const to = anchorEnd;
     const from = addMonths(to, -cfg.months);
-    // SMA60(60거래일)이 보이는 구간 시작부터 연속되도록 prices 는 warmup 만큼 더 받는다.
+    // prices fetches an extra warm-up so the SMA60 (60 trading days) is continuous from the start of the visible range.
     const warmup = SMA_WARMUP_MONTHS;
     const priceFrom = addMonths(from, -warmup);
     const priceLimit = Math.min(5000, (cfg.months + warmup) * 31 + 5);
@@ -242,10 +242,10 @@ export default function MultiChartClient({ stocks }: Props) {
     return () => { cancelled = true; };
   }, [selected, range, anchorEnd]);
 
-  // #85 — setSelected 는 useState setter 가 아니라 market 에 따라 갈리는 파생값이다
-  // (setSelectedKr | setSelectedUs). 그래서 의존성에 반드시 넣어야 한다. 빠뜨리면 최초
-  // market 의 setter 를 클로저에 가둔 채 재생성되지 않아, 탭을 옮긴 뒤 누르면 엉뚱한
-  // 시장의 목록이 바뀐다.
+  // #85 - setSelected is not a useState setter but a derived value that branches on market
+  // (setSelectedKr | setSelectedUs). So it must be in the dependencies. Omitting it traps the initial
+  // market's setter in the closure and never rebuilds it, so pressing after switching tabs changes the
+  // wrong market's list.
   const addTicker = useCallback(
     (ticker: string) => {
       if (selected.length >= MAX_SELECTED) return;
@@ -270,28 +270,28 @@ export default function MultiChartClient({ stocks }: Props) {
     [suggestions, addTicker],
   );
 
-  // ?center=YYYY-MM-DD 인식 — 매매 차트에서 클릭으로 넘어올 때 사용.
-  // 차트 ready 후 dispatchAction 으로 한 번만 zoom 설정 + URL 에서 center 제거 →
-  // 이후 사용자 zoom 변경은 보존.
+  // Recognises ?center=YYYY-MM-DD - used when arriving by a click from the trade chart.
+  // Once the chart is ready it sets the zoom once through dispatchAction and removes center from the URL,
+  // so the user's later zoom changes are preserved.
   const centerDate = sp.get("center");
 
   const echartsOption = useMemo<EChartsOption | null>(() => {
     if (selected.length === 0) return null;
-    // 종목별 series — close + SMA20 + SMA60 + 매수 marker + 매도 marker.
+    // The per-symbol series - close, SMA20, SMA60, buy markers and sell markers.
     type ESeries = NonNullable<EChartsOption["series"]>;
     const series: ESeries = [];
     const legendData: string[] = [];
 
-    // 기간별 자동 틱으로 다운샘플(일/주/월). dsByTicker 는 warmup 포함(SMA 연속용),
-    // winFrom 이전은 화면에서 가린다. 종목별로 한 번 계산해 축·시리즈에 공유.
+    // Downsampled to the period's automatic tick (daily/weekly/monthly). dsByTicker includes the warm-up (for SMA continuity),
+    // and anything before winFrom is hidden on screen. Computed once per symbol and shared by the axis and the series.
     const rcfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
     const tick = rcfg.tick;
-    const winFrom = addMonths(anchorEnd, -rcfg.months); // 보이는 구간 시작
+    const winFrom = addMonths(anchorEnd, -rcfg.months); // the start of the visible range
     const dsByTicker: Record<string, SeriesPoint[]> = {};
     for (const t of selected) dsByTicker[t] = downsample(byTicker[t] ?? [], tick);
 
-    // xAxis 의 category data 명시 — echarts 가 series 등장 순서로 자동 수집하면
-    // 종목별 휴장일 차이로 순서가 깨짐. union dates sort 후 명시. 보이는 구간만.
+    // The xAxis's category data is stated explicitly - letting echarts collect it from the order the series appear
+    // breaks the order when symbols have different holidays. The union of dates is sorted and stated. Visible range only.
     const dateSet = new Set<string>();
     for (const t of selected) {
       for (const p of dsByTicker[t]) if (p.date >= winFrom) dateSet.add(p.date);
@@ -303,8 +303,8 @@ export default function MultiChartClient({ stocks }: Props) {
       const t = selected[i];
       const color = COLORS[i % COLORS.length];
       const meta = metaByTicker[t];
-      // 가격선은 틱 다운샘플. 이동평균선은 보기(주/월봉)와 무관하게 *항상 일봉 기준
-      // 20/60 거래일*로 계산해 tick 날짜에 샘플 → 어느 기간이든 동일한 20일선·60일선.
+      // The price line is downsampled to the tick. The moving averages are always computed on *20 and 60 daily-bar
+      // trading days*, regardless of the view (weekly or monthly), and sampled at the tick dates -> the same 20- and 60-day lines at any period.
       const dsFull = (dsByTicker[t] ?? [])
         .slice()
         .sort((a, b) => a.date.localeCompare(b.date));
@@ -318,7 +318,7 @@ export default function MultiChartClient({ stocks }: Props) {
       const closeData = dsFull
         .filter((p) => p.date >= winFrom)
         .map((p) => [p.date, adj(p.close)] as [string, number]);
-      // 일봉 SMA(20/60 거래일) → 날짜별 맵(tick 날짜에 샘플하기 위함).
+      // The daily-bar SMA (20/60 trading days) -> a per-date map (so it can be sampled at the tick dates).
       const normDaily: SeriesPoint[] = dailyFull.map((p) => ({ date: p.date, close: adj(p.close) }));
       const ma20Map = new Map(sma(normDaily, 20));
       const ma60Map = new Map(sma(normDaily, 60));
@@ -337,10 +337,10 @@ export default function MultiChartClient({ stocks }: Props) {
         emphasis: { focus: "series" },
       });
 
-      // 매매 마커 — 색=매수(빨강)/매도(파랑), 모양=전략(무한매수 v1 ▲ / 추세 ◆ / 기타 ●).
-      // 전략별로 scatter series 를 나눠 모양과 툴팁으로 구분한다. legend 엔 종목 line 만 노출.
-      // 매핑은 types/trading-marker 가 원본이다 (#367). 여기서 직접 비교하던 시절엔
-      // 전략이 늘어도 아무도 안 고쳐서, infinite_v4 145건이 전부 "기타 ○" 로 그려졌다.
+      // Trade markers - the colour is the side (buy red / sell blue) and the shape the strategy (infinite v1 a triangle / trend a diamond / other a circle).
+      // A separate scatter series per strategy tells them apart by shape and tooltip. Only the symbol lines appear in the legend.
+      // types/trading-marker is the source for the mapping (#367). Back when this compared directly here,
+      // nobody updated it as strategies grew, so all 145 infinite_v4 records were drawn as "other".
       const stratSymbol = strategyMarker;
       const stratLabel = strategyLabel;
       type MarkerPoint = { value: [string, number]; qty: number; cum: number };
@@ -383,7 +383,7 @@ export default function MultiChartClient({ stocks }: Props) {
       }
 
       if (showMA) {
-        // 일봉 SMA 를 화면 tick 날짜에 샘플 — 보이는 구간 시작부터 연속.
+        // The daily-bar SMA sampled at the screen's tick dates - continuous from the start of the visible range.
         const visDates = dsFull.filter((p) => p.date >= winFrom).map((p) => p.date);
         const sma20 = visDates.map(
           (d) => [d, ma20Map.get(d) ?? null] as [string, number | null],
@@ -441,7 +441,7 @@ export default function MultiChartClient({ stocks }: Props) {
     };
   }, [selected, byTicker, tradesByTicker, normalize, showMA, showTrades, metaByTicker, range, anchorEnd]);
 
-  // 기간 창(표시·chevron). anchorEnd = 우측 끝, 좌/우로 기간만큼 이동(미래로는 오늘까지).
+  // The period window (display and chevrons). anchorEnd is the right edge, moving a period left or right (forward only as far as today).
   const rangeCfg = RANGES.find((r) => r.key === range) ?? RANGES[0];
   const windowFrom = addMonths(anchorEnd, -rangeCfg.months);
   const atToday = anchorEnd >= ymd(new Date());
@@ -503,7 +503,7 @@ export default function MultiChartClient({ stocks }: Props) {
                     type="button"
                     onClick={() => {
                       setRange(r.key);
-                      setAnchorEnd(ymd(new Date())); // 기간 바꾸면 최신 구간으로
+                      setAnchorEnd(ymd(new Date())); // changing the period jumps to the most recent range
                     }}
                     className={
                       "px-3 py-1 border-l first:border-l-0 border-gray-300 " +
@@ -569,7 +569,7 @@ export default function MultiChartClient({ stocks }: Props) {
                 startValue: fmt(before),
                 endValue: fmt(after),
               });
-              // center 한 번 적용 후 URL 정리 — 이후 사용자 zoom 보존
+              // The URL is tidied after center is applied once - the user's later zoom is preserved
               const params = new URLSearchParams(sp.toString());
               params.delete("center");
               router.replace(`?${params.toString()}`, { scroll: false });

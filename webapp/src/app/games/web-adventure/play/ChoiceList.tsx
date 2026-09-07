@@ -10,8 +10,8 @@ import {
   isChoiceVisible,
 } from "@/lib/web-adventure/engine/choiceFilter";
 
-// 선택지 리스트 — 종류별 (plain/probability/conditional) 렌더.
-// 4 주차: conditional + hidden=true 미충족 시 *완전 숨김*.
+// The choice list - rendered per kind (plain/probability/conditional).
+// Week 4: a conditional with hidden=true is *fully hidden* when unmet.
 
 const STAT_LABELS_SHORT: Record<string, string> = {
   str: "힘",
@@ -35,7 +35,7 @@ type Props = {
 };
 
 export default function ChoiceList({ choices, character, onChoose }: Props) {
-  // 4 주차 — hidden 모드: 보이지 않는 선택지를 사전 필터.
+  // Week 4 - hidden mode: invisible choices are filtered out beforehand.
   const visibleChoices = choices.filter((c) => isChoiceVisible(c, character));
 
   if (visibleChoices.length === 0) {
@@ -59,7 +59,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
           );
         }
         if (c.kind === "probability") {
-          // 3 주차: effectiveStat (base + passive) 으로 백분율 계산.
+          // Week 3: the percentage is computed from the effectiveStat (base plus passives).
           const percent = estimateSuccessPercent({
             stat: effectiveStat(character, c.stat),
             ability: character.ability,
@@ -82,7 +82,7 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
             </li>
           );
         }
-        // conditional — hidden=false 또는 미정의 시 회색 표시 (isChoiceVisible 가 true 임을 보장).
+        // conditional - greyed out when hidden is false or undefined (isChoiceVisible guarantees it is true).
         const allowed = isChoiceAvailable(c, character);
         let reason = "";
         if (c.condition.kind === "minStat") {
@@ -97,13 +97,13 @@ export default function ChoiceList({ choices, character, onChoose }: Props) {
           const label = FLAG_LABEL_KO[c.condition.key] ?? c.condition.key;
           reason = `${label} ${c.condition.min} 이상 필요`;
         } else if (c.condition.kind === "ability") {
-          // #321 ability — 4 성흔별.
+          // #321 ability - per the 4 stigmata.
           const ABILITY_KO: Record<string, string> = { lunar: "루나", selene: "셀레네", hecate: "헤카테", none: "무흔" };
           reason = `성흔 필요: ${ABILITY_KO[c.condition.required] ?? c.condition.required}`;
         } else if (c.condition.kind === "stigmaAtLeast") {
           reason = `침식도 ${c.condition.min} 이상 필요`;
         } else {
-          // #359 all — 복합 조건.
+          // #359 all - a composite condition.
           reason = "여러 조건 충족 필요";
         }
         return (

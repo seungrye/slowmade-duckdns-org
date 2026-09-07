@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     return apiError("likeChecked는 boolean이어야 합니다.", HttpStatusCode.BadRequest);
   }
 
-  // 비공개 글은 작성자 본인만 좋아요 가능(타인이 _id 로 직접 조작하는 것 차단).
+  // Only the author can like a private post (blocking someone else manipulating it directly by _id).
   const owner = await Post.findById(payload._id).select('isPrivate userEmail').lean<{ isPrivate?: boolean; userEmail?: string } | null>();
   if (!owner) return apiError("게시글을 찾을 수 없습니다.", HttpStatusCode.NotFound);
   if (owner.isPrivate && owner.userEmail !== auth.email) {

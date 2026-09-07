@@ -77,7 +77,7 @@ describe('/api/games/retro/roms/[id]/cover', () => {
       const [bucket, key, , , meta] = mockPutObject.mock.calls[0];
       expect(bucket).toBe('test-bucket');
       expect(key).toMatch(/^retro-covers\//);
-      // 브라우저가 그대로 그릴 수 있도록 형식을 함께 저장한다.
+      // The format is stored alongside so the browser can draw it as is.
       expect(meta['Content-Type']).toBe('image/png');
 
       const [, update] = mockUpdateOne.mock.calls[0];

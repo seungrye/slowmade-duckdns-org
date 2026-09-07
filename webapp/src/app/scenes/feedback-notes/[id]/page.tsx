@@ -1,4 +1,4 @@
-// /scenes/feedback-notes/[id] — 피드백 노트 단건 뷰 (owner 전용). LLM 원문 유지. (#9)
+// /scenes/feedback-notes/[id] - a single feedback note view (owner only). The LLM's original text is kept. (#9)
 
 import { notFound } from 'next/navigation';
 import { endingLabel } from '@/content/web-adventure/endings';
@@ -32,8 +32,8 @@ export default async function FeedbackNoteDetailPage({
   if (!note || note.isDeleted || note.ownerEmail !== owner.email) notFound();
 
   const label = endingLabel(note.endingId);
-  // #90 — 어떤 문체로 읽은 회차인지. 노트가 인용한 문장의 출처를 짚을 수 있다.
-  //   옛 노트에는 없으므로 그때만 표기를 생략한다.
+  // #90 - which prose style this run was read in. It lets a note's quoted sentence be traced to its source.
+  //   Old notes lack it, so it is omitted only then.
   const voiceLabel = note.voice ? tabLabel(note.voice) : null;
 
   return (

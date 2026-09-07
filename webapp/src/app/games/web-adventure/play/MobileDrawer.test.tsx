@@ -1,4 +1,4 @@
-// MobileDrawer — #242. 모바일 사이드 패널 접근 햄버거 메뉴.
+// MobileDrawer - #242. The hamburger menu that reaches the mobile side panel.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from 'vitest';

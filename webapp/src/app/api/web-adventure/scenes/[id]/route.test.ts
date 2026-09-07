@@ -1,11 +1,11 @@
-// /api/web-adventure/scenes/[id] — GET / PUT / DELETE 테스트.
+// /api/web-adventure/scenes/[id] - GET, PUT and DELETE tests.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/auth', () => ({ auth: vi.fn() }));
-// #179 — 씬 쓰기는 작성자 전용이 됐다(가입만 하면 남이 고칠 수 있었다). 인가는 목으로 갈아 끼운다.
+// #179 - scene writes became author-only (merely signing up let anyone edit them). Authorisation is swapped for a mock.
 vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 vi.mock('@/models/web-adventure-scene', () => ({
   default: {
@@ -66,7 +66,7 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
-    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // 기본 작성자
+    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // the author by default
   });
 
   it('작성자가 아니면 404 (씬 수정는 작성자만 — #179)', async () => {
@@ -105,7 +105,7 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     expect(body.data.title).toBe('바뀐 제목');
   });
 
-  // #revision/v3 — git-like: snapshot = *변경 후* (updated). version = 이 PUT 의 0-based index.
+  // #revision/v3 - git-like: the snapshot is *after* the change (updated). version is this PUT's 0-based index.
   it('기존 씬 update 시 *변경 후* snapshot 으로 revision 자동 생성', async () => {
     const existing = { id: 'town_square_dawn', title: '옛 제목', body: ['옛 본문'] };
     const updated = { id: 'town_square_dawn', title: '새 제목', body: ['옛 본문'] };
@@ -122,7 +122,7 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     const res = await PUT(makeRequest('PUT', { title: '새 제목' }), { params });
     expect(res.status).toBe(200);
 
-    // revision create — snapshot = *변경 후* (updated). version = existing.revisionCount.
+    // The revision create - the snapshot is *after* the change (updated). version = existing.revisionCount.
     const createMock = WebAdventureSceneRevision.create as ReturnType<typeof vi.fn>;
     expect(createMock).toHaveBeenCalledOnce();
     const arg = createMock.mock.calls[0]![0] as {
@@ -133,11 +133,11 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     };
     expect(arg.sceneId).toBe('town_square_dawn');
     expect(arg.snapshot).toEqual(updated);
-    // existing 에 revisionCount 없으면 0 (이 PUT 이 0 번째 commit).
+    // With no revisionCount on existing it is 0 (this PUT is commit 0).
     expect(arg.version).toBe(0);
   });
 
-  // #revision/v4 — 모든 commit (첫 생성 포함) 시 revision 생성.
+  // #revision/v4 - a revision is created on every commit (the first creation included).
   it('첫 생성 (existing=null) 시 revision v0 생성', async () => {
     const updated = { id: 'town_square_dawn', title: '신규', revisionCount: 0 };
     (WebAdventureScene.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -156,7 +156,7 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     expect(arg.snapshot).toEqual(updated);
   });
 
-  // 옛 quest CMS 패턴 — PUT 시 scene.revisionCount $inc 1.
+  // The old quest CMS pattern - a PUT $incs scene.revisionCount by 1.
   it('기존 씬 update 시 scene.revisionCount 를 $inc 1 로 증가', async () => {
     const existing = { id: 'town_square_dawn', title: '옛', revisionCount: 2 };
     const updated = { id: 'town_square_dawn', title: '새', revisionCount: 3 };
@@ -171,14 +171,14 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     });
 
     await PUT(makeRequest('PUT', { title: '새' }), { params });
-    // findOneAndUpdate 호출 인자 — 두 번째가 update 쿼리.
+    // findOneAndUpdate's arguments - the second is the update query.
     const updateCall = (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
     const updateQuery = updateCall![1] as { $set?: Record<string, unknown>; $inc?: Record<string, unknown> };
     expect(updateQuery.$inc).toBeDefined();
     expect(updateQuery.$inc!.revisionCount).toBe(1);
   });
 
-  // 옛 quest CMS 패턴 — 첫 생성 (existing=null) 시 revisionCount 증가 안 함.
+  // The old quest CMS pattern - on a first creation (existing=null) revisionCount is not incremented.
   it('첫 생성 (existing=null) 시 $inc revisionCount 미적용', async () => {
     const updated = { id: 'town_square_dawn', title: '신규' };
     (WebAdventureScene.findOne as ReturnType<typeof vi.fn>).mockReturnValue({
@@ -191,11 +191,11 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     await PUT(makeRequest('PUT', { title: '신규' }), { params });
     const updateCall = (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0];
     const updateQuery = updateCall![1] as { $set?: Record<string, unknown>; $inc?: Record<string, unknown> };
-    // existing 없으므로 inc 적용 X. ($inc 키 자체가 없어야 한다.)
+    // With no existing, no inc applies. (The $inc key itself must be absent.)
     expect(updateQuery.$inc).toBeUndefined();
   });
 
-  // #revision/v4 — version = updated.revisionCount (그 commit 의 결과 revCount).
+  // #revision/v4 - version = updated.revisionCount (the resulting revCount of that commit).
   it('existing.revisionCount=3 → updated.revisionCount=4 → revision version=4', async () => {
     const existing = { id: 'town_square_dawn', title: '옛', revisionCount: 3 };
     const updated = { id: 'town_square_dawn', title: '새', revisionCount: 4 };
@@ -213,7 +213,7 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     expect(arg.snapshot).toEqual(updated);
   });
 
-  // 그래프 카드 이동 — position 만 바뀐 커밋은 버저닝하지 않는다(드래그마다 리비전 방지).
+  // Moving a graph card - a commit changing only position is not versioned (preventing a revision per drag).
   it('position 만 변경 시 revision 미생성 + revisionCount 미증가', async () => {
     const existing = { id: 'town_square_dawn', title: '광장', revisionCount: 2 };
     const updated = { id: 'town_square_dawn', title: '광장', revisionCount: 2, position: { x: 10, y: 20 } };
@@ -226,9 +226,9 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
 
     const res = await PUT(makeRequest('PUT', { position: { x: 10, y: 20 } }), { params });
     expect(res.status).toBe(200);
-    // revision 생성 안 함
+    // no revision is created
     expect(WebAdventureSceneRevision.create as ReturnType<typeof vi.fn>).not.toHaveBeenCalled();
-    // revisionCount $inc 안 함
+    // revisionCount is not $inc'd
     const updateQuery = (WebAdventureScene.findOneAndUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![1] as {
       $set?: Record<string, unknown>; $inc?: Record<string, unknown>;
     };
@@ -236,7 +236,7 @@ describe('PUT /api/web-adventure/scenes/[id]', () => {
     expect(updateQuery.$set).toMatchObject({ position: { x: 10, y: 20 } });
   });
 
-  // position 과 content 를 함께 바꾸면 종전대로 버저닝한다.
+  // Changing position and content together versions as before.
   it('position + content(title) 동시 변경은 버저닝한다', async () => {
     const existing = { id: 'town_square_dawn', title: '옛', revisionCount: 1 };
     const updated = { id: 'town_square_dawn', title: '새', revisionCount: 2, position: { x: 5, y: 5 } };
@@ -260,7 +260,7 @@ describe('DELETE /api/web-adventure/scenes/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     asMock(auth).mockResolvedValue({ user: { email: 'owner@test' } });
-    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // 기본 작성자
+    vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@test' }); // the author by default
   });
 
   it('작성자가 아니면 404 (씬 삭제는 작성자만 — #179)', async () => {
@@ -281,7 +281,7 @@ describe('DELETE /api/web-adventure/scenes/[id]', () => {
     upd.mockResolvedValue({ id: 'town_square_dawn', isDeleted: true });
     const res = await DELETE(makeRequest('DELETE'), { params });
     expect(res.status).toBe(200);
-    // 하드 삭제가 아니라 isDeleted 를 세팅해야 한다.
+    // It must set isDeleted rather than hard delete.
     const setArg = upd.mock.calls[0]![1] as { $set?: Record<string, unknown> };
     expect(setArg.$set?.isDeleted).toBe(true);
   });

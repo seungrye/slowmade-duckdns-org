@@ -9,13 +9,13 @@ export const dynamic = "force-dynamic";
  * GET /api/admin/stocks/prices
  *   ?tickers=AAPL,TSLA,005930&from=YYYY-MM-DD&to=YYYY-MM-DD&limit=N
  *
- * 다중 종목 일봉 — 멀티 line chart 용 (#사이클A 멀티 UI).
+ * Multi-symbol daily bars - for the multi-line chart (the cycle A multi UI).
  *
- * 반환: { byTicker: { ticker: [{date, close}, ...] }, requested, missing }
+ * Returns: { byTicker: { ticker: [{date, close}, ...] }, requested, missing }
  *
- * - tickers 콤마 분리, 최대 20 개 (UI 가시성 한계 + 부하 가드).
- * - from/to 누락 시 최근 365일.
- * - limit 누락 시 각 종목당 1000일.
+ * - tickers is comma separated, at most 20 (the UI's visibility limit plus a load guard).
+ * - Without from/to it uses the last 365 days.
+ * - Without limit it uses 1000 days per symbol.
  */
 const MAX_TICKERS = 20;
 const DEFAULT_DAYS = 365;

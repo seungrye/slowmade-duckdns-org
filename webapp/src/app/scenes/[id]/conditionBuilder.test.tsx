@@ -40,7 +40,7 @@ describe('ConditionBuilder', () => {
     expect(fn).toHaveBeenCalled();
     const arg = fn.mock.calls[fn.mock.calls.length - 1][0] as ChoiceCondition;
     expect(arg.kind).toBe('hasItem');
-    // 다른 필드들이 사라져야 함 (stat / min 없음)
+    // the other fields must disappear (no stat / min)
     expect((arg as { stat?: string }).stat).toBeUndefined();
     expect((arg as { min?: number }).min).toBeUndefined();
   });

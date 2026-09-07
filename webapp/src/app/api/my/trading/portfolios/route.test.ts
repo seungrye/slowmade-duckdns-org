@@ -30,7 +30,7 @@ const mockOwner = requireOwner as unknown as ReturnType<typeof vi.fn>;
 const P = TradingPortfolio as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const A = TradingAccount as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const R = TradingPortfolioRevision as unknown as Record<string, ReturnType<typeof vi.fn>>;
-/** revision 모델의 findOne().sort().select().lean() 체인 */
+/** The revision model's findOne().sort().select().lean() chain */
 const revLean = (v: unknown) => ({
   sort: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(v) }) }),
 });
@@ -70,7 +70,7 @@ describe("POST — 추가와 수정을 가른다 (#339)", () => {
 
     expect(res.status).toBe(200);
     expect(P.create).toHaveBeenCalledOnce();
-    // 예전 버그: (accountId, market) 로 upsert 해서 기존 것이 조용히 교체됐다.
+    // The old bug: upserting on (accountId, market) quietly replaced the existing one.
     expect(P.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -127,12 +127,12 @@ describe("DELETE — 숨김은 마지막 블록일 때만 (#339)", () => {
 
   it("형제가 남아 있으면 통화 블록을 숨기지 않는다", async () => {
     P.findById.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ accountId: ACCOUNT, market: "us" }) }) });
-    P.countDocuments.mockResolvedValue(1); // 아직 하나 남음
+    P.countDocuments.mockResolvedValue(1); // one still remains
 
     const res = await del();
 
     expect(res.status).toBe(200);
-    // 남은 블록의 매매기록이 통째로 사라지면 안 된다.
+    // The remaining block's trade records must not vanish wholesale.
     expect(P.countDocuments).toHaveBeenCalledWith({ accountId: ACCOUNT, market: "us", isDeleted: { $ne: true } });
   });
 
@@ -147,7 +147,7 @@ describe("DELETE — 숨김은 마지막 블록일 때만 (#339)", () => {
 });
 
 describe("설정 리비전 (#350) — 값이 사라지지 않게", () => {
-  // #348: 전략을 갈아타자 예전 config 가 통째로 덮여 사라졌고, 주문로그에서 역산해야 했다.
+  // #348: switching strategy overwrote the old config wholesale and lost it, forcing a reverse-engineering from the order log.
   const prevSame = {
     _id: "edit-1", isDeleted: false, market: "us", strategy: "infinite_v4", runAt: "09:35",
     weekdaysOnly: true, enabled: true, reservedCash: 0,
@@ -173,18 +173,18 @@ describe("설정 리비전 (#350) — 값이 사라지지 않게", () => {
     const rev = R.create.mock.calls[0][0];
     expect(rev.action).toBe("update");
     expect(rev.changed.sort()).toEqual(["config", "runAt"]);
-    // 이 값이 남아 있었다면 #348 에서 역산할 필요가 없었다.
+    // Had this value remained, there would have been no need to reverse-engineer in #348.
     expect(rev.snapshot.config).toEqual({ symbol: "TQQQ", principal: 93300 });
   });
 
   it("아무것도 안 바꾸고 저장하면 리비전을 안 만든다", async () => {
-    // 저장 버튼만 눌러도 upsert 가 도므로, 이게 무너지면 이력이 같은 줄로 도배된다.
+    // An upsert runs on every save-button press, so if this breaks the history fills with identical rows.
     P.findOne.mockReturnValue(lean(prevSame));
 
     const res = await post(body({ portfolioId: "edit-1" }));
 
     expect(res.status).toBe(200);
-    expect(P.findOneAndUpdate).toHaveBeenCalledOnce(); // 저장 자체는 된다
+    expect(P.findOneAndUpdate).toHaveBeenCalledOnce(); // the save itself still succeeds
     expect(R.create).not.toHaveBeenCalled();
   });
 
@@ -198,7 +198,7 @@ describe("설정 리비전 (#350) — 값이 사라지지 않게", () => {
   });
 
   it("스냅샷에 state 가 절대 안 들어간다", async () => {
-    // 엔진이 매 실행마다 고치는 값이라(T·cycleCash) 담으면 이력이 도배돼 쓸모없어진다.
+    // The engine rewrites these on every run (T and cycleCash), so including them fills the history and makes it useless.
     P.findOne.mockReturnValue(lean({ ...prevSame, state: { v4: { t: 9.28 } } }));
 
     await post(body({ portfolioId: "edit-1", runAt: "10:50" }));
@@ -207,7 +207,7 @@ describe("설정 리비전 (#350) — 값이 사라지지 않게", () => {
   });
 
   it("리비전 기록이 터져도 설정 저장은 성공한다", async () => {
-    // 이력 때문에 매매 설정을 못 바꾸면 안 된다 — 원장·메일과 같은 원칙.
+    // The history must never stop the trading settings being changed - the same principle as the ledger and mail.
     R.create.mockRejectedValue(new Error("DB 다운"));
 
     const res = await post(body());
@@ -222,7 +222,7 @@ describe("설정 리비전 (#350) — 값이 사라지지 않게", () => {
 
     const rev = R.create.mock.calls[0][0];
     expect(rev.action).toBe("delete");
-    // 지운 블록의 설정을 나중에 다시 볼 수 있어야 한다.
+    // A deleted block's settings must remain readable later.
     expect(rev.snapshot.config).toEqual({ symbol: "TQQQ", principal: 1000 });
   });
 });

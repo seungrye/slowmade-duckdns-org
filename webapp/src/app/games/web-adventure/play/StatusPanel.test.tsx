@@ -1,4 +1,4 @@
-// StatusPanel — #241. 6 스탯 + HP + 어빌 + 인벤 + 회차.
+// StatusPanel - #241. The 6 stats plus HP, ability, inventory and run.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from 'vitest';
@@ -80,7 +80,7 @@ describe('StatusPanel', () => {
         onUseItem={vi.fn()}
       />,
     );
-    // 한국어 라벨 (의료용 붕대, 에테르 정제수)
+    // Korean labels (medical bandage, refined ether water)
     expect(screen.getByText(/의료용 붕대/)).toBeInTheDocument();
     expect(screen.getByText(/에테르 정제수/)).toBeInTheDocument();
   });
@@ -104,7 +104,7 @@ describe('StatusPanel', () => {
     expect(screen.queryByRole('button', { name: /재굴림|다시 굴리기/ })).toBeNull();
   });
 
-  // 성흔 침식 시각화 — stigma-sense 단일 출처(5단계·신체+심리) (#397).
+  // Visualising the stigma contamination - stigma-sense as the single source (5 stages, body plus mind) (#397).
   const renderStigma = (stigmaErosion: number) => render(
     <StatusPanel character={makeCharacter({ stigmaErosion })} runIndex={1} onUseItem={vi.fn()} />,
   );
@@ -119,7 +119,7 @@ describe('StatusPanel', () => {
   it('침식이 오르면 신체 감각(손)이 늘 보인다 — 수치가 아니라 몸으로', () => {
     renderStigma(60); // tier 2
     expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-tier', '2');
-    // stigma-sense 의 손 감각(tier2): "손가락 두 개가 제 뜻대로 접히지 않는다."
+    // stigma-sense's hand sensation (tier 2): "two of your fingers will not bend as you mean them to."
     expect(screen.getByText(/손가락 두 개가 제 뜻대로/)).toBeInTheDocument();
   });
 
@@ -127,8 +127,8 @@ describe('StatusPanel', () => {
     renderStigma(90); // tier 3
     expect(screen.getByTestId('stigma-bar')).toHaveAttribute('data-tier', '3');
     const sense = screen.getByTestId('stigma-sense');
-    expect(sense.textContent).toMatch(/살갗 아래에서 유리 갈리는 소리/); // 손 tier3
-    expect(sense.textContent).toMatch(/결정이 너를 대신해/); // 마음 tier3
+    expect(sense.textContent).toMatch(/살갗 아래에서 유리 갈리는 소리/); // hand tier 3
+    expect(sense.textContent).toMatch(/결정이 너를 대신해/); // mind tier 3
   });
 
   it('침식 100(tier 4) — 최종 단계 감각', () => {

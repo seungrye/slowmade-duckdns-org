@@ -1,22 +1,22 @@
-// work_log 진단 올리기 (#409) — 앱이 죽은 뒤 다음에 열릴 때 부른다.
+// The work_log diagnostics upload (#409) - the app calls it the next time it opens after dying.
 //
-// 인증은 릴리스 올리기와 같은 공유 앱 키(x-app-key).
+// Authentication is the same shared app key as the release upload (x-app-key).
 //
-// **middleware matcher 에서 빼지 않았다.** #407 에서 APK 가 10MB 에 걸려 잘렸던 것과 달리
-// 이 본문은 1MB 상한이라 그 벽에 안 닿는다. 뺄 이유가 없는데 빼면 얻는 것 없이 보안 헤더만
-// 사라진다 — 그래서 그대로 둔다.
+// **It is not excluded from the middleware matcher.** Unlike #407, where the APK was truncated at 10MB,
+// this body is capped at 1MB and never reaches that wall. Excluding it with nothing to gain would only lose the
+// security headers - so it stays.
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
 import WorkLogDiag from '@/models/work-log-diag';
 import { parseDiagUpload } from '@/lib/work-log-diag';
 
-/** 남겨 둘 벌 수. 되풀이되는 흐름을 보기에 넉넉하다. */
+/** How many sets to keep. Enough to see a recurring pattern. */
 const KEEP = 20;
 
 export async function POST(req: NextRequest) {
   const key = env.appKey.trim();
-  // 키가 없으면 아무나 쌓아 넣을 수 있다 — 열어 두지 않는다(default secure).
+  // Without a key anyone could pile things in - it is not left open (secure by default).
   if (!key) return NextResponse.json({ message: 'APP_KEY 미설정' }, { status: 503 });
   if (req.headers.get('x-app-key') !== key) {
     return NextResponse.json({ message: 'unauthorized' }, { status: 401 });
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   await connectToDB();
   const saved = await WorkLogDiag.create(parsed);
 
-  // 오래된 것을 걷는다. **방금 넣은 것은 절대 안 걷는다** — 최근 KEEP 벌을 남긴다.
+  // Prunes the old ones. **What was just inserted is never pruned** - the most recent KEEP sets are kept.
   const 남길것 = await WorkLogDiag.find({}, { _id: 1 })
     .sort({ createdAt: -1 })
     .limit(KEEP)

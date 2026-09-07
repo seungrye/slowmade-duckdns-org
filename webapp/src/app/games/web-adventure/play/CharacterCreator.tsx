@@ -1,13 +1,13 @@
 "use client";
 
-// #258 〈에테르니아의 추락〉 — 캐릭터 선택 (스탯 분배 제거).
+// #258 The Fall of Eternia - character selection (stat allocation removed).
 //
-// 흐름:
-//   1. 주인공 카드 3 종 (Kael/Rin/Solwen) 중 선택 — 시작 스탯/침식도/씬/인벤 자동.
-//   2. 성흔 4 종 (lunar/selene/hecate/none) 선택.
-//   3. '모험 시작' → Character + startScene 전달.
+// The flow:
+//   1. pick one of the 3 protagonist cards (Kael/Rin/Solwen) - the starting stats, contamination, scene and inventory follow automatically.
+//   2. pick one of the 4 stigmata (lunar/selene/hecate/none).
+//   3. 'begin the adventure' -> the Character and startScene are passed on.
 //
-// 스탯 분배 UI 는 제거. 주인공 정체성 = 고정 스탯 + 시작 침식 + 시작 씬.
+// The stat-allocation UI is removed. A protagonist's identity is their fixed stats plus starting contamination and scene.
 
 import { useState } from "react";
 import type { AbilityKey, Character, Protagonist, StatKey } from "@/types/web-adventure";
@@ -115,8 +115,8 @@ export default function CharacterCreator({ onComplete }: Props) {
         <h3 className="text-sm font-semibold text-amber-900 mb-2">시작 능력치</h3>
         <ul className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           {STAT_KEYS.map((k) => {
-            // #291 — 시작 침식 50+ 시 con/dex -2 디버프 미리 표시.
-            //   Kael (시작 80) 카드 선택 시 사용자가 *바로 디버프 인지*.
+            // #291 - the con/dex -2 debuff is shown in advance at a starting contamination of 50+.
+            //   Picking Kael's card (starting at 80) makes the user *aware of the debuff immediately*.
             const debuffed =
               protaMeta.startStigma >= 50 && (k === "con" || k === "dex");
             const effective = debuffed

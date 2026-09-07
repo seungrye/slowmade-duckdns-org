@@ -1,10 +1,10 @@
-// /api/web-adventure/scenes/[id]/revisions/[version] — 단일 GET 테스트.
-// snapshot 포함 (미리보기 용).
+// /api/web-adventure/scenes/[id]/revisions/[version] - single GET tests.
+// The snapshot is included (for previewing).
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// #177 — 리비전은 작성자 전용이 됐다. 인가는 목으로 갈아 끼운다(next-auth 를 안 태운다).
+// #177 - revisions became author-only. Authorisation is swapped for a mock (next-auth is not exercised).
 vi.mock('@/lib/require-owner', () => ({ requireOwner: vi.fn() }));
 vi.mock('@/lib/db', () => ({ connectToDB: vi.fn() }));
 vi.mock('@/models/web-adventure-scene-revision', () => ({
@@ -24,7 +24,7 @@ function makeRequest(): NextRequest {
 describe('GET /api/web-adventure/scenes/[id]/revisions/[version]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // 기본은 작성자 — 아래 개별 케이스에서만 비작성자로 바꾼다.
+    // The author by default - only the individual cases below switch to a non-author.
     vi.mocked(requireOwner).mockResolvedValue({ email: 'owner@x.test' });
   });
 
@@ -66,7 +66,7 @@ describe('GET /api/web-adventure/scenes/[id]/revisions/[version]', () => {
     expect(res.status).toBe(400);
   });
 
-  // #177 — 스냅샷은 씬 전문이라 더 민감하다.
+  // #177 - a snapshot is the scene's full text and so more sensitive.
   it('작성자가 아니면 404 — 스냅샷을 조회조차 하지 않는다', async () => {
     const { NextResponse } = await import('next/server');
     vi.mocked(requireOwner).mockResolvedValue(NextResponse.json({ message: 'Not found' }, { status: 404 }));

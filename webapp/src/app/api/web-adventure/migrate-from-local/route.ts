@@ -1,11 +1,11 @@
-// /api/web-adventure/migrate-from-local — 비로그인 → 로그인 시 localStorage 이전 (#240).
+// /api/web-adventure/migrate-from-local - migrating localStorage on logging in (#240).
 //
-// 클라이언트가 로그인 직후 localStorage 의 save + past_runs 페이로드를 전송하면
-//   - 서버 save 가 없으면 → upsert.
-//   - 서버 save 가 있으면 mode 에 따라 처리:
-//       mode 미지정 또는 'keep' → migrated:false, reason:'server_exists'
-//       mode='force' → 서버 save 덮어쓰기.
-//   - past_runs 는 (userEmail, runIndex) unique 라 *기존 runIndex 와 안 겹치는* 항목만 insertMany.
+// When the client sends localStorage's save plus past_runs payload right after login:
+//   - with no server save -> upsert.
+//   - with a server save, it depends on mode:
+//       mode unset or 'keep' -> migrated:false, reason:'server_exists'
+//       mode='force' -> the server save is overwritten.
+//   - past_runs is unique on (userEmail, runIndex), so only entries *not colliding with an existing runIndex* are insertMany'd.
 
 import { NextRequest } from 'next/server';
 import { connectToDB } from '@/lib/db';
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   let migrated = false;
   let reason: string | undefined;
 
-  // 1. save 이전
+  // 1. Migrating the save
   if (body.save) {
     const existing = await WebAdventureSave.findOne({ userEmail }).lean();
     if (existing && mode !== 'force') {
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 2. pastRuns 이전 — 기존 runIndex 와 안 겹치는 것만.
+  // 2. Migrating pastRuns - only those not colliding with an existing runIndex.
   let pastRunsMigrated = 0;
   if (body.pastRuns && body.pastRuns.length > 0) {
     const existingRuns = await WebAdventurePastRun.find({ userEmail })
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
         runIndex: r.runIndex,
         endingId: r.endingId,
         finalSceneId: r.finalSceneId,
-        // #289 — 옛 localStorage 의 character snapshot 호환 (protagonist/stigmaErosion 보정).
+        // #289 - compatibility with an old localStorage character snapshot (correcting protagonist and stigmaErosion).
         character: hydrateCharacterSnapshot(r.character),
         completedAt: r.completedAt ? new Date(r.completedAt) : new Date(),
       }));

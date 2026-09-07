@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
   try {
     await connectToDB();
 
-    // 글을 쓰면서 **자기 태그를 다시 쓰는 것**이 자연스럽다. 그래서 자동완성도 작성자
-    // 본인의 비공개 글 태그를 포함한다 (#230). 남의 비공개 글은 privacyMatch 가 막는다.
+    // **Reusing one's own tags** while writing is natural. So autocomplete includes the tags on the author's own
+    // private posts (#230). Someone else's private posts are blocked by privacyMatch.
     const session = await auth();
     const viewerEmail = session?.user?.email ?? null;
 

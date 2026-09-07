@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-// updatePostViews 는 DB write 이므로 mock — route 가 올바른 id 로 호출하는지만 검증.
+// updatePostViews is a DB write and so is mocked - only that the route calls it with the right id is verified.
 const mockUpdate = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/lib/posts', () => ({ updatePostViews: mockUpdate }));
 

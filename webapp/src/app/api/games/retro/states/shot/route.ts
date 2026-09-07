@@ -1,7 +1,7 @@
-// 세이브 순간의 화면(썸네일) 내려주기 (#114).
+// Serving the screen at the moment of saving (the thumbnail) (#114).
 //
-// EmulatorJS 가 saveState 이벤트에 스크린샷을 함께 준다. 목록에 그림이 있으면 "언제 저장한
-// 것인지" 를 날짜보다 빨리 알아본다.
+// EmulatorJS provides a screenshot with the saveState event. A picture in the list identifies "when this was saved"
+// faster than a date does.
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     const body = Readable.toWeb(stream) as unknown as ReadableStream<Uint8Array>;
     return new NextResponse(body, {
       headers: {
-        // 형식은 EmulatorJS 가 준 값을 따르되, 이상한 값이 헤더로 새 나가지 않게 화이트리스트.
+        // The format follows what EmulatorJS gave, but through a whitelist so no odd value leaks into a header.
         'Content-Type': doc.shotFormat === 'image/jpeg' ? 'image/jpeg' : 'image/png',
         'Cache-Control': 'private, no-store',
         'X-Content-Type-Options': 'nosniff',

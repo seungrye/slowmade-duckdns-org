@@ -41,8 +41,8 @@ export async function PUT(request: Request) {
       { new: true, upsert: true, projection: { settings: 1 } }
     );
 
-    // 테마는 client(localStorage)에서 관리하므로 쿠키를 더 이상 세팅하지 않는다.
-    // DB(user.settings.theme)는 원본으로 유지되고 ThemeSync 가 로그인 시 동기화한다.
+    // The theme is managed on the client (localStorage), so no cookie is set any more.
+    // The DB (user.settings.theme) remains the source, and ThemeSync syncs it at login.
     return apiSuccess(updatedUser?.settings);
   } catch (error) {
     console.error('Error updating user settings:', error);

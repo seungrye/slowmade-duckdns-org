@@ -5,8 +5,8 @@ import { connectToDB } from '@/lib/db';
 import Post from '@/models/post';
 import { auth } from '@/auth';
 
-// 첨부 다운로드 프록시 — **첨부 id 기준**. 본문 인라인 첨부 칩이 글 저장 전에도 안정적으로 가리킬 수
-// 있게(글ID 불요). 그 첨부를 가진 글을 찾아 공개면 허용·비공개면 작성자 본인만 → MinIO 스트리밍.
+// The attachment download proxy - **keyed by attachment id**. It lets an inline attachment chip in the body point
+// reliably even before the post is saved (no post id needed). It finds the post holding that attachment, allows it if public or if the viewer is the author, then streams from MinIO.
 
 const minioClient = new Minio.Client({
   endPoint: env.minio.endpoint,
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ attId: stri
     .lean<{ isPrivate?: boolean; userEmail?: string; attachments?: AttMeta[] } | null>();
   if (!post) return new NextResponse('Not Found', { status: 404 });
 
-  // 비공개 글 첨부는 작성자 본인만.
+  // A private post's attachment is the author's alone.
   if (post.isPrivate) {
     const session = await auth();
     if (session?.user?.email !== post.userEmail) {

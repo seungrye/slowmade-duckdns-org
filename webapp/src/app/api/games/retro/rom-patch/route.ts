@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto';
-// 롬에 패치 붙이기 (#112) — **교체 방식** (#116).
+// Attaching a patch to a ROM (#112) - **by replacement** (#116).
 //
-// 롬당 패치는 하나다(카드의 체크박스 하나로 다룬다). 새로 올리면 기존 것을 soft delete 하고
-// 새것을 넣는다. 배열 스키마는 그대로 둬 나중에 여러 개로 되돌릴 문을 닫지 않는다.
+// There is one patch per ROM (handled by one checkbox on the card). Uploading a new one soft-deletes the existing
+// one and inserts the new one. The array schema stays, leaving the door open to going back to several later.
 //
-// 롬과 패치는 **따로** 둔다. 합친 결과는 저장하지 않는다 — 합치기는 실행할 때 브라우저가 하고
-// (`public/games/retro/rom-patch.js`), 그래서 원본 하나에 패치를 갈아 끼울 수 있다.
+// The ROM and the patch are kept **separate**. The merged result is never stored - merging happens in the browser at
+// run time (`public/games/retro/rom-patch.js`), which is what lets one original have its patch swapped.
 //
-// 한도가 8MB 라 middleware 본문 제한(10MB) 안에 들어간다 — 롬 업로드와 달리 matcher 에서
-// 뺄 필요가 없다.
+// The 8MB limit keeps it inside middleware's body limit (10MB) - unlike ROM upload, there is no need to exclude it
+// from the matcher.
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const check = validatePatchUpload({
     filename: file.name,
     size: file.size,
-    // 매직만 보면 되므로 앞부분만 넘긴다.
+    // Only the magic is needed, so only the head is passed.
     bytes: new Uint8Array(buf.subarray(0, 16)),
   });
   if (!check.ok) {
@@ -53,12 +53,12 @@ export async function POST(req: NextRequest) {
   }
 
   await connectToDB();
-  // 내 롬인지 먼저 본다 — 남의 롬에 패치를 붙일 수 없어야 하고, 없는 롬에 파일만 남으면 곤란하다.
+  // Ownership is checked first - a patch must not be attachable to someone else's ROM, and a file left against a non-existent ROM is trouble.
   const owned = await RetroRom.exists({ _id: romId, userEmail: authed.email, isDeleted: { $ne: true } });
   if (!owned) return apiError('롬을 찾을 수 없습니다.', 404);
 
   const safeName = file.name.replace(/[/\\]/g, '_').slice(0, 200) || 'patch';
-  const key = `${KEY_PREFIX}/${randomUUID()}-${safeName}`; // 랜덤 프리픽스 — 키 추측 방지
+  const key = `${KEY_PREFIX}/${randomUUID()}-${safeName}`; // A random prefix - it prevents key guessing
 
   try {
     await minioClient.putObject(env.minio.bucket, key, buf);
@@ -68,21 +68,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 기존 패치를 먼저 접는다 — 살아 있는 항목이 늘 최대 하나가 되도록.
+    // The existing patch is folded away first - so at most one entry is ever live.
     await RetroRom.updateOne(
       { _id: romId, userEmail: authed.email, isDeleted: { $ne: true } },
       { $set: { 'patches.$[live].isDeleted': true } },
       { arrayFilters: [{ 'live.isDeleted': { $ne: true } }] },
     );
 
-    // 패치 내용도 방 번호에 들어간다 (#188) — 켠 쪽과 끈 쪽이 같은 방에 붙으면 desync 난다.
+    // The patch's content is part of the room number too (#188) - a patched and an unpatched side in one room desync.
     const patch = {
       name: check.name, format: check.format, size: file.size, objectKey: key,
       sha256: createHash('sha256').update(buf).digest('hex'),
     };
     const updated = await RetroRom.findOneAndUpdate(
       { _id: romId, userEmail: authed.email, isDeleted: { $ne: true } },
-      // 올렸다는 건 쓰겠다는 뜻이므로 적용도 함께 켠다.
+      // Uploading means intending to use it, so applying is turned on as well.
       { $push: { patches: patch }, $set: { patchEnabled: true } },
       { new: true, projection: { patches: 1 } },
     ).lean<{ patches: LeanPatch[] } | null>();
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (!added) throw new Error('패치를 기록하지 못했습니다.');
     return apiSuccess(toPatchDto(added), 201);
   } catch (err) {
-    // 기록이 안 됐으면 파일만 남아 아무도 못 찾는 고아가 된다 — 되돌린다.
+    // If the record failed, the file is left orphaned where nobody can find it - so it is rolled back.
     console.error('patch record failed, rolling back object:', err);
     try {
       await minioClient.removeObject(env.minio.bucket, key);

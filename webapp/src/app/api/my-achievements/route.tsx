@@ -4,13 +4,13 @@ import { achievementView } from "@/lib/achievements";
 import { requireAuth } from "@/lib/require-auth";
 
 /**
- * 내 업적 (#333).
+ * My achievements (#333).
  *
- * 달성한 것과 **도전 중인 것**을 함께 내려준다. 예전엔 달성한 것만 줘서 무엇을 노릴지 알 길이
- * 없었다. 숨김 업적은 `achievementView` 가 **서버에서** 가린다 — 클라이언트에서 가리면
- * devtools 로 다 보인다.
+ * It returns what was earned together with **what is in progress**. It used to return only what was earned, leaving
+ * no way to know what to aim for. Hidden achievements are masked by `achievementView` **on the server** - masking on
+ * the client leaves them all visible in devtools.
  *
- * 조회할 때 재평가하므로, 프로필을 여는 것만으로 밀린 업적이 소급 부여된다.
+ * It re-evaluates on read, so opening the profile grants the backlog retroactively.
  */
 export async function GET() {
   const auth = await requireAuth();

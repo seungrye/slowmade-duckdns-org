@@ -11,7 +11,7 @@ import {
   tabLabel,
 } from "@/lib/web-adventure/scene-body-tabs";
 
-// CMS 의 endingId 드롭다운 — 목록은 types 가 원본 (#352).
+// The CMS's endingId dropdown - types is the source of the list (#352).
 import { ENDING_IDS } from "@/types/web-adventure";
 
 const inputCls = "w-full border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800";
@@ -26,7 +26,7 @@ export function SceneForm({ scene, onChange }: Props) {
   const [newItemId, setNewItemId] = useState("");
   const [bgmUploading, setBgmUploading] = useState(false);
   const [bgmError, setBgmError] = useState<string | null>(null);
-  // 본문 탭 (#79) — 기본은 「기본」 탭.
+  // The body tabs (#79) - the default is the 'basic' tab.
   const [activeTab, setActiveTab] = useState<string>(BODY_TAB);
   const tabs = bodyTabs(scene);
 
@@ -39,7 +39,7 @@ export function SceneForm({ scene, onChange }: Props) {
 
   function patchOnEnter(patch: Partial<NonNullable<Scene["onEnter"]>>) {
     const next: NonNullable<Scene["onEnter"]> = { ...(scene.onEnter ?? {}), ...patch };
-    // setFlags / addItems 가 빈 객체/배열이면 정리
+    // setFlags / addItems are cleaned up when the object or array is empty
     if (next.setFlags && Object.keys(next.setFlags).length === 0) delete next.setFlags;
     if (next.addItems && next.addItems.length === 0) delete next.addItems;
     const hasAny = (next.setFlags && Object.keys(next.setFlags).length > 0)
@@ -76,12 +76,12 @@ export function SceneForm({ scene, onChange }: Props) {
     patchOnEnter({ addItems: addItems.filter((x) => x !== itemId) });
   }
 
-  // ── 배경음(BGM) ─────────────────────────────────────────────────────────
+  // -- background music (BGM) ------------------------------------------------
   function updateBgm(next: NonNullable<Scene["bgm"]> | undefined) {
     onChange({ ...scene, bgm: next });
   }
   function handleBgmSrc(src: string) {
-    if (!src.trim()) return updateBgm(undefined); // 비우면 제거
+    if (!src.trim()) return updateBgm(undefined); // Cleared, it is removed
     updateBgm({ ...scene.bgm, src });
   }
   function handleBgmLoop(loop: boolean) {
@@ -260,7 +260,7 @@ export function SceneForm({ scene, onChange }: Props) {
               onClick={() => {
                 const name = window.prompt("추가할 문체 키 (예: hemingway)")?.trim();
                 if (!name) return;
-                if (name.startsWith(":")) return; // 내부 예약 키와 충돌 방지
+                if (name.startsWith(":")) return; // Avoids clashing with the internal reserved keys
                 onChange(writeTab(scene, name, readTab(scene, name)));
                 setActiveTab(name);
               }}
@@ -280,7 +280,7 @@ export function SceneForm({ scene, onChange }: Props) {
             value={readTab(scene, activeTab).join("\n")}
             onChange={(e) => {
               const lines = e.target.value.split("\n");
-              // 후행 빈 줄 1개는 입력 중 자연스러운 상태, 그러나 모두 빈 줄은 빈 배열
+              // A single trailing blank line is natural while typing, but all-blank lines mean an empty array
               const cleaned = lines.filter((l) => l.length > 0);
               onChange(writeTab(scene, activeTab, cleaned));
             }}

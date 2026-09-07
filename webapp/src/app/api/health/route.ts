@@ -1,8 +1,8 @@
-// 무중단 배포 헬스체크 — deploy.sh 가 폴링.
+// The zero-downtime deploy health check - polled by deploy.sh.
 //
-// 기본: 가벼운 `{ok: true}` (인스턴스 응답성만).
-// ?deep=true: mongo 연결 + admin ping 까지 검사 (DB 실패 인스턴스가 healthy 응답
-//   하는 false positive 차단). 실패 시 503.
+// By default: a light `{ok: true}` (the instance's responsiveness alone).
+// ?deep=true: it also checks the mongo connection and an admin ping (blocking the false positive where an instance
+//   with a broken DB answers healthy). A failure gives 503.
 
 import { apiSuccess, apiError } from '@/lib/api-response';
 import { connectToDB } from '@/lib/db';
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     return apiSuccess({ ok: true });
   }
 
-  // 심층 — mongo 연결 + admin ping.
+  // Deep - the mongo connection plus an admin ping.
   try {
     await connectToDB();
     const admin = mongoose.connection.db?.admin();
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     await admin.ping();
     return apiSuccess({ ok: true, mongo: 'ok' });
   } catch (e) {
-    // 내부 에러 원문(DB 연결정보 등)은 로그로만 — 무인증 공개 엔드포인트라 응답엔 제네릭 메시지.
+    // The raw internal error (DB connection details and so on) stays in the log - being an unauthenticated public endpoint, the response carries a generic message.
     console.error('[health] deep check failed:', e);
     return apiError('deep health check failed', 503);
   }

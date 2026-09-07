@@ -1,5 +1,5 @@
-// /api/web-adventure/feedback-notes — 목록(GET) (#9, #11)
-// 수동 생성(POST)은 제거됨 — 노트는 엔딩 시 자동 생성만.
+// /api/web-adventure/feedback-notes - the list (GET) (#9, #11)
+// Manual creation (POST) was removed - notes are created automatically on an ending only.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextResponse } from 'next/server';

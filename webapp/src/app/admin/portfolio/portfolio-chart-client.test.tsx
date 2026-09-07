@@ -1,5 +1,5 @@
-// PortfolioChartClient — SSR 계약 + HTML 범례 + 마커 클릭 (#378).
-// 옵션 조립 자체는 chart-option.test.ts 가 본다.
+// PortfolioChartClient - the SSR contract, the HTML legend and marker clicks (#378).
+// Assembling the options themselves is chart-option.test.ts's concern.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -16,7 +16,7 @@ vi.mock('echarts-for-react', () => ({
       captured.onEvents = props.onEvents;
       return null;
     },
-    // ref 로 getEchartsInstance 를 부르므로 forwardRef 흉내가 필요하다.
+    // getEchartsInstance is called through a ref, so forwardRef has to be mimicked.
     { $$typeof: Symbol.for('react.forward_ref') },
   ),
 }));
@@ -80,7 +80,7 @@ describe('HTML 범례 (#378)', () => {
     await 렌더();
     const ul = screen.getByLabelText('차트 범례');
     expect(ul.tagName).toBe('UL');
-    // 겹침의 원인이던 절대배치가 아니어야 한다.
+    // It must not be the absolute positioning that caused the overlap.
     expect(ul.className).not.toContain('absolute');
   });
 

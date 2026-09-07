@@ -1,12 +1,12 @@
 'use client';
 
-// 알림 항목 (#247).
+// A notification item (#247).
 //
-// 누르면 **그 항목만** 읽음으로 남기고 덧글로 간다. 예전엔 페이지를 여는 것만으로 전부
-// 읽음이 돼서, 표식이 새로고침 한 번에 사라졌다 — 무엇을 아직 안 봤는지 알 수 없었다.
+// Pressing it marks **that item alone** read and goes to the comment. Opening the page used to mark
+// everything read, so the marking vanished on a single refresh - there was no telling what was still unseen.
 //
-// `keepalive` 로 보낸다. 클릭 직후 화면이 넘어가는데, 이게 없으면 브라우저가 이동하면서
-// 요청을 끊어 버려 읽음 처리가 조용히 누락된다.
+// It is sent with `keepalive`. The screen navigates right after the click, and without this the browser
+// cuts the request off as it navigates, quietly losing the read marking.
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { emitNotificationRead } from '@/lib/notification-events';
@@ -25,9 +25,9 @@ export default function NotificationLink({
   children: ReactNode;
 }) {
   const markRead = () => {
-    // 서버 응답을 기다리지 않고 **누르는 즉시** 알린다 (#259) — 벨은 navbar 에 있어 화면을
-    // 옮겨도 다시 마운트되지 않으므로, 알려 주지 않으면 새로고침 전까지 숫자가 그대로다.
-    // 이미 읽은 항목을 다시 눌렀을 때 빼면 안 되니 안 읽은 것만 센다.
+    // It notifies **the moment it is pressed**, without waiting for the server (#259) - the bell is in the navbar and is
+    // not remounted by navigation, so without being told the number stays put until a refresh.
+    // Only unread items are counted, so pressing an already-read one does not subtract.
     if (isUnread) emitNotificationRead();
     fetch('/api/notifications/read', {
       method: 'POST',

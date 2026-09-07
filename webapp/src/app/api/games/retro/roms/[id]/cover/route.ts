@@ -1,9 +1,9 @@
-// 카드 커버 이미지 — 올리기(POST) · 내려주기(GET) (#122).
+// The card's cover image - upload (POST) and serve (GET) (#122).
 //
-// 올린 롬은 박스아트가 없어 제목 첫 글자 타일이 전부였다. 직접 그림을 넣게 한다.
+// An uploaded ROM has no box art, so a tile of the title's first character was all there was. This lets a picture be added.
 //
-// 롬·패치와 같은 원칙: 공개 `/s3/` URL 을 만들지 않고 본인 세션일 때만 내려준다.
-// 커버는 5MB 라 middleware 본문 제한(10MB) 안이다 — matcher 를 건드리지 않는다.
+// The same principle as ROMs and patches: no public `/s3/` URL, served only to the owner's own session.
+// At 5MB a cover stays inside middleware's body limit (10MB) - the matcher is untouched.
 
 import { NextRequest, NextResponse } from 'next/server';
 import * as Minio from 'minio';
@@ -27,7 +27,7 @@ const minioClient = new Minio.Client({
 });
 
 const KEY_PREFIX = 'retro-covers';
-/** 브라우저에 그대로 넘길 수 있는 형식만 — 이상한 값이 헤더로 새 나가지 않게 한다. */
+/** Only formats the browser can draw as they are - so no odd value leaks into a header. */
 const SERVABLE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   }
 
   await connectToDB();
-  // 내 롬인지 먼저 본다 — 남의 카드를 바꿀 수 없어야 하고, 없는 롬에 파일만 남으면 곤란하다.
+  // Ownership is checked first - someone else's card must not be changeable, and a file left against a non-existent ROM is trouble.
   const rom = await RetroRom.findOne({ _id: id, userEmail: authed.email, isDeleted: { $ne: true } })
     .select('coverKey')
     .lean<{ coverKey?: string } | null>();
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     return apiError('커버 정보를 저장하지 못했습니다.', 500);
   }
 
-  // 이전 커버는 지운다 — 롬·패치와 달리 되살릴 이유가 없다. 실패해도 새 커버는 이미 걸렸다.
+  // The previous cover is deleted - unlike ROMs and patches there is no reason to restore it. Even on failure the new cover is already in place.
   if (rom.coverKey) {
     try {
       await minioClient.removeObject(env.minio.bucket, rom.coverKey);
@@ -88,14 +88,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     }
   }
 
-  // 주소는 그대로이고 내용만 바뀌므로, 클라이언트가 캐시를 깨도록 시각을 함께 준다.
+  // The address stays the same while the content changes, so a timestamp is sent along for the client to break its cache.
   return apiSuccess({ coverUrl: `/api/games/retro/roms/${id}/cover`, updatedAt: Date.now() });
 }
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth();
   const email = session?.user?.email;
-  // 인증 실패도 404 — 401 은 "그 롬은 있다" 는 정보가 된다.
+  // A failed authorisation is a 404 too - a 401 would reveal "that ROM exists".
   if (!email) return new NextResponse('Not Found', { status: 404 });
 
   const { id } = await ctx.params;
@@ -113,7 +113,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string
     return new NextResponse(body, {
       headers: {
         'Content-Type': SERVABLE.has(rom.coverFormat ?? '') ? rom.coverFormat! : 'image/png',
-        // 개인 파일이라 공유 캐시에 남기지 않는다. 바꾸면 바로 보여야 하므로 재검증도 강제.
+        // A personal file, so it is kept out of shared caches. A change must show at once, so revalidation is forced too.
         'Cache-Control': 'private, no-cache',
         'X-Content-Type-Options': 'nosniff',
       },

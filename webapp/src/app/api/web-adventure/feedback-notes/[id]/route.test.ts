@@ -1,4 +1,4 @@
-// /api/web-adventure/feedback-notes/[id] — 단건/삭제 (#9)
+// /api/web-adventure/feedback-notes/[id] - reading one and deleting (#9)
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextResponse, type NextRequest } from 'next/server';

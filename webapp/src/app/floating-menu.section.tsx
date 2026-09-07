@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { Plus, ArrowUpToLine, PanelTopClose, PanelTopOpen, ChevronUp, ChevronDown } from 'lucide-react'; // 아이콘 라이브러리 예시 (lucide-react)
+import { Plus, ArrowUpToLine, PanelTopClose, PanelTopOpen, ChevronUp, ChevronDown } from 'lucide-react'; // An icon library example (lucide-react)
 
 interface FloatingMenuProps {
     onExpandAll?: () => void;
     onCollapseAll?: () => void;
-    onScrollToPrev?: () => void; // 이전 게시물로 스크롤하는 함수
-    onScrollToNext?: () => void; // 다음 게시물로 스크롤하는 함수
+    onScrollToPrev?: () => void; // Scrolls to the previous post
+    onScrollToNext?: () => void; // Scrolls to the next post
 }
 
 export default function FloatingMenu({ onExpandAll, onCollapseAll, onScrollToPrev, onScrollToNext }: FloatingMenuProps) {

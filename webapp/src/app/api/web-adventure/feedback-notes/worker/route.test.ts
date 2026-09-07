@@ -1,4 +1,4 @@
-// 피드백 노트 큐 워커 테스트 (#9)
+// Tests for the feedback-note queue worker (#9)
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { NextResponse, type NextRequest } from 'next/server';
@@ -10,7 +10,7 @@ vi.mock('@/models/web-adventure-feedback-note', () => ({
   default: { updateMany: vi.fn(), countDocuments: vi.fn(), findOneAndUpdate: vi.fn() },
 }));
 vi.mock('@/models/web-adventure-past-run', () => ({ default: { findById: vi.fn() } }));
-// #163 — 워커가 씬 목록(제목)을 프롬프트에 싣는다. 여기선 DB 를 안 타게만 한다.
+// #163 - the worker puts the scene list (titles) in the prompt. Here it is only kept off the DB.
 vi.mock('@/models/web-adventure-scene', () => ({
   default: { find: () => ({ select: () => ({ lean: async () => [] }) }) },
 }));
@@ -62,14 +62,14 @@ describe('feedback-notes worker', () => {
   });
 
   it('stale 복구 실행 후 busy 면 claim 안 함', async () => {
-    asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(1); // 살아있는 processing
+    asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(1); // a live processing item
     const res = await POST(req());
     expect(res.status).toBe(200);
-    // stale 복구 호출됨
+    // stale recovery was called
     expect(WebAdventureFeedbackNote.updateMany).toHaveBeenCalled();
     const upd = asMock(WebAdventureFeedbackNote.updateMany).mock.calls[0];
     expect(upd[0]).toMatchObject({ status: 'processing' });
-    // busy → claim(findOneAndUpdate) 안 함
+    // busy -> no claim (findOneAndUpdate)
     expect(WebAdventureFeedbackNote.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
@@ -90,7 +90,7 @@ describe('feedback-notes worker', () => {
         endingId: 'harmony', finalSceneId: 's', runIndex: 3, scenePath: [], log: ['줄1', '줄2'], character: null,
       }),
     });
-    // AI 는 작가 노트만 반환. 서사·제목은 워커가 원본 로그·엔딩으로 채운다.
+    // The AI returns only the author's note. The worker fills the narrative and title from the original log and ending.
     asMock(generateFeedbackNote).mockResolvedValue({ title: '', narrative: '', authorNote: 'A' });
 
     const res = await POST(req());
@@ -98,8 +98,8 @@ describe('feedback-notes worker', () => {
     expect(body.data.state).toBe('done');
     expect(note.status).toBe('ready');
     expect(note.authorNote).toBe('A');
-    expect(note.narrative).toBe('줄1\n줄2'); // 엔딩 원본 로그
-    expect(note.title).toContain('조화'); // 엔딩명 기반 제목
+    expect(note.narrative).toBe('줄1\n줄2'); // the ending's original log
+    expect(note.title).toContain('조화'); // a title based on the ending's name
     expect(note.save).toHaveBeenCalled();
   });
 
@@ -130,25 +130,25 @@ describe('feedback-notes worker', () => {
     expect(note.status).toBe('failed');
   });
 
-  // 저사양 머신에서 생성이 30분을 넘기자, 아직 돌고 있는 작업을 stale 로 판단해 다른 틱이
-  // 다시 집어갔다 — 중복 생성 + attempts 소진으로 failed. 두 상수의 대소를 고정한다.
+  // When generation exceeded 30 minutes on a low-spec machine, a job still running was judged stale and picked up by
+  // another tick - duplicating the generation and exhausting attempts into failed. The two constants' order is pinned.
   it('stale 판정은 생성 타임아웃보다 길어야 한다', () => {
     expect(STALE_MS).toBeGreaterThan(GEN_TIMEOUT_MS);
   });
 });
 
-// ── #101 중단(프로세스 사망)은 재시도 횟수를 깎지 않는다 ─────────────────────
+// ── #101 an interruption (the process dying) does not consume a retry ─────────────────────
 //
-// 배포로 인스턴스가 종료되면 catch 도 돌지 못해 note 가 processing 인 채 남는다. stale 복구가
-// 나중에 queued 로 되돌리는데, 그때 claim 시점에 올려 둔 attempts 는 그대로였다. 그래서
-// **배포 세 번이면 사람이 손대야 하는 failed** 가 됐다(2026-08-12 실제 사고).
-// 실행 결과를 기록하지 못한 시도는 시도로 치지 않는다.
+// When a deploy terminates the instance, even the catch cannot run and the note is left processing. Stale recovery
+// later returns it to queued, but the attempts raised at claim time stayed as they were. So
+// **three deploys made it a failed note needing manual intervention** (a real incident on 2026-08-12).
+// An attempt that never recorded its outcome does not count as an attempt.
 describe('중단된 작업의 재시도 횟수 (#101)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     asMock(requireOwner).mockResolvedValue({ email: 'o@x' });
     asMock(WebAdventureFeedbackNote.countDocuments).mockResolvedValue(0);
-    asMock(WebAdventureFeedbackNote.findOneAndUpdate).mockResolvedValue(null); // idle 로 끝냄
+    asMock(WebAdventureFeedbackNote.findOneAndUpdate).mockResolvedValue(null); // it ends as idle
   });
 
   it('stale 복구는 attempts 를 되돌린다', async () => {
@@ -156,7 +156,7 @@ describe('중단된 작업의 재시도 횟수 (#101)', () => {
 
     const [filter, update] = asMock(WebAdventureFeedbackNote.updateMany).mock.calls[0];
     expect(filter.status).toBe('processing');
-    // queued 로 되돌리면서 attempts 를 하나 깎는다.
+    // returning it to queued decrements attempts by one.
     expect(update.$inc).toEqual({ attempts: -1 });
     expect(update.$set ?? update).toMatchObject({ status: 'queued' });
   });

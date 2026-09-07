@@ -1,4 +1,4 @@
-// 매매 차트 옵션 조립 (#373·#378). ECharts 를 목으로 감싸지 않고 옵션만 본다.
+// Assembling the trade chart's options (#373, #378). It checks the options alone rather than wrapping ECharts in a mock.
 import { describe, it, expect } from 'vitest';
 import { buildChartOption, type PortfolioResponse } from './chart-option';
 
@@ -33,7 +33,7 @@ const 두블록: PortfolioResponse = {
   unownedTradesByDate: { '2026-08-10': stats(1, 0) },
 };
 
-// 국장 — 블록이 하나. 여기서 전략 선·마커가 사라지던 것이 #378 의 신고 내용이다.
+// KRX - a single block. This is where the strategy line and markers used to disappear, which is what #378 reported.
 const 한블록: PortfolioResponse = {
   env: 'paper-50194613', currency: 'KRW', history: 계좌,
   blocks: [{
@@ -111,7 +111,7 @@ describe('마커', () => {
   it('블록이 하나뿐인 국장도 전략 선 위에 찍힌다 (#378)', () => {
     const m = find(한블록, '무한매수 V4 평가액', 'scatter');
     expect(m).toBeTruthy();
-    // 계좌 총재산(1000)이 아니라 블록 평가액(600) 위다.
+    // On the block's valuation (600), not the account's total assets (1000).
     expect((m!.data[0] as { value: [string, number] }).value).toEqual(['2026-08-10', 600]);
   });
 
@@ -197,26 +197,26 @@ describe('마커 채움/테두리 구분 (#399)', () => {
   };
 
   it('매수만 = 채운 삼각형 (색이 투명 아님)', () => {
-    // 두블록: 무한매수 V4 의 2026-08-10 은 매수만(stats(2,0)).
+    // Two blocks: infinite buying V4's 2026-08-10 is buys only (stats(2,0)).
     const it = scatterData(두블록, '무한매수 V4 평가액')[0];
     expect(it.symbol).toBe('triangle');
     expect(it.symbolRotate).toBeUndefined();
-    expect(it.itemStyle.color).not.toBe('transparent'); // 채움
+    expect(it.itemStyle.color).not.toBe('transparent'); // filled
     expect(it.itemStyle.color).toBe(it.itemStyle.borderColor);
   });
 
   it('매수+매도 = 테두리만 사각형 (채움 투명)', () => {
-    // VR 의 2026-08-11 은 매수+매도(stats(1,1)).
+    // VR's 2026-08-11 has both a buy and a sell (stats(1,1)).
     const it = scatterData(두블록, '밸류리밸런싱 VR 평가액')[0];
     expect(it.symbol).toBe('rect');
-    expect(it.itemStyle.color).toBe('transparent'); // 테두리만
+    expect(it.itemStyle.color).toBe('transparent'); // outline only
     expect(it.itemStyle.borderColor).not.toBe('transparent');
   });
 
   it('매도만 = 테두리만 아래 삼각형', () => {
-    // 한블록: 국장 2026-08-11 은 매도만(stats(0,2)).
+    // One block: KRX's 2026-08-11 is sells only (stats(0,2)).
     const it = scatterData(한블록, '무한매수 V4 평가액').find((x) => x.symbolRotate === 180)!;
     expect(it.symbol).toBe('triangle');
-    expect(it.itemStyle.color).toBe('transparent'); // 테두리만
+    expect(it.itemStyle.color).toBe('transparent'); // outline only
   });
 });

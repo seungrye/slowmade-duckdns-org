@@ -1,7 +1,7 @@
-// /api/web-adventure/feedback-notes — 피드백 노트 목록(GET). (#9, #11)
+// /api/web-adventure/feedback-notes - the feedback note list (GET). (#9, #11)
 //
-// owner 전용. 생성은 **엔딩 시 자동**(end-run → 큐 적재 → 워커)만 사용한다.
-// 수동 생성(POST enqueue)은 제거됨(#11 후속) — 노트는 플레이 엔딩에서만 자동 생성.
+// Owner only. Creation happens **automatically on an ending** (end-run -> queued -> the worker) alone.
+// Manual creation (a POST enqueue) was removed (following #11) - a note is created only from a play's ending.
 
 import { NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';

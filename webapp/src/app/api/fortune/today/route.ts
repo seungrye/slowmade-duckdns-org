@@ -1,9 +1,9 @@
-// /api/fortune/today — 오늘의 운세(타로) 조회, 없으면 생성 (#388).
+// /api/fortune/today - reads today's fortune (tarot), creating it when absent (#388).
 //
-// GET: 로그인 사용자의 오늘(KST) 문서를 get-or-create.
-//   없으면 결정론 카드(draw) + 템플릿 풀이로 즉시 생성(status='pending') → 밤 배치가 LLM 으로 교체.
-//   그래서 신규/휴면 사용자도 30초 대기 없이 바로 카드와 그럴듯한 풀이를 본다.
-// 로그인 스코프(session.user.email)라 IDOR 없음.
+// GET: get-or-create the logged-in user's document for today (KST).
+//   When absent it creates one at once from the deterministic card (draw) plus a template reading (status='pending') -> the nightly batch replaces it with the LLM's.
+//   So a new or dormant user sees a card and a plausible reading immediately, with no 30-second wait.
+// Scoped to the login (session.user.email), so there is no IDOR.
 
 import { apiSuccess, apiError } from "@/lib/api-response";
 import { connectToDB } from "@/lib/db";
@@ -34,7 +34,7 @@ export async function GET() {
     const { cardId, orientation } = drawDailyCard(email, dateKey);
     const card = cardById(cardId)!;
     try {
-      // upsert 로 동시요청 경쟁을 흡수(같은 사용자 두 탭). 유니크 인덱스가 중복을 막는다.
+      // The upsert absorbs concurrent requests (the same user in two tabs). A unique index prevents duplicates.
       await DailyFortune.updateOne(
         { userEmail: email, dateKey },
         {
@@ -58,7 +58,7 @@ export async function GET() {
   const imageUrl = buildPublicUrl(env.minio.publicHost, env.minio.bucket, card.image);
   const dto = fortuneDTO(doc, card, imageUrl);
 
-  // 사주 블록 — 생일이 있을 때만. 사주판·일간은 매번 계산(결정론), LLM 풀이만 doc 에서.
+  // The saju block - only with a birthday. The chart and day stem are recomputed every time (deterministic); only the LLM reading comes from the doc.
   const user = await User.findOne({ email }).select("birthday birthTime").lean<{ birthday?: Date; birthTime?: string | null } | null>();
   const saju = user?.birthday
     ? sajuBlock(

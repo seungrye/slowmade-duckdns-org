@@ -43,7 +43,7 @@ describe('ChoiceEditor — kind 별 폼', () => {
     expect(options).toContain('scene_a');
     expect(options).toContain('scene_b');
     expect(options).toContain('scene_c');
-    // datalist 가 아니라 select 임
+    // it is a select, not a datalist
     expect(container.querySelector('select[aria-label="to"]')).not.toBeNull();
   });
 
@@ -78,7 +78,7 @@ describe('ChoiceEditor — kind 별 폼', () => {
     ];
     render(<ChoiceEditor choices={choices} onChange={vi.fn()} allSceneIds={allSceneIds} />);
     expect(screen.getByLabelText('to')).toBeTruthy();
-    // condition kind select 가 있어야 함
+    // the condition kind select must be present
     expect(screen.getByLabelText('condition kind')).toBeTruthy();
   });
 });

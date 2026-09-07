@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
-// 글 작성 임시 저장 (#199) — 화면 동작.
+// Draft autosave while writing (#199) - the screen behaviour.
 //
-// 값 다루기는 `lib/post-draft.test.ts` 가 본다. 여기서는 **실제로 되살아나는지**,
-// "새로 쓰기" 로 지워지는지, 저장 성공 뒤 초안이 남지 않는지를 본다.
+// Handling the values is `lib/post-draft.test.ts`'s job. Here it is **whether it really comes back**,
+// whether "start over" clears it, and whether no draft remains after a successful save.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { draftKey, serializeDraft, type PostDraft } from '@/lib/post-draft';
 
-// 에디터는 무겁고 jsdom 에서 못 그린다 — 우리가 쓰는 핸들만 흉내 낸다.
-// 실제 에디터는 `immediatelyRender: false` 라 첫 렌더에 준비돼 있지 않다. 그 상태에서
-// setContent 는 조용히 무시된다 — 이번 버그(#201)의 본질이라 목도 그렇게 흉내 낸다.
+// The editor is heavy and cannot be drawn under jsdom - only the handles we use are imitated.
+// The real editor is `immediatelyRender: false` and so is not ready on the first render. In that state
+// setContent is silently ignored - that being the essence of this bug (#201), the mock imitates it too.
 const editorState = vi.hoisted(() => ({ content: null as unknown, urls: [] as unknown[], ready: true }));
 vi.mock('@/components/rich-web-editor/editor', async () => {
   const React = await import('react');
@@ -19,7 +19,7 @@ vi.mock('@/components/rich-web-editor/editor', async () => {
       getContent: () => (editorState.ready
         ? { jsonContent: editorState.content, htmlContent: '<p/>', uploadImageUrls: editorState.urls }
         : { jsonContent: undefined, htmlContent: undefined, uploadImageUrls: [] }),
-      // 준비 전 호출은 실제와 같이 **무시한다** — 이번 버그(#201)의 본질이다.
+      // A call before readiness is **ignored**, as in reality - the essence of this bug (#201).
       setContent: (c: unknown, u: unknown[]) => {
         if (!editorState.ready) return;
         editorState.content = c; editorState.urls = u ?? [];
@@ -102,7 +102,7 @@ describe('글 작성 임시 저장', () => {
     expect(screen.queryByText(/되살렸습니다/)).toBeNull();
   });
 
-  // 오래된 글이 난데없이 되살아나는 편이 더 나쁘다.
+  // An old post springing back out of nowhere is the worse outcome.
   it('오래된 초안은 되살리지 않는다', async () => {
     localStorage.setItem(KEY, serializeDraft(draft({ savedAt: Date.now() - 30 * 24 * 60 * 60 * 1000 }))!);
     render(<PostWriterForm />);
@@ -129,13 +129,13 @@ describe('글 작성 임시 저장', () => {
   });
 });
 
-// #201 — 제목은 되살아나는데 본문은 안 되던 문제.
+// #201 - the title came back but the body did not.
 describe('에디터가 늦게 뜰 때 (#201)', () => {
   beforeEach(() => {
     localStorage.clear();
     editorState.content = null;
     editorState.urls = [];
-    editorState.ready = false; // 첫 렌더에는 아직 준비되지 않았다
+    editorState.ready = false; // not ready yet on the first render
     vi.clearAllMocks();
   });
 
@@ -143,21 +143,21 @@ describe('에디터가 늦게 뜰 때 (#201)', () => {
     localStorage.setItem(KEY, serializeDraft(draft())!);
     render(<PostWriterForm />);
 
-    // 아직 준비 전 — 본문은 들어가지 않았다.
+    // still not ready - the body has not gone in.
     await waitFor(() => expect(screen.getByPlaceholderText('제목을 입력하세요')).toBeTruthy());
     expect(editorState.content).toBeNull();
 
-    editorState.ready = true;              // 에디터가 떴다
+    editorState.ready = true;              // the editor has come up
     await waitFor(() => expect(editorState.content).toEqual(body), { timeout: 3000 });
   });
 
-  // 이게 더 위험했다 — 되살릴 방법이 없는 손실이다.
+  // This was the more dangerous one - a loss with no way back.
   it('에디터가 없는 사이에 저장돼도 초안의 본문을 지우지 않는다', async () => {
     vi.useFakeTimers();
     try {
       localStorage.setItem(KEY, serializeDraft(draft())!);
       render(<PostWriterForm />);
-      // 제목이 복원되며 디바운스 저장이 걸린다 — 이때 에디터는 아직 없다.
+      // Restoring the title schedules a debounced save - and the editor is not there yet.
       await vi.advanceTimersByTimeAsync(1500);
       const saved = JSON.parse(localStorage.getItem(KEY)!);
       expect(saved.jsonContent).toEqual(body);
@@ -167,22 +167,22 @@ describe('에디터가 늦게 뜰 때 (#201)', () => {
   });
 });
 
-// ── 제출하고 나면 초안은 남지 않아야 한다 (#257) ────────────────────
+// -- once submitted, no draft should remain (#257) ----------------------
 //
-// 실제 증상: 글을 정상 제출했는데 다시 글쓰기에 들어가면 방금 올린 글이
-// "작성 중이던 내용" 으로 되살아났다. 스테이징 재현 결과 —
-//   제출 후 초안 남아있나: true → 제목: 초안 정리 확인용 글
-//   새 글쓰기 제목칸: "초안 정리 확인용 글"
+// The real symptom: after submitting a post normally, returning to the writer brought the just-published post
+// back as "what you were writing". Reproduced on staging -
+//   draft still there after submitting: true -> title: a post for checking draft cleanup
+//   the new post's title field: "a post for checking draft cleanup"
 //
-// 원인이 둘이다. (1) 제출 성공 경로에 초안 삭제가 없었다. (2) 화면을 벗어날 때
-// 초안을 담는 정리 훅이 있어서, 지우더라도 홈으로 이동하는 순간 **방금 제출한
-// 내용이 다시 기록**된다. 그래서 지우는 것만으로는 안 되고 저장 자체를 멈춰야 한다.
+// There are two causes. (1) the success path had no draft deletion. (2) a cleanup hook stores the draft
+// when leaving the screen, so even after deleting it, navigating home **records what was just
+// submitted** all over again. Deleting alone is not enough - the saving itself has to stop.
 describe('제출 뒤 초안 정리 (#257)', () => {
   beforeEach(() => {
     localStorage.clear();
     editorState.content = null;
     editorState.urls = [];
-    editorState.ready = true;   // 이 시나리오는 에디터가 떠 있는 평범한 상태다
+    editorState.ready = true;   // this scenario is the ordinary state, with the editor up
     vi.clearAllMocks();
   });
 
@@ -191,8 +191,8 @@ describe('제출 뒤 초안 정리 (#257)', () => {
   async function writeAndSubmit(response: unknown = okResponse) {
     vi.stubGlobal('fetch', vi.fn(async () => response));
     editorState.content = body;
-    // 초안이 **실제로 있는 상태**에서 제출해야 지워지는지 알 수 있다.
-    // 안 심어 두면 제출 시점에 아직 디바운스 저장이 안 돼 그냥 통과해 버린다.
+    // Submitting **with a draft actually present** is the only way to tell whether it gets cleared.
+    // Without planting one, the debounced save has not fired by submit time and it just passes.
     localStorage.setItem(KEY, serializeDraft(draft())!);
     const view = render(<PostWriterForm />);
     await waitFor(() => expect(localStorage.getItem(KEY)).not.toBeNull());
@@ -208,7 +208,7 @@ describe('제출 뒤 초안 정리 (#257)', () => {
     await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
   });
 
-  // 이쪽이 진짜 원인이다 — 지우기만 하면 이동하면서 곧바로 되살아난다.
+  // This is the real cause - deleting alone brings it straight back as it navigates.
   it('제출 뒤 화면을 벗어나도 초안이 다시 생기지 않는다', async () => {
     const view = await writeAndSubmit();
     await waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
@@ -223,7 +223,7 @@ describe('제출 뒤 초안 정리 (#257)', () => {
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 
-  // 제출이 실패했는데 초안까지 지우면 쓰던 글이 사라진다.
+  // Clearing the draft when the submit failed loses what was being written.
   it('제출에 실패하면 초안을 그대로 둔다', async () => {
     const view = await writeAndSubmit({ ok: false, json: async () => ({}) });
     view.unmount();

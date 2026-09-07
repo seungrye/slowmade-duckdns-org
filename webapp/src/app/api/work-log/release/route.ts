@@ -1,10 +1,10 @@
-// work_log 릴리스 올리기 (#261) — 릴리스 워크플로가 부른다.
+// Uploading a work_log release (#261) - called by the release workflow.
 //
-// work_log 저장소가 비공개라 앱이 GitHub 릴리스 API 를 못 본다. 그래서 사이트가 최신
-// APK 를 들고 있다가 앱에 알려 준다.
+// The work_log repo is private, so the app cannot see GitHub's releases API. The site therefore holds the latest
+// APK and tells the app about it.
 //
-// 인증은 공유 앱 키(x-app-key) — 에테르니아 app-end-run 과 같은 방식이다.
-// APK 는 **MinIO** 에 담는다. `public/` 에 두면 새 파일이 재빌드 전까지 404 다(겪은 함정).
+// Authentication is the shared app key (x-app-key) - the same way as Eternia's app-end-run.
+// The APK goes into **MinIO**. Putting it in `public/` would 404 until a rebuild (a trap already met).
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDB } from '@/lib/db';
 import { env } from '@/lib/env';
@@ -12,12 +12,12 @@ import { getMinioClient } from '@/lib/minio-client';
 import WorkLogRelease from '@/models/work-log-release';
 import { parseReleaseUpload } from '@/lib/work-log-release';
 
-/** 늘 같은 자리에 덮어쓴다 — 한 벌만 보관한다. */
+/** Always overwritten in the same place - only one copy is kept. */
 const OBJECT_KEY = 'work-log/app-release.apk';
 
 export async function POST(req: NextRequest) {
   const key = env.appKey.trim();
-  // 키가 없으면 아무나 APK 를 갈아 끼울 수 있다 — 열어 두지 않는다(default secure).
+  // Without a key anyone could swap the APK - it is not left open (secure by default).
   if (!key) return NextResponse.json({ message: 'APP_KEY 미설정' }, { status: 503 });
   if (req.headers.get('x-app-key') !== key) {
     return NextResponse.json({ message: 'unauthorized' }, { status: 401 });
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   });
 
   await connectToDB();
-  // 한 벌만 둔다 — 늘 최신으로 갈아 끼운다.
+  // Only one is kept - always swapped for the latest.
   await WorkLogRelease.deleteMany({});
   await WorkLogRelease.create({ ...parsed, objectKey: OBJECT_KEY, size: bytes.length });
 

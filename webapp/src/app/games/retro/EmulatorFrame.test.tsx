@@ -48,7 +48,7 @@ describe('EmulatorFrame', () => {
     expect(iframe()).toBeNull();
   });
 
-  // #123 — 포커스가 바깥에 있으면 방향키가 페이지를 스크롤한다.
+  // #123 - with focus outside, the arrow keys scroll the page.
   describe('포커스', () => {
     it('불러오기가 끝나면 iframe 에 포커스를 준다 — 방향키가 페이지를 밀지 않게', () => {
       render(<EmulatorFrame core="snes9x" rom="/games/retro/roms/a.sfc" />);

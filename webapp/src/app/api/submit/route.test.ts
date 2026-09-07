@@ -8,7 +8,7 @@ vi.mock('@/models/post', () => ({ default: { create: vi.fn(), findById: vi.fn() 
 vi.mock('@/models/user', () => ({ default: { findOneAndUpdate: vi.fn(), findOne: vi.fn() } }));
 vi.mock('@/models/post-revision', () => ({ default: { create: vi.fn() } }));
 vi.mock('@/lib/achievements', () => ({ evaluateAndGrant: vi.fn().mockResolvedValue([]) }));
-// 신규 글 후 백그라운드 AI 태그 호출(fire-and-forget) — 라우트 단위 테스트에선 목킹.
+// The background AI tagging call after a new post (fire and forget) - mocked in these route unit tests.
 vi.mock('@/lib/tags/suggest-tags', () => ({ generateAndUpdateTags: vi.fn().mockResolvedValue(undefined) }));
 
 import { POST } from './route';
@@ -19,7 +19,7 @@ import PostRevision from '@/models/post-revision';
 
 const mockAuth = auth as unknown as ReturnType<typeof vi.fn>;
 const asMock = (fn: unknown) => fn as ReturnType<typeof vi.fn>;
-// 새 글 작성 경로가 참조하는 User.findOne(...).lean() 기본 목(작성자명 조회).
+// The default mock for the User.findOne(...).lean() the new-post path uses (looking up the author's name).
 const stubAuthorUser = (username = '진짜닉') =>
   asMock(User.findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue({ username }) });
 
@@ -78,9 +78,9 @@ describe('POST /api/submit', () => {
       author: '관리자', likes: 999, views: 999, isDeleted: true, version: 42,
     }));
     const arg = asMock(Post.create).mock.calls[0][0];
-    expect(arg.author).toBe('진짜닉');        // 클라 '관리자' 위조 무시 → 서버 username
-    expect(arg.userEmail).toBe('a@test.com'); // 세션 강제
-    expect(arg.likes).toBeUndefined();         // 클라 값 미전달(스키마 기본 0)
+    expect(arg.author).toBe('진짜닉');        // a client-forged 'admin' is ignored -> the server's username
+    expect(arg.userEmail).toBe('a@test.com'); // forced from the session
+    expect(arg.likes).toBeUndefined();         // the client value is not passed through (the schema default of 0)
     expect(arg.views).toBeUndefined();
     expect(arg.isDeleted).toBeUndefined();
     expect(arg.version).toBeUndefined();
@@ -147,7 +147,7 @@ describe('POST /api/submit', () => {
     (Post.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockPost);
     (PostRevision.create as ReturnType<typeof vi.fn>).mockResolvedValue({});
     await POST(makeRequest({ _id: 'post1', userEmail: 'a@test.com', title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'], version: 999 }));
-    // isPrivate(기본 false)·attachments(기본 [])는 허용 필드. version 등 그 외는 무시.
+    // isPrivate (false by default) and attachments (empty by default) are allowed fields. Everything else, version included, is ignored.
     expect(mockPost.set).toHaveBeenCalledWith({ title: '새 제목', htmlContent: '<p>내용</p>', jsonContent: '{}', tags: ['tag1'], isPrivate: false, attachments: [] });
     expect(mockPost.set).not.toHaveBeenCalledWith(expect.objectContaining({ version: 999 }));
   });

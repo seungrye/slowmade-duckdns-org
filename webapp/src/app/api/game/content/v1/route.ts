@@ -1,15 +1,15 @@
-// 게임 콘텐츠 라이브 동기화용 공개 read-only API.
-// wasm 게임이 시작 시 fetch 해 최신 DB 콘텐츠를 받아 쓴다.
+// The public read-only API for the game's live content sync.
+// The wasm game fetches it at startup to use the latest DB content.
 //
-// 응답 스키마(version: 1):
+// The response schema (version: 1):
 //   { version, generated_at, quests: [{id, ron}], items: {<file>: ron}, villagers: ron, monsters: ron }
 //
-// - 직렬화는 src/lib/ron.ts 의 기존 함수만 재사용(게임 RON 과 라운드트립 검증됨).
-// - StartLoadout 만 DB 스키마가 아직 없어 게임 기본값과 동일한 RON 상수를 반환한다.
-// - 인증 X (공개 데이터: quest/item/villager/monster 카탈로그).
+// - Serialisation reuses only the existing functions in src/lib/ron.ts (round-trip verified against the game's RON).
+// - Only StartLoadout has no DB schema yet, so it returns a RON constant identical to the game's default.
+// - No authentication (public data: the quest, item, villager and monster catalogues).
 //
-// 캐싱: 1분(편집 후 1분 내 게임 반영). CORS: same-origin 이면 사실 필요 없지만 wasm 이
-// 다른 도메인에서 호스팅될 수도 있어 명시적으로 * 허용.
+// Caching: 1 minute (an edit reaches the game within a minute). CORS: unnecessary while same-origin, but the wasm
+// might be hosted on another domain, so * is allowed explicitly.
 
 import { connectToDB } from "@/lib/db";
 import Quest from "@/models/quest";
@@ -46,9 +46,9 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// ── 응답 스키마 ──────────────────────────────────────────────────────────────
-// 게임 측 파서와 동일 형태(키/타입). 변경 시 version 증가 & 게임 동시 업데이트 필수.
-// v2: town_config 키 추가 (시작 마을 ZoneId::Town 생성 옵션 RON).
+// ── The response schema ──────────────────────────────────────────────────────────────
+// The same shape (keys and types) as the game's parser. A change requires bumping version and updating the game at the same time.
+// v2: the town_config key added (the generation options RON for the starting town, ZoneId::Town).
 const SCHEMA_VERSION = 2;
 
 interface ContentResponse {
@@ -65,11 +65,11 @@ interface ContentResponse {
   };
   villagers: string;
   monsters: string;
-  /** 시작 마을 생성 옵션 RON. 게임은 ZoneId::Town 진입 시 이 옵션을 generator 에 전달. */
+  /** The starting town's generation options RON. The game passes them to the generator on entering ZoneId::Town. */
   town_config: string;
 }
 
-// ── DB 문서 → 도메인 타입 매핑 ────────────────────────────────────────────────
+// ── Mapping DB documents to domain types ────────────────────────────────────────────────
 
 function toQuestDef(doc: Record<string, unknown>): QuestDef {
   const rawPhases = doc.phases;
@@ -102,9 +102,9 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
     glyphGameIcon: d.glyphGameIcon as string,
     pickupMessage: d.pickupMessage as string,
   };
-  // 상점 가격 필드 (buyPrice/sellPrice) — 모든 kind 공통. 누락 시 키 자체 미존재 →
-  // RON 응답에서 buy_price/sell_price 미출력 (게임 측 #[serde(default)] None 미러).
-  // 음수/비숫자 등 잘못된 값은 안전망으로 무시 — DB invariant 가 보장하지 않을 수 있으므로.
+  // The shop price fields (buyPrice/sellPrice) - shared by every kind. When absent the key itself is absent ->
+  // buy_price/sell_price are not emitted in the RON response (mirroring the game's #[serde(default)] None).
+  // A bad value (negative, non-numeric) is ignored as a safety net - the DB invariant may not guarantee it.
   function applyPrices<T extends { buyPrice?: number; sellPrice?: number }>(out: T): T {
     if (typeof d.buyPrice === "number" && Number.isFinite(d.buyPrice) && d.buyPrice >= 0) {
       out.buyPrice = d.buyPrice;
@@ -151,8 +151,8 @@ function toItemDef(d: Record<string, unknown>): ItemDef {
         ...base,
         desc: (d.desc as string) ?? "",
       };
-      // effects 가 DB 에 있고 유효한 키만 살려서 응답에 포함.
-      // 유효성 검증은 작성 시 거치지만, 직렬화 단계에서도 한번 더 필터링해 안전망.
+      // Only effects present in the DB with valid keys are kept in the response.
+      // Validation happens at write time, but filtering once more at serialisation is a safety net.
       const raw = d.effects;
       if (Array.isArray(raw)) {
         const filtered = raw.filter(
@@ -179,19 +179,19 @@ function toVillagerDef(d: Record<string, unknown>): VillagerDef {
   };
   if (d.stationary) v.stationary = true;
   if (d.vendor) v.vendor = true;
-  // homeZone — Mongoose subdoc 그대로 통과(serializer 가 Town 기본은 자동 생략).
+  // homeZone - the Mongoose subdoc passes through as is (the serializer omits the Town default automatically).
   if (d.homeZone) v.homeZone = d.homeZone as VillagerDef["homeZone"];
-  // homeLandmark — schema 기본 "random". serializer 가 기본값 생략.
+  // homeLandmark - the schema's default is "random". The serializer omits the default.
   if (d.homeLandmark) v.homeLandmark = d.homeLandmark as VillagerDef["homeLandmark"];
-  // freeRoam — schema 기본 false. true 만 RON 에 출력(serializer 가 기본값 생략).
+  // freeRoam - the schema's default is false. Only true is emitted in the RON (the serializer omits the default).
   if (d.freeRoam) v.freeRoam = true;
-  // vendorVisionRadius — Option<u32>. null/undefined 는 게임 측 fallback default(6) 사용.
-  //   명시 시 그 vendor 만 그 반경 적용 (예: market_owner = 2). serializer 가 Some(N) 출력.
-  //   이 매핑이 빠지면 mongo 값이 RON 응답에 안 실려 게임이 영원히 fallback 으로 동작한다.
+  // vendorVisionRadius - Option<u32>. null/undefined uses the game's fallback default (6).
+  //   When given, only that vendor uses that radius (market_owner = 2, say). The serializer emits Some(N).
+  //   Without this mapping the mongo value never reaches the RON response and the game runs on the fallback forever.
   if (typeof d.vendorVisionRadius === "number") v.vendorVisionRadius = d.vendorVisionRadius;
-  // vendorInventory — Option<Vec<String>>. 명시적 빈 상점([]) 과 SHOP_CATALOG fallback
-  // (undefined) 구분. Array.isArray 만으로 분기해 빈 배열도 보존.
-  // 유효 id 만 필터(string 화) — 잘못된 DB 값 안전망.
+  // vendorInventory - Option<Vec<String>>. It distinguishes an explicitly empty shop ([]) from the SHOP_CATALOG
+  // fallback (undefined). Branching on Array.isArray alone preserves the empty array.
+  // Only valid ids are kept (stringified) - a safety net against bad DB values.
   if (Array.isArray(d.vendorInventory)) {
     v.vendorInventory = d.vendorInventory.filter((x): x is string => typeof x === "string");
   }
@@ -219,8 +219,8 @@ function toMonsterDef(d: Record<string, unknown>): MonsterDef {
   return m;
 }
 
-// ── StartLoadout 기본값 ────────────────────────────────────────────────────────
-// DB 에 doc 이 없을 때 폴백 — 게임 측 read_start_loadout() 의 default (gold 50) 미러.
+// ── The StartLoadout default ────────────────────────────────────────────────────────
+// The fallback when there is no doc in the DB - mirroring the game's read_start_loadout() default (gold 50).
 const DEFAULT_START_LOADOUT: StartLoadoutDef = {
   gold: 50,
   weapon: null,
@@ -243,8 +243,8 @@ function toStartLoadoutDef(d: Record<string, unknown>): StartLoadoutDef {
   };
 }
 
-// ── TownConfig 폴백 ────────────────────────────────────────────────────────────
-// DB doc 의 알 수 없는/누락 값은 default 로 치환 — 새 옵션 추가 시 호환.
+// ── The TownConfig fallback ────────────────────────────────────────────────────────────
+// Unknown or missing values in the DB doc are replaced by the defaults - compatible when a new option is added.
 function toTownConfigDef(d: Record<string, unknown>): TownConfigDef {
   const inEnum = <T extends string>(set: readonly T[], v: unknown, fallback: T): T =>
     (typeof v === "string" && (set as readonly string[]).includes(v)) ? (v as T) : fallback;
