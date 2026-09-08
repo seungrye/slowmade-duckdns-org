@@ -22,7 +22,21 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import type { Card } from '@/lib/eternia-refine/types';
 
 /** 위로 이만큼 끌면 낸다. 짧으면 오발이 나고 길면 답답하다. */
-const DRAG_THRESHOLD = -96;
+const DRAG_THRESHOLD = -84;
+
+/**
+ * 튕기기(플릭) 판정 — 위로 이보다 빠르면 거리가 짧아도 낸다 (px/ms).
+ *
+ * 엄지로 톡 튕기는 손짓은 이동 거리가 짧다. 거리만 보면 그게 안 먹혀서
+ * "왜 안 나가지" 가 된다. 속도를 같이 본다.
+ */
+const FLICK_VELOCITY = -0.55;
+
+/** 플릭이라도 최소 이만큼은 올라가야 한다 — 손 떨림을 제출로 오인하지 않게. */
+const FLICK_MIN_DY = -18;
+
+/** 속도를 재는 창. 손을 떼기 직전 이 시간만큼의 움직임만 본다. */
+const FLICK_WINDOW_MS = 80;
 
 /** 이만큼 위로 끌기 전까지는 좌우 훑기로 본다. */
 const SCRUB_UNTIL = -18;
@@ -35,10 +49,19 @@ const PIVOT_BELOW = 150;
 
 /**
  * 카드 한 장당 기울기. 바깥 카드는 이것의 (n−1)/2 배까지 눕는다.
- * 13 으로 뒀더니 5장에서 바깥이 26° 라 카드 이름이 안 읽혔다 — 7 이면 14° 다.
+ *
+ * 13 → 7 → 4 로 내려왔다. 눕힐수록 부채는 예쁘지만 이름이 안 읽히고 폭을 많이 먹는다.
+ * 손패가 5장으로 고정이 아니므로(루나는 더 뽑는다) **덜 눕히고 더 겹치는** 편이
+ * 장수가 늘어도 버틴다. 4° 면 8장에서도 바깥이 14° 다.
  */
-const MAX_SPREAD_DEG = 7;
-const LIFT_PX = -44;
+const MAX_SPREAD_DEG = 4;
+
+/** 겹침 정도 — 이 값보다 넓게는 안 벌린다. 작을수록 많이 겹친다. */
+const MAX_GAP = 34;
+
+/** 이보다 좁아지면 더는 안 겹치고 각도를 줄인다. */
+const MIN_GAP = 13;
+const LIFT_PX = -56;
 const EDGE_PAD = 10;
 
 const rad = (d: number) => (d * Math.PI) / 180;
@@ -62,8 +85,8 @@ export function fanGeometry(width: number, n: number) {
     const pivotPush = PIVOT_BELOW * Math.sin(rot);
     const room = budget - halfRotated - pivotPush;
     if (room <= 0) continue;
-    const gap = Math.min(46, room / maxOffset);
-    if (gap >= 16) return pick(deg, gap);
+    const gap = Math.min(MAX_GAP, room / maxOffset);
+    if (gap >= MIN_GAP) return pick(deg, gap);
   }
   // 아주 좁은 화면 — 회전 없이 최소 간격으로 겹친다.
   return pick(0, Math.max(8, (budget - CARD_W / 2) / maxOffset));
@@ -101,6 +124,13 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
   const [width, setWidth] = useState(360);
   const dragging = useRef(false);
   const startY = useRef(0);
+  /**
+   * 최근 움직임 표본 — 플릭 속도를 재려고 들고 있는다.
+   *
+   * 표본 하나(직전 이벤트)로 재면 두 이벤트의 시각이 같을 때 dt=0 이라 속도가 0 으로
+   * 남는다. 실제로 그래서 튕겨도 안 나갔다. **창(window)으로** 재면 그 구멍이 없다.
+   */
+  const samples = useRef<{ y: number; t: number }[]>([]);
   const root = useRef<HTMLDivElement>(null);
   const cards = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -136,12 +166,31 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
     return best;
   }, []);
 
+  /** 표본을 쌓되 창 밖은 버린다. */
+  const pushSample = (y: number) => {
+    const t = performance.now();
+    const xs = samples.current;
+    xs.push({ y, t });
+    while (xs.length > 2 && t - xs[0].t > FLICK_WINDOW_MS) xs.shift();
+  };
+
+  /** 창 안에서의 평균 속도(px/ms). 위로 갈수록 음수. */
+  const velocity = () => {
+    const xs = samples.current;
+    if (xs.length < 2) return 0;
+    const a = xs[0];
+    const b = xs[xs.length - 1];
+    const dt = b.t - a.t;
+    return dt > 0 ? (b.y - a.y) / dt : 0;
+  };
+
   const down = (e: React.PointerEvent) => {
     if (disabled) return;
     const i = cardAt(e.clientX);
     if (i < 0) return;
     dragging.current = true;
     startY.current = e.clientY;
+    samples.current = [{ y: e.clientY, t: performance.now() }];
     setSel(i);
     setDy(0);
     setArmed(false);
@@ -151,6 +200,8 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
   const move = (e: React.PointerEvent) => {
     if (!dragging.current) return;
     const delta = e.clientY - startY.current;
+
+    pushSample(e.clientY);
 
     // 위로 안 끌었으면 좌우 훑기 — 손가락 밑 카드로 갈아탄다.
     if (delta > SCRUB_UNTIL) {
@@ -174,7 +225,12 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
     if (!dragging.current) return;
     dragging.current = false;
     const i = sel;
-    const shouldPlay = armed;
+
+    // 제출은 **두 길뿐**이다: 충분히 끌어 올렸거나, 위로 튕겼거나.
+    // 탭은 펼치기이므로 여기서 제출로 새면 안 된다.
+    const flicked = velocity() <= FLICK_VELOCITY && dy <= FLICK_MIN_DY;
+    const shouldPlay = armed || flicked;
+
     setDy(0);
     setArmed(false);
     if (shouldPlay && i >= 0 && hand[i] && canPlay(hand[i])) onPlay(i);
@@ -229,8 +285,14 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
               transformOrigin: `50% ${PIVOT_BELOW + CARD_H / 2}px`,
               zIndex: isSel ? 60 : i,
             }}
-            onClick={() => {
-              if (!dragging.current && playable) onPlay(i);
+            onClick={(e) => {
+              // 탭·클릭은 **펼치기**다 (사용자 지정). 제출은 위로 끌거나 튕길 때만.
+              // 다만 키보드 활성화(detail === 0)는 손짓을 쓸 수 없으므로,
+              // 펼쳐 둔 카드에서 한 번 더 누르면 제출로 받는다.
+              if (dragging.current) return;
+              const byKeyboard = e.detail === 0;
+              if (byKeyboard && sel === i && playable) onPlay(i);
+              else setSel(i);
             }}
             className={[
               'absolute left-1/2 flex flex-col gap-1 overflow-hidden rounded-md border p-2 text-left',
