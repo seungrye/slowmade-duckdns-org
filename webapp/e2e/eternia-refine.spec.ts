@@ -17,6 +17,12 @@
 //   - 탭 검사는 **맨 뒤 카드**만 누른다 — 그 자리에서 topmost 라 가려지지 않는다.
 //   - 끌기·튕기기는 `dragUp` 이 손패 컨테이너에 직접 이벤트를 낸다. 어느 카드인지는
 //     FanHand 가 X 좌표로 고르므로(cardAt) 가려짐과 무관하다.
+//
+// 그리고 **포인터 탭은 카드의 `onClick` 을 타지 않는다.** pointerdown 에서 컨테이너가
+// 포인터를 캡처하므로 뒤따르는 click 이 컨테이너로 재타겟된다 — 카드가 펼쳐지는 것은
+// `down()` 의 setSel 덕이다. 그래서 `onClick` 의 키보드 분기(detail === 0)는 키보드
+// 검사가 유일한 파수꾼이다. 변형 실험으로 확인했다: onClick 을 "누르면 곧 제출"로
+// 되돌리면 **키보드 검사만** 깨지고 탭 검사는 멀쩡히 통과한다.
 
 import { test, expect, type Page } from "@playwright/test";
 import { dragUp, centerOf } from "./helpers/pointer-gesture";
