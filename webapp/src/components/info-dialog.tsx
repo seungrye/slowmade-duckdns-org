@@ -10,16 +10,16 @@ import {
   type ReactNode,
 } from "react";
 
-// ── 타입 ──────────────────────────────────────────────────────────────────
+// -- the types --------------------------------------------------------------
 
 export type InfoDialogVariant = "info" | "success" | "warning" | "error";
 
 export interface InfoDialogOptions {
-  /** 모달 상단 제목 (생략 시 variant 별 기본 한국어 제목). */
+  /** The modal's title (omitted, the variant's default Korean title). */
   title?: string;
-  /** 본문 — 사용자가 선택/복사 가능한 텍스트. */
+  /** The body - text the user can select and copy. */
   body: string;
-  /** info / success / warning / error 색조. 기본 "info". */
+  /** The info / success / warning / error tone. "info" by default. */
   variant?: InfoDialogVariant;
 }
 
@@ -45,7 +45,7 @@ export function InfoDialogProvider({ children }: { children: ReactNode }) {
     setCopied(false);
   }, []);
 
-  // ESC 키로 닫기
+  // Closing with the Escape key
   useEffect(() => {
     if (!opts) return;
     function onKey(e: KeyboardEvent) {
@@ -83,12 +83,12 @@ export function InfoDialogProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ── 훅 ────────────────────────────────────────────────────────────────────
+// -- the hook ---------------------------------------------------------------
 
 export function useInfoDialog(): InfoDialogContextValue {
   const ctx = useContext(InfoDialogContext);
   if (!ctx) {
-    // Provider 가 없는 환경 (테스트 등) — fallback 으로 alert.
+    // Without a Provider (in tests and so on) - falling back to alert.
     return {
       showInfo: ({ title, body }) => {
         if (typeof window !== "undefined") {
@@ -100,7 +100,7 @@ export function useInfoDialog(): InfoDialogContextValue {
   return ctx;
 }
 
-// ── 표시 ──────────────────────────────────────────────────────────────────
+// -- the display ------------------------------------------------------------
 
 function defaultTitle(variant: InfoDialogVariant): string {
   switch (variant) {

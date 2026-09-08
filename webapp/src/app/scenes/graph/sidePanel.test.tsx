@@ -1,12 +1,12 @@
-// SidePanel — /scenes/graph 우측 인라인 편집 패널 테스트.
+// SidePanel - tests for /scenes/graph's right-hand inline editing panel.
 // #226 — TDD red→green.
 //
-// 검증 포인트:
-//   - sceneId=null → 안내 메시지.
-//   - sceneId 설정 → fetch /api/web-adventure/scenes/[id] + /api/web-adventure/scenes (씬 ID 목록) 호출 → 로딩 → SceneForm + ChoiceEditor 렌더.
-//   - 닫기 버튼 → onClose 콜백.
-//   - 저장 버튼 → PUT 호출 + onSaved 콜백 (갱신된 scene 전달).
-//   - 제목 변경 시 SceneForm 의 controlled state 즉시 갱신.
+// What is verified:
+//   - sceneId=null -> the hint message.
+//   - a set sceneId -> fetching /api/web-adventure/scenes/[id] and /api/web-adventure/scenes (the scene id list) -> loading -> SceneForm and ChoiceEditor render.
+//   - the close button -> the onClose callback.
+//   - the save button -> a PUT plus the onSaved callback (passing the updated scene).
+//   - changing the title updates SceneForm's controlled state at once.
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -26,7 +26,7 @@ function makeScene(id = "scene_01") {
 }
 
 beforeEach(() => {
-  // jsdom 에 window.matchMedia 없음 — sm 매치 = true (desktop 가정).
+  // jsdom has no window.matchMedia - sm matches = true (assuming desktop).
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (q: string) => ({
@@ -70,7 +70,7 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     const { container } = render(
       <SidePanel sceneId={null} onClose={() => {}} onSaved={() => {}} />,
     );
-    // 안내 메시지 X, aside 자체 X.
+    // no hint message, and no aside either.
     expect(container.querySelector("[data-testid='side-panel']")).toBeNull();
     expect(screen.queryByText(/노드를 클릭하면 편집/)).toBeNull();
   });
@@ -79,11 +79,11 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     render(<SidePanel sceneId="scene_01" onClose={() => {}} onSaved={() => {}} />);
     await act(async () => {});
     await act(async () => {});
-    // SceneForm 의 '제목' aria-label input 이 렌더되어야 한다.
+    // SceneForm's title-labelled input must render.
     const titleInput = screen.getByLabelText("제목") as HTMLInputElement;
     expect(titleInput).toBeTruthy();
     expect(titleInput.value).toBe("테스트 씬");
-    // fetch 호출 확인.
+    // Checking the fetch calls.
     const calls = fetchMock.mock.calls.map((c: unknown[]) => c[0] as string);
     expect(calls.some((u: string) => u.includes("/api/web-adventure/scenes/scene_01"))).toBe(true);
   });
@@ -103,16 +103,16 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     render(<SidePanel sceneId="scene_01" onClose={() => {}} onSaved={onSaved} />);
     await act(async () => {});
     await act(async () => {});
-    // 제목 변경.
+    // Changing the title.
     const titleInput = screen.getByLabelText("제목") as HTMLInputElement;
     fireEvent.change(titleInput, { target: { value: "변경된 제목" } });
-    // 저장 버튼.
+    // The save button.
     const saveBtn = screen.getByRole("button", { name: /^저장$/ });
     await act(async () => {
       fireEvent.click(saveBtn);
     });
     await act(async () => {});
-    // PUT 호출.
+    // The PUT call.
     const putCall = fetchMock.mock.calls.find(
       (c: unknown[]) =>
         typeof c[0] === "string" &&
@@ -122,14 +122,14 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     expect(putCall).toBeTruthy();
     const body = JSON.parse((putCall![1] as { body: string }).body) as { title: string };
     expect(body.title).toBe("변경된 제목");
-    // onSaved 콜백.
+    // The onSaved callback.
     expect(onSaved).toHaveBeenCalled();
     const arg = onSaved.mock.calls[0]![0] as { title: string; id: string };
     expect(arg.title).toBe("변경된 제목");
     expect(arg.id).toBe("scene_01");
   });
 
-  // #340 — header 의 sticky top-0 제거. 스크롤 시 자연스럽게 흐름.
+  // #340 - the header's sticky top-0 is gone. It flows naturally as the panel scrolls.
   it("패널 header 에 sticky top-0 클래스 없음 (일반 흐름)", async () => {
     render(<SidePanel sceneId="scene_01" onClose={vi.fn()} onSaved={vi.fn()} />);
     await act(async () => {});
@@ -141,25 +141,25 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     expect(header!.className).not.toMatch(/top-0/);
   });
 
-  // #339 — 모바일 fullscreen (네비 제외) — top-[60px] + max-h 해제.
+  // #339 - fullscreen on mobile (excluding the nav) - top-[60px] plus the max-h released.
   it("baseAside 가 top-[60px] fixed 모바일 fullscreen 클래스 포함", async () => {
     render(<SidePanel sceneId="s1" onClose={vi.fn()} onSaved={vi.fn()} />);
     await act(async () => {});
     await act(async () => {});
     const panel = screen.getByTestId("side-panel") as HTMLElement;
     expect(panel.className).toMatch(/top-\[60px\]/);
-    // 옛 max-h-[80vh] 잔재 없음.
+    // no leftover max-h-[80vh].
     expect(panel.className).not.toMatch(/max-h-\[80vh\]/);
   });
 
-  // #338 — 가로 크기 조절 핸들.
+  // #338 - the horizontal resize handle.
   it("리사이즈 핸들이 패널 좌측에 존재 (data-testid='side-panel-resize')", async () => {
     render(<SidePanel sceneId="s1" onClose={vi.fn()} onSaved={vi.fn()} />);
     await act(async () => {});
     await act(async () => {});
     const handle = screen.getByTestId("side-panel-resize");
     expect(handle).toBeTruthy();
-    // cursor-col-resize 스타일.
+    // the cursor-col-resize style.
     expect((handle as HTMLElement).className).toMatch(/cursor-col-resize/);
   });
 
@@ -172,7 +172,7 @@ describe("/scenes/graph — SidePanel (#231)", () => {
     const handle = screen.getByTestId("side-panel-resize") as HTMLElement;
     const before = panel.style.width;
 
-    // 마우스 클라이언트 X = 1000 → 800 (왼쪽으로 200px = 패널 200 px 더 넓어짐).
+    // The mouse's client X goes 1000 -> 800 (200px to the left = the panel grows by 200px).
     await act(async () => {
       fireEvent.mouseDown(handle, { clientX: 1000 });
     });
@@ -185,17 +185,17 @@ describe("/scenes/graph — SidePanel (#231)", () => {
 
     const after = panel.style.width;
     expect(after).not.toBe(before);
-    // 숫자 px 형태.
+    // in numeric px form.
     expect(after).toMatch(/^\d+px$/);
   });
 
-  // 옛 quest CMS 패턴 — RevisionHistorySection 은 별도 /scenes/[id]/revisions 페이지로 이동.
-  // SidePanel 에서 *제거* 됨을 검증.
+  // The old quest CMS pattern - RevisionHistorySection moved to its own /scenes/[id]/revisions page.
+  // Verifying it is *gone* from the SidePanel.
   it("SidePanel 에는 RevisionHistorySection 의 '변경 이력' 토글이 *부재*", async () => {
     render(<SidePanel sceneId="scene_01" onClose={() => {}} onSaved={() => {}} />);
     await act(async () => {});
     await act(async () => {});
-    // 더 이상 변경 이력 라벨이 패널 안에 표시되지 않아야 한다.
+    // The change-history label must no longer show inside the panel.
     expect(screen.queryByRole("button", { name: /변경 이력/ })).toBeNull();
   });
 

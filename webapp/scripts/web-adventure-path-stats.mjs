@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scripts/web-adventure-path-stats.mjs — 회차 경로(씬 시퀀스) 분포 집계.
+// scripts/web-adventure-path-stats.mjs - the distribution of run paths (scene sequences).
 //
-// past-run 의 scenePath(시작→종료 거쳐간 씬 id 시퀀스) 를 묶어, 어떤 경로로
-// 진행한 케이스가 많은지 분석. (단일 씬 접근 횟수가 아니라 *전체 경로* 빈도.)
-// scenePath 는 #(이 커밋) 이후 회차부터 수집되므로, 그 전 데이터엔 경로가 없다.
+// It groups past-runs' scenePath (the sequence of scene ids passed from start to end) and analyses which paths
+// were taken most. (The frequency of *whole paths*, not how often a single scene was visited.)
+// scenePath is collected only from the runs after #(this commit), so earlier data has no path.
 //
-// 사용:
+// Usage:
 //   node --env-file=.env.local scripts/web-adventure-path-stats.mjs
 //   node --env-file=.env.local scripts/web-adventure-path-stats.mjs --top=30
 
@@ -36,7 +36,7 @@ async function main() {
     )
     .toArray();
 
-  // 1) 전체 경로 시퀀스 빈도 (주인공 + 경로 + 엔딩 단위)
+  // 1) the frequency of whole path sequences (by protagonist, path and ending)
   const freq = new Map();
   const lenBuckets = new Map();
   for (const r of runs) {
@@ -54,13 +54,13 @@ async function main() {
     console.log(`  ${n}회 (${pct}%)  ${path}`);
   }
 
-  // 2) 경로 길이 분포
+  // 2) the distribution of path lengths
   console.log('\n=== 경로 길이(거쳐간 씬 수) 분포 ===');
   for (const [len, n] of [...lenBuckets.entries()].sort((a, b) => a[0] - b[0])) {
     console.log(`  ${len}개 씬: ${n}회`);
   }
 
-  // 3) 첫 분기(시작 씬 다음) 선호 — 시작 직후 어디로 가는지
+  // 3) the first branch's preference (after the starting scene) - where people go right away
   const secondStep = new Map();
   for (const r of runs) {
     if (r.scenePath.length >= 2) {

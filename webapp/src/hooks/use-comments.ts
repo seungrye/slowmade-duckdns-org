@@ -63,7 +63,7 @@ export function useComments(postId: string) {
       localStorage.setItem('anonid-token', anonidToken);
     }
 
-    // 기존 호환: parentIsEnji=true 도 받아 enji 분기.
+    // Backwards compatible: parentIsEnji=true is accepted too and takes the enji branch.
     const parentIsEnji = parentBotAuthor === true || parentBotAuthor === 'enji-bot';
     const parentIsPainter = parentBotAuthor === 'painter-bot';
 
@@ -72,7 +72,7 @@ export function useComments(postId: string) {
     const hasEnjiMention = /@enji-bot/i.test(content);
 
     const isPainterCall = parentIsPainter || hasPainterMention;
-    // painter 가 우선 — @enji-bot 과 @painter-bot 동시 있으면 painter 처리.
+    // painter takes precedence - with both @enji-bot and @painter-bot present, painter handles it.
     const isEnjiCall = !isPainterCall && (parentIsEnji || hasEnjiMention || isImageCmd);
 
     let endpoint = '/api/comments';

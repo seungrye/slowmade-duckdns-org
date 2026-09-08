@@ -1,16 +1,16 @@
 import mongoose from "mongoose";
 import type { InferSchemaType, Model } from "mongoose";
 
-// ESM interop: named export 는 순수 node ESM 에서 안 풀려 default 로 접근(tsx 스크립트 호환).
+// ESM interop: a named export does not resolve under plain node ESM, so it is reached through default (for tsx script compatibility).
 const { Schema, model, models } = mongoose;
 
 /**
- * 포트폴리오 시계열 — stock-automator reports/{paper,real}/portfolio_history.json 동기화.
+ * The portfolio time series - synced from stock-automator's reports/{paper,real}/portfolio_history.json.
  *
  * env: "paper" | "real"
- * currency: "KRW" | "USD" — 국장/미장 분리
- * date: ISO timestamp (사이클 끝 시점) — 같은 날 여러 사이클 가능
- * dateStr: "YYYY-MM-DD" — 차트 x 축 + 매매 join key
+ * currency: "KRW" | "USD" - separating the domestic and US markets
+ * date: an ISO timestamp (the cycle's end) - several cycles a day are possible
+ * dateStr: "YYYY-MM-DD" - the chart's x axis plus the join key for the trades
  *
  * unique: (env, currency, date)
  */
@@ -26,32 +26,32 @@ const PortfolioHistorySchema = new Schema(
     runPnl: { type: Number, default: 0 },
     cumulativePnl: { type: Number, default: 0 },
     /**
-     * 블록 행이면 그 블록의 id (#367). **계좌 행은 이 필드가 없다.**
+     * For a block row, that block's id (#367). **An account row does not have this field.**
      *
-     * 계정·시장에 블록이 여럿이면(미국: TQQQ v4 + SOXL VR) 계좌 값 하나로는 구분이 안 된다.
-     * 계좌 행은 그대로 두고 블록 행을 더한다 — 옛 조회는 `portfolioId: null` 로 걸러 쓴다.
+     * With several blocks on one account and market (the US: TQQQ v4 plus SOXL VR) a single account value cannot tell them apart.
+     * The account rows stay and the block rows are added - an old query filters with `portfolioId: null`.
      */
     portfolioId: { type: Schema.Types.ObjectId, ref: "TradingPortfolio", default: null, index: true },
-    /** 블록 행의 전략(화면 라벨용). 계좌 행은 빈 값. */
+    /** The block row's strategy (for the screen's label). Empty on an account row. */
     strategy: { type: String, default: "" },
     /**
-     * 매매기록·일봉으로 **되살린** 과거 행 (#373). 라이브 행과 섞이지 않게 표시한다.
+     * A past row **rebuilt** from the trade records and daily prices (#373). Marked so it does not mix with the live rows.
      *
-     * 되살릴 수 있는 건 보유 평가액뿐이다 — 블록 장부 현금(v4 `cycleCash`·VR `pool`)은
-     * 과거값이 DB 에 없다. 그래서 이 행의 `cash`·`totalValue` 는 **모르는 값**이고,
-     * 화면은 숫자가 아니라 `—` 로 보여야 한다. 0 을 숫자로 내보이면 "현금이 없다"는
-     * 거짓말이 된다(`block-snapshot.ts` 가 같은 이유로 cash: null 을 쓴다).
+     * Only the holdings' value can be rebuilt - the block's book cash (v4's `cycleCash`, VR's `pool`) has
+     * no past value in the DB. So this row's `cash` and `totalValue` are **unknown**, and
+     * the screen must show an em dash rather than a number. Showing 0 as a number would be the lie
+     * "there is no cash" (`block-snapshot.ts` uses cash: null for the same reason).
      */
     backfilled: { type: Boolean, default: false },
-    // 소프트 삭제 — 포트폴리오 삭제 시 (env,currency) 스냅샷을 숨긴다(복구 가능). 조회는 { hidden: { $ne: true } }.
+    // Soft delete - deleting a portfolio hides that (env,currency) snapshot (recoverably). Queries use { hidden: { $ne: true } }.
     hidden: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
 
-// portfolioId 를 키에 넣는다 (#367). 기존 문서는 이 필드가 없어 null 로 묶이므로 계좌 행은
-// 예전처럼 하루 하나다. ⚠ mongoose 는 옛 인덱스를 안 지운다 —
-// scripts/drop-portfolio-history-index.mjs 를 한 번 돌려야 한다.
+// portfolioId goes into the key (#367). Existing documents lack the field and group under null, so an account row is
+// one a day as before. Note: mongoose does not drop the old index -
+// scripts/drop-portfolio-history-index.mjs has to be run once.
 PortfolioHistorySchema.index(
   { env: 1, currency: 1, portfolioId: 1, date: 1 },
   { unique: true },

@@ -77,7 +77,7 @@ describe("content-client submitAppEndRun", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  // 실패를 삼키되 성공 여부는 돌려준다 — 재시도 큐가 언제 지울지 판단해야 하므로. (#61)
+  // The failure is swallowed but success is returned - the retry queue has to know when to drop an entry. (#61)
   it("전송 실패는 삼키고 false 를 돌려준다(throw 안 함)", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error("net"));
     await expect(
@@ -108,7 +108,7 @@ describe("content-client submitAppEndRun", () => {
   });
 });
 
-// ── #87 문체(voice) 지원 ───────────────────────────────────────────────
+// -- #87 prose style (voice) support ------------------------------------
 describe("문체 지원 (#87)", () => {
   const scenesPayload = (bodyFirst) => ({
     ok: true,
@@ -153,7 +153,7 @@ describe("문체 지원 (#87)", () => {
     });
     expect(out.voice).toBe("tolkien");
     expect(out.scenes.kael_infirmary.body[0]).toBe("톨킨 본문");
-    expect(urls.length).toBe(2); // 커버리지 확보용 1 회 + 선택 문체 1 회
+    expect(urls.length).toBe(2); // once for the coverage plus once for the chosen style
   });
 
   it("기본 문체가 뽑히면 두 번 받지 않는다", async () => {

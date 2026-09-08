@@ -1,36 +1,36 @@
-// WebAdventureFeedbackNote — 플레이 회차(past-run)를 로컬 LLM으로 살 붙여 만든
-// 작가(owner) 전용 피드백 노트 (#9).
+// WebAdventureFeedbackNote - the author's (owner's) feedback note, made by fleshing out a play run
+// (a past-run) with the local LLM (#9).
 //
-// 이 문서가 **내구 큐 아이템**을 겸한다: status 로 생성 파이프라인을 표현한다.
+// This document doubles as **the durable queue item**: status expresses the generation pipeline.
 //   queued → processing → ready | failed
-// 워커가 status=queued 중 가장 오래된 것을 원자적으로 claim(→processing)해 한 개씩
-// 순차 처리한다(shim 이 단일 슬롯이라 병렬 금지). 서버 재시작으로 끊긴 processing 은
-// claimedAt 이 오래되면 워커가 queued 로 되돌린다(유실 방지).
+// The worker atomically claims the oldest status=queued (-> processing) and handles them one at a
+// time, in order (the shim has a single slot, so parallelism is forbidden). A processing cut off by a server restart
+// is returned to queued by the worker once claimedAt is old enough (preventing a loss).
 //
-// 결과(narrative/authorNote)는 ready 로 보존, 삭제는 soft-delete(isDeleted).
+// The result (narrative/authorNote) is kept as ready, and deletion is a soft delete (isDeleted).
 
 import { Schema, model, models, Model, Types } from 'mongoose';
 
 const WebAdventureFeedbackNoteSchema = new Schema(
   {
-    // 노트를 소유/열람하는 owner (owner 전용 기능이라 사실상 OWNER_EMAIL).
+    // The owner who owns and reads the note (an owner-only feature, so in practice OWNER_EMAIL).
     ownerEmail: { type: String, required: true, index: true },
-    // 입력 원천 past-run 참조 + 표시용 비정규화 필드.
+    // The reference to the source past-run plus the denormalised fields for display.
     pastRunId: { type: Schema.Types.ObjectId, ref: 'WebAdventurePastRun', required: true },
     sourceUserEmail: { type: String, required: true }, // 그 회차를 플레이한 사용자
     runIndex: { type: Number, required: true },
     endingId: { type: String, required: true },
-    // #90 — 그 회차의 문체(pastRun 에서 복사). 표시·추적용이며 생성 프롬프트에는 쓰지 않는다.
+    // #90 - that run's prose style (copied from pastRun). For display and tracing; it is not used in the generation prompt.
     voice: { type: String, default: '' },
     finalSceneId: { type: String, required: true },
-    // 생성 결과 (LLM 원문 유지).
+    // The generated result (the LLM's original text is kept).
     title: { type: String, default: '' },
     narrative: { type: String, default: '' }, // 살 붙인 서사
-    // 작가 노트 = 신규 시나리오 힌트/제안. 생성기가 채우는 유일한 본문 필드다.
-    // (#27 의 scenarioProposal 은 생성기가 한 번도 채우지 않아 제거했다. 값이 있던 1건은
-    //  "## 시나리오 제안(이관)" 섹션으로 authorNote 에 병합해 보존. #69)
+    // The author's note = hints and suggestions for a new scenario. It is the only body field the generator fills in.
+    // (#27's scenarioProposal was never once filled in by the generator and was removed. The one document that had a value
+    //  was preserved by merging it into authorNote as a "scenario proposal (migrated)" section. #69)
     authorNote: { type: String, default: '' },
-    // 큐/파이프라인 상태.
+    // The queue and pipeline state.
     status: {
       type: String,
       required: true,
@@ -47,7 +47,7 @@ const WebAdventureFeedbackNoteSchema = new Schema(
   { timestamps: true },
 );
 
-// 워커가 오래된 queued 를 먼저 집도록 정렬 인덱스.
+// The sort index so the worker picks the oldest queued first.
 WebAdventureFeedbackNoteSchema.index({ status: 1, createdAt: 1 });
 
 export type FeedbackNoteStatus = 'queued' | 'processing' | 'ready' | 'failed';
@@ -59,7 +59,7 @@ export interface WebAdventureFeedbackNoteDoc {
   sourceUserEmail: string;
   runIndex: number;
   endingId: string;
-  /** #90 그 회차의 문체(pastRun 에서 복사). 표시·추적용. */
+  /** #90 - that run's prose style (copied from pastRun). For display and tracing. */
   voice?: string;
   finalSceneId: string;
   title: string;

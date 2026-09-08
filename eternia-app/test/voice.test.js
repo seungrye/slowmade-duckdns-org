@@ -1,8 +1,8 @@
-// #87 — 앱의 랜덤 문체 선택.
+// #87 - the app's random prose-style selection.
 //
-// 규칙은 웹(webapp/src/lib/web-adventure/voice.ts)과 같다. 앱은 vanilla JS 번들이라
-// 코드를 공유하지 않고 같은 규칙을 따로 구현한다 — 어긋나면 같은 판에서 웹과 앱의 문체가
-// 달라지므로, 규칙을 바꿀 때는 양쪽을 함께 고쳐야 한다.
+// The rules are the same as the web's (webapp/src/lib/web-adventure/voice.ts). The app is a vanilla JS bundle, so it
+// shares no code and implements the same rules separately - out of step, the web and the app read the same run in
+// different styles, so changing a rule means changing both.
 import { describe, it, expect } from "vitest";
 import { DEFAULT_VOICE, RUN_VOICE_KEY, pickVoiceFromCoverage, chooseRunVoice } from "../src/voice.js";
 
@@ -22,7 +22,7 @@ describe("pickVoiceFromCoverage", () => {
     expect(pickVoiceFromCoverage(cov, () => 0)).toBe(DEFAULT_VOICE);
   });
 
-  // 미완비를 고르면 빈 씬이 기본 본문으로 폴백돼 한 판 안에서 문체가 섞인다.
+  // Choosing an incomplete style makes an empty scene fall back to the default body and mixes styles within a run.
   it("완비되지 않은 문체는 후보에서 뺀다", () => {
     const only = { prose: { filled: 1, total: 3, complete: false } };
     expect(pickVoiceFromCoverage(only, () => 0.99)).toBe(DEFAULT_VOICE);

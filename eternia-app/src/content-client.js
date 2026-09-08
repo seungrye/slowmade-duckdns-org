@@ -1,12 +1,12 @@
-// 사이트 web-adventure 콘텐츠 클라이언트 — GET /api/web-adventure/content/v1 → {id: scene} 맵.
-// webapp/src/lib/web-adventure/engine/sceneRegistry.ts 의 fetch+retry 를 앱(JS)으로 이식.
-// 실시간 fetch 전용(오프라인 미지원).
+// The site's web-adventure content client - GET /api/web-adventure/content/v1 -> a {id: scene} map.
+// The fetch and retry of webapp/src/lib/web-adventure/engine/sceneRegistry.ts, ported to the app (JS).
+// Live fetch only (no offline support).
 
 import { chooseRunVoice, DEFAULT_VOICE } from "./voice.js";
 
 export const DEFAULT_API_BASE = "https://handmade.r-e.kr";
 
-/** Kael 의 시작 씬(사이트 sceneRegistry.START_SCENE_ID 와 동일). */
+/** Kael's starting scene (the same as the site's sceneRegistry.START_SCENE_ID). */
 export const START_SCENE_ID = "kael_infirmary";
 
 const FETCH_RETRIES = 2;
@@ -14,7 +14,7 @@ const FETCH_BACKOFFS_MS = [500, 1500];
 
 function resolveBase(baseUrl) {
   if (baseUrl) return baseUrl;
-  // Vite: import.meta.env.VITE_API_BASE 로 override 가능.
+  // Vite: overridable through import.meta.env.VITE_API_BASE.
   try {
     if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_BASE) {
       return import.meta.env.VITE_API_BASE;
@@ -37,14 +37,14 @@ function resolveAppKey() {
 }
 
 /**
- * 엔딩 결과를 앱 전용 엔드포인트(/api/web-adventure/app-end-run)로 제출 → AI 피드백 노트 생성.
- * 로그인 없이 공유 앱 키(x-app-key = VITE_APP_KEY)로 인증. 실패는 삼킨다(플레이 방해 금지).
+ * Submits the ending result to the app-only endpoint (/api/web-adventure/app-end-run) -> generating an AI feedback note.
+ * Authenticated without a login, by a shared app key (x-app-key = VITE_APP_KEY). Failures are swallowed (play must not be blocked).
  * @param {object} payload {endingId, finalSceneId, scenePath, log, character}
  * @param {object} [opts] {appKey, baseUrl, fetchImpl}
  */
 export async function submitAppEndRun(payload, opts = {}) {
   const key = opts.appKey || resolveAppKey();
-  if (!key) return false; // 키 미주입(빌드에 VITE_APP_KEY 없음) → 미전송.
+  if (!key) return false; // No key injected (the build has no VITE_APP_KEY) -> nothing is sent.
   const baseUrl = resolveBase(opts.baseUrl);
   const fetchImpl = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch.bind(globalThis) : null);
   if (!fetchImpl) return false;
@@ -54,31 +54,31 @@ export async function submitAppEndRun(payload, opts = {}) {
       headers: { "Content-Type": "application/json", "x-app-key": key },
       body: JSON.stringify(payload),
     });
-    // 성공 여부를 돌려줘야 재시도 큐가 언제 지울지 판단할 수 있다(#61).
+    // Success has to be returned so the retry queue knows when to drop an entry (#61).
     return Boolean(res && res.ok);
   } catch {
-    return false; // 전송 실패는 여전히 삼킨다 — 플레이를 막지 않는다.
+    return false; // A send failure is still swallowed - it does not block play.
   }
 }
 
-// 마지막 응답의 문체 커버리지 (#87).
-// 서버는 씬에서 variants 를 떼고 보내므로, 어떤 문체가 완비인지는 이 값으로만 알 수 있다.
+// The prose-style coverage from the last response (#87).
+// The server strips variants from the scenes, so this value is the only way to tell which styles are complete.
 let lastVoices = {};
-// #103 — 아이템 카탈로그. 앱에 미러하지 않고 서버가 준 것을 쓴다(이중 관리 방지).
+// #103 - the item catalogue. It is not mirrored in the app; what the server gives is used (avoiding double maintenance).
 let lastItems = {};
 let lastInventoryCap = 8;
 
-/** 마지막 content fetch 가 알려 준 문체별 커버리지. fetch 전에는 빈 객체. */
+/** The per-style coverage reported by the last content fetch. An empty object before the fetch. */
 export function getVoiceCoverage() {
   return lastVoices;
 }
 
-/** 마지막 content fetch 가 준 아이템 카탈로그 `{id: Item}`. fetch 전에는 빈 객체. */
+/** The item catalogue `{id: Item}` from the last content fetch. An empty object before the fetch. */
 export function getItemCatalog() {
   return lastItems;
 }
 
-/** 소지품 한도. 서버가 안 주면 8(웹 INVENTORY_CAP 기본값). */
+/** The inventory cap. 8 when the server gives none (the web's INVENTORY_CAP default). */
 export function getInventoryCap() {
   return lastInventoryCap;
 }
@@ -100,13 +100,13 @@ async function fetchOnce(baseUrl, fetchImpl, voice) {
 }
 
 /**
- * 씬 맵 fetch.
+ * Fetches the scene map.
  * @param {object} [opts]
- * @param {string} [opts.baseUrl] API 베이스(기본 DEFAULT_API_BASE / VITE_API_BASE)
- * @param {function} [opts.fetchImpl] 주입형 fetch(테스트)
- * @param {boolean} [opts.retry=true] 실패 시 재시도
- * @param {number[]} [opts.backoffs] 재시도 backoff(ms)
- * @param {string} [opts.voice] 문체(#87). 미지정이면 기본 본문.
+ * @param {string} [opts.baseUrl] the API base (DEFAULT_API_BASE / VITE_API_BASE by default)
+ * @param {function} [opts.fetchImpl] an injected fetch (for tests)
+ * @param {boolean} [opts.retry=true] retry on failure
+ * @param {number[]} [opts.backoffs] the retry backoffs (ms)
+ * @param {string} [opts.voice] the prose style (#87). Unset, the default body.
  * @returns {Promise<Record<string, object>>} {sceneId: Scene}
  */
 export async function fetchScenes(opts = {}) {
@@ -134,24 +134,24 @@ export async function fetchScenes(opts = {}) {
 }
 
 /**
- * 이번 판에 쓸 문체를 정해 씬을 받아온다 (#87).
+ * Decides this run's prose style and fetches the scenes (#87).
  *
- * 서버는 씬에서 variants 를 떼고 보내므로 어떤 문체가 완비인지 알 수 없다. 그래서 우선 한 번
- * 받아 커버리지를 확보한 뒤 문체를 고르고, 기본이 아니면 그 문체로 다시 받는다. 첫 로드에
- * 요청이 두 번 나갈 수 있으나 대개 캐시에 걸린다(웹 플레이 화면과 같은 방식).
+ * The server strips variants from the scenes, so which styles are complete cannot be told. It fetches once
+ * to get the coverage, picks a style and, when that is not the default, fetches again in that style. The first load
+ * can therefore make two requests, but the second usually hits the cache (the same approach as the web play screen).
  *
- * 고른 문체는 저장해 **한 판 내내 유지**한다 — 씬마다 문체가 갈리면 몰입이 깨진다.
+ * The chosen style is stored and **kept for the whole run** - a style that varies scene by scene breaks the immersion.
  *
- * @param {object} [opts] fetchScenes 의 옵션 + { storage, rnd, voice }
+ * @param {object} [opts] fetchScenes' options plus { storage, rnd, voice }
  * @returns {Promise<{scenes: Record<string, object>, voice: string}>}
  */
 export async function fetchScenesForRun(opts = {}) {
   const first = await fetchScenes(opts);
   if (opts.voice) return { scenes: first, voice: opts.voice };
 
-  // sessionStorage 를 쓰는 이유: 앱을 껐다 켜면 새 문체로 시작하게 하려는 것이다.
-  // localStorage 였다면 한 번 뽑힌 문체가 영원히 고정돼 랜덤의 의미가 없어진다.
-  // (웹 플레이 화면도 같은 이유로 sessionStorage 를 쓴다)
+  // Why sessionStorage: closing and reopening the app should start with a new style.
+  // With localStorage the style drawn once would be fixed forever and the randomness would mean nothing.
+  // (The web play screen uses sessionStorage for the same reason.)
   const storage =
     opts.storage ||
     (typeof sessionStorage !== "undefined" ? sessionStorage : undefined);

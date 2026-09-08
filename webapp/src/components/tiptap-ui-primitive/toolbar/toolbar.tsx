@@ -233,9 +233,9 @@ export const Toolbar = React.forwardRef<HTMLDivElement, ToolbarProps>(
   ({ children, className, variant = "fixed", ...props }, ref) => {
     const toolbarRef = React.useRef<HTMLDivElement>(null)
     const isVisible = useToolbarVisibility(toolbarRef)
-    // 툴바가 창보다 넓을 때 세로 휠로 좌우 스크롤. 스크롤바를 숨겨 둔 탓에(toolbar.scss)
-    // 이게 없으면 잘린 오른쪽 아이콘에 마우스로 닿을 수가 없다.
-    // floating 변형은 overflow:hidden 이라 스크롤할 게 없으므로 끈다.
+    // A vertical wheel scrolls sideways when the toolbar is wider than the window. The scrollbar is hidden (toolbar.scss),
+    // so without this the clipped icons on the right cannot be reached with a mouse at all.
+    // The floating variant is overflow:hidden with nothing to scroll, so it is turned off there.
     const { ref: wheelRef } = useWheelScrollX<HTMLDivElement>(variant === "fixed")
 
     useToolbarKeyboardNav(toolbarRef)

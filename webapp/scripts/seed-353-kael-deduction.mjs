@@ -1,26 +1,26 @@
 #!/usr/bin/env node
-// scripts/seed-353-kael-deduction.mjs — #353 kael 추리 시퀀스 "잔해 속의 진실".
+// scripts/seed-353-kael-deduction.mjs - #353's Kael deduction sequence, "the truth in the wreckage".
 //
-// kael Act1 의 추락(kael_falling) 직후, 옴팔로스 합류 전에 *kael 전용* 추리
-// 미니 시퀀스를 삽입. 성흔(ability)은 주인공과 독립이라 ability 조건으로
-// kael 전용성을 못 걸지만, kael 만 거치는 Act1 구간이라 전용성 자동 보장.
+// A *Kael-only* deduction mini-sequence inserted right after Act 1's fall (kael_falling) and before
+// joining Omphalos. The stigma (ability) is independent of the protagonist, so Kael-exclusivity cannot be gated
+// by an ability condition, but it is an Act 1 stretch only Kael passes through, so exclusivity is automatic.
 //
-// 구조 (허브-스포크 + 누적 카운터):
+// The structure (a hub and spokes plus a cumulative counter):
 //   kael_falling / kael_falling_aftermath → kael_wreckage_hub
-//     ├ 조사: kael_clue_bodies   (단서+1, 침식+2, saw_bodies)
-//     ├ 조사: kael_clue_manifest (단서+1, 침식+2, saw_manifest)
-//     └ 떠난다 → kael_truth_gate
+//     |- investigate: kael_clue_bodies   (clues +1, contamination +2, saw_bodies)
+//     |- investigate: kael_clue_manifest (clues +1, contamination +2, saw_manifest)
+//     |_ leave -> kael_truth_gate
 //                  ├ (kael_clue ≥ 2) → kael_truth_revealed → knowsAscensionPlot
-//                  └ (부족)          → omphalos_outskirts
-//   진실/일반 모두 omphalos_outskirts 합류.
+//                  |_ (not enough)   -> omphalos_outskirts
+//   Both the truth and the ordinary path converge on omphalos_outskirts.
 //
-// 핵심 트레이드오프: 단서마다 침식 +2 (kael 시작 80 → 84+, 임계 80 진입).
-//   "진실을 알수록 몸이 굳는다" — 시한부 테마 + 추리 결합.
-// 보상(절제): knowsAscensionPlot 선취 → station_knowledge_branch 의 harmony
-//   분기 해금(엔딩 직접 부여 아님).
+// The key trade-off: +2 contamination per clue (Kael starts at 80 -> 84+, past the threshold of 80).
+//   "The more truth you learn, the more your body hardens" - the time-limit theme joined to the deduction.
+// The reward (kept restrained): knowsAscensionPlot is gained early -> unlocking station_knowledge_branch's
+//   harmony branch (not granting the ending directly).
 //
-// 엔진 도구 첫 사용: incrementCounters(누적) + condition minFlag(임계).
-// 멱등: upsert + $set. illustration 보호 가드.
+// The first use of the engine's tools: incrementCounters (cumulative) plus the minFlag condition (the threshold).
+// Idempotent: upsert + $set. With the illustration guard.
 
 import mongoose from 'mongoose';
 
@@ -43,7 +43,7 @@ async function main() {
     console.log('upsert:', doc.id);
   }
 
-  // ── 신규 1: 허브 ────────────────────────────────────────────────────
+  // -- new 1: the hub ---------------------------------------------------
   await upsertScene({
     id: 'kael_wreckage_hub',
     illustration: PH,
@@ -79,7 +79,7 @@ async function main() {
     ],
   });
 
-  // ── 신규 2: 단서 A — 명판들 ─────────────────────────────────────────
+  // -- new 2: clue A - the nameplates -----------------------------------
   await upsertScene({
     id: 'kael_clue_bodies',
     illustration: PH,
@@ -104,7 +104,7 @@ async function main() {
     },
   });
 
-  // ── 신규 3: 단서 B — 적하 일지 ──────────────────────────────────────
+  // -- new 3: clue B - the cargo manifest -------------------------------
   await upsertScene({
     id: 'kael_clue_manifest',
     illustration: PH,
@@ -129,7 +129,7 @@ async function main() {
     },
   });
 
-  // ── 신규 4: 출구 판정 게이트 ────────────────────────────────────────
+  // -- new 4: the exit gate ---------------------------------------------
   await upsertScene({
     id: 'kael_truth_gate',
     illustration: PH,
@@ -157,7 +157,7 @@ async function main() {
     ],
   });
 
-  // ── 신규 5: 진실 ────────────────────────────────────────────────────
+  // -- new 5: the truth --------------------------------------------------
   await upsertScene({
     id: 'kael_truth_revealed',
     illustration: PH,
@@ -181,7 +181,7 @@ async function main() {
     },
   });
 
-  // ── 수정: kael_falling → 허브로 우회 ────────────────────────────────
+  // -- edit: kael_falling detours to the hub ----------------------------
   {
     const s = await Scene.findOne({ id: 'kael_falling' }).lean();
     if (s) {
@@ -199,7 +199,7 @@ async function main() {
     }
   }
 
-  // ── 수정: kael_falling_aftermath → 허브로 우회 ──────────────────────
+  // -- edit: kael_falling_aftermath detours to the hub ------------------
   {
     const s = await Scene.findOne({ id: 'kael_falling_aftermath' }).lean();
     if (s) {

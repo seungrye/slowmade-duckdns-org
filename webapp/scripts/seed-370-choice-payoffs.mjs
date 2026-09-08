@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-// scripts/seed-370-choice-payoffs.mjs — #107 남긴 흔적을 이야기에서 되돌려 준다.
+// scripts/seed-370-choice-payoffs.mjs - #107: paying the traces back in the story.
 //
-// #89 에서 선택마다 flag 를 남기게 했지만 그것을 받아 주는 장면이 없었다. 셋을 회수한다.
-// 씬은 늘리지 않는다 — 조건부 선택지 하나씩이다.
+// #89 made each choice leave a flag, but no scene took them up. Three are paid off here.
+// No scenes are added - one conditional choice each.
 //
-// 화면 선택지는 셋을 넘지 않아야 하므로(#262), 자리를 **바꿔치기** 한다.
-//   기존 판정 선택지에 hideWhenFlag 를 걸어 숨기고, 그 자리에 조건부를 넣는다.
-//   그래서 흔적이 있는 사람은 「판정 없이 통하는 길」을, 없는 사람은 종전의 판정을 본다.
+// The screen must not exceed three choices (#262), so the slots are **swapped**.
+//   The existing roll choice is hidden with hideWhenFlag and the conditional takes its place.
+//   So someone carrying the trace sees "the road that opens without a roll", and someone without it sees the roll as before.
 //
-//   cameoAlly       골목에서 만난 동류와 함께 가기로 했다
-//                   → climax_harmony_path 에서 반대편 고리를 맡아 준다. 굴리지 않고 성공.
-//                     (이 씬은 노출 선택지가 하나뿐이라 자리를 비울 필요가 없다)
-//   tunnelDebt      갱도 안내에 비밀을 값으로 냈다
-//                   → 그 연으로 뒷문을 안다. [민첩] 판정 자리를 대신한다.
-//   leakedToPress   증거를 언론에 먼저 흘렸다
-//                   → 호프만 앞에서 패가 된다. [언변] 판정 자리를 대신한다.
+//   cameoAlly       you agreed to go on with the kindred spirit met in the alley
+//                   -> they take the far ring in climax_harmony_path. A success without a roll.
+//                     (this scene shows only one choice, so no slot needs freeing)
+//   tunnelDebt      you paid a secret for the guide through the mine
+//                   -> that tie lets you know the back door. It replaces the dexterity roll's slot.
+//   leakedToPress   you leaked the evidence to the press first
+//                   -> it becomes a card in front of Hoffmann. It replaces the persuasion roll's slot.
 //
-// 멱등: 같은 id 의 선택지를 갈아끼우므로 두 번 돌려도 결과가 같다.
+// Idempotent: the choice with the same id is swapped in, so a second run gives the same result.
 
 import mongoose from 'mongoose';
 
@@ -26,10 +26,10 @@ if (!MONGO_URI) {
   process.exit(2);
 }
 
-/** 흔적을 가진 사람에게 열리는 길. */
+/** The road that opens to someone carrying the trace. */
 const PAYOFFS = {
-  // climax_harmony_path 에 두려 했으나 그 씬은 이미 선택지 6 개로 저작 pool 상한(lint.ts
-  // maxChoices)에 닿아 있었다. 강철의 길도 「둘이 나눠 맡는다」가 자연스러운 자리다.
+  // It was meant for climax_harmony_path, but that scene already had 6 choices, at the authoring pool's cap (lint.ts's
+  // maxChoices). The steel road is a natural place for "splitting it between two" as well.
   station_path_steel: {
     hideWhenFlagOn: { choiceId: 'derail', flag: 'cameoAlly' },
     add: {
@@ -42,7 +42,7 @@ const PAYOFFS = {
     },
   },
   omphalos_infiltration: {
-    // 비밀을 판 값으로 뒷문을 안다 — 굴리지 않는다.
+    // The secret you sold bought you the back door - no roll.
     hideWhenFlagOn: { choiceId: 'sneak_in', flag: 'tunnelDebt' },
     add: {
       kind: 'conditional',
@@ -71,7 +71,7 @@ const main = async () => {
   const col = mongoose.connection.db.collection('webadventurescenes');
   let touched = 0;
 
-  // 앞선 판에서 climax_harmony_path 에 넣었던 것을 걷어낸다(그 씬은 pool 상한에 닿아 있다).
+  // Removing what an earlier run put into climax_harmony_path (that scene is at the pool's cap).
   const stale = await col.findOne({ id: 'climax_harmony_path' });
   if (stale && (stale.choices || []).some((c) => c.id === 'cameo_ally_hands')) {
     await col.updateOne(

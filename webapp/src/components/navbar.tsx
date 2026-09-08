@@ -40,11 +40,11 @@ const myPageLinks = [
     { href: "/post/write", label: "유머 업로드", description: "새로운 유머 업로드하기", icon: <Upload size={20} /> },
 ];
 
-// "게임" 2단 메뉴 (#49) — 게임 ▾ → 게임별 ▸ → 항목.
-//   게임이 여러 개가 될 수 있어 게임을 한 단계 두고, 그 아래 플레이와 제작 도구를 묶는다.
-//   권한은 항목별: 플레이는 공개, 씬은 로그인(authOnly), 피드백 노트·서버 상태는 owner.
-//   따라서 게임 메뉴 자체는 비로그인에게도 보인다(예전 "에테르니아" 드롭다운은 통째로 숨겼다).
-//   bevy-rogue 라우트(/games/bevy-rogue)는 라이브 유지하되 navbar 에는 노출하지 않는다(#219).
+// The two-level "Games" menu (#49) - Games -> per game -> the item.
+//   There can be several games, so a game gets its own level with play and the authoring tools grouped beneath it.
+//   Permissions are per item: play is public, the scenes need a login (authOnly), and the feedback notes and server status are owner-only.
+//   So the game menu itself is visible to a logged-out visitor (the old "Eternia" dropdown was hidden wholesale).
+//   The bevy-rogue route (/games/bevy-rogue) stays live but is not exposed in the navbar (#219).
 const gameLinks = [
     {
         key: "web-adventure",
@@ -79,7 +79,7 @@ const gameLinks = [
         ],
     },
     {
-        // #109 — EmulatorJS 로 도는 고전 게임. 자기가 올린 롬을 다루므로 로그인 전용이다.
+        // #109 - the classic games running on EmulatorJS. They handle roms you uploaded yourself, so they need a login.
         key: "retro",
         label: "고전 게임",
         description: "브라우저에서 바로 즐기는 레트로",
@@ -97,15 +97,14 @@ const gameLinks = [
     },
     {
         /**
-         * 서버 상태는 특정 게임의 것이 아니라 로컬 LLM·서버 전반이라, 게임 메뉴 **바로
-         * 아래 평탄한 항목**으로 둔다 (#316). 예전엔 "에테르니아의 추락" 하위에 묻혀
-         * 있어서 두 번 눌러야 했다.
+         * The server status is not any one game's but covers the local LLM and the server generally, so it sits as a **flat
+         * item directly under the game menu** (#316). It used to be buried under "The Fall of Eternia"
+         * and took two presses.
          *
-         * 하위가 하나뿐인 묶음은 이름 자체가 그 링크로 그려진다(#51). 그래서 JSX 를
-         * 안 고치고 데이터만으로 평탄해진다.
+         * A group with a single child renders its name itself as that link (#51). So it goes flat through the data alone,
+         * without touching the JSX.
          *
-         * **맨 끝에 둔다** — 앞에 끼우면 모바일 기본 펼침 대상(`gameLinks[0].key`)이
-         * 바뀐다.
+         * **It goes last** - inserting it earlier would change which item mobile expands by default (`gameLinks[0].key`).
          */
         key: "server-status",
         label: "서버 상태",
@@ -124,8 +123,8 @@ const gameLinks = [
     },
 ];
 
-// owner 전용 hidden "주식" 묶음 — session.user.isOwner 가 true 일 때만 노출.
-// 마이페이지 패턴과 동일한 드롭다운 그룹.
+// The owner-only hidden "stocks" group - shown only when session.user.isOwner is true.
+// The same dropdown group pattern as my page.
 const stocksLinks = [
     {
         href: "/admin/stocks",
@@ -145,8 +144,8 @@ const stocksLinks = [
         description: "무한매수 v1 과거 시뮬레이션",
         icon: <FlaskConical size={20} />,
     },
-    // owner 전용 설정이라 개인 설정 페이지에서 떼어내 여기 둔다. 마이페이지 설정엔
-    // 테마만 남는다. (#47)
+    // Being an owner-only setting it is taken off the personal settings page and put here. My page's settings keep
+    // the theme alone. (#47)
     {
         href: "/admin/trading",
         label: "자동매매 설정",
@@ -161,7 +160,7 @@ export default function Navbar() {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [isStocksDropdownOpen, setIsStocksDropdownOpen] = useState(false);
     const [isGamesDropdownOpen, setIsGamesDropdownOpen] = useState(false);
-    // 2단 중첩 — 데스크톱에서 하위 메뉴가 펼쳐진 게임(null 이면 모두 접힘).
+    // The two-level nesting - the game whose submenu is open on desktop (null collapses them all).
     const [openGameKey, setOpenGameKey] = useState<string | null>(null);
     const pathname = usePathname();
     const dropdownRef = useRef<HTMLLIElement>(null);
@@ -180,7 +179,7 @@ export default function Navbar() {
     const isMyPageActive = pathname === "/post/write" || pathname.startsWith("/dashboard");
     const isOwner = Boolean(session?.user?.isOwner);
 
-    // 모바일 메뉴 내부 collapsible 섹션 상태.
+    // The state of the collapsible sections inside the mobile menu.
     const [isMobileMyPageOpen, setIsMobileMyPageOpen] = useState<boolean>(isMyPageActive);
     const [isMobileStocksOpen, setIsMobileStocksOpen] = useState<boolean>(isStocksGroupActive);
     const [isMobileGamesOpen, setIsMobileGamesOpen] = useState<boolean>(isGamesGroupActive);
@@ -188,12 +187,12 @@ export default function Navbar() {
         isGamesGroupActive ? gameLinks[0]?.key ?? null : null,
     );
 
-    // 항목별 권한 필터 — 플레이는 공개, 씬은 로그인, 피드백노트·서버상태는 owner.
+    // The per-item permission filter - play is public, the scenes need a login, and the feedback notes and server status are owner-only.
     const visibleChildren = (game: (typeof gameLinks)[number]) =>
         game.children.filter(
             (c) => (!c.authOnly || Boolean(session)) && (!c.ownerOnly || isOwner),
         );
-    // 보여줄 항목이 하나도 없는 게임은 메뉴에서 뺀다.
+    // A game with nothing left to show is dropped from the menu.
     const visibleGames = gameLinks.filter((g) => visibleChildren(g).length > 0);
 
     useEffect(() => {
@@ -207,7 +206,7 @@ export default function Navbar() {
             }
             if (gamesDropdownRef.current && !gamesDropdownRef.current.contains(target)) {
                 setIsGamesDropdownOpen(false);
-                setOpenGameKey(null); // 하위 메뉴도 같이 접는다.
+                setOpenGameKey(null); // The submenu collapses with it.
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -258,8 +257,8 @@ export default function Navbar() {
                                 <ul className="absolute right-0 mt-2 w-56 bg-gray-800 shadow-lg rounded-lg z-20 py-1">
                                     {visibleGames.map((game) => {
                                         const children = visibleChildren(game);
-                                        // 하위가 하나뿐이면(예: 비로그인 = 플레이만) 펼치는 게 헛클릭이라
-                                        // 게임 이름 자체를 그 항목 링크로 만든다. (#51)
+                                        // With a single child (a logged-out visitor gets play alone, for instance), expanding is a wasted click, so
+                                        // the game's name itself becomes that item's link. (#51)
                                         const only = children.length === 1 ? children[0] : null;
                                         return (
                                             <li key={game.key} className="relative">
@@ -353,7 +352,7 @@ export default function Navbar() {
 
                     {/* 로그인 상태에 따라 메뉴 변경 */}
                     {session ? (
-                        // 로그인한 경우: "마이페이지" 메뉴
+                        // Logged in: the "my page" menu
                         <li className="relative" ref={dropdownRef}>
                             <button
                                 className="flex items-center gap-1 text-gray-500 hover:text-gray-300 transition"
@@ -392,7 +391,7 @@ export default function Navbar() {
                             )}
                         </li>
                     ) : (
-                        // 로그인하지 않은 경우: "로그인" 버튼
+                        // Logged out: the "log in" button
                         <li className="relative group">
                             <Link
                                 href='/login'
@@ -463,7 +462,7 @@ export default function Navbar() {
                                 <ul className="pl-4 border-l border-gray-700 ml-2 mt-1 space-y-1">
                                     {visibleGames.map((game) => {
                                         const children = visibleChildren(game);
-                                        // 하위가 하나뿐이면 게임 이름이 곧 그 링크. (#51)
+                                        // With a single child the game's name is that link. (#51)
                                         const only = children.length === 1 ? children[0] : null;
                                         return (
                                             <li key={game.key}>

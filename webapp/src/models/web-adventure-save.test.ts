@@ -1,8 +1,8 @@
-// WebAdventureSave 모델 단위 테스트 (#237).
+// Unit tests for the WebAdventureSave model (#237).
 //
-// 5주차 milestone — 플레이어의 진행도 mongo 저장.
-// 한 사용자(userEmail) 당 1 save (현재 진행 중인 회차). 엔딩 도달 시 past run
-// 으로 이전 후 save 초기화 (회차 시스템은 #239 에서).
+// The week 5 milestone - storing the player's progress in mongo.
+// One save per user (userEmail) (the run in progress). On reaching an ending it moves to a past run
+// and the save is reset (the run system comes in #239).
 
 import { describe, it, expect } from 'vitest';
 import WebAdventureSave from './web-adventure-save';
@@ -72,7 +72,7 @@ describe('WebAdventureSave 필수 필드', () => {
   it('character.stats 의 6 스탯 모두 number 이어야', () => {
     const doc = makeDoc({
       character: {
-        stats: { str: 5, dex: 5, int: 5, cha: 5, con: 5 /* wis 누락 */ },
+        stats: { str: 5, dex: 5, int: 5, cha: 5, con: 5 /* wis missing */ },
         hp: 10,
         maxHp: 10,
         ability: 'scholar',
@@ -130,8 +130,8 @@ describe('WebAdventureSave 정상 케이스', () => {
     expect(doc.validateSync()).toBeUndefined();
   });
 
-  // #287 〈에테르니아〉 — character.protagonist + stigmaErosion 보존.
-  // strict mode 에서 schema 누락 시 *직렬화 단계에서 사라짐* → round-trip 실패.
+  // #287 Eternia - character.protagonist plus stigmaErosion are preserved.
+  // Under strict mode a field missing from the schema *disappears at serialisation* -> the round trip fails.
   it('character.protagonist 가 schema 에 정의되어 round-trip 보존', () => {
     const doc = makeDoc({
       character: {

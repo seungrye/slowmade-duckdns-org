@@ -1,4 +1,4 @@
-// PostItem — 비공개 글은 목록 제목 앞에 자물쇠(홈·태그·대시보드 공용).
+// PostItem - a private post gets a padlock before its title in the list (shared by home, tags and the dashboard).
 // @vitest-environment jsdom
 
 import { describe, it, expect } from "vitest";

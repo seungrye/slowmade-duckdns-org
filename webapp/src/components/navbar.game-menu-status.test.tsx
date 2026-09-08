@@ -10,13 +10,13 @@ vi.mock("next/navigation", () => ({ usePathname: () => pathnameMock() }));
 import { useSession } from "next-auth/react";
 
 /**
- * 서버 상태를 게임 메뉴 **바로 아래 평탄한 항목**으로 (#316).
+ * The server status as a **flat item directly under the game menu** (#316).
  *
- * 예전엔 "에테르니아의 추락" 하위에 묻혀 있었다. 그런데 서버 상태는 특정 게임의 것이
- * 아니라 로컬 LLM·서버 전반이라 그 자리가 맞지 않는다.
+ * It used to be buried under "The Fall of Eternia". But the server status is not any one game's -
+ * it covers the local LLM and the server generally - so that place was wrong.
  *
- * JSX 는 안 고친다. `gameLinks` 데이터만 바꾼다 — 하위가 하나뿐인 묶음은 이름 자체가
- * 링크가 되는 패턴(#51)이 이미 있어서, 하위 하나짜리 묶음으로 두면 평탄한 항목이 된다.
+ * The JSX is not changed. Only the `gameLinks` data is - a group with a single child already renders its name itself
+ * as the link (#51), so leaving it as a one-child group makes it a flat item.
  */
 const 세션 = (opts: { 로그인: boolean; owner?: boolean }) =>
   vi.mocked(useSession).mockReturnValue(
@@ -33,7 +33,7 @@ describe("Navbar — 서버 상태는 게임 메뉴 바로 아래 (#316)", () =>
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText("게임 메뉴"));
 
-    // 펼침 토글이 아니라 링크여야 한다. 헛클릭 한 번을 없애는 것이 이 이슈의 목적이다.
+    // It must be a link rather than an expand toggle. Removing one wasted click is this issue's purpose.
     const link = screen.getByRole("link", { name: /서버 상태/ });
     expect(link.getAttribute("href")).toBe("/scenes/status");
   });
@@ -45,8 +45,8 @@ describe("Navbar — 서버 상태는 게임 메뉴 바로 아래 (#316)", () =>
     fireEvent.click(screen.getByLabelText("에테르니아의 추락 하위 메뉴"));
 
     const 에테르니아하위 = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
-    expect(에테르니아하위).toContain("/scenes");            // 씬은 그대로 있고
-    expect(에테르니아하위.filter((h) => h === "/scenes/status")).toHaveLength(1); // 서버 상태는 한 곳뿐
+    expect(에테르니아하위).toContain("/scenes");            // The scenes are still there and
+    expect(에테르니아하위.filter((h) => h === "/scenes/status")).toHaveLength(1); // the server status appears exactly once
   });
 
   it("로그인했지만 owner 가 아니면 안 보인다", () => {

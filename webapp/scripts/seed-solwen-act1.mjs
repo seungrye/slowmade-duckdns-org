@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scripts/seed-solwen-act1.mjs — #254 Solwen 1막.
+// scripts/seed-solwen-act1.mjs - #254's Solwen act 1.
 //
-// 솔벤 / Solwen — 네오-엘프 자치령 옥수.
-//   Scene 01 세계수 사냥터 — 인간 밀렵단 발견.
-//   Scene 02 영수 전투 — 기계 톱과 가솔린 화염.
-//   Scene 03 영수의 죽음 — 세계수 원천 파괴 인지.
-//   Scene 04 숲을 떠남 — 복수 맹세.
+// Solwen - a jade guard of the neo-elf autonomy.
+//   Scene 01 the world tree's hunting ground - finding the human poachers.
+//   Scene 02 the spirit beast's fight - mechanical saws and petrol flame.
+//   Scene 03 the spirit beast's death - realising the world tree's source is being destroyed.
+//   Scene 04 leaving the forest - the oath of revenge.
 
 import mongoose from 'mongoose';
 
@@ -147,7 +147,7 @@ const scenes = [
 async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
-  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const s of scenes) {
     const cur = await Scene.findOne({ id: s.id }).lean();
     const update = { ...s };

@@ -1,25 +1,25 @@
 #!/usr/bin/env node
-// scripts/seed-349-narrative-strengthening.mjs — #349 시나리오 개연성 보강 (P0~P3).
+// scripts/seed-349-narrative-strengthening.mjs - #349's scenario-plausibility work (P0~P3).
 //
-// 검토 의견:
-//   P0-1: 사제단 의식 정체 명시 — *부유도시 엔진 동력 흡수 의식* 단서 추가
+// The review's points:
+//   P0-1: stating what the priesthood's rite is - adding the clue that it *absorbs the floating city's engine power*
 //         (omphalos_outskirts / omphalos_station / omphalos_blackmarket / climax_fall_path).
-//   P0-2: kael_cargo_container.climb_in 라벨 + body[1] *뚜껑 폐쇄 + 벽 붙잡기* 의도 일치.
-//   P1  : omphalos_outskirts → omphalos_station 사이 중간 침투 씬 (omphalos_infiltration) 신설,
-//         3 분기 (민첩/지능/카리스마) probability + 실패 시 기존 kael_caught_minor 재이용.
-//   P2-1: omphalos_station 사자 등장 라인 (저 멀리 → *대형 확성기* 방송) 명확화.
-//   P2-2: kael_struggled body 에 *어깨 결정 파편* 부상 연속성 1 줄 추가.
-//   P3  : kael_cargo_container body[0] 에 *에테르 가솔린 기괴 성질* 묘사 추가.
+//   P0-2: kael_cargo_container.climb_in's label and body[1] agree on the intent (*closing the lid and gripping the wall*).
+//   P1  : a new intermediate infiltration scene (omphalos_infiltration) between omphalos_outskirts and omphalos_station,
+//         with 3 probability branches (dexterity/intelligence/charisma) and the existing kael_caught_minor reused on failure.
+//   P2-1: clarifying omphalos_station's herald line (from far away -> a broadcast over *a large loudspeaker*).
+//   P2-2: one line added to kael_struggled's body for the continuity of the *crystal shard in the shoulder* injury.
+//   P3  : a description of *ether petrol's uncanny nature* added to kael_cargo_container's body[0].
 //
-// 설계 — patch 방식 (insertAt / replaceAt). 이전 시드 (npc-names, stigma-items,
-//   omphalos-cameo, ending-aftermath 등) 의 누적 patch 줄을 *보존*. idempotent —
-//   재실행 시 중복 patch 안 함 (정확 일치 라인 또는 marker 검사).
+// The design - a patch approach (insertAt / replaceAt). The accumulated patch lines of earlier seeds (npc-names, stigma-items,
+//   omphalos-cameo, ending-aftermath and so on) are *preserved*. Idempotent -
+//   a rerun never patches twice (checked by an exact line match or a marker).
 
 import mongoose from 'mongoose';
 
 const PLACEHOLDER = '/web-adventure/scenes/placeholder-square.svg';
 
-// ───────────── 1. 신규 씬 ─────────────
+// ------------- 1. the new scene -------------
 
 const NEW_SCENE_INFILTRATION = {
   id: 'omphalos_infiltration',
@@ -64,15 +64,15 @@ const NEW_SCENE_INFILTRATION = {
   onEnter: { stigmaDelta: 2 },
 };
 
-// ───────────── 2. body patch 정의 ─────────────
+// ------------- 2. the body patch definitions -------------
 //
-// 두 가지 작업 종류:
-//   - insertLine: body 의 특정 위치에 1 줄 삽입 (이미 있으면 skip — idempotent).
-//   - replaceMatching: 본문에서 *마커 문자열* 을 포함한 줄을 *새 줄* 로 교체. 마커는
-//     기존 시드들 (act23-omphalos 등) 에서 유래한 *고정 구문* 기반.
+// Two kinds of operation:
+//   - insertLine: inserts 1 line at a given position in the body (skipped when already there - idempotent).
+//   - replaceMatching: replaces a body line containing a *marker string* with a *new line*. The markers are
+//     based on *fixed phrases* originating in the earlier seeds (act23-omphalos and so on).
 
 const BODY_PATCHES = [
-  // P3 — kael_cargo_container body[0]. "에테르 가솔린 — 500 갤런" → 기괴 강조 보강.
+  // P3 - kael_cargo_container's body[0]. "ether petrol - 500 gallons" -> the uncanniness strengthened.
   {
     sceneId: 'kael_cargo_container',
     op: 'replaceMatching',
@@ -81,7 +81,7 @@ const BODY_PATCHES = [
       '거대한 컨테이너 옆구리에 노란 라벨. 에테르 가솔린 — 500 갤런. *푸른 빛을 발하는 점성 액체* 가 출렁인다. 인간의 마력을 *압축한 비명의 흔적* — 표면에서 *희미한 한숨* 같은 기화가 피어오른다.',
     desc: '가솔린 기괴 성질',
   },
-  // P0-2 — kael_cargo_container body[1]. 안에 누워있기 → 뚜껑 폐쇄 + 벽 붙잡기 (climb_in 라벨 일치).
+  // P0-2 - kael_cargo_container's body[1]. Lying inside -> closing the lid and gripping the wall (matching the climb_in label).
   {
     sceneId: 'kael_cargo_container',
     op: 'replaceMatching',
@@ -90,8 +90,8 @@ const BODY_PATCHES = [
       '뚜껑을 살짝 들어올린다. 안은 가득 차지 않았다 — 벽면을 따라 *손가락이 걸릴 돌출부* 가 있다. *뚜껑을 다시 닫고* 벽에 매달려 있으면 액체에 닿지 않고 살아남을 수 있다.',
     desc: '뚜껑 폐쇄 + 벽 붙잡기',
   },
-  // P0-1 — omphalos_outskirts. body 끝 직전에 *의식 정체 단서* 1 줄 삽입.
-  //   "너의 정체와는 무관하게" 직전 (= 마지막에서 2 번째) 에 끼움.
+  // P0-1 - omphalos_outskirts. One line of *the clue to the rite* inserted just before the body's end.
+  //   Placed just before "너의 정체와는 무관하게" (= second from last).
   {
     sceneId: 'omphalos_outskirts',
     op: 'insertBefore',
@@ -99,8 +99,8 @@ const BODY_PATCHES = [
     line: '곁의 노인이 *낮게 속삭인다*. "저 열차의 *에테르 코어* — 세 달이 겹치는 새벽, *부유도시 엔진의 마력을 한 번에 빨아들이는* 의식의 *점화기* 라네. 그 후엔 — 모두 떨어진다네."',
     desc: '노인의 속삭임 — 의식 정체 단서',
   },
-  // P0-1 + P2-1 — omphalos_station. "저 멀리 사제단의 사자가 차가운 미소로 말한다" 라인 교체.
-  //   *대형 확성기* 방송으로 공간 명확 + 의식 = 도시 동력 흡수 명시.
+  // P0-1 + P2-1 - omphalos_station. Replacing the line where the priesthood's herald speaks with a cold smile from far away.
+  //   A broadcast over *a large loudspeaker* clarifies the space, and the rite is stated as absorbing the city's power.
   {
     sceneId: 'omphalos_station',
     op: 'replaceMatching',
@@ -109,9 +109,9 @@ const BODY_PATCHES = [
       '정거장의 *대형 확성기* 가 사제단 사자의 음성을 흘려보낸다 — 차가운 미소가 라디오 송출의 *잡음 너머* 로. "*이 열차는 부유도시의 동력을 거두는 점화기다. 세 달이 겹치는 새벽, 너희 도시는 — 우리에게 마력을 *돌려준다*. 너는 그 안에 *포함될지*, *제외될지* 선택할 뿐.*"',
     desc: '확성기 방송 + 의식 정체',
   },
-  // P0-1 — omphalos_blackmarket. 정보상의 *세 달 정렬* 종이 라인 교체.
-  //   기존: "지상 모든 생명을 *연료* 로 태우려는 것이다. 신계 승천."
-  //   새  : "에테르 코어가 부유도시 엔진의 마력을 *한 번에 흡수* — 도시가 떨어진다. 신계 승천."
+  // P0-1 - omphalos_blackmarket. Replacing the informant's *three-moon alignment* paper line.
+  //   Before: burning every life on the surface as *fuel*. An ascension to the divine realm.
+  //   After : the ether core absorbs the floating city's engine magic *all at once* - the city falls. An ascension to the divine realm.
   {
     sceneId: 'omphalos_blackmarket',
     op: 'replaceMatching',
@@ -120,8 +120,8 @@ const BODY_PATCHES = [
       '정보상이 너에게 작은 종이를 건넨다. "사제단의 본 의식은 *세 달 정렬* 직후, 호송 열차의 *에테르 코어* 가 부유도시 정점에서 점화 — *모든 부유도시 엔진의 마력을 한 번에 흡수* 한다. 도시들은 *동력 없이 떨어진다*. 사제단은 그 마력으로 *신계 승천*."',
     desc: '의식의 실체 — 동력 흡수 인과',
   },
-  // P0-1 — climax_fall_path. "부유도시 엔진의 마력이 한 번에 빠져나간다" 라인 교체.
-  //   *호송 열차의 에테르 코어 = 의식의 점화기* 인과 연결.
+  // P0-1 - climax_fall_path. Replacing the line where the floating city's engine magic drains all at once.
+  //   Connecting the cause: *the convoy train's ether core = the rite's igniter*.
   {
     sceneId: 'climax_fall_path',
     op: 'replaceMatching',
@@ -130,8 +130,8 @@ const BODY_PATCHES = [
       '세 달이 겹친다. 호송 열차의 *에테르 코어* 가 점화되고 — *모든 부유도시 엔진의 마력* 이 그 한 점을 향해 빨려들어간다. 동력이 *완전히* 빠져나간다.',
     desc: '의식 = 동력 흡수 인과',
   },
-  // P2-2 — kael_struggled. body[1] "온몸의 푸른 결정이 충격에 따라 *균열*" 라인에
-  //   *어깨 결정 파편* 부상 연속성 1 문장 추가.
+  // P2-2 - kael_struggled. One sentence of continuity for the *crystal shard in the shoulder* injury added
+  //   to body[1]'s line about the blue crystals across the body *cracking* under the impact.
   {
     sceneId: 'kael_struggled',
     op: 'replaceMatching',
@@ -142,14 +142,14 @@ const BODY_PATCHES = [
   },
 ];
 
-// ───────────── 3. 분기 재지정 ─────────────
+// ------------- 3. reassigning the branches -------------
 
 const OUTSKIRTS_REDIRECT = { choiceId: 'to_station', to: 'omphalos_infiltration' };
 
-// kael_cargo_container.climb_in 라벨 (P0-2).
+// kael_cargo_container.climb_in's label (P0-2).
 const CARGO_CHOICE_CLIMB_IN_LABEL = '[완력] 뚜껑을 다시 *팔 힘으로* 폐쇄 — *벽을 붙잡고* 액체 위에 매달린다.';
 
-// ───────────── 실행 ─────────────
+// ------------- running -------------
 
 async function upsertWithIllustrationGuard(Scene, sceneSpec) {
   const cur = await Scene.findOne({ id: sceneSpec.id }).lean();
@@ -171,7 +171,7 @@ async function applyBodyPatch(Scene, patch) {
   if (patch.op === 'replaceMatching') {
     const idx = body.findIndex((b) => b.includes(patch.marker));
     if (idx < 0) {
-      // 이미 *새 줄* 자체가 들어 있다면 idempotent skip.
+      // An idempotent skip when *the new line* itself is already there.
       if (body.some((b) => b === patch.newLine)) {
         console.log(`  skip: ${patch.sceneId} / ${patch.desc} (이미 적용)`);
         return;
@@ -208,7 +208,7 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // 1. 신규 침투 씬 upsert.
+  // 1. upserting the new infiltration scene.
   await upsertWithIllustrationGuard(Scene, NEW_SCENE_INFILTRATION);
   console.log(`upsert: ${NEW_SCENE_INFILTRATION.id} (${NEW_SCENE_INFILTRATION.choices.length} 분기, stigmaΔ+${NEW_SCENE_INFILTRATION.onEnter.stigmaDelta})`);
 

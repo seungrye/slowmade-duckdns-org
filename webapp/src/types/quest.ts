@@ -1,6 +1,6 @@
 import type { HomeLandmark } from "./villager";
 
-// ── 조건 타입 ──────────────────────────────────────────────────────────────
+// -- the condition types ----------------------------------------------------
 
 export type Condition =
   | { type: "FlagIs"; flag: string; value: string }
@@ -13,7 +13,7 @@ export type Condition =
   | { type: "PhaseIs"; quest: string; phase: string }
   | { type: "InZone"; zone: SpawnZone };
 
-// ── 포털 배치 ─────────────────────────────────────────────────────────────
+// -- portal placement -------------------------------------------------------
 
 export type PortalPlacement =
   | { type: "InsideRoom" }
@@ -21,9 +21,9 @@ export type PortalPlacement =
   | { type: "Random" }
   | { type: "NearGiver"; radius: number };
 
-// ── 액션 타입 ─────────────────────────────────────────────────────────────
+// -- the action types -------------------------------------------------------
 
-/** 함정 종류 (bevy-rogue trap::TrapKind 미러). */
+/** The trap kinds (mirroring bevy-rogue's trap::TrapKind). */
 export type TrapKind = "Spike" | "Poison" | "Alarm" | "Teleport";
 
 export type Action =
@@ -89,22 +89,22 @@ export type Action =
       count?: number;
     };
 
-// ── 상태 전환 ─────────────────────────────────────────────────────────────
+// -- the state transitions --------------------------------------------------
 
 /**
- * 상태 전이의 트리거 종류.
- * - `Interact` — NPC 마지막 대사 이후 플레이어가 상호작용했을 때.
- * - `Auto`     — 매 프레임 조건 자동 평가.
- * - `EnterNpcFov` — 플레이어가 지정 NPC 의 시야 안에 들어옴 (잠입 퀘스트의 vendor 발각 등).
- *                  `triggerNpcId` 가 그 NPC 의 id.
- * - `HoldingItemInNpcFov` — 위 + 지정 아이템 인벤토리 보유 동시 조건.
- *                          `triggerNpcId` + `triggerItemId` 가 필요.
+ * The kind of trigger for a state transition.
+ * - `Interact` - when the player interacts after the NPC's last line.
+ * - `Auto`     - the condition is evaluated automatically every frame.
+ * - `EnterNpcFov` - the player enters the given NPC's field of view (a vendor spotting them in a stealth quest, for instance).
+ *                  `triggerNpcId` is that NPC's id.
+ * - `HoldingItemInNpcFov` - the above plus holding the given item in the inventory.
+ *                          `triggerNpcId` and `triggerItemId` are required.
  *
- * 게임 `quest::TriggerKind` enum 미러. variant 추가 시 ron.ts 의 parser/serializer 도 함께 갱신.
+ * Mirroring the game's `quest::TriggerKind` enum. Adding a variant means updating ron.ts's parser and serializer too.
  *
- * NOTE: 호환성을 위해 string union 으로 유지. EnterNpcFov / HoldingItemInNpcFov 의
- * 인스턴스 매개변수(npc_id / item_id)는 `QuestTransition` 의 `triggerNpcId`
- * / `triggerItemId` 필드로 전달한다.
+ * NOTE: kept as a string union for compatibility. EnterNpcFov's and HoldingItemInNpcFov's
+ * instance parameters (npc_id / item_id) are passed through `QuestTransition`'s `triggerNpcId`
+ * and `triggerItemId` fields.
  */
 export type TriggerKind =
   | "Interact"
@@ -113,36 +113,36 @@ export type TriggerKind =
   | "HoldingItemInNpcFov";
 
 /**
- * 순서형 상태 전환 규칙. 같은 (from, trigger) 그룹에서 RON 목록 순서대로
- * 평가하여 첫 번째 매칭(when 충족)만 실행한다. `to === from` 이면 같은 phase
- * 에 머문다 (Log 전용 등).
+ * An ordered state transition rule. Within the same (from, trigger) group they are evaluated in the RON list's
+ * order and only the first match (whose when is met) runs. With `to === from` it stays in the same phase
+ * (for a Log-only transition and so on).
  */
 export interface QuestTransition {
   from: string;
   trigger: TriggerKind;
   /**
-   * `EnterNpcFov` / `HoldingItemInNpcFov` 트리거의 NPC id.
-   * 다른 trigger 종류에선 무시되며 RON 직렬화에도 포함되지 않는다.
+   * The NPC id for the `EnterNpcFov` / `HoldingItemInNpcFov` triggers.
+   * Ignored on other trigger kinds and left out of the RON serialisation.
    */
   triggerNpcId?: string;
   /**
-   * `HoldingItemInNpcFov` 트리거의 item id.
-   * 다른 trigger 종류에선 무시.
+   * The item id for the `HoldingItemInNpcFov` trigger.
+   * Ignored on other trigger kinds.
    */
   triggerItemId?: string;
-  /** 없으면 항상 매칭 (unconditional) */
+  /** Absent, it always matches (unconditional) */
   when?: Condition;
-  /** Auto / FOV trigger 는 DespawnWorldItem / RemoveItem / RemoveItems / SetFlag / Log / TeleportToNpcHome 만 허용 */
+  /** The Auto and FOV triggers allow only DespawnWorldItem / RemoveItem / RemoveItems / SetFlag / Log / TeleportToNpcHome */
   actions: Action[];
   to: string;
 }
 
-// ── 스폰 존 ───────────────────────────────────────────────────────────────
+// -- the spawn zones --------------------------------------------------------
 //
-// 단순화: 게임의 `ZoneId` 가 `Town | Named(String)` 로 통일됐다.
-// 표준 Named id: "forest", "dungeon_<N>", "mountain_village", "seaside_harbor".
-// 옛 RON 의 bare ident(`Forest`/`MountainVillage`/`SeasideHarbor`) 와 paren
-// 형식(`Dungeon(N)`) 도 파서가 자동으로 Named 로 흡수한다.
+// Simplified: the game's `ZoneId` is unified as `Town | Named(String)`.
+// The standard Named ids: "forest", "dungeon_<N>", "mountain_village", "seaside_harbor".
+// The old RON's bare idents (`Forest`/`MountainVillage`/`SeasideHarbor`) and paren
+// form (`Dungeon(N)`) are absorbed into Named by the parser automatically.
 
 export type SpawnZone =
   | { type: "Town" }
@@ -155,37 +155,37 @@ export interface QuestSpawn {
   count?: number;
   condition?: Condition;
   /**
-   * Town zone 안에서 *특정 landmark 영역* 안으로 스폰 위치를 좁힌다.
-   * 예: `landmark: "market"` 이면 시장 안 floor 타일에만 spawn.
-   * 게임 `QuestSpawn.landmark: Option<HomeLandmark>` 미러. 누락은 None (기존 동작 — zone 의 임의 방).
+   * Narrows the spawn position to *a particular landmark's area* within the Town zone.
+   * With `landmark: "market"`, for instance, it spawns only on floor tiles inside the market.
+   * Mirroring the game's `QuestSpawn.landmark: Option<HomeLandmark>`. Absent means None (the previous behaviour - any room in the zone).
    *
-   * `landmark_tiles` 는 prefab carve 시점에 *내부* (외벽+1) Floor 좌표만 기록되므로
-   * "상점 내부" 가 자연히 보장된다 (외벽 / 도로 옆은 제외).
+   * `landmark_tiles` records only the *interior* (the outer wall plus 1) Floor coordinates at prefab carve time, so
+   * "inside the shop" is guaranteed naturally (the outer wall and the roadside are excluded).
    */
   landmark?: HomeLandmark;
   /**
-   * vendor (`vendor: true` 인 NPC) 로부터 최소 manhattan 거리. landmark 안에서도
-   * 이 거리 미만의 타일은 후보에서 제외 — vendor 카운터 옆 즉시 시야에 spawn 금지.
+   * The minimum manhattan distance from a vendor (an NPC with `vendor: true`). Even inside the landmark,
+   * tiles nearer than this are excluded - nothing spawns in immediate sight beside the vendor's counter.
    *
-   * `super_tintham_cracker` 처럼 vendor 가 *몰래 숨겨놓은* 아이템이 vendor 옆에
-   * spawn 되면 곧바로 발각된다 → 어느 정도 떨어진 위치여야 회피 가능. `2` 면
-   * 카운터로부터 2칸 떨어진 후보만 허용.
+   * An item a vendor *hid away*, such as `super_tintham_cracker`, is spotted at once if it spawns beside
+   * the vendor -> it has to be some distance off to be avoidable. With `2`, only candidates
+   * 2 tiles from the counter are allowed.
    *
-   * 게임 `QuestSpawn.vendor_distance_min: Option<u32>` 미러. 누락은 None (필터 없음).
+   * Mirroring the game's `QuestSpawn.vendor_distance_min: Option<u32>`. Absent means None (no filter).
    */
   vendorDistanceMin?: number;
 }
 
-// ── 페이즈 ────────────────────────────────────────────────────────────────
+// -- the phases -------------------------------------------------------------
 
 export interface QuestPhaseDef {
   dialog: string[];
   objective: string | null;
-  /** React Flow 캔버스 위치 (에디터 전용) */
+  /** The React Flow canvas position (editor only) */
   position?: { x: number; y: number };
 }
 
-// ── 퀘스트 ────────────────────────────────────────────────────────────────
+// -- the quest --------------------------------------------------------------
 
 export interface QuestDef {
   id: string;
@@ -194,12 +194,12 @@ export interface QuestDef {
   initialPhase: string;
   spawnChance?: number;
   phases: Record<string, QuestPhaseDef>;
-  /** 순서형 상태 전환 규칙 목록 */
+  /** The list of ordered state transition rules */
   transitions: QuestTransition[];
   spawns: QuestSpawn[];
 }
 
-// ── DB 문서 타입 ──────────────────────────────────────────────────────────
+// -- the DB document types --------------------------------------------------
 
 export interface QuestDocument extends QuestDef {
   _id: string;

@@ -14,7 +14,7 @@ interface PostActionsProps {
   authorEmail: string;
 }
 
-const DELETE_POST_COST = process.env.NEXT_PUBLIC_DELETE_POST_COST || 7; // 기본값을 7로 설정, 환경변수에서 가져오지 못할 경우를 대비
+const DELETE_POST_COST = process.env.NEXT_PUBLIC_DELETE_POST_COST || 7; // Defaults to 7, in case it cannot be read from the environment variable
 
 export default function PostActions({ postId, authorEmail }: PostActionsProps) {
   const { data: session } = useSession();
@@ -43,7 +43,7 @@ export default function PostActions({ postId, authorEmail }: PostActionsProps) {
       }
 
       toast.success(result.message);
-      router.refresh(); // 현재 페이지의 데이터를 새로고침하여 삭제된 게시물을 반영합니다.
+      router.refresh(); // Refreshes the current page's data so the deleted post is reflected.
     } catch (error) {
       const message = error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다.';
       toast.error(message);

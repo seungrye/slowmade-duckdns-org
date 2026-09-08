@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scripts/seed-rin-act1.mjs — #253 Rin 1막 4 씬.
+// scripts/seed-rin-act1.mjs - #253's 4 Rin act 1 scenes.
 //
-// 린 / Rin — 아이언가드 공국 하급 수사관.
-//   Scene 01 검은 항만 — 밀수 적발 현장.
-//   Scene 02 사제단 인장 — 솔라리스 인장 발견.
-//   Scene 03 상관 배신 — 상급 수사관의 암살 시도.
-//   Scene 04 지하 잠적 — 옴팔로스로.
+// Rin - a junior investigator of the Ironguard principality.
+//   Scene 01 the black harbour - the scene of a smuggling bust.
+//   Scene 02 the priesthood's seal - finding the Solaris seal.
+//   Scene 03 the superior's betrayal - the senior investigator's assassination attempt.
+//   Scene 04 going underground - on to Omphalos.
 
 import mongoose from 'mongoose';
 
@@ -169,7 +169,7 @@ const scenes = [
 async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
-  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const s of scenes) {
     const cur = await Scene.findOne({ id: s.id }).lean();
     const update = { ...s };

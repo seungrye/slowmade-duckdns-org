@@ -1,15 +1,15 @@
-// 기존 롬·패치·부모셋에 sha256 을 채운다 (#188).
+// Fills in sha256 for the existing roms, patches and parent sets (#188).
 //
-// netplay 방 번호를 **코어가 실제로 읽는 바이트**로 묶으려면 해시가 있어야 한다. 업로드
-// 라우트는 이제 저장 시점에 떠 두지만, 그 전에 올린 것들은 비어 있다. 해시가 없는 롬은
-// netplay 진입이 감춰지므로(엉뚱한 방에 붙어 desync 나느니 낫다) 한 번 채워 준다.
+// Grouping netplay rooms by **the bytes the core actually reads** needs the hash. The upload
+// route now takes it at save time, but anything uploaded before that is empty. A rom without a hash
+// has its netplay entry hidden (better than joining the wrong room and desyncing), so it is filled in once.
 //
-// 사용:
-//   cd ~/site/webapp && node ../scripts/games/backfill-rom-hashes.mjs          # 확인만
-//   cd ~/site/webapp && node ../scripts/games/backfill-rom-hashes.mjs --write  # 실제 기록
+// Usage:
+//   cd ~/site/webapp && node ../scripts/games/backfill-rom-hashes.mjs          # check only
+//   cd ~/site/webapp && node ../scripts/games/backfill-rom-hashes.mjs --write  # actually write
 //
-// **멱등하다** — 이미 있는 해시는 건드리지 않는다. 읽기 전용으로 먼저 돌려 보고 쓰는 걸 권한다.
-// 삭제된(soft delete) 항목도 채운다. 되살렸을 때 바로 쓸 수 있어야 한다.
+// **It is idempotent** - an existing hash is left alone. Running it read-only first is recommended.
+// Soft-deleted entries are filled in too. They must be usable the moment they are restored.
 
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -30,7 +30,7 @@ const minio = new Minio.Client({
 });
 const BUCKET = envOf('MINIO_BUCKET');
 
-/** 오브젝트를 흘려 읽으며 sha256 을 뜬다 — 큰 아케이드 롬(수십 MB)을 통째로 메모리에 올리지 않는다. */
+/** Streams the object and takes its sha256 - a large arcade rom (tens of MB) never goes into memory whole. */
 async function hashObject(objectKey) {
   const stream = await minio.getObject(BUCKET, objectKey);
   const hash = createHash('sha256');
@@ -54,14 +54,14 @@ for (const rom of await roms.find({}).toArray()) {
   const set = {};
   const label = `${rom.title} (${rom.filename})`;
 
-  // ── 롬 본체
+  // -- the rom itself
   checked++;
   if (rom.sha256) {
     skipped++;
   } else if (rom.objectKey) {
     try {
       const { sha256, size } = await hashObject(rom.objectKey);
-      // 기록된 크기와 실제가 다르면 엉뚱한 오브젝트를 읽은 것이다 — 그대로 쓰면 안 된다.
+      // A recorded size differing from the real one means the wrong object was read - it must not be used.
       if (rom.size && size !== rom.size) {
         problems.push(`${label}: 크기 불일치(문서 ${rom.size} / 실제 ${size}) — 건너뜀`);
       } else {
@@ -73,7 +73,7 @@ for (const rom of await roms.find({}).toArray()) {
     }
   }
 
-  // ── 패치들
+  // -- the patches
   for (let i = 0; i < (rom.patches ?? []).length; i++) {
     const p = rom.patches[i];
     checked++;
@@ -87,7 +87,7 @@ for (const rom of await roms.find({}).toArray()) {
     }
   }
 
-  // ── 부모 롬셋들
+  // -- the parent rom sets
   for (let i = 0; i < (rom.parentSets ?? []).length; i++) {
     const ps = rom.parentSets[i];
     checked++;

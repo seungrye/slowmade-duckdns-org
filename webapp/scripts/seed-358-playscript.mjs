@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// seed-358-playscript.mjs — 씬 본문을 *희곡(연극 대본) 형식*으로 재구성.
+// seed-358-playscript.mjs - recasting the scene bodies as *a play script*.
 //
-// 의도(#358): 사용자가 산문체가 아니라 "연극 시나리오" 느낌을 원함.
-//   지문은 *이탤릭*, 등장인물 대사는 **인물명** *(행동)* + "대사" 형식.
+// The intent (#358): the user wants the feel of "a stage scenario" rather than prose.
+//   Stage directions are *italic*, and a character's speech is **name** *(action)* plus "the line".
 //
-// 설계:
-//   - bodyProse 보존 — 최초 실행 때 현재 body(소설 산문)를 bodyProse 에 백업. 이후
-//     *항상 bodyProse 기준* 으로 재변환 → 재실행해도 누적·폭주 안 함(멱등성).
-//   - 엔딩 씬(isEnding)은 제외 — 후일담 마커("—" 시작 마지막 줄, #275 테스트) 보존.
-//   - AI: Gemma 4 메인 + 폴백(translate.ts 동일). rate limit 60초/씬, 실패 시 제곱 백오프.
-//   - 검증: 비엔딩 ≥3줄. 미달이면 원본 유지(스킵).
+// The design:
+//   - bodyProse is preserved - the first run backs the current body (the novel prose) up into bodyProse. From then on the conversion is
+//     *always based on bodyProse* -> a rerun never accumulates or runs away (idempotence).
+//   - ending scenes (isEnding) are excluded - preserving the aftermath marker (a last line starting with an em dash, #275's test).
+//   - the AI: Gemma 4 as the main model plus the fallbacks (the same as translate.ts). A 60-second rate limit per scene, with an exponential backoff on failure.
+//   - the check: >=3 lines for a non-ending. Falling short, the original is kept (skipped).
 //
-// 사용:
+// Usage:
 //   node --env-file=.env.local scripts/seed-358-playscript.mjs --only kael_infirmary --dry
 //   node --env-file=.env.local scripts/seed-358-playscript.mjs --all
 
@@ -115,7 +115,7 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  const query = only ? { id: { $in: only } } : { isEnding: { $ne: true } }; // 엔딩 제외.
+  const query = only ? { id: { $in: only } } : { isEnding: { $ne: true } }; // Endings excluded.
   const scenes = await Scene.find(query).lean();
   scenes.sort((x, y) => x.id.localeCompare(y.id));
   console.log(`대상 ${scenes.length} 씬${dry ? ' (DRY)' : ''} (엔딩 제외)\n`);

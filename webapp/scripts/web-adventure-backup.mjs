@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// scripts/web-adventure-backup.mjs — #279 web-adventure mongo 컬렉션 정기 백업.
+// scripts/web-adventure-backup.mjs - #279's regular backup of the web-adventure mongo collections.
 //
-// 시드 변경 (각 seed-*.mjs 실행) 전 또는 cron 으로 호출. 보관 위치:
+// Called before a seed change (running any seed-*.mjs), or from cron. Kept at:
 //   scripts/backups/web-adventure-YYYY-MM-DDTHH-MM-SS.json
 //
-// 자동 회전: 최근 20 개만 유지 (오래된 파일 자동 삭제).
+// Automatic rotation: only the most recent 20 are kept (older files are deleted automatically).
 //
-// 사용:
+// Usage:
 //   MONGO_URI=mongodb://127.0.0.1:27017/handmade-site node scripts/web-adventure-backup.mjs
 
 import mongoose from 'mongoose';
@@ -35,7 +35,7 @@ async function main() {
   writeFileSync(file, JSON.stringify(all, null, 2));
   console.log(`✓ backup → ${file} (${all.length} 씬)`);
 
-  // 회전 — 최근 KEEP_LATEST 개만 유지.
+  // The rotation - only the most recent KEEP_LATEST are kept.
   const backups = readdirSync(dir)
     .filter((f) => f.startsWith('web-adventure-') && f.endsWith('.json'))
     .map((f) => ({ f, t: statSync(join(dir, f)).mtimeMs }))

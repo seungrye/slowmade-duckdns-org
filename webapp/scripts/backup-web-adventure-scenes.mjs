@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scripts/backup-web-adventure-scenes.mjs — 기존 web-adventure 콘텐츠 백업.
+// scripts/backup-web-adventure-scenes.mjs - backing up the existing web-adventure content.
 //
-// 〈에테르니아의 추락〉 리프래시 (#253) 전, 기존 한국 사극 톤 30 씬을
-// JSON 파일로 보관. 이후 mongo 컬렉션 비우고 새 세계관 적치.
-// 보관 위치: scripts/backups/web-adventure-pre-aethernia-{ts}.json
+// Before The Fall of Eternia's refresh (#253), the existing 30 scenes in the Korean historical-drama tone
+// are kept as a JSON file. The mongo collection is then emptied and the new setting loaded.
+// Kept at: scripts/backups/web-adventure-pre-aethernia-{ts}.json
 //
-// 사용:
+// Usage:
 //   node --env-file=.env.local scripts/backup-web-adventure-scenes.mjs
 
 import mongoose from 'mongoose';

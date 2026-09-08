@@ -1,23 +1,23 @@
 #!/usr/bin/env node
-// scripts/seed-act23-omphalos.mjs — #255/#256 옴팔로스 2-3막 + 6 엔딩.
+// scripts/seed-act23-omphalos.mjs - #255/#256's Omphalos acts 2-3 plus the 6 endings.
 //
-// 합류 지점: 옴팔로스의 *에테르 가솔린 열차 탈취 작전*. 사제단이 지상 연료를
-// 강탈해 부유도시로 쏘아 올린다. 세 주인공이 *각자의 목적* 으로 이 열차에 잠입.
+// The convergence point: Omphalos's *operation to seize the ether-petrol train*. The priesthood is robbing the surface of its fuel
+// and firing it up to the floating city. All three protagonists infiltrate this train *for their own purposes*.
 //
-// 교차 영향 (#255): past_runs 의 endingId 가 *world flag* 로 주입되어 분기 조건.
-//   world.solaris_strong  — 이전 ascension 도달 (사제단 강화)
-//   world.revolution_won  — 이전 revolution 도달 (아이언가드 무장)
-//   world.sylvan_awoke    — 이전 sylvan_bond 도달 (영수 깨어남)
-//   world.world_fell      — 이전 fall 도달 (잿더미 톤)
+// The cross-influence (#255): past_runs' endingId is injected as a *world flag* and becomes a branch condition.
+//   world.solaris_strong  - a previous ascension was reached (the priesthood is stronger)
+//   world.revolution_won  - a previous revolution was reached (the Ironguard are armed)
+//   world.sylvan_awoke    - a previous sylvan_bond was reached (the spirit beast has woken)
+//   world.world_fell      - a previous fall was reached (an ashen tone)
 //
-// 엔딩 6 종 — types/EndingId 와 동기.
+// The 6 endings - in sync with types/EndingId.
 
 import mongoose from 'mongoose';
 
 const PLACEHOLDER = '/web-adventure/scenes/placeholder-square.svg';
 
 const scenes = [
-  // ── 합류 지점 (omphalos_outskirts 는 이미 placeholder 적치됨, 정상 분기로 교체) ──
+  // -- the convergence point (omphalos_outskirts is already loaded as a placeholder; it is replaced with the real branches) --
   {
     id: 'omphalos_outskirts',
     title: 'Scene 05 — 옴팔로스 외곽',
@@ -118,7 +118,7 @@ const scenes = [
     ],
   },
 
-  // ── 클라이맥스 분기 (각 엔딩 직전 1 씬) ──
+  // -- the climax branches (1 scene before each ending) --
   {
     id: 'climax_harmony_path',
     title: 'Scene 08H — 의식을 멈추는 자',
@@ -220,7 +220,7 @@ const scenes = [
     ],
   },
 
-  // ── 6 엔딩 씬 ──
+  // -- the 6 ending scenes --
   {
     id: 'ending_ascension',
     title: '✨ 승천 — 신계의 부름',
@@ -298,7 +298,7 @@ const scenes = [
 async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
-  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const s of scenes) {
     const cur = await Scene.findOne({ id: s.id }).lean();
     const update = { ...s };

@@ -5,18 +5,18 @@ import { useSession } from "next-auth/react";
 import { Theme, readStoredTheme, storeTheme, applyTheme } from "@/lib/theme";
 
 /**
- * 테마(다크모드) 동기화 — client 전용.
+ * Theme (dark mode) synchronisation - client only.
  *
- * 초기 테마는 localStorage 에서 읽고(마운트 시), system 이면 prefers-color-scheme
- * 변화에 반응한다. 로그인 사용자는 DB(user.settings.theme)를 원본으로 localStorage 를
- * 갱신한다. 서버 렌더는 테마를 모른 채 정적으로 남고, FOUC 는 layout <head> 의
- * THEME_INIT_SCRIPT(동기 인라인)가 hydration 전에 막는다.
+ * The initial theme is read from localStorage (on mount), and under system it reacts to prefers-color-scheme
+ * changes. For a logged-in user localStorage is refreshed from the DB (user.settings.theme) as the source.
+ * The server render stays static without knowing the theme, and FOUC is prevented before hydration by
+ * THEME_INIT_SCRIPT (a synchronous inline script) in the layout's <head>.
  */
 export default function ThemeSync() {
   const { status } = useSession();
   const themeRef = useRef<Theme>('system');
 
-  // 마운트: localStorage 초기 테마 적용 + system 변화 리스너.
+  // On mount: localStorage's initial theme is applied plus a listener for system changes.
   useEffect(() => {
     const stored = readStoredTheme();
     themeRef.current = stored;
@@ -32,7 +32,7 @@ export default function ThemeSync() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
 
-  // 로그인: DB 테마를 원본으로 localStorage 갱신 + 즉시 적용.
+  // Logged in: localStorage is refreshed from the DB's theme and applied at once.
   useEffect(() => {
     if (status !== 'authenticated') return;
 

@@ -1,17 +1,17 @@
 /**
- * 블록의 과거 자산 곡선을 매매기록으로 되살린다 (#373).
+ * Rebuilds a block's past asset curve from the trade records (#373).
  *
- * 블록 행은 #369 부터 하루 한 점씩 쌓인다. 그 전은 빈칸이고, 점이 하나뿐인 라인은
- * 아무것도 안 그려져 차트에 범례 이름만 뜬다. 그래서 과거를 채운다.
+ * Block rows accumulate one point a day from #369 on. Before that they are blank, and a line with a single
+ * point draws nothing, leaving only the legend's name on the chart. So the past is filled in.
  *
- * 되살리는 건 **보유 평가액뿐**이다 — 블록 장부 현금(v4 cycleCash·VR pool)은 과거값이
- * DB 에 없다. 그래서 이 행은 `backfilled: true` 로 표시하고 `cash` 를 안 적는다.
- * 값은 전부 실측이다: 수량은 그 블록에 귀속된 체결(#372)의 누적, 가격은 stockdailyprices.
+ * Only **the holdings' value** is rebuilt - the block's book cash (v4's cycleCash, VR's pool) has no past value
+ * in the DB. So these rows are marked `backfilled: true` and carry no `cash`.
+ * Every value is measured: the quantity is the cumulative total of fills attributed to that block (#372), the price comes from stockdailyprices.
  *
- * 라이브 행(close-sync 가 쓴 행)은 **건드리지 않는다**.
+ * Live rows (those written by close-sync) are **left alone**.
  *
- *   node scripts/backfill-block-history.mjs           # 무엇이 생길지 보여만 준다
- *   node scripts/backfill-block-history.mjs --apply   # 실제로 넣는다
+ *   node scripts/backfill-block-history.mjs           # only shows what would be created
+ *   node scripts/backfill-block-history.mjs --apply   # actually inserts
  */
 import mongoose from "mongoose";
 import path from "node:path";
@@ -68,7 +68,7 @@ for (const p of ports) {
   const dates = [...dateSet].sort();
 
   const series = blockValueSeries({ trades, closes, dates });
-  // 라이브 행이 이미 있는 날은 건드리지 않는다.
+  // A day that already has a live row is left alone.
   const live = new Set(
     (await db.collection("portfoliohistories")
       .find({ env: envKey, currency, portfolioId: p._id, backfilled: { $ne: true } })
@@ -96,8 +96,8 @@ for (const p of ports) {
             date: `${s.date}T00:00:00.000Z`, dateStr: s.date,
             holdingsValue: s.holdingsValue, totalValue: s.holdingsValue,
             cash: 0,
-            // runPnl·cumulativePnl 은 안 쓴다 (#382) — 블록별 실현손익은 계산하지 않는다.
-            // 0 을 넣으면 "손익 0" 이라는 거짓말이 된다. 화면은 없으면 `—` 로 낸다.
+            // runPnl and cumulativePnl are unused (#382) - realised profit is not computed per block.
+            // Writing 0 would be the lie "zero profit". The screen shows an em dash when it is absent.
             backfilled: true,
           },
           $currentDate: { updatedAt: true },

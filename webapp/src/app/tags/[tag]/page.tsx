@@ -5,11 +5,11 @@ import { auth } from '@/auth';
 
 type Props = Promise<{ tag: string }>;
 
-// SEO를 위한 동적 메타데이터 생성
+// Generating the dynamic metadata for SEO
 export async function generateMetadata(props: {
     params: Props
 }): Promise<Metadata> {
-  // URL에 포함된 태그는 인코딩되어 있으므로 디코딩합니다.
+  // The tag in the URL is encoded, so it is decoded.
   const params = await props.params;
   const decodedTag = decodeURIComponent(params.tag);
   return {
@@ -23,7 +23,7 @@ export default async function TagPage(props: {
 }) {
     const params = await props.params;
   const decodedTag = decodeURIComponent(params.tag);
-  const session = await auth(); // 로그인 작성자는 자기 비공개 글도 태그 목록에 포함
+  const session = await auth(); // A logged-in author's own private posts are included in the tag list too
   const {posts} = await getPostsByTag(decodedTag, session?.user?.email ?? null);
 
   return (

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// #325 selene 분기 — solwen_combat_hard 에 hidden 분기.
-//   *완력으로 가솔린 통을 *직접* 부수기*. condition.ability=selene.
+// #325's selene branch - a hidden branch in solwen_combat_hard.
+//   *Breaking the petrol drum *by hand*, through sheer strength*. condition.ability=selene.
 
 import mongoose from 'mongoose';
 

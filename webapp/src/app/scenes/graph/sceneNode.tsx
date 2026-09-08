@@ -1,16 +1,16 @@
-// SceneNode — ReactFlow 커스텀 노드 컴포넌트.
+// SceneNode - the ReactFlow custom node component.
 //
-// #222 — /scenes/graph 차트.
+// #222 - the /scenes/graph chart.
 //
-// 디자인:
-//   - 시작 씬 (town_square_dawn) — 노란색 굵은 테두리.
-//   - 엔딩 씬 — endingId 별 독립 색상.
-//   - 일반 씬 — 회색 배경 + 어두운 글씨.
+// The design:
+//   - the starting scene (town_square_dawn) - a thick yellow border.
+//   - an ending scene - its own colour per endingId.
+//   - an ordinary scene - a grey background with dark text.
 //
-// data-* 속성 (테스트 + 외부 querySelector 용):
-//   - data-graph-node-id  씬 id
-//   - data-ending-id      endingId (있는 경우)
-//   - data-saved-position true/false (mongo position 저장 여부)
+// The data-* attributes (for the tests and outside querySelectors):
+//   - data-graph-node-id  the scene id
+//   - data-ending-id      the endingId (where there is one)
+//   - data-saved-position true/false (whether mongo holds a position)
 
 import { memo } from "react";
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
@@ -19,35 +19,35 @@ import { endingsMeta } from "@/content/web-adventure/endings";
 
 type SceneNodeType = Node<GraphNodeData, "scene">;
 
-// #335 — 모든 엔딩 단일 색 (amber). 6 endingId 차이는 *icon* 으로만 구분.
-// 그래프 시인성: 종류별 6 색 매핑이 시각 노이즈 → 일반 노드 vs 엔딩 노드 구분
-// 만 유지. 범례의 6 엔딩 라인도 제거 (개별 색 의미 없음).
+// #335 - every ending is a single colour (amber). The 6 endingIds are told apart by *icon* alone.
+// Graph legibility: a 6-colour mapping per kind was visual noise -> only the ordinary-node vs ending-node
+// distinction is kept. The legend's 6 ending lines are gone too (individual colours meant nothing).
 const ENDING_COLOR_SINGLE = "bg-amber-200 text-amber-900 border-amber-500";
 
-// ReactFlow 가 자동으로 selected/dragging 등을 NodeProps 로 전달.
-// #234 — selected 시 노란 ring 으로 시각 피드백 (시작 노드의 isStart ring 과
-// 색만 다름: 시작=amber-400, 선택=yellow-300 굵게 + offset).
+// ReactFlow passes selected, dragging and so on as NodeProps automatically.
+// #234 - a yellow ring gives visual feedback when selected (differing from the starting node's isStart ring
+// in colour alone: start = amber-400, selected = a thick yellow-300 with an offset).
 type Props = NodeProps<SceneNodeType>;
 
-// #347 — React.memo: 69 노드 × 매 ReactFlow render 마다 re-render 부담 차단.
-// props (id/data/selected/dragging 등) 변화 시만 렌더.
+// #347 - React.memo: blocking the cost of re-rendering 69 nodes on every ReactFlow render.
+// It renders only when the props (id/data/selected/dragging and so on) change.
 function SceneNodeInner({ id, data, selected }: Props) {
   const isEnding = data.isEnding === true;
   const isStart = data.isStart === true;
-  // endingsMeta 단일 소스 — endings.ts 변경 시 자동 반영.
+  // endingsMeta is the single source - a change in endings.ts is reflected automatically.
   const endingIcon =
     data.endingId && data.endingId in endingsMeta
       ? endingsMeta[data.endingId as keyof typeof endingsMeta].icon
       : "";
 
-  // #335 — 엔딩 노드는 *단일 색* (amber). endingId 별 색 매핑 제거.
+  // #335 - an ending node is a *single colour* (amber). The per-endingId colour mapping is gone.
   const baseClass = isEnding
     ? `${ENDING_COLOR_SINGLE} border-2`
     : "bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100 border border-gray-400";
-  // 우선순위: selected (노란 glow) > isStart (보라 ring — 색 구분).
-  // #235 — 시작 노드 violet (amber 와 차별).
-  // #337 — 선택 노드: ring → *노란 glow* (box-shadow). 연결 엣지의 노란
-  // drop-shadow glow (#334) 와 일관된 시각 언어.
+  // The priority: selected (a yellow glow) > isStart (a violet ring - told apart by colour).
+  // #235 - the starting node is violet (distinct from amber).
+  // #337 - the selected node: a ring becomes *a yellow glow* (box-shadow). The same visual language as
+  // the connected edges' yellow drop-shadow glow (#334).
   const ringClass = !selected && isStart ? "ring-4 ring-violet-500" : "";
   const glowStyle = selected
     ? { boxShadow: "0 0 8px #fde047, 0 0 16px #fde047" }
@@ -61,8 +61,8 @@ function SceneNodeInner({ id, data, selected }: Props) {
       data-selected={selected ? "true" : "false"}
       className={`${baseClass} ${ringClass} rounded-md px-3 py-2 w-[180px] h-[60px] text-xs ${selected ? "" : "shadow-sm"} cursor-grab active:cursor-grabbing flex flex-col justify-center transition-shadow`}
       title={`${id}\n${data.title}`}
-      // #347/will-change — 드래그/줌 시 transform 갱신을 GPU 합성층에 격리.
-      //   브라우저 hint 로 painting 비용 절감 → 노드 드래그 응답성 개선.
+      // #347/will-change - isolating the transform updates of a drag or zoom onto a GPU compositing layer.
+      //   The browser hint cuts the painting cost -> better node-drag responsiveness.
       style={{ willChange: "transform", ...glowStyle }}
     >
       <Handle type="target" position={Position.Left} />

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 
-// editor.scss 등 CSS/SCSS 는 jsdom 에서 파싱하지 않으므로 무시
+// CSS and SCSS such as editor.scss are not parsed under jsdom, so they are ignored
 vi.mock('katex/dist/katex.min.css', () => ({}));
 vi.mock('./editor.scss', () => ({}));
 vi.mock('@/components/tiptap-node/code-block-node/code-block-node.scss', () => ({}));
@@ -14,8 +14,8 @@ import { Editor } from '@tiptap/react';
 import { editorExtensions } from './editor.extensions';
 import { tiptapExtensions } from './viewer';
 
-// editor / viewer 양쪽 모두에서 table 노드가 스키마에 존재하고
-// insertTable() 으로 <table> HTML 이 만들어지는지 검증
+// Verifying that the table node is in the schema on both the editor and the viewer
+// and that insertTable() produces <table> HTML
 describe('Table 확장 — editorExtensions', () => {
     it('insertTable() 호출 후 getHTML() 결과에 <table> 이 포함된다', () => {
         const editor = new Editor({ extensions: editorExtensions, content: '' });

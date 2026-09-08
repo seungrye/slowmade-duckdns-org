@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// scripts/seed-omphalos-cameo.mjs — #274 옴팔로스 심층 1 단계 (omphalos_cameo).
+// scripts/seed-omphalos-cameo.mjs - #274's Omphalos depth, stage 1 (omphalos_cameo).
 //
-// 디자인:
-//   omphalos_blackmarket 의 hidden 분기 `meet_cameo` (sawOtherProtagonist 충족 시)
-//     → 새 씬 `omphalos_cameo` — 다른 주인공의 후드 그림자와 짧은 마주침.
-//       3 분기:
-//         1. [cha 설득] 함께 가자 — int+cha 판정. 성공 → flag `recruitedOther`.
-//         2. [int 교환] 정보만 — 단순 flag set `gainedOtherIntel`.
-//         3. [외면] 갈 길을 간다 — flag 없음, 빠른 진행.
-//       모두 omphalos_station 으로 이어진다.
+// The design:
+//   omphalos_blackmarket's hidden `meet_cameo` branch (when sawOtherProtagonist is met)
+//     -> the new scene `omphalos_cameo` - a brief encounter with another protagonist's hooded shadow.
+//       3 branches:
+//         1. [cha persuasion] come with me - an int+cha roll. Success -> the `recruitedOther` flag.
+//         2. [int exchange] information only - a plain flag set, `gainedOtherIntel`.
+//         3. [look away] you go your way - no flag, a quick move on.
+//       All lead on to omphalos_station.
 //
-// 후속 회차 활용: recruitedOther / gainedOtherIntel flag 는 station_knowledge_branch
-// 또는 climax 의 추가 cutscene 자격으로 사용 가능 (다음 작업에서 확장).
+// Use in later runs: the recruitedOther / gainedOtherIntel flags can qualify an extra cutscene in station_knowledge_branch
+// or the climax (extended in a later task).
 
 import mongoose from 'mongoose';
 
@@ -69,8 +69,8 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // 1) 신규 omphalos_cameo upsert.
-  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // 1) upserting the new omphalos_cameo.
+  //    An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   const curCameo = await Scene.findOne({ id: newScene.id }).lean();
   const cameoUpdate = { ...newScene };
   if (curCameo && curCameo.illustration && !curCameo.illustration.includes('placeholder')) {
@@ -79,7 +79,7 @@ async function main() {
   await Scene.findOneAndUpdate({ id: newScene.id }, cameoUpdate, { upsert: true, new: true });
   console.log('upsert: omphalos_cameo (3 분기)');
 
-  // 2) omphalos_blackmarket 에 meet_cameo hidden 분기 추가 (3 분기 한도 검증).
+  // 2) adding the hidden meet_cameo branch to omphalos_blackmarket (the 3-branch limit is checked).
   const bm = await Scene.findOne({ id: 'omphalos_blackmarket' }).lean();
   if (!bm) { console.error('blackmarket 없음'); process.exit(1); }
   const choices = [...(bm.choices ?? [])];
@@ -93,13 +93,13 @@ async function main() {
   await Scene.findOneAndUpdate({ id: 'omphalos_blackmarket' }, { choices });
   console.log(`updated: omphalos_blackmarket → ${choices.length} 분기 (meet_cameo hidden 포함)`);
 
-  // 3) 후속 회차 효과 추가 — climax_revolution_path 에 *recruitedOther* 추가 cutscene
-  //    (description 변경 + 분기 stigmaDelta -1) 같은 건 다음 단계 (#275) 에서.
+  // 3) adding the later-run effects - something like a *recruitedOther* extra cutscene in climax_revolution_path
+  //    (a changed description plus a branch stigmaDelta -1) comes in the next stage (#275).
 
-  // 4) onEnter.setFlags 로 cameo 만남에서 별도 flag set 가능하지만,
-  //    *어떻게 카메오에서 떠났는지* (설득/교환/외면) 는 분기 onEnter 가 아닌
-  //    *분기 자체* 의 setFlags 가 필요. mongoose schema 가 choice.setFlags 를 받는지
-  //    확인 후 시드 (이번 라운드는 *cameo 자체 진입* 까지만 — 다음 #275 에서 setFlags).
+  // 4) onEnter.setFlags could set its own flag on meeting the cameo, but
+  //    *how you left the cameo* (persuading, exchanging, looking away) needs setFlags on
+  //    *the branch itself* rather than the branch's onEnter. It will be seeded once whether the mongoose schema accepts
+  //    choice.setFlags is confirmed (this round goes only as far as *entering the cameo* - setFlags comes in #275).
   console.log('NOTE: recruitedOther/gainedOtherIntel flag set 은 #275 에서.');
 
   await mongoose.disconnect();

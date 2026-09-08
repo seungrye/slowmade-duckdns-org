@@ -1,19 +1,19 @@
 /**
- * 매매기록의 블록 귀속을 바로잡는다 (#372).
+ * Corrects the block attribution of the trade records (#372).
  *
- * close-sync 는 **계좌 전체 체결내역**을 받는데, 블록마다 돌면서 그걸 전부 자기 전략으로
- * 태깅했다(`$setOnInsert` 라 먼저 도는 블록이 선점). 미국 계좌에 VR 이 붙자 첫날부터 틀렸다:
+ * close-sync receives **the whole account's fills**, and looping over the blocks tagged every one of them with its own
+ * strategy (`$setOnInsert`, so the block that ran first claimed them). It was wrong from day one once VR joined the US account:
  *
- *   2026-09-01 SOXL 64주 — tradingorderlogs 는 value_rebalancing, stocktrades 는 infinite_v4
+ *   2026-09-01 SOXL 64 shares - tradingorderlogs says value_rebalancing, stocktrades says infinite_v4
  *
- * 코드는 고쳤지만 strategy 는 `$setOnInsert` 라 이미 들어간 기록을 스스로 못 고친다.
- * 이 스크립트가 한 번 훑어 교정한다.
+ * The code is fixed, but strategy is `$setOnInsert` and cannot correct records already stored.
+ * This script sweeps through once and repairs them.
  *
- * 판정은 **앱과 같은 함수**(`lib/trading/fill-attribution.ts` 의 ownerLookup)를 jiti 로
- * 그대로 불러 쓴다 — 규칙을 두 벌 두면 어긋난다.
+ * The judgement uses **the same function as the app** (ownerLookup in `lib/trading/fill-attribution.ts`), loaded
+ * directly through jiti - two copies of a rule drift apart.
  *
- *   node scripts/fix-trade-attribution.mjs           # 무엇이 바뀔지 보여만 준다
- *   node scripts/fix-trade-attribution.mjs --apply   # 실제로 고친다
+ *   node scripts/fix-trade-attribution.mjs           # only shows what would change
+ *   node scripts/fix-trade-attribution.mjs --apply   # actually fixes
  */
 import mongoose from "mongoose";
 import path from "node:path";
@@ -39,7 +39,7 @@ const accounts = await db.collection("tradingaccounts").find({ isDeleted: { $ne:
 const envKeyOf = new Map(accounts.map((a) => [String(a._id), a.envKey]));
 
 const ports = await db.collection("tradingportfolios").find({ isDeleted: { $ne: true } }).toArray();
-// (envKey, market) 별로 형제 블록을 묶는다 — 겹침 판단에 형제가 필요하다.
+// Sibling blocks are grouped per (envKey, market) - judging an overlap needs the siblings.
 const byScope = new Map();
 for (const p of ports) {
   const envKey = envKeyOf.get(String(p.accountId));
@@ -49,7 +49,7 @@ for (const p of ports) {
     id: String(p._id),
     strategy: String(p.strategy ?? ""),
     config: p.config ?? {},
-    // 블록이 생기기 전 체결은 그 블록 것이 아니다.
+    // A fill from before a block existed is not that block's.
     ...(p.createdAt ? { since: new Date(p.createdAt).toISOString().slice(0, 10) } : {}),
   };
   (byScope.get(key) ?? byScope.set(key, []).get(key)).push(block);
@@ -68,7 +68,7 @@ for (const [scope, blocks] of byScope) {
 const lookups = new Map([...byScope].map(([k, v]) => [k, ownerLookup(v)]));
 const strategyOfBlock = new Map(ports.map((p) => [String(p._id), String(p.strategy ?? "")]));
 
-// ── 주문 로그로 교차검증 — 실제 주문을 낸 전략과 어긋나는지 본다 ─────────
+// -- Cross-checking against the order log - looking for a mismatch with the strategy that actually placed the order --
 const orderStrategies = new Map(); // `${envKey}|${market}|${symbol}` -> Set(strategy)
 for (const l of await db.collection("tradingorderlogs").find({}).toArray()) {
   const k = `${l.envKey}|${l.market}|${l.symbol}`;
@@ -91,7 +91,7 @@ for (const t of trades) {
   if (t.strategy !== own.strategy) set.strategy = own.strategy;
   if (!Object.keys(set).length) { 손대지않음++; continue; }
 
-  // 주문 로그와 어긋나면 소리 내어 알린다(귀속 규칙이 틀렸을 수도 있다).
+  // A mismatch with the order log is announced loudly (the attribution rule may itself be wrong).
   const 낸전략 = orderStrategies.get(`${t.env}|${market}|${t.ticker}`);
   const 경고 = 낸전략 && 낸전략.size === 1 && !낸전략.has(own.strategy)
     ? `  ⚠ 주문로그는 ${[...낸전략].join("/")}` : "";

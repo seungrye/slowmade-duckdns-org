@@ -1,24 +1,24 @@
 #!/usr/bin/env node
-// scripts/seed-369-choice-traces.mjs — #89 헛도는 판정을 걷고 선택의 흔적을 남긴다.
+// scripts/seed-369-choice-traces.mjs - #89: removing the idle rolls and leaving a trace of the choice.
 //
-// 세 곳에서 선택이 사라지고 있었다.
+// In three places a choice was vanishing.
 //
-//   omphalos_cameo   [설득]·[지혜] 가 probability 인데 성공·실패가 **같은 씬**으로 간다.
-//                    주사위를 굴리게 해 놓고 결과가 같으니, 플레이어를 속이는 셈이다.
-//   omphalos_tunnel  [혼자 간다] 도 마찬가지.
-//   rin_evidence     [상급자 보고] 와 [신문사에 흘리고] 가 같은 씬으로 간다. 언론에 흘린
-//                    사실이 어디에도 남지 않는다.
+//   omphalos_cameo   persuasion and wisdom are probability choices whose success and failure lead to **the same scene**.
+//                    Making the player roll and then giving the same result deceives them.
+//   omphalos_tunnel  going alone is the same.
+//   rin_evidence     reporting to a superior and leaking to the press lead to the same scene. That the leak happened
+//                    is recorded nowhere.
 //
-// 두 가지를 한다.
-//   1) 결과가 갈리지 않는 probability → plain. 굴릴 이유가 없으면 굴리지 않는다.
-//      곁들여 omphalos_cameo 의 노출 선택지가 5 개에서 3 개로 줄어 화면도 정리된다.
-//   2) 선택마다 flag 를 남긴다(#89 의 선택지 setFlags). 도착 씬이 같아도 무엇을 골랐는지는
-//      캐릭터에 남으므로, 뒤에서 조건부 선택지·서술로 회수할 수 있다.
+// Two things are done.
+//   1) a probability whose outcomes do not diverge becomes plain. With no reason to roll, nothing is rolled.
+//      As a bonus, omphalos_cameo's visible choices drop from 5 to 3 and the screen is tidier.
+//   2) each choice leaves a flag (#89's per-choice setFlags). Even when the destination is the same, what was chosen
+//      stays on the character and can be paid off later through conditional choices and narration.
 //
-// ⚠ 이 시드는 **흔적을 남기기까지**다. 그 flag 를 실제로 회수하는 장면은 아직 없다 —
-//   별도 과제. 회수 전까지는 "선택이 사라지지는 않으나 아직 티가 나지도 않는" 상태다.
+// Note: this seed goes only as far as **leaving the trace**. No scene actually pays those flags off yet -
+//   that is a separate task. Until then the state is "the choice no longer vanishes, but it does not show either".
 //
-// 멱등: 같은 값을 다시 써도 mongo 가 변경으로 치지 않는다.
+// Idempotent: writing the same value again is not counted as a change by mongo.
 
 import mongoose from 'mongoose';
 
@@ -28,7 +28,7 @@ if (!MONGO_URI) {
   process.exit(2);
 }
 
-// 씬 → { 선택지 id → { toPlain?: 도착씬, setFlags } }
+// scene -> { choice id -> { toPlain?: the destination scene, setFlags } }
 const PLAN = {
   omphalos_cameo: {
     persuade_join: { toPlain: 'omphalos_station', setFlags: { metCameo: true, cameoAlly: true } },
@@ -59,7 +59,7 @@ const main = async () => {
       if (!p) return c;
       const next = { ...c, setFlags: p.setFlags };
       if (p.toPlain) {
-        // 판정을 걷어낸다 — 성공·실패가 같은 곳이면 굴릴 이유가 없다.
+        // The roll is removed - with success and failure in the same place there is no reason to roll.
         next.kind = 'plain';
         next.to = p.toPlain;
         delete next.stat; delete next.difficulty;

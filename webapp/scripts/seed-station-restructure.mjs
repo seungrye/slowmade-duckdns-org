@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// scripts/seed-station-restructure.mjs — #262 옴팔로스 역 분기 3 제한.
+// scripts/seed-station-restructure.mjs - #262's 3-branch limit at the Omphalos station.
 //
-// 변경:
-//   omphalos_station: 5 → 3 plain 선택지 (접근 방식).
-//     [강철의 길] → climax_revolution_path (직진 — 기존 derail+hijack 통합)
-//     [지식의 길] → station_knowledge_branch (간 단계)
-//     [영혼의 길] → station_spirit_branch (간 단계)
-//   신규: station_knowledge_branch (3 분기 — 의식 동조 / 사제단 거래 / 되돌아간다)
-//   신규: station_spirit_branch (2 분기 — 세계수 깨움 / 되돌아간다)
+// The changes:
+//   omphalos_station: 5 -> 3 plain choices (by approach).
+//     [the road of steel] -> climax_revolution_path (direct - merging the old derail and hijack)
+//     [the road of knowledge] -> station_knowledge_branch (an intermediate stage)
+//     [the road of the spirit] -> station_spirit_branch (an intermediate stage)
+//   new: station_knowledge_branch (3 branches - attuning to the rite / bargaining with the priesthood / turning back)
+//   new: station_spirit_branch (2 branches - waking the world tree / turning back)
 
 import mongoose from 'mongoose';
 
@@ -142,7 +142,7 @@ const updates = [
 async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
-  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const u of updates) {
     const cur = await Scene.findOne({ id: u.id }).lean();
     const update = { ...u };

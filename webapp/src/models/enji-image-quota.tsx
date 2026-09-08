@@ -1,9 +1,9 @@
 import mongoose, { model, models } from 'mongoose';
 
 /**
- * Pollinations.AI 이미지 생성 일일 한도 카운터.
- * _id: 'YYYY-MM-DD' (UTC) — 날짜별 한 문서
- * count: 그 날 생성 횟수
+ * The daily limit counter for Pollinations.AI image generation.
+ * _id: 'YYYY-MM-DD' (UTC) - one document per date
+ * count: that day's generations
  */
 const EnjiImageQuotaSchema = new mongoose.Schema(
   {

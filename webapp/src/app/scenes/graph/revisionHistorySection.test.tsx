@@ -1,10 +1,10 @@
-// RevisionHistorySection — SidePanel 안 collapsible 변경 이력 섹션 테스트.
+// RevisionHistorySection - tests for the collapsible change-history section inside the SidePanel.
 //
-// 검증 포인트:
-//   - 기본 접힘 — 리스트 미 fetch.
-//   - 펼치면 fetch /api/web-adventure/scenes/[id]/revisions → 목록 렌더.
-//   - 항목 클릭 → snapshot fetch + 미리보기 (제목/body 첫 줄).
-//   - 복원 버튼 → confirm → POST /restore → onRestore 콜백.
+// What is verified:
+//   - collapsed by default - the list is not fetched.
+//   - expanding fetches /api/web-adventure/scenes/[id]/revisions -> the list renders.
+//   - clicking an item -> the snapshot is fetched and previewed (the title and the body's first line).
+//   - the restore button -> confirm -> POST /restore -> the onRestore callback.
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -67,9 +67,9 @@ afterEach(() => {
 describe("/scenes/graph — RevisionHistorySection", () => {
   it("기본 접힘 상태 — 리스트 미 fetch", () => {
     render(<RevisionHistorySection sceneId="kael_infirmary" onRestore={vi.fn()} />);
-    // 초기 fetch 호출 없음.
+    // no initial fetch call.
     expect(fetchMock).not.toHaveBeenCalled();
-    // 토글 버튼은 보임.
+    // the toggle button is visible.
     expect(screen.getByRole("button", { name: /변경 이력/ })).toBeTruthy();
   });
 
@@ -80,11 +80,11 @@ describe("/scenes/graph — RevisionHistorySection", () => {
       fireEvent.click(toggle);
     });
     await act(async () => {});
-    // fetch 호출 — /revisions 엔드포인트.
+    // the fetch call - the /revisions endpoint.
     expect(fetchMock.mock.calls.some((c: unknown[]) =>
       typeof c[0] === "string" && (c[0] as string).endsWith("/api/web-adventure/scenes/kael_infirmary/revisions"),
     )).toBe(true);
-    // 항목 3 개 렌더 — v3, v2, v1.
+    // 3 items render - v3, v2, v1.
     expect(screen.getByText(/v3/)).toBeTruthy();
     expect(screen.getByText(/v2/)).toBeTruthy();
     expect(screen.getByText(/v1/)).toBeTruthy();
@@ -95,15 +95,15 @@ describe("/scenes/graph — RevisionHistorySection", () => {
     const toggle = screen.getByRole("button", { name: /변경 이력/ });
     await act(async () => { fireEvent.click(toggle); });
     await act(async () => {});
-    // v2 클릭.
+    // clicking v2.
     const v2Btn = screen.getByRole("button", { name: /v2/ });
     await act(async () => { fireEvent.click(v2Btn); });
     await act(async () => {});
-    // snapshot fetch 호출.
+    // the snapshot fetch call.
     expect(fetchMock.mock.calls.some((c: unknown[]) =>
       typeof c[0] === "string" && (c[0] as string).endsWith("/revisions/2"),
     )).toBe(true);
-    // 미리보기 — 제목 + body 첫 줄.
+    // the preview - the title plus the body's first line.
     expect(screen.getByText(/v2 옛 제목/)).toBeTruthy();
     expect(screen.getByText(/v2 본문 첫 줄/)).toBeTruthy();
   });
@@ -118,7 +118,7 @@ describe("/scenes/graph — RevisionHistorySection", () => {
     const restoreBtn = screen.getByRole("button", { name: /이 내용으로 되돌리기/ });
     await act(async () => { fireEvent.click(restoreBtn); });
     await act(async () => {});
-    // POST /restore 호출.
+    // the POST /restore call.
     const postCall = fetchMock.mock.calls.find(
       (c: unknown[]) =>
         typeof c[0] === "string" &&
@@ -128,7 +128,7 @@ describe("/scenes/graph — RevisionHistorySection", () => {
     expect(postCall).toBeTruthy();
     const body = JSON.parse((postCall![1] as { body: string }).body) as { version: number };
     expect(body.version).toBe(2);
-    // onRestore 콜백.
+    // the onRestore callback.
     expect(onRestore).toHaveBeenCalled();
   });
 

@@ -1,8 +1,8 @@
 // Rust `QuestItemDef` / `WeaponDef` / `ArmorDef` / `ConsumableDef` / `AccessoryDef`
-// 와 일치 — 단일 컬렉션 + kind 변별자 형태로 webapp 에 통합 저장.
+// Matching it - stored in webapp as a single collection with a kind discriminator.
 //
-// "accessory" 는 통계 영향 없는 장신구 (scout_lens / trap_scope 등).
-// 효과는 게임 코드가 id 가 아닌 `effects` 키 목록으로 분기한다.
+// "accessory" is a trinket with no effect on the stats (scout_lens, trap_scope and so on).
+// The game code branches on the `effects` key list rather than the id.
 
 export type ItemKind = "quest" | "weapon" | "armor" | "consumable" | "accessory";
 
@@ -11,17 +11,17 @@ export type WeaponElement = "fire" | "ice" | "lightning";
 export type ConsumableEffect = { type: "Heal"; amount: number };
 
 /**
- * 액세서리의 데이터 주도 효과 키 — Rust 측 `AccessoryEffect` enum 과 1:1 대응.
- * id 가 아닌 이 키로 게임 동작이 결정되므로, UI 에서 효과 조합을 자유롭게 바꿀 수 있다.
+ * An accessory's data-driven effect keys - corresponding 1:1 to the Rust `AccessoryEffect` enum.
+ * The game's behaviour is decided by these keys rather than the id, so the UI can recombine effects freely.
  *
- * 추가 시: Rust enum / 본 union / UI 라벨 3 곳을 함께 업데이트.
+ * When adding one: update the Rust enum, this union and the UI's labels together.
  */
 export type AccessoryEffect =
   | "RevealGuardVision"
   | "RevealTrapsInSight"
   | "RevealVendorVision";
 
-/** UI 표시용 한국어 라벨 — 편집 화면 멀티셀렉트 옵션에 사용. */
+/** The Korean labels for the UI - used by the editing screen's multi-select options. */
 export const ACCESSORY_EFFECT_LABELS: Record<AccessoryEffect, string> = {
   RevealGuardVision: "가드 시야 노출 (잠입)",
   RevealTrapsInSight: "함정 시야 노출 (함정)",
@@ -41,28 +41,28 @@ interface ItemBase {
   glyphGameIcon: string;
   pickupMessage: string;
   /**
-   * 일반 vendor 인벤토리에 노출되지 않게 할지 여부. true 면 vendor 가 이 아이템을
-   * 판매 인벤토리에 자동 편성하지 않는다 (퀘스트 spawn 같은 명시적 경로는 별도).
-   * `#[serde(default)]` 미러 — 누락은 false (기존 RON 호환).
+   * Whether to keep it out of an ordinary vendor's inventory. With true, a vendor never places this item
+   * into its stock automatically (an explicit path such as a quest spawn is separate).
+   * Mirroring `#[serde(default)]` - absent means false (compatible with the existing RON).
    */
   hidden?: boolean;
   /**
-   * 상점 시스템 — vendor → player 매수가. undefined/null 이면 비매물(비매품).
-   * 게임 측 `Option<u32>` 미러. 누락 시 게임 측에서 SHOP_CATALOG fallback (phase 2).
-   * 음수 불가, 0 은 무료 판매로 의미적 허용.
+   * The shop system - the vendor -> player purchase price. undefined/null means not for sale.
+   * Mirroring the game's `Option<u32>`. Absent, the game falls back to SHOP_CATALOG (phase 2).
+   * Negative is not allowed; 0 is meaningfully permitted as a free sale.
    */
   buyPrice?: number;
   /**
-   * 상점 시스템 — player → vendor 매도가. undefined/null 이면 buyPrice/2 자동.
-   * 게임 측 `Option<u32>` 미러. 누락 시 게임 측 default 추론.
+   * The shop system - the player -> vendor sale price. undefined/null gives buyPrice/2 automatically.
+   * Mirroring the game's `Option<u32>`. Absent, the game infers its default.
    */
   sellPrice?: number;
 }
 
-// 무기/방어구의 랜덤 스탯 모드 — 게임이 RON 에 attack_power_min/max + tier 를 두고
-// 드롭 시 그 범위에서 롤한다. 기존 단일값(attackPower / defenseBonus)도 호환을 위해
-// 그대로 유지하며, 신규 필드가 있으면 그것을 우선한다.
-// tier 는 1..=5 정수 (게임의 드롭 테이블/난이도 통제).
+// The weapons' and armour's random-stat mode - the game keeps attack_power_min/max plus tier in the RON
+// and rolls within that range on a drop. The old single values (attackPower / defenseBonus) are kept
+// for compatibility, and the new fields take precedence where present.
+// tier is an integer 1..=5 (controlling the game's drop table and difficulty).
 export type ItemDef =
   | (ItemBase & { kind: "quest"; imagePath: string })
   | (ItemBase & {

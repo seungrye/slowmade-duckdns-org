@@ -1,17 +1,17 @@
-// 18 정적 ts 씬 → mongo `webadventurescenes` 컬렉션 upsert 마이그레이션.
+// The migration upserting the 18 static ts scenes into mongo's `webadventurescenes` collection.
 //
-// 사용:
+// Usage:
 //   node --env-file=.env.local scripts/migrate-web-adventure-scenes.mjs
 //   node --env-file=.env.local scripts/migrate-web-adventure-scenes.mjs --dry-run
 //
-// 동작:
-//   1. .env.local 의 MONGO_URI 로 직접 연결.
-//   2. src/lib/web-adventure/engine/sceneRegistry.ts 를 jiti 로 동적 로드 →
-//      18 개 Scene 객체.
-//   3. src/lib/web-adventure/migrate-scenes.ts 의 buildSceneDocs 로 변환.
-//   4. id 기준 upsert (멱등). 변경된 경우만 update 카운트.
+// How it works:
+//   1. connects directly with .env.local's MONGO_URI.
+//   2. src/lib/web-adventure/engine/sceneRegistry.ts is loaded dynamically through jiti ->
+//      the 18 Scene objects.
+//   3. converted by buildSceneDocs in src/lib/web-adventure/migrate-scenes.ts.
+//   4. upserted by id (idempotent). Only a changed document counts as an update.
 //
-// 보고: insert N / update M / skip K (== unchanged).
+// The report: insert N / update M / skip K (== unchanged).
 
 import path from "node:path";
 import fs from "node:fs";
@@ -24,8 +24,8 @@ const webappRoot = path.resolve(__dirname0, "..");
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 
-// node --env-file=.env.local 이 환경변수를 채워주므로 별도 파싱 불필요.
-// fallback: .env.local 수동 로드.
+// node --env-file=.env.local fills the environment variables in, so no separate parsing is needed.
+// The fallback: loading .env.local by hand.
 if (!process.env.MONGO_URI) {
   const envPath = path.join(webappRoot, ".env.local");
   if (fs.existsSync(envPath)) {
@@ -47,7 +47,7 @@ if (!process.env.MONGO_URI) {
   process.exit(1);
 }
 
-// ── jiti 로 TS 모듈 동적 로드 ────────────────────────────────────────────
+// -- loading the TS modules dynamically through jiti ------------------------
 const jitiEntry = path.resolve(
   webappRoot,
   "node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti.mjs",
@@ -73,16 +73,16 @@ async function loadDefault(rel) {
 }
 const WebAdventureScene = await loadDefault("src/models/web-adventure-scene.tsx");
 
-// ── 정적 씬 로드 + payload 변환 ─────────────────────────────────────────
+// -- loading the static scenes and converting the payload -------------------
 const staticScenes = Object.values(sceneRegistry.scenes);
 const docs = migrateScenes.buildSceneDocs(staticScenes);
 
 console.log(`[migrate-scenes] 정적 씬 ${docs.length} 개 로드 (DRY_RUN=${DRY_RUN}).`);
 
-// ── 변경 감지 (안정 비교) ───────────────────────────────────────────────
+// -- change detection (a stable comparison) ---------------------------------
 function normalize(obj) {
-  // mongoose lean / new doc 의 차이 무시.
-  // Map → object 정규화.
+  // Ignoring the difference between a mongoose lean result and a new doc.
+  // Map -> object normalisation.
   if (obj instanceof Map) return Object.fromEntries(obj);
   if (Array.isArray(obj)) return obj.map(normalize);
   if (obj && typeof obj === "object") {
@@ -99,11 +99,11 @@ function normalize(obj) {
 function sameContent(existing, payload) {
   const e = normalize(existing);
   const p = normalize(payload);
-  // existing 은 _id/__v/timestamps 제외 + Map 정규화. payload 는 그대로 비교.
+  // existing drops _id/__v/timestamps and normalises Maps. payload is compared as it is.
   return JSON.stringify(e) === JSON.stringify(p);
 }
 
-// ── 실행 ───────────────────────────────────────────────────────────────
+// -- running ----------------------------------------------------------------
 let inserted = 0;
 let updated = 0;
 let unchanged = 0;

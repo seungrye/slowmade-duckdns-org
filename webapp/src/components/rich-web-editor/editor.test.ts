@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { editorExtensions } from './editor.extensions';
 
-// editorExtensions 배열 — Markdown 포함, 중복 없음 검증
+// The editorExtensions array - verifying Markdown is included and there are no duplicates
 describe('editorExtensions', () => {
     it('Markdown 익스텐션이 포함되어 있다', () => {
         const names = editorExtensions.map(e => e.name);
@@ -21,8 +21,8 @@ describe('editorExtensions', () => {
 
     it('StarterKit 이 포함되어 있다', () => {
         const names = editorExtensions.map(e => e.name);
-        // StarterKit 은 내부에 여러 익스텐션을 번들하므로 이름이 'starterKit' 이 아닐 수 있음
-        // 최소한 배열이 비어있지 않아야 함
+        // StarterKit bundles several extensions internally, so the name may not be 'starterKit'
+        // At a minimum the array must not be empty
         expect(names.length).toBeGreaterThan(5);
     });
 
@@ -46,7 +46,7 @@ describe('editorExtensions', () => {
     });
 });
 
-// renderMarkdown 커스텀 직렬화 검증 — <sup>/<sub>/<p style> 로 포맷 보존
+// Verifying renderMarkdown's custom serialisation - the format is preserved through <sup>/<sub>/<p style>
 describe('renderMarkdown 커스텀 직렬화', () => {
     const mockH = (children: string) => ({ renderChildren: () => children });
 
@@ -89,7 +89,7 @@ describe('renderMarkdown 커스텀 직렬화', () => {
     });
 });
 
-// markdown 정규화 헬퍼 — Code→Visual 복귀 시 코드블록 닫는 ``` 파싱 오류 방지
+// The markdown normalisation helper - avoiding a parse error on a code block's closing ``` when returning from Code to Visual
 describe('markdown normalizeForParsing', () => {
     const normalize = (md: string) => md.endsWith('\n') ? md : md + '\n';
 

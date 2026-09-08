@@ -1,19 +1,19 @@
-// work_log 앱 릴리스 (#261).
+// The work_log app's releases (#261).
 //
-// APK 파일 자체는 MinIO 에 있고 여기엔 위치(objectKey)와 버전만 둔다.
-// **한 벌만 보관한다** — 최신 하나면 앱이 업데이트를 받는 데 충분하고, 과거 버전을
-// 되돌릴 일은 GitHub 릴리스에 남아 있다.
+// The APK file itself lives in MinIO; this holds only its location (objectKey) and the version.
+// **Only one is kept** - the latest alone is enough for the app to get an update, and reverting to an older
+// version is what the GitHub releases are for.
 
 import { Schema, model, models, Model } from "mongoose";
 
 export interface WorkLogReleaseDoc {
-  /** 앱이 "새 버전인가"를 이 숫자로만 판단한다. 이름 비교는 어긋날 여지가 있다. */
+  /** The app judges "is this newer" from this number alone. Comparing names leaves room for drift. */
   versionCode: number;
-  /** 사람에게 보여 줄 이름 (0.2). */
+  /** The name to show people (0.2). */
   versionName: string;
-  /** 무엇이 바뀌었는지 — 알림에 한두 줄 보여 준다. */
+  /** What changed - a line or two shown in the notice. */
   notes: string;
-  /** MinIO 안의 위치. 공개 URL 은 만들지 않는다 — 내려주기는 라우트가 한다. */
+  /** The location inside MinIO. No public URL is made - the route serves it. */
   objectKey: string;
   size: number;
   createdAt: Date;

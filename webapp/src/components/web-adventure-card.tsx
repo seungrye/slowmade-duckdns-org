@@ -1,7 +1,7 @@
-// WebAdventureCard — 사이트 홈 카드 (#246 → #253 〈에테르니아〉 톤).
+// WebAdventureCard - the site's home card (#246 -> #253's Eternia tone).
 //
-// 게임 진입 카드. 홈 page.tsx 에는 *현재 마운트 안 됨* (사용자가 #246 revert).
-// 다른 위치 (예: 게임 섹션 / 별도 랜딩) 에 재활용 가능하도록 유지.
+// The game's entry card. It is *not currently mounted* in the home page.tsx (the user reverted #246).
+// Kept so it can be reused elsewhere (a games section, a separate landing page).
 
 import Link from 'next/link';
 

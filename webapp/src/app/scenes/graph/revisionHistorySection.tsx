@@ -1,11 +1,11 @@
-// RevisionHistorySection — SidePanel 안 collapsible 변경 이력 섹션.
+// RevisionHistorySection - the collapsible change-history section inside the SidePanel.
 //
-// 옛 post/view 의 revision-history.section.tsx 패턴 회수:
-//   - 기본 접힘 (useState(false)) — fetch 도 지연.
-//   - 펼치면 GET /api/web-adventure/scenes/[id]/revisions → 목록.
-//   - 항목 클릭 → GET 단일 (snapshot 포함) → 인라인 미리보기.
-//   - "이 시점 으로 되돌리기" → confirm → POST /restore → onRestore 콜백.
-//   - faChevronRight / faChevronDown 아이콘.
+// Reclaiming the old post/view revision-history.section.tsx pattern:
+//   - collapsed by default (useState(false)) - the fetch is deferred too.
+//   - expanding -> GET /api/web-adventure/scenes/[id]/revisions -> the list.
+//   - clicking an item -> a single GET (including the snapshot) -> an inline preview.
+//   - "revert to this point" -> confirm -> POST /restore -> the onRestore callback.
+//   - the faChevronRight / faChevronDown icons.
 
 "use client";
 
@@ -38,23 +38,23 @@ interface RevisionDetail {
 interface Props {
   sceneId: string;
   onRestore: () => void;
-  /** 옛 quest CMS 패턴 — 별도 페이지에 마운트 될 때는 기본 펼침. */
+  /** The old quest CMS pattern - expanded by default when mounted on its own page. */
   defaultOpen?: boolean;
 }
 
-// unified diff 형식 — git diff 와 동일한 hunk + 컨텍스트 패턴.
+// The unified diff format - the same hunk plus context pattern as git diff.
 //   - hunk-header (@@ -A,B +C,D @@)
-//   - added (+) / removed (-) / same (공백, 컨텍스트)
-// jsdiff 의 structuredPatch 가 각 hunk 의 lines 를 *이미 +/-/공백 prefix 한
-// 문자열 배열* 로 제공 → 그대로 사용.
+//   - added (+) / removed (-) / same (a space, context)
+// jsdiff's structuredPatch gives each hunk's lines as *an array of strings already prefixed
+// with +/-/space* -> used as they are.
 interface DiffRow {
   kind: "added" | "removed" | "same" | "hunk-header";
   text: string;
 }
 
 function buildDiffRows(currentJson: string, snapshotJson: string): DiffRow[] {
-  // snapshot = 옛 (old), current = 새 (new).
-  // context=3 lines (git 기본). 변경 없으면 hunks 빈 배열 → row 없음.
+  // snapshot = old, current = new.
+  // context=3 lines (git's default). With no change, hunks is an empty array -> no rows.
   const patch = structuredPatch(
     "old",
     "new",
@@ -71,7 +71,7 @@ function buildDiffRows(currentJson: string, snapshotJson: string): DiffRow[] {
       text: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
     });
     for (const line of hunk.lines) {
-      // 첫 문자가 +/-/공백 prefix. \ No newline at end of file 같은 라인은 same 으로.
+      // The first character is the +/-/space prefix. A line such as \ No newline at end of file counts as same.
       const ch = line.charAt(0);
       const text = line.slice(1);
       if (ch === "+") rows.push({ kind: "added", text });
@@ -103,19 +103,19 @@ export function RevisionHistorySection({
   defaultOpen = false,
 }: Props) {
   const [open, setOpen] = useState(defaultOpen);
-  // openSeq — 펼침 토글마다 +1. 같은 sceneId 라도 *다시 펼침* 시 재 fetch (저장/복원 직후 신선 반영).
-  // defaultOpen=true 일 때는 마운트 직후 1 회 fetch 보장 위해 1 부터 시작.
+  // openSeq - +1 on every expand toggle. Even for the same sceneId, *expanding again* refetches (so a save or restore shows fresh).
+  // With defaultOpen=true it starts at 1 to guarantee one fetch right after mounting.
   const [openSeq, setOpenSeq] = useState(defaultOpen ? 1 : 0);
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState<RevisionListItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // 펼친 단일 revision (snapshot 포함). version → detail.
+  // The expanded single revision (including the snapshot). version -> detail.
   const [details, setDetails] = useState<Record<number, RevisionDetail>>({});
   const [activeVersion, setActiveVersion] = useState<number | null>(null);
   const [loadingVersion, setLoadingVersion] = useState<number | null>(null);
   const [restoring, setRestoring] = useState(false);
 
-  // 펼쳤을 때 목록 fetch. openSeq 변경마다 (= 매 펼침 토글) 신선 fetch — 저장/복원 직후 반영.
+  // The list is fetched when expanded. Every openSeq change (= every expand toggle) fetches fresh - reflecting a save or restore.
   useEffect(() => {
     if (!open || openSeq === 0) return;
     let cancelled = false;
@@ -148,9 +148,9 @@ export function RevisionHistorySection({
     };
   }, [open, openSeq, sceneId]);
 
-  // sceneId 변경 시 캐시 초기화 (다른 씬 패널로 이동).
-  // defaultOpen=true 일 때는 *마운트 시* 펼침 상태 유지하므로 초기화 분기 X
-  // (실제로 별도 페이지에서는 sceneId 변경이 발생하지 않으므로 안전).
+  // The cache is reset when sceneId changes (moving to another scene's panel).
+  // With defaultOpen=true the expanded state is kept *at mount*, so there is no reset branch
+  // (safe in practice, since sceneId never changes on the separate page).
   useEffect(() => {
     setList(null);
     setDetails({});
@@ -168,8 +168,8 @@ export function RevisionHistorySection({
     setActiveVersion(version);
     setLoadingVersion(version);
     try {
-      // 이 revision + 직전 revision (version-1) 둘 다 fetch (diff 비교용).
-      // v0 은 직전 없음 → "최초 작성" 표시.
+      // Both this revision and the one before it (version-1) are fetched (for the diff comparison).
+      // v0 has nothing before it -> shown as "first write".
       const fetches: Array<Promise<RevisionDetail | null>> = [];
       if (!details[version]) {
         fetches.push(
@@ -202,9 +202,9 @@ export function RevisionHistorySection({
   }
 
   async function handleRestore(version: number) {
-    // git-like 의미: v{N} = N 번째 PUT commit. snapshot = 그 commit 후 상태.
-    // 'v{N} 으로 되돌리기' = mongo 를 v{N} 의 snapshot 으로 덮어쓰기 (이후 변경 취소).
-    // 현재 상태는 *복원 commit* 으로 자동 백업되어 다시 되돌릴 수 있다.
+    // The git-like meaning: v{N} = the Nth PUT commit. The snapshot is the state after that commit.
+    // 'revert to v{N}' = overwriting mongo with v{N}'s snapshot (undoing the changes after it).
+    // The current state is backed up automatically as a *restore commit*, so it can be reverted again.
     const ok = window.confirm(
       `v${version} 의 내용으로 되돌립니다.\nv${version} 이후의 모든 변경이 취소됩니다.\n현재 상태는 새 리비전으로 자동 백업되어 다시 되돌릴 수 있습니다.\n\n계속하시겠습니까?`,
     );
@@ -220,7 +220,7 @@ export function RevisionHistorySection({
         },
       );
       if (res.ok) {
-        // 목록 재 fetch 위해 캐시 초기화.
+        // The cache is reset so the list refetches.
         setList(null);
         setDetails({});
         setActiveVersion(null);
@@ -243,7 +243,7 @@ export function RevisionHistorySection({
         onClick={() => {
           setOpen((v) => {
             const next = !v;
-            // 펼침 토글 시 seq 증가 — fetch effect 재실행.
+            // The expand toggle increments seq - re-running the fetch effect.
             if (next) setOpenSeq((s) => s + 1);
             return next;
           });
@@ -347,8 +347,8 @@ export function RevisionHistorySection({
 }
 
 // ── DiffPanel ─────────────────────────────────────────────────────────────
-// #revision-diff — *직전 snapshot (v_{N-1})* → *이 snapshot (v_N)* 의 변경.
-// unified diff (git 형식). v0 은 별도 처리 ("최초 작성", 호출 안 됨).
+// #revision-diff - the change from *the previous snapshot (v_{N-1})* to *this snapshot (v_N)*.
+// A unified diff (git's format). v0 is handled separately ("first write", never calling this).
 function DiffPanel({
   prevSnapshot,
   snapshot,
@@ -358,10 +358,10 @@ function DiffPanel({
 }) {
   const prevJson = stringifyForDiff(prevSnapshot);
   const snapshotJson = stringifyForDiff(snapshot);
-  // buildDiffRows(current, snapshot) 시 *snapshot 이 old, current 가 new*.
-  // 우리는 *prev 가 old, snapshot 이 new* 로 의미 정렬.
-  // buildDiffRows 의 인자: (currentJson, snapshotJson) — 내부에서 snapshot=old, current=new.
-  // 따라서 호출 = (newJson, oldJson) = (snapshotJson, prevJson).
+  // In buildDiffRows(current, snapshot), *snapshot is old and current is new*.
+  // We align the meaning as *prev is old and snapshot is new*.
+  // buildDiffRows' arguments: (currentJson, snapshotJson) - internally snapshot=old, current=new.
+  // So the call is (newJson, oldJson) = (snapshotJson, prevJson).
   const rows = buildDiffRows(snapshotJson, prevJson);
 
   return (
@@ -410,7 +410,7 @@ function DiffPanel({
   );
 }
 
-// 직렬화 — 시각 노이즈 (_id / __v / timestamps) 제거 후 indented JSON.
+// Serialisation - indented JSON after stripping the visual noise (_id / __v / timestamps).
 function stringifyForDiff(scene: Record<string, unknown>): string {
   const omit = new Set([
     "_id",

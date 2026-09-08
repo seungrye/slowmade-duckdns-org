@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// scripts/seed-npc-names.mjs — #278 사이드 NPC 이름 부여.
+// scripts/seed-npc-names.mjs - #278: giving the side NPCs names.
 //
-// 익명 → 이름. 다크 에픽 톤. 추가 1 줄 (또는 기존 줄 교체) 로 자연스럽게.
+// Anonymous -> named. A dark epic tone. Done naturally with one added line (or by replacing an existing one).
 //
-// 명단:
-//   군의관 (kael_infirmary)          → "벤딕트 박사"
-//   상급 수사관 (rin_betrayal)       → "호프만 수사관장"
-//   정보상 (omphalos_blackmarket)    → "그라모르"
-//   영수 (solwen_grief)              → "흰눈 (영수의 이름)"
-//   청소부 노인 (kael_corridor_clear)→ "마릭 영감"
-// 후드 그림자 (omphalos_cameo) — *모호함* 이 디자인 의도, 이름 부여 X.
+// The roster:
+//   the army surgeon (kael_infirmary)   -> "Dr Benedict"
+//   the senior investigator (rin_betrayal) -> "Chief Investigator Hoffmann"
+//   the informant (omphalos_blackmarket)  -> "Gramor"
+//   the spirit beast (solwen_grief)       -> "Whitesnow (the spirit beast's name)"
+//   the old cleaner (kael_corridor_clear) -> "old Marik"
+// The hooded shadow (omphalos_cameo) - *the ambiguity* is the design intent, so no name.
 
 import mongoose from 'mongoose';
 

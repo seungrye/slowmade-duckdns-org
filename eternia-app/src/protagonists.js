@@ -1,5 +1,5 @@
-// 3 주인공 메타 — MIRROR webapp/src/content/web-adventure/protagonists.ts.
-// (nameShort/role 은 앱 네임플레이트 표기용 추가 필드.)
+// The 3 protagonists' metadata - MIRROR webapp/src/content/web-adventure/protagonists.ts.
+// (nameShort/role are extra fields for the app's nameplate.)
 
 export const protagonists = {
   kael: {
@@ -27,12 +27,12 @@ export const protagonists = {
 
 export const PROTAGONIST_ORDER = ["kael", "rin", "solwen"];
 
-// HP/재굴림 공식 (webapp CharacterCreator).
+// The HP and reroll formulas (webapp's CharacterCreator).
 export const MAX_HP_BASE = 100;
 export const MAX_HP_PER_CON = 5;
 export const NO_STIGMA_REROLLS = 3;
 
-/** 선택 → 완성 Character (webapp submit() 이식). */
+/** A selection -> a finished Character (ported from webapp's submit()). */
 export function buildCharacter(protagonist, ability) {
   const meta = protagonists[protagonist];
   const stats = Object.assign({}, meta.baseStats);

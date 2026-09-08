@@ -25,7 +25,7 @@ import {
 export interface TableButtonProps extends Omit<ButtonProps, "type"> {
     editor?: Editor | null
     /**
-     * 표 기능을 사용할 수 없을 때 버튼을 숨길지 여부
+     * Whether to hide the button when tables are unavailable
      * @default true
      */
     hideWhenUnavailable?: boolean

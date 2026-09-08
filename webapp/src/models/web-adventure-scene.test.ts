@@ -1,7 +1,7 @@
-// WebAdventureScene 모델 단위 테스트 (Mongoose 스키마 검증).
+// Unit tests for the WebAdventureScene model (the Mongoose schema's validation).
 //
-// 실제 DB 연결 없이 schema-level validation 만 검증한다.
-// (mongoose validate() 메서드는 DB 없이도 동작.)
+// Only schema-level validation is checked, with no real DB connection.
+// (mongoose's validate() method works without a DB.)
 
 import { describe, it, expect } from 'vitest';
 import WebAdventureScene from './web-adventure-scene';
@@ -61,7 +61,7 @@ describe('Choice kind 별 필드 검증', () => {
       choices: [{ kind: 'plain', id: 'c1', label: '라벨' }],
     });
     const err = doc.validateSync();
-    // schema-level 또는 custom validator 모두 가능 — choices 경로 어딘가에 에러
+    // Either schema-level or a custom validator is fine - an error somewhere on the choices path
     expect(err).toBeDefined();
   });
 
@@ -110,7 +110,7 @@ describe('Choice kind 별 필드 검증', () => {
 describe('revisionCount 필드 (옛 quest CMS version 패턴)', () => {
   it('revisionCount 미정의 시 default 0', () => {
     const doc = makeDoc();
-    // 미명시 시 기본값 0.
+    // 0 by default when unstated.
     expect((doc as unknown as { revisionCount: number }).revisionCount).toBe(0);
   });
 

@@ -90,7 +90,7 @@ describe("checkForUpdate", () => {
     expect(called).toBe(false);
   });
 
-  // 업데이트 확인 실패가 게임을 막으면 안 된다 — 전송 실패를 삼키는 기존 정책과 동일.
+  // A failed update check must not block the game - the same policy as swallowing a failed send.
   it("응답이 실패면 조용히 null", async () => {
     const bad = async () => ({ ok: false, json: async () => ({}) });
     expect(await checkForUpdate({ currentVersion: "1.0.13", fetchImpl: bad })).toBeNull();

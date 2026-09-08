@@ -24,12 +24,12 @@ function fmtBytes(n: number): string {
 }
 
 /**
- * 첨부 칩 — FA 파일 아이콘만 표시(박스·라벨 없음). 파일명은 호버 시 모던 툴팁으로.
- * 툴팁은 floating-ui 포탈(body 렌더)이라 부모의 overflow:hidden 에도 잘리지 않고,
- * 화면 가장자리에서 flip/shift 로 자동 재배치된다.
- * - downloadHref: 있으면 <a href download>(뷰에서 클릭 다운로드).
- * - onRemove: 있으면 아이콘 우하단에 X 삭제 버튼(작성에서만).
- * - 호버: 아이콘에 약간의 쉐도우(drop-shadow).
+ * The attachment chip - only an FA file icon (no box, no label). The filename comes as a modern tooltip on hover.
+ * The tooltip is a floating-ui portal (rendered on body), so a parent's overflow:hidden never clips it and
+ * it repositions itself at the screen's edge through flip/shift.
+ * - downloadHref: when present, an <a href download> (a click downloads, in the view).
+ * - onRemove: when present, an X delete button at the icon's bottom right (while writing only).
+ * - hover: a slight shadow on the icon (drop-shadow).
  */
 export function AttachmentChip({
   att,
@@ -40,7 +40,7 @@ export function AttachmentChip({
   att: AttachmentChipData;
   onRemove?: () => void;
   downloadHref?: string;
-  /** 지정 시 '업로드 진행 중' 상태 — 아이콘을 흐리게 + 스피너·퍼센트 오버레이(삭제/다운로드 비활성). */
+  /** When set, the 'uploading' state - the icon dims with a spinner and percentage overlay (delete and download disabled). */
   progress?: number;
 }) {
   const label = `${att.name} (${fmtBytes(att.size)})`;
@@ -72,7 +72,7 @@ export function AttachmentChip({
         className={`h-8 w-auto block transition group-hover:drop-shadow-md ${pending ? "opacity-40" : ""}`}
       />
       {pending && (
-        /* 업로드 진행 오버레이 — 스피너 링 + 퍼센트(결정 진행률). 100% 도달 후엔 서버 저장까지 스피너 유지. */
+        /* The upload progress overlay - a spinner ring plus the percentage (a determinate progress). Past 100% the spinner stays until the server has stored it. */
         <span className="absolute inset-0 flex items-center justify-center" aria-label={`업로드 중 ${progress}%`}>
           <span className="absolute h-7 w-7 rounded-full border-2 border-blue-500/30 border-t-blue-500 animate-spin" aria-hidden="true" />
           <span className="relative text-[9px] font-bold tabular-nums text-blue-700 dark:text-blue-300">{progress}%</span>
@@ -102,7 +102,7 @@ export function AttachmentChip({
         </button>
       )}
       {!pending && downloadHref && (
-        /* 다운로드 배지 — 호버/포커스 시 아이콘 우하단에 표시(파란 원+흰 아래화살표). 클릭은 링크가 처리. */
+        /* The download badge - shown at the icon's bottom right on hover or focus (a blue circle with a white down arrow). The link handles the click. */
         <span
           data-role="download-badge"
           aria-hidden="true"
@@ -116,7 +116,7 @@ export function AttachmentChip({
     </>
   );
 
-  // 툴팁은 항상 mount 하고 opacity 로만 표시 토글(포탈은 body 에 렌더).
+  // The tooltip is always mounted and toggled by opacity alone (the portal renders on body).
   const tip = (
     <FloatingPortal>
       <div

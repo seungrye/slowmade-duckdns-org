@@ -1,22 +1,22 @@
 #!/usr/bin/env node
-// scripts/seed-stocks.mjs — KOSPI200 + S&P500 + NASDAQ-100 종목 메타 seed.
+// scripts/seed-stocks.mjs - seeding the KOSPI200 + S&P500 + NASDAQ-100 symbol metadata.
 //
-// stock-automator 가 매일 갱신하는 universe 캐시 텍스트 파일을 읽어
-// site DB 의 stocks 컬렉션에 upsert.
+// It reads the universe cache text files stock-automator refreshes daily and
+// upserts them into the site DB's stocks collection.
 //
 //   /home/seungrye/stock-automator/universe/.cache/kospi200.txt
 //   /home/seungrye/stock-automator/universe/.cache/sp500.txt
 //   /home/seungrye/stock-automator/universe/.cache/nasdaq100.txt
 //
-// 각 파일: 첫 줄 `# fetched: YYYY-MM-DD`, 이후 한 줄당 ticker 하나.
-// SP500 ∩ NASDAQ-100 (예: AAPL) 종목은 indices 합집합으로 통합.
+// Each file: a first line of `# fetched: YYYY-MM-DD`, then one ticker per line.
+// A symbol in both SP500 and NASDAQ-100 (AAPL, for example) is merged with the union of its indices.
 //
-// name/exchange/sector 는 비워둠 — 추후 stock-automator ingest 가 채움.
-//   (이 시점엔 name=ticker, exchange=시장 코드, sector="" 로 placeholder).
+// name/exchange/sector are left empty - stock-automator's ingest fills them in later.
+//   (At this point they are placeholders: name=ticker, exchange=the market code, sector="".)
 //
-// 사용: pnpm exec node scripts/seed-stocks.mjs
-// 필수 env: MONGO_URI
-// 옵션 env: UNIVERSE_CACHE_DIR (기본 /home/seungrye/stock-automator/universe/.cache)
+// Usage: pnpm exec node scripts/seed-stocks.mjs
+// Required env: MONGO_URI
+// Optional env: UNIVERSE_CACHE_DIR (default /home/seungrye/stock-automator/universe/.cache)
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,7 +51,7 @@ async function main() {
   }
   await mongoose.connect(process.env.MONGO_URI);
 
-  // raw schema — 모델 코드와 충돌 회피 (스크립트는 자체 컬렉션 핸들).
+  // A raw schema - avoiding a clash with the model code (the script owns its collection handle).
   const Stock = mongoose.model(
     'StockSeed',
     new mongoose.Schema({}, { strict: false, collection: 'stocks' }),
@@ -64,7 +64,7 @@ async function main() {
     const tickers = readTickers(src.file);
     console.log(`${src.file}: ${tickers.length} 종목`);
     for (const t of tickers) {
-      // KIS 표기 통일 — Wikipedia BRK-B → KIS BRK.B (US 만).
+      // Unifying the KIS spelling - Wikipedia's BRK-B -> KIS's BRK.B (US only).
       const ticker = src.market === 'US' ? t.replace('-', '.') : t;
       if (!merged.has(ticker)) {
         merged.set(ticker, {

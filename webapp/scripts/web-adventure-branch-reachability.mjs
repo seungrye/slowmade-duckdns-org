@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// scripts/web-adventure-branch-reachability.mjs — #286 모든 conditional 분기 도달성.
+// scripts/web-adventure-branch-reachability.mjs - #286's reachability of every conditional branch.
 //
-// 분기마다 *어느 주인공 / 어떤 사전 경로* 로 도달·통과 가능한지 매트릭스 출력.
+// It prints a matrix of *which protagonist and which prior path* can reach and pass each branch.
 //
-// 도달성 = (1) 그 choice 가 있는 씬에 BFS 도달 + (2) 조건 (flag / minStat) 충족 가능.
+// Reachability = (1) the scene holding that choice is reached by BFS, plus (2) the condition (a flag or minStat) can be met.
 
 import mongoose from 'mongoose';
 
@@ -13,7 +13,7 @@ const PROTAGONISTS = {
   solwen: { startScene: 'solwen_grove',   baseStats: { str: 6, dex: 7, int: 5, cha: 5, con: 5, wis: 7 } },
 };
 
-// 회차 부메랑 — 어떤 ending 이전 회차에 도달해야 world flag 가 set 되나
+// The cross-run boomerang - which ending a previous run must reach for a world flag to be set
 const WORLD_FLAG_SOURCES = {
   'world.solaris_strong':  'ascension',
   'world.revolution_won':  'revolution',
@@ -48,12 +48,12 @@ function bfsScenes(registry, roots) {
 }
 
 /**
- * 이 flag 를 세우는 곳을 모두 찾는다.
+ * Finds everywhere this flag is set.
  *
- * 씬 `onEnter` 만 보면 안 된다 — **선택지에도 setFlags 가 있고**(#89 선택의 흔적) 엔진이
- * 실제로 적용한다(engine/reducer 의 applyChoiceFlags). 처음엔 onEnter 만 봐서, 멀쩡히
- * 도달 가능한 분기 3 개를 "도달 불가" 로 신고했다. 이야기를 지키라고 만든 검사가 늑대를
- * 외치면 아무도 믿지 않게 된다.
+ * Looking at the scenes' `onEnter` alone is not enough - **choices carry setFlags too** (#89's traces of choice) and the engine
+ * really applies them (applyChoiceFlags in engine/reducer). Looking only at onEnter at first reported 3
+ * perfectly reachable branches as "unreachable". A check built to protect the story that cries wolf
+ * ends up believed by nobody.
  */
 function flagSetters(registry, flag) {
   const result = [];
@@ -79,7 +79,7 @@ async function main() {
   const startScenes = Object.values(PROTAGONISTS).map((p) => p.startScene);
   const allReachable = bfsScenes(registry, startScenes);
 
-  // 모든 conditional choice 수집
+  // collecting every conditional choice
   const branches = [];
   for (const s of all) {
     for (const c of s.choices ?? []) {

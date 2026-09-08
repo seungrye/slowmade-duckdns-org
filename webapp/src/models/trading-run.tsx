@@ -1,21 +1,21 @@
 import mongoose from "mongoose";
 import type { InferSchemaType, Model } from "mongoose";
 
-// ESM interop: named export(models 등)는 순수 node ESM 에서 안 풀려 default 로 접근한다
-// (Next/webpack·tsx 스크립트 양쪽 호환 — trading-smoke 등 서버 외 구동 지원).
+// ESM interop: named exports (models and so on) do not resolve under plain node ESM, so they are reached through default
+// (compatible with both Next/webpack and tsx scripts - supporting runs outside the server, such as trading-smoke).
 const { Schema, model, models } = mongoose;
 
 /**
- * 매매 사이클 실행 기록 = **멱등성의 원장**.
+ * The record of a trading cycle's run = **the ledger of idempotence**.
  *
- * (portfolioId, dateKey, phase) unique — 스케줄러가 원자 클레임해 phase당 하루 1회를
- * 보장한다. 블루그린 배포로 구/신 인스턴스가 잠깐 공존해도, 재시작·catch-up 이
- * 겹쳐도 두 번 실행되지 않는다(파이썬 데몬의 "하루 1회 + cancel 안전망" 대응).
+ * (portfolioId, dateKey, phase) is unique - the scheduler claims it atomically, guaranteeing one run a day per phase.
+ * Even when a blue-green deploy leaves the old and new instances coexisting briefly, and even when a restart and a catch-up
+ * overlap, it never runs twice (matching the python daemon's "once a day plus the cancel safety net").
  *
- * dateKey: 시장 tz 기준 "YYYY-MM-DD"(us 는 ET 날짜) — 미장 자정 넘김 문제 방지.
- * status: running → done | failed. running 이 STALE_MS 넘게 방치되면(크래시)
- *   재클레임 허용(abandoned 처리) — 주문은 dry-run 이거나 live 도 클레임 안에서만.
- * catchUp: 기동 시 "런 시각 경과 & 미실행" 감지로 돌린 사이클 표시.
+ * dateKey: "YYYY-MM-DD" in the market's tz (the ET date for us) - avoiding the US market's midnight rollover problem.
+ * status: running -> done | failed. A running left longer than STALE_MS (a crash) may be
+ *   reclaimed (treated as abandoned) - the orders are either dry-run or, when live, only inside the claim.
+ * catchUp: marks a cycle run from the "past its run time and not run" detection at startup.
  */
 const TradingRunSchema = new Schema(
   {

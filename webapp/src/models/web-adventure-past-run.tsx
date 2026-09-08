@@ -1,11 +1,11 @@
-// WebAdventurePastRun — 한 회차가 엔딩으로 종결됐을 때 적치되는 기록 (#239).
+// WebAdventurePastRun - the record stored when a run ends in an ending (#239).
 //
-// save 의 진행 중 회차가 엔딩 도달 시 이 컬렉션으로 이전 + save 의 runIndex+1
-// 로 재생성된다 (회차 시스템). 갤러리/통계에 사용.
+// The save's in-progress run moves to this collection when an ending is reached and the save is recreated
+// with runIndex+1 (the run system). Used by the gallery and the statistics.
 
 import { Schema, model, models, Model } from 'mongoose';
-// 엔딩 목록의 단일 출처 (#352). alias(@/) 가 아니라 상대경로다 — 이 모델은 jiti 로 도는
-// scripts/*.mjs(migrate-web-adventure-scenes 등)에서도 로드된다.
+// The single source of the ending list (#352). A relative path rather than the alias (@/) - this model is loaded
+// by the scripts/*.mjs that run through jiti (migrate-web-adventure-scenes and the like) too.
 import { ENDING_IDS, type EndingId } from '../types/web-adventure';
 
 const StatsSchema = new Schema(
@@ -26,13 +26,13 @@ const CharacterSchema = new Schema(
     hp: { type: Number, required: true },
     maxHp: { type: Number, required: true },
     ability: { type: String, required: true },
-    // #287 〈에테르니아〉 — 주인공 정체성 + 침식. snapshot 보존.
+    // #287 Eternia - the protagonist's identity plus the contamination. Preserved in the snapshot.
     protagonist: { type: String, required: true }, // kael | rin | solwen
     stigmaErosion: { type: Number, required: true, min: 0, max: 100 },
     inventory: { type: [String], required: true, default: [] },
-    // #356 — Map 이 아니다. world.* 플래그의 키에 **점**이 들어 있는데 MongoDB 는 Map
-    //   키에 점을 못 쓴다. 그 탓에 두 번째 회차부터 문서 전체가 저장되지 않았다.
-    //   코드는 어디서도 Map 으로 안 쓴다 — 늘 character.flags[key] 로 읽는다.
+    // #356 - not a Map. The world.* flags' keys contain **dots**, and MongoDB cannot use a dot
+    //   in a Map key. Because of that the whole document stopped being stored from the second run on.
+    //   The code never uses it as a Map - it always reads character.flags[key].
     flags: { type: Schema.Types.Mixed, default: {} },
     rerollsLeft: { type: Number, required: true },
   },
@@ -43,35 +43,35 @@ const WebAdventurePastRunSchema = new Schema(
   {
     userEmail: { type: String, required: true, index: true },
     runIndex: { type: Number, required: true, min: 1 },
-    // #90 — 그 회차를 어떤 문체로 읽었는지. 노트가 인용한 문장의 출처 추적용.
+    // #90 - which prose style that run was read in. For tracing the source of a sentence a note quotes.
     voice: { type: String, default: '' },
     endingId: {
       type: String,
       required: true,
-      // #352 — 손으로 복사한 목록이었다. 엔딩 5종이 추가됐을 때 여기만 안 따라와서
-      //   그 엔딩으로 끝낸 회차가 전부 검증 실패로 버려졌다. 이제 단일 출처를 쓴다.
+      // #352 - it used to be a hand-copied list. When the 5 endings were added this alone did not follow,
+      //   and every run ending in one of them was discarded as a validation failure. It now uses the single source.
       enum: [...ENDING_IDS],
     },
     finalSceneId: { type: String, required: true },
-    // 시작 → 종료까지 거쳐간 씬 id 시퀀스 (경로 분포 통계용). 기존 데이터엔 없음.
+    // The sequence of scene ids passed from start to end (for the path distribution statistics). Absent from the old data.
     scenePath: { type: [String], default: [] },
-    // #9 — 엔딩 시점의 풍부한 서사 로그(선택·본문·판정 텍스트). 피드백 노트 LLM 입력용.
-    //   클라이언트 GameState.log 를 그대로 저장. 기존 데이터엔 없음.
+    // #9 - the rich narrative log at the ending (the choice, body and roll text). Input for the feedback note's LLM.
+    //   The client's GameState.log is stored as it is. Absent from the old data.
     log: { type: [String], default: [] },
     character: { type: CharacterSchema, required: true },
-    // #63 — 클라이언트가 회차마다 만드는 고유 id. 앱 재시도 큐(#61)가 같은 회차를 다시
-    //   보내도 한 번만 저장하기 위한 멱등 키. 웹/기존 데이터엔 없으므로 기본 빈 문자열.
+    // #63 - the unique id the client makes per run. The idempotency key so the app's retry queue (#61) stores the same run
+    //   only once even when it resends it. Absent on the web and in the old data, hence the empty-string default.
     clientRunId: { type: String, default: '' },
     completedAt: { type: Date, required: true, default: () => new Date() },
   },
   { timestamps: true },
 );
 
-// 한 사용자의 같은 runIndex 가 중복 적치되지 않도록 unique 복합 인덱스.
+// The unique compound index so one user's same runIndex is not stored twice.
 WebAdventurePastRunSchema.index({ userEmail: 1, runIndex: 1 }, { unique: true });
 
-// 멱등 키 — 값이 있는 문서끼리만 unique. 기존 문서·웹 회차는 빈 문자열이라 제외된다
-// (partial 이 아니면 빈 문자열이 서로 충돌해 두 번째 회차부터 저장이 막힌다).
+// The idempotency key - unique only among documents that have a value. Existing documents and web runs hold an empty string and are excluded
+// (without partial, the empty strings clash and storing is blocked from the second run on).
 WebAdventurePastRunSchema.index(
   { userEmail: 1, clientRunId: 1 },
   { unique: true, partialFilterExpression: { clientRunId: { $gt: '' } } },
@@ -82,7 +82,7 @@ export interface WebAdventurePastRunDoc {
   userEmail: string;
   runIndex: number;
   endingId: EndingId;
-  /** #90 그 회차를 읽은 문체. 미기록이면 빈 문자열. */
+  /** #90 - the style that run was read in. An empty string when unrecorded. */
   voice?: string;
   finalSceneId: string;
   scenePath: string[];

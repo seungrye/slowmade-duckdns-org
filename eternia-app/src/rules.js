@@ -1,16 +1,16 @@
-// 게임 규칙 — 굴림/침식/조건평가 (순수 함수).
+// The game rules - rolls, contamination and condition evaluation (pure functions).
 //
-// MIRROR — webapp/src/lib/web-adventure/engine/{rollDice,stigma}.ts + reducer.evalCondition 을
-// 앱 JS 로 이식. character 는 {stats, inventory, flags, stigmaErosion, ability, hp, maxHp} 형태.
-// ⚠ effectiveStat 은 base stat 만 반영(패시브 아이템 보너스 미이식 — 후속 슬라이스).
+// MIRROR - webapp/src/lib/web-adventure/engine/{rollDice,stigma}.ts plus reducer.evalCondition, ported
+// to the app's JS. character has the shape {stats, inventory, flags, stigmaErosion, ability, hp, maxHp}.
+// Note: effectiveStat reflects the base stat only (passive item bonuses are not ported - a later slice).
 
 export const STIGMA_MAX = 100;
 export const STIGMA_DEBUFF_THRESHOLD = 50;
 export const STIGMA_CRITICAL_THRESHOLD = 80;
 export const INVENTORY_CAP = 8;
 
-// ── 굴림 (d20 + stat + 성흔 보정 vs 난이도) ──
-/** 성흔 어빌별 보정 — 일치하는 statKey 면 +2. lunar→int, selene→str, hecate→cha, none→0. */
+// -- rolls (d20 + stat + the stigma modifier vs the difficulty) --
+/** The modifier per stigma ability - +2 on a matching statKey. lunar->int, selene->str, hecate->cha, none->0. */
 export function abilityBonus(ability, statKey) {
   if (ability === "lunar" && statKey === "int") return 2;
   if (ability === "selene" && statKey === "str") return 2;
@@ -18,7 +18,7 @@ export function abilityBonus(ability, statKey) {
   return 0;
 }
 
-/** [0,1) → 1..20. rng 가 1.0 이어도 안전 클램프. */
+/** [0,1) -> 1..20. Clamped safely even when rng returns 1.0. */
 export function rollD20(rng) {
   const v = rng();
   const clamped = v >= 1 ? 0.99999 : Math.max(0, v);
@@ -34,7 +34,7 @@ export function rollProbability(opts) {
   return { roll, bonus, total, success: total >= opts.difficulty };
 }
 
-/** 성공 확률(%) 정수 — 라이브 표시용. */
+/** The success probability (%) as an integer - for the live display. */
 export function estimateSuccessPercent(opts) {
   const bonus = abilityBonus(opts.ability, opts.statKey);
   let success = 0;
@@ -44,15 +44,15 @@ export function estimateSuccessPercent(opts) {
   return Math.round((success / 20) * 100);
 }
 
-// ── 침식(stigma) ──
-/** 침식 ≥ 50 이면 con/dex 판정에 -2. 그 외 0. */
+// -- contamination (stigma) --
+/** Contamination >= 50 gives -2 on con/dex rolls. Otherwise 0. */
 export function stigmaDebuff(stigmaErosion, stat) {
   if ((stigmaErosion || 0) < STIGMA_DEBUFF_THRESHOLD) return 0;
   if (stat === "con" || stat === "dex") return -2;
   return 0;
 }
 
-/** 침식도 가감 clamp [0,100] — NaN/Infinity 방어. */
+/** Adds to or subtracts from the contamination, clamped to [0,100] - guarding against NaN and Infinity. */
 export function clampStigma(start, delta) {
   const safeStart = Number.isFinite(start) ? start : 0;
   const safeDelta = Number.isFinite(delta) ? delta : 0;
@@ -66,17 +66,17 @@ export function isDead(character) {
   return (character.hp || 0) <= 0;
 }
 
-/** base stat (패시브 아이템 보너스 미반영 — 후속). */
+/** The base stat (passive item bonuses not reflected - later). */
 export function effectiveStat(character, stat) {
   return character.stats[stat] || 0;
 }
 
-/** 판정용 유효 스탯 = base + 침식 디버프. */
+/** The effective stat for a roll = the base plus the contamination debuff. */
 export function rollStat(character, stat) {
   return effectiveStat(character, stat) + stigmaDebuff(character.stigmaErosion, stat);
 }
 
-// ── 조건 평가 (reducer.evalCondition 이식) ──
+// -- condition evaluation (ported from reducer.evalCondition) --
 export function evalCondition(cond, character) {
   if (!cond) return true;
   switch (cond.kind) {
@@ -101,6 +101,6 @@ export function evalCondition(cond, character) {
     case "all":
       return (cond.conditions || []).every((c) => evalCondition(c, character));
     default:
-      return true; // 미지 조건은 열어둔다.
+      return true; // An unknown condition is left open.
   }
 }

@@ -26,17 +26,17 @@ const UserSchema = new mongoose.Schema(
       default: () => ({ theme: 'system' }),
     },
     points: { type: Number, default: 0 }, // 사용자 포인트
-    // 생일 (#326). 'YYYY-MM-DD' 를 **UTC 자정**으로 저장하고 월·일도 UTC 게터로 읽는다.
-    // 로컬 시각으로 만들면 KST 사용자의 1990-03-15 가 UTC 03-14T15:00Z 가 되어 하루 밀린다.
+    // The birthday (#326). 'YYYY-MM-DD' is stored as **UTC midnight** and the month and day are read with the UTC getters.
+    // Built in local time, a KST user's 1990-03-15 becomes UTC 03-14T15:00Z and slips a day.
     birthday: { type: Date },
-    // 태어난 시 "HH:mm" (#390) — 선택. 있으면 사주 시주(時柱)까지 계산. 없으면 3주만.
+    // The hour of birth, "HH:mm" (#390) - optional. With it the saju's hour pillar is computed too; without it, only 3 pillars.
     birthTime: { type: String, default: undefined },
     likedPosts: { type: [String], default: [] }, // 좋아요한 게시글 ID 목록
-    // 덧글 알림 읽음 상태 (#237, #247). 두 값이 함께 판정한다.
-    //   기준선  이 시각보다 오래된 것은 무조건 읽음. 없으면(한 번도 안 봤으면) 전부 새 것.
-    //           [모두 읽음] 버튼이 now 로 올린다.
-    //   개별    기준선보다 새 것 중 **눌러서 처리한** 덧글 id. 방문만으로는 쌓이지 않는다.
-    // 기준선 없이 개별 목록만 쓰면 예전 알림이 전부 안 읽음으로 되살아나 뱃지가 터진다.
+    // The read state of the comment notifications (#237, #247). The two values decide it together.
+    //   the baseline  anything older than this time counts as read. Absent (never looked), everything is new.
+    //           The [mark all read] button raises it to now.
+    //   individual    the ids of comments newer than the baseline that were **pressed and handled**. A visit alone does not accumulate them.
+    // With the individual list alone and no baseline, every old notification comes back as unread and the badge explodes.
     notificationsSeenAt: { type: Date },
     notificationsReadIds: { type: [String], default: [] },
     createdAt: { type: Date, default: Date.now }, // 가입일

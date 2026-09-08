@@ -1,14 +1,14 @@
 'use client';
 
 /**
- * 오늘의 운세 토스트 (#388) — 그날 첫 방문 시 우하단에 뜨는 타로 카드.
+ * The daily fortune toast (#388) - a tarot card in the bottom right on the day's first visit.
  *
- * 트리거는 birthday-fireworks 를 미러하되, 하루 1회 판정을 **서버 seenAt** 으로 한다
- * (localStorage 아님 — 사용자가 서버 필드로 정함). 로그인 상태에서 오늘 문서의 seen 이
- * false 면 뜨고, 클릭하면 프로필의 '오늘의 운세'로 데려가며 seen 을 기록한다.
+ * The trigger mirrors birthday-fireworks, but the once-a-day check uses **the server's seenAt**
+ * (not localStorage - the user decided on a server field). While logged in, it appears when today's document has seen
+ * false, and clicking it takes you to the profile's 'today's fortune' and records seen.
  *
- * 폭죽과 같은 오버레이라 providers 에 형제로 마운트한다. 프로필 페이지에서는 이미 섹션이
- * 보이므로 토스트를 띄우지 않는다(중복).
+ * Being an overlay like the fireworks, it mounts as their sibling in providers. On the profile page the section is
+ * already visible, so no toast is shown (it would duplicate).
  */
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -23,7 +23,7 @@ export default function FortuneToast() {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
-    // 프로필 페이지엔 섹션이 이미 있으니 토스트는 생략.
+    // The profile page already has the section, so the toast is skipped.
     if (pathname?.startsWith('/dashboard/profile')) return;
     let cancelled = false;
     fetch('/api/fortune/today')
@@ -31,7 +31,7 @@ export default function FortuneToast() {
       .then((res) => {
         const seen = res?.data?.seen;
         if (!cancelled && res?.data && !seen) {
-          // 살짝 늦게 등장(페이지가 자리 잡은 뒤).
+          // It appears slightly late (once the page has settled).
           setTimeout(() => { if (!cancelled) setShow(true); }, 1000);
         }
       })

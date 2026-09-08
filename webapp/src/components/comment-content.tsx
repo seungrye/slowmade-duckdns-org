@@ -4,11 +4,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
-// 코멘트 본문 markdown 렌더.
-// - react-markdown 은 raw HTML 을 텍스트로 처리하고 위험 URL(javascript: 등)을
-//   기본 차단하므로 사용자 입력에 안전 (dangerouslySetInnerHTML 미사용).
-// - remark-gfm: [text](url) + raw URL 자동 링크 + 취소선/표 등.
-// - remark-breaks: 단일 줄바꿈 → <br> (기존 whitespace-pre-wrap 동작 보존).
+// The comment body's markdown render.
+// - react-markdown treats raw HTML as text and blocks dangerous URLs (javascript: and so on)
+//   by default, so it is safe for user input (no dangerouslySetInnerHTML).
+// - remark-gfm: [text](url) plus raw-URL autolinking, strikethrough, tables and so on.
+// - remark-breaks: a single newline -> <br> (preserving the previous whitespace-pre-wrap behaviour).
 
 export default function CommentContent({ content }: { content: string }) {
   return (
@@ -37,26 +37,26 @@ export default function CommentContent({ content }: { content: string }) {
           ),
           p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
           ul: ({ children }) => <ul className="list-disc ml-5 my-1">{children}</ul>,
-          // `start` 를 넘겨야 한다 (#220). 마크다운에서 `4.` 로 시작하는 문단은
-          // <ol start="4"> 로 파싱되는데, 그걸 버리면 CSS 카운터가 매번 1부터 다시 센다
-          // — 항목이 전부 "1." 로 보였다.
+          // `start` has to be passed through (#220). A markdown paragraph starting with `4.` parses as
+          // <ol start="4">, and dropping that makes the CSS counter start from 1 every time
+          // - every item appeared as "1.".
           ol: ({ children, start }) => (
             <ol start={start} className="list-decimal ml-5 my-1">
               {children}
             </ol>
           ),
-          // Tailwind v4 Preflight 가 제목의 크기·굵기를 지운다. 매핑이 없으면 본문과
-          // 똑같이 보인다 (globals.css 에 .comment-markdown 기본 스타일도 없다).
+          // Tailwind v4's Preflight strips a heading's size and weight. With no mapping it looks exactly
+          // like the body (globals.css has no .comment-markdown defaults either).
           h1: ({ children }) => <h1 className="text-xl font-bold mt-3 mb-1">{children}</h1>,
           h2: ({ children }) => <h2 className="text-lg font-bold mt-3 mb-1">{children}</h2>,
           h3: ({ children }) => <h3 className="text-base font-semibold mt-2 mb-1">{children}</h3>,
           h4: ({ children }) => <h4 className="text-sm font-semibold mt-2 mb-1">{children}</h4>,
           h5: ({ children }) => <h5 className="text-sm font-semibold mt-2 mb-1">{children}</h5>,
           h6: ({ children }) => <h6 className="text-sm font-semibold mt-2 mb-1">{children}</h6>,
-          // 코드블록. `pre` 매핑이 없으면 여러 줄 코드가 아래 인라인용 알약 스타일을
-          // 그대로 뒤집어써 뭉개진다. 블록 껍데기는 여기서 입히고, 안쪽 code 의 알약
-          // 배경·여백은 되돌린다 — inline 여부를 code 쪽에서 판별하는 것보다 확실하다
-          // (언어 표기가 없는 펜스는 className 이 비어 있어 구분이 안 된다).
+          // Code blocks. With no `pre` mapping, multi-line code takes on the inline pill style
+          // below and is mangled. The block's shell is applied here and the inner code's pill
+          // background and padding are undone - more reliable than deciding inline-ness on the code side
+          // (a fence with no language has an empty className and cannot be told apart).
           pre: ({ children }) => (
             <pre className="overflow-x-auto my-2 p-3 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-inherit">
               {children}
@@ -67,8 +67,8 @@ export default function CommentContent({ content }: { content: string }) {
               {children}
             </code>
           ),
-          // remark-gfm 이 표를 <table> 로 파싱하지만 Tailwind Preflight 가 기본 테두리를
-          // 지우므로 여기서 명시 스타일. 넓은 표는 가로 스크롤 컨테이너로 감싸 모바일 대응.
+          // remark-gfm parses a table into a <table>, but Tailwind's Preflight strips the default borders,
+          // so the style is explicit here. A wide table is wrapped in a horizontal scroll container for mobile.
           table: ({ children }) => (
             <div className="overflow-x-auto my-2">
               <table className="border-collapse w-full text-sm">{children}</table>

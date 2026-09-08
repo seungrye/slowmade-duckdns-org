@@ -3,7 +3,7 @@ import type { Condition, SpawnZone } from "@/types/quest";
 
 const MonsterSchema = new Schema(
   {
-    // 정체성 키 — QuestAction::SpawnMonster 가 참조. snake_case 안정 식별자.
+    // The identity key - referenced by QuestAction::SpawnMonster. A stable snake_case identifier.
     id: { type: String, required: true, unique: true },
     displayName: { type: String, required: true },
     glyph: { type: String, required: true },
@@ -22,9 +22,9 @@ const MonsterSchema = new Schema(
     speed: { type: Number, required: true },
     element: { type: String, default: null }, // "fire" | "ice" | "poison" | "lightning" | null
     spawnWeight: { type: Number, default: 1.0 },
-    // ZoneId 목록 — 중첩 구조라 Mixed 로 저장 (RON 직렬화는 lib/ron.ts 가 담당).
+    // The list of ZoneIds - stored as Mixed, being a nested structure (lib/ron.ts handles the RON serialisation).
     zones: { type: [Schema.Types.Mixed], default: [] },
-    // QuestCondition — 재귀 구조라 Mixed 로 저장 (없으면 자연 스폰 항상 허용).
+    // QuestCondition - stored as Mixed, being recursive (absent, natural spawning is always allowed).
     spawnCondition: { type: Schema.Types.Mixed, default: null },
     questOnly: { type: Boolean, default: false },
 

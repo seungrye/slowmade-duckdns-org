@@ -1,20 +1,20 @@
 // @vitest-environment jsdom
 //
-// 덧글 마크다운 렌더 (#220).
+// The comment markdown render (#220).
 //
-// AI 팀 논의가 전부 덧글로 오가는데 읽기가 나빴다. 원인은 컴포넌트 맵이 `children` 만
-// 받고 나머지를 버리거나(번호), 아예 매핑이 없는 것(제목·코드블록)이다. Tailwind v4
-// Preflight 가 기본 스타일을 지우므로 **매핑이 없으면 본문과 구분이 사라진다.**
-// (`globals.css` 에 `.comment-markdown` 기본 스타일도 없다.)
+// The AI team's discussion happens entirely in comments and read badly. The cause is a component map that takes `children`
+// alone and drops the rest (the numbers), or has no mapping at all (headings, code blocks). Tailwind v4's
+// Preflight strips the default styles, so **with no mapping they become indistinguishable from the body.**
+// (`globals.css` has no `.comment-markdown` defaults either.)
 //
-// jsdom 에는 Tailwind CSS 가 없어 계산된 스타일을 볼 수 없다. 그래서 "그 역할을 하는
-// 클래스가 붙었는가"로 확인한다 — 우리가 통제하는 값이라 이게 확인 가능한 최선이다.
+// jsdom has no Tailwind CSS, so computed styles cannot be seen. It is checked as "was the class that does that job
+// attached" - a value we control, and the best check available.
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CommentContent from './comment-content';
 
 describe('CommentContent — 번호 매긴 목록', () => {
-  // 이게 사용자가 본 증상이다: 1~7번 항목이 화면에 전부 "1." 로 나왔다.
+  // This is the symptom the user saw: items 1 through 7 all appeared on screen as "1.".
   it('4. 로 시작하면 4번부터 센다', () => {
     const { container } = render(<CommentContent content={'4. 넷\n5. 다섯'} />);
     expect(container.querySelector('ol')?.getAttribute('start')).toBe('4');
@@ -33,7 +33,7 @@ describe('CommentContent — 번호 매긴 목록', () => {
 });
 
 describe('CommentContent — 제목', () => {
-  // Preflight 가 h1~h6 의 크기·굵기를 지운다. 매핑이 없으면 본문과 똑같이 보인다.
+  // Preflight strips h1~h6's size and weight. With no mapping they look exactly like the body.
   it('제목은 본문과 구분되는 크기를 갖는다', () => {
     render(<CommentContent content={'## 제목입니다\n\n본문입니다'} />);
     const h2 = screen.getByRole('heading', { level: 2 });
@@ -50,7 +50,7 @@ describe('CommentContent — 제목', () => {
 describe('CommentContent — 코드', () => {
   const fence = '```\nconst a = 1;\nconst b = 2;\n```';
 
-  // pre 매핑이 없으면 여러 줄 코드가 인라인용 알약 스타일을 뒤집어써 뭉개진다.
+  // With no pre mapping, multi-line code takes on the inline pill style and is mangled.
   it('코드블록은 pre 로 감싸이고 긴 줄은 가로 스크롤된다', () => {
     const { container } = render(<CommentContent content={fence} />);
     const pre = container.querySelector('pre');
@@ -60,7 +60,7 @@ describe('CommentContent — 코드', () => {
 
   it('코드블록 안에서는 인라인 알약 배경을 지운다', () => {
     const { container } = render(<CommentContent content={fence} />);
-    // jsdom 에 CSS 가 없어 계산값을 못 보므로, pre 가 자식 code 를 되돌리는지로 본다.
+    // jsdom has no CSS and no computed values, so it is checked by whether pre undoes it on the child code.
     expect(container.querySelector('pre')?.className).toMatch(/bg-transparent/);
   });
 

@@ -97,10 +97,10 @@ describe('CalendarBadge', () => {
       render(<CalendarBadge />);
 
       await screen.findByLabelText('광복절');
-      // 앞의 3개 + 넘침 칸
+      // the first 3 plus the overflow slot
       expect(icons()).toHaveLength(4);
       expect(screen.getByLabelText('외 1건 더 보기')).toHaveTextContent('+1');
-      // 4번째 이벤트는 칸으로는 안 그린다.
+      // The 4th event is not drawn as a slot.
       expect(screen.queryByLabelText('식목일')).toBeNull();
     });
 
@@ -188,7 +188,7 @@ describe('CalendarBadge', () => {
       fireEvent.click(await screen.findByLabelText('조달의 날'));
       const tooltip = screen.getByRole('tooltip');
       expect(tooltip).toHaveTextContent('조달의 날');
-      // 빈 설명 문단을 그리지 않는다.
+      // An empty description paragraph is not drawn.
       expect(tooltip.querySelectorAll('p')).toHaveLength(1);
     });
 

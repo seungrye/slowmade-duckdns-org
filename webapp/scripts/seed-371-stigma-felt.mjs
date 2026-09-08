@@ -1,27 +1,27 @@
 #!/usr/bin/env node
-// scripts/seed-371-stigma-felt.mjs — #160 침식을 몸으로 느끼게 한다.
+// scripts/seed-371-stigma-felt.mjs - #160: making the contamination felt in the body.
 //
-// 회차 피드백 노트가 **서로 다른 두 회차에서 같은 말**을 했다:
+// The run feedback notes said **the same thing across two different runs**:
 //
-//   "카엘의 침식도가 100 으로 최대치인데도 그에 따른 물리적·심리적 영향이 충분히
-//    드러나지 않았다. 각 단계에서의 체감 변화를 더 구체적으로 묘사해야 한다."
-//   "정전의 순간이나 열차 앞에서의 결정 시, 주인공의 내면 갈등이나 심리적 부담을
-//    더 강하게 드러내는 대사나 상황을 추가할 수 있다."
+//   "Kael's contamination is at its maximum of 100, yet the physical and psychological effects are not
+//    shown enough. The felt change at each stage should be described more concretely."
+//   "At the moment of the blackout, or when deciding in front of the train, lines or situations could be added that show
+//    the protagonist's inner conflict and psychological burden more strongly."
 //
-// 숫자는 오르는데 글이 그걸 말하지 않는다 — 시스템과 서술이 따로 놀았다.
+// The number rises but the prose does not say so - the system and the narration ran apart.
 //
-// 고치는 방법: 본문에 `{{침식_손}}` 같은 **파생 변수**를 놓는다(lib/web-adventure/stigma-sense).
-// 침식도가 오르면 같은 문장이 저절로 무거워진다. 씬마다 다른 감각(손·시야·숨·마음)을 골라
-// 벽지처럼 반복되지 않게 한다.
+// The fix: put **derived variables** like `{{침식_손}}` in the body (lib/web-adventure/stigma-sense).
+// As the contamination rises, the same sentence grows heavier by itself. A different sense is chosen per scene (hand, sight, breath, mind)
+// so it does not repeat like wallpaper.
 //
-//   "복도로 흘러나간다. {{침식_손}}"
-//     침식 0   → "…손끝이 조금 시리다."
-//     침식 100 → "…굳은 손가락이 접히지 않는다. 손등으로 밀어야 한다."
+//   "It spills into the corridor. {{침식_손}}"
+//     contamination 0   -> "…your fingertips are a little cold."
+//     contamination 100 -> "…your stiffened fingers will not bend. You have to push with the back of your hand."
 //
-// 노트가 짚은 두 장면(정전의 잔영, 수송 컨테이너 앞)에는 **마음** 감각을 넣어 내면 갈등이
-// 침식과 함께 무거워지게 한다.
+// The two scenes the notes pointed at (the blackout's afterimage, and before the transport container) get the **mind** sense, so the inner conflict
+// grows heavier along with the contamination.
 //
-// 멱등: 이미 변수가 박힌 문단은 건드리지 않는다.
+// Idempotent: a paragraph that already carries a variable is left alone.
 
 import mongoose from 'mongoose';
 
@@ -31,29 +31,29 @@ if (!MONGO_URI) {
   process.exit(2);
 }
 
-// 씬 → [문단 인덱스, 덧붙일 문장]
-// 문단 끝에 한 문장을 잇는다. 새 문단을 만들지 않는 이유는 리빌(문단 단위 노출) 호흡을
-// 흐트러뜨리지 않기 위해서다.
+// scene -> [the paragraph index, the sentence to append]
+// One sentence is joined to the end of a paragraph. A new paragraph is not made, so the reveal's
+// paragraph-by-paragraph rhythm is not disturbed.
 const PLAN = {
-  // 시작 — 팔의 결정이 주제인 씬. 손으로 연다.
+  // The start - a scene about the crystals in the arm. Opened with the hand.
   kael_infirmary: [[1, '{{침식_손}}']],
-  // 이동 — 맨발과 굳은 몸. 이미 발가락 묘사가 있으니 손으로 겹치지 않게 받는다.
+  // Moving - bare feet and a stiffened body. Toes are already described, so the hand takes it up without overlapping.
   kael_corridor: [[0, '{{침식_손}}']],
-  // 정전 — 노트가 지목한 장면. 어둠 속 자기 빛을 보는 순간의 내면.
+  // The blackout - a scene the notes named. The inner life at the moment of seeing your own light in the dark.
   kael_corridor_spark: [[2, '{{침식_마음}}']],
-  // 메스를 쥔 손 — 손.
+  // The hand holding the scalpel - the hand.
   kael_corridor_blade: [[1, '{{침식_손}}']],
-  // 위조 성공 후 — 긴장이 풀리는 자리에 숨.
+  // After the forgery succeeds - breath, where the tension eases.
   kael_corridor_clear: [[2, '{{침식_숨}}']],
-  // 컨테이너 앞 결정 — 노트가 지목한 장면. 뛰어들지 말지 재는 순간의 부담.
+  // The decision before the container - a scene the notes named. The burden of weighing whether to jump in.
   kael_cargo_container: [[2, '{{침식_마음}}']],
-  // 추락 직후 — 몸을 일으키는 자리에 숨.
+  // Right after the fall - breath, where the body is raised.
   kael_falling: [[3, '{{침식_숨}}']],
-  // 무릎이 굳었다 — 이름부터 침식이다. 손으로 받는다.
+  // The knees have stiffened - the name itself is contamination. Taken up by the hand.
   kael_falling_aftermath: [[2, '{{침식_손}}']],
-  // 잔해장 — 넓은 곳을 둘러보는 자리에 시야.
+  // The wreckage field - sight, where a wide place is surveyed.
   kael_wreckage_hub: [[1, '{{침식_시야}}']],
-  // 적하 일지 — 글자를 읽는 장면이라 시야가 가장 아프게 걸린다.
+  // The cargo manifest - a scene of reading letters, so sight bites hardest.
   kael_clue_manifest: [[2, '{{침식_시야}}']],
 };
 
@@ -83,7 +83,7 @@ async function main() {
         missing += 1;
         continue;
       }
-      // 이미 어떤 침식 변수든 박혀 있으면 손대지 않는다(재실행 안전).
+      // A paragraph already carrying any contamination variable is left alone (safe to rerun).
       if (/\{\{침식[_단]/.test(body[idx])) {
         skipped += 1;
         continue;

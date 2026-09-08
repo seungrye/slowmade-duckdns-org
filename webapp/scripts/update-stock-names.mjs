@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// scripts/update-stock-names.mjs — JSONL {ticker, name} → stocks.name 갱신.
+// scripts/update-stock-names.mjs - a JSONL {ticker, name} -> updating stocks.name.
 //
 // usage:
 //   pnpm exec node --env-file=.env.local scripts/update-stock-names.mjs [path]
@@ -42,8 +42,8 @@ async function main() {
     try { rec = JSON.parse(trimmed); } catch { skipped++; continue; }
     processed++;
     if (!rec.ticker || !rec.name) { skipped++; continue; }
-    // name 이 ticker 와 동일하거나 의미 없는 placeholder 일 때만 갱신하지 않고,
-    // 항상 최신 name 으로 덮어쓰기. seed 의 placeholder 도 자동 교체.
+    // Rather than updating only when the name equals the ticker or is a meaningless placeholder,
+    // it always overwrites with the latest name. The seed's placeholders are replaced automatically too.
     ops.push({
       updateOne: {
         filter: { ticker: rec.ticker },

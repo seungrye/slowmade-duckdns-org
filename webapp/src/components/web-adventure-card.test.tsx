@@ -1,4 +1,4 @@
-// WebAdventureCard — 사이트 홈 카드 (#246).
+// WebAdventureCard - the site's home card (#246).
 // @vitest-environment jsdom
 
 import { describe, it, expect } from 'vitest';

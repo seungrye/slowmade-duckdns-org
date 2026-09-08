@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// scripts/seed-world-flag-branches.mjs — #272 회차 부메랑 활용.
+// scripts/seed-world-flag-branches.mjs - #272: putting the cross-run boomerang to use.
 //
-// 이전 회차의 endingId 가 다음 회차의 *분기 자체* 를 바꾸도록 — 실 콘텐츠에
-// world.* flag 검사 conditional 분기를 추가.
+// So a previous run's endingId changes *the branches themselves* in the next run - conditional branches
+// checking a world.* flag are added to the real content.
 //
-// 추가:
+// Added:
 //   climax_revolution_path
-//     기존: join_revolution / reject_revolution
-//     추가: [조화의 메아리] 망치 대신 노래로 — `world.harmony_kept` hidden
-//          → climax_harmony_path (회차 부메랑으로 두 번째 길 해금)
+//     existing: join_revolution / reject_revolution
+//     added: [the echo of harmony] a song instead of the hammer - hidden behind `world.harmony_kept`
+//          -> climax_harmony_path (a second road unlocked by the cross-run boomerang)
 //   omphalos_blackmarket
-//     기존: to_station_after
-//     추가: [잿빛 정보상] 무너진 세계의 잔재 — `world.world_fell` hidden
-//          → omphalos_station (정보상이 *추락한 세계의 기억* 공유, stigma -3 보너스)
+//     existing: to_station_after
+//     added: [the ashen informant] the remains of a fallen world - hidden behind `world.world_fell`
+//          -> omphalos_station (the informant shares *the memory of the fallen world*, a stigma -3 bonus)
 
 import mongoose from 'mongoose';
 
@@ -60,7 +60,7 @@ async function main() {
       added++;
     }
     if (added === 0) { console.log('skip:', u.id); continue; }
-    // 3 분기 초과 방지 검증.
+    // Checked so the 3-branch limit is not exceeded.
     if (choices.length > 3) {
       console.error(`${u.id}: ${choices.length} > 3 — 추가 거부`);
       continue;

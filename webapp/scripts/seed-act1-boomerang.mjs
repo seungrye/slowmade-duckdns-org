@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// scripts/seed-act1-boomerang.mjs — #283 회차 부메랑 — act1 우회 분기.
+// scripts/seed-act1-boomerang.mjs - #283's cross-run boomerang - the act 1 detour branches.
 //
-// 디자인:
-//   이전 회차의 결과가 *다음 회차의 act1 진행* 도 *살짝 다르게* 만든다. 본 분기로
-//   이어지는 *짧은 우회 가지* 형태로 — 본 시퀀스를 부수지 않고 *추가 한 줄*.
+// The design:
+//   A previous run's outcome makes *the next run's act 1* go *slightly differently* too. As a
+//   *short detour branch* off the main one - *one added line* that does not break the main sequence.
 //
-// 매트릭스:
-//   kael_corridor    + world.last_one_fell  → kael_corridor_clear (forge_id 성공과 동등) + 침식 -2
-//   rin_evidence     + world.revolution_won → rin_underground (rin_betrayal 우회) + flag set
-//   solwen_combat    + world.sylvan_awoke   → solwen_grief (전투 우회) + 침식 -3
+// The matrix:
+//   kael_corridor    + world.last_one_fell  -> kael_corridor_clear (equivalent to a forge_id success) plus contamination -2
+//   rin_evidence     + world.revolution_won -> rin_underground (bypassing rin_betrayal) plus a flag set
+//   solwen_combat    + world.sylvan_awoke   -> solwen_grief (bypassing the fight) plus contamination -3
 
 import mongoose from 'mongoose';
 

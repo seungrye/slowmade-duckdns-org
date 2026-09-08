@@ -1,44 +1,44 @@
-// web-adventure (Web MUD CYOA PoC) 타입 정의.
-// 1 주차 PoC: 단일 씬 + 단일 엔딩.
+// The web-adventure (Web MUD CYOA PoC) type definitions.
+// The week 1 PoC: a single scene with a single ending.
 //
-// 의도:
-//   - 직렬화 친화 (모두 plain object). 5 주차에서 Mongo / localStorage 저장 시 그대로 사용.
-//   - reducer 가 받는 GameState 는 *phase* 별 discriminated union.
+// The intent:
+//   - serialisation-friendly (all plain objects). Used as they are for the Mongo and localStorage storage in week 5.
+//   - the GameState the reducer takes is a discriminated union on *phase*.
 
-/** 캐릭터 6 스탯. 기본값 5. 시작 보너스 +5 분배(스탯당 최대 +2). */
+/** The character's 6 stats. 5 by default. A starting bonus of +5 is distributed (at most +2 per stat). */
 export type StatKey = "str" | "dex" | "int" | "cha" | "con" | "wis";
 
 /**
- * 〈에테르니아의 추락〉 리프래시 (#253) — 성흔 어빌리티 4 종.
- *   - lunar    루나 성흔  (학식/지능 +2)
- *   - selene   셀레네 성흔 (완력/전투 +2)
- *   - hecate   헤카테 성흔 (언변/환영 +2)
- *   - none     무흔        (마법 못 씀, 석화병 면역, 재굴림 +3)
+ * The Fall of Eternia's refresh (#253) - the 4 stigma abilities.
+ *   - lunar    the lunar stigma  (learning/intelligence +2)
+ *   - selene   the selene stigma (strength/combat +2)
+ *   - hecate   the hecate stigma (persuasion/illusion +2)
+ *   - none     unmarked          (no magic, immune to petrification, +3 rerolls)
  */
 export type AbilityKey = "lunar" | "selene" | "hecate" | "none";
 
 /**
- * 주인공 — 3 갈래 시작점. 목록이 원본이고 타입을 파생한다 (#354).
+ * The protagonists - 3 starting points. The list is the source and the type is derived (#354).
  *
- * 업적의 분모(lib/achievements/rules.PROTAGONISTS)와 전시 순서(content/protagonists)가
- * 각자 같은 배열을 들고 있었다. #352 에서 엔딩이 정확히 그것 때문에 틀렸다 —
- * 「모든 엔딩」이 6종에서 열렸는데 실제로는 11종이었다.
+ * The achievements' denominator (lib/achievements/rules.PROTAGONISTS) and the display order (content/protagonists)
+ * each held their own copy of the same array. In #352 the endings went wrong for exactly that reason -
+ * "every ending" unlocked at 6 when there were really 11.
  */
 export const PROTAGONIST_IDS = ["kael", "rin", "solwen"] as const;
 
 export type Protagonist = (typeof PROTAGONIST_IDS)[number];
 
 /**
- * 엔딩 목록 — **여기가 단일 출처다** (#352).
+ * The ending list - **this is the single source** (#352).
  *
- * 예전엔 이게 타입(union)뿐이었고, mongoose enum·업적 분모·UI 목록은 문자열 배열을 손으로
- * 복사해 뒀다. #359·#361 이 엔딩 5종을 더할 때 past-run 모델의 enum 만 안 따라와서, 그 5종으로
- * 끝낸 회차가 전부 검증 실패(500)로 버려졌다 — 피드백 노트·갤러리·업적까지 통째로. 타입은
- * 런타임 문자열 배열을 못 보니 TypeScript 도 못 잡았고 2주 넘게 몰랐다.
+ * This used to be a type (a union) alone, and the mongoose enum, the achievements' denominator and the UI lists each held
+ * a hand-copied string array. When #359 and #361 added 5 endings, the past-run model's enum alone did not follow, and every run
+ * ending in one of those 5 was discarded as a validation failure (500) - taking the feedback notes, the gallery and the achievements with it. A type
+ * cannot see a runtime string array, so TypeScript could not catch it either and it went unnoticed for over two weeks.
  *
- * 그래서 **런타임 배열을 원본으로 두고 타입을 거기서 파생**한다. 엔딩을 더할 땐 이 배열에만
- * 넣으면 된다 — `Record<EndingId, …>` 로 선언한 맵은 타입 에러로, mongoose enum 은
- * `lib/web-adventure/__tests__/ending-ids.test.ts` 로 빠짐없이 걸린다.
+ * So **the runtime array is the source and the type is derived from it**. Adding an ending means adding it to this array
+ * alone - a map declared as `Record<EndingId, …>` catches it as a type error, and the mongoose enum is caught by
+ * `lib/web-adventure/__tests__/ending-ids.test.ts`.
  */
 export const ENDING_IDS = [
   "ascension",
@@ -47,10 +47,10 @@ export const ENDING_IDS = [
   "fall",
   "petrification",
   "sylvan_bond",
-  /** #359 각성 루트 전용 엔딩 — 옴팔로스를 우회한 독립 스토리의 결말. */
+  /** #359's awakening-route-only endings - the conclusions of the independent story bypassing Omphalos. */
   "liberation",
   "usurpation",
-  /** #361 린 각성 루트(신념과 타락) 엔딩. regency=타락 생존, purge=타살死(범용), wayfarer=열린 결말. */
+  /** #361's Rin awakening route (conviction and corruption) endings. regency = surviving corrupted, purge = death by another's hand (general), wayfarer = an open ending. */
   "regency",
   "purge",
   "wayfarer",
@@ -63,38 +63,38 @@ export type Character = {
   hp: number;
   maxHp: number;
   ability: AbilityKey;
-  /** 주인공 정체성. 3 갈래 시작점 + 일부 전용 엔딩 자격 결정. */
+  /** The protagonist's identity. The 3 starting points, and it qualifies some route-only endings. */
   protagonist: Protagonist;
   /**
-   * 성흔 침식도 (0-100).
-   *   - 0-49: 정상.
-   *   - 50-79: 디버프 (con/dex 판정 -2, 셀레네 마법 +3).
-   *   - 80-99: 임계 (UI 경고 + 마법 액션 일부 잠금).
-   *   - 100: 자동 petrification 엔딩.
+   * The stigma's contamination (0-100).
+   *   - 0-49: normal.
+   *   - 50-79: a debuff (-2 on con/dex rolls, +3 on selene magic).
+   *   - 80-99: critical (a UI warning plus some magic actions locked).
+   *   - 100: the automatic petrification ending.
    */
   stigmaErosion: number;
   inventory: string[];
   flags: Record<string, boolean | number>;
   rerollsLeft: number;
-  /** 동적 텍스트 변수({{키}} 치환 소스). Scene.onEnter.setVars / `<<set …>>` 로 채워짐. */
+  /** The dynamic text variables (the source for {{key}} substitution). Filled in by Scene.onEnter.setVars and `<<set …>>`. */
   variables?: Record<string, string | number>;
 };
 
-/** 선택지 — 3 종 (plain / probability / conditional). */
-// `pinned` (공통, 옵션): 씬 선택지가 표시 상한(3)을 넘을 때 랜덤 3-of-N 으로 추린다.
-// pinned=true 면 항상 노출(추첨 제외) — 핵심 진행/스토리 분기가 랜덤으로 가려져 소프트락
-// 되지 않게 한다. plain 이 아닌 분기(conditional/probability)는 pinned 여부와 무관하게
-// 항상 노출된다(해금·도전 분기라 랜덤 대상 아님). 추첨은 non-pinned plain 만 대상.
+/** The choices - 3 kinds (plain / probability / conditional). */
+// `pinned` (shared, optional): when a scene's choices exceed the display cap (3) they are narrowed by a random 3-of-N draw.
+// pinned=true always shows (excluded from the draw) - so a key progression or story branch is never hidden by chance and
+// soft-locks the run. A non-plain branch (conditional/probability) always shows regardless of pinned
+// (being an unlock or a challenge, it is not subject to the draw). The draw covers non-pinned plain choices alone.
 export type Choice =
   | { kind: "plain"; id: string; label: string; to: string;
       /**
-       * #89 이 선택지를 고른 흔적. 도착 씬이 같은 갈래들(골목의 동류 접촉, 갱도 거래 등)은
-       * 씬의 onEnter 로는 어느 쪽을 골랐는지 남길 수 없어 선택이 사라졌다. 여기에 남긴다.
+       * #89 - the trace of picking this choice. Branches whose destination scene is the same (meeting the kindred spirit in the alley, the mine's bargain and so on)
+       * cannot record which was picked through the scene's onEnter, and the choice vanished. It is recorded here.
        */
       setFlags?: Record<string, boolean>;
-      /** #253 — 〈에테르니아〉 침식도 변동 (예: 마법 사용 시 +N, 정제수 사용 시 -N). */
+      /** #253 - Eternia's contamination change (+N on using magic, -N on using refined water, for instance). */
       stigmaDelta?: number;
-      /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출. */
+      /** Excluded from the random 3-of-N draw and always shown. */
       pinned?: boolean;
     }
   | {
@@ -106,33 +106,33 @@ export type Choice =
       onSuccess: string;
       onFailure: string;
       /**
-       * 5 주차 (#221) — *일회성 probability 분기* 자동 hidden.
-       * 지정된 flag 가 truthy 면 isVisible=false (UI 에서 완전 숨김).
+       * Week 5 (#221) - the automatic hidden for a *one-off probability branch*.
+       * With the given flag truthy, isVisible=false (fully hidden in the UI).
        */
       hideWhenFlag?: string;
-      /** #253 — 시도(성공/실패 무관) 자체에 따른 침식도 변동. */
+      /** #253 - the contamination change from the attempt itself (regardless of success or failure). */
       stigmaDelta?: number;
-      /** #253 — *성공 시에만* 추가로 적용되는 침식도 변동 (별도). */
+      /** #253 - the extra contamination change applied *on success only* (separately). */
       stigmaDeltaOnSuccess?: number;
-      /** #253 — *실패 시에만* 추가로 적용되는 침식도 변동. */
+      /** #253 - the extra contamination change applied *on failure only*. */
       stigmaDeltaOnFailure?: number;
-      /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출(probability 는 기본적으로 항상 노출). */
+      /** Excluded from the random 3-of-N draw and always shown (a probability choice always shows by default). */
       pinned?: boolean;
     }
   | {
       kind: "conditional";
-      /** #89 이 선택지를 고른 흔적. plain 과 같은 뜻. */
+      /** #89 - the trace of picking this choice. The same meaning as on plain. */
       setFlags?: Record<string, boolean>;
       id: string;
       label: string;
       condition: ChoiceCondition;
       to: string;
       /**
-       * 4 주차: 조건 미충족 시 *완전 숨김* (회색 표시 X).
+       * Week 4: *fully hidden* when the condition is unmet (not shown greyed out).
        */
       hidden?: boolean;
       stigmaDelta?: number;
-      /** 랜덤 3-of-N 추첨에서 제외하고 항상 노출(conditional 은 기본적으로 항상 노출). */
+      /** Excluded from the random 3-of-N draw and always shown (a conditional choice always shows by default). */
       pinned?: boolean;
     };
 
@@ -159,9 +159,9 @@ export type ChoiceCondition =
   /** #359 각성 — 복합 AND. 모든 하위 조건을 만족할 때 충족(각성 다중 조건 게이트용). */
   | { kind: "all"; conditions: ChoiceCondition[] };
 
-/** 씬 진입 시 재생할 기본 BGM. 없으면 이전 BGM 유지(또는 무음). 중간 제어는 body 의 `<<bgm …>>` 디렉티브. */
+/** The default BGM played on entering the scene. Absent, the previous BGM continues (or silence). Mid-scene control is the body's `<<bgm …>>` directive. */
 export type SceneBgm = {
-  /** 오디오 에셋 키 또는 URL(→ 호스팅에서 해석). */
+  /** An audio asset key or a URL (resolved by the host). */
   src: string;
   loop?: boolean;
   /** 0..1 */
@@ -171,64 +171,64 @@ export type SceneBgm = {
 export type Scene = {
   id: string;
   illustration: string;
-  /** 배리에이션 이미지 배열. 비면 illustration 단일 사용. */
+  /** The array of variation images. Empty, illustration alone is used. */
   illustrations?: string[];
   title: string;
   body: string[];
   /**
-   * #73 사건의 뼈대(집필용 정본). **화면에 절대 나가지 않는다** —
-   * 문체 변형이 없으면 body 로 폴백한다.
+   * #73's event skeleton (the canonical text for writing). **It never goes on screen** -
+   * with no prose variant it falls back to body.
    */
   treatment?: string[];
-  /** #73 문체별 본문 `{ [voice]: string[] }`. 없으면 body 로 폴백. */
+  /** #73's per-style bodies, `{ [voice]: string[] }`. Absent, it falls back to body. */
   variants?: Record<string, string[]>;
   choices: Choice[];
   /**
-   * 씬 진입 BGM(선택). body 문단은 인라인 스크립트 확장 지원 — `{{변수}}` 치환 +
-   * `<< sfx|bgm|fx|img|wait|set … >>` 디렉티브(lib/web-adventure/script.ts). 토큰 없으면 종전과 동일.
+   * The scene's entry BGM (optional). A body paragraph supports the inline script extensions - `{{variable}}` substitution plus
+   * the `<< sfx|bgm|fx|img|wait|set … >>` directives (lib/web-adventure/script.ts). With no tokens it behaves exactly as before.
    */
   bgm?: SceneBgm;
   isEnding?: boolean;
   endingId?: EndingId;
   /**
-   * 씬 진입 시 부여될 효과.
-   * - setFlags: character.flags 에 병합 (true/false 설정).
-   * - addItems: character.inventory 에 추가 (중복 방지).
-   * - incrementCounters: 4 주차 — 누적 카운터 (예: caughtCount) +1 씩 누적.
-   *   flags 와 같은 객체를 공유 (boolean | number 호환).
+   * The effects granted on entering the scene.
+   * - setFlags: merged into character.flags (setting true/false).
+   * - addItems: added to character.inventory (avoiding duplicates).
+   * - incrementCounters: week 4 - cumulative counters (caughtCount, for example) incremented by 1.
+   *   Sharing the same object as flags (boolean | number compatible).
    */
   onEnter?: {
     setFlags?: Record<string, boolean>;
     addItems?: string[];
     incrementCounters?: string[];
-    /** #253 — 씬 진입 시 침식도 변동. */
+    /** #253 - the contamination change on entering the scene. */
     stigmaDelta?: number;
-    /** #318 — 씬 진입 시 HP 변동 (음수 = 데미지, 양수 = 회복). 0 도달 시 자동 fall ending. */
+    /** #318 - the HP change on entering the scene (negative = damage, positive = healing). Reaching 0 gives the automatic fall ending. */
     hpDelta?: number;
-    /** 재굴림 횟수 변동 (양수 = 보충). 주인공 무관 재굴림 보충 이벤트용. */
+    /** The change in the reroll count (positive = a top-up). For the protagonist-independent reroll top-up event. */
     rerollDelta?: number;
-    /** 씬 진입 시 설정할 동적 텍스트 변수({{키}} 치환 소스). character.variables 에 병합. */
+    /** The dynamic text variables to set on entering the scene (the source for {{key}} substitution). Merged into character.variables. */
     setVars?: Record<string, string | number>;
   };
 };
 
 export type SceneRegistry = Record<string, Scene>;
 
-/** GameState — phase 별 discriminated union. */
+/** GameState - a discriminated union on phase. */
 /**
- * probability 판정 *대기* 상태 — 결과를 보여주고 재굴림/계속을 선택하기 위한 메타.
- * 선택 즉시 전이하지 않고 pendingRoll 에 보관 → CONFIRM_ROLL 시 비로소 전이.
+ * The state of a probability roll *awaiting confirmation* - the metadata for showing the result and choosing to reroll or continue.
+ * A choice does not transition at once but is held in pendingRoll -> the transition happens on CONFIRM_ROLL.
  */
 export type PendingRoll = {
   choiceId: string;
   label: string;
   roll: number; // d20
-  bonus: number; // 성흔 보너스
-  statValue: number; // 침식 디버프 반영된 effective stat
+  bonus: number; // the stigma's bonus
+  statValue: number; // the effective stat, with the contamination debuff applied
   difficulty: number;
   success: boolean;
-  target: string; // 확정 시 이동할 씬 (성공/실패 분기)
-  totalDelta: number; // 확정 시 적용할 침식 delta
+  target: string; // the scene to move to on confirmation (the success/failure branch)
+  totalDelta: number; // the contamination delta to apply on confirmation
 };
 
 export type GameState =
@@ -238,7 +238,7 @@ export type GameState =
       character: Character;
       currentScene: string;
       log: string[];
-      /** probability 판정 대기 — 있으면 결과+재굴림/계속 UI 표시, ChoiceList 숨김. */
+      /** A probability roll awaiting confirmation - when present, the result plus the reroll/continue UI shows and the ChoiceList is hidden. */
       pendingRoll?: PendingRoll;
     }
   | {

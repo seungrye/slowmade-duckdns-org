@@ -4,9 +4,9 @@ import {
 } from "./town-config";
 
 describe("availableLandmarks — size 무관, 환경만 적용", () => {
-  // 정책 변경: 마을 크기는 (landmark + villager 수) 로 자동 결정되어 size 선택이
-  // 무의미해짐. 모든 12 종 landmark 가 항상 사용 가능 — env 만 의미 (Coastal 일 때
-  // 만 Docks 추가).
+  // A policy change: the town's size is decided automatically from (the landmark and villager counts), which made choosing
+  // a size pointless. All 12 landmarks are always available - only env matters (Docks is added
+  // under Coastal alone).
   it("Plains 는 12 종 (Docks 제외, size 무관)", () => {
     for (const size of ["hamlet", "village", "town"] as const) {
       const got = availableLandmarks(size, "plains");

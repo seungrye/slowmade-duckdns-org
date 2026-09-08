@@ -1,4 +1,4 @@
-// 〈에테르니아의 추락〉 3 주인공 메타 (#251).
+// The Fall of Eternia's 3 protagonists' metadata (#251).
 
 import { PROTAGONIST_IDS, type Protagonist, type StatKey } from "@/types/web-adventure";
 
@@ -6,7 +6,7 @@ export type ProtagonistMeta = {
   name: string;
   oneLine: string;
   description: string;
-  /** 시작 스탯 (보너스 분배 *전* base). 일반 5 가 아닌 *주인공 별 기본 보정*. */
+  /** The starting stats (the base *before* the bonus is distributed). A *per-protagonist base adjustment* rather than a flat 5. */
   baseStats: Record<StatKey, number>;
   startStigma: number;
   startScene: string;
@@ -46,6 +46,6 @@ export const protagonists: Record<Protagonist, ProtagonistMeta> = {
   },
 };
 
-// 전시 순서 — 지금은 정의 순서와 같다. 달라져야 하면 여기만 다시 적되,
-// __tests__/protagonist-ids.test.ts 가 빠진 주인공을 잡아 준다 (#354).
+// The display order - the same as the definition order for now. Should they need to differ, only this is rewritten, and
+// __tests__/protagonist-ids.test.ts catches a missing protagonist (#354).
 export const PROTAGONIST_ORDER: Protagonist[] = [...PROTAGONIST_IDS];

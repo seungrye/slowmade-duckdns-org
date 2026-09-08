@@ -1,4 +1,4 @@
-// 성흔 4 종 — MIRROR webapp/src/content/web-adventure/abilities.ts.
+// The 4 stigmata - MIRROR webapp/src/content/web-adventure/abilities.ts.
 export const abilities = {
   lunar: { name: "루나 성흔", desc: "학식/지능 판정 +2" },
   selene: { name: "셀레네 성흔", desc: "완력/전투 판정 +2" },

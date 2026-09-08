@@ -176,10 +176,10 @@ export const DropdownMenuTrigger = React.forwardRef<
       context.getReferenceProps({
         ...props,
         ...(typeof children.props === "object" ? children.props : {}),
-        // ref 는 반드시 children.props 뒤에 와야 한다. React 19 에서 ref 는 일반
-        // prop 이라, 자식이 ref 를 들고 있으면 앞에 둔 앵커 ref 를 덮어써 버린다.
-        // 그러면 floating-ui 가 기준점을 잃고 메뉴를 (0,0) 에 렌더한다. (#43)
-        // 자식의 ref 는 위 useMergeRefs 에서 이미 병합돼 있으므로 유실되지 않는다.
+        // ref must come after children.props. In React 19 ref is an ordinary
+        // prop, so a child carrying a ref overwrites the anchor ref placed before it.
+        // floating-ui then loses its reference point and renders the menu at (0,0). (#43)
+        // The child's ref is already merged by useMergeRefs above, so it is not lost.
         ref,
         "aria-expanded": context.open,
         "aria-haspopup": "menu" as const,

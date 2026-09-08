@@ -3,8 +3,8 @@ import { buttonVariantClasses, buttonSizeClasses } from '../button.variants'
 import { badgeVariantClasses } from '../badge.variants'
 
 /**
- * cn: Tailwind 클래스를 충돌 없이 병합하는 유틸리티 함수.
- * clsx로 조건부 클래스를 처리하고, tailwind-merge로 중복 클래스를 제거한다.
+ * cn: the utility that merges Tailwind classes without clashes.
+ * clsx handles the conditional classes and tailwind-merge removes the duplicates.
  */
 describe('cn', () => {
   it('여러 클래스 문자열을 하나로 합친다', () => {
@@ -29,8 +29,8 @@ describe('cn', () => {
 })
 
 /**
- * buttonVariantClasses: 버튼 variant별 클래스 정의 맵.
- * 각 variant가 필요한 색상·상태 클래스를 포함하는지 검증한다.
+ * buttonVariantClasses: the map defining the classes per button variant.
+ * Verifies each variant carries the colour and state classes it needs.
  */
 describe('buttonVariantClasses', () => {
   it('primary variant는 파란 배경 클래스를 포함한다', () => {
@@ -62,7 +62,7 @@ describe('buttonVariantClasses', () => {
 })
 
 /**
- * buttonSizeClasses: 버튼 size별 패딩·텍스트 크기 클래스 정의 맵.
+ * buttonSizeClasses: the map defining the padding and text-size classes per button size.
  */
 describe('buttonSizeClasses', () => {
   it('sm은 작은 패딩을 가진다', () => {
@@ -82,7 +82,7 @@ describe('buttonSizeClasses', () => {
 })
 
 /**
- * badgeVariantClasses: 배지 variant별 색상 클래스 정의 맵.
+ * badgeVariantClasses: the map defining the colour classes per badge variant.
  */
 describe('badgeVariantClasses', () => {
   it('default variant는 회색 배경을 가진다', () => {

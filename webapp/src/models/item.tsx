@@ -20,40 +20,40 @@ const ItemSchema = new Schema(
     glyphAscii: { type: String, required: true },
     glyphGameIcon: { type: String, required: true },
     pickupMessage: { type: String, required: true },
-    // hidden=true 면 일반 vendor 인벤토리에 자동 편성되지 않는다 (Phase 2 보너스).
-    // 누락 시 false 의미 (기존 호환).
+    // With hidden=true it is not placed into an ordinary vendor's inventory automatically (a Phase 2 bonus).
+    // Absent, it means false (backwards compatible).
     hidden: { type: Boolean, default: undefined },
 
-    // quest 전용
+    // quest only
     imagePath: { type: String },
 
-    // weapon 전용 — 단일값(attackPower) 은 호환 유지, random-stat 모드는 min/max + tier.
+    // weapon only - the single value (attackPower) stays for compatibility; the random-stat mode uses min/max plus tier.
     attackPower: { type: Number },
     attackPowerMin: { type: Number },
     attackPowerMax: { type: Number },
     element: { type: String, default: null }, // "fire" | "ice" | "lightning" | null
 
-    // armor 전용
+    // armor only
     defenseBonus: { type: Number },
     defenseBonusMin: { type: Number },
     defenseBonusMax: { type: Number },
 
-    // weapon/armor 공통 — 드롭 테이블 등급 (1..=5)
+    // shared by weapon and armor - the drop table's tier (1..=5)
     tier: { type: Number },
 
-    // consumable 전용
+    // consumable only
     effect: { type: ConsumableEffectSchema },
 
-    // accessory 전용 — 효과 설명 텍스트 (사람용)
+    // accessory only - the effect's description (for people)
     desc: { type: String },
-    // accessory 전용 — 데이터 주도 효과 키 목록. 게임 코드가 id 가 아닌 이 키로 분기.
-    // 유효 값: "RevealGuardVision" | "RevealTrapsInSight" | "RevealVendorVision" (types/item.ts AccessoryEffect 와 동기).
+    // accessory only - the list of data-driven effect keys. The game code branches on these keys rather than the id.
+    // The valid values: "RevealGuardVision" | "RevealTrapsInSight" | "RevealVendorVision" (in sync with AccessoryEffect in types/item.ts).
     effects: { type: [String], default: undefined },
 
-    // 상점 시스템 (모든 kind 공통) — game 측 `Option<u32>` 미러.
-    // buyPrice 누락 → 비매물 (vendor 가 판매 인벤토리에 노출 X, phase 2 게임 측에서 필터).
-    // sellPrice 누락 → 게임 측에서 buyPrice/2 자동 계산.
-    // default: undefined — Mongoose 가 doc 에 키 자체를 넣지 않게 해 RON serializer 가 미출력으로 처리.
+    // The shop system (shared by every kind) - mirroring the game's `Option<u32>`.
+    // A missing buyPrice -> not for sale (a vendor never lists it, filtered on the game side in phase 2).
+    // A missing sellPrice -> the game computes buyPrice/2 automatically.
+    // default: undefined - so Mongoose leaves the key out of the doc entirely and the RON serializer treats it as unset.
     buyPrice: { type: Number, default: undefined },
     sellPrice: { type: Number, default: undefined },
 

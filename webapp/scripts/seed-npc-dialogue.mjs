@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// scripts/seed-npc-dialogue.mjs — 사이드 NPC 짧은 대사 추가 (#260).
+// scripts/seed-npc-dialogue.mjs - adding short lines for the side NPCs (#260).
 //
-// 옴팔로스 블랙마켓의 정보상, 솔라리스 군의관, 사제단 사자, 영수의 목소리 등을
-// 본문 일부에 인용 형태로 삽입해 세계관 분위기 풍부화.
+// The Omphalos black market's informant, the Solaris army surgeon, the priesthood's herald, the spirit beast's voice and so on
+// are inserted into parts of the body as quotations, enriching the setting's atmosphere.
 
 import mongoose from 'mongoose';
 
@@ -44,7 +44,7 @@ async function main() {
       console.log('skip (없음):', u.id);
       continue;
     }
-    // #304 idempotent — 이미 append 된 라인 skip (재실행 안전).
+    // #304 idempotent - an already appended line is skipped (safe to rerun).
     const body = [...(cur.body ?? [])];
     let added = 0;
     for (const line of u.appendBody) {

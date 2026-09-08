@@ -4,9 +4,9 @@ import { connectToDB } from "@/lib/db";
 import UserModel from "@/models/user";
 import { env } from "@/lib/env";
 
-// 구글 시트 내보내기(#181)가 제거되면서 `drive.file` 범위와 refresh token 저장도 함께
-// 걷어냈다 (#228). 그 분기는 `GOOGLE_SHEETS_EXPORT` 가 켜져야 동작했는데 한 번도 켜진 적이
-// 없어, 로그인은 처음부터 기본 범위로만 돌고 있었다 — 즉 동작이 바뀌지 않는다.
+// When the Google Sheets export (#181) was removed, the `drive.file` scope and the stored refresh token went
+// with it (#228). That branch only ran with `GOOGLE_SHEETS_EXPORT` on, and it was never on,
+// so login had always run on the default scopes alone - that is, the behaviour does not change.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     GoogleProvider({
@@ -47,7 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (secret && session.user) {
         session.user.token = secret as string;
       }
-      // owner 플래그 — UI 메뉴 노출용. server 측 가드는 항상 requireOwner 로 재검증.
+      // The owner flag - for showing the UI menu. Server-side guards always re-check with requireOwner.
       if (session.user?.email && env.ownerEmail) {
         session.user.isOwner = session.user.email === env.ownerEmail;
       }

@@ -1,7 +1,7 @@
-// 페이징 계산 (#184).
+// The paging arithmetic (#184).
 //
-// 화면 없이 검증할 수 있게 계산만 떼어 놓았다. 페이징에서 사고가 나는 자리는 거의 언제나
-// **경계**다 — 0건, 정확히 나누어떨어질 때, 마지막 페이지, 범위를 벗어난 page 값.
+// Split out so it can be verified without a screen. Where paging goes wrong is almost always
+// **the boundaries** - 0 rows, an exact division, the last page, and a page value out of range.
 import { describe, it, expect } from 'vitest';
 import { clampPage, pageCount, pageOfIndex, pageSlice } from './pager';
 
@@ -31,7 +31,7 @@ describe('clampPage', () => {
     expect(clampPage(1, 51, 25)).toBe(1);
   });
 
-  // 자료가 줄어들면(필터 변경 등) 들고 있던 page 가 범위를 벗어난다. 그때 빈 표가 뜨면 안 된다.
+  // When the data shrinks (a changed filter and so on) the page held goes out of range. An empty table must not appear then.
   it('마지막 페이지를 넘어가면 마지막으로 당긴다', () => {
     expect(clampPage(9, 51, 25)).toBe(2);
     expect(clampPage(3, 0, 25)).toBe(0);
@@ -70,7 +70,7 @@ describe('pageSlice', () => {
 });
 
 describe('pageOfIndex', () => {
-  // 마커로 들어온 날짜가 든 페이지를 여는 데 쓴다.
+  // Used to open the page holding a date arrived at from a marker.
   it('경계에서 정확하다', () => {
     expect(pageOfIndex(0, 25)).toBe(0);
     expect(pageOfIndex(24, 25)).toBe(0);

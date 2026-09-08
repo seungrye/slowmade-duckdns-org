@@ -10,7 +10,7 @@ const compat = new FlatCompat({
 });
 
 const eslintConfig = [
-  // #281 — `next lint` deprecation (Next 16) 대응. 빌드 산출물 / 의존성 제외.
+  // #281 - handling `next lint`'s deprecation (Next 16). Build output and dependencies are excluded.
   {
     ignores: [
       ".next/**",
@@ -21,8 +21,8 @@ const eslintConfig = [
       "test-results/**",
       "playwright-report/**",
       "scripts/backups/**",
-      // 내려받은 EmulatorJS 본체 — 남의 코드이고 minified 다 (#148).
-      // 우리가 쓴 public/games/retro/*.js 만 검사한다.
+      // The downloaded EmulatorJS itself - someone else's code, and minified (#148).
+      // Only the public/games/retro/*.js we wrote are checked.
       "public/games/retro/data/**",
     ],
   },
@@ -32,12 +32,12 @@ const eslintConfig = [
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
     },
   },
-  // 브라우저에서 그대로 도는 플레이어 모듈 (#148).
+  // The player modules that run in the browser as they are (#148).
   //
-  // 번들러를 거치지 않고 `public/` 에서 바로 서빙된다. player.html 의 **인라인 스크립트**로
-  // 있던 동안에는 eslint 도 tsc 도 보지 않아서, 정의조차 없는 함수를 부르는 채로 배포됐다
-  // (`romFileName is not defined` — 패치·분할셋 병합이 통째로 죽었다).
-  // 파일로 떼어 내고 `no-undef` 를 켜 그 부류를 여기서 잡는다.
+  // They are served straight from `public/` without passing through a bundler. While they lived as **inline scripts**
+  // in player.html, neither eslint nor tsc looked at them, and a call to an undefined function shipped
+  // (`romFileName is not defined` - patch and split-set merging died entirely).
+  // Splitting them into files and turning `no-undef` on catches that class of bug here.
   {
     files: ["public/games/retro/*.js"],
     languageOptions: {

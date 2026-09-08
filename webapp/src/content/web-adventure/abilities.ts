@@ -1,27 +1,27 @@
-// 〈에테르니아의 추락〉 성흔(聖痕) 4 종 (#253 리프래시 / #359 정체 확립).
+// The Fall of Eternia's 4 stigmata (#253's refresh / #359's identity work).
 //
-// 보정 규칙은 lib/web-adventure/engine/rollDice.ts 와 1:1 매핑.
+// The modifier rules map 1:1 onto lib/web-adventure/engine/rollDice.ts.
 //
-// ── 성흔의 정체 (세계관 설정) ──────────────────────────────────────────────
-// [성흔이란] 마력에 손댄 자의 몸에 새겨지는 푸른 결정. 힘·치유·전투·마법을 원해
-//   마력을 쓰면 *누구나* 침식이 시작된다. 그러나 능력이 실제로 *발현*되는 건 소수 —
-//   사제단은 이들을 "세 달의 여신이 선택한 자"라 부른다.
-// [3 층의 진실]
-//   · 표층(사제단 교리): 성흔은 세 여신(루나·셀레네·헤카테)이 선택한 자에게 내린 축복.
-//     침식이 깊어짐 = 여신께 가까워짐, 정제소행 = 승천의 축복. → 성흔체가 *기꺼이*
-//     연료가 되도록 만드는 신앙 장치.
-//   · 중층(첫 균열): 가솔린 = 성흔 결정의 적출물. "축복이 아니라 도살이었다".
-//   · 심층(진짜): 여신 신앙은 사제단이 지어낸 거짓. 진짜 마력 근원은 *세계수*. 사제단은
-//     세계수 마력에 절은 시민을 성흔체로 길러(가솔린 문명 = 양식장) 결정을 수확한다.
-//     "선택"도 "치료(정제소)"도 위장 — 능력자든 무능력자든 침식하면 결국 연료. 발현이
-//     소수인 것은 신의 간택이 아니라 그저 개체차·우연.
-// [어빌리티 = 발현한 소수] lunar/selene/hecate. 단 *주인공은 성흔만 있고 능력은 미발현*
-//   상태로 시작한다. 선택받지 못한 자이므로 저절로 깨어나지 않고 — 성흔의 작동 원리를
-//   알고, 제어법을 전수받고(연구자), 침식 억제 도구를 갖추고, 침식을 끌어올린 대가를
-//   치르고, 연구자의 신뢰를 얻어야 *후천 각성*한다(다중 조건). 각성 루트는 옴팔로스를
-//   우회하는 독립 비선형 스토리이며, 전용 엔딩 + 기존 엔딩 모두 도달 가능.
-// [무흔(none)] 마력을 거부한 자(겁쟁이거나 자신의 의지로). 성흔이 없어 석화 면역 +
-//   재굴림 +3. 사제단에겐 "여신께 버림받은 자"로 멸시받지만, 유일하게 자유로운 자.
+// -- what a stigma is (the setting) ---------------------------------------
+// [the stigma] the blue crystal that marks the body of anyone who touches magic. Using magic for strength, healing, combat or spellcraft
+//   starts the contamination in *anyone*. But the ability actually *manifests* in only a few -
+//   the priesthood calls them "those chosen by the three moon goddesses".
+// [the truth, in 3 layers]
+//   - the surface (the priesthood's doctrine): a stigma is a blessing granted to those the three goddesses (Luna, Selene, Hecate) chose.
+//     Deeper contamination = drawing nearer to the goddess, and being sent to the refinery = the blessing of ascension. -> a device of faith
+//     that makes the stigma-bearing body become fuel *willingly*.
+//   - the middle (the first crack): the petrol is extracted from stigma crystals. "It was not a blessing but a slaughter."
+//   - the deep (the real one): the goddesses' faith is a lie the priesthood invented. The true source of magic is *the world tree*. The priesthood
+//     raises citizens steeped in the world tree's magic into stigma-bearers (a petrol civilisation = a fish farm) and harvests the crystals.
+//     Both "being chosen" and "the cure (the refinery)" are disguises - gifted or not, whoever is contaminated ends up as fuel. That manifestation is
+//     rare is no divine selection but simple individual variation and chance.
+// [the ability = the few who manifested] lunar/selene/hecate. But *the protagonist starts with the stigma alone and no manifested ability*.
+//   Being one of the unchosen, it does not wake by itself - they must learn how the stigma works,
+//   be taught to control it (by the researcher), obtain a contamination suppressor, pay the price of raising their
+//   contamination and earn the researcher's trust before *awakening later in life* (a composite gate). The awakening route is an independent, non-linear
+//   story bypassing Omphalos, and both its own endings and the existing ones are reachable.
+// [unmarked (none)] someone who refused magic (out of cowardice, or by their own will). With no stigma they are immune to petrification and get
+//   +3 rerolls. The priesthood despises them as "those the goddesses abandoned", yet they alone are free.
 // ──────────────────────────────────────────────────────────────────────────
 
 import type { AbilityKey } from "@/types/web-adventure";

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// scripts/build-worldview-post.mjs — 〈에테르니아의 추락〉 독자용 세계관 Post.
-//   장소 설명·특징 + 세력 + 등장인물. (이미지 가이드 Post 와 별도.)
-//   멱등 — 같은 title 이면 덮어쓰기.
+// scripts/build-worldview-post.mjs - The Fall of Eternia's setting Post for readers.
+//   The places, their descriptions and features, plus the factions and characters. (Separate from the image-guide Post.)
+//   Idempotent - the same title is overwritten.
 
 import mongoose from 'mongoose';
 

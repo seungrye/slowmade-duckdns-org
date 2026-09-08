@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
 import type { InferSchemaType, Model } from "mongoose";
 
-// ESM interop: named export(models 등)는 순수 node ESM 에서 안 풀려 default 로 접근한다
-// (Next/webpack·tsx 스크립트 양쪽 호환 — trading-smoke 등 서버 외 구동 지원).
+// ESM interop: named exports (models and so on) do not resolve under plain node ESM, so they are reached through default
+// (compatible with both Next/webpack and tsx scripts - supporting runs outside the server, such as trading-smoke).
 const { Schema, model, models } = mongoose;
 
 /**
- * 주문 로그 — 엔진이 내려던/내린 주문 1건마다 append(파이썬 trades/ ledger 대응).
- * dry-run 은 orderNo="" + dryRun=true. 계정별 매매 확인·차트의 기초 데이터.
+ * The order log - appended once per order the engine tried to place or placed (matching python's trades/ ledger).
+ * A dry run has orderNo="" plus dryRun=true. The base data for per-account trade checks and the charts.
  */
 const TradingOrderLogSchema = new Schema(
   {

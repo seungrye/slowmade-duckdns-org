@@ -1,25 +1,25 @@
 #!/usr/bin/env node
-// scripts/seed-stat-balance.mjs — #319 6 스탯 활용 균형 + hasItem 조건 활성화.
+// scripts/seed-stat-balance.mjs - #319: balancing the use of the 6 stats plus activating the hasItem condition.
 //
-// 현재 활용 매트릭스:
+// The current usage matrix:
 //   str: 2, dex: 6, int: 4 (+1 minStat), cha: 5, con: 1, wis: 2
-//   → dex/cha 절반 / con/wis 거의 0
+//   -> dex/cha at half, con/wis at almost 0
 //
-// 4 성흔 (lunar/selene/hecate/none) 별 특수 분기도 거의 없음.
-// hasItem 조건 분기 0 — 인벤 시스템 데코레이션 상태.
+// There are also almost no special branches per stigma (lunar/selene/hecate/none).
+// 0 hasItem condition branches - the inventory system is decorative.
 //
-// 라운드별 진행 (한 시드로 통합):
-//   - con: kael_falling/rise_to_ground plain → con probability (추락 충격)
-//   - wis: solwen_combat/shield_spirit 는 이미 wis 13 ✓ 유지
-//   - hasItem: rin_evidence 에 imperial_seal hidden 분기 (사제단 인장 직접 활용)
-//     + omphalos_blackmarket 에 service_revolver hidden 분기 (총으로 협박)
-//   - 성흔 특수: ability 검사는 evalCondition 미지원 — 별도 시스템 (이번 fix 외)
+// The rounds (combined into one seed):
+//   - con: kael_falling/rise_to_ground plain -> a con probability (the fall's impact)
+//   - wis: solwen_combat/shield_spirit already has wis 13, kept as it is
+//   - hasItem: a hidden imperial_seal branch in rin_evidence (using the priesthood's seal directly)
+//     plus a hidden service_revolver branch in omphalos_blackmarket (threatening at gunpoint)
+//   - the stigma specials: evalCondition does not support an ability check - a separate system (outside this fix)
 
 import mongoose from 'mongoose';
 
 const updates = [
   // 1. kael_falling/rise_to_ground plain → con probability.
-  //    실패 시 신규 우회 씬 kael_falling_aftermath (hpΔ-5, 그 후 omphalos_outskirts 자동).
+  //    On failure, the new detour scene kael_falling_aftermath (hp -5, then on to omphalos_outskirts automatically).
   {
     sceneId: 'kael_falling',
     choices: [
@@ -63,7 +63,7 @@ const NEW_SCENES = [
 ];
 
 const HASITEM_BRANCHES = [
-  // rin_evidence 에 hasItem(imperial_seal) hidden 분기 — *바로 인장으로 위협*.
+  // A hidden hasItem(imperial_seal) branch in rin_evidence - *threatening with the seal at once*.
   {
     sceneId: 'rin_evidence',
     choice: {
@@ -76,7 +76,7 @@ const HASITEM_BRANCHES = [
       stigmaDelta: 0,
     },
   },
-  // omphalos_blackmarket 에 hasItem(service_revolver) hidden 분기 — *총으로 정보상 협박*.
+  // A hidden hasItem(service_revolver) branch in omphalos_blackmarket - *threatening the informant at gunpoint*.
   {
     sceneId: 'omphalos_blackmarket',
     choice: {
@@ -95,8 +95,8 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // 1. 신규 씬 upsert.
-  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // 1. upserting the new scenes.
+  //    An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const s of NEW_SCENES) {
     const cur = await Scene.findOne({ id: s.id }).lean();
     const update = { ...s };
@@ -107,11 +107,11 @@ async function main() {
     console.log('upsert:', s.id);
   }
 
-  // 2. 기존 분기 변경 (rise_to_ground plain → probability).
+  // 2. changing the existing branch (rise_to_ground plain -> probability).
   for (const u of updates) {
     const cur = await Scene.findOne({ id: u.sceneId }).lean();
     if (!cur) { console.log('없음:', u.sceneId); continue; }
-    // u.choices 의 각 id 에 매칭 — 기존 분기와 합치되 *id 매칭은 덮어쓰기*.
+    // Matched by each id in u.choices - merged with the existing branches, but *a matching id is overwritten*.
     const map = new Map(cur.choices.map((c) => [c.id, c]));
     for (const c of u.choices) map.set(c.id, c);
     const merged = [...map.values()];
@@ -119,7 +119,7 @@ async function main() {
     console.log('updated:', u.sceneId, `(${merged.length} 분기)`);
   }
 
-  // 3. hasItem 분기 추가 (3 분기 한도 검증).
+  // 3. adding the hasItem branches (the 3-branch limit is checked).
   for (const b of HASITEM_BRANCHES) {
     const cur = await Scene.findOne({ id: b.sceneId }).lean();
     if (!cur) { console.log('없음:', b.sceneId); continue; }

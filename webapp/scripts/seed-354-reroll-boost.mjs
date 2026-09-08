@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// scripts/seed-354-reroll-boost.mjs — 재굴림 +1 보충 이벤트 (주인공 무관 공통).
-// omphalos_blackmarket(선택적 공통 씬, 모든 주인공 진입 가능) 진입 시 재굴림 +1.
-// onEnter.rerollDelta=1 + 본문 한 줄. 멱등(중복 방지).
+// scripts/seed-354-reroll-boost.mjs - the +1 reroll top-up event (shared, protagonist-independent).
+// Entering omphalos_blackmarket (an optional shared scene every protagonist can reach) gives +1 reroll.
+// onEnter.rerollDelta=1 plus one line of body. Idempotent (no duplication).
 import mongoose from 'mongoose';
 async function main(){
   await mongoose.connect(process.env.MONGO_URI);

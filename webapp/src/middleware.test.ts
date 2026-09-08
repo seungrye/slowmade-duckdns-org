@@ -14,7 +14,7 @@ describe('middleware', () => {
 
   it("script-src에 'unsafe-inline'과 cdn.jsdelivr.net, googletagmanager.com을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
-    // 개별 토큰으로 단언 — 미들웨어 정책이 항목 추가에 유연하도록.
+    // Asserted per token - so the middleware's policy stays flexible as entries are added.
     expect(csp).toMatch(/script-src [^;]*'self'/);
     expect(csp).toMatch(/script-src [^;]*'unsafe-inline'/);
     expect(csp).toMatch(/script-src [^;]*https:\/\/cdn\.jsdelivr\.net/);
@@ -88,8 +88,8 @@ describe('middleware', () => {
 });
 
 describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
-  // matcher 가 매칭하면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한 → FormData 파싱 실패(500).
-  // 대용량 업로드 라우트는 matcher 의 negative-lookahead 에서 제외해야 한다. source 정규식으로 매칭 재현.
+  // A matcher hit makes Next buffer the request body and cap it at 10MB by default -> FormData parsing fails (500).
+  // Large-upload routes must be excluded in the matcher's negative lookahead. The match is reproduced with the source regex.
   const source = (config.matcher as { source: string }[])[0].source;
   const re = new RegExp('^' + source + '$');
 
@@ -101,11 +101,11 @@ describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
   it('일반 경로·기타 API 는 여전히 적용', () => {
     expect(re.test('/post/write')).toBe(true);
     expect(re.test('/api/submit')).toBe(true);
-    expect(re.test('/api/upload')).toBe(true); // 이미지(클라 5MB 게이트)는 그대로
+    expect(re.test('/api/upload')).toBe(true); // images (gated at 5MB on the client) stay as they were
     expect(re.test('/admin/x')).toBe(true);
   });
 
-  // #109 — 레트로 에뮬레이터 플레이어 문서만 CSP 를 두 군데 낮춘다.
+  // #109 - the CSP is lowered in two places for the retro emulator player document alone.
   describe('레트로 플레이어 iframe (/games/retro/player.html)', () => {
     const PLAYER = '/games/retro/player.html';
     const cspOf = (path: string) =>
@@ -116,13 +116,13 @@ describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
     });
 
     it('플레이어에는 unsafe-eval 을 준다 — 없으면 코어 7z 해제가 통째로 막힌다', () => {
-      // EmulatorJS 의 emscripten 글루가 cwrap("extract","number",["string"]) 를 부르는데,
-      // string 인자가 끼면 래퍼를 eval 로 만든다. wasm-unsafe-eval 로는 부족하다.
+      // EmulatorJS's emscripten glue calls cwrap("extract","number",["string"]), and
+      // a string argument makes it build the wrapper through eval. wasm-unsafe-eval is not enough.
       expect(cspOf(PLAYER)).toMatch(/script-src [^;]*'unsafe-eval'/);
     });
 
     it('플레이어에는 blob: 을 준다 — 코어를 푼 뒤 Blob 스크립트로 싣고 fetch 로 읽는다', () => {
-      // 헤드리스로 다섯 기종을 돌려 확인한 값이다. 둘 중 하나만 열면 부팅이 멈춘다.
+      // These values were confirmed by running five systems headlessly. Opening only one of the two stalls the boot.
       const csp = cspOf(PLAYER);
       expect(csp).toMatch(/script-src [^;]*blob:/);
       expect(csp).toMatch(/connect-src [^;]*blob:/);
@@ -136,7 +136,7 @@ describe('middleware matcher — 대용량 업로드 라우트 제외', () => {
       const csp = cspOf('/');
       expect(csp).toMatch(/frame-ancestors 'none'/);
       expect(csp).not.toMatch(/script-src [^;]*'unsafe-eval'/);
-      // wasm-unsafe-eval 은 unsafe-eval 을 포함하지 않는 별개 토큰이다(bevy-rogue 용).
+      // wasm-unsafe-eval is a separate token that does not include unsafe-eval (it is for bevy-rogue).
       expect(csp).toMatch(/script-src [^;]*'wasm-unsafe-eval'/);
       expect(csp).not.toMatch(/script-src [^;]*blob:/);
       expect(csp).not.toMatch(/connect-src [^;]*blob:/);

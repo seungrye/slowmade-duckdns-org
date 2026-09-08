@@ -1,20 +1,20 @@
 #!/usr/bin/env node
-// scripts/ingest-stocks.mjs — stock-automator parquet 덤프(JSONL) → MongoDB bulkWrite.
+// scripts/ingest-stocks.mjs - a stock-automator parquet dump (JSONL) -> a MongoDB bulkWrite.
 //
-// 입력 형식 (한 줄당 1 record):
+// The input format (1 record per line):
 //   {"ticker":"AAPL","date":"2026-06-12","open":...,"high":...,"low":...,"close":...,"volume":...}
 //
-// 동작:
-//   - readline 으로 line-by-line stream (대용량 안전)
-//   - close 가 null/누락 인 record 는 skip (필수 필드)
-//   - 1000 records 마다 bulkWrite (ticker+date upsert)
-//   - 결과: 총 처리/upsert/스킵 카운트
+// How it works:
+//   - a line-by-line stream through readline (safe for large files)
+//   - a record whose close is null or missing is skipped (a required field)
+//   - a bulkWrite every 1000 records (a ticker+date upsert)
+//   - the result: the total processed, upserted and skipped counts
 //
 // usage:
 //   pnpm exec node --env-file=.env.local scripts/ingest-stocks.mjs [path]
-//   path 미지정 시 stdin 에서 읽음.
+//   With no path given it reads from stdin.
 //
-// 예 (백필 one-shot):
+// For example (a one-shot backfill):
 //   /home/seungrye/stock-automator/.venv/bin/python \
 //     /home/seungrye/stock-automator/scripts/dump_market_data.py \
 //     /tmp/stock_prices.jsonl
@@ -34,7 +34,7 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
 
   const Prices = mongoose.connection.collection('stockdailyprices');
-  // (ticker, date) unique 인덱스 보장 — 이미 있으면 no-op
+  // Ensures the (ticker, date) unique index - a no-op when it already exists
   await Prices.createIndex({ ticker: 1, date: -1 }, { unique: true });
 
   const inputPath = process.argv[2];
@@ -52,7 +52,7 @@ async function main() {
       const r = await Prices.bulkWrite(ops, { ordered: false });
       upserted += (r.upsertedCount ?? 0) + (r.modifiedCount ?? 0);
     } catch (e) {
-      // 중복 키 등 — 카운트만 남기고 진행
+      // A duplicate key and so on - counted and skipped
       console.error(`[bulkWrite] partial error: ${e.message}`);
     }
     ops = [];

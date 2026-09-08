@@ -1,11 +1,11 @@
 import mongoose, { model, models } from 'mongoose';
 
 /**
- * painter-bot Pollinations.AI 이미지 생성 일일 한도 카운터.
- * _id: 'YYYY-MM-DD' (UTC) — 날짜별 한 문서
- * count: 그 날 생성 횟수
+ * painter-bot's daily limit counter for Pollinations.AI image generation.
+ * _id: 'YYYY-MM-DD' (UTC) - one document per date
+ * count: that day's generations
  *
- * enji-bot 의 EnjiImageQuota 와 별도 collection 으로 분리.
+ * Kept in its own collection, separate from enji-bot's EnjiImageQuota.
  */
 const PainterImageQuotaSchema = new mongoose.Schema(
   {

@@ -1,6 +1,6 @@
-// WebAdventurePastRun 모델 (#239).
+// The WebAdventurePastRun model (#239).
 //
-// 엔딩 도달 시 현재 save 를 옮겨 적치. 갤러리/통계용.
+// The current save is moved here when an ending is reached. For the gallery and the statistics.
 
 import { describe, it, expect } from 'vitest';
 import WebAdventurePastRun from './web-adventure-past-run';
@@ -52,7 +52,7 @@ describe('WebAdventurePastRun 필수 필드', () => {
     }
   });
 
-  // #287 — protagonist + stigmaErosion 보존 (snapshot 의미 보장).
+  // #287 - protagonist plus stigmaErosion are preserved (guaranteeing the snapshot's meaning).
   it('character.protagonist + stigmaErosion 보존', () => {
     const doc = makeDoc();
     expect(doc.validateSync()).toBeUndefined();

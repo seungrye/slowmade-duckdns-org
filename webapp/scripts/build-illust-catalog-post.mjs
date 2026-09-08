@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/build-illust-catalog-post.mjs — 씬 일러스트 카탈로그 Post 생성.
+// scripts/build-illust-catalog-post.mjs - creating the scene illustration catalogue Post.
 //
-// 전체 80 씬의 [제목 + (사용된 영어 prompt) + 이미지] 를 주인공별로 묶어
-// 하나의 Post(TipTap doc jsonContent + htmlContent)로 발행한다.
-//   - prompt 는 이번 생성분(english-overrides)만 보유 → 나머지는 제목+이미지만.
-// 멱등: 같은 title Post 가 있으면 update(덮어쓰기), 없으면 create.
+// All 80 scenes' [title + (the English prompt used) + image] are grouped by protagonist and
+// published as one Post (a TipTap doc's jsonContent plus htmlContent).
+//   - only this generation's prompts (english-overrides) are held -> the rest get the title and image alone.
+// Idempotent: a Post with the same title is updated (overwritten), otherwise created.
 
 import mongoose from 'mongoose';
 import fs from 'node:fs';
@@ -66,10 +66,10 @@ async function main() {
   const all = (await Scene.find({}).lean()).sort((a, b) => a.id.localeCompare(b.id));
 
   const content = []; // jsonContent.content
-  const html = []; // htmlContent 조각
+  const html = []; // the htmlContent fragments
   const urls = []; // {url, thumbnailUrl}
 
-  // 인트로
+  // the introduction
   content.push(heading(1, TITLE));
   html.push(`<h1>${esc(TITLE)}</h1>`);
   const intro =

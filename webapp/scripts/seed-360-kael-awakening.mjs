@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// seed-360-kael-awakening.mjs — #359 각성 시스템 카엘 파일럿.
+// seed-360-kael-awakening.mjs - #359's awakening system, the Kael pilot.
 //
-// 옴팔로스를 우회하는 독립 비선형 루트: kael_truth_revealed 에서 분기 →
-//   연구자(베일 박사) 접촉 → 신뢰 → 진실·제어법 전수(+억제기) → 각성 게이트(복합 조건)
-//   → 각성 절정 → 독립 클라이맥스 → 해방/찬탈 엔딩.
+// An independent non-linear route bypassing Omphalos: branching at kael_truth_revealed ->
+//   contacting the researcher (Dr Vale) -> trust -> the truth and the means of control are passed on (plus a suppressor) -> the awakening gate (a composite condition)
+//   -> the awakening's peak -> an independent climax -> the liberation or usurpation ending.
 //
-// 각성 게이트 = all 복합 조건(vale_trusted + learned_control + hasItem:stigma_suppressor
-//   + stigmaAtLeast:70). 카엘 startStigma 80 이라 침식 조건은 자동 충족.
-// 신뢰 실패·각성 보류 시 omphalos_outskirts(메인)로 복귀 — dead-end 방지.
+// The awakening gate = an all composite condition (vale_trusted + learned_control + hasItem:stigma_suppressor
+//   + stigmaAtLeast:70). Kael's startStigma of 80 satisfies the contamination condition automatically.
+// Failing the trust or holding off the awakening returns to omphalos_outskirts (the main line) - avoiding a dead end.
 //
-// 본문은 희곡체(지문 *이탤릭* / **인물** "대사"). 엔딩 씬은 후일담 마커(— 시작) 보존.
+// The bodies are in play-script form (*italic* stage directions, **name** "line"). Ending scenes keep the aftermath marker (starting with an em dash).
 
 import mongoose from 'mongoose';
 
@@ -42,7 +42,7 @@ const NEW_SCENES = [
     ],
     choices: [
       { kind: 'probability', id: 'earn_trust', label: '[진심] 네 분노와 두려움을 숨김없이 내보인다.', stat: 'cha', difficulty: 14, onSuccess: 'kael_vale_teaching', onFailure: 'kael_vale_distrust', stigmaDelta: 0 },
-      // #359 회차 부메랑 — 이전 회차 해방(world.truth_freed)이면 베일이 이미 너를 알아본다.
+      // #359's cross-run boomerang - with a previous run's liberation (world.truth_freed), Vale already recognises you.
       { kind: 'conditional', id: 'prior_truth', label: '[풀려난 진실] 지난 세계에서 이미 진실이 풀렸다 — 베일이 너를 알아본다.', to: 'kael_vale_teaching', condition: { kind: 'flag', key: 'world.truth_freed' }, hidden: true },
     ],
     onEnter: {},
@@ -126,7 +126,7 @@ const NEW_SCENES = [
     choices: [
       { kind: 'plain', id: 'choose_liberation', label: '[해방] 정제소를 부수고 진실을 외친다 — 모두를 깨운다.', to: 'ending_liberation' },
       { kind: 'plain', id: 'choose_usurpation', label: '[찬탈] 승천 의식을 가로챈다 — 내가 새 신이 된다.', to: 'ending_usurpation' },
-      // #359 회차 부메랑 — 이전 회차 찬탈(world.false_god)이면 빈 신좌의 유혹이 더 짙다.
+      // #359's cross-run boomerang - after a previous run's usurpation (world.false_god) the empty throne tempts harder.
       { kind: 'conditional', id: 'false_god_echo', label: '[거짓 신의 메아리] 지난 세계의 찬탈자가 너를 부른다 — 신좌는 비어 있다.', to: 'ending_usurpation', condition: { kind: 'flag', key: 'world.false_god' }, hidden: true },
     ],
     onEnter: {},
@@ -168,7 +168,7 @@ async function main() {
     const cur = await Scene.findOne({ id: spec.id }).lean();
     const update = { ...spec, illustration: PH };
     if (cur?.illustration && !cur.illustration.includes('placeholder')) update.illustration = cur.illustration;
-    if (cur?.bodyProse) delete update.body; // 희곡 변환 보존(재실행 시).
+    if (cur?.bodyProse) delete update.body; // Preserving the play-script conversion (on a rerun).
     await Scene.findOneAndUpdate({ id: spec.id }, update, { upsert: true });
     console.log(`  upsert: ${spec.id}${spec.isEnding ? ' [엔딩 ' + spec.endingId + ']' : ''}`);
   }

@@ -12,7 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 1,
     },
-    // #311 web-adventure 공개 영역 sitemap 등록.
+    // #311 - registering web-adventure's public area in the sitemap.
     {
       url: `${URL}/games/web-adventure`,
       lastModified: new Date(),

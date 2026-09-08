@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// scripts/seed-failure-bypass.mjs — #318 시나리오적 게임오버 직행 → HP/침식 패널티 후 우회.
+// scripts/seed-failure-bypass.mjs - #318: from a straight scenario game-over to a detour after an HP or contamination penalty.
 //
-// 디자인 의도 — 시나리오 ending (caught/chase) 은 *진짜 막다른 결정* 에만.
-// 대부분의 RNG 실패는 *HP/침식 누적 데미지* 로 이어지고, 그 누적이 한계 도달하면
-// 자동 fall/petrification ending.
+// The design intent - a scenario ending (caught/chase) is for *a genuinely final decision* alone.
+// Most RNG failures lead to *cumulative HP and contamination damage*, and when that accumulation reaches the limit
+// it becomes an automatic fall or petrification ending.
 //
-// 변경:
-//   1. 신규 우회 씬 4 종 (kael_struggled / kael_caught_minor / rin_pursued / rin_betrayal_aftermath).
-//   2. 기존 probability 분기 11 곳의 onFailure → *_caught/_chase → 우회 씬으로.
-//   3. 기존 *_caught / *_chase 씬은 reachable 0 → 운영 mongo 에서 *유지* (자동 trigger 대비
-//      isFullyPetrified / isDead 자동 ending 이 우선). lint 의 ORPHAN 검사는 autoEndingSceneIds
-//      에 추가하거나 우회 씬으로 reachable 유지.
+// The changes:
+//   1. 4 new detour scenes (kael_struggled / kael_caught_minor / rin_pursued / rin_betrayal_aftermath).
+//   2. the onFailure of 11 existing probability branches goes from *_caught/_chase to a detour scene.
+//   3. the existing *_caught / *_chase scenes become reachable 0 -> they are *kept* in production mongo (the automatic
+//      isFullyPetrified / isDead endings take precedence for the automatic trigger). lint's ORPHAN check either adds them to autoEndingSceneIds
+//      or keeps them reachable through a detour scene.
 
 import mongoose from 'mongoose';
 
@@ -87,13 +87,13 @@ const NEW_SCENES = [
   },
 ];
 
-// onFailure 재지정 — 기존 *_caught / *_chase 직행 → 신규 우회 씬.
+// Reassigning onFailure - from a straight *_caught / *_chase to the new detour scenes.
 const FAILURE_REDIRECTS = [
   // Kael
   { sceneId: 'kael_infirmary', choiceId: 'grab_scalpel', newFailure: 'kael_struggled' },
   { sceneId: 'kael_infirmary', choiceId: 'overload_panel', newFailure: 'kael_struggled' },
-  // fake_flatline 은 *지능 14 가사 위장* — 실패 시 *즉시 적발 → 석화* 가 원래
-  // 시드 의도 (kael_caught = Scene 01b — 적발). 우회 씬 redirect 제거.
+  // fake_flatline is *faking death with intelligence 14* - the original seed's intent is that failure means
+  // *immediate discovery -> petrification* (kael_caught = Scene 01b - discovery). The detour redirect is removed.
   // { sceneId: 'kael_infirmary', choiceId: 'fake_flatline', newFailure: 'kael_struggled' },
   { sceneId: 'kael_corridor', choiceId: 'forge_id', newFailure: 'kael_caught_minor' },
   // Rin
@@ -109,8 +109,8 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // 1. 신규 씬 upsert.
-  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // 1. upserting the new scenes.
+  //    An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const scene of NEW_SCENES) {
     const cur = await Scene.findOne({ id: scene.id }).lean();
     const update = { ...scene };
@@ -121,7 +121,7 @@ async function main() {
     console.log('upsert:', scene.id, `(hpΔ${scene.onEnter.hpDelta}, stigmaΔ+${scene.onEnter.stigmaDelta})`);
   }
 
-  // 2. onFailure 재지정.
+  // 2. reassigning onFailure.
   for (const r of FAILURE_REDIRECTS) {
     const cur = await Scene.findOne({ id: r.sceneId }).lean();
     if (!cur) { console.log('없음:', r.sceneId); continue; }

@@ -1,10 +1,10 @@
-// WebAdventureSceneRevision 모델 단위 테스트.
-// PUT 마다 *이전 상태* 의 snapshot 을 저장 → 복원 가능.
+// Unit tests for the WebAdventureSceneRevision model.
+// Every PUT stores a snapshot of the *previous state* -> it can be restored.
 //
-// 옛 post revision 패턴과 동일:
-//   - sceneId 별 version 증가 (1, 2, 3, ...)
-//   - 다른 sceneId 는 독립 sequence.
-//   - snapshot 은 Schema.Types.Mixed (씬 전체 자유 구조).
+// The same as the old post revision pattern:
+//   - version increases per sceneId (1, 2, 3, ...)
+//   - a different sceneId has an independent sequence.
+//   - snapshot is Schema.Types.Mixed (the whole scene, free-form).
 
 import { describe, it, expect } from 'vitest';
 import WebAdventureSceneRevision from './web-adventure-scene-revision';

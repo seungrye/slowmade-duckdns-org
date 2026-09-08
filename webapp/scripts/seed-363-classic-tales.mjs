@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// scripts/seed-363-classic-tales.mjs — 고전 삽화(揷話) 이벤트 4편, 12씬.
+// scripts/seed-363-classic-tales.mjs - 4 classic side-tale events, 12 scenes.
 //
-// 퍼블릭 도메인 고전의 모티프를 〈에테르니아〉 세계관으로 각색한 곁가지 이벤트.
-// 각 이벤트는 기존 1지선다 씬에 우회로(choice)를 추가하고, 결말은 원래 목적지로
-// 합류한다(그래프 불변 — 엔딩·본편 분기 무영향). 서식은 FORMAT.md 규약.
+// Side events adapting public-domain classics' motifs into Eternia's setting.
+// Each event adds a detour (a choice) to an existing single-choice scene, and its conclusion rejoins
+// the original destination (the graph is unchanged - endings and the main branches are unaffected). The formatting follows FORMAT.md.
 //
-//   지킬과 하이드  → 카엘 Scene 02c  잠긴 조제실 (kael_corridor_clear 분기)
-//   파우스트       → 카엘 Scene 03b  어둠 속의 거래 (kael_cargo_container 분기)
-//   오디세이아     → 린   Scene 03c  수로의 노래 (rin_underground_* 3변형 분기)
-//   돈키호테       → 솔웬 Scene 04b  풍차의 거인 (solwen_departure 분기)
+//   Jekyll and Hyde  -> Kael's Scene 02c  the locked dispensary (a kael_corridor_clear branch)
+//   Faust            -> Kael's Scene 03b  a bargain in the dark (a kael_cargo_container branch)
+//   The Odyssey      -> Rin's Scene 03c   the song in the waterway (branches off the 3 rin_underground_* variants)
+//   Don Quixote      -> Solwen's Scene 04b the giant of the windmill (a solwen_departure branch)
 //
-// 보상 아이템 4종은 src/content/web-adventure/items.ts 에 등재(mutagen_serum,
+// The 4 reward items are registered in src/content/web-adventure/items.ts (mutagen_serum,
 // faust_pact, old_knight_lance, siren_scale).
 
 import mongoose from 'mongoose';
@@ -18,7 +18,7 @@ import mongoose from 'mongoose';
 const PLACEHOLDER_ILLUSTRATION = '/web-adventure/scenes/placeholder-square.svg';
 
 const scenes = [
-  // ── 지킬과 하이드 — 잠긴 조제실 ─────────────────────────────────────
+  // -- Jekyll and Hyde - the locked dispensary --------------------------
   {
     id: 'tale_serum_lab',
     title: 'Scene 02c — 잠긴 조제실',
@@ -76,7 +76,7 @@ const scenes = [
     ],
   },
 
-  // ── 파우스트 — 어둠 속의 거래 ───────────────────────────────────────
+  // -- Faust - a bargain in the dark ------------------------------------
   {
     id: 'tale_pact_voice',
     title: 'Scene 03b — 어둠 속의 거래',
@@ -138,7 +138,7 @@ const scenes = [
     ],
   },
 
-  // ── 오디세이아 — 수로의 노래 ────────────────────────────────────────
+  // -- The Odyssey - the song in the waterway ---------------------------
   {
     id: 'tale_siren_song',
     title: 'Scene 03c — 수로의 노래',
@@ -190,7 +190,7 @@ const scenes = [
     ],
   },
 
-  // ── 돈키호테 — 풍차의 거인 ──────────────────────────────────────────
+  // -- Don Quixote - the giant of the windmill --------------------------
   {
     id: 'tale_windmill_knight',
     title: 'Scene 04b — 풍차의 거인',
@@ -246,7 +246,7 @@ const scenes = [
   },
 ];
 
-// 기존 씬에 우회로 choice 를 멱등 추가(choice id 존재 시 skip). 각 이벤트의 진입점.
+// The detour choice is added idempotently to the existing scene (skipped when the choice id is there). Each event's entry point.
 const hooks = [
   { sceneId: 'kael_corridor_clear',
     choice: { kind: 'plain', id: 'tale_serum_hook', label: '반쯤 열린 조제실 문틈으로 — 푸른 빛이 샌다.', to: 'tale_serum_lab' } },
@@ -269,7 +269,7 @@ async function main() {
     new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }),
   );
 
-  // 멱등 — upsert by id (placeholder 가 아닌 illustration 은 보존).
+  // Idempotent - upsert by id (an illustration that is not a placeholder is preserved).
   for (const s of scenes) {
     const cur = await Scene.findOne({ id: s.id }).lean();
     const update = { ...s };
@@ -282,7 +282,7 @@ async function main() {
     console.log('upsert:', s.id);
   }
 
-  // 우회로 choice 멱등 push (choices ≤3 유지 — 대상은 전부 1지선다 씬).
+  // The detour choice is pushed idempotently (keeping choices <= 3 - every target is a single-choice scene).
   for (const { sceneId, choice } of hooks) {
     const cur = await Scene.findOne({ id: sceneId }).lean();
     if (!cur) { console.log('⚠ hook 대상 없음:', sceneId); continue; }

@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// scripts/seed-352-body-min-3lines.mjs — #267 body 3줄 규칙 충족.
+// scripts/seed-352-body-min-3lines.mjs - meeting #267's 3-line body rule.
 //
-// scene-body-min.test (#267): 엔딩 외 모든 씬 body ≥ 3 줄. 그러나 분기/실패
-// 씬 30개가 2줄로 남아 있어, MONGO_URI 주입 시 테스트가 실패했다.
-// (평소 env 없이 돌면 skip → 그동안 드러나지 않음.)
+// scene-body-min.test (#267): every non-ending scene's body must be >= 3 lines. But 30 branch and failure
+// scenes were left at 2 lines, so the test failed whenever MONGO_URI was injected.
+// (Run without the env it skips, which is why it went unnoticed.)
 //
-// 각 씬에 *톤(다크 판타지) + 별표 강조 + 서사 연속* 을 지키는 3번째 줄을 추가.
-// 단순 패딩이 아니라 감정 여운 / 다음 장면 연결 / 복선을 담는다.
-// 특히 rin_underground_talk 의 추가 줄은 seed-351 의 호프만 생존 콜백
-// (omphalos_hoffmann_return) 복선을 심는다.
+// A third line is added to each scene, keeping *the tone (dark fantasy), the asterisk emphasis and the narrative continuity*.
+// It is not mere padding but carries an emotional beat, a link to the next scene, or foreshadowing.
+// rin_underground_talk's added line in particular plants the foreshadowing for seed-351's Hoffmann-survival callback
+// (omphalos_hoffmann_return).
 //
-// 멱등: body.length >= 3 이면 skip (첫 실행 2→3, 재실행 skip).
+// Idempotent: skipped when body.length >= 3 (the first run takes 2 -> 3, a rerun skips).
 
 import mongoose from 'mongoose';
 

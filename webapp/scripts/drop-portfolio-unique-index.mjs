@@ -1,12 +1,12 @@
 /**
- * 포트폴리오의 (accountId, market) 유니크 인덱스를 지운다 (#339).
+ * Drops the portfolios' (accountId, market) unique index (#339).
  *
- * 계정·시장당 여러 블록을 두려면 이 인덱스가 없어야 한다. mongoose 는 스키마에서 인덱스를
- * 빼도 **이미 만들어진 DB 인덱스를 지우지 않으므로**, 안 지우면 두 번째 블록을 만들 때
- * duplicate key 로 실패한다.
+ * Several blocks per account and market need this index gone. mongoose **does not drop an index already
+ * created in the DB** when it is removed from the schema, so left in place, creating a second block fails
+ * with a duplicate key.
  *
- *   node scripts/drop-portfolio-unique-index.mjs           # 지금 인덱스를 보여만 준다
- *   node scripts/drop-portfolio-unique-index.mjs --apply   # 실제로 지운다
+ *   node scripts/drop-portfolio-unique-index.mjs           # only shows the current indexes
+ *   node scripts/drop-portfolio-unique-index.mjs --apply   # actually drops
  */
 import mongoose from 'mongoose';
 
@@ -30,8 +30,8 @@ if (!target) {
   console.log(`\n${NAME} (UNIQUE) 를 지운다 — 실제로 지우려면 --apply`);
 } else {
   await col.dropIndex(NAME);
-  // 조회용 인덱스는 남긴다. 다음 앱 기동 때 mongoose 가 다시 만들지만, 여기서 바로 만들어
-  // 두면 지운 직후의 조회도 느려지지 않는다.
+  // The lookup index is kept. mongoose recreates it at the next app start, but creating it here
+  // keeps lookups fast right after the drop.
   await col.createIndex({ accountId: 1, market: 1 });
   console.log(`\n${NAME} (UNIQUE) 를 지우고 조회용으로 다시 만들었다.`);
 }

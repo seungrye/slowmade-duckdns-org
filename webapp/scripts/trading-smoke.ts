@@ -1,11 +1,11 @@
-// 자동매매 dry-run 스모크(일회성) — 세션 없이 엔진을 직접 구동해 실 KIS API 검증.
+// A one-off dry-run smoke test for the automated trading - driving the engine directly, without a session, to verify the real KIS API.
 //   pnpm dlx tsx scripts/trading-smoke.mts <kr|us> [universeLimit]
 import { readFileSync } from "node:fs";
 for (const line of readFileSync(".env.local", "utf8").split("\n")) {
   const m = line.match(/^([A-Z_0-9]+)=(.*)$/);
   if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^"|"$/g, "");
 }
-process.env.TRADING_LIVE_ALLOWED = "false"; // 스모크는 무조건 dry
+process.env.TRADING_LIVE_ALLOWED = "false"; // The smoke test is always dry
 
 const { connectToDB } = await import("../src/lib/db");
 const TradingAccount = (await import("../src/models/trading-account")).default;

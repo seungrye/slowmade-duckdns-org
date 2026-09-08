@@ -1,30 +1,30 @@
-// WebAdventureSceneRevision — 씬 PUT 마다 *이전 상태* snapshot 백업.
+// WebAdventureSceneRevision - a snapshot of the *previous state* backed up on every scene PUT.
 //
-// 옛 post-revision 패턴을 그대로 차용:
-//   - sceneId 별 version 1 부터 sequential 증가.
-//   - 다른 sceneId 끼리는 독립 sequence.
-//   - snapshot 은 Schema.Types.Mixed (씬 전체 자유 구조 — onEnter / choices / illustration 등).
-//   - PUT 핸들러가 *현재* 씬을 백업한 뒤 새 데이터로 덮어쓴다.
-//   - restore 호출 시에도 동일 로직 — 현재 → revision 백업 후 snapshot 복원.
+// It borrows the old post-revision pattern as it is:
+//   - version increases sequentially from 1 per sceneId.
+//   - different sceneIds have independent sequences.
+//   - snapshot is Schema.Types.Mixed (the whole scene, free-form - onEnter, choices, illustration and so on).
+//   - the PUT handler backs up the *current* scene, then overwrites it with the new data.
+//   - a restore does the same - the current one is backed up as a revision, then the snapshot is restored.
 
 import { InferSchemaType, Model, Schema, model, models } from 'mongoose';
 
 const WebAdventureSceneRevisionSchema = new Schema(
   {
-    // mongo 의 *비즈니스 id* (예: kael_infirmary). _id 아님.
+    // mongo's *business id* (kael_infirmary, for example). Not the _id.
     sceneId: { type: String, required: true, index: true },
-    // 씬 전체 snapshot — strict 미적용 (씬 스키마가 진화해도 보존 가능).
+    // The whole scene's snapshot - not strict (so it survives the scene schema evolving).
     snapshot: { type: Schema.Types.Mixed, required: true },
-    // 1 부터 sceneId 별 독립 증가.
+    // Increasing independently per sceneId, from 1.
     version: { type: Number, required: true },
-    // 현 세션 email 또는 system.
+    // The current session's email, or system.
     author: { type: String, default: 'system' },
     createdAt: { type: Date, required: true, default: Date.now },
   },
   { collection: 'webadventurescenerevisions' },
 );
 
-// 복합 인덱스 — sceneId 별 version DESC 목록 query 효율.
+// The compound index - for an efficient version DESC listing per sceneId.
 WebAdventureSceneRevisionSchema.index({ sceneId: 1, version: -1 });
 
 export type WebAdventureSceneRevisionType = InferSchemaType<

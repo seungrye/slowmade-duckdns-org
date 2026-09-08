@@ -96,8 +96,8 @@ const MainToolbarContent = ({
                     display: 'flex',
                     alignItems: 'center',
                     flexWrap: 'nowrap',
-                    // 수축하면 툴바가 넘치지 않아 스크롤 여지가 안 생기고, 대신 안의 버튼만
-                    // 잘려서 클릭할 수 없게 된다. 넘치게 둬야 툴바가 가로로 스크롤된다.
+                    // Shrinking it stops the toolbar overflowing and leaves no room to scroll; instead the buttons inside
+                    // are clipped and cannot be clicked. It has to overflow for the toolbar to scroll horizontally.
                     flexShrink: 0,
                     ...(isMarkdownMode ? { opacity: 0.35, pointerEvents: 'none' } : {}),
                 }}
@@ -221,10 +221,10 @@ const MobileToolbarContent = ({
 
 export interface RichWebEditorHandle {
     /**
-     * 에디터가 준비됐나 (#201).
+     * Is the editor ready (#201).
      *
-     * `immediatelyRender: false` 라 첫 렌더에는 내부 editor 가 없다. 그때 `setContent` 를
-     * 부르면 **조용히 무시된다**(아래 early return). 부르는 쪽이 기다릴 수 있게 알려 준다.
+     * With `immediatelyRender: false` the inner editor is absent on the first render. Calling `setContent` then
+     * is **silently ignored** (the early return below). This tells the caller so it can wait.
      */
     isReady: () => boolean;
     getContent: () => {
@@ -236,7 +236,7 @@ export interface RichWebEditorHandle {
     focus: () => void;
 }
 
-// 첨부 업로드 라이프사이클 — 부모(작성 폼)가 진행 칩·성공/실패 UI 를 그리도록 방출.
+// The attachment upload lifecycle - emitted so the parent (the writing form) can draw the progress chips and the success/failure UI.
 export type RichWebEditorProps = {
     onAttachStart?: (p: { tempId: string; name: string; size: number; mimeType: string }) => void;
     onAttachProgress?: (tempId: string, percent: number) => void;
@@ -318,8 +318,8 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditor
         content: "",
     })
 
-    // 파일 첨부 — /api/attachment/upload 로 올린 뒤 상위(작성 폼)로 메타 콜백. 본문에 삽입하지 않고,
-    // 폼 하단 전용 첨부 영역에 칩으로 쌓인다(제출 시 서버 프록시가 key·권한 해석).
+    // File attachment - uploaded through /api/attachment/upload, then the metadata goes back to the parent (the writing form) by callback. It is not inserted into the body but
+    // stacks as chips in the dedicated attachment area at the foot of the form (on submission the server proxy resolves the key and the permissions).
     const uploadOne = React.useCallback(async (file: File) => {
         const tempId = crypto.randomUUID();
         props.onAttachStart?.({ tempId, name: file.name, size: file.size, mimeType: file.type || "application/octet-stream" });
@@ -333,7 +333,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditor
         }
     }, [props]);
 
-    // 다중 선택 지원 — 파일마다 병렬 업로드(각 uploadOne 이 자체 try/catch 라 1건 실패가 나머지를 막지 않음).
+    // Multiple selection is supported - each file uploads in parallel (each uploadOne has its own try/catch, so one failure does not block the rest).
     const insertAttachments = React.useCallback(async (files: File[]) => {
         await Promise.all(files.map(uploadOne));
     }, [uploadOne]);
@@ -376,14 +376,14 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditor
         }
     }, [isMobile, mobileView])
 
-    // textarea 를 내용 높이에 맞춰 늘린다. 데스크톱은 고정높이 content-wrapper 안에서
-    // 넘치면 그 컨테이너가 내부 스크롤, 모바일은 페이지가 늘어나 페이지 스크롤(플로팅 툴바).
+    // The textarea grows to fit its content. On desktop, overflowing inside the fixed-height content-wrapper makes
+    // that container scroll internally; on mobile the page grows and the page scrolls (the floating toolbar).
     const autoResizeTextarea = React.useCallback((el: HTMLTextAreaElement) => {
         el.style.height = 'auto';
         el.style.height = `${el.scrollHeight}px`;
     }, []);
 
-    // Markdown 모드 진입 시 textarea 초기 높이 조절
+    // Setting the textarea's initial height when entering Markdown mode
     React.useEffect(() => {
         if (isMarkdownMode && textareaRef.current) {
             autoResizeTextarea(textareaRef.current);
@@ -393,7 +393,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditor
     const handleToggleMarkdown = React.useCallback(() => {
         if (!editor) return;
         if (!isMarkdownModeRef.current) {
-            // Visual → Code: 원본 JSON 저장 후 Markdown 직렬화
+            // Visual -> Code: the original JSON is stored, then serialised to Markdown
             savedJsonRef.current = editor.getJSON();
             const md = editor.getMarkdown();
             savedMarkdownRef.current = md;
@@ -402,7 +402,7 @@ export const RichWebEditor = React.forwardRef<RichWebEditorHandle, RichWebEditor
             isMarkdownModeRef.current = true;
             setIsMarkdownMode(true);
         } else {
-            // Code → Visual: 변경 없으면 원본 JSON 복원, 변경 있으면 Markdown 파싱
+            // Code -> Visual: unchanged, the original JSON is restored; changed, the Markdown is parsed
             if (markdownContentRef.current === savedMarkdownRef.current && savedJsonRef.current) {
                 editor.commands.setContent(savedJsonRef.current);
             } else {

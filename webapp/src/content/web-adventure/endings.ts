@@ -1,8 +1,8 @@
-// 〈에테르니아의 추락〉 엔딩 메타 (#253 리프래시).
+// The Fall of Eternia's ending metadata (#253's refresh).
 //
-// 엔딩 메타 — 한국어 에필로그 200-400 자. 목록은 types/web-adventure 의 ENDING_IDS 가 원본(#352).
+// The ending metadata - a Korean epilogue of 200-400 characters. ENDING_IDS in types/web-adventure is the list's source (#352).
 //
-// EndingId 는 types/web-adventure.ts 에서 단일 정의 (mongoose enum 과 동기).
+// EndingId is defined once in types/web-adventure.ts (in sync with the mongoose enum).
 
 import type { EndingId } from "@/types/web-adventure";
 
@@ -13,21 +13,21 @@ export type EndingMeta = {
   epilogue: string;
   icon: string;
   /**
-   * #275 후일담 — *세 달 후 / 다음 세대* 시점의 1 문단.
-   * EndingScreen 이 epilogue 와 시각 분리 (—) 로 표시.
+   * #275's aftermath - one paragraph set *three months later / a generation on*.
+   * EndingScreen shows it separated from the epilogue by an em dash.
    */
   aftermath: string;
 };
 
 /**
- * 엔딩 짧은 이름 — 노트 제목·목록·상세가 함께 쓴다.
+ * The endings' short names - shared by a note's title, the list and the detail view.
  *
- * `Record<EndingId, …>` 라 **엔딩을 더하면 여기서 타입 에러가 난다** (#352). 예전엔
- * `Record<string, …>` 사본이 화면 두 곳과 lib 에 각각 있었고, 새 엔딩이 어디에도 없어
- * 화면에 id 가 그대로 노출됐다.
+ * Being a `Record<EndingId, …>`, **adding an ending gives a type error here** (#352). It used to be
+ * a `Record<string, …>` copied into two screens and lib separately, and a new ending appeared in none of them,
+ * so the id showed on screen as it was.
  *
- * 여기 있는 이유: 이 파일은 순수 데이터라 **서버·클라이언트 어디서든 import 해도 안전**하다.
- * feedback-note.ts 는 node:crypto·undici 를 물고 있어 클라이언트가 못 가져간다.
+ * Why it lives here: this file is pure data and so **safe to import from the server or the client**.
+ * feedback-note.ts pulls in node:crypto and undici and cannot go to the client.
  */
 export const ENDING_LABEL: Record<EndingId, string> = {
   ascension: "승천",
@@ -44,10 +44,10 @@ export const ENDING_LABEL: Record<EndingId, string> = {
 };
 
 /**
- * DB 에서 온 문자열로 라벨을 찾는다. 모르는 값이면 그대로 돌려준다.
+ * Finds the label for a string from the DB. An unknown value is returned as it is.
  *
- * ENDING_LABEL 은 `Record<EndingId, …>` 라 완전성이 강제되지만, past-run·노트의 endingId 는
- * 저장된 문자열이라 타입이 좁혀지지 않는다. 그 캐스팅을 화면마다 흩지 않고 여기서 한 번만 한다.
+ * ENDING_LABEL is a `Record<EndingId, …>` and so is complete by force, but a past-run's or a note's endingId is
+ * a stored string and is not narrowed by the type. That cast is done once here rather than scattered across the screens.
  */
 export function endingLabel(id: string): string {
   return ENDING_LABEL[id as EndingId] ?? id;
@@ -102,7 +102,7 @@ export const endingsMeta: Record<EndingId, EndingMeta> = {
     aftermath:
       "— 도시들이 *기억 속에만* 남은 후, 영수가 새 인간의 아이 하나를 키운다. 그 아이가 자라 *옛 솔벤의 노래* 를 한 소절 기억한다 — 자신의 노래라고 믿으면서.",
   },
-  // #359 각성 루트 전용 엔딩.
+  // #359's awakening-route-only endings.
   liberation: {
     title: "해방 — 깨어난 자들",
     epilogue:
@@ -119,7 +119,7 @@ export const endingsMeta: Record<EndingId, EndingMeta> = {
     aftermath:
       "— 세 달 후. 새 사제단이 *카엘 신* 의 이름을 외운다. 성흔은 여전히 \"선택\" 이라 불리고, 정제소는 여전히 돌아간다. 다만 꼭대기에 앉은 얼굴만 바뀌었을 뿐. 누군가 또, *깨어나기를 기다리며*.",
   },
-  // #361 린 각성 루트(신념과 타락) 엔딩.
+  // #361's Rin awakening route (conviction and corruption) endings.
   regency: {
     title: "권좌 — 살아남은 타락자",
     epilogue:

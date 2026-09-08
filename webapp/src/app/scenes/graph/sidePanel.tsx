@@ -1,22 +1,22 @@
-// SidePanel — /scenes/graph 우측 인라인 편집 패널.
+// SidePanel - /scenes/graph's right-hand inline editing panel.
 //
-// #226 — /scenes/[id] 페이지로 라우팅하지 않고 같은 컴포넌트들을
-// (sceneForm / choiceEditor / conditionBuilder) 재사용해 우측 패널에서 편집.
+// #226 - instead of routing to the /scenes/[id] page, the same components
+// (sceneForm / choiceEditor / conditionBuilder) are reused to edit in the right-hand panel.
 //
-// #231 — bevy-rogue quest CMS 패턴 회수.
-//   - sceneId=null 시 → null 반환 (DOM 미렌더). 안내 메시지 제거.
-//   - 부모 (/scenes/graph/page.tsx) 가 `{selectedSceneId && <SidePanel ... />}`
-//     로 조건부 렌더 (= mount/unmount) 하며, 첫 mount 시 slide-in 애니메이션을
-//     주기 위해 패널 자체에 transition + translate-x 토글을 둔다.
+// #231 - reclaiming the bevy-rogue quest CMS pattern.
+//   - with sceneId=null it returns null (no DOM rendered). The hint message is gone.
+//   - the parent (/scenes/graph/page.tsx) renders it conditionally with `{selectedSceneId && <SidePanel ... />}`
+//     (= mount/unmount), and the panel itself carries a transition plus a translate-x toggle so the
+//     first mount slides in.
 //
-// 동작:
-//   - sceneId 설정     → /api/web-adventure/scenes/[id] 로 로드 → 폼 + 선택지 편집.
-//   - 저장 버튼        → PUT → onSaved 콜백 (page 의 nodes data 갱신).
-//   - 닫기 버튼        → onClose 콜백.
+// How it works:
+//   - a set sceneId  -> loads from /api/web-adventure/scenes/[id] -> the form plus choice editing.
+//   - the save button -> a PUT -> the onSaved callback (updating the page's node data).
+//   - the close button -> the onClose callback.
 //
-// 반응형 (MVP):
-//   - sm 이상: 우측 고정 패널 (w-96).
-//   - sm 미만: bottom drawer (화면 하단 max-h-[80vh] overflow-y-auto).
+// Responsive (MVP):
+//   - sm and up: a fixed right-hand panel (w-96).
+//   - below sm: a bottom drawer (max-h-[80vh] overflow-y-auto at the foot of the screen).
 
 "use client";
 
@@ -31,12 +31,12 @@ interface Props {
   onSaved: (scene: Scene) => void;
 }
 
-// #338 — 가로 리사이즈 핸들.
-//   - sm 이상 우측 패널에서만 적용 (sm 미만 = bottom drawer).
-//   - localStorage 에 마지막 width 저장 — 다음 mount 시 유지.
-//   - min 280 / max window.innerWidth - 200 (그래프 영역 최소 200 px 보장).
+// #338 - the horizontal resize handle.
+//   - applies only to the right-hand panel at sm and up (below sm it is a bottom drawer).
+//   - the last width is stored in localStorage - kept on the next mount.
+//   - min 280 / max window.innerWidth - 200 (guaranteeing the graph area at least 200px).
 const PANEL_WIDTH_KEY = "scenes-graph:side-panel-width";
-const DEFAULT_WIDTH = 384; // sm:w-96 와 동등.
+const DEFAULT_WIDTH = 384; // Equivalent to sm:w-96.
 const MIN_WIDTH = 280;
 function getInitialWidth(): number {
   if (typeof window === "undefined") return DEFAULT_WIDTH;
@@ -51,29 +51,29 @@ function clampWidth(w: number): number {
 }
 
 export function SidePanel({ sceneId, onClose, onSaved }: Props) {
-  // #231 — sceneId=null 시 컴포넌트 자체를 mount 하지 않는다 (bevy-rogue 패턴).
-  // 부모가 `{selectedSceneId && <SidePanel ... />}` 로 가드해도, 직접 호출자
-  // 안전망으로 같은 분기를 유지한다.
+  // #231 - with sceneId=null the component itself is not mounted (the bevy-rogue pattern).
+  // The parent guards with `{selectedSceneId && <SidePanel ... />}`, but the same branch is kept
+  // as a safety net for a direct caller.
   const [scene, setScene] = useState<Scene | null>(null);
   const [allSceneIds, setAllSceneIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
-  // #231 — mount 직후 slide-in 을 위해 첫 paint 후 translate-x 를 0 으로 토글.
+  // #231 - translate-x toggles to 0 after the first paint so it slides in right after mounting.
   const [slidIn, setSlidIn] = useState(false);
   useEffect(() => {
     if (!sceneId) {
       setSlidIn(false);
       return;
     }
-    // 다음 frame 에서 transition 효과로 들어오게 한다.
+    // It comes in with the transition on the next frame.
     const raf = requestAnimationFrame(() => setSlidIn(true));
     return () => cancelAnimationFrame(raf);
   }, [sceneId]);
 
-  // #339 — sm breakpoint (≥640px) 매치 여부 추적. 모바일 시 width inline style
-  // 제거 + Tailwind fixed inset 으로 fullscreen.
+  // #339 - tracking whether the sm breakpoint (>=640px) matches. On mobile the inline width style
+  // is dropped and Tailwind's fixed inset makes it fullscreen.
   const [isSm, setIsSm] = useState(false);
   useEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
@@ -84,16 +84,16 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
     return () => mq.removeEventListener("change", onChange);
   }, []);
 
-  // #338 — width state + 드래그 핸들 로직.
-  // handleMouseDown 안에서 직접 window listener 등록 → closure 로 startX /
-  // startWidth 캡처. useEffect deps reattach race + stale closure 차단.
+  // #338 - the width state plus the drag handle logic.
+  // The window listeners are registered inside handleMouseDown so the closure captures startX and
+  // startWidth. That blocks the useEffect deps reattach race and a stale closure.
   const [width, setWidth] = useState<number>(() => getInitialWidth());
   const handleHandleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = width;
     function onMove(ev: MouseEvent) {
-      // 우측 패널 — 마우스가 *왼쪽으로* 이동 = 패널 *더 넓어짐*.
+      // The right-hand panel - moving the mouse *left* makes the panel *wider*.
       const dx = startX - ev.clientX;
       setWidth(clampWidth(startWidth + dx));
     }
@@ -104,7 +104,7 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   };
-  // width 변경 시 localStorage 저장 (디바운스 불필요 — drag 끝의 마지막 값만 유의).
+  // A changed width is stored in localStorage (no debounce needed - only the last value at the end of a drag matters).
   useEffect(() => {
     try {
       window.localStorage.setItem(PANEL_WIDTH_KEY, String(width));
@@ -113,7 +113,7 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
     }
   }, [width]);
 
-  // sceneId 변경 시 fetch.
+  // Fetches when sceneId changes.
   useEffect(() => {
     if (!sceneId) {
       setScene(null);
@@ -188,16 +188,16 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
     }
   }
 
-  // ── 렌더링 ──────────────────────────────────────────────────────────────────
-  // #231 — sceneId=null → null 반환 (DOM 미렌더). 부모가 mount/unmount.
-  // 안내 메시지 제거.
+  // -- rendering ------------------------------------------------------------
+  // #231 - sceneId=null -> returns null (no DOM rendered). The parent mounts and unmounts.
+  // The hint message is gone.
   if (!sceneId) {
     return null;
   }
 
-  // 슬라이드인 transition (300ms ease-out).
-  // sm 이상 → 우측에서 들어옴 (translate-x-full → translate-x-0).
-  // sm 미만 → 하단에서 올라옴 (translate-y-full → translate-y-0).
+  // The slide-in transition (300ms ease-out).
+  // sm and up -> it comes in from the right (translate-x-full -> translate-x-0).
+  // below sm -> it rises from the bottom (translate-y-full -> translate-y-0).
   const slideClass = slidIn
     ? "translate-x-0 translate-y-0"
     : "translate-x-0 translate-y-full sm:translate-x-full sm:translate-y-0";
@@ -206,16 +206,16 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
     "transition-transform duration-300 ease-out " +
     slideClass +
     " " +
-    // sm 이상 — 우측 사이드. #338 width 는 inline style 로 (sm:w-96 제거).
+    // sm and up - the right-hand side. #338's width is an inline style (sm:w-96 is gone).
     "sm:border-l sm:max-h-none sm:h-full sm:static sm:top-auto sm:border-t-0 sm:shadow-none sm:relative " +
-    // #339 — sm 미만 (모바일) — fullscreen (네비 제외).
-    // top-[60px] = navbar (py-3 + 30px icon ≈ 60px) 아래.
-    // sm 이상은 sm:static 으로 position 복원 (handle absolute 의 부모 컨테이닝
-    // 위해 sm:relative). 모바일은 fixed 가 활성.
+    // #339 - below sm (mobile) - fullscreen (excluding the nav).
+    // top-[60px] = below the navbar (py-3 plus a 30px icon, about 60px).
+    // sm and up restores the position with sm:static (sm:relative so the absolute handle has a
+    // containing parent). On mobile the fixed positioning is active.
     "fixed top-[60px] bottom-0 left-0 right-0 max-h-none border-t shadow-lg z-20";
 
-  // #338 — 가로 리사이즈 핸들. sm 이상에서만 보임 (sm 미만 = bottom drawer 라 의미 없음).
-  // 패널 좌측에 absolute 위치 — 4 px 띠 + hover 시 파란 강조.
+  // #338 - the horizontal resize handle. Visible at sm and up only (below sm it is a bottom drawer, so it means nothing).
+  // Positioned absolutely at the panel's left - a 4px strip with a blue highlight on hover.
   const ResizeHandle = (
     <div
       data-testid="side-panel-resize"
@@ -227,7 +227,7 @@ export function SidePanel({ sceneId, onClose, onSaved }: Props) {
     />
   );
 
-  // 우측 패널 sm 이상 시 width 적용. sm 미만은 fullscreen (네비 제외) — width 미적용.
+  // The width applies to the right-hand panel at sm and up. Below sm it is fullscreen (excluding the nav) - no width applied.
   const widthStyle: React.CSSProperties | undefined = isSm
     ? { width: `${width}px` }
     : undefined;

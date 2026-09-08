@@ -17,7 +17,7 @@ describe("attachmentIconSpec — MIME → 배지 라벨/색", () => {
   it("gist 확장 카테고리 — audio/video/code(prefix·구체)", () => {
     expect(attachmentIconSpec("audio/mpeg").label).toBe("AUD");
     expect(attachmentIconSpec("video/mp4").label).toBe("VID");
-    expect(attachmentIconSpec("text/html").label).toBe("CODE");   // code (text/* 보다 우선)
+    expect(attachmentIconSpec("text/html").label).toBe("CODE");   // code (taking precedence over text/*)
     expect(attachmentIconSpec("application/json").label).toBe("CODE");
     expect(attachmentIconSpec("application/gzip").label).toBe("ZIP");
     expect(attachmentIconSpec("application/vnd.oasis.opendocument.text").label).toBe("DOC");
@@ -42,9 +42,9 @@ describe("attachmentIconSvg / dataUri", () => {
   it("FA 파일 아이콘 SVG — path + 타입 색, 타입별로 다름", () => {
     const pdf = attachmentIconSvg("application/pdf");
     expect(pdf).toContain("<svg");
-    expect(pdf).toContain("<path"); // FA 아이콘 path
-    expect(pdf).toContain('fill="#e11d48"'); // PDF 색
-    // 타입이 다르면 아이콘(path)도 다르다
+    expect(pdf).toContain("<path"); // the FA icon's path
+    expect(pdf).toContain('fill="#e11d48"'); // the PDF colour
+    // a different type gives a different icon (path) too
     expect(attachmentIconSvg("application/zip")).not.toBe(pdf);
   });
   it("dataUri 는 svg+xml", () => {

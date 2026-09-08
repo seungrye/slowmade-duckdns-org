@@ -1,28 +1,28 @@
 'use client';
 
-// 헤더 달력 배지 (#328).
+// The header's calendar badge (#328).
 //
-// 알림 종(notification-bell.tsx)과 같은 방침 — navbar 는 595줄에 데스크톱·모바일 마크업이
-// 두 벌이라, 여기서 자기완결로 끝내야 navbar 변경이 한 줄로 끝난다.
+// The same policy as the notification bell (notification-bell.tsx) - navbar holds two sets of markup, desktop and mobile,
+// across 595 lines, so finishing self-contained here keeps the navbar change to one line.
 //
-// 로그인 없이도 보인다. 공휴일은 누구에게나 공휴일이다.
+// It shows without a login. A public holiday is a holiday for everyone.
 
 import { useEffect, useRef, useState } from 'react';
 import { seoulDateKey } from '@/lib/birthday';
 import type { CalendarEvent, EventKind } from '@/lib/calendar/types';
 
-/** 조회한 KST 날짜. 하루 1회만 부르려고 둔다(생일 기능과 같은 방식). */
+/** The KST date checked. Kept so it is called once a day (the same approach as the birthday feature). */
 export const CALENDAR_CHECKED_KEY = 'calendar-checked';
 const CACHED_EVENTS_KEY = 'calendar-events';
 
 /**
- * 종류별 색 — 공휴일은 붉게(쉬는 날), 기념일은 푸르게, 절기는 무채색으로.
+ * The colour per kind - holidays red (a day off), observances blue, solar terms achromatic.
  *
- * 겹쳐 쌓는 방식이라 크기로 무게를 나눌 수 없어(뒤엣것이 가려진다) 색으로 나눈다.
+ * They are stacked, so weight cannot be shown by size (the one behind is hidden) and colour carries it instead.
  *
- * **다만 겹침을 89.3% 로 올린 뒤로는(#413) 스택에서 색이 보이는 것은 첫 칸뿐이다.**
- * 나머지는 2.8px 실오라기라 색을 알아볼 수 없다. 그래서 색은 이제 **첫 칸과 툴팁**에서만
- * 뜻이 있다 — 자리를 아끼려고 알고 치른 값이다. 종류를 낱낱이 보려면 눌러서 "전부 보기".
+ * **But since the overlap went to 89.3% (#413), only the first slot's colour is visible in the stack.**
+ * The rest are 2.8px threads whose colour cannot be made out. So colour now means something only in **the first slot and the tooltip**
+ * - a price knowingly paid to save space. To see every kind, press for "show all".
  */
 const TONE: Record<EventKind, string> = {
   holiday: 'bg-rose-600/90',
@@ -30,22 +30,22 @@ const TONE: Record<EventKind, string> = {
   season: 'bg-gray-600/90',
 };
 
-/** 스택에 실제로 그리는 최대 개수. 넘으면 마지막 칸이 +N 이 된다. */
+/** The most slots actually drawn in the stack. Beyond that the last slot becomes +N. */
 const VISIBLE = 3;
 
 export default function CalendarBadge() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  /** 마우스·포커스가 짚은 칸. null 이면 아무것도 안 짚은 상태. */
+  /** The slot the mouse or focus is on. null means none.*/
   const [hovered, setHovered] = useState<number | null>(null);
-  /** 눌러서 연 상태(모바일). hover 가 없는 기기에서 툴팁을 여는 유일한 길이다. */
+  /** Opened by a press (mobile). On a device without hover it is the only way to open the tooltip. */
   const [pinned, setPinned] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const today = seoulDateKey(new Date());
 
-    // 오늘 이미 확인했으면 네트워크를 타지 않는다. 결과까지 같이 들고 있어야, 페이지를
-    // 옮길 때마다 배지가 사라졌다 나타나지 않는다.
+    // Already checked today, so no network call. The result is held alongside it so the badge does not
+    // disappear and reappear on every page change.
     try {
       if (localStorage.getItem(CALENDAR_CHECKED_KEY) === today) {
         const cached = localStorage.getItem(CACHED_EVENTS_KEY);
@@ -79,7 +79,7 @@ export default function CalendarBadge() {
     };
   }, []);
 
-  // Esc·바깥 클릭으로 닫기 — navbar 의 드롭다운과 같은 방식.
+  // Closed by Escape or a click outside - the same approach as the navbar's dropdowns.
   useEffect(() => {
     if (!pinned) return;
     const onKey = (e: KeyboardEvent) => {
@@ -96,18 +96,18 @@ export default function CalendarBadge() {
     };
   }, [pinned]);
 
-  // 해당 없는 날엔 자리도 차지하지 않는다.
+  // On a day with none it takes up no space either.
   if (events.length === 0) return null;
 
   const shown = events.slice(0, VISIBLE);
   const overflow = events.length - shown.length;
   const open = hovered !== null || pinned;
-  // 짚은 칸이 있으면 그것만, 없으면(=탭으로 연 모바일) 전부 보여준다.
+  // With a slot pointed at, only that one; without (= opened by a tap on mobile), all of them.
   const listed = hovered !== null ? [events[hovered]] : events;
 
   /**
-   * 누르면 "전부 보기". 데스크톱에선 hover 로 하나씩 보다가 누르면 전체가 되고,
-   * 모바일은 hover 가 없어 탭이 곧 전체 보기가 된다.
+   * A press means "show all". On desktop you hover through them one by one and a press gives the whole set,
+   * and on mobile, with no hover, a tap is the show-all.
    */
   const showAll = () => {
     setHovered(null);
@@ -130,17 +130,17 @@ export default function CalendarBadge() {
             onFocus={() => setHovered(i)}
             onBlur={() => setHovered(null)}
             onClick={showAll}
-            // 겹쳐 쌓되 링으로 경계를 그어 이모지끼리 뭉개지지 않게 한다.
-            // 링 색은 navbar 배경과 같아야 오려낸 것처럼 보인다.
+            // Stacked, but with a ring drawing the boundary so the emoji do not blur together.
+            // The ring's colour must match the navbar's background to look cut out.
             //
-            // 겹침 **89.3%(-ml-[25px])** — navbar 에서 자리를 아끼려고 한 것이다 (#413).
-            // 28.6%(-ml-2) 88px → 60.7% 61px(#410) → 지금 36px. 처음의 41% 다.
-            // 정확히 90% 면 25.2px 인데 소수 px 는 가장자리를 흐려 정수로 둔다.
+            // The overlap is **89.3% (-ml-[25px])** - done to save space in the navbar (#413).
+            // 28.6% (-ml-2) 88px -> 60.7% 61px (#410) -> 36px now. 41% of the original.
+            // Exactly 90% would be 25.2px, but a fractional px blurs the edges, so it is kept whole.
             //
-            // **치른 값을 적어 둔다**(그려 보고 고른 것이다): 첫 칸만 보이고 나머지는 2.8px
-            // 실오라기라 색도 +N 개수도 안 읽히고, 배지별 hover 판정도 그만큼 좁다.
-            // 짚어 보기가 아주 죽지는 않는다 — **누르면 "전부 보기"** 이고, 모바일은 원래
-            // hover 가 없어 그 길로만 썼다. 짚어 보기는 데스크톱에서 덤이었다.
+            // **The price is written down** (it was chosen by drawing it): only the first slot shows, the rest are 2.8px
+            // threads whose colour and +N count cannot be read, and the per-badge hover target is that narrow too.
+            // Pointing is not quite dead - **a press means "show all"**, and mobile never had
+            // hover and always used that route. Pointing was a bonus on desktop.
             style={{ zIndex: hovered === i ? 30 : shown.length - i }}
             className={`relative -ml-[25px] flex h-7 w-7 items-center justify-center rounded-full text-sm leading-none ring-2 ring-gray-900 transition first:ml-0 focus:outline-none ${TONE[event.kind]} ${
               hovered === i ? 'scale-110 ring-white' : ''

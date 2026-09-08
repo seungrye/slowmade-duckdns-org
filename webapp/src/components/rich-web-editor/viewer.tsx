@@ -50,10 +50,10 @@ import { lowlight } from "@/lib/lowlight"
 // --- Styles ---
 import "./editor.scss"
 
-// 뷰어(editable:false) 전용 이미지 렌더. ImageResize 의 NodeView 는 읽기전용에서 wrapper(display:flex)
-// 를 버리고 container 만 렌더해 container 의 margin:auto 정렬이 무효화된다(block width 100%). 여기선
-// renderHTML 로 wrapper+container 구조를 재현해 정렬(중앙/좌/우)·크기(width)를 그대로 반영한다.
-// 드래그 리사이즈는 에디터 전용이라 뷰어엔 NodeView 가 불필요.
+// The image render for the viewer (editable:false) alone. ImageResize's NodeView drops the wrapper (display:flex) when read-only
+// and renders the container alone, which voids the container's margin:auto alignment (a block at width 100%). Here
+// renderHTML reproduces the wrapper+container structure so the alignment (centre/left/right) and size (width) carry over.
+// Drag resizing is editor-only, so the viewer needs no NodeView.
 const ViewerImage = Image.extend({
     name: "image",
     addAttributes() {
@@ -78,9 +78,9 @@ const ViewerImage = Image.extend({
     },
 })
 
-// CSS 인젝션 방어 — jsonContent 는 서버가 임의 Object 로 저장하므로(에디터 우회 가능), 렌더 시점에
-// style 속성의 위험 토큰(외부 리소스 로드 url()·@import·expression·javascript:)을 제거한다.
-// display/flex/margin 등 레이아웃 스타일은 그대로 유지.
+// CSS injection defence - jsonContent is stored by the server as an arbitrary Object (the editor can be bypassed), so at render time
+// the style attribute's dangerous tokens (external resource loads through url(), @import, expression, javascript:) are stripped.
+// Layout styles such as display/flex/margin are kept as they are.
 export function sanitizeStyle(style: unknown): string {
     if (typeof style !== "string") return ""
     return style
@@ -90,13 +90,13 @@ export function sanitizeStyle(style: unknown): string {
         .replace(/javascript:/gi, "")
 }
 
-// 이미지 src 는 http(s) 또는 data:image 만 허용(그 외 스킴 차단).
+// An image src is allowed only as http(s) or data:image (other schemes are blocked).
 export function sanitizeSrc(src: unknown): string {
     if (typeof src !== "string") return ""
     return /^(https?:|data:image\/)/i.test(src.trim()) ? src : ""
 }
 
-// Tiptap 확장 기능은 컴포넌트 외부에서 정의하여 리렌더링 시 재생성되지 않도록 합니다.
+// The Tiptap extensions are defined outside the component so they are not recreated on a re-render.
 export const tiptapExtensions = [
     StarterKit.configure({ codeBlock: false, link: false, underline: false, trailingNode: false }),
     CodeBlockLowlight.configure({ lowlight }),
@@ -122,13 +122,13 @@ export const tiptapExtensions = [
 
 export interface RichContentViewerProps {
     content: JSONContent;
-    waitRenderComplete?: boolean; // 렌더링 완료 이벤트를 기다릴지 여부
+    waitRenderComplete?: boolean; // Whether to wait for the render-complete event
 }
 
 export const RichContentViewer = (props: RichContentViewerProps) => {
-    // 뷰어의 최상위 DOM 요소를 참조하기 위한 ref. MutationObserver를 연결하는 데 사용됩니다.
+    // The ref to the viewer's root DOM element. Used to attach the MutationObserver.
     const viewerRef = React.useRef<HTMLDivElement>(null);
-    // 디바운싱을 위한 타이머 ID를 저장하는 ref. 잦은 이벤트 발생을 방지합니다.
+    // The ref holding the debounce timer id. It prevents frequent events.
     const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
 
     const isMobile = useMobile()
@@ -150,42 +150,42 @@ export const RichContentViewer = (props: RichContentViewerProps) => {
         }
     }, [isMobile, mobileView])
 
-    // 이 useEffect는 Tiptap 뷰어의 렌더링이 완전히 안정화되는 시점을 감지하는 핵심 로직입니다.
-    // 비동기적으로 로드되는 이미지나 DOM 변경이 모두 완료된 후 커스텀 이벤트를 발생시킵니다.
+    // This useEffect is the core logic detecting when the Tiptap viewer's render has fully settled.
+    // It fires a custom event once every asynchronously loaded image and DOM change has finished.
     React.useEffect(() => {
         let observer: MutationObserver | null = null;
         
         const waitDebouncedRenderComplete = () => {
-            // 뷰어의 DOM 요소가 아직 마운트되지 않았으면 아무것도 하지 않습니다.
+            // Does nothing while the viewer's DOM element is not yet mounted.
             const viewerElement = viewerRef.current;
             if (!viewerElement) return;
 
-            // 렌더링이 안정화되었다고 판단될 때 호출되는 함수입니다.
+            // The function called when the render is judged to have settled.
             const dispatchRenderCompleteEvent = () => {
-                // 혹시라도 남아있는 디바운스 타이머를 제거합니다.
+                // Clears any debounce timer still pending.
                 if (debounceTimerRef.current) {
                     clearTimeout(debounceTimerRef.current);
                 }
-                // 렌더링이 완료되었음을 알리는 커스텀 이벤트를 window 객체에 발생시킵니다.
-                // 다른 컴포넌트(예: comments.section.tsx)에서 이 이벤트를 수신하여 스크롤과 같은 후속 작업을 수행할 수 있습니다.
+                // Fires the custom event on the window object announcing the render is complete.
+                // Another component (comments.section.tsx, for instance) can listen for it and do follow-up work such as scrolling.
                 console.log('Rich content rendering appears complete. Dispatching event.');
                 window.dispatchEvent(new CustomEvent('richContentRendered'));
             };
 
-            // 여러 변경 사항이 짧은 시간 내에 연속적으로 발생할 경우,
-            // 마지막 변경 후 일정 시간(300ms)이 지날 때까지 기다렸다가 이벤트를 한 번만 발생시키는 디바운스 함수입니다.
+            // The debounce function: when several changes happen in quick succession,
+            // it waits until a set time (300ms) has passed since the last one and fires the event just once.
             const debouncedDispatch = () => {
-                // 기존에 설정된 타이머가 있다면 취소합니다.
+                // Cancels any timer already set.
                 if (debounceTimerRef.current) {
                     clearTimeout(debounceTimerRef.current);
                 }
-                // 300ms 후에 렌더링 완료 이벤트를 발생시키도록 새로운 타이머를 설정합니다.
-                // 이 시간 동안 추가 변경이 없으면, 레이아웃이 안정된 것으로 간주합니다.
+                // Sets a new timer to fire the render-complete event in 300ms.
+                // With no further change in that time, the layout is taken to have settled.
                 debounceTimerRef.current = setTimeout(dispatchRenderCompleteEvent, 300);
             };
 
-            // 1. MutationObserver를 사용하여 뷰어 내부의 DOM 변경을 감지합니다.
-            // 자식 노드 추가/제거, 하위 모든 노드의 변경, 속성 변경을 모두 감시합니다.
+            // 1. A MutationObserver detects DOM changes inside the viewer.
+            // It watches child additions and removals, changes in every descendant, and attribute changes.
             observer = new MutationObserver(debouncedDispatch);
             observer.observe(viewerElement, {
                 childList: true,
@@ -193,34 +193,34 @@ export const RichContentViewer = (props: RichContentViewerProps) => {
                 attributes: true,
             });
 
-            // 2. 뷰어 내부에 포함된 모든 이미지의 로딩 완료 시점을 감지합니다.
-            // 이미지는 비동기적으로 로드되므로, 모든 이미지가 로드되어야 레이아웃이 최종적으로 확정됩니다.
+            // 2. It detects when every image inside the viewer has finished loading.
+            // Images load asynchronously, so the layout is only final once they all have.
             const images = Array.from(viewerElement.getElementsByTagName('img'));
-            // 이미지가 하나도 없다면, DOM 변경만으로 렌더링 완료를 판단할 수 있습니다.
+            // With no images at all, the DOM changes alone decide the render is complete.
             if (images.length === 0) {
                 debouncedDispatch();
             } else {
-                // 이미지가 있다면, 모든 이미지가 로드될 때까지 기다립니다.
+                // With images, it waits until every one has loaded.
                 const totalImages = images.length;
                 let loadedImages = 0;
 
-                // 이미지가 로드되거나 에러가 발생했을 때 호출되는 콜백 함수입니다.
+                // The callback invoked when an image loads or errors.
                 const onImageLoad = () => {
                     loadedImages++;
-                    // 모든 이미지가 처리되었으면, 렌더링이 안정화된 것으로 간주하고 디바운스 함수를 호출합니다.
+                    // Once every image is handled, the render is taken to have settled and the debounce function is called.
                     if (loadedImages >= totalImages) {
                         debouncedDispatch();
                     }
                 };
 
                 images.forEach(img => {
-                    // 이미지가 이미 캐시되어 로드가 완료된 경우
+                    // When the image was already cached and has finished loading
                     if (img.complete) onImageLoad();
                     else {
-                        // 아직 로드되지 않은 경우, 'load'와 'error' 이벤트 리스너를 추가합니다.
-                        // { once: true } 옵션으로 이벤트가 한 번만 실행되도록 합니다.
+                        // When it has not loaded yet, 'load' and 'error' listeners are added.
+                        // The { once: true } option makes the event fire only once.
                         img.addEventListener('load', onImageLoad, { once: true });
-                        img.addEventListener('error', onImageLoad, { once: true }); // 로드 실패 시에도 카운트를 증가시켜 무한 대기를 방지합니다.
+                        img.addEventListener('error', onImageLoad, { once: true }); // The count increases on a failed load too, preventing an endless wait.
                     }
                 });
             }
@@ -228,14 +228,14 @@ export const RichContentViewer = (props: RichContentViewerProps) => {
 
         if (props.waitRenderComplete) waitDebouncedRenderComplete();
 
-        // 컴포넌트가 언마운트될 때 실행되는 정리(cleanup) 함수입니다.
+        // The cleanup function run when the component unmounts.
         return () => {
-            // MutationObserver의 감시를 중단하여 메모리 누수를 방지합니다.
+            // The MutationObserver stops watching, preventing a memory leak.
             observer?.disconnect();
-            // 만약 컴포넌트가 사라질 때 아직 실행되지 않은 타이머가 있다면 제거합니다.
+            // Any timer still pending when the component disappears is cleared.
             if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         };
-    }, [props.content, props.waitRenderComplete]); // content prop이 변경될 때마다 이 로직을 다시 실행합니다.
+    }, [props.content, props.waitRenderComplete]); // This logic runs again whenever the content prop changes.
 
 
     return (

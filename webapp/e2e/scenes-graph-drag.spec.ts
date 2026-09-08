@@ -1,20 +1,20 @@
-// #329 — /scenes/graph 노드 드래그 실 브라우저 e2e.
+// #329 - the real-browser e2e for dragging a node on /scenes/graph.
 //
-// 검증:
-//   1. ReactFlow 마운트 + 노드 ≥ 1 렌더.
-//   2. 노드 한 개의 *초기 position* (transform: translate(...)) 캡처.
-//   3. mouse 드래그 (down → move → up) → 노드의 transform 이 *변경됨*.
-//   4. 500ms debounce 후 PUT /api/web-adventure/scenes/{id} 호출 + body.position 확인.
+// What is verified:
+//   1. ReactFlow mounts and at least 1 node renders.
+//   2. one node's *initial position* (transform: translate(...)) is captured.
+//   3. a mouse drag (down -> move -> up) -> the node's transform *changes*.
+//   4. after the 500ms debounce, PUT /api/web-adventure/scenes/{id} is called and body.position is checked.
 
 import { test, expect } from "@playwright/test";
 import { zoomInChart } from "./helpers/zoom-chart";
 
-// focus=kael_infirmary → 그 노드 중앙 + zoom 1.2 — 69 씬 fitView 후 노드가
-// 매우 작아져 drag e2e 가 *옆 노드 위* 로 mouse.move 가는 문제 차단.
+// focus=kael_infirmary -> that node centred at zoom 1.2 - blocking the problem where, after fitView over 69 scenes,
+// the nodes are so small that the drag e2e's mouse.move lands *on the node next door*.
 const GRAPH_URL = "/scenes/graph?focus=kael_infirmary";
 
-// ReactFlow 노드의 외부 wrapper 는 .react-flow__node 클래스를 갖고
-// inline style 의 transform: translate(Xpx, Ypx) 로 위치한다.
+// A ReactFlow node's outer wrapper carries the .react-flow__node class and is
+// positioned by the inline style's transform: translate(Xpx, Ypx).
 async function getNodeTransform(page: import("@playwright/test").Page, sceneId: string): Promise<{ x: number; y: number }> {
   return await page.evaluate((id) => {
     const inner = document.querySelector(`[data-graph-node-id="${id}"]`) as HTMLElement | null;
@@ -22,15 +22,15 @@ async function getNodeTransform(page: import("@playwright/test").Page, sceneId: 
     const outer = inner.closest(".react-flow__node") as HTMLElement | null;
     if (!outer) throw new Error(`react-flow__node wrapper not found: ${id}`);
     const tr = outer.style.transform;
-    // translate(100px, 200px) 또는 translate3d(100px, 200px, 0px) 패턴.
+    // The translate(100px, 200px) or translate3d(100px, 200px, 0px) pattern.
     const m = tr.match(/translate(?:3d)?\(([-\d.]+)px,\s*([-\d.]+)px(?:,\s*[-\d.]+px)?\)/);
     if (!m) throw new Error(`unexpected transform: ${tr}`);
     return { x: parseFloat(m[1]), y: parseFloat(m[2]) };
   }, sceneId);
 }
 
-// viewport 의 inline transform (.react-flow__viewport).
-// 캔버스 pan/zoom 시 변화. 노드 드래그 시 변하면 안 됨.
+// The viewport's inline transform (.react-flow__viewport).
+// It changes when the canvas pans or zooms. It must not change on a node drag.
 async function getViewportTransform(page: import("@playwright/test").Page): Promise<string> {
   return await page.evaluate(() => {
     const vp = document.querySelector(".react-flow__viewport") as HTMLElement | null;
@@ -57,13 +57,13 @@ test.describe("/scenes/graph — #329 노드 드래그 e2e", () => {
     await page.mouse.down();
     await page.mouse.move(cx + 200, cy + 100, { steps: 10 });
     await page.mouse.up();
-    // setTimeout 350ms 의 setCenter 가 발화하지 않음을 확인하기 위해 충분히
-    // 기다림 (500ms — debounce + 350ms 카메라 효과 모두 지남).
+    // It waits long enough to confirm the setCenter in the 350ms setTimeout does not
+    // fire (500ms - past both the debounce and the 350ms camera effect).
     await page.waitForTimeout(900);
 
     const vpAfter = await getViewportTransform(page);
-    // viewport transform 의 *큰 이동* (≥ 10px) 없음.
-    // ReactFlow 의 자체 jiggle (수 px) 은 허용. setCenter 카메라 jump 는 ≥ 50px.
+    // No *large movement* (>= 10px) in the viewport transform.
+    // ReactFlow's own jiggle (a few px) is allowed. A setCenter camera jump is >= 50px.
     const parse = (t: string) => {
       const m = t.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
       return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
@@ -80,9 +80,9 @@ test.describe("/scenes/graph — #329 노드 드래그 e2e", () => {
     await expect(page.locator(".react-flow")).toBeVisible({ timeout: 30000 });
     await zoomInChart(page);
 
-    // 노드 ≥ 2 — 캔버스 pan 과 *진짜 노드 드래그* 의 구분에 필수.
-    // 캔버스 pan 이면 *모든 노드* 의 .react-flow__node transform 이 동시에 변함.
-    // 진짜 노드 드래그면 *해당 노드* 만 변함.
+    // At least 2 nodes - essential to tell a canvas pan from *a real node drag*.
+    // On a canvas pan, *every node's* .react-flow__node transform changes together.
+    // On a real node drag, only *that node* changes.
     const allNodes = page.locator(".react-flow__node");
     await expect(allNodes.first()).toBeVisible({ timeout: 30000 });
     const count = await allNodes.count();
@@ -103,7 +103,7 @@ test.describe("/scenes/graph — #329 노드 드래그 e2e", () => {
     const dragBefore = await getNodeTransform(page, dragId!);
     const otherBefore = await getNodeTransform(page, otherId!);
 
-    // 드래그 노드 중심에서 mousedown → 단계적 move → up.
+    // mousedown at the dragged node's centre -> stepwise moves -> up.
     const box = await allNodes.nth(0).boundingBox();
     expect(box).toBeTruthy();
     const cx = box!.x + box!.width / 2;
@@ -120,13 +120,13 @@ test.describe("/scenes/graph — #329 노드 드래그 e2e", () => {
     const dragAfter = await getNodeTransform(page, dragId!);
     const otherAfter = await getNodeTransform(page, otherId!);
 
-    // 드래그한 노드 — transform 의 x/y 가 충분히 변경됨 (20 px 이상).
+    // The dragged node - the transform's x/y changed enough (20px or more).
     const dragDx = Math.abs(dragAfter.x - dragBefore.x);
     const dragDy = Math.abs(dragAfter.y - dragBefore.y);
     expect(dragDx + dragDy).toBeGreaterThan(20);
 
-    // 다른 노드 — transform 변동 거의 없음 (≤ 2 px, 부동소수점 오차 허용).
-    // 캔버스 pan 이었으면 dragDx/Dy 만큼 똑같이 변함 — fail.
+    // The other node - almost no change in the transform (<= 2px, allowing floating-point error).
+    // Had it been a canvas pan it would have changed by the same dragDx/Dy - a failure.
     const otherDx = Math.abs(otherAfter.x - otherBefore.x);
     const otherDy = Math.abs(otherAfter.y - otherBefore.y);
     expect(otherDx).toBeLessThanOrEqual(2);
@@ -144,7 +144,7 @@ test.describe("/scenes/graph — #329 노드 드래그 e2e", () => {
       .getAttribute("data-graph-node-id");
     expect(sceneId).toBeTruthy();
 
-    // PUT 요청 캡처.
+    // Capturing the PUT request.
     const putPromise = page.waitForRequest(
       (req) =>
         req.method() === "PUT" &&
@@ -159,11 +159,11 @@ test.describe("/scenes/graph — #329 노드 드래그 e2e", () => {
 
     await page.mouse.move(cx, cy);
     await page.mouse.down();
-    // 좌측으로 이동 — focus URL 진입 시 우측 SidePanel(384px) 위로 가지 않도록.
+    // Moving left - so a focus-URL entry does not land on the right-hand SidePanel (384px).
     await page.mouse.move(cx - 200, cy + 100, { steps: 10 });
     await page.mouse.up();
 
-    // 500ms debounce 후 PUT.
+    // The PUT after the 500ms debounce.
     const put = await putPromise;
     const postBody = put.postDataJSON() as { position?: { x: number; y: number } };
     expect(postBody.position).toBeDefined();

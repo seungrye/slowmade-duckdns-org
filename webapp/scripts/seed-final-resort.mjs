@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// scripts/seed-final-resort.mjs — #327 orphan 4 씬 정리.
+// scripts/seed-final-resort.mjs - #327's cleanup of the 4 orphan scenes.
 //
-// kael_caught / rin_chase / rin_caught — 우회 씬 (#318 신설) 의 *2 번째 분기*
-// 로 재이용. *진짜 막다른 결단* (자결/항복) → 시나리오 ending.
+// kael_caught / rin_chase / rin_caught - reused as the *second branch* of the detour scenes
+// added in #318. *A genuinely final decision* (taking your own life, or surrendering) -> a scenario ending.
 //
-// ending_petrification — reducer 의 isFullyPetrified 자동 ending 으로 *씬 미사용*.
-//   EndingScreen 이 endingsMeta 만 본다. 별도 삭제 (deleteOne).
+// ending_petrification - the reducer's isFullyPetrified automatic ending means *the scene is unused*.
+//   EndingScreen looks only at endingsMeta. Deleted separately (deleteOne).
 
 import mongoose from 'mongoose';
 
 const REUSE_BRANCHES = [
-  // kael_struggled 우회 씬에 *자결 분기* 추가 → kael_caught.
+  // A *suicide branch* added to the kael_struggled detour scene -> kael_caught.
   {
     sceneId: 'kael_struggled',
     choice: {
@@ -20,7 +20,7 @@ const REUSE_BRANCHES = [
       to: 'kael_caught',
     },
   },
-  // rin_pursued 우회 씬에 *자수 분기* 추가 → rin_chase.
+  // A *surrender branch* added to the rin_pursued detour scene -> rin_chase.
   {
     sceneId: 'rin_pursued',
     choice: {
@@ -30,7 +30,7 @@ const REUSE_BRANCHES = [
       to: 'rin_chase',
     },
   },
-  // rin_betrayal_aftermath 우회 씬에 *자결 분기* 추가 → rin_caught.
+  // A *suicide branch* added to the rin_betrayal_aftermath detour scene -> rin_caught.
   {
     sceneId: 'rin_betrayal_aftermath',
     choice: {
@@ -46,7 +46,7 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // 1. 우회 씬에 *자결 plain 분기* 추가.
+  // 1. adding the *plain suicide branch* to the detour scenes.
   for (const r of REUSE_BRANCHES) {
     const cur = await Scene.findOne({ id: r.sceneId }).lean();
     if (!cur) { console.log('없음:', r.sceneId); continue; }
@@ -63,7 +63,7 @@ async function main() {
     console.log('재이용:', r.sceneId, '+', r.choice.id, '→', r.choice.to);
   }
 
-  // 2. ending_petrification 삭제 — 자동 ending 잔재.
+  // 2. deleting ending_petrification - a leftover of the automatic ending.
   const delResult = await Scene.deleteOne({ id: 'ending_petrification' });
   console.log('deleted: ending_petrification ×', delResult.deletedCount);
 

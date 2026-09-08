@@ -1,13 +1,13 @@
 import mongoose, { InferSchemaType, model, models, Schema } from "mongoose";
 
 /**
- * 특일 정보 연 단위 캐시 (#328).
+ * The per-year cache of the special-days information (#328).
  *
- * 주기 작업(스케줄러)을 새로 만들지 않는다. 필요할 때 해당 연도가 없으면 그 자리에서 받아
- * 채운다 — 재시작·배포에 영향받지 않고 스스로 낫는다.
+ * No new periodic job (scheduler) is created. When a year is missing at the moment it is needed, it is fetched
+ * and filled in there and then - unaffected by restarts and deploys, and self-healing.
  *
- * `fetchedAt` 은 만료 판단용이다. 연 1회로는 부족한데, **임시공휴일이 연중에 새로 지정**되기
- * 때문이다(lib/calendar/cache.ts 의 STALE_AFTER_MS).
+ * `fetchedAt` decides expiry. Once a year is not enough, because **a temporary public holiday can be designated
+ * mid-year** (STALE_AFTER_MS in lib/calendar/cache.ts).
  */
 const CalendarDaySchema = new Schema(
   {

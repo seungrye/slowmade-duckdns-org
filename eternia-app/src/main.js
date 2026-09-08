@@ -12,14 +12,14 @@ import {
   clampStigma, isFullyPetrified, isDead, evalCondition, STIGMA_MAX, INVENTORY_CAP,
 } from "./rules.js";
 
-// 에테르니아의 추락 — 플레이어. 사이트 계약(/api/web-adventure/content/v1)의 Scene 을 소비해
-// 렌더한다. (슬라이스2: 사이트 굴림/침식/조건/onEnter 규칙 패리티. 디렉티브 실행·캐릭터 생성은 이후.)
+// The Fall of Eternia - the player. It consumes the Scene of the site's contract (/api/web-adventure/content/v1)
+// and renders it. (Slice 2: parity with the site's roll, contamination, condition and onEnter rules. Running directives and character creation come later.)
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   var log = $("log"), cont = $("cont"), newpill = $("newpill"), toastEl = $("toast");
 
-  // ── 캐릭터 상태 (사이트 Character 필드 정합. 캐릭터 생성은 슬라이스4.) ──
+  // -- the character state (matching the site's Character fields. Character creation is slice 4.) --
   function initState() {
     return {
       stats: { str: 4, dex: 6, int: 7, cha: 6, con: 5, wis: 6 },
@@ -37,12 +37,12 @@ import {
     sylvan_bond: "정령의 결속", liberation: "해방", usurpation: "찬탈", regency: "섭정", purge: "숙청", wayfarer: "방랑자",
   };
 
-  // ── 씬 데이터 (사이트 content/v1 에서 fetch) ──
+  // -- the scene data (fetched from the site's content/v1) --
   var sceneMap = {};
-  // 오디오 버스 — 앱 단일 페이지라 인스턴스 유지(BGM 씬 전환 연속). 테스트는 globalThis.Audio 스텁.
+  // The audio bus - the app is a single page, so the instance persists (BGM continues across scene changes). The tests stub globalThis.Audio.
   var audio = new AudioBus();
 
-  // ── 마크업 토크나이저 (**굵게** *지문* "대사" [[명사]] {{변수}}) ──
+  // -- the markup tokenizer (**bold** *stage direction* "speech" [[noun]] {{variable}}) --
   function tokenize(raw) {
     var t = raw, runs = [], i = 0, plain = "";
     function flush() { if (plain) { runs.push({ text: plain, cls: "" }); plain = ""; } }
@@ -66,21 +66,21 @@ import {
   }
   function stripMarks(s) { return s.replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/\*\*([^*]+)\*\*/g, "$1"); }
 
-  // ── 스크롤/백로그/토스트 ──
+  // -- scrolling, the backlog and toasts --
   function nearBottom() { return log.scrollHeight - log.scrollTop - log.clientHeight < 40; }
   var stick = true;
   log.addEventListener("scroll", function () { stick = nearBottom(); if (stick) newpill.classList.remove("show"); });
   function toBottom(force) { if (force || stick) { log.scrollTop = log.scrollHeight; newpill.classList.remove("show"); } else { newpill.classList.add("show"); } }
   newpill.addEventListener("click", function () { stick = true; log.scrollTop = log.scrollHeight; newpill.classList.remove("show"); });
   var toastT = null;
-  /** 이번 판에 쓰인 문체 — end-run 에 함께 보낸다 (#90). */
+  /** The style used in this run - sent along with end-run (#90). */
   function readRunVoice() {
     try { return sessionStorage.getItem(RUN_VOICE_KEY) || DEFAULT_VOICE; } catch (e) { return DEFAULT_VOICE; }
   }
   function toast(msg) { if (!msg) return; toastEl.textContent = msg; toastEl.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(function () { toastEl.classList.remove("show"); }, 1800); }
   function addBlk(cls) { var d = document.createElement("div"); d.className = "blk " + (cls || ""); log.appendChild(d); return d; }
 
-  // ── 타이핑(호흡) ──
+  // -- typing (the breathing) --
   var fast = false, typing = false, timer = null;
   function clearT() { clearTimeout(timer); }
   function charDelay(ch) {
@@ -100,18 +100,18 @@ import {
     })();
   }
 
-  // ── 씬 진입/진행 ──
-  // 문단 뒤에서 '탭하여 계속' 으로 멈출 디렉티브. 화면을 차지하거나 눈길을 요구하는 것만
-  // 넣는다 — 소리(sfx/bgm)는 글을 읽는 동안 들려도 되므로 뺐다. 소리에서도 멈추고 싶으면
-  // 여기에 "sfx" 를 추가하면 된다. (#71)
+  // -- entering and advancing a scene --
+  // The directives that pause after a paragraph with 'tap to continue'. Only those that take up the screen or
+  // ask for attention belong here - sound (sfx/bgm) is fine to hear while reading and was left out. To pause on sound
+  // too, add "sfx" here. (#71)
   var STOP_DIRECTIVES = ["img", "fx"];
 
   var scene = null, cur = { id: null, pi: 0 }, ended = false, awaitingChoice = false;
 
-  // ── 진행 로그/경로 누적 (#33) — 엔딩 시 서버(app-end-run)로 보내 AI 피드백 노트 생성.
-  //   웹 GameState.log 포맷과 1:1(▶ 씬제목 (id) / 본문 들여쓰기 / → 선택: / → 판정). ──
+  // -- accumulating the progress log and path (#33) - sent to the server (app-end-run) at an ending to generate the AI feedback note.
+  //   1:1 with the web's GameState.log format (the scene title / an indented body / a chosen line / a roll). --
   var flowLog = [], scenePath = [], endRunSent = false;
-  // 본문 1문단의 표시 텍스트(디렉티브 제외, {{변수}} 치환) — emitPara 의 textRaw 와 동일.
+  // The display text of one body paragraph (directives excluded, {{variable}} substituted) - the same as emitPara's textRaw.
   function bodyText(raw) {
     var segs = parseScript(raw, S.variables);
     return segs.filter(function (s) { return s.kind === "text"; }).map(function (s) { return s.text; }).join("");
@@ -127,17 +127,17 @@ import {
     var sc = sceneMap[sceneId];
     if (!sc) { var b = addBlk("p-blk"); b.innerHTML = '<div class="p" style="opacity:.6">…(씬 없음: ' + esc(String(sceneId)) + ")</div>"; cont.classList.add("hidden"); return; }
     scene = sc; cur = { id: sceneId, pi: 0 }; ended = false; awaitingChoice = false;
-    scenePath.push(sceneId); // 진행 경로 누적(#33)
+    scenePath.push(sceneId); // accumulating the path travelled (#33)
     applyOnEnter(sc.onEnter);
-    if (sc.bgm && sc.bgm.src) audio.playBgm(sc.bgm.src, { loop: sc.bgm.loop, volume: sc.bgm.volume }); // 씬 기본 BGM
-    // 자동 엔딩(사이트 moveToScene): 명시 isEnding 은 body 렌더 후(afterBody), 침식100/HP0 은 즉시.
+    if (sc.bgm && sc.bgm.src) audio.playBgm(sc.bgm.src, { loop: sc.bgm.loop, volume: sc.bgm.volume }); // the scene's default BGM
+    // The automatic ending (the site's moveToScene): an explicit isEnding comes after the body renders (afterBody), while contamination 100 or HP 0 is immediate.
     if (!sc.isEnding && isFullyPetrified(S)) { showEndingCard("petrification", sc); return; }
     if (!sc.isEnding && isDead(S)) { showEndingCard("fall", sc); return; }
-    // 진행 로그(#33): 씬 제목 + 본문 문단(디렉티브 제외). 웹 reducer 포맷과 동일.
+    // The progress log (#33): the scene title plus the body paragraphs (directives excluded). The same format as the web reducer.
     if (sc.title) flowLog.push("▶ " + sc.title + " (" + sceneId + ")");
     (sc.body || []).forEach(function (raw) { var t = bodyText(raw); if (t) flowLog.push("  " + t); });
     if (sc.title) emitHead(sc);
-    if (sc.illustration) emitIllustration(sc.illustration); // 씬 삽화(painter 생성 URL)
+    if (sc.illustration) emitIllustration(sc.illustration); // the scene illustration (a painter-generated URL)
     var body = sc.body || [];
     if (body.length) emitPara(); else afterBody();
   }
@@ -151,12 +151,12 @@ import {
   function emitIllustration(url) { var b = addBlk(); b.appendChild(emitFig(url, { alt: "씬 삽화" })); toBottom(); }
   function emitPara() {
     var b = addBlk("p-blk"); var p = document.createElement("div"); p.className = "p"; b.appendChild(p); toBottom();
-    // {{변수}} 선치환 + << 디렉티브 >> 실행(img/fx). 표시 텍스트는 tokenize.
+    // {{variable}} is substituted first, then << directives >> run (img/fx). The display text is tokenized.
     var segs = parseScript(scene.body[cur.pi], S.variables);
     var textRaw = segs.filter(function (s) { return s.kind === "text"; }).map(function (s) { return s.text; }).join("");
     segs.forEach(function (s) { if (s.kind === "directive") execDirective(s); });
-    // 멈출 이유가 있을 때만 '탭하여 계속' 을 띄운다. 예전엔 순수 텍스트에도 무조건 떠서
-    // 문단마다 탭해야 했다. 소리는 텍스트와 동시에 들려도 되므로 흘려보낸다. (#71)
+    // 'tap to continue' appears only when there is a reason to pause. It used to appear unconditionally, even on plain text,
+    // so every paragraph needed a tap. Sound may be heard alongside the text, so it flows past. (#71)
     var mustStop = segs.some(function (s) {
       return s.kind === "directive" && STOP_DIRECTIVES.indexOf(s.cmd) >= 0;
     });
@@ -165,7 +165,7 @@ import {
       cont.classList.remove("hidden");
     });
   }
-  // << 디렉티브 >> 실행 — img(삽화)·fx(화면효과). sfx/bgm 은 슬라이스3-audio.
+  // Running << directives >> - img (illustrations) and fx (screen effects). sfx/bgm are slice 3-audio.
   function execDirective(s) {
     if (s.cmd === "img" && s.args[0]) { var fb = addBlk(); fb.appendChild(emitFig(s.args[0], { impact: s.args.indexOf("impact") >= 0, alt: "삽화 " + s.args[0] })); toBottom(); return; }
     if (s.cmd === "fx" && s.args[0]) { var ms = parseInt(s.args[1], 10); execFx(s.args[0], Number.isFinite(ms) ? ms : 0); return; }
@@ -207,13 +207,13 @@ import {
     cont.classList.add("hidden"); afterBody();
   }
   log.addEventListener("click", function (e) {
-    // 버튼(선택지·엔딩 등) 클릭은 자기 핸들러가 처리 — 로그 탭(진행)으로 오인하지 않는다.
-    // (선택지 클릭이 여기로 버블되면 advance→afterBody→emitChoices 로 선택지가 중복 출력됨.)
+    // A button click (a choice, an ending and so on) is handled by its own handler - it is not mistaken for a log tap (advancing).
+    // (A choice click bubbling here would go advance -> afterBody -> emitChoices and print the choices twice.)
     if (e.target.closest("button")) return;
     if (typing) advance(); else if (scene && !ended && !awaitingChoice) advance();
   });
 
-  // ── onEnter (사이트 applyOnEnter 이식) ──
+  // -- onEnter (ported from the site's applyOnEnter) --
   function applyOnEnter(oe) {
     if (!oe) return;
     if (oe.setVars) for (var k in oe.setVars) S.variables[k] = oe.setVars[k];
@@ -229,9 +229,9 @@ import {
     S.stigmaErosion = clampStigma(S.stigmaErosion, delta); renderStig(true); if (delta > 0) toast("침식도 +" + delta);
   }
 
-  // ── 선택지 (사이트 Choice discriminated union → 렌더/판정) ──
+  // -- the choices (the site's Choice discriminated union -> rendering and rolling) --
   function choiceVisible(c) {
-    // conditional hidden=true + 미충족 → 숨김. probability hideWhenFlag truthy → 숨김.
+    // conditional with hidden=true and unmet -> hidden. probability with a truthy hideWhenFlag -> hidden.
     if (c.kind === "conditional" && c.hidden && !evalCondition(c.condition, S)) return false;
     if (c.kind === "probability" && c.hideWhenFlag && S.flags[c.hideWhenFlag]) return false;
     return true;
@@ -266,7 +266,7 @@ import {
     awaitingChoice = false;
     blk.innerHTML = ""; var rec = document.createElement("div"); rec.className = "picked"; rec.innerHTML = '<span class="bul">✤</span> <b>' + esc(stripMarks(c.label || "")) + "</b>"; blk.appendChild(rec);
     if (c.kind === "probability") {
-      var rng = reduce ? function () { return 0.5; } : Math.random; // 테스트 결정성(roll=11)
+      var rng = reduce ? function () { return 0.5; } : Math.random; // test determinism (roll=11)
       var statV = rollStat(S, c.stat);
       var res = rollProbability({ stat: statV, ability: S.ability, statKey: c.stat, difficulty: c.difficulty, rng: rng });
       emitRoll(res, c, statV);
@@ -276,12 +276,12 @@ import {
       setTimeout(function () { goTo(target); }, reduce ? 150 : 800);
       return;
     }
-    flowLog.push("→ 선택: " + stripMarks(c.label || "")); // 진행 로그(#33, 비확률 선택)
+    flowLog.push("→ 선택: " + stripMarks(c.label || "")); // the progress log (#33, a non-probability choice)
     applyStig(c.stigmaDelta);
     goTo(c.to);
   }
   function emitRoll(res, c, statV) {
-    // 진행 로그(#33, 판정) — 웹 reducer 포맷: → {선택} — d20={roll}+{stat}(+{bonus}) vs {난이도} → 성공/실패
+    // The progress log (#33, a roll) - the web reducer's format: -> {choice} - d20={roll}+{stat}(+{bonus}) vs {difficulty} -> success/failure
     flowLog.push("→ " + stripMarks(c.label || "") + " — d20=" + res.roll + "+" + statV + "(+" + (res.bonus || 0) + ") vs " + c.difficulty + " → " + (res.success ? "성공" : "실패"));
     var b = addBlk(); var el = document.createElement("div"); el.className = "rollcard " + (res.success ? "ok" : "fail");
     var bonusStr = res.bonus ? " + 성흔(" + res.bonus + ")" : "";
@@ -291,8 +291,8 @@ import {
     b.appendChild(el); toBottom(true);
   }
 
-  // ── 상태바 렌더 ──
-  // maxHp 가 100+ 라 하트 고정 칸(HP_HEARTS)에 비율로 스케일 표시(살아있으면 최소 1칸).
+  // -- rendering the status bar --
+  // maxHp can be 100+, so it is scaled proportionally into the fixed heart slots (HP_HEARTS) (at least 1 while alive).
   var HP_HEARTS = 5;
   function renderHP(flash) {
     var hp = $("hpPips"); hp.innerHTML = "";
@@ -307,11 +307,11 @@ import {
   function renderStig(flash) { $("stigBar").style.width = (S.stigmaErosion / STIGMA_MAX * 100) + "%"; $("stigVal").textContent = S.stigmaErosion; if (flash) { var e = $("stigVal"); if (e.animate) e.animate([{ filter: "brightness(2)" }, { filter: "brightness(1)" }], { duration: 700 }); } }
   function renderStats(flash) { var g = $("statgrid"); g.innerHTML = ""; STAT_ORDER.forEach(function (k) { var d = document.createElement("div"); d.className = "sstat"; d.setAttribute("data-stat", k); d.setAttribute("title", STAT_KO[k]); d.innerHTML = '<span class="ic">' + STAT_IC[k] + "</span>" + S.stats[k]; g.appendChild(d); }); if (flash && g.animate) g.animate([{ filter: "brightness(1.8)" }, { filter: "brightness(1)" }], { duration: 600 }); }
 
-  // ── 엔딩 ──
+  // -- the ending --
   function showEndingCard(endingId, sc) {
     clearT(); cont.classList.add("hidden");
     ended = true; scene = null; awaitingChoice = false; cur = { id: null, pi: 0 };
-    // 진행 로그(#33) 자동엔딩 꼬리말 + 엔딩 결과를 서버로 1회 전송(AI 피드백 노트).
+    // The progress log's (#33) automatic-ending tail, plus one send of the ending result to the server (the AI feedback note).
     if (endingId === "petrification") flowLog.push("성흔 침식이 한계에 도달했다. 몸이 굳어간다…");
     else if (endingId === "fall") flowLog.push("체력이 다하여 쓰러진다…");
     if (!endRunSent) {
@@ -322,12 +322,12 @@ import {
         scenePath: scenePath.slice(),
         log: flowLog.slice(),
         character: characterSnapshot(),
-        // #90 — 이번 판의 문체. 노트가 인용한 문장의 출처 추적용.
+        // #90 - this run's prose style. For tracing the source of a sentence the note quotes.
         voice: readRunVoice(),
       };
-      // 전송을 기다리지 않으므로(엔딩 카드를 바로 띄운다) 앱이 곧장 닫히면 요청이 유실된다.
-      // 먼저 큐에 넣고 성공했을 때만 지운다 — 실패분은 다음 실행에서 재전송. (#61)
-      // 같은 id 를 clientRunId 로 함께 보내 재전송돼도 서버가 한 번만 저장하게 한다. (#63)
+      // The send is not awaited (the ending card shows at once), so closing the app immediately loses the request.
+      // It is queued first and removed only on success - what failed is resent on the next launch. (#61)
+      // The same id is sent as clientRunId so the server stores it once even if it is resent. (#63)
       var qid = makeId();
       payload.clientRunId = qid;
       enqueue(pendingStore(), payload, qid);
@@ -343,7 +343,7 @@ import {
     var ab = $("againBtn"); if (ab) ab.addEventListener("click", restart);
   }
 
-  // ── 캐릭터 생성 (2단계: 주인공 → 화면전환 → 성흔) ──
+  // -- character creation (two steps: the protagonist -> a transition -> the stigma) --
   var sel = { protagonist: "kael", ability: "lunar" };
   var startSceneId = START_SCENE_ID;
   function setNameplate(m, ability) { var np = document.querySelector(".nameplate"); if (np) np.textContent = m.nameShort + " · " + abilities[ability].name; }
@@ -355,7 +355,7 @@ import {
     $("screen").appendChild(box);
     renderProtaStep();
   }
-  // Step 1 — 주인공 선택(탭 시 성흔 화면으로 전환)
+  // Step 1 - choosing the protagonist (a tap moves to the stigma screen)
   function renderProtaStep() {
     var box = $("creator"); if (!box) return;
     box.innerHTML = '<p class="cr-step mono">STEP 1 / 2 · 주인공</p><h2 class="cr-h">너의 운명을 선택하라</h2><div class="cr-cards" id="cr-protas"></div>';
@@ -366,7 +366,7 @@ import {
       box.querySelector("#cr-protas").appendChild(b);
     });
   }
-  // Step 2 — 성흔 선택 + 시작(주인공 다시 뒤로)
+  // Step 2 - choosing the stigma and starting (with the protagonist step behind)
   function renderAbilityStep() {
     var box = $("creator"); if (!box) return;
     var m = protagonists[sel.protagonist];
@@ -400,13 +400,13 @@ import {
     boot();
   }
 
-  // ── 부팅/컨트롤 ──
+  // -- boot and controls --
   function showMsg(txt) { var b = addBlk("p-blk"); var p = document.createElement("div"); p.className = "p"; p.style.opacity = ".7"; p.textContent = txt; b.appendChild(p); toBottom(true); return b; }
   var loadingBlk = null;
   async function boot() {
     loadingBlk = showMsg("불러오는 중…");
     try {
-      // #87 — 이번 판의 문체를 정해 받는다(완비된 문체 중 랜덤, 한 판 내내 유지).
+      // #87 - this run's prose style is decided and fetched (random among the complete styles, kept for the whole run).
       sceneMap = (await fetchScenesForRun({})).scenes;
     } catch (e) {
       if (loadingBlk) { loadingBlk.remove(); loadingBlk = null; }
@@ -418,9 +418,9 @@ import {
     if (loadingBlk) { loadingBlk.remove(); loadingBlk = null; }
     goTo(startSceneId);
   }
-  // ── 가방 모달 (#103) ────────────────────────────────────────────────
-  // 종전에는 토스트로 이름만 늘어놓았고 아이템을 쓸 수 없었다. 화면 중앙 그리드로 띄우고
-  // 소모품은 그 자리에서 쓴다. 규칙은 items.js(웹 reducer 의 USE_ITEM 과 같은 규칙).
+  // -- the bag modal (#103) ------------------------------------------
+  // It used to list only the names in a toast, with no way to use an item. Now it opens as a grid in the middle of the screen
+  // and a consumable is used on the spot. The rules are in items.js (the same rules as the web reducer's USE_ITEM).
   var invEl = null;
   function closeInv() { if (invEl) { invEl.remove(); invEl = null; } }
   function itemEffectText(it) {
@@ -458,7 +458,7 @@ import {
       var grid = document.createElement("div");
       grid.className = "invgrid";
       S.inventory.forEach(function (id) {
-        // 카탈로그에 없는 id 라도 이름만이라도 보여 준다(서버가 늦게 알려 줄 수 있다).
+        // An id absent from the catalogue still shows at least its name (the server may tell us late).
         var it = cat[id] || { id: id, displayName: id, kind: "quest" };
         var usable = isUsableItem(it);
         var cell = document.createElement("button");
@@ -474,7 +474,7 @@ import {
           Object.assign(S, out.character);
           renderHP(true); renderStig(true);
           toast(out.log);
-          openInv(); // 목록 갱신 — 다 썼으면 칸이 사라진다.
+          openInv(); // Refreshing the list - a slot disappears once its item is used up.
         });
         grid.appendChild(cell);
       });
@@ -484,13 +484,13 @@ import {
     wrap.appendChild(box);
     wrap.addEventListener("click", function (e) { if (e.target === wrap) closeInv(); });
     x.addEventListener("click", closeInv);
-    // .screen 이 position:relative 라 inset:0 이 화면에 딱 맞는다(둥근 모서리·overflow 도 상속).
+    // .screen is position:relative, so inset:0 fits the screen exactly (inheriting the rounded corners and overflow too).
     ($("screen") || document.body).appendChild(wrap);
     invEl = wrap;
   }
 
   function on(id, ev, fn) { var el = $(id); if (el) el.addEventListener(ev, fn); }
-  on("title", "click", showCreator); // 타이틀 탭 → 캐릭터 생성
+  on("title", "click", showCreator); // tapping the title -> character creation
   on("bottombar", "click", function (e) {
     var b = e.target.closest("[data-bb]"); if (!b) return; var k = b.getAttribute("data-bb");
     if (k === "inv") openInv();
@@ -498,7 +498,7 @@ import {
     else if (k === "rank") toast("업적·랭크 — 준비 중");
     else if (k === "wip") toast("증거 — 작업중…");
   });
-  // 스탯 툴팁 — 클릭한 아이콘 바로 옆(공간 부족하면 아래)에 앵커. 하단 토스트 대신.
+  // The stat tooltip - anchored right beside the clicked icon (below it when there is no room). Instead of a toast at the foot.
   var statTipEl = null, statTipT = null;
   function hideStatTip() { if (statTipEl) { statTipEl.remove(); statTipEl = null; } clearTimeout(statTipT); }
   function showStatTip(anchor, text) {
@@ -520,20 +520,20 @@ import {
     statTipT = setTimeout(hideStatTip, 2200);
   }
   on("statgrid", "click", function (e) { var s = e.target.closest("[data-stat]"); if (!s) return; var k = s.getAttribute("data-stat"); showStatTip(s, STAT_KO[k] + " · " + S.stats[k]); });
-  // 다른 곳 탭 시 툴팁 닫기(스탯/툴팁 자신 클릭은 유지)
+  // Tapping elsewhere closes the tooltip (clicking the stat or the tooltip itself keeps it)
   document.addEventListener("click", function (e) { if (statTipEl && !e.target.closest("[data-stat]") && !e.target.closest(".stat-tip")) hideStatTip(); });
   function restart() { clearT(); audio.dispose(); S = initState(); log.innerHTML = ""; newpill.classList.remove("show"); toastEl.classList.remove("show"); stick = true; ended = false; awaitingChoice = false; scene = null; flowLog = []; scenePath = []; endRunSent = false; renderHP(false); renderStig(false); renderStats(false); showCreator(); }
 
-  renderHP(false); renderStig(false); renderStats(false); // 타이틀 화면 대기 — 탭 시 showCreator()
+  renderHP(false); renderStig(false); renderStats(false); // Waiting on the title screen - a tap calls showCreator()
 
-  // 사생활 보호 모드 등에서 localStorage 접근이 던질 수 있다 — 없으면 큐를 포기하고 진행.
+  // Reaching localStorage can throw in private mode and so on - without it the queue is given up and play continues.
   function pendingStore() {
     try { return window.localStorage; } catch { return null; }
   }
 
-  // ── 업데이트 안내 (#55 후속) ─────────────────────────────────
-  // 설치는 사용자가 한다. 앱이 직접 설치하려면 REQUEST_INSTALL_PACKAGES 권한과
-  // FileProvider 가 필요해 범위가 커진다. 여기선 알림 + 다운로드 열기까지.
+  // -- the update notice (following #55) -----------------------
+  // The user installs it. For the app to install directly it would need the REQUEST_INSTALL_PACKAGES permission and
+  // a FileProvider, which widens the scope. Here it goes as far as a notice plus opening the download.
   function showUpdateBanner(info) {
     var bar = document.createElement("div");
     bar.className = "update-bar";
@@ -548,7 +548,7 @@ import {
     get.className = "update-btn";
     get.textContent = "받기";
     get.addEventListener("click", function () {
-      // apk 자산이 없으면 릴리스 페이지로 보낸다.
+      // With no apk asset it goes to the release page.
       var url = info.apkUrl || info.releaseUrl;
       if (url) window.open(url, "_blank");
     });
@@ -563,9 +563,9 @@ import {
     document.body.insertBefore(bar, document.body.firstChild);
   }
 
-  // 확인 실패는 update-check 안에서 삼킨다(null 반환) — 게임 진행을 막지 않는다.
+  // A failed check is swallowed inside update-check (returning null) - it does not block play.
   checkForUpdate().then(function (u) { if (u) showUpdateBanner(u); });
 
-  // 이전 실행에서 못 보낸 엔딩 회차 재전송 (#61). 실패분은 큐에 남아 다음 기회를 노린다.
+  // Resending the ending runs the previous launch could not send (#61). What fails stays queued for the next chance.
   flushQueue({ storage: pendingStore(), submit: submitAppEndRun });
 })();

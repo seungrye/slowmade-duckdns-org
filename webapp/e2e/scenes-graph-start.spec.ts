@@ -1,4 +1,4 @@
-// #333 — /scenes/graph 시작 씬 3 노드 ⭐ 표시 e2e.
+// #333 - the e2e for the star marking on /scenes/graph's 3 starting-scene nodes.
 import { test, expect } from "@playwright/test";
 import { zoomInChart } from "./helpers/zoom-chart";
 
@@ -11,10 +11,10 @@ test.describe("/scenes/graph — #333 시작 씬 ⭐ 표시", () => {
     for (const id of ["kael_infirmary", "rin_harbor", "solwen_grove"]) {
       const node = page.locator(`[data-graph-node-id="${id}"]`);
       await expect(node).toBeVisible({ timeout: 30000 });
-      // SceneNode 의 isStart=true 시 outer div 클래스에 ring-violet-500 + ⭐.
+      // With SceneNode's isStart=true the outer div's classes carry ring-violet-500 plus the star.
       const cls = await node.getAttribute("class");
       expect(cls).toMatch(/ring-violet-500/);
-      // ⭐ 텍스트는 노드 안 첫 span 으로.
+      // The star text is the first span inside the node.
       const hasStar = await node.locator("text=⭐").count();
       expect(hasStar).toBeGreaterThanOrEqual(1);
     }

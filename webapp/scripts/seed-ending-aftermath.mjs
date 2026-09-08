@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// scripts/seed-ending-aftermath.mjs — #275 엔딩 후일담.
+// scripts/seed-ending-aftermath.mjs - #275's ending aftermaths.
 //
-// 각 ending 씬 본문 끝에 *— 세 달 후 / 다음 세대* 톤의 후일담 1 줄 추가.
-// endingsMeta.epilogue 는 갤러리 카드용 (짧음) 으로 유지 — ending 씬 본문은 full
-// epilogue + 후일담.
+// One line of aftermath in a *three months later / the next generation* tone is added to the end of each ending scene's body.
+// endingsMeta.epilogue stays as it is for the gallery card (short) - the ending scene's body carries the full
+// epilogue plus the aftermath.
 //
-// 회차 시스템의 *부메랑* 의미를 강화 — 한 모험의 결과가 *다음 세대* 에 어떻게
-// 남는가.
+// It strengthens the run system's *boomerang* meaning - how one adventure's outcome
+// remains for *the next generation*.
 
 import mongoose from 'mongoose';
 

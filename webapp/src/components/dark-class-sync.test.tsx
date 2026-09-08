@@ -33,7 +33,7 @@ describe('ThemeSync', () => {
     vi.clearAllMocks();
   });
 
-  // 초기 테마는 localStorage 에서 읽는다(쿠키/prop 아님).
+  // The initial theme is read from localStorage (not a cookie or a prop).
   describe('localStorage 초기 테마 (system)', () => {
     it('시스템이 다크면 마운트 시 dark 클래스를 추가한다', () => {
       localStorage.setItem('theme', 'system');
@@ -75,7 +75,7 @@ describe('ThemeSync', () => {
     });
   });
 
-  // 고정 테마(dark/light)는 client 가 마운트 시 직접 적용(SSR 은 테마를 모름).
+  // A fixed theme (dark/light) is applied by the client on mount (SSR does not know the theme).
   describe('고정 테마 (dark/light)', () => {
     it('dark 면 마운트 시 dark 를 붙이고 시스템 변경을 무시한다', () => {
       localStorage.setItem('theme', 'dark');
@@ -98,7 +98,7 @@ describe('ThemeSync', () => {
     });
   });
 
-  // 로그인 시 DB(user.settings.theme)를 원본으로 localStorage 를 갱신하고 적용한다.
+  // While logged in, localStorage is refreshed from the DB (user.settings.theme) as the source and applied.
   describe('로그인 시 DB 테마 동기화', () => {
     async function authenticate() {
       const { useSession } = await import('next-auth/react');

@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
 import type { InferSchemaType, Model } from "mongoose";
 
-// ESM interop: named export(models 등)는 순수 node ESM 에서 안 풀려 default 로 접근한다
-// (Next/webpack·tsx 스크립트 양쪽 호환 — trading-smoke 등 서버 외 구동 지원).
+// ESM interop: named exports (models and so on) do not resolve under plain node ESM, so they are reached through default
+// (compatible with both Next/webpack and tsx scripts - supporting runs outside the server, such as trading-smoke).
 const { Schema, model, models } = mongoose;
 
 /**
- * 브로커 액세스 토큰 캐시 — 파일 캐시 대신 Mongo(블루그린 두 인스턴스 공유,
- * KIS 발급 제한 1분 1회 충돌 방지). cacheKey 예: "kis:paper:PSxxxxxx", "toss:cid12345".
+ * The broker access token cache - Mongo rather than a file cache (shared by the two blue-green instances,
+ * avoiding a clash with KIS's one-issue-per-minute limit). cacheKey examples: "kis:paper:PSxxxxxx", "toss:cid12345".
  */
 const TradingTokenSchema = new Schema(
   {

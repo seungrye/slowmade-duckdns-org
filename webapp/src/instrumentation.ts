@@ -1,12 +1,12 @@
-// Next.js instrumentation — 서버 프로세스 기동 시 1회 실행(Next 15 안정 기능).
-// 자동매매 스케줄러를 여기서 시작한다: 배포/재시작 직후 첫 틱이 "run 시각 경과 &
-// 오늘 미실행" 사이클을 DB 기준으로 catch-up 한다(블루그린 내성은 Mongo 클레임이 보장).
+// Next.js instrumentation - run once as the server process starts (a stable Next 15 feature).
+// The trading scheduler starts here: right after a deploy or restart the first tick catches up, from the DB, on any
+// cycle that is "past its run time and not run today" (the Mongo claim guarantees blue-green safety).
 
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startTradingScheduler } = await import("@/lib/trading/scheduler");
     startTradingScheduler();
-    // 오늘의 운세 밤 배치 (#388) — 매매와 독립된 스케줄러.
+    // The daily fortune's night batch (#388) - a scheduler independent of the trading one.
     const { startFortuneScheduler } = await import("@/lib/fortune/scheduler");
     startFortuneScheduler();
   }

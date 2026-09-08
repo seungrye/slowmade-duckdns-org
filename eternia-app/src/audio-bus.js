@@ -1,7 +1,7 @@
-// 오디오 재생 버스 — HTMLAudioElement 래퍼.
-//   BGM: 단일 트랙, 씬 전환에도 지속(같은 src 면 재시작 안 함). SFX: 원샷.
-// MIRROR — webapp/src/app/games/web-adventure/play/audio-bus.ts. 재생 실패(미구현·autoplay
-// 차단)는 삼킨다 — 오디오 때문에 렌더가 죽지 않게. factory 주입으로 테스트 가능.
+// The audio playback bus - a wrapper over HTMLAudioElement.
+//   BGM: a single track that persists across scene changes (the same src never restarts). SFX: one-shot.
+// MIRROR - webapp/src/app/games/web-adventure/play/audio-bus.ts. A playback failure (unimplemented, or blocked
+// autoplay) is swallowed - audio must not kill the render. Injecting the factory keeps it testable.
 
 const defaultFactory = (src) => new Audio(src);
 
@@ -12,7 +12,7 @@ export class AudioBus {
     this.bgmSrc = null;
   }
 
-  /** BGM 재생. 같은 트랙이면 재시작하지 않고 이어/재개(씬 전환 연속성). */
+  /** Plays the BGM. The same track resumes rather than restarting (continuity across scene changes). */
   playBgm(src, opts) {
     opts = opts || {};
     if (!src) return;
@@ -31,7 +31,7 @@ export class AudioBus {
   pauseBgm() { if (this.bgm) this._safePause(this.bgm); }
   resumeBgm() { if (this.bgm) this._safePlay(this.bgm); }
 
-  /** 효과음 원샷 — 호출마다 새 엘리먼트(겹쳐 재생 허용). */
+  /** A one-shot sound effect - a new element per call (overlapping playback allowed). */
   playSfx(src, volume) {
     if (!src) return;
     const el = this.factory(src);

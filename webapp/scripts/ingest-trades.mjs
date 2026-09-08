@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/ingest-trades.mjs — stock-automator trades.json 덤프(JSONL) → MongoDB.
+// scripts/ingest-trades.mjs - a stock-automator trades.json dump (JSONL) -> MongoDB.
 //
 // usage:
 //   pnpm exec node --env-file=.env.local scripts/ingest-trades.mjs [path]
 //
-// (env, ticker, time) unique key — 같은 trade 중복 upsert.
+// The (env, ticker, time) unique key - the same trade upserts rather than duplicating.
 
 import fs from 'node:fs';
 import readline from 'node:readline';

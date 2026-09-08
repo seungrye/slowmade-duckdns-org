@@ -1,28 +1,28 @@
-// RetroRom — 사용자가 올린 롬 파일 메타 (#109).
+// RetroRom - the metadata of a rom file the user uploaded (#109).
 //
-// 파일 자체는 MinIO 에 있고 여기엔 위치(objectKey)와 표시 정보만 둔다.
-// **올린 사람만 보고 실행할 수 있다** — 목록·다운로드·삭제 전부 userEmail 로 좁힌다.
-// 남의 롬이 주소만으로 새 나가면 저작권 문제가 되므로 공개 URL 은 만들지 않는다.
+// The file itself lives in MinIO; this holds only its location (objectKey) and display information.
+// **Only the uploader can see and run it** - the listing, download and deletion are all narrowed by userEmail.
+// Someone else's rom leaking through an address alone would be a copyright problem, so no public URL is made.
 
 import { Schema, model, models, Model, Types } from "mongoose";
 
 /**
- * 롬에 매다는 패치 (#112) — 한글 패치 등.
+ * A patch attached to a rom (#112) - a translation patch and the like.
  *
- * 롬과 패치는 **따로** 보관하고 합친 결과는 저장하지 않는다. 합치기는 실행할 때 브라우저가
- * 한다(`public/games/retro/rom-patch.js`). 그래서 원본 하나에 패치를 갈아 끼울 수 있다.
+ * The rom and the patch are kept **separately** and the merged result is never stored. The merging happens in the browser
+ * at run time (`public/games/retro/rom-patch.js`). So patches can be swapped over one original.
  *
- * `Post.attachments`(`models/post.tsx`)와 같은 임베드 배열 방식이다.
+ * The same embedded-array approach as `Post.attachments` (`models/post.tsx`).
  */
 export interface RetroPatchDoc {
   _id: Types.ObjectId;
-  /** 표시용 이름 — 확장자를 남겨 형식이 눈에 보이게 한다. */
+  /** The display name - the extension is kept so the format is visible. */
   name: string;
-  /** ips | bps | ups — 업로드 시점에 매직으로 판별해 굳혀 둔다. */
+  /** ips | bps | ups - decided by the magic bytes at upload time and fixed. */
   format: string;
   size: number;
   objectKey: string;
-  /** 파일 내용의 sha256 (#188). 옛 문서엔 없다 — 백필 스크립트가 채운다. */
+  /** The file content's sha256 (#188). Old documents lack it - a backfill script fills it in. */
   sha256?: string;
   isDeleted?: boolean;
   createdAt: Date;
@@ -34,10 +34,10 @@ const RetroPatchSchema = new Schema<RetroPatchDoc>(
     format: { type: String, required: true },
     size: { type: Number, required: true },
     objectKey: { type: String, required: true },
-    // netplay 방을 가르는 근거 (#188). 패치를 켠 쪽과 끈 쪽이 같은 방에 붙으면
-    // 조용히 desync 나므로, 패치 내용까지 방 번호에 들어가야 한다.
+    // The basis for separating netplay rooms (#188). Someone with the patch on joining the room of someone with it off
+    // desyncs quietly, so the patch's content has to go into the room number too.
     sha256: { type: String, default: '' },
-    // 롬과 같은 원칙 — 배열에서 빼지 않고 플래그만 세운다.
+    // The same principle as the rom - it is not removed from the array; only a flag is set.
     isDeleted: { type: Boolean, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: false } },
@@ -45,34 +45,34 @@ const RetroPatchSchema = new Schema<RetroPatchDoc>(
 
 export interface RetroRomDoc {
   _id: Types.ObjectId;
-  /** 소유자 — 이 값으로 모든 조회를 좁힌다. */
+  /** The owner - every query is narrowed by this value. */
   userEmail: string;
   title: string;
-  /** PlatformId (`src/lib/retro/platforms.ts`). 문자열로 두어 기종 추가 시 마이그레이션이 없다. */
+  /** The PlatformId (`src/lib/retro/platforms.ts`). Kept as a string so adding a system needs no migration. */
   platform: string;
-  /** EmulatorJS 코어명 — 업로드 시점 기종에서 확정해 굳혀 둔다. */
+  /** The EmulatorJS core name - decided from the system at upload time and fixed. */
   core: string;
-  /** 올릴 때의 원본 파일명(표시·다운로드용). */
+  /** The original filename at upload (for display and download). */
   filename: string;
   size: number;
-  /** MinIO 오브젝트 키. */
+  /** The MinIO object key. */
   objectKey: string;
-  /** 파일 내용의 sha256 (#188). 옛 문서엔 없다 — 백필 스크립트가 채운다. */
+  /** The file content's sha256 (#188). Old documents lack it - a backfill script fills it in. */
   sha256?: string;
   /**
-   * 이 롬에 매단 패치 (#112). 배열이지만 **살아 있는 항목은 항상 최대 하나**다 (#116) —
-   * 새로 올리면 이전 것을 soft delete 하고 교체한다. 카드의 체크박스 하나로 다루기 위해서다.
-   * 스키마를 배열로 둔 건 나중에 여러 개로 되돌릴 문을 닫지 않으려는 것.
+   * The patches attached to this rom (#112). It is an array, but **at most one entry is ever live** (#116) -
+   * uploading a new one soft-deletes the previous and replaces it. That is so a single checkbox on the card can handle it.
+   * The schema is an array to keep the door open to going back to several later.
    */
   patches: RetroPatchDoc[];
-  /** 패치를 실제로 적용할지 (#116). 카드의 체크박스가 이 값을 뒤집는다. */
+  /** Whether to actually apply the patch (#116). The card's checkbox flips this. */
   patchEnabled?: boolean;
-  /** 사용자가 올린 카드 커버 (#122). 없으면 카드가 제목 첫 글자 타일을 그린다. */
+  /** A cover the user uploaded for the card (#122). Without it the card draws a tile of the title's first character. */
   coverKey?: string;
   coverFormat?: string;
   /**
-   * 코어에 함께 놓을 부모 롬셋들 (#143) — 아케이드 분할 셋.
-   * **일반적인 것부터** 담는다. 실행할 때 이 순서로 쌓고 마지막에 본체(클론)가 이긴다.
+   * The parent rom sets to place alongside the core (#143) - split arcade sets.
+   * Held **most generic first**. At run time they are stacked in this order and the main file (the clone) wins last.
    */
   parentSets: { name: string; size: number; objectKey: string; sha256?: string }[];
   isDeleted?: boolean;
@@ -89,25 +89,25 @@ const RetroRomSchema = new Schema<RetroRomDoc>(
     filename: { type: String, required: true },
     size: { type: Number, required: true },
     objectKey: { type: String, required: true },
-    // netplay 방을 가르는 근거 (#188) — 롬 바이트가 다르면 락스텝 동기화가 어긋난다.
+    // The basis for separating netplay rooms (#188) - differing rom bytes break the lockstep synchronisation.
     sha256: { type: String, default: '' },
     patches: { type: [RetroPatchSchema], default: [] },
-    // 올렸다면 쓰겠다는 뜻이므로 기본은 켜짐.
+    // Uploading it means intending to use it, so it is on by default.
     patchEnabled: { type: Boolean, default: true },
     coverKey: { type: String },
     coverFormat: { type: String },
     parentSets: {
-      // 부모셋도 코어가 읽는 바이트라 sha256 을 함께 둔다 (#188).
+      // A parent set is bytes the core reads too, so its sha256 is kept alongside (#188).
       type: [new Schema({ name: String, size: Number, objectKey: String, sha256: String }, { _id: false })],
       default: [],
     },
-    // 삭제는 항상 soft — 실수로 지운 롬을 되살릴 수 있어야 한다. MinIO 오브젝트도 남긴다.
+    // Deletion is always soft - a rom deleted by mistake must be recoverable. The MinIO object is kept too.
     isDeleted: { type: Boolean, default: false, index: true },
   },
   { timestamps: true },
 );
 
-// 목록 질의(내 롬, 안 지운 것, 최신순) 한 방에 타는 복합 인덱스.
+// The compound index the listing query (my roms, not deleted, newest first) rides in one go.
 RetroRomSchema.index({ userEmail: 1, isDeleted: 1, createdAt: -1 });
 
 const RetroRom = (models.RetroRom as Model<RetroRomDoc>) || model<RetroRomDoc>("RetroRom", RetroRomSchema);

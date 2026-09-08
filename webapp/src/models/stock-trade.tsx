@@ -1,19 +1,19 @@
 import mongoose from "mongoose";
 import type { InferSchemaType, Model } from "mongoose";
 
-// ESM interop: named export 는 순수 node ESM 에서 안 풀려 default 로 접근(tsx 스크립트 호환).
+// ESM interop: a named export does not resolve under plain node ESM, so it is reached through default (for tsx script compatibility).
 const { Schema, model, models } = mongoose;
 
 /**
- * 매매 기록 — stock-automator reports/{paper,real}/trades.json 동기화.
+ * The trade records - synced from stock-automator's reports/{paper,real}/trades.json.
  *
- * env: "paper" | "real" — 모의/실전 구분.
+ * env: "paper" | "real" - paper or live.
  * action: "buy" | "sell".
- * strategy: 전략 구분 (예: "infinite" 무한매수 | "trend" 추세추종). v2 가 전송. 빈 문자열=미지정.
- * date: "YYYY-MM-DD" — 차트의 x 축 (일봉 데이터와 join).
- * time: ISO 문자열(마이크로초) — 같은 날 여러 건 구분 + unique 키.
+ * strategy: which strategy ("infinite" for infinite buying | "trend" for trend following, for example). Sent by v2. An empty string means unset.
+ * date: "YYYY-MM-DD" - the chart's x axis (joined with the daily-bar data).
+ * time: an ISO string (microseconds) - telling several trades on one day apart, plus the unique key.
  *
- * 복합 unique: (env, ticker, time). v2 의 time 은 마이크로초라 같은 사이클 다건도 고유.
+ * The compound unique: (env, ticker, time). v2's time is in microseconds, so several trades in one cycle stay unique.
  */
 const StockTradeSchema = new Schema(
   {
@@ -29,16 +29,16 @@ const StockTradeSchema = new Schema(
     date: { type: String, required: true }, // YYYY-MM-DD
     time: { type: String, required: true }, // ISO
     /**
-     * 이 체결을 낸 블록 (#372). **주인이 분명할 때만** 채운다.
+     * The block that placed this fill (#372). Filled in **only when the owner is unambiguous**.
      *
-     * close-sync 는 계좌 전체 체결내역을 받는데, 블록마다 돌면서 그걸 전부 자기 전략으로
-     * 태깅하고 있었다 — 미국 계좌에 블록이 둘이 되자 먼저 도는 쪽이 선점했다(2026-09-01
-     * SOXL 이 VR 주문인데 infinite_v4 로 기록). 종목의 주인이 정확히 하나일 때만 붙인다.
-     * 주인이 없거나 겹치면 null 로 두고 계좌 귀속으로 남긴다.
+     * close-sync receives the whole account's fills, and looping over the blocks was tagging every one of them
+     * with its own strategy - once the US account had two blocks, whichever ran first claimed them (2026-09-01's
+     * SOXL was a VR order recorded as infinite_v4). It is attached only when a symbol has exactly one owner.
+     * With no owner, or overlapping owners, it is left null and stays attributed to the account.
      */
     portfolioId: { type: Schema.Types.ObjectId, ref: "TradingPortfolio", default: null, index: true },
-    // 소프트 삭제 — 포트폴리오 삭제 시 (env,currency) 기록을 숨긴다(하드 삭제 아님, 복구 가능).
-    // 미설정(undefined)=표시. 조회는 { hidden: { $ne: true } } 로 제외.
+    // Soft delete - deleting a portfolio hides that (env,currency) record (not a hard delete; recoverable).
+    // Unset (undefined) = shown. Queries exclude it with { hidden: { $ne: true } }.
     hidden: { type: Boolean, default: false },
   },
   { timestamps: true },

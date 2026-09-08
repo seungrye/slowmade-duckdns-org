@@ -1,10 +1,10 @@
 'use client';
 
-// 알림 종 (#237).
+// The notification bell (#237).
 //
-// **목록은 여기서 그리지 않는다.** navbar 는 595줄에 데스크톱·모바일 마크업이 두 벌이라,
-// 드롭다운을 넣으면 두 곳에 각각 붙여야 하고 좁은 화면에서도 답답하다. 여기는 숫자만 보여
-// 주고 `/notifications` 로 보낸다 — navbar 변경이 한 줄로 끝난다.
+// **The list is not drawn here.** navbar holds two sets of markup, desktop and mobile, across 595 lines,
+// so a dropdown would have to be attached in both places and would feel cramped on a narrow screen. This shows the number alone and
+// sends you to `/notifications` - so the navbar change is one line.
 
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
@@ -23,7 +23,7 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!session) return;
     let cancelled = false;
-    // 페이지 진입 시 한 번이면 충분하다. 폴링은 필요해지면 그때 얹는다.
+    // Once on entering the page is enough. Polling is added when it becomes necessary.
     fetch('/api/notifications')
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (!cancelled) setCount(d?.data?.unreadCount ?? 0); })
@@ -31,11 +31,11 @@ export default function NotificationBell() {
     return () => { cancelled = true; };
   }, [session]);
 
-  // 읽음 처리를 바로 따라간다 (#259).
+  // It follows the read marking at once (#259).
   //
-  // 이 컴포넌트는 navbar 에 있어 화면을 옮겨도 **다시 마운트되지 않는다.** 그래서 위 조회만
-  // 있을 때는 알림을 눌러 읽어도 숫자가 그대로였다 — 새로고침해야 바뀌었다. 목록 쪽이 보내는
-  // 신호를 듣고 즉시 줄인다. 어긋나더라도 다음 조회에서 서버 값으로 맞춰진다.
+  // This component lives in the navbar and is **not remounted** by navigation. So with the fetch above alone,
+  // pressing a notification and reading it left the number as it was - it changed only on a refresh. It listens for the signal
+  // the list sends and decrements at once. Even if it drifts, the next fetch brings it back to the server's value.
   useEffect(() => {
     const onOne = () => setCount(decrementUnread);
     const onAll = () => setCount(0);

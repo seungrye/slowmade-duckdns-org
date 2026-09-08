@@ -1,13 +1,13 @@
-// 〈에테르니아의 추락〉 아이템 카탈로그 (#252 리프래시).
+// The Fall of Eternia's item catalogue (#252's refresh).
 //
-// 5 종류:
-//   - weapon: 공격력 (전투 시뮬레이션 시)
-//   - consumable: heal — HP 회복 또는 stigma 감소 (USE_ITEM 즉시 사용)
-//   - key: unlocks — 특정 씬 분기 (conditional hasItem)
-//   - passive: passiveStat — 보유 시 effectiveStat 자동 반영
-//   - quest: 이벤트 트리거 / 조건용
+// 5 kinds:
+//   - weapon: attack power (in a combat simulation)
+//   - consumable: heal - restores HP or lowers the stigma (used at once through USE_ITEM)
+//   - key: unlocks - a particular scene branch (a conditional hasItem)
+//   - passive: passiveStat - reflected automatically in effectiveStat while held
+//   - quest: for triggering events or as a condition
 //
-// 인벤토리 cap (INVENTORY_CAP = 8).
+// The inventory cap (INVENTORY_CAP = 8).
 
 import type { StatKey } from "@/types/web-adventure";
 
@@ -21,7 +21,7 @@ export type Item = {
   stackable: boolean;
   attack?: number;
   heal?: number;
-  /** #253 — 사용 시 침식도 감소 (양수 값). 음수면 침식 증가. */
+  /** #253 - lowers the contamination when used (a positive value). Negative raises it. */
   stigmaDelta?: number;
   passiveStat?: { stat: StatKey; bonus: number };
   unlocks?: string;
@@ -30,7 +30,7 @@ export type Item = {
 export const INVENTORY_CAP = 8;
 
 export const items: Record<string, Item> = {
-  // ── 주인공 시작 인벤 ────────────────────────────────────────────────
+  // -- the protagonists' starting inventories --------------------------
   patient_gown: {
     id: "patient_gown",
     displayName: "환자복",
@@ -78,7 +78,7 @@ export const items: Record<string, Item> = {
     heal: 8,
   },
 
-  // ── 성흔 관련 핵심 아이템 ─────────────────────────────────────────
+  // -- the key stigma-related items ----------------------------------
   ether_refined_water: {
     id: "ether_refined_water",
     displayName: "에테르 정제수",
@@ -95,7 +95,7 @@ export const items: Record<string, Item> = {
     stackable: true,
     stigmaDelta: 5,
   },
-  // #359 각성 — 침식 억제 장치. 보유 자체가 각성 조건(다중 게이트의 하나).
+  // #359's awakening - the contamination suppressor. Holding it is itself an awakening condition (one of the composite gate's).
   stigma_suppressor: {
     id: "stigma_suppressor",
     displayName: "성흔 억제기",
@@ -104,7 +104,7 @@ export const items: Record<string, Item> = {
     stackable: false,
   },
 
-  // ── 분기/퀘스트 아이템 ──────────────────────────────────────────
+  // -- the branch and quest items ----------------------------------
   imperial_seal: {
     id: "imperial_seal",
     displayName: "사제단 인장",
@@ -127,7 +127,7 @@ export const items: Record<string, Item> = {
     stackable: false,
     passiveStat: { stat: "wis", bonus: 1 },
   },
-  // ── 고전 삽화 이벤트 보상 (seed-363-classic-tales) ──────────────────
+  // -- the classic side-tale event rewards (seed-363-classic-tales) ----
   mutagen_serum: {
     id: "mutagen_serum",
     displayName: "변성 혈청",

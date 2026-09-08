@@ -1,27 +1,27 @@
-// #227 — Web Adventure 25 신규 씬 painter-bot 일러스트 자동 생성.
+// #227 - generating painter-bot illustrations automatically for Web Adventure's 25 new scenes.
 //
-// 사용:
+// Usage:
 //   node --env-file=.env.local scripts/painter-generate-scene-illustrations.mjs
 //   node --env-file=.env.local scripts/painter-generate-scene-illustrations.mjs --dry-run
 //   node --env-file=.env.local scripts/painter-generate-scene-illustrations.mjs --only=cave_inside,goblin_encounter
 //
-// 동작:
-//   1. .env.local 의 MONGO_URI 로 직접 연결.
-//   2. webadventurescenes 에서 25 개 (KEEP_IDS 제외) 씬 fetch.
-//   3. 씬마다:
-//      a) Gemini 로 body 텍스트를 *시각적 도트 픽셀 prompt* (한국어) 자동 생성.
-//      b) translateAndGenerate (Gemini 한→영 + Pollinations FLUX + MinIO 업로드).
-//      c) painter 일일 quota +1 (50/day 한도 체크).
-//      d) Scene.illustration 을 MinIO URL 로 update.
-//      e) ATTRIBUTION 엔트리 누적.
-//   4. ATTRIBUTION.md 의 painter-bot 섹션 갱신 (기존 5 + 신규 25).
-//   5. 결과 요약 보고.
+// How it works:
+//   1. connects directly with .env.local's MONGO_URI.
+//   2. fetches the 25 scenes (KEEP_IDS excluded) from webadventurescenes.
+//   3. per scene:
+//      a) Gemini turns the body text into a *visual pixel-art prompt* (in Korean) automatically.
+//      b) translateAndGenerate (Gemini Korean->English + Pollinations FLUX + a MinIO upload).
+//      c) painter's daily quota +1 (checked against the 50/day limit).
+//      d) Scene.illustration is updated to the MinIO URL.
+//      e) an ATTRIBUTION entry is accumulated.
+//   4. ATTRIBUTION.md's painter-bot section is updated (the existing 5 plus the new 25).
+//   5. a summary is reported.
 //
-// 안전장치:
-//   - Pollinations rate limit 회피 — 순차 호출 + 호출 간 2 초 sleep.
-//   - quota 초과 시 즉시 정지.
-//   - --dry-run: 외부 호출 0, mongo write 0 — prompt 만 출력.
-//   - 기존 5 대표 씬 (KEEP_IDS) 절대 건드리지 않음.
+// The safeguards:
+//   - avoiding Pollinations' rate limit - sequential calls with a 2-second sleep between them.
+//   - stopping at once when the quota is exceeded.
+//   - --dry-run: 0 external calls, 0 mongo writes - it prints the prompts alone.
+//   - the existing 5 representative scenes (KEEP_IDS) are never touched.
 
 import path from "node:path";
 import fs from "node:fs";
@@ -34,10 +34,10 @@ const siteRoot = path.resolve(webappRoot, "..");
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
-const ALL = args.includes("--all"); // placeholder 무시, 전체 씬 재생성.
-// 씬당 배리에이션 장수 (seed 변형). 기본 3.
+const ALL = args.includes("--all"); // Ignores the placeholders and regenerates every scene.
+// The number of variations per scene (seed variants). 3 by default.
 const VARIATIONS = parseInt(process.env.PAINTER_VARIATIONS ?? "3", 10);
-// 배리에이션 사이 sleep (ms). Pollinations 부담 완화. 기본 3초.
+// The sleep between variations (ms). Easing the load on Pollinations. 3 seconds by default.
 const BETWEEN_VARIATIONS_MS = parseInt(process.env.PAINTER_BETWEEN_VARIATIONS_MS ?? "3000", 10);
 const ONLY_ARG = args.find((a) => a.startsWith("--only="));
 const ONLY_IDS = ONLY_ARG ? ONLY_ARG.slice("--only=".length).split(",").filter(Boolean) : null;
@@ -46,41 +46,41 @@ const PROMPT_CACHE_PATH = PROMPT_CACHE_ARG ? PROMPT_CACHE_ARG.slice("--prompt-ca
 const EN_OVERRIDE_ARG = args.find((a) => a.startsWith("--english-overrides="));
 const EN_OVERRIDE_PATH = EN_OVERRIDE_ARG ? EN_OVERRIDE_ARG.slice("--english-overrides=".length) : null;
 
-// 기존 5 대표 씬 — 이미지 유지, 절대 건드리지 않음.
-// #253 〈에테르니아의 추락〉 — 옛 씬 모두 제거됨. KEEP_IDS 비움.
+// The existing 5 representative scenes - their images are kept and never touched.
+// #253 The Fall of Eternia - every old scene is gone. KEEP_IDS is emptied.
 const KEEP_IDS = new Set([]);
 
-// 〈에테르니아〉 30 + 1 씬 — Kael 1막 / Rin 1막 / Solwen 1막 / 옴팔로스 2-3막 / 6 엔딩.
+// Eternia's 30 + 1 scenes - Kael's act 1 / Rin's act 1 / Solwen's act 1 / Omphalos acts 2-3 / the 6 endings.
 const TARGET_IDS = [
-  // Kael 1막
+  // Kael's act 1
   "kael_infirmary",
   "kael_corridor",
   "kael_corridor_clear",
   "kael_cargo_container",
   "kael_falling",
   "kael_caught",
-  // Rin 1막 — rin_chase / rin_caught 는 #328 dead orphan 정리에서 삭제됨.
+  // Rin's act 1 - rin_chase and rin_caught were deleted in #328's dead-orphan cleanup.
   "rin_harbor",
   "rin_evidence",
   "rin_betrayal",
   "rin_underground",
-  // Solwen 1막
+  // Solwen's act 1
   "solwen_grove",
   "solwen_combat",
   "solwen_combat_hard",
   "solwen_grief",
   "solwen_departure",
-  // 옴팔로스 합류
+  // joining Omphalos
   "omphalos_outskirts",
   "omphalos_blackmarket",
   "omphalos_station",
-  // 클라이맥스
+  // the climax
   "climax_harmony_path",
   "climax_revolution_path",
   "climax_sylvan_path",
   "climax_ascension_path",
   "climax_fall_path",
-  // 5 엔딩 — ending_petrification 은 #327 에서 삭제 (자동 ending, 씬 데이터 미사용).
+  // The 5 endings - ending_petrification was deleted in #327 (an automatic ending, using no scene data).
   "ending_ascension",
   "ending_revolution",
   "ending_harmony",
@@ -88,10 +88,10 @@ const TARGET_IDS = [
   "ending_sylvan_bond",
 ];
 
-// #253 〈에테르니아의 추락〉 — 다크 에픽 판타지 톤 (천체 마법공학).
+// #253 The Fall of Eternia - a dark epic fantasy tone (celestial magitech).
 const STYLE_SUFFIX = "다크 에픽 판타지, 강철과 증기, 천체 마법공학, 차가운 푸른 빛, 검은 연기, 16비트 RPG 도트 픽셀 아트, 인물 없음";
 
-// env fallback 로드 (node --env-file 미사용 케이스)
+// The env fallback load (for cases not using node --env-file)
 if (!process.env.MONGO_URI) {
   const envPath = path.join(webappRoot, ".env.local");
   if (fs.existsSync(envPath)) {
@@ -115,7 +115,7 @@ for (const k of ["MONGO_URI", "MINIO_ENDPOINT", "MINIO_ACCESSKEY", "MINIO_SECRET
   }
 }
 
-// ── jiti 로 TS 모듈 동적 로드 ────────────────────────────────────────────
+// -- loading the TS modules dynamically through jiti ------------------------
 const jitiEntry = path.resolve(
   webappRoot,
   "node_modules/.pnpm/jiti@2.7.0/node_modules/jiti/lib/jiti.mjs",
@@ -142,7 +142,7 @@ const PainterImageQuota = await loadDefault("src/models/painter-image-quota.tsx"
 const imageGenMod = await jiti.import(path.join(webappRoot, "src/lib/painter/imageGen.ts"));
 const { translateAndGenerate } = imageGenMod;
 
-// ── 헬퍼 ────────────────────────────────────────────────────────────────
+// -- helpers ----------------------------------------------------------------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function todayKey(now = new Date()) {
@@ -169,7 +169,7 @@ async function tryConsumeDailyQuota() {
   }
 }
 
-// ── Gemini: body → 한국어 도트 prompt 자동 작성 ──────────────────────────
+// -- Gemini: the body -> a Korean pixel-art prompt, written automatically ---
 const PROMPT_GEN_SYSTEM = `너는 게임 일러스트 prompt 작성자다.
 한국어 CYOA 씬 묘사를 받아, *환경/조명/주요 사물* 만 추출한 *시각적 한국어 prompt* 로 변환한다.
 규칙:
@@ -185,9 +185,9 @@ function isRateLimit(err) {
   return /\b(429|RESOURCE_EXHAUSTED|quota|rate)\b/i.test(msg);
 }
 
-// Pollinations rate limit(402/429/5xx) 시 지수 백오프 재시도.
-//   대기: 2,4,8,16,32,64,128,256s ... cap 300s. rate limit 풀릴 때까지 기다린다.
-//   rate limit 이 아닌 에러는 즉시 throw.
+// An exponential backoff retry on Pollinations' rate limit (402/429/5xx).
+//   The waits: 2,4,8,16,32,64,128,256s ... capped at 300s. It waits until the rate limit clears.
+//   An error that is not a rate limit throws at once.
 async function withBackoff(fn, label = "gen") {
   const MAX = parseInt(process.env.PAINTER_MAX_RETRIES ?? "8", 10);
   let lastErr;
@@ -211,8 +211,8 @@ async function generateKoreanPromptFromBody(title, body, geminiKey) {
   const ai = new GoogleGenAI({ apiKey: geminiKey });
   const userInput = `씬 제목: ${title}\n\n씬 묘사:\n${body.join("\n")}`;
 
-  // 모델 + 재시도 매트릭스. RPD 한도 우선 — Gemma 4(RPD 1,500 + TPM 무제한)를
-  // 메인으로, 신세대 Gemini 를 폴백. (2.5 Flash 는 RPD 20 으로 배치에서 금방 소진.)
+  // The model and retry matrix. The RPD limit comes first - Gemma 4 (RPD 1,500 with unlimited TPM) is
+  // the main model and the newer Gemini the fallback. (2.5 Flash's RPD of 20 is spent quickly in a batch.)
   const PLANS = [
     { model: "gemma-4-26b-a4b-it",     waits: [0, 8000, 20000] },
     { model: "gemma-4-31b-it",         waits: [0, 8000, 20000] },
@@ -243,14 +243,14 @@ async function generateKoreanPromptFromBody(title, body, geminiKey) {
         lastErr = e;
         const msg = String(e?.message ?? e).slice(0, 160);
         console.warn(`  [gemini-prompt] ${plan.model} 시도 ${attempt + 1} 실패: ${msg}`);
-        if (!isRateLimit(e)) break; // 429 가 아니면 같은 모델로 재시도 무의미
+        if (!isRateLimit(e)) break; // Retrying the same model is pointless unless it was a 429
       }
     }
   }
   throw lastErr ?? new Error("Gemini prompt 작성 실패");
 }
 
-// ── MinIO 클라이언트 ────────────────────────────────────────────────────
+// -- the MinIO client -------------------------------------------------------
 let _minioClient = null;
 function getMinioClient() {
   if (!_minioClient) {
@@ -265,7 +265,7 @@ function getMinioClient() {
   return _minioClient;
 }
 
-// ── 메인 ────────────────────────────────────────────────────────────────
+// -- main -------------------------------------------------------------------
 const results = [];
 let startedAt = Date.now();
 
@@ -273,13 +273,13 @@ try {
   await mongoose.connect(process.env.MONGO_URI);
   console.log("[painter-scenes] MongoDB 연결 OK.");
 
-  // 현재 quota 확인 (보고용)
+  // Checking the current quota (for the report)
   const todayQuotaDoc = await PainterImageQuota.findById(todayKey()).lean();
   const startCount = todayQuotaDoc?.count ?? 0;
   console.log(`[painter-scenes] 오늘 quota 시작: ${startCount}/${PAINTER_DAILY_LIMIT}`);
 
-  // 대상 씬 fetch — ONLY_IDS 지정 시 그것, 아니면 *현재 mongo 의 placeholder 인
-  // 모든 씬* 동적 fetch (시드 신설에 자동 대응).
+  // Fetching the target scenes - those given by ONLY_IDS, or otherwise a dynamic fetch of *every scene
+  // that is a placeholder in mongo right now* (adapting automatically to newly seeded ones).
   let ids;
   if (ONLY_IDS) {
     ids = ONLY_IDS;
@@ -311,7 +311,7 @@ try {
     process.exit(1);
   }
 
-  // prompt 캐시 로드 (이전 dry-run 결과 재사용 — Gemini 호출 절감)
+  // Loading the prompt cache (reusing an earlier dry run's result - fewer Gemini calls)
   const promptCache = new Map();
   if (PROMPT_CACHE_PATH && fs.existsSync(PROMPT_CACHE_PATH)) {
     try {
@@ -325,7 +325,7 @@ try {
     }
   }
 
-  // 영어 prompt 오버라이드 — Gemini 번역 우회 (Pollinations 에 직접 영어 전송)
+  // The English prompt override - bypassing Gemini's translation (English goes straight to Pollinations)
   const englishOverrides = new Map();
   if (EN_OVERRIDE_PATH && fs.existsSync(EN_OVERRIDE_PATH)) {
     try {
@@ -348,8 +348,8 @@ try {
     const idx = `[${i + 1}/${ids.length}]`;
     console.log(`${idx} ${id} — ${scene.title}`);
 
-    // override 가 있으면 AI(Gemma/번역) 를 *전혀 호출하지 않음* — 영어 prompt 직접 사용.
-    //   koreanPrompt 는 기록용일 뿐이라 cache 값 또는 placeholder 로 충분.
+    // With an override, the AI (Gemma and the translation) is *never called* - the English prompt is used directly.
+    //   koreanPrompt is only for the record, so a cached value or a placeholder is enough.
     const enOverride = englishOverrides.get(id);
     let koreanPrompt;
     const cached = promptCache.get(id);
@@ -359,7 +359,7 @@ try {
       koreanPrompt = cached;
       console.log(`  prompt(KR) [cached]: ${koreanPrompt}`);
     } else {
-      // AI 호출 — 사용자 정책상 분당 1회로 제한 (override 미보유 씬만 해당).
+      // The AI call - limited to once a minute by the user's policy (only for scenes without an override).
       try {
         koreanPrompt = await generateKoreanPromptFromBody(scene.title, scene.body, process.env.GEMINI_API_KEY);
       } catch (e) {
@@ -368,7 +368,7 @@ try {
         continue;
       }
       console.log(`  prompt(KR): ${koreanPrompt}`);
-      // 다음 AI 호출까지 분당 1회 (사용자 정책). override 없는 씬 사이에서만 적용.
+      // Once a minute until the next AI call (the user's policy). Applied only between scenes without an override.
       await sleep(parseInt(process.env.PAINTER_AI_INTERVAL_MS ?? "60000", 10));
     }
 
@@ -377,14 +377,14 @@ try {
       continue;
     }
 
-    // 씬당 VARIATIONS 장 생성 (seed 변형) → illustrations[].
+    // VARIATIONS images generated per scene (seed variants) -> illustrations[].
     const callStart = Date.now();
     const { generateImage } = imageGenMod;
     const urls = [];
     let usedEnPrompt = enOverride ?? null;
     let quotaHit = false;
     for (let v = 0; v < VARIATIONS; v++) {
-      // quota 체크 (원자적 +1, 장당).
+      // The quota check (an atomic +1, per image).
       const allowed = await tryConsumeDailyQuota();
       if (!allowed) {
         if (!quotaWarned) {
@@ -440,7 +440,7 @@ try {
     const callMs = Date.now() - callStart;
     console.log(`  painter OK (${callMs}ms): ${urls.length}장`);
 
-    // illustration = 첫 장(호환), illustrations = 전체 배리에이션.
+    // illustration = the first image (for compatibility), illustrations = every variation.
     await WebAdventureScene.updateOne(
       { id: scene.id },
       { $set: { illustration: urls[0], illustrations: urls } },
@@ -460,14 +460,14 @@ try {
     });
     if (quotaHit) break;
 
-    // 씬 사이 sleep — Gemini 분당 quota 회피용.
-    //   기본 2500ms (Pollinations 부담 완화).
-    //   PAINTER_BETWEEN_SCENES_MS 환경 변수로 override (예: 65000 = 분당 1).
+    // The sleep between scenes - avoiding Gemini's per-minute quota.
+    //   2500ms by default (easing the load on Pollinations).
+    //   Overridable through the PAINTER_BETWEEN_SCENES_MS environment variable (65000 = once a minute, for example).
     const betweenMs = parseInt(process.env.PAINTER_BETWEEN_SCENES_MS ?? "2500", 10);
     if (i < ids.length - 1) await sleep(betweenMs);
   }
 
-  // 보고
+  // the report
   const elapsedSec = Math.round((Date.now() - startedAt) / 1000);
   const ok = results.filter((r) => r.ok).length;
   const fail = results.filter((r) => !r.ok).length;
@@ -482,7 +482,7 @@ try {
   console.log(`[painter-scenes] DRY_RUN=${DRY_RUN}`);
   console.log("═══════════════════════════════════════════════");
 
-  // 결과 JSON 저장 (ATTRIBUTION.md 갱신 입력으로 사용)
+  // Saving the result JSON (used as input for updating ATTRIBUTION.md)
   const outPath = path.join(webappRoot, "scripts", `painter-scene-results.json`);
   fs.writeFileSync(outPath, JSON.stringify({
     timestamp: new Date().toISOString(),

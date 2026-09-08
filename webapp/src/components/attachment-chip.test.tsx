@@ -1,4 +1,4 @@
-// AttachmentChip — 전용 첨부 영역 칩(뷰 다운로드 / 작성 삭제). 아이콘만 표시, 파일명은 호버 툴팁.
+// AttachmentChip - the dedicated attachment area's chip (download in the view, delete while writing). Only an icon shows; the filename is a hover tooltip.
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from "vitest";

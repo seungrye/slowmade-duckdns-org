@@ -1,12 +1,12 @@
-// 세로 휠 → 가로 스크롤 변환 (#41 — 에디터 툴바가 넘칠 때 잘린 아이콘에 손이 닿게).
+// Turning a vertical wheel into horizontal scrolling (#41 - so a clipped icon can be reached when the editor toolbar overflows).
 // @vitest-environment jsdom
 
 import { describe, it, expect } from "vitest";
 import { render } from "@testing-library/react";
 import { useWheelScrollX, useDragScrollX } from "./use-drag-scroll";
 
-/** jsdom 은 레이아웃이 없어 scrollWidth/clientWidth 가 늘 0 이고 scrollLeft 는 쓰기가 무시된다.
- *  오버플로 상황을 흉내내려면 세 속성을 직접 정의해 줘야 한다. */
+/** jsdom has no layout, so scrollWidth/clientWidth are always 0 and writes to scrollLeft are ignored.
+ *  Imitating an overflow means defining those three properties by hand. */
 function stubMetrics(
   el: HTMLElement,
   { scrollWidth, clientWidth }: { scrollWidth: number; clientWidth: number },
@@ -16,8 +16,8 @@ function stubMetrics(
   Object.defineProperty(el, "scrollLeft", { value: 0, writable: true, configurable: true });
 }
 
-/** 훅이 addEventListener 로 직접 등록하므로(passive 회피) React 합성 경로인
- *  fireEvent.wheel 로는 잡히지 않는다. 네이티브 이벤트를 직접 쏜다. */
+/** The hook registers through addEventListener directly (to avoid passive), so React's synthetic path
+ *  fireEvent.wheel does not reach it. A native event is dispatched instead. */
 function wheel(el: HTMLElement, init: WheelEventInit) {
   const ev = new WheelEvent("wheel", { cancelable: true, bubbles: true, ...init });
   el.dispatchEvent(ev);

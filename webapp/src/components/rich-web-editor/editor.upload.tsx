@@ -43,9 +43,9 @@ export const uploadImage = async (
 };
 
 /**
- * 첨부 파일 업로드 — /api/attachment/upload 로 POST, 진행률 콜백 지원.
- * uploadImage 와 같은 axios onUploadProgress 패턴. 실패는 **친절한 Error** 로 변환한다
- * (구 fetch 구현은 413 HTML 응답에 res.json() 하다 SyntaxError 로 터졌음).
+ * The attachment upload - a POST to /api/attachment/upload, with progress callbacks.
+ * The same axios onUploadProgress pattern as uploadImage. A failure is turned into **a friendly Error**
+ * (the old fetch implementation blew up with a SyntaxError calling res.json() on a 413 HTML response).
  */
 export const uploadAttachment = async (
   file: File,
@@ -68,7 +68,7 @@ export const uploadAttachment = async (
   } catch (err: unknown) {
     const e = err as { response?: { status?: number; data?: unknown } };
     const status = e.response?.status;
-    // 앱 JSON 에러는 message 를 담아 보냄(400 MIME 은 한글). nginx 413 은 HTML 이라 message 없음.
+    // The app's JSON errors carry a message (a 400 MIME error is in Korean). nginx's 413 is HTML and has none.
     const dataMsg =
       e.response && typeof e.response.data === "object" && e.response.data !== null
         ? (e.response.data as { message?: string }).message

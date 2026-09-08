@@ -1,12 +1,12 @@
-// RevisionHistorySection — diff UI 단위 테스트.
+// RevisionHistorySection - unit tests for the diff UI.
 //
-// 새 의미 (git-like):
-//   v0 = 최초 작성 (직전 없음 → "최초 작성" 표시)
-//   v_N (N>=1) = N 번째 commit. diff = v_{N-1} snapshot → v_N snapshot.
+// The new (git-like) meaning:
+//   v0 = the first write (nothing before it -> shown as "first write")
+//   v_N (N>=1) = the Nth commit. The diff is the v_{N-1} snapshot -> the v_N snapshot.
 //
-// 검증:
-//   - v0 클릭 → "최초 작성" 메시지, diff 없음.
-//   - v1 클릭 → v0/v1 두 snapshot fetch + diff 영역 렌더.
+// Verified:
+//   - clicking v0 -> the "first write" message, no diff.
+//   - clicking v1 -> both the v0 and v1 snapshots are fetched and the diff area renders.
 
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -23,7 +23,7 @@ beforeEach(() => {
         json: async () => ({
           success: true,
           data: [
-            // 목록은 version DESC. v1, v0.
+            // The list is version DESC. v1, v0.
             { _id: "r2", version: 1, createdAt: "2026-06-06T09:00:00.000Z", author: "system" },
             { _id: "r1", version: 0, createdAt: "2026-06-06T08:00:00.000Z", author: "system" },
           ],
@@ -83,9 +83,9 @@ describe("RevisionHistorySection — text diff UI (v_{N-1} → v_N)", () => {
     });
     await act(async () => {});
 
-    // diff 미노출.
+    // no diff shown.
     expect(screen.queryByTestId("revision-diff")).toBeNull();
-    // "최초 작성" 메시지.
+    // the "first write" message.
     expect(screen.getByText(/최초 작성/)).toBeTruthy();
   });
 
@@ -107,19 +107,19 @@ describe("RevisionHistorySection — text diff UI (v_{N-1} → v_N)", () => {
     await act(async () => {});
     await act(async () => {});
 
-    // diff 컨테이너 노출.
+    // the diff container is shown.
     const diff = await screen.findByTestId("revision-diff");
     expect(diff).toBeTruthy();
 
-    // 추가/삭제 라인 — v0 ("옛") → v1 ("새") 차이.
+    // The added and removed lines - the difference between v0 ("old") and v1 ("new").
     const addedLines = within(diff).getAllByTestId("revision-diff-line-added");
     const removedLines = within(diff).getAllByTestId("revision-diff-line-removed");
     expect(addedLines.length).toBeGreaterThan(0);
     expect(removedLines.length).toBeGreaterThan(0);
 
-    // 추가 라인에 '새' 가 포함.
+    // the added line contains 'new'.
     expect(addedLines.some((el) => /새/.test(el.textContent ?? ""))).toBe(true);
-    // 삭제 라인에 '옛' 가 포함.
+    // the removed line contains 'old'.
     expect(removedLines.some((el) => /옛/.test(el.textContent ?? ""))).toBe(true);
   });
 });

@@ -26,7 +26,7 @@ describe('PostScrollDepth', () => {
   });
 
   it('마운트 시 초기 스크롤 위치를 즉시 계산한다', async () => {
-    // 처음부터 100% 위치 (짧은 페이지)
+    // at the 100% position from the start (a short page)
     setScrollPosition(0, 500, 500);
 
     await act(async () => {

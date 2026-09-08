@@ -123,7 +123,7 @@ function useFileUpload(options: UploadOptions) {
       return []
     }
 
-    // 여러 장을 한 번에 — 순차 업로드(fileItem 프리뷰가 현재 파일 진행률 표시).
+    // Several at once - uploaded in sequence (the fileItem preview shows the current file's progress).
     const results: { url: string; name: string }[] = []
     for (const file of files) {
       const url = await uploadFile(file)
@@ -365,7 +365,7 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
       const pos = props.getPos()
       if (pos === undefined) return
 
-      // 업로드 노드 1개를 제거하고 업로드된 이미지들을 순서대로 삽입.
+      // Removes the one upload node and inserts the uploaded images in order.
       props.editor
         .chain()
         .focus()

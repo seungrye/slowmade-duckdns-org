@@ -1,24 +1,24 @@
 #!/usr/bin/env node
-// scripts/seed-magic-failure-stigma.mjs — #263 마법 실패 시 추가 침식.
+// scripts/seed-magic-failure-stigma.mjs - #263's extra contamination on a failed spell.
 //
-// 마법 또는 마력 소모성 선택지의 *실패* 에 stigmaDeltaOnFailure 추가.
-// 성공 시는 choice.stigmaDelta 만으로 충분 (현재 +2/+3). 실패 시 *주문 통제 실패
-// = 더 큰 신체 부담* 으로 추가 침식.
+// stigmaDeltaOnFailure is added to the *failure* of magic or magic-consuming choices.
+// On success choice.stigmaDelta alone is enough (currently +2/+3). On failure the extra contamination stands for
+// *losing control of the spell = a greater strain on the body*.
 
 import mongoose from 'mongoose';
 
 const magicChoicePatches = [
-  // 셀레네 마법 (kael_infirmary)
+  // selene's magic (kael_infirmary)
   { sceneId: 'kael_infirmary', choiceId: 'overload_panel', stigmaDeltaOnFailure: 3 },
-  // 헤카테 환영 (solwen_grove)
+  // hecate's illusion (solwen_grove)
   { sceneId: 'solwen_grove', choiceId: 'frighten_chant', stigmaDeltaOnFailure: 2 },
-  // 헤카테 환영 (solwen_combat)
+  // hecate's illusion (solwen_combat)
   { sceneId: 'solwen_combat', choiceId: 'shield_spirit', stigmaDeltaOnFailure: 3 },
-  // 지능 마법공학 위조 (kael_corridor) — 마법공학 = 약한 마법 소모
+  // the intelligence magitech forgery (kael_corridor) - magitech = a small drain of magic
   { sceneId: 'kael_corridor', choiceId: 'forge_id', stigmaDeltaOnFailure: 2 },
-  // 지능 마법공학 해킹 (station_path_steel)
+  // the intelligence magitech hack (station_path_steel)
   { sceneId: 'station_path_steel', choiceId: 'hijack', stigmaDeltaOnFailure: 3 },
-  // 지혜 의식 동조 (climax_harmony_path) — 가장 위험한 마법
+  // attuning to the rite through wisdom (climax_harmony_path) - the most dangerous magic
   { sceneId: 'climax_harmony_path', choiceId: 'still_the_engine', stigmaDeltaOnFailure: 10 },
 ];
 

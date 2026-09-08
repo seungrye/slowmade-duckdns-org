@@ -1,4 +1,4 @@
-// #103 — 아이템 사용 규칙. 웹 reducer 의 USE_ITEM 과 같은 규칙이어야 한다.
+// #103 - the item-use rules. They must match the web reducer's USE_ITEM.
 import { describe, it, expect } from "vitest";
 import { isUsableItem, applyItemUse } from "../src/items.js";
 
@@ -48,7 +48,7 @@ describe("applyItemUse", () => {
     expect(out.character.stigmaErosion).toBe(25);
   });
 
-  // 같은 아이템을 여러 개 가졌으면 하나만 준다.
+  // Holding several of the same item gives up just one.
   it("같은 아이템이 둘이면 하나만 소모", () => {
     const out = applyItemUse(char({ inventory: ["medical_bandage", "medical_bandage"] }), CATALOG.medical_bandage);
     expect(out.character.inventory).toEqual(["medical_bandage"]);

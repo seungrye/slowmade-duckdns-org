@@ -1,25 +1,25 @@
 #!/usr/bin/env node
-// scripts/seed-365-expansion-scenes.mjs — 씬 확장분 적치 (재해 복구 구멍 메우기).
+// scripts/seed-365-expansion-scenes.mjs - loading the scene expansion (filling the disaster-recovery hole).
 //
-// 왜 필요한가
-//   seeds-replay.sh 로 빈 mongo 를 재구축하면 125 개 씬만 생겼다. 프로덕션에는 135 개가
-//   있다. 차이 10 개는 뒤에 「작가노트를 반영한 씬 확장」으로 만든 것들인데, 그 작업이
-//   시드에 한 줄도 남지 않았다. 그 씬들을 가리키는 **부모 씬의 선택지**도 함께 빠져 있었다.
+// Why it is needed
+//   Rebuilding an empty mongo with seeds-replay.sh produced only 125 scenes. Production has 135.
+//   The 10 missing were made later by "the scene expansion reflecting the author's notes", and not a line of that work
+//   survived in the seeds. **The parent scenes' choices** pointing at them were missing too.
 //
-//   재구축본이 깨져 보이지는 않는다(깨진 링크 0). 확장 이전 상태로 자체 완결되기 때문이다.
-//   그래서 더 위험했다 — 복구해 놓고도 무엇이 사라졌는지 알아채기 어렵다.
+//   The rebuild does not look broken (0 broken links). It is self-consistent as the state before the expansion.
+//   That made it more dangerous - even after a recovery it is hard to notice what disappeared.
 //
-// 무엇을 넣나
-//   · 확장 씬 10 개: 성흔별 조화 분기 4(lunar/selene/hecate/none), 카엘 회상 2
-//     (kael_gate_recall · kael_marik_truth), 솔벤 유대 2(bond_accept · bond_echo),
-//     설화 확장 2(tale_knight_past · tale_serum_ward)
-//   · 그 씬들로 가는 길을 여는 부모 6 개의 choices
+// What goes in
+//   - the 10 expansion scenes: 4 harmony branches per stigma (lunar/selene/hecate/none), 2 Kael recollections
+//     (kael_gate_recall, kael_marik_truth), 2 Solwen bonds (bond_accept, bond_echo),
+//     2 tale expansions (tale_knight_past, tale_serum_ward)
+//   - the 6 parents' choices that open the way to them
 //
-//   데이터는 scripts/seed-expansion-data.json. treatment/variants 는 넣지 않는다 —
-//   그쪽은 seed-367-voices 담당이라 **이 시드가 먼저** 돌아 씬을 만들어 두어야 한다.
+//   The data is in scripts/seed-expansion-data.json. treatment and variants are not included -
+//   those belong to seed-367-voices, so **this seed must run first** and create the scenes.
 //
-// 멱등: 씬은 $set upsert, 선택지는 같은 값이면 mongo 가 변경으로 치지 않는다.
-//   updatedAt 은 건드리지 않는다(seed-idempotency 규칙).
+// Idempotent: the scenes are $set upserts, and mongo does not count an identical choice as a change.
+//   updatedAt is left alone (the seed-idempotency rule).
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

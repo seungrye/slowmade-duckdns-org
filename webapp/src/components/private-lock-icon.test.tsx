@@ -1,4 +1,4 @@
-// PrivateLockIcon — 비공개 표시용 잠긴 자물쇠(뷰 제목·목록 제목 공용).
+// PrivateLockIcon - the closed padlock marking a private post (shared by the view's title and the list's titles).
 // @vitest-environment jsdom
 
 import { describe, it, expect } from "vitest";

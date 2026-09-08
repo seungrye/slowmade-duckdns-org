@@ -15,7 +15,7 @@ export interface AttachmentUploadButtonProps extends Omit<ButtonProps, "onClick"
   text?: string
 }
 
-/** 본문 툴바의 '파일 첨부' 버튼 — 파일 선택 시 onPick(files) 호출(다중 선택 지원, 업로드는 상위가 처리). */
+/** The body toolbar's 'attach file' button - selecting files calls onPick(files) (multiple selection supported; the parent handles the upload). */
 export const AttachmentUploadButton = React.forwardRef<HTMLButtonElement, AttachmentUploadButtonProps>(
   ({ onPick, text, className = "", ...buttonProps }, ref) => {
     const inputRef = React.useRef<HTMLInputElement>(null)
@@ -43,7 +43,7 @@ export const AttachmentUploadButton = React.forwardRef<HTMLButtonElement, Attach
           style={{ display: "none" }}
           onChange={(e) => {
             const files = Array.from(e.target.files ?? [])
-            e.target.value = "" // 같은 파일 재선택 허용
+            e.target.value = "" // selecting the same file again is allowed
             if (files.length) onPick(files)
           }}
         />

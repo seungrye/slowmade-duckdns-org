@@ -1,15 +1,15 @@
 /**
- * 티커 표기를 점 없는 쪽으로 (#335).
+ * Moves ticker spellings to the dot-free form (#335).
  *
- * `stocks` 에 `BRK.B`·`BF.B` 로 들어간 종목이, 가격(`stockdailyprices`)에는 `BRKB`·`BFB`
- * 로 쌓여 있어 차트에서 고르면 선이 안 그려졌다. 라이브 매매 유니버스와 가격 6,658건이
- * 전부 점 없는 표기라, `stocks` 쪽을 맞춘다.
+ * Symbols stored in `stocks` as `BRK.B` and `BF.B` had their prices (`stockdailyprices`) accumulated as `BRKB` and `BFB`,
+ * so picking them in the chart drew no line. The live trading universe and all 6,658 price rows
+ * use the dot-free spelling, so the `stocks` side is brought into line.
  *
- * **덮어쓰지 않는다** — 점 없는 표기가 이미 있으면 건너뛴다. 같은 종목이 두 문서로 남는
- * 것이 잘못 합쳐지는 것보다 낫다.
+ * **It does not overwrite** - an existing dot-free spelling is skipped. The same symbol left as two documents
+ * is better than the two being merged wrongly.
  *
- *   node scripts/fix-ticker-dots.mjs           # 무엇이 바뀔지 보여만 준다
- *   node scripts/fix-ticker-dots.mjs --apply   # 실제로 고친다
+ *   node scripts/fix-ticker-dots.mjs           # only shows what would change
+ *   node scripts/fix-ticker-dots.mjs --apply   # actually fixes
  */
 import mongoose from 'mongoose';
 

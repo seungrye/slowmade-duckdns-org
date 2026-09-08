@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// scripts/seed-falling-lunar.mjs — #323 kael_falling 에 lunar ability hidden 분기.
+// scripts/seed-falling-lunar.mjs - #323's hidden lunar-ability branch in kael_falling.
 //
-// kael_falling 분기 1/3 (rise_to_ground con probability).
-// lunar 성흔 — 마법공학 항법 데이터로 *안전 착륙*. hpDelta -1 만.
+// kael_falling's branch 1 of 3 (the rise_to_ground con probability).
+// The lunar stigma - *a safe landing* through magitech navigation data. Only hpDelta -1.
 
 import mongoose from 'mongoose';
 

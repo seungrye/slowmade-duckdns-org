@@ -1,8 +1,8 @@
 "use client";
 
-// 서버 상태 대시보드 (owner 전용). shim /api/system·/api/state 를 3초마다 폴링해
-// CPU/메모리 게이지·부하·코어별·CPU 히스토리를 실시간 갱신. (#19)
-// webapp 은 표시만 — 시스템 무접촉.
+// The server status dashboard (owner only). It polls the shim's /api/system and /api/state every 3 seconds to
+// refresh the CPU and memory gauges, the load, the per-core figures and the CPU history live. (#19)
+// The webapp only displays - it never touches the system.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 

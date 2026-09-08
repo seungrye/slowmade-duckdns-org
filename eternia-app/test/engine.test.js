@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-// index.html 의 <body> 마크업(스크립트 제외)을 jsdom 에 심고 main.js 를 import 해 엔진을 구동한다.
-// 콘텐츠는 사이트 content/v1 fetch 이므로 global fetch 를 스텁해 결정적으로 씬을 주입.
+// index.html's <body> markup (scripts excluded) is planted in jsdom and main.js is imported to drive the engine.
+// The content comes from the site's content/v1 fetch, so global fetch is stubbed to inject the scenes deterministically.
 const html = readFileSync(resolve(import.meta.dirname, "../index.html"), "utf8");
 const bodyInner = html
   .match(/<body[^>]*>([\s\S]*?)<\/body>/i)[1]
   .replace(/<script[\s\S]*?<\/script>/gi, "");
 
-// 결정적 미니 씬 그래프 (start=kael_infirmary → hall → fin(엔딩)). plain 선택지만 사용.
+// A deterministic mini scene graph (start=kael_infirmary -> hall -> fin (the ending)). Plain choices only.
 const MOCK_SCENES = [
   {
     id: "kael_infirmary",
@@ -39,11 +39,11 @@ function mountApp() {
   document.body.innerHTML = bodyInner;
 }
 function startGame(opts) {
-  document.getElementById("title").click(); // 타이틀 탭 → STEP1(주인공)
+  document.getElementById("title").click(); // tapping the title -> STEP1 (the protagonist)
   const p = (opts && opts.protagonist) || "kael";
-  document.querySelector('.cr-prota[data-p="' + p + '"]').click(); // 주인공 선택 → STEP2(성흔)
+  document.querySelector('.cr-prota[data-p="' + p + '"]').click(); // choosing the protagonist -> STEP2 (the stigma)
   if (opts && opts.ability) document.querySelector('.cr-abil[data-a="' + opts.ability + '"]').click();
-  document.getElementById("cr-start").click(); // 시작 → boot(fetch)
+  document.getElementById("cr-start").click(); // starting -> boot (fetch)
 }
 async function waitFor(pred, { timeout = 1000, interval = 5 } = {}) {
   const start = Date.now();
@@ -53,7 +53,7 @@ async function waitFor(pred, { timeout = 1000, interval = 5 } = {}) {
   }
   return pred();
 }
-// 선택지는 '마지막(=plain 경로)'을 눌러 결정적으로 엔딩까지 진행. 없으면 log 탭으로 문단 진행.
+// The 'last' choice (= the plain path) is pressed to reach the ending deterministically. With none, the paragraphs advance by tapping the log.
 function driveToEnding(maxSteps = 100) {
   const log = document.getElementById("log");
   for (let i = 0; i < maxSteps; i++) {
@@ -68,16 +68,16 @@ function driveToEnding(maxSteps = 100) {
 describe("eternia 엔진 (사이트 계약 소비)", () => {
   beforeEach(() => {
     vi.resetModules();
-    // 엔딩 재시도 큐(#61)가 localStorage 에 남아 다음 테스트 시작 시 재전송되면
-    // app-end-run 호출 수가 어긋난다. 테스트마다 비운다.
+    // If the ending retry queue (#61) is left in localStorage it resends at the start of the next test and
+    // the app-end-run call count goes wrong. It is emptied per test.
     try { window.localStorage.clear(); } catch { /* 저장소 없음 */ }
-    // jsdom: matchMedia 스텁 (reduce-motion=true → 타이핑 즉시완료·결정적)
+    // jsdom: a matchMedia stub (reduce-motion=true -> typing completes at once, deterministically)
     window.matchMedia = () => ({
       matches: true,
       addEventListener() {}, removeEventListener() {},
       addListener() {}, removeListener() {},
     });
-    // content/v1 fetch 스텁 — MOCK_SCENES 반환
+    // the content/v1 fetch stub - returning MOCK_SCENES
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ success: true, data: { scenes: MOCK_SCENES } }),
@@ -90,18 +90,18 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     await import("../src/main.js");
     const title = document.getElementById("title");
     expect(title.classList.contains("hidden")).toBe(false);
-    // 탭 → STEP1: 주인공 3 (성흔은 아직 없음)
+    // a tap -> STEP1: the 3 protagonists (no stigmata yet)
     title.click();
     expect(document.querySelector("#creator")).toBeTruthy();
     expect(document.querySelectorAll(".cr-prota").length).toBe(3);
     expect(document.querySelectorAll(".cr-abil").length).toBe(0);
     expect(document.getElementById("cr-start")).toBeNull();
-    // 주인공 선택 → STEP2 전환: 성흔 4 + 시작 버튼 등장, 주인공 카드는 사라짐
+    // choosing the protagonist -> the STEP2 transition: the 4 stigmata plus the start button appear, and the protagonist cards go
     document.querySelector('.cr-prota[data-p="kael"]').click();
     expect(document.querySelectorAll(".cr-prota").length).toBe(0);
     expect(document.querySelectorAll(".cr-abil").length).toBe(4);
     expect(document.getElementById("cr-start")).toBeTruthy();
-    // 시작 → boot(fetch)
+    // starting -> boot (fetch)
     document.getElementById("cr-start").click();
     await waitFor(() => document.querySelector("#log")?.textContent.includes("카엘"));
     const text = document.getElementById("log").textContent;
@@ -114,14 +114,14 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
   it("스탯 클릭 시 앵커 툴팁(.stat-tip)으로 표시하고, 다른 곳 탭 시 닫힌다", async () => {
     mountApp();
     await import("../src/main.js");
-    // 상태바 스탯은 초기 렌더됨(타이틀 화면에서도)
+    // The status bar's stats render initially (on the title screen too)
     const intStat = document.querySelector('.sstat[data-stat="int"]');
     expect(intStat).toBeTruthy();
     intStat.click();
     const tip = document.querySelector(".stat-tip");
     expect(tip).toBeTruthy();
     expect(tip.textContent).toContain("지능"); // STAT_KO.int
-    // 다른 곳(로그) 탭 → 툴팁 닫힘
+    // tapping elsewhere (the log) -> the tooltip closes
     document.getElementById("log").click();
     expect(document.querySelector(".stat-tip")).toBeNull();
   });
@@ -132,7 +132,7 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     document.getElementById("title").click();
     document.querySelector('.cr-prota[data-p="rin"]').click(); // → STEP2
     expect(document.querySelectorAll(".cr-abil").length).toBe(4);
-    document.getElementById("cr-back").click(); // ← 주인공 다시
+    document.getElementById("cr-back").click(); // <- back to the protagonist
     expect(document.querySelectorAll(".cr-prota").length).toBe(3);
     expect(document.querySelectorAll(".cr-abil").length).toBe(0);
   });
@@ -153,14 +153,14 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     mountApp();
     await import("../src/main.js");
     startGame();
-    await waitFor(() => document.querySelector(".stitle")); // 씬 헤더 = fetch 완료·씬 진입(로딩 .p 아님)
+    await waitFor(() => document.querySelector(".stitle")); // the scene header = the fetch finished and the scene was entered (not the loading .p)
 
     expect(driveToEnding()).toBe(true);
     expect(document.querySelectorAll(".ending").length).toBe(1);
 
     const log = document.getElementById("log");
     const blocksAtEnding = document.querySelectorAll("#log .blk").length;
-    for (let i = 0; i < 6; i++) log.click(); // 엔딩 후 본문 탭 연타
+    for (let i = 0; i < 6; i++) log.click(); // tapping the body repeatedly after the ending
 
     expect(document.querySelectorAll(".ending").length).toBe(1);
     expect(document.querySelectorAll("#log .blk").length).toBe(blocksAtEnding);
@@ -171,12 +171,12 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     mountApp();
     await import("../src/main.js");
     startGame();
-    // fetchScenes 재시도(backoff 500+1500ms) 후 실패하므로 넉넉히 대기
+    // fetchScenes retries (a 500 + 1500ms backoff) before failing, so it waits generously
     await waitFor(() => document.getElementById("log").textContent.includes("불러오지 못"), { timeout: 3500 });
     expect(document.getElementById("log").textContent).toContain("불러오지 못");
   });
 
-  // 임의의 씬 셋으로 부팅하는 헬퍼
+  // A helper that boots with an arbitrary set of scenes
   async function boot(scenes) {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true, json: async () => ({ success: true, data: { scenes } }),
@@ -192,7 +192,7 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
       { id: "kael_infirmary", title: "시작", body: ["b"], choices: [{ kind: "plain", id: "g", label: "간다", to: "doom" }] },
       { id: "doom", title: "심연", onEnter: { stigmaDelta: 100 }, body: ["돌이 된다"], choices: [] },
     ]);
-    // 첫 씬 진행 → doom 진입 시 침식 100 → 즉시 석화 엔딩(본문 미표시)
+    // advancing the first scene -> entering doom brings contamination to 100 -> the petrification ending at once (no body shown)
     driveToEnding();
     const t = document.getElementById("log").textContent;
     expect(document.querySelectorAll(".ending").length).toBe(1);
@@ -200,10 +200,10 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(t).toContain("석화");
   });
 
-  // 앱에서 sylvan_bond 엔딩 뒤 '다시 플레이' 로 이어서 본 석화 엔딩이 서버에 도달하지
-  // 않은 사례. restart() 가 endRunSent 를 리셋하므로 두 번째도 전송돼야 한다.
+  // A case where the petrification ending seen through 'play again' after the sylvan_bond ending never reached the
+  // server. restart() resets endRunSent, so the second must be sent too.
   it("다시 플레이 후 두 번째 엔딩(석화)도 app-end-run 으로 전송", async () => {
-    vi.stubEnv("VITE_APP_KEY", "test-key"); // 키가 없으면 submitAppEndRun 이 즉시 return
+    vi.stubEnv("VITE_APP_KEY", "test-key"); // with no key, submitAppEndRun returns at once
     const scenes = [
       { id: "kael_infirmary", title: "시작", body: ["b"], choices: [{ kind: "plain", id: "g", label: "간다", to: "doom" }] },
       { id: "doom", title: "심연", onEnter: { stigmaDelta: 100 }, body: ["돌이 된다"], choices: [] },
@@ -216,11 +216,11 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     await waitFor(() => endRunCalls().length >= 1);
     expect(endRunCalls().length).toBe(1);
 
-    // 재전송 시 서버가 중복을 걸러낼 수 있도록 멱등 키를 함께 보낸다. (#63)
+    // The idempotency key is sent along so the server can filter a duplicate on a resend. (#63)
     const firstBody = JSON.parse(endRunCalls()[0][1].body);
     expect(firstBody.clientRunId).toBeTruthy();
 
-    // 엔딩 카드 → 다시 플레이(restart) → 캐릭터 생성부터 재시작
+    // the ending card -> play again (restart) -> restarting from character creation
     document.getElementById("againBtn").click();
     document.querySelector('.cr-prota[data-p="kael"]').click();
     document.getElementById("cr-start").click();
@@ -233,13 +233,13 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     vi.unstubAllEnvs();
   });
 
-  // 문단마다 '탭하여 계속' 이 떠서 순수 텍스트에도 탭이 필요했다. 멈출 이유(삽화·화면효과)가
-  // 있을 때만 멈추고, 나머지는 이어서 낸다. (#71)
+  // 'tap to continue' appeared on every paragraph, so even plain text needed a tap. It now pauses only when there is a reason
+  // (an illustration or a screen effect) and lets the rest run on. (#71)
   it("순수 텍스트 문단은 탭 없이 이어서 출력된다", async () => {
     await boot([
       { id: "kael_infirmary", title: "연속", body: ["첫째 줄.", "둘째 줄.", "셋째 줄."], choices: [] },
     ]);
-    // 진입만 하고 클릭하지 않았는데도 세 문단이 모두 나와 있어야 한다.
+    // All three paragraphs must be out having only entered, without a click.
     const text = document.getElementById("log").textContent;
     expect(text).toContain("첫째 줄.");
     expect(text).toContain("둘째 줄.");
@@ -257,7 +257,7 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     ]);
     const text = document.getElementById("log").textContent;
     expect(text).toContain("앞 문단.");
-    expect(text).not.toContain("뒤 문단은 아직."); // 탭 대기
+    expect(text).not.toContain("뒤 문단은 아직."); // waiting for a tap
     expect(document.getElementById("cont").classList.contains("hidden")).toBe(false);
   });
 
@@ -294,7 +294,7 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
       },
       { id: "x", title: "끝", body: ["끝"], isEnding: true, endingId: "fall", choices: [] },
     ]);
-    // 첫 문단 넘겨 선택지 노출
+    // advancing past the first paragraph to reveal the choices
     document.getElementById("log").click();
     await waitFor(() => document.querySelector(".choices"));
     const locked = document.querySelector(".choice.locked");
@@ -303,7 +303,7 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
   });
 
   it("probability 선택 → 굴림 카드가 뜬다(성공/실패 결정적)", async () => {
-    // reduce-motion 에서 roll=11. stat int7 + 11 = 18. 난이도 12 → 성공.
+    // Under reduce-motion roll=11. The int stat 7 + 11 = 18. Difficulty 12 -> success.
     await boot([
       {
         id: "kael_infirmary", title: "도전", body: ["b"],
@@ -316,9 +316,9 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     await waitFor(() => document.querySelector(".choices .choice"));
     document.querySelector(".choices .choice").click();
     await waitFor(() => document.querySelector(".rollcard"));
-    expect(document.querySelector(".rollcard.ok")).toBeTruthy(); // 성공
-    await waitFor(() => document.getElementById("log").textContent.includes("해냈다")); // win 씬 진입(150ms 후)
-    driveToEnding(); // win 본문 넘겨 엔딩 카드까지
+    expect(document.querySelector(".rollcard.ok")).toBeTruthy(); // success
+    await waitFor(() => document.getElementById("log").textContent.includes("해냈다")); // entering the win scene (after 150ms)
+    driveToEnding(); // advancing past win's body to the ending card
     expect(document.querySelectorAll(".ending").length).toBe(1);
     expect(document.getElementById("log").textContent).toContain("ascension");
   });
@@ -329,11 +329,11 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
       { id: "win", title: "성공", body: ["ok"], isEnding: true, endingId: "ascension", choices: [] },
       { id: "lose", title: "실패", body: ["no"], isEnding: true, endingId: "fall", choices: [] },
     ]);
-    document.getElementById("log").click(); // 본문 넘겨 선택지 노출
+    document.getElementById("log").click(); // advancing past the body to reveal the choices
     await waitFor(() => document.querySelector(".choices .choice"));
     expect(document.querySelectorAll(".choices").length).toBe(1);
-    document.querySelector(".choices .choice").click(); // 확률 선택
-    // 판정 카드는 뜨되, 선택지가 다시 출력되면 안 됨(버그 시 버블된 log-click → afterBody → emitChoices).
+    document.querySelector(".choices .choice").click(); // a probability choice
+    // The roll card shows, but the choices must not print again (with the bug, a bubbled log-click -> afterBody -> emitChoices).
     expect(document.querySelector(".rollcard")).toBeTruthy();
     expect(document.querySelectorAll(".choices").length).toBe(0);
   });
@@ -357,7 +357,7 @@ describe("eternia 엔진 (사이트 계약 소비)", () => {
     expect(document.querySelector("#stage .fx-ov[data-fx='flash']")).toBeTruthy();
   });
 
-  // globalThis.Audio 를 스텁해 생성된 오디오 엘리먼트를 관찰
+  // globalThis.Audio is stubbed to observe the audio elements created
   function stubAudio() {
     const created = [];
     globalThis.Audio = vi.fn().mockImplementation((src) => {

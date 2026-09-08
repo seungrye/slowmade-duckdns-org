@@ -1,16 +1,16 @@
 import { InferSchemaType, Schema, model, models, Model } from "mongoose";
 
-// 이미지 URL과 썸네일 URL을 포함하는 객체
+// The object holding the image URL and the thumbnail URL
 const ImageUrlSchema = new Schema(
   {
     url: String,
     thumbnailUrl: String,
   },
-  { _id: false } // ← _id 생성하지 않음
+  { _id: false } // <- no _id is generated
 );
 
-// 다운로드 첨부파일(본문 이미지와 별개). key = MinIO 오브젝트 키 — 공개 URL 이 아니라
-// 인증 프록시(/api/attachment)가 키로 해석해 스트리밍한다(비공개 글 첨부 보호).
+// Downloadable attachments (separate from the body's images). key is the MinIO object key - not a public URL;
+// the authenticated proxy (/api/attachment) resolves the key and streams it (protecting a private post's attachments).
 const AttachmentSchema = new Schema(
   {
     id: String, // 클라 생성 랜덤 id (다운로드 링크·삭제 식별용)
@@ -36,10 +36,10 @@ const PostSchema = new Schema(
     tags: {
         type: [String],
         default: [],
-        index: true // 나중에 태그로 검색할 때 성능 향상을 위해 인덱스를 추가합니다.
+        index: true // An index is added for the performance of searching by tag later.
     },
-    // AI(Gemini)가 본문 기반으로 자동 추가한 태그(사용자 태그와 구분·표시색 결정용).
-    // aiTags 는 tags 의 부분집합 — tags 에 병합돼 검색·집계는 정상 동작하고, 출처만 여기서 표시.
+    // The tags the AI (Gemini) added automatically from the body (telling them from the user's tags and deciding their colour).
+    // aiTags is a subset of tags - merged into tags, so search and aggregation work normally; only the origin is marked here.
     aiTags: {
         type: [String],
         default: [],
@@ -63,12 +63,12 @@ const PostSchema = new Schema(
   { timestamps: true }
 );
 
-// 타입 자동 추론
+// The type is inferred automatically
 export type PostType = InferSchemaType<typeof PostSchema>;
 export type ImageUrlType = InferSchemaType<typeof ImageUrlSchema>;
 export type AttachmentType = InferSchemaType<typeof AttachmentSchema>;
 
-// 모델 생성
+// Creating the model
 const Post: Model<PostType> = models.Post || model<PostType>("Post", PostSchema);
 
 export default Post;

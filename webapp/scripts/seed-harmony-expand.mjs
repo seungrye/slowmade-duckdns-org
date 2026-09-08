@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/seed-harmony-expand.mjs — #265 블랙마켓에서 sawOtherProtagonist flag 도 추가.
+// scripts/seed-harmony-expand.mjs - #265: the sawOtherProtagonist flag added at the black market too.
 //
-// 이미 블랙마켓 본문은 *다른 주인공 마주침* 내러티브를 담고 있다. 자격 flag 추가:
+// The black market's body already carries the *running into another protagonist* narrative. The qualifying flag is added:
 //   sawOtherProtagonist: true
-// 추후 추가 신규 분기 (예: 블랙마켓 의식 사보타지) 자격으로 사용 가능. 현재는
-// flag 만 명시.
+// It can qualify a new branch added later (sabotaging the rite at the black market, for instance). For now only
+// the flag is stated.
 
 import mongoose from 'mongoose';
 

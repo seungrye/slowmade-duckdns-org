@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-// seed-355-enrich-bodies.mjs — 전 씬 본문을 "요약본" → "소설" 톤으로 AI 윤색.
+// seed-355-enrich-bodies.mjs - polishing every scene's body from a "summary" into a "novel" tone with AI.
 //
-// 의도(#355):
-//   기존 본문은 평균 3.4줄/203자로 *스토리 요약본* 느낌. 감각 묘사·주인공 내면·
-//   NPC 대사/개입을 더해 *소설처럼* 읽히도록 확장. 단 기존 사건·정보·분기는 절대
-//   변형하지 않고 *살만 붙인다*.
+// The intent (#355):
+//   At an average of 3.4 lines and 203 characters, the existing bodies read like *a story summary*. Sensory description, the protagonist's inner life
+//   and NPC speech and interventions are added so they read *like a novel*. But the existing events, information and branches are never
+//   altered - only *flesh is added*.
 //
-// 설계:
-//   - bodyOriginal 보존 — 첫 실행 때 현재 body 를 bodyOriginal 에 저장. 이후 *항상
-//     bodyOriginal 기준* 으로 재확장 → 재실행해도 본문이 누적·폭주하지 않음(멱등성).
-//   - AI: Gemma 4 메인 + 폴백 체인(translate.ts 와 동일). GEMINI_API_KEY 필요.
-//   - rate limit: 씬 사이 60초(사용자 정책 "1분에 1쿼리"). 실패 시 제곱 백오프 재시도.
-//   - 검증: 비엔딩 ≥3줄, 엔딩 ≥1줄. 미달이면 그 씬은 원본 유지(스킵).
+// The design:
+//   - bodyOriginal is preserved - the first run stores the current body in bodyOriginal. From then on the expansion is *always
+//     based on bodyOriginal* -> a rerun never accumulates or runs away (idempotence).
+//   - the AI: Gemma 4 as the main model plus the fallback chain (the same as translate.ts). GEMINI_API_KEY is required.
+//   - the rate limit: 60 seconds between scenes (the user's "one query a minute" policy). An exponential backoff retry on failure.
+//   - the check: >=3 lines for a non-ending, >=1 for an ending. Falling short, that scene keeps its original (skipped).
 //
-// 사용:
+// Usage:
 //   node --env-file=.env.local scripts/seed-355-enrich-bodies.mjs --only kael_infirmary --dry
 //   node --env-file=.env.local scripts/seed-355-enrich-bodies.mjs --all
 //   node --env-file=.env.local scripts/seed-355-enrich-bodies.mjs --only id1,id2
@@ -55,9 +55,9 @@ function isTransient(err) {
 
 function parseBody(raw) {
   let s = (raw ?? '').trim();
-  // 코드펜스 제거.
+  // Stripping the code fence.
   s = s.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-  // JSON 배열 추출 (앞뒤 잡음 방어).
+  // Extracting the JSON array (guarding against noise before and after).
   const start = s.indexOf('[');
   const end = s.lastIndexOf(']');
   if (start >= 0 && end > start) s = s.slice(start, end + 1);
@@ -96,14 +96,14 @@ async function enrichOne(ai, scene) {
   const minLines = scene.isEnding ? 1 : 3;
   let lastErr;
   for (const model of MODELS) {
-    // 모델별 제곱 백오프 (transient 한정, 최대 4회).
+    // An exponential backoff per model (transient errors only, 4 attempts at most).
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const raw = await callModel(ai, model, user);
         const lines = parseBody(raw);
         if (!lines) {
           lastErr = new Error(`parse 실패 (model=${model})`);
-          break; // 파싱 실패는 모델 문제 → 다음 모델로.
+          break; // A parse failure is the model's problem -> on to the next model.
         }
         if (lines.length < minLines) {
           lastErr = new Error(`줄 수 부족 ${lines.length}<${minLines} (model=${model})`);
@@ -112,7 +112,7 @@ async function enrichOne(ai, scene) {
         return { lines, model, source };
       } catch (err) {
         lastErr = err;
-        if (!isTransient(err)) break; // 영구 에러 → 다음 모델.
+        if (!isTransient(err)) break; // A permanent error -> the next model.
         const wait = Math.min(2 ** attempt * 5, 120);
         console.warn(`    ↻ ${model} transient(${(err.message ?? err).toString().slice(0, 80)}) — ${wait}s 후 재시도`);
         await sleep(wait * 1000);
@@ -164,7 +164,7 @@ async function main() {
         lines.forEach((l) => console.log(`      | ${l}`));
       } else {
         const update = { body: lines };
-        if (!s.bodyOriginal) update.bodyOriginal = source; // 최초 1회만 원본 보존.
+        if (!s.bodyOriginal) update.bodyOriginal = source; // The original is preserved on the first run only.
         await Scene.findOneAndUpdate({ id: s.id }, update);
       }
       ok++;
@@ -172,7 +172,7 @@ async function main() {
       console.log(`✗ ${(err.message ?? err).toString().slice(0, 120)}`);
       fail++;
     }
-    // 마지막 씬 뒤엔 대기 불필요. dry 도 rate limit 준수.
+    // No wait is needed after the last scene. A dry run respects the rate limit too.
     if (i < scenes.length - 1) await sleep(60_000);
   }
 

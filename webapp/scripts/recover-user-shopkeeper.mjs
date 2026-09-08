@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// scripts/recover-user-shopkeeper.mjs — 일회성 데이터 복구 (#252).
+// scripts/recover-user-shopkeeper.mjs - a one-off data recovery (#252).
 //
-// 사용자(seungrye@gmail.com) 의 shopkeeper 엔딩 도달이 #252 진앙 (unique key
-// 충돌로 end-run 400) 으로 mongo 에 적치 안 됨. 복구:
-//   1. past_run 에 (runIndex=2, endingId=shopkeeper) insert.
-//   2. save 의 character/currentSceneId unset + runIndex=3.
+// The user's (seungrye@gmail.com) shopkeeper ending was never stored in mongo because of #252's epicentre (a unique-key
+// clash making end-run 400). The recovery:
+//   1. insert (runIndex=2, endingId=shopkeeper) into past_run.
+//   2. unset the save's character and currentSceneId, and set runIndex=3.
 //
-// 실행 후 갤러리에서 shopkeeper 표시 + 다음 모험은 creating 부터.
+// Afterwards the gallery shows shopkeeper and the next adventure starts from creating.
 
 import mongoose from 'mongoose';
 
@@ -27,7 +27,7 @@ async function main() {
   }
   console.log('현재 save:', { runIndex: save.runIndex, scene: save.currentSceneId, hasChar: !!save.character });
 
-  // 가장 큰 runIndex 다음 슬롯 — 일반적으로 save.runIndex+1.
+  // The slot after the largest runIndex - normally save.runIndex+1.
   const existingRuns = await PastRun.find({ userEmail: USER_EMAIL }).lean();
   const maxRunIndex = existingRuns.reduce((m, r) => Math.max(m, r.runIndex), 0);
   const targetRunIndex = Math.max(save.runIndex, maxRunIndex) + 1;
@@ -49,7 +49,7 @@ async function main() {
   );
   console.log('past_run upsert:', upRes._id, upRes.endingId);
 
-  // save 갱신.
+  // Updating the save.
   const newRunIndex = targetRunIndex + 1;
   await Save.findOneAndUpdate(
     { userEmail: USER_EMAIL },

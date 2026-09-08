@@ -1,44 +1,44 @@
-// WebAdventureScene — Web MUD CYOA 씬 mongo 모델.
+// WebAdventureScene - the Web MUD CYOA scene's mongo model.
 //
-// Phase B (#212): 18 정적 ts 씬을 mongo 로 100% 이전.
-// 클라이언트는 `/api/web-adventure/content/v1` 엔드포인트로 캐시 가능한
-// 전체 씬 컨텐츠를 fetch (Phase C 에서 도입).
+// Phase B (#212): the 18 static ts scenes moved 100% into mongo.
+// The client fetches the whole scene content, cacheable, from the
+// `/api/web-adventure/content/v1` endpoint (introduced in Phase C).
 //
-// 스키마는 src/types/web-adventure.ts 의 Scene 타입을 1:1 미러링.
-// Choice 의 kind 별 필드 (plain → to, probability → onSuccess/onFailure,
-// conditional → condition) 는 schema-level required 가 표현하기 어려우므로
-// path-level validate() 로 동적 검증한다 (validateSync 에서도 호출됨).
+// The schema mirrors the Scene type in src/types/web-adventure.ts 1:1.
+// A Choice's per-kind fields (plain -> to, probability -> onSuccess/onFailure,
+// conditional -> condition) are hard to express as schema-level required, so they are
+// checked dynamically through a path-level validate() (which validateSync calls too).
 
 import { Schema, model, models, Model } from "mongoose";
-// 엔딩 목록의 단일 출처 (#352). jiti 스크립트 호환을 위해 상대경로.
+// The single source of the ending list (#352). A relative path, for jiti script compatibility.
 import { ENDING_IDS } from '../types/web-adventure';
 
-// ── Choice 의 condition (conditional 종류일 때만 사용) ─────────────────────
+// -- a Choice's condition (used only on the conditional kind) --------------
 const ChoiceConditionSchema = new Schema(
   {
     kind: { type: String, enum: ["minStat", "hasItem", "flag", "minFlag", "ability", "stigmaAtLeast", "stigmaAtMost", "all"], required: true },
     stat: { type: String },
     min: { type: Number },
-    // #99 stigmaAtMost 상한.
+    // #99's stigmaAtMost ceiling.
     max: { type: Number },
     itemId: { type: String },
     key: { type: String },
-    // 5 주차 (#221) — flag 조건의 *반전 매치* (expect=false 시 flag 미설정일 때 충족).
-    // 미정의 시 default true (기존 동작 보존). mongoose 가 자동으로 false 를 채워넣지 않도록
-    // default 를 명시하지 않는다.
+    // Week 5 (#221) - the flag condition's *inverted match* (with expect=false it is met when the flag is unset).
+    // Undefined it defaults to true (preserving the previous behaviour). No default is stated, so mongoose does not
+    // fill in false automatically.
     expect: { type: Boolean },
   },
   { _id: false },
 );
 
 // ── Choice ──────────────────────────────────────────────────────────────────
-// kind 별 필수 필드 매트릭스:
+// The matrix of required fields per kind:
 //   plain        → to
 //   probability  → stat, difficulty, onSuccess, onFailure
 //   conditional  → condition, to
 //
-// pre('validate') 는 validateSync() 에서 동작하지 않으므로 path-level
-// .validate() 로 구현 (validator 가 false 반환 또는 throw 시 에러 등록).
+// pre('validate') does not run under validateSync(), so it is implemented as a path-level
+// .validate() (a validator returning false or throwing registers the error).
 const ChoiceSchema = new Schema(
   {
     kind: {
@@ -58,22 +58,22 @@ const ChoiceSchema = new Schema(
     onSuccess: { type: String },
     onFailure: { type: String },
 
-    // #89 — 이 선택지를 고른 흔적(도착 씬이 같은 갈래를 구분하기 위함).
+    // #89 - the trace of picking this choice (telling apart branches whose destination scene is the same).
     setFlags: { type: Map, of: Boolean },
     // conditional
     condition: { type: ChoiceConditionSchema },
-    // 4 주차 — conditional 의 *완전 숨김* 모드 (조건 미충족 시 UI 에서 렌더 X).
+    // Week 4 - the conditional's *fully hidden* mode (not rendered in the UI when the condition is unmet).
     hidden: { type: Boolean },
-    // 5 주차 (#221) — probability 의 *일회성 자동 hidden* (해당 flag truthy 면 UI 에서 렌더 X).
+    // Week 5 (#221) - the probability's *one-off automatic hidden* (not rendered in the UI when that flag is truthy).
     hideWhenFlag: { type: String },
   },
   { _id: false },
 );
 
-// kind path 의 validator 에 *전체 choice* 를 점검하는 함수를 매단다.
-// (mongoose 는 validator 함수에서 this = sub-document.)
+// A function checking *the whole choice* is hung on the kind path's validator.
+// (In a mongoose validator function, this = the sub-document.)
 ChoiceSchema.path("kind").validate(function (kind: string) {
-  // this 는 choice sub-document.
+  // this is the choice sub-document.
   const self = this as unknown as Record<string, unknown>;
   if (kind === "plain") {
     if (!self.to) return false;
@@ -90,7 +90,7 @@ ChoiceSchema.path("kind").validate(function (kind: string) {
 }, "Choice 의 kind 별 필수 필드가 누락되었습니다.");
 
 // ── position (#222) ─────────────────────────────────────────────────────────
-// /scenes/graph 의 ReactFlow 노드 좌표. optional — 미설정 시 dagre 자동.
+// The ReactFlow node coordinates on /scenes/graph. Optional - dagre lays it out when unset.
 const PositionSchema = new Schema(
   {
     x: { type: Number, required: true },
@@ -103,19 +103,19 @@ const PositionSchema = new Schema(
 const OnEnterSchema = new Schema(
   {
     setFlags: { type: Map, of: Boolean },
-    // default 를 명시적으로 undefined 로 — mongoose 가 array 타입에 자동으로
-    // 빈 배열을 부여하지 않도록 막는다 (idempotent migration 위함).
+    // The default is stated as explicitly undefined - stopping mongoose from giving an array type
+    // an empty array automatically (for an idempotent migration).
     addItems: { type: [String], default: undefined },
-    // 4 주차 — 누적 카운터 (예: caughtCount) +1 씩 누적.
+    // Week 4 - cumulative counters (caughtCount, for example) incremented by 1.
     incrementCounters: { type: [String], default: undefined },
-    // 동적 텍스트 변수({{키}} 치환 소스) — character.variables 에 병합. 값은 string|number.
+    // The dynamic text variables (the source for {{key}} substitution) - merged into character.variables. The values are string|number.
     setVars: { type: Map, of: Schema.Types.Mixed },
   },
   { _id: false },
 );
 
-// ── bgm (씬 기본 배경음) ─────────────────────────────────────────────────────
-// types/web-adventure.ts 의 SceneBgm 1:1 미러. 중간 제어는 body 의 <<bgm …>> 디렉티브.
+// -- bgm (the scene's default background music) -----------------------------
+// Mirroring SceneBgm in types/web-adventure.ts 1:1. Mid-scene control is the body's <<bgm …>> directive.
 const SceneBgmSchema = new Schema(
   {
     src: { type: String, required: true },
@@ -125,15 +125,15 @@ const SceneBgmSchema = new Schema(
   { _id: false },
 );
 
-// ── Scene 본체 ──────────────────────────────────────────────────────────────
-// body 는 mongoose 가 array 타입을 default [] 로 처리해서 required 만으로는
-// "누락" 을 잡지 못하므로 validator 로 *비어있지 않음* 까지 강제한다.
+// -- the Scene itself -------------------------------------------------------
+// mongoose gives an array type a default of [], so required alone cannot catch a missing body;
+// a validator forces it to be *non-empty* as well.
 const WebAdventureSceneSchema = new Schema(
   {
     id: { type: String, required: true, unique: true, index: true },
     title: { type: String, required: true },
     illustration: { type: String, required: true },
-    // 배리에이션 이미지 배열. 진입 시 (회차+씬) 결정적 선택. 비면 illustration fallback.
+    // The array of variation images. Chosen deterministically from (run + scene) on entry. Empty, it falls back to illustration.
     illustrations: { type: [String], default: [] },
     body: {
       type: [String],
@@ -143,34 +143,34 @@ const WebAdventureSceneSchema = new Schema(
         message: "body 는 비어있지 않은 배열이어야 합니다.",
       },
     },
-    // #73 문체 변형 — treatment 는 사건의 뼈대(집필용 정본), variants 는 문체별 본문.
-    //   treatment 는 **화면에 절대 나가지 않는다**(변형이 없으면 body 로 폴백한다).
-    //   variants 는 { [voice]: string[] } 자유 키라 Mixed — 작가를 늘려도 스키마를 안 고친다.
+    // #73's prose variants - treatment is the event's skeleton (the canonical text for writing), variants the per-style bodies.
+    //   treatment **never goes on screen** (with no variant it falls back to body).
+    //   variants is a free-keyed { [voice]: string[] } and so is Mixed - adding a style needs no schema change.
     treatment: { type: [String], default: [] },
     variants: { type: Schema.Types.Mixed, default: {} },
     choices: { type: [ChoiceSchema], required: true, default: [] },
     onEnter: { type: OnEnterSchema },
-    // 씬 진입 기본 BGM(선택). 중간 제어는 body 의 <<bgm …>> 디렉티브.
+    // The scene's default BGM on entry (optional). Mid-scene control is the body's <<bgm …>> directive.
     bgm: { type: SceneBgmSchema },
     isEnding: { type: Boolean },
     endingId: {
       type: String,
       enum: [...ENDING_IDS], // #352 단일 출처
     },
-    // #222 — /scenes/graph 노드 좌표 (사용자 드래그로 갱신). optional.
+    // #222 - the /scenes/graph node's coordinates (updated by the user's drag). Optional.
     position: { type: PositionSchema },
-    // 옛 quest CMS 패턴 — Scene 의 *현재 리비전 번호*. PUT 마다 +1.
-    // 기존 씬은 정의되지 않은 상태로 잔존 — 첫 PUT 시 default 0 + $inc 1 = 1.
+    // The old quest CMS pattern - the Scene's *current revision number*. +1 on every PUT.
+    // Existing scenes are left undefined - the first PUT gives default 0 plus $inc 1 = 1.
     revisionCount: { type: Number, default: 0 },
-    // 소프트 삭제 — 삭제해도 문서를 지우지 않는다(리비전 이력 보존). id 가 unique 라 같은
-    // id 로 재생성 시엔 소프트 삭제된 문서를 재사용(undelete). 게임·목록 조회는 { $ne: true }.
+    // Soft delete - deleting does not remove the document (preserving the revision history). id being unique, recreating with the same
+    // id reuses (undeletes) the soft-deleted document. The game and listing queries use { $ne: true }.
     isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
 
-// ── DTO 인터페이스 ─────────────────────────────────────────────────────────
+// -- the DTO interfaces -----------------------------------------------------
 export interface WebAdventureSceneDoc {
   _id: unknown;
   id: string;
@@ -178,9 +178,9 @@ export interface WebAdventureSceneDoc {
   illustration: string;
   illustrations?: string[];
   body: string[];
-  /** #73 사건의 뼈대(집필용). 화면에 나가지 않는다. */
+  /** #73's event skeleton (for writing). It never goes on screen. */
   treatment?: string[];
-  /** #73 문체별 본문 { [voice]: string[] }. 없으면 body 로 폴백. */
+  /** #73's per-style bodies, { [voice]: string[] }. Absent, it falls back to body. */
   variants?: Record<string, string[]>;
   choices: Array<Record<string, unknown>>;
   onEnter?: {
@@ -189,15 +189,15 @@ export interface WebAdventureSceneDoc {
     incrementCounters?: string[];
     setVars?: Map<string, string | number>;
   };
-  /** 씬 진입 기본 BGM(선택). types/web-adventure.ts SceneBgm 미러. */
+  /** The scene's default BGM on entry (optional). Mirrors SceneBgm in types/web-adventure.ts. */
   bgm?: { src: string; loop?: boolean; volume?: number };
   isEnding?: boolean;
   endingId?: string;
-  /** #222 — /scenes/graph 노드 좌표. optional. */
+  /** #222 - the /scenes/graph node's coordinates. Optional. */
   position?: { x: number; y: number };
-  /** 옛 quest CMS 패턴 — 현재 리비전 번호. PUT 마다 +1. */
+  /** The old quest CMS pattern - the current revision number. +1 on every PUT. */
   revisionCount?: number;
-  /** 소프트 삭제 — true 면 게임·목록에서 제외(문서는 보존). */
+  /** Soft delete - true excludes it from the game and the listings (the document is kept). */
   isDeleted?: boolean;
   deletedAt?: Date | null;
   createdAt: Date;

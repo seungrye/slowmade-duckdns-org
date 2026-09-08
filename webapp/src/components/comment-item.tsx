@@ -7,8 +7,8 @@ import type { Comment } from "@/types/comment.d";
 import CommentInput from "./comment-input";
 import CommentContent from "./comment-content";
 
-// enji(AI) 댓글 작성자명에만 쓰이는 폰트 — 드물게 사용되므로 preload 하지 않아
-// "preloaded but not used" 경고를 피하고, 로드 지연은 swap 으로 fallback 표시.
+// The font used only for enji's (the AI's) comment author name - being rare it is not preloaded,
+// avoiding the "preloaded but not used" warning, and a slow load falls back through swap.
 const manrope = Manrope({ subsets: ['latin'], preload: false, display: 'swap' });
 
 interface CommentItemProps {
@@ -22,11 +22,11 @@ interface CommentItemProps {
   onRef: (el: HTMLDivElement | null) => void;
   onReplySubmit: (parentId: string, content: string) => Promise<boolean>;
   submitting: boolean;
-  /** 직속 자식(답글) 수 — 0 이면 접기 토글 미표시. */
+  /** The number of direct children (replies) - 0 hides the collapse toggle. */
   childCount?: number;
-  /** 이 코멘트의 자식들이 접혀 있는지. */
+  /** Whether this comment's children are collapsed. */
   isCollapsed?: boolean;
-  /** 접기 토글. */
+  /** The collapse toggle. */
   onToggleCollapse?: (id: string) => void;
   children?: React.ReactNode;
 }
@@ -48,7 +48,7 @@ export default function CommentItem({
   children,
 }: CommentItemProps) {
   const indentClass = isNested ? "ml-6 md:ml-12 " : "";
-  // 접기 토글 버튼 — *최상위 댓글*에만 (스레드 단위 접기). 자식 답글엔 없음.
+  // The collapse toggle - on *top-level comments* only (collapsing per thread). Child replies have none.
   const collapseBtn =
     !isNested && childCount > 0 && onToggleCollapse ? (
       <button

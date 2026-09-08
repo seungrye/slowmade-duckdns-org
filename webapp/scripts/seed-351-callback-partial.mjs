@@ -1,27 +1,27 @@
 #!/usr/bin/env node
-// scripts/seed-351-callback-partial.mjs — #351 핀포인트 시나리오 확장.
+// scripts/seed-351-callback-partial.mjs - #351's pinpoint scenario extension.
 //
-// 두 가지 TRPG적 깊이 추가 (사용자 승인, 2026-06-10):
+// Two additions of TRPG depth (approved by the user, 2026-06-10):
 //
-//   1) 장기 콜백 — 호프만 생존 추적.
-//      rin 이 상관 호프만을 [언변] 으로 설득해 *살려보낸* 경우
-//      (rin_underground_talk), 그 빚이 광산 길목에서 추적자로 돌아온다.
-//      → flag hoffmann_spared 설정 + rin_underground 에 conditional 콜백 분기
-//      + 신규 씬 omphalos_hoffmann_return.
-//      "내 과거 선택이 세계에 흔적을 남긴다" 체감.
+//   1) a long-range callback - tracking Hoffmann's survival.
+//      When Rin talks her superior Hoffmann round with [persuasion] and *lets him live*
+//      (rin_underground_talk), that debt returns as a pursuer on the road to the mine.
+//      -> setting the hoffmann_spared flag, a conditional callback branch in rin_underground
+//      and the new scene omphalos_hoffmann_return.
+//      Making "my past choices leave a mark on the world" felt.
 //
-//   2) 부분 성공 — 정찰병 희생.
-//      강철 갈래(station_path_steel)에 derail/hijack 외 *세 번째 길*:
-//      정찰병이 수동 분리 레버에 목숨을 걸어 의식 차량 *절반만* 떼어낸다.
-//      추락은 *늦춰지나 멈추진 않는다* (mixed success). 그의 희생이
-//      약화된 의식을 멈출 harmony 의 문을 연다.
-//      → station_path_steel 의 back_to_station 을 sacrifice 로 교체 (3 분기 유지)
-//      + 신규 씬 climax_partial_decouple.
+//   2) a partial success - the scout's sacrifice.
+//      A *third road* on the steel fork (station_path_steel), beside derail and hijack:
+//      the scout stakes their life on the manual uncoupling lever and detaches *only half* of the rite's carriages.
+//      The fall is *delayed but not stopped* (a mixed success). Their sacrifice opens
+//      the door to a harmony that can halt the weakened rite.
+//      -> station_path_steel's back_to_station is replaced by sacrifice (still 3 branches)
+//      plus the new scene climax_partial_decouple.
 //
-// 모두 idempotent (findOneAndUpdate $set / upsert). illustration 보호 가드.
-// content-lint(structure/reachability) 통과 전제로 설계:
-//   - rin_underground 2 분기, station_path_steel 3 분기, 신규 2 씬 각 2 분기 (≤3).
-//   - 신규 씬 모두 도달 가능 + exit 존재 (dead-end 없음).
+// All idempotent (findOneAndUpdate $set / upsert). With the illustration guard.
+// Designed to pass content-lint (structure/reachability):
+//   - rin_underground has 2 branches, station_path_steel 3, and each new scene 2 (<=3).
+//   - every new scene is reachable and has an exit (no dead ends).
 
 import mongoose from 'mongoose';
 
@@ -34,18 +34,18 @@ async function main() {
     new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }),
   );
 
-  // illustration 보호 upsert 헬퍼.
+  // The illustration-guarding upsert helper.
   async function upsertScene(doc) {
     const cur = await Scene.findOne({ id: doc.id }).lean();
     const next = { ...doc };
     if (cur?.illustration && !cur.illustration.includes('placeholder')) {
-      next.illustration = cur.illustration; // painter 실 URL 보존.
+      next.illustration = cur.illustration; // A real painter URL is preserved.
     }
     await Scene.findOneAndUpdate({ id: doc.id }, next, { upsert: true, new: true });
     console.log('upsert:', doc.id);
   }
 
-  // ── 콜백 1: rin_underground_talk 에 hoffmann_spared flag ──────────────
+  // -- callback 1: the hoffmann_spared flag on rin_underground_talk ------
   {
     const s = await Scene.findOne({ id: 'rin_underground_talk' }).lean();
     if (s) {
@@ -61,15 +61,15 @@ async function main() {
     }
   }
 
-  // ── 콜백 2: rin_underground 에 conditional 콜백 분기 ───────────────────
-  // 기존 choices(1: to_omphalos) 에 hidden conditional 추가 → 2 분기.
+  // -- callback 2: the conditional callback branch in rin_underground ----
+  // A hidden conditional is added to the existing choices (1: to_omphalos) -> 2 branches.
   {
     const s = await Scene.findOne({ id: 'rin_underground' }).lean();
     if (s) {
       const choices = [...(s.choices ?? [])];
       const exists = choices.some((c) => c.id === 'hoffmann_shadow');
       if (!exists) {
-        // 콜백 분기를 *맨 앞* 에 — flag 보유 시 먼저 눈에 띄도록.
+        // The callback branch goes *first* - so it stands out when the flag is held.
         choices.unshift({
           kind: 'conditional',
           id: 'hoffmann_shadow',
@@ -92,7 +92,7 @@ async function main() {
     }
   }
 
-  // ── 콜백 3: 신규 씬 omphalos_hoffmann_return ─────────────────────────
+  // -- callback 3: the new scene omphalos_hoffmann_return ---------------
   await upsertScene({
     id: 'omphalos_hoffmann_return',
     illustration: PLACEHOLDER,
@@ -125,7 +125,7 @@ async function main() {
     onEnter: { stigmaDelta: 2 },
   });
 
-  // ── 부분성공 1: station_path_steel 재구성 (back → sacrifice) ──────────
+  // -- partial success 1: restructuring station_path_steel (back -> sacrifice) --
   {
     const s = await Scene.findOne({ id: 'station_path_steel' }).lean();
     if (s) {
@@ -152,7 +152,7 @@ async function main() {
     }
   }
 
-  // ── 부분성공 2: 신규 씬 climax_partial_decouple ───────────────────────
+  // -- partial success 2: the new scene climax_partial_decouple ---------
   await upsertScene({
     id: 'climax_partial_decouple',
     illustration: PLACEHOLDER,

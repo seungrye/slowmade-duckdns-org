@@ -1,15 +1,15 @@
-// Playwright config — #277 실 브라우저 통합 e2e.
+// The Playwright config - #277's real-browser integration e2e.
 //
-// 운영 환경:
-//   - PLAYWRIGHT_BASE_URL 으로 운영 중인 dev/prod 서버 주소 주입.
-//     기본값: http://localhost:3010 (Blue 슬롯).
-//   - mongo 가 켜진 상태여야 web-adventure content fetch 성공.
+// The environment:
+//   - PLAYWRIGHT_BASE_URL injects the address of a running dev or prod server.
+//     Default: http://localhost:3010 (the Blue slot).
+//   - mongo must be up for the web-adventure content fetch to succeed.
 //
-// 실행:
+// Running it:
 //   PLAYWRIGHT_BASE_URL=http://localhost:3010 npx playwright test
 //   PLAYWRIGHT_BASE_URL=https://slowmade.duckdns.org npx playwright test
 //
-// CI 의도 — 본 설정은 *로컬 검증* 위주. CI 자동화는 별도 워크플로.
+// The CI intent - this config is mainly for *local verification*. CI automation is a separate workflow.
 
 import { defineConfig, devices } from "@playwright/test";
 

@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-// test-setup 이 jsdom 환경에서 해 줘야 할 일들 — 조용히 빠지면 알아채기 어렵다.
+// What test-setup has to do under the jsdom environment - a silent omission is hard to notice.
 //
-// jest-dom 은 node 환경 파일(288 중 221)이 매번 물 이유가 없어 `typeof window` 로 갈라
-// 실었다(실측 setup 40s → 10s). 그 분기가 잘못되면 jsdom 테스트에서 매처가 통째로
-// 사라지는데, 매처 없이 쓰면 "not a function" 으로 죽으니 티는 난다. 다만 어느 파일이
-// 먼저 깨지는지가 매번 달라 원인을 찾기 어렵다 — 여기서 한 줄로 못 박는다.
+// jest-dom has no reason to be pulled in by every node-environment file (221 of 288), so it is loaded behind a `typeof window`
+// branch (measured: setup 40s -> 10s). Get that branch wrong and the matchers vanish entirely from the jsdom
+// tests - using one without a matcher dies with "not a function", so it does show. But which file
+// breaks first varies every time and the cause is hard to find - so it is pinned down here in one line.
 import { describe, it, expect } from 'vitest';
 
 describe('test-setup (jsdom)', () => {

@@ -1,27 +1,27 @@
 #!/usr/bin/env node
-// scripts/seed-ability-branches.mjs — #321 4 성흔 차별화 분기.
+// scripts/seed-ability-branches.mjs - #321's differentiating branches for the 4 stigmata.
 //
-// evalCondition 에 ability kind 추가 (system) — 이번 시드는 *콘텐츠 적용*.
+// The ability kind was added to evalCondition (the system) - this seed is *the content's application*.
 //
-// 4 성흔 별 *특수 hidden 분기* — 한 분기당 한 위치 (3 분기 한도 유지).
-//   selene (str 보너스, 전투): solwen_combat 에 신규 hidden
-//   hecate (cha 보너스, 환영): omphalos_blackmarket — 한도로 추가 어려움 → cameo 활용
-//   lunar  (int 보너스, 마법): kael_corridor — 한도로 추가 어려움 → 별도 위치
-//   none   (무흔, 재굴림 3): *재굴림으로 평소 위험 분기 시도* — 시스템 의미만,
-//                            별도 분기 없음
+// A *special hidden branch* per stigma - one place each (keeping the 3-branch limit).
+//   selene (a str bonus, combat): a new hidden branch in solwen_combat
+//   hecate (a cha bonus, illusion): omphalos_blackmarket - hard to add at the limit -> the cameo is used
+//   lunar  (an int bonus, magic): kael_corridor - hard to add at the limit -> its own place
+//   none   (unmarked, 3 rerolls): *attempting the usually dangerous branch with a reroll* - a systemic meaning only,
+//                            with no branch of its own
 
 import mongoose from 'mongoose';
 
 const ABILITY_BRANCHES = [
-  // selene = 전투 +2 (str). solwen_combat 에 hidden 분기 *셀레네 마법으로 화염*.
-  // 현재 solwen_combat: shoot_canister / shield_spirit / spirit_guidance (3 분기)
-  // → 한도 차서 추가 불가. 패스.
-  // 대신 station_path_steel (현재 3 분기) — 한도 차.
-  // → 신설 위치: kael_caught_minor / kael_struggled / kael_falling_aftermath 같은 *우회 씬* 의 plain
-  //   분기를 *selene 시 다른 효과* 로 변경. 그러나 *우회 씬은 1 분기 plain 만*.
+  // selene = +2 in combat (str). A hidden *flame through selene's magic* branch in solwen_combat.
+  // solwen_combat currently has shoot_canister / shield_spirit / spirit_guidance (3 branches)
+  // -> at the limit, so nothing can be added. Skipped.
+  // station_path_steel instead (currently 3 branches) - also at the limit.
+  // -> a new place: changing the plain branch of a *detour scene* such as kael_caught_minor / kael_struggled / kael_falling_aftermath
+  //   to *a different effect under selene*. But *a detour scene has only 1 plain branch*.
   //
-  // 가장 자연: omphalos_cameo 의 walk_past (plain) → hecate 시 hidden 분기로
-  //   [헤카테] 환영을 만들어 *빠른 도주*. condition.ability=hecate.
+  // The most natural: omphalos_cameo's walk_past (plain) -> under hecate, a hidden branch that
+  //   conjures an illusion for *a swift escape*. condition.ability=hecate.
   {
     sceneId: 'omphalos_cameo',
     choice: {
@@ -50,7 +50,7 @@ async function main() {
       console.log('skip:', b.sceneId);
       continue;
     }
-    // walk_past 제거 후 hecate_illusion 추가 (분기 3 한도 유지).
+    // walk_past is removed and hecate_illusion added (keeping the 3-branch limit).
     const filtered = choices.filter((c) => c.id !== 'walk_past');
     filtered.push(b.choice);
     if (filtered.length > 3) {

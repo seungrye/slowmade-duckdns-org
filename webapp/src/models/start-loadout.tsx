@@ -1,7 +1,7 @@
 import { Schema, model, models, Model } from "mongoose";
 
-// 단일 doc 패턴 — collection 에 항상 0개 또는 1개. _id 는 고정 문자열 "default".
-// 게임 측 StartLoadout 과 1:1 매핑. weapon/armor 는 None 시 null.
+// The single-doc pattern - the collection always holds 0 or 1. _id is the fixed string "default".
+// Mapped 1:1 onto the game's StartLoadout. weapon and armor are null when None.
 
 const ConsumableEntrySchema = new Schema(
   {

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * RWS 타로 78장을 MinIO 로 업로드한다 (#388).
+ * Uploads the 78 RWS tarot cards to MinIO (#388).
  *
- * 원화는 퍼블릭 도메인(라이더-웨이트-스미스, 1909, Pamela Colman Smith). Wikimedia Commons 에서
- * 받아 MinIO `tarot/rws/{id}.jpg` 로 올린다 — 덱의 image 키(tarot-deck.ts)와 정확히 맞춘다.
- * public-read 버킷이라 buildPublicUrl 로 바로 서빙된다(프록시 불필요).
+ * The originals are public domain (Rider-Waite-Smith, 1909, Pamela Colman Smith). They are fetched from Wikimedia Commons
+ * and uploaded to MinIO as `tarot/rws/{id}.jpg` - matching the deck's image keys (tarot-deck.ts) exactly.
+ * The bucket is public-read, so buildPublicUrl serves them directly (no proxy needed).
  *
- * 실행(node 20+ 내장 env 로더):
- *   node --env-file=.env.local scripts/upload-tarot-cards.mjs           # 미리보기(다운로드 없음)
- *   node --env-file=.env.local scripts/upload-tarot-cards.mjs --apply   # 실제 다운로드+업로드
- *   ... --force   # 이미 있어도 다시 올린다
+ * Running it (node 20+'s built-in env loader):
+ *   node --env-file=.env.local scripts/upload-tarot-cards.mjs           # a preview (no download)
+ *   node --env-file=.env.local scripts/upload-tarot-cards.mjs --apply   # the real download and upload
+ *   ... --force   # re-uploads even when it is already there
  */
 import * as Minio from 'minio';
 
@@ -18,7 +18,7 @@ const FORCE = process.argv.includes('--force');
 const BUCKET = process.env.MINIO_BUCKET;
 const COMMONS = 'https://commons.wikimedia.org/wiki/Special:FilePath/';
 
-// 메이저 22 — Wikimedia RWS 파일명(정확).
+// The 22 majors - the exact Wikimedia RWS filenames.
 const MAJOR = [
   'RWS_Tarot_00_Fool.jpg', 'RWS_Tarot_01_Magician.jpg', 'RWS_Tarot_02_High_Priestess.jpg',
   'RWS_Tarot_03_Empress.jpg', 'RWS_Tarot_04_Emperor.jpg', 'RWS_Tarot_05_Hierophant.jpg',
@@ -29,11 +29,11 @@ const MAJOR = [
   'RWS_Tarot_18_Moon.jpg', 'RWS_Tarot_19_Sun.jpg', 'RWS_Tarot_20_Judgement.jpg',
   'RWS_Tarot_21_World.jpg',
 ];
-// 마이너 56 — Wikimedia 파일명은 {Suit}{NN}.jpg (Ace=01 … King=14). pentacles→Pents.
+// The 56 minors - the Wikimedia filenames are {Suit}{NN}.jpg (Ace=01 … King=14). pentacles -> Pents.
 const SUIT_FILE = { wands: 'Wands', cups: 'Cups', swords: 'Swords', pentacles: 'Pents' };
 const SUIT_ORDER = ['wands', 'cups', 'swords', 'pentacles'];
 
-// 덱의 id 순서(tarot-deck.ts 와 동일): 메이저 0-21 → 수트별 1-14.
+// The deck's id order (the same as tarot-deck.ts): majors 0-21, then 1-14 per suit.
 function sourceFor(id) {
   if (id < 22) return MAJOR[id];
   const k = id - 22;
@@ -88,7 +88,7 @@ for (const t of TARGETS) {
     await minio.putObject(BUCKET, t.key, buf, buf.length, { 'Content-Type': 'image/jpeg' });
     up++;
     console.log(`  ✓ #${t.id} (${(buf.length / 1024).toFixed(0)}KB) ${sourceFor(t.id)}`);
-    await new Promise((r) => setTimeout(r, 1500)); // Wikimedia 예의상 간격
+    await new Promise((r) => setTimeout(r, 1500)); // A courteous gap for Wikimedia
   } catch (e) {
     fail++;
     console.error(`  ✗ #${t.id} ${sourceFor(t.id)}: ${e.message}`);

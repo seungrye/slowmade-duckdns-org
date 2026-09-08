@@ -1,20 +1,20 @@
-// items 컬렉션의 glyphGameIcon 값을 game-icons.net codepoint 로 변환하고
-// glyphUnicode 필드를 영구 제거한다. RPG-Awesome PUA (U+E900~U+EAEE) 와
-// 기타 Unicode emoji/symbol 을 의미 매핑으로 game-icons.net Supplementary PUA
-// (U+FF000~U+100005) 로 대체한다.
+// Converts the items collection's glyphGameIcon values to game-icons.net codepoints and
+// removes the glyphUnicode field permanently. RPG-Awesome's PUA (U+E900~U+EAEE) and
+// other Unicode emoji and symbols are replaced, by a meaning-based mapping, with game-icons.net's Supplementary PUA
+// (U+FF000~U+100005).
 //
-// 사용:
+// Usage:
 //   node scripts/migrate-glyph-game-icon.mjs --dry-run
 //   node scripts/migrate-glyph-game-icon.mjs
 //
-// 동작:
-//   1. .env.local 의 MONGO_URI 로 mongoose 직접 연결.
-//   2. items 컬렉션 전체 순회.
-//   3. glyphGameIcon 의 첫 codepoint 가 매핑표에 있으면 새 codepoint 의 단일 문자로 교체.
-//      ASCII (0x00~0x7F) 는 그대로 둔다.
-//      매핑표에 없는 PUA 는 디폴트 (hexagonal-nut U+FF753) 로 폴백 + warn.
-//   4. glyphUnicode 필드는 $unset 으로 영구 제거.
-//   5. revisionn 백업 없음 — 일회성 마이그레이션이고, 이후엔 정규 UI 가 revision 관리.
+// How it works:
+//   1. connects mongoose directly with .env.local's MONGO_URI.
+//   2. walks the whole items collection.
+//   3. when glyphGameIcon's first codepoint is in the mapping table it is replaced by the new codepoint's single character.
+//      ASCII (0x00~0x7F) is left alone.
+//      A PUA absent from the table falls back to the default (hexagonal-nut U+FF753) with a warning.
+//   4. the glyphUnicode field is removed permanently with $unset.
+//   5. no revision backup - it is a one-off migration, and the regular UI manages revisions afterwards.
 
 import path from "node:path";
 import fs from "node:fs";
@@ -23,9 +23,9 @@ import url from "node:url";
 const __filename0 = url.fileURLToPath(import.meta.url);
 const __dirname0 = path.dirname(__filename0);
 
-// 의미 매핑 — 게임 RON 마이그레이션에 사용한 표와 동일.
-// 키: 옛 codepoint (RPG-Awesome PUA 또는 Unicode emoji/symbol)
-// 값: game-icons.net codepoint (Supplementary PUA)
+// The meaning-based mapping - the same table used for the game's RON migration.
+// The key: the old codepoint (RPG-Awesome's PUA, or a Unicode emoji or symbol)
+// The value: the game-icons.net codepoint (the Supplementary PUA)
 const GLYPH_MAPPING = new Map([
   // RPG-Awesome PUA → game-icons
   [0xE908, 0xF0C8], // ankh
@@ -107,9 +107,9 @@ const GLYPH_MAPPING = new Map([
   [0x2B22,  0xF753], // ⬢ hexagonal-nut
 ]);
 
-const DEFAULT_GAME_ICON = 0xF753; // hexagonal-nut — 매핑 누락 시 시각적 placeholder
+const DEFAULT_GAME_ICON = 0xF753; // hexagonal-nut - the visual placeholder for a missing mapping
 
-// .env.local 의 MONGO_URI 추출 (mongoose 직접 연결)
+// Extracting MONGO_URI from .env.local (a direct mongoose connection)
 function loadMongoUri() {
   const envPath = path.resolve(__dirname0, "..", ".env.local");
   if (!fs.existsSync(envPath)) {
@@ -140,12 +140,12 @@ async function main() {
   for (const doc of all) {
     const ops = {};
 
-    // glyphUnicode 제거 (있을 때만)
+    // Removing glyphUnicode (only where it exists)
     if (doc.glyphUnicode !== undefined) {
       ops.$unset = { glyphUnicode: "" };
     }
 
-    // glyphGameIcon 변환
+    // Converting glyphGameIcon
     const cur = doc.glyphGameIcon;
     if (typeof cur === "string" && cur.length > 0) {
       const cp = cur.codePointAt(0);
@@ -162,7 +162,7 @@ async function main() {
         ops.$set = { ...(ops.$set || {}), glyphGameIcon: String.fromCodePoint(DEFAULT_GAME_ICON) };
       }
     } else {
-      // 빈 값 → 디폴트
+      // an empty value -> the default
       ops.$set = { ...(ops.$set || {}), glyphGameIcon: String.fromCodePoint(DEFAULT_GAME_ICON) };
     }
 

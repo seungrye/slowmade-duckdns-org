@@ -1,31 +1,32 @@
 /**
- * 미국 계좌에 VR(밸류리밸런싱) 블록을 하나 더 둔다.
+ * Adds one more VR (value rebalancing) block to the US account.
  *
- * ── 왜 SOXL 인가 ────────────────────────────────────────────────────────
+ * -- Why SOXL --------------------------------------------------------
  *
- * VR 엔진은 브로커의 **실제 보유수량**을 읽는다(`snapshot(sym).holding`). 그런데 TQQQ 는
- * 이미 infinite_v4 블록이 굴리고 있어서, VR 을 TQQQ 로 만들면 **v4 가 산 주식을 자기
- * 것으로 착각**한다. 그래서 다른 종목이어야 한다. SOXL 은 문서가 TQQQ 와 함께 드는
- * 레버리지 ETF 다.
+ * The VR engine reads the broker's **actual holding** (`snapshot(sym).holding`). But TQQQ is
+ * already run by the infinite_v4 block, so making VR use TQQQ would have it **mistake the shares v4
+ * bought for its own**. It has to be a different symbol. SOXL is the leveraged ETF the documentation
+ * names alongside TQQQ.
  *
- * ── 왜 예약금을 둘 다 적어야 하나 ────────────────────────────────────────
+ * -- Why both reservations must be written ---------------------------
  *
- * 예약(#339)은 **만든 순서대로** 채우고, 금액을 안 적은 블록이 **잔여 전액**을 가져간다.
- * v4 가 먼저(2026-07-17) 만들어졌고 예약금이 비어 있어서, 그대로면 v4 가 계좌 현금을 전부
- * 가져가고 VR 몫이 0 이 된다. 그래서 v4 에도 금액을 적는다.
+ * Reservations (#339) fill **in creation order**, and a block with no amount takes **all the remainder**.
+ * v4 was created first (2026-07-17) with an empty reservation, so left alone v4 would take every bit of the
+ * account's cash and leave VR with 0. Hence an amount is written on v4 too.
  *
- * ── 금액 ────────────────────────────────────────────────────────────────
+ * -- The amounts -----------------------------------------------------
  *
- * 실측(2026-08-31): 미국 계좌 총 $92,580 = 현금 $50,855 + 주식 $41,725.
- * v4 는 사이클 진행 중(T=7.98/20, 장부 $55,978, 1회 매수 $4,656)이라 남은 회차에 쓸 돈이
- * 이미 계좌 현금보다 크다. VR 을 크게 잡으면 v4 사이클이 눈에 띄게 짧아진다.
+ * Measured (2026-08-31): the US account totals $92,580 = $50,855 cash + $41,725 in shares.
+ * v4 is mid-cycle (T=7.98/20, a book of $55,978, $4,656 per buy), so the money it needs for the remaining rounds
+ * already exceeds the account's cash. Taking a large VR would visibly shorten v4's cycle.
  *
- *   VR $8,000  — 1회차에 85%($6,800)를 SOXL 로 사고 나머지가 Pool.
- *   v4 $42,000 — 남은 현금. 회차 두 개쯤(≈$9k) 줄어드는 셈이다.
+ *   VR $8,000  - round 1 buys 85% ($6,800) of SOXL and the rest becomes the Pool.
+ *   v4 $42,000 - the remaining cash. Roughly two rounds (about $9k) shorter.
  *
- * 모의계좌라 이 정도 간섭은 감수한다. 실계좌라면 v4 사이클이 끝난 뒤에 넣는 편이 낫다.
+ * It is a paper account, so this much interference is accepted. On a live account it would be better to add it
+ * after v4's cycle ends.
  *
- *   node scripts/add-vr-block.mjs           # 무엇이 바뀌는지 보여만 준다
+ *   node scripts/add-vr-block.mjs           # only shows what would change
  *   node scripts/add-vr-block.mjs --apply
  */
 import mongoose from 'mongoose';
@@ -80,8 +81,8 @@ const r = await col.insertOne({
   createdAt: now,
   updatedAt: now,
 });
-// 리비전 이력(#350)에도 남긴다. 설정 API 를 안 거치고 DB 를 직접 고치면 이력이 비어
-// 나중에 "언제 왜 바뀌었나" 를 또 역산해야 한다 — #348 이 그래서 생긴 일이다.
+// It is recorded in the revision history (#350) too. Editing the DB directly instead of going through the settings API leaves the history
+// empty and forces "when and why did this change" to be reconstructed later - which is exactly how #348 came about.
 const revs = mongoose.connection.db.collection('tradingportfoliorevisions');
 const 설정만 = (d) => ({
   market: d.market, strategy: d.strategy, runAt: d.runAt,

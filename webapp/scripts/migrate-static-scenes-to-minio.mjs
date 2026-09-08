@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 // scripts/migrate-static-scenes-to-minio.mjs
 //
-// PoC 단계 정적 placeholder 5 씬을 minio 로 이전 + mongo 의 illustration URL 갱신.
+// Moves the PoC stage's 5 static placeholder scenes to minio and updates mongo's illustration URLs.
 //
-// 대상 (현재 public/web-adventure/scenes/*.jpg):
+// The subjects (currently public/web-adventure/scenes/*.jpg):
 //   town_square_dawn / market_morning / elder_house_arrival / forest_entry / cave_entry
 //
-// 흐름:
-//   1. public/web-adventure/scenes/*.jpg 를 minio handmade-site 버킷의
-//      painter-images/web-adventure-{sceneId}-{ts}.jpg 으로 putObject.
-//   2. mongo PUT /api/web-adventure/scenes/{sceneId} 로 illustration URL 갱신.
-//   3. PUT 은 NextAuth 보호 없음 (Phase B 의 admin 미적용 상태) — 그대로 호출.
+// The flow:
+//   1. public/web-adventure/scenes/*.jpg are putObject'd into the minio handmade-site bucket as
+//      painter-images/web-adventure-{sceneId}-{ts}.jpg.
+//   2. the illustration URL is updated through mongo's PUT /api/web-adventure/scenes/{sceneId}.
+//   3. the PUT has no NextAuth protection (admin is not applied at Phase B) - it is called as it is.
 //
-// 사용:
-//   pnpm node scripts/migrate-static-scenes-to-minio.mjs              # 프로덕션
+// Usage:
+//   pnpm node scripts/migrate-static-scenes-to-minio.mjs              # production
 //   API_BASE=http://localhost:3010 pnpm node scripts/migrate-static-scenes-to-minio.mjs
 
-// 환경 변수: node 20+ 내장 `--env-file=.env.local` 사용.
+// Environment variables: node 20+'s built-in `--env-file=.env.local`.
 //   pnpm node --env-file=.env.local scripts/migrate-static-scenes-to-minio.mjs
 
 import * as Minio from 'minio';

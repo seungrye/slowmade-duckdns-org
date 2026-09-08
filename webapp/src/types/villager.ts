@@ -1,22 +1,22 @@
-// Rust `VillagerDef` 와 일치 — bevy-rogue 의 villagers.ron 형식
+// Matching the Rust `VillagerDef` - bevy-rogue's villagers.ron format
 
 import type { ZoneIdValue } from "./zone";
 
 /**
- * Villager 의 거주 landmark (Town zone 한정).
+ * A villager's home landmark (within the Town zone only).
  *
- * 게임 측 `HomeLandmark` Rust enum 미러:
- *   - `random` — 임의 floor tile (기본값, 기존 동작 유지)
- *   - `road`   — 도로(road) 타일군
- *   - 13 landmark — Inn / Smithy / Temple / Guard / Market / Manor /
+ * Mirroring the game's `HomeLandmark` Rust enum:
+ *   - `random` - any floor tile (the default, keeping the previous behaviour)
+ *   - `road`   - the road tiles
+ *   - the 13 landmarks - Inn / Smithy / Temple / Guard / Market / Manor /
  *                  Tavern / Herbalist / Graveyard / Jail / Guild /
  *                  Alchemist / Docks
  *
- * 게임 측에서 `home_zone == Town` 이고 해당 landmark 가 TownConfig.landmarks 에
- * 포함된 경우 그 영역 내부 임의 floor tile 에 spawn. 비활성/Town 외 zone 이면
- * Random fallback.
+ * When the game has `home_zone == Town` and that landmark is in TownConfig.landmarks,
+ * it spawns on any floor tile inside that area. When the landmark is inactive or the zone is not Town,
+ * it falls back to Random.
  *
- * TS 는 kebab/lowercase, RON 은 PascalCase 로 직렬화한다(serializeVillagersRon 참조).
+ * TS uses kebab/lowercase and the RON serialises as PascalCase (see serializeVillagersRon).
  */
 export type HomeLandmark =
   | "random"
@@ -41,7 +41,7 @@ export const HOME_LANDMARKS: readonly HomeLandmark[] = [
   "tavern", "herbalist", "graveyard", "jail", "guild", "alchemist", "docks",
 ] as const;
 
-/** 한글 라벨 — UI 표시용 (game 측은 PascalCase enum). */
+/** The Korean labels - for the UI's display (the game uses a PascalCase enum). */
 export const HOME_LANDMARK_LABEL: Record<HomeLandmark, string> = {
   random:    "임의 위치 (Random) — 기본",
   road:      "도로 (Road)",
@@ -61,61 +61,61 @@ export const HOME_LANDMARK_LABEL: Record<HomeLandmark, string> = {
 };
 
 export interface VillagerDef {
-  /** unique 식별자 (snake_case). 퀘스트 giver_npc / KillNpc 가 참조. */
+  /** The unique identifier (snake_case). Referenced by a quest's giver_npc and KillNpc. */
   id: string;
-  /** UI/dialog 표시용 이름 (unique 보장 X) */
+  /** The name for the UI and dialogue (not guaranteed unique) */
   name: string;
   /** RGB 0.0~1.0 */
   color: [number, number, number];
   dialogs: string[];
   speed: number;
-  /** 정지 주민 — true 면 매 턴 제자리(가판대 뒤 상인 등). 기본 false. */
+  /** A stationary resident - true keeps them in place every turn (a merchant behind a stall and so on). false by default. */
   stationary?: boolean;
-  /** 상인 — true 면 상호작용 시 상점이 열린다. 기본 false. */
+  /** A merchant - true opens a shop on interaction. false by default. */
   vendor?: boolean;
   /**
-   * NPC 거주 zone — 이 zone 의 마을 맵에서만 게임이 이 NPC 를 스폰한다.
-   * 기본값은 `{ type: "Town" }` 으로, 기존 RON 과 100% 호환된다(미지정 시 시작 마을).
-   * MountainVillage/SeasideHarbor 등 신규 마을 zone 으로 분산하려면 명시한다.
-   * 게임 측 `#[serde(default = "default_home_zone")]` 와 동일한 의미.
+   * The NPC's home zone - the game spawns this NPC only on that zone's town map.
+   * The default is `{ type: "Town" }`, which is 100% compatible with the existing RON (unset means the starting town).
+   * State it to spread them into new town zones such as MountainVillage or SeasideHarbor.
+   * The same meaning as the game's `#[serde(default = "default_home_zone")]`.
    */
   homeZone?: ZoneIdValue;
   /**
-   * 거주 landmark — Town zone 한정 (그 외 zone 에서는 무시되고 Random fallback).
-   * 미지정/누락 시 `"random"` (게임 측 `#[serde(default)] HomeLandmark::Random` 미러).
+   * The home landmark - within the Town zone only (ignored in other zones, falling back to Random).
+   * Unset or absent it is `"random"` (mirroring the game's `#[serde(default)] HomeLandmark::Random`).
    */
   homeLandmark?: HomeLandmark;
   /**
-   * 자유 이동 — true 면 어디든 이동 (기존 동작). false (기본) 면 거주 영역 안만:
-   *   - homeLandmark = specific landmark → 그 landmark room 안
-   *   - homeLandmark = "random" → 그 villager 의 명명 거주 집 안
-   *   - homeLandmark = "road"   → 도로 타일 따라
-   * 게임 측 `#[serde(default)] free_roam: false` 미러.
+   * Free roaming - true lets them move anywhere (the previous behaviour). false (the default) confines them to their home area:
+   *   - homeLandmark = a specific landmark -> inside that landmark's room
+   *   - homeLandmark = "random" -> inside that villager's named home
+   *   - homeLandmark = "road"   -> along the road tiles
+   * Mirroring the game's `#[serde(default)] free_roam: false`.
    */
   freeRoam?: boolean;
   /**
-   * vendor (`vendor: true`) 의 시야 반경 (타일 단위). `RevealVendorVision`
-   * 액세서리 효과가 활성일 때 이 반경의 FOV 가 보라색 오버레이로 표시된다.
+   * A vendor's (`vendor: true`) vision radius, in tiles. When the `RevealVendorVision`
+   * accessory effect is active, the FOV at this radius is shown as a purple overlay.
    *
-   * 미지정 (`undefined` / `null`) 시 게임 측 fallback default (6 타일) 사용.
-   * 명시 시 그 vendor 만 해당 반경 적용 (예: market_owner 는 2 로 상점 내부만).
+   * Unset (`undefined` / `null`), the game's fallback default (6 tiles) is used.
+   * Stated, that radius applies to that vendor alone (market_owner uses 2, covering the shop's interior only).
    *
-   * `vendor: false` 인 NPC 에서는 무시된다 (오버레이는 vendor 만 그린다).
-   * 게임 측 `#[serde(default)] vendor_vision_radius: Option<u32>` 미러.
+   * Ignored on an NPC with `vendor: false` (the overlay is drawn for vendors only).
+   * Mirroring the game's `#[serde(default)] vendor_vision_radius: Option<u32>`.
    */
   vendorVisionRadius?: number | null;
   /**
-   * 상점 인벤토리 — 이 vendor 가 판매할 아이템 id 목록.
-   * - `undefined` (필드 누락) → 게임 측 SHOP_CATALOG 하드코딩 fallback (phase 2).
-   * - `[]` (빈 배열) → 명시적 빈 상점 (None 과 의미가 다름).
-   * - `[...]` → 그 id 목록의 아이템만 판매 (item buyPrice 가 None 이면 게임 측에서 제외).
+   * The shop inventory - the list of item ids this vendor sells.
+   * - `undefined` (the field absent) -> the game's hard-coded SHOP_CATALOG fallback (phase 2).
+   * - `[]` (an empty array) -> an explicitly empty shop (meaning something different from None).
+   * - `[...]` -> only those ids are sold (the game excludes an item whose buyPrice is None).
    *
-   * 게임 측 RON 직렬화는 `Option<Vec<String>>` 으로 표현:
-   *   - undefined → 필드 생략
-   *   - []        → `vendor_inventory: Some([])`
-   *   - [...]     → `vendor_inventory: Some([...])`
+   * The game's RON serialisation expresses it as an `Option<Vec<String>>`:
+   *   - undefined -> the field is omitted
+   *   - []        -> `vendor_inventory: Some([])`
+   *   - [...]     -> `vendor_inventory: Some([...])`
    *
-   * `vendor: false` 인 NPC 에서는 의미 없음 (게임 측에서 무시).
+   * Meaningless on an NPC with `vendor: false` (the game ignores it).
    */
   vendorInventory?: string[];
 }

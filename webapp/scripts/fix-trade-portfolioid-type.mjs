@@ -1,15 +1,15 @@
 /**
- * stocktrades.portfolioId 가 **문자열로 저장된** 것을 ObjectId 로 되돌린다 (#384).
+ * Restores stocktrades.portfolioId **stored as a string** to an ObjectId (#384).
  *
- * `upsertTrades` 는 `StockTrade.collection.bulkWrite`(원시 드라이버)를 쓴다 — 거기엔
- * mongoose 캐스팅이 없어서, 귀속(#372)이 넘긴 `String(_id)` 가 문자열 그대로 저장됐다.
- * 반면 조회(`StockTrade.find({ portfolioId })`)는 스키마대로 ObjectId 로 캐스팅되므로
- * **한 건도 안 맞는다** → 블록별 매매 상세가 "매매 종목 주가 데이터가 없습니다" 로 비었다.
+ * `upsertTrades` uses `StockTrade.collection.bulkWrite` (the raw driver) - there is no mongoose casting there,
+ * so the `String(_id)` the attribution (#372) passed was stored as a string.
+ * Lookups (`StockTrade.find({ portfolioId })`), meanwhile, cast to an ObjectId per the schema, so
+ * **not one matches** -> the per-block trade detail was empty with "no price data for the traded symbols".
  *
- * 쓰는 쪽은 trade-upsert.ts 에서 고쳤다. 이 스크립트는 이미 들어간 문서를 되돌린다.
+ * The writing side is fixed in trade-upsert.ts. This script restores the documents already stored.
  *
- *   node scripts/fix-trade-portfolioid-type.mjs           # 무엇이 바뀔지 보여만 준다
- *   node scripts/fix-trade-portfolioid-type.mjs --apply   # 실제로 고친다
+ *   node scripts/fix-trade-portfolioid-type.mjs           # only shows what would change
+ *   node scripts/fix-trade-portfolioid-type.mjs --apply   # actually fixes
  */
 import mongoose from 'mongoose';
 

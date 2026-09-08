@@ -1,14 +1,14 @@
-// 앱 시작 시 GitHub 최신 릴리스와 현재 버전을 비교해 업데이트를 안내한다.
+// On app start it compares the current version with GitHub's latest release and offers the update.
 //
-// 설치까지 앱이 직접 하려면 REQUEST_INSTALL_PACKAGES 권한과 FileProvider 가 필요해
-// 범위가 커진다. 여기서는 "확인 → 사용자 컨펌 → 다운로드 열기" 까지만 한다.
+// For the app to install it itself it would need the REQUEST_INSTALL_PACKAGES permission and a FileProvider,
+// which widens the scope. Here it goes only as far as "check -> the user confirms -> open the download".
 //
-// 확인 실패(오프라인·API rate limit 등)는 삼킨다 — 업데이트 때문에 게임이 막히면 안 된다.
-// content-client 의 submitAppEndRun 과 같은 정책.
+// A failed check (offline, an API rate limit and so on) is swallowed - an update must never block the game.
+// The same policy as content-client's submitAppEndRun.
 
 export const REPO = "seungrye/slowmade-duckdns-org";
 
-/** "v1.0.13" | "1.0.13" → [1,0,13]. 숫자가 아닌 조각은 0. */
+/** "v1.0.13" | "1.0.13" -> [1,0,13]. A non-numeric piece is 0. */
 export function parseVersion(v) {
   return String(v ?? "")
     .replace(/^v/i, "")
@@ -19,7 +19,7 @@ export function parseVersion(v) {
     });
 }
 
-/** latest 가 current 보다 높은가. 문자열이 아니라 자리별 숫자로 비교한다(10 > 9). */
+/** Whether latest is higher than current. Compared digit group by digit group rather than as strings (10 > 9). */
 export function isNewerVersion(latest, current) {
   const a = parseVersion(latest);
   const b = parseVersion(current);
@@ -32,7 +32,7 @@ export function isNewerVersion(latest, current) {
   return false;
 }
 
-/** 서명본(app-release.apk) 우선 — 디버그본과 서명이 달라 덮어쓸 수 없기 때문. */
+/** The signed build (app-release.apk) is preferred - a debug build's signature differs and cannot overwrite it. */
 export function pickApkAsset(assets) {
   const list = Array.isArray(assets) ? assets : [];
   return (
@@ -42,7 +42,7 @@ export function pickApkAsset(assets) {
   );
 }
 
-/** 빌드 시 주입된 버전(VITE_APP_VERSION). 로컬 개발 빌드엔 없다. */
+/** The version injected at build time (VITE_APP_VERSION). A local development build has none. */
 function resolveCurrentVersion() {
   try {
     if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_APP_VERSION) {
@@ -56,12 +56,12 @@ function resolveCurrentVersion() {
 
 /**
  * @returns {Promise<null | {latestVersion, currentVersion, apkUrl, apkName, releaseUrl}>}
- *          최신이거나 확인 불가면 null.
+ *          null when it is up to date or cannot be checked.
  */
 export async function checkForUpdate(opts = {}) {
   const current =
     opts.currentVersion !== undefined ? opts.currentVersion : resolveCurrentVersion();
-  if (!current) return null; // 비교 기준이 없으면(개발 빌드) 확인하지 않는다.
+  if (!current) return null; // With nothing to compare against (a development build) it does not check.
 
   const fetchImpl = opts.fetchImpl || (typeof fetch !== "undefined" ? fetch.bind(globalThis) : null);
   if (!fetchImpl) return null;
@@ -85,6 +85,6 @@ export async function checkForUpdate(opts = {}) {
       releaseUrl: (json && json.html_url) || null,
     };
   } catch {
-    return null; // 오프라인·rate limit 등
+    return null; // offline, a rate limit and so on
   }
 }

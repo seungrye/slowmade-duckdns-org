@@ -1,26 +1,26 @@
-// bevy-rogue/assets/ → site DB 일괄 마이그레이션 스크립트
+// The bulk migration script from bevy-rogue/assets/ into the site DB
 //
-// 사용:
+// Usage:
 //   node scripts/migrate-from-bevy-rogue.mjs --dry-run
 //   node scripts/migrate-from-bevy-rogue.mjs
 //   node scripts/migrate-from-bevy-rogue.mjs --source /path/to/assets --prune
 //
-// 동작:
-//   1. .env.local 의 MONGO_URI 로 직접 연결 (auth 우회 없음 — Mongoose 직접).
-//   2. RON 파서·모델은 src/lib/ron.ts / src/models/*.tsx 를 jiti 로 동적 로드.
-//      → 검증된 코드 100% 재사용 (round-trip parser).
-//   3. upsert by id (기존 항목 보존 + 변경 반영). revision 백업은 site UI 의
-//      import API 와 동일하게 변경되는 항목만 수행.
-//   4. --dry-run 시 DB 쓰기 없이 카운트만 보고.
-//   5. --prune 시 RON 에 없고 DB 에 있는 항목 삭제 (옵션, 기본 미사용).
-//   6. start_loadout.ron 은 webapp 에 DB 모델이 없어 (의도된 상태) 스킵하고 안내.
+// How it works:
+//   1. connects directly with .env.local's MONGO_URI (no auth bypass - Mongoose directly).
+//   2. the RON parser and the models are loaded dynamically from src/lib/ron.ts and src/models/*.tsx through jiti.
+//      -> 100% reuse of verified code (a round-trip parser).
+//   3. upsert by id (existing entries preserved, changes applied). A revision backup is taken only for changed
+//      entries, as in the site UI's import API.
+//   4. --dry-run reports the counts without writing to the DB.
+//   5. --prune deletes entries in the DB but absent from the RON (optional, off by default).
+//   6. start_loadout.ron has no DB model in webapp (deliberately), so it is skipped with a notice.
 
 import path from "node:path";
 import fs from "node:fs";
 import url from "node:url";
 
-// jiti 가 webapp 직접 의존은 아니지만 pnpm 가상 저장소에 설치돼 있음 (vite 의 의존).
-// 명시 경로로 불러 안정적으로 사용.
+// jiti is not a direct webapp dependency but is installed in the pnpm virtual store (vite depends on it).
+// It is loaded by an explicit path for reliability.
 const __filename0 = url.fileURLToPath(import.meta.url);
 const __dirname0 = path.dirname(__filename0);
 const jitiEntry = path.resolve(
@@ -30,7 +30,7 @@ const jitiEntry = path.resolve(
 );
 const { createJiti } = await import(url.pathToFileURL(jitiEntry).href);
 
-// ── 인자 파싱 ────────────────────────────────────────────────────────────────
+// -- parsing the arguments ---------------------------------------------------
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry-run");
 const PRUNE = args.includes("--prune");
@@ -41,7 +41,7 @@ function argValue(name, fallback) {
 }
 const SOURCE = path.resolve(argValue("--source", "/home/seungrye/bevy-rogue/assets"));
 
-// ── 환경: .env.local 직접 로드 (dotenv 미설치 환경 대비 수동 파싱) ──────────
+// -- the environment: .env.local loaded directly (parsed by hand, for machines without dotenv) --
 const webappRoot = path.resolve(__dirname0, "..");
 const envPath = path.join(webappRoot, ".env.local");
 if (fs.existsSync(envPath)) {
@@ -62,10 +62,10 @@ if (!process.env.MONGO_URI) {
   process.exit(1);
 }
 
-// ── 동적 로드: jiti 로 src/lib/ron.ts 와 src/models/*.tsx import ─────────────
+// -- dynamic loading: src/lib/ron.ts and src/models/*.tsx imported through jiti --
 const jiti = createJiti(import.meta.url, {
   alias: { "@": path.join(webappRoot, "src") },
-  // models/*.tsx 가 mongoose 를 사이드 이펙트로 등록 — 캐시 사용
+  // models/*.tsx registers mongoose as a side effect - the cache is used
   cache: true,
 });
 
@@ -89,10 +89,10 @@ const ItemRevision = await loadDefault("src/models/item-revision.tsx");
 const VillagerRevision = await loadDefault("src/models/villager-revision.tsx");
 const MonsterRevision = await loadDefault("src/models/monster-revision.tsx");
 
-// quest 안의 Named zone 들을 사이트 Zone 카탈로그에 자동 upsert (재마이그레이션 안전성).
+// The Named zones inside a quest are upserted into the site's Zone catalogue automatically (so re-migration is safe).
 const zoneExtract = await jiti.import(path.join(webappRoot, "src/lib/zone-extract.ts"));
 
-// ── 유틸 ────────────────────────────────────────────────────────────────────
+// -- utilities --------------------------------------------------------------
 function readText(p) { return fs.readFileSync(p, "utf8"); }
 function listRonFiles(dir) {
   if (!fs.existsSync(dir)) return [];
@@ -101,12 +101,12 @@ function listRonFiles(dir) {
 const log = (...a) => console.log("[migrate]", ...a);
 const warn = (...a) => console.warn("[migrate:warn]", ...a);
 
-// ── 전처리 없음 ─────────────────────────────────────────────────────────────
-// 이전에는 webapp 가 모르는 필드(attack_power_min/max, tier, stationary, vendor 등)를
-// 평균값으로 변환하거나 제거했지만, 이제 site 가 모든 필드를 1급으로 지원하므로
-// 게임 RON 을 그대로 통과시킨다. (스키마 확장 후 재마이그레이션 시점)
+// -- no preprocessing -------------------------------------------------------
+// Fields webapp did not know (attack_power_min/max, tier, stationary, vendor and so on) used to be
+// averaged or dropped, but the site now supports every field as a first-class citizen, so
+// the game's RON passes through as it is. (At the point of re-migrating after the schema was extended.)
 
-// 카운터
+// the counters
 const stats = {
   quests:       { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
   questItems:   { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
@@ -119,19 +119,19 @@ const stats = {
   startLoadout: { parsed: 0, created: 0, updated: 0, unchanged: 0, skipped: 0, pruned: 0 },
 };
 
-// 변경 감지를 위한 안정 비교 (단순 JSON stringify)
+// A stable comparison for detecting changes (a plain JSON stringify)
 function changed(existing, fields) {
   for (const k of Object.keys(fields)) {
     const a = existing[k];
     const b = fields[k];
-    // Map → object 정규화
+    // Map -> object normalisation
     const an = a instanceof Map ? Object.fromEntries(a) : a;
     if (JSON.stringify(an) !== JSON.stringify(b)) return true;
   }
   return false;
 }
 
-// ── 개별 카테고리 ────────────────────────────────────────────────────────────
+// -- the individual categories ----------------------------------------------
 
 async function migrateQuests() {
   const files = listRonFiles(path.join(SOURCE, "quests"));
@@ -150,10 +150,10 @@ async function migrateQuests() {
     stats.quests.parsed++;
     seenIds.add(def.id);
 
-    // Named zone (SpawnGuards/PlaceTraps/SpawnMonster/InZone/spawns) 자동 등록.
-    // 게임 RON 이 새 zone 을 도입했을 때 site Zone 카탈로그에 동기 누락되지 않도록.
-    // generator 는 같은 quest 의 OpenPortal 매핑에서 가져옴(없으면 fallback "bsp").
-    // 기존 zone 중 generator === "default" (이전 버전의 placeholder) 인 것은 정정.
+    // Named zones (SpawnGuards/PlaceTraps/SpawnMonster/InZone/spawns) are registered automatically.
+    // So a new zone introduced by the game's RON is never missing from the site's Zone catalogue.
+    // The generator comes from the same quest's OpenPortal mapping (falling back to "bsp").
+    // An existing zone whose generator === "default" (an older version's placeholder) is corrected.
     if (!DRY_RUN) {
       const portalRefs = zoneExtract.collectFromQuest(def); // [{zone, generator}]
       const portalGen = new Map();
@@ -182,15 +182,15 @@ async function migrateQuests() {
       title: def.title,
       giverNpc: def.giverNpc ?? "",
       initialPhase: def.initialPhase ?? "dormant",
-      // game default_spawn_chance 미러 — RON 에 없으면 1.0
+      // Mirroring the game's default_spawn_chance - 1.0 when the RON has none
       spawnChance: def.spawnChance ?? 1.0,
       phases: def.phases ?? {},
       transitions: def.transitions ?? [],
       spawns: def.spawns ?? [],
     };
 
-    // Mongoose 스키마 default 로 인해 existing.spawnChance 는 미저장 문서에서도
-    // 1.0 으로 채워져 보인다 → "DB 에 실제로 저장됐는지" 를 .lean() 으로 별도 확인.
+    // The Mongoose schema default makes existing.spawnChance appear as 1.0 even on a document that never
+    // stored it -> whether it is *actually stored in the DB* is checked separately with .lean().
     const existingRaw = await Quest.findOne({ id: def.id }).lean();
     const existing = await Quest.findOne({ id: def.id });
     const spawnChanceStored = existingRaw && Object.prototype.hasOwnProperty.call(existingRaw, "spawnChance")
@@ -201,7 +201,7 @@ async function migrateQuests() {
         title: existing.title,
         giverNpc: existing.giverNpc,
         initialPhase: existing.initialPhase,
-        // 비교 시에는 lean() 로 본 "실제 저장 값" 을 사용해 미저장 문서를 update 로 유도.
+        // The comparison uses the "actually stored value" seen through lean(), so an unstored document goes through update.
         spawnChance: spawnChanceStored,
         phases: existing.phases,
         transitions: existing.transitions,
@@ -212,7 +212,7 @@ async function migrateQuests() {
         continue;
       }
       if (DRY_RUN) { stats.quests.updated++; continue; }
-      // revision 백업
+      // the revision backup
       await QuestRevision.create({
         questId: existing._id,
         version: existing.version,
@@ -265,7 +265,7 @@ async function migrateQuests() {
   }
 }
 
-// items: kind 별로 한 파일씩 처리 — 공통 헬퍼
+// items: one file per kind - the shared helper
 async function migrateItemFile(file, kind, parser, statKey, preprocess) {
   if (!fs.existsSync(file)) {
     warn(`${kind} 파일 없음: ${file}`);
@@ -353,7 +353,7 @@ async function migrateItemFile(file, kind, parser, statKey, preprocess) {
         continue;
       }
       if (DRY_RUN) { stats[statKey].updated++; continue; }
-      // revision 백업
+      // the revision backup
       const snap = { id: existing.id, ...compareSet };
       await ItemRevision.create({
         itemId: existing._id,
@@ -425,9 +425,9 @@ async function migrateVillagers() {
     stats.villagers.parsed++;
     seenIds.add(v.id);
 
-    // homeZone — RON 측 home_zone 이 누락되면 ron.ts 의 parseVillagerDef 가 그 키를
-    // 세팅하지 않으므로 v.homeZone === undefined. 게임 측 #[serde(default)] 와 동일하게
-    // Town 으로 보정해 DB 에 일관된 형태로 저장한다(미러).
+    // homeZone - when the RON side's home_zone is missing, ron.ts's parseVillagerDef never sets that key,
+    // so v.homeZone === undefined. As with the game's #[serde(default)], it is corrected to
+    // Town and stored in a consistent shape (a mirror).
     const homeZone = v.homeZone ?? { type: "Town" };
     const fields = {
       name: v.name,
@@ -440,12 +440,12 @@ async function migrateVillagers() {
     };
     const existing = await Villager.findOne({ id: v.id });
     if (existing) {
-      // existing.homeZone 은 Mongoose Document 가 들어있으니 plain object 로 정규화.
-      // 새 schema: { type: "Town" } | { type: "Named", id: "..." } 만 유효.
+      // existing.homeZone holds a Mongoose Document, so it is normalised to a plain object.
+      // The new schema: only { type: "Town" } | { type: "Named", id: "..." } is valid.
       const existingHomeZone = existing.homeZone
         ? { type: existing.homeZone.type, id: existing.homeZone.id }
         : { type: "Town" };
-      // undefined 필드는 비교에서 제외하기 위해 정리
+      // Cleaned so undefined fields are excluded from the comparison
       if (existingHomeZone.id === undefined) delete existingHomeZone.id;
       const compareSet = {
         name: existing.name,
@@ -591,7 +591,7 @@ async function migrateStartLoadout() {
     consumables: (def.consumables ?? []).map((c) => ({ id: c.id, count: c.count })),
   };
 
-  // 단일 doc(_id="default"). lean 비교로 mongoose Document 메타 노이즈 회피.
+  // A single doc (_id="default"). A lean comparison avoids the mongoose Document's metadata noise.
   const existing = await StartLoadout.findById("default").lean();
   if (existing) {
     const compareSet = {
@@ -622,10 +622,10 @@ async function migrateStartLoadout() {
   }
 }
 
-// ── 메인 ────────────────────────────────────────────────────────────────────
+// -- main -------------------------------------------------------------------
 
-// 게임 코드의 ZoneId 단순화에 맞춰 표준 Named zone 들이 카탈로그에 없으면
-// 자동 등록한다. 게임 측 `ZoneId::algorithm()` 의 정적 매핑 표와 동일한 generator.
+// Following the game code's ZoneId simplification, the standard Named zones are registered automatically
+// when the catalogue lacks them. The same generator as the game's static `ZoneId::algorithm()` table.
 async function seedDefaultZones() {
   const defaults = [
     { name: "forest",           generator: "forest",       description: "숲 — 마을과 던전 사이 (게임 표준 Named zone)" },
@@ -683,7 +683,7 @@ async function main() {
     await migrateStartLoadout();
     log(`  startLoadout: parsed=${stats.startLoadout.parsed} created=${stats.startLoadout.created} updated=${stats.startLoadout.updated} unchanged=${stats.startLoadout.unchanged} skipped=${stats.startLoadout.skipped}`);
 
-    // 요약
+    // the summary
     console.log("\n[migrate] === 요약 ===");
     for (const [k, s] of Object.entries(stats)) {
       console.log(`  ${k.padEnd(12)} parsed=${s.parsed}  created=${s.created}  updated=${s.updated}  unchanged=${s.unchanged}  skipped=${s.skipped}  pruned=${s.pruned}`);

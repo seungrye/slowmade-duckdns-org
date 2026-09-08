@@ -1,44 +1,44 @@
-// 표 페이저 (#184).
+// The table pager (#184).
 //
-// `admin/trading/monitor` 안에만 있던 것을 꺼내 공용으로 옮겼다 — 매매 상세 화면의 두 표도
-// 같은 모양이 필요해서다. 컴포넌트 동작은 옮기기 전과 같다.
+// Taken out of `admin/trading/monitor`, where it lived alone, and made shared - the trade detail screen's two tables
+// need the same shape. The component behaves exactly as it did before the move.
 //
-// 계산은 밖으로 빼 두었다. 페이징에서 사고가 나는 자리는 거의 언제나 **경계**(0건, 정확히
-// 나누어떨어질 때, 범위를 벗어난 page)인데, 순수 함수라야 그 경우를 다 찔러 볼 수 있다.
+// The arithmetic is pulled out. Where paging goes wrong is almost always **the boundaries** (0 rows, an exact
+// division, a page out of range), and only a pure function lets every one of those cases be poked at.
 
-/** 전체 페이지 수. 0건이어도 1 — `0 / 0` 같은 표시가 나오지 않게. */
+/** The total number of pages. 1 even with 0 rows - so nothing reads `0 / 0`. */
 export function pageCount(total: number, size: number): number {
   if (size <= 0) return 1;
   return Math.max(1, Math.ceil(total / size));
 }
 
 /**
- * page 를 유효 범위로 당긴다.
+ * Pulls page back into the valid range.
  *
- * 자료가 줄어들면(필터를 바꾸는 등) 들고 있던 page 가 범위를 벗어난다. 그대로 두면
- * 빈 표가 뜬다.
+ * When the data shrinks (changing a filter, for instance) the page held goes out of range. Left alone,
+ * an empty table appears.
  */
 export function clampPage(page: number, total: number, size: number): number {
   return Math.min(Math.max(0, page), pageCount(total, size) - 1);
 }
 
-/** 해당 페이지의 항목들. 범위를 벗어난 page 는 마지막 페이지로 본다. */
+/** That page's items. A page out of range counts as the last page. */
 export function pageSlice<T>(items: T[], page: number, size: number): T[] {
   if (size <= 0) return items;
   const p = clampPage(page, items.length, size);
   return items.slice(p * size, p * size + size);
 }
 
-/** 몇 번째 항목이 몇 페이지에 있나. 못 찾았을 때(-1)는 첫 페이지. */
+/** Which page a given item is on. Not found (-1), the first page. */
 export function pageOfIndex(index: number, size: number): number {
   if (index < 0 || size <= 0) return 0;
   return Math.floor(index / size);
 }
 
 /**
- * 이전/다음 버튼과 `1 / 3 · 총 51건` 표시.
+ * The previous and next buttons plus the `1 / 3 · 51 in total` display.
  *
- * **한 페이지에 다 들어가면 스스로 사라진다** — 짧은 표 아래에 쓸모없는 버튼이 남지 않게.
+ * **It disappears by itself when everything fits on one page** - so no useless buttons sit under a short table.
  */
 export default function Pager({ page, total, size, onPage }: {
   page: number; total: number; size: number; onPage: (p: number) => void;

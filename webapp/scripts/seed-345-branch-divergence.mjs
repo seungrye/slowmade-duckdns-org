@@ -1,25 +1,25 @@
 #!/usr/bin/env node
-// scripts/seed-345-branch-divergence.mjs — #345 6 씬 probability 분기 분리.
+// scripts/seed-345-branch-divergence.mjs - #345's probability-branch split across 6 scenes.
 //
-// 디자인 의도 — *각 분기의 수단 (메스/마법/위장 등) 이 결과 씬에도 반영*. A success → C-1,
-// B success → C-2, A failure → D-1, B failure → D-2. 합류 후 *기존 다음 씬* 으로 통일.
+// The design intent - *each branch's means (a scalpel, magic, a disguise and so on) shows in the result scene too*. A success -> C-1,
+// B success -> C-2, A failure -> D-1, B failure -> D-2. After converging they unify into *the existing next scene*.
 //
-// 변경:
-//   1. 신규 우회/결과 씬 31 종 upsert (illustration 보호 가드).
-//   2. 6 씬 의 각 probability 분기 onSuccess/onFailure 재지정.
-//      예외 — kael_infirmary 의 fake_flatline onFailure 는 kael_caught (석화 직행) 로 유지.
-//   3. 기존 우회 씬 (kael_struggled, rin_pursued, rin_betrayal_aftermath, solwen_combat_hard 등)
-//      은 *유지* — 삭제 금지. 추후 추가 활용 가능.
+// The changes:
+//   1. 31 new detour and result scenes are upserted (with the illustration guard).
+//   2. each of the 6 scenes' probability branches has its onSuccess/onFailure reassigned.
+//      The exception - kael_infirmary's fake_flatline onFailure stays kael_caught (straight to petrification).
+//   3. the existing detour scenes (kael_struggled, rin_pursued, rin_betrayal_aftermath, solwen_combat_hard and so on)
+//      are *kept* - never deleted. They may be used further later.
 
 import mongoose from 'mongoose';
 
 const PLACEHOLDER = '/web-adventure/scenes/placeholder-square.svg';
 
 // ───────────── Scene Spec ─────────────
-// 각 새 씬은 다음 합류 씬으로 흐름. 본문 2~3 줄, 시나리오 톤 일관.
+// Each new scene flows into the next converging scene. A body of 2-3 lines, consistent with the scenario's tone.
 
 const NEW_SCENES = [
-  // ───── kael_infirmary success 3 분기 → kael_corridor ─────
+  // ----- kael_infirmary's 3 success branches -> kael_corridor -----
   {
     id: 'kael_corridor_blade',
     title: 'Scene 02a-i — 손에 쥐인 메스',
@@ -57,7 +57,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: 0, stigmaDelta: 0 },
   },
 
-  // ───── kael_infirmary failure 2 분기 → kael_corridor (kael_struggled 유지, 분기별 변형) ─────
+  // ----- kael_infirmary's 2 failure branches -> kael_corridor (kael_struggled kept, varied per branch) -----
   {
     id: 'kael_struggled_blade',
     title: 'Scene 01a-fail — 메스를 떨어뜨렸다',
@@ -68,7 +68,7 @@ const NEW_SCENES = [
     ],
     choices: [
       { kind: 'plain', id: 'continue', label: '계속 — 부상 상태로 복도로.', to: 'kael_corridor' },
-      // 기존 우회 씬 kael_struggled 재이용 — *더 깊은 발각* 분기.
+      // The existing detour scene kael_struggled is reused - the *discovered more deeply* branch.
       { kind: 'plain', id: 'to_deep_struggle', label: '경비병들의 외침이 *더* 가까워진다 — 추가 도주.', to: 'kael_struggled' },
     ],
     onEnter: { hpDelta: -5, stigmaDelta: 5 },
@@ -86,7 +86,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -3, stigmaDelta: 8 },
   },
 
-  // ───── rin_harbor success 3 분기 → rin_evidence ─────
+  // ----- rin_harbor's 3 success branches -> rin_evidence -----
   {
     id: 'rin_evidence_breach',
     title: 'Scene 02a-i — 폭파된 자물쇠',
@@ -124,7 +124,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: 0, stigmaDelta: 0 },
   },
 
-  // ───── rin_harbor failure 3 분기 → rin_evidence (rin_pursued 변형) ─────
+  // ----- rin_harbor's 3 failure branches -> rin_evidence (a rin_pursued variant) -----
   {
     id: 'rin_pursued_lock',
     title: 'Scene 01a-fail — 빗나간 총성',
@@ -134,7 +134,7 @@ const NEW_SCENES = [
     ],
     choices: [
       { kind: 'plain', id: 'continue', label: '계속 — 외곽에서 단서 회수.', to: 'rin_evidence' },
-      // 기존 우회 씬 rin_pursued 재이용 — *추적이 더 깊이 붙는* 경로.
+      // The existing detour scene rin_pursued is reused - the path where *the pursuit closes in further*.
       { kind: 'plain', id: 'to_full_pursuit', label: '경적이 *더 가까워진다* — 본격 추격.', to: 'rin_pursued' },
     ],
     onEnter: { hpDelta: -5, stigmaDelta: 3 },
@@ -164,7 +164,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -6, stigmaDelta: 3 },
   },
 
-  // ───── rin_betrayal success 3 분기 → rin_underground ─────
+  // ----- rin_betrayal's 3 success branches -> rin_underground -----
   {
     id: 'rin_underground_shot',
     title: 'Scene 03a-i — 먼저 쏘았다',
@@ -202,7 +202,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -2, stigmaDelta: 1 },
   },
 
-  // ───── rin_betrayal failure 3 분기 → rin_underground (rin_betrayal_aftermath 변형) ─────
+  // ----- rin_betrayal's 3 failure branches -> rin_underground (a rin_betrayal_aftermath variant) -----
   {
     id: 'rin_betrayal_aftermath_shot',
     title: 'Scene 03b-fail — 빗나간 첫 발',
@@ -212,7 +212,7 @@ const NEW_SCENES = [
     ],
     choices: [
       { kind: 'plain', id: 'continue', label: '계속 — 큰 부상으로 지하로.', to: 'rin_underground' },
-      // 기존 우회 씬 rin_betrayal_aftermath 재이용 — *피의 휘장* 무게로 잠시 정지.
+      // The existing detour scene rin_betrayal_aftermath is reused - a pause under the weight of the blood-stained banner.
       { kind: 'plain', id: 'to_blood_oath', label: '피 묻은 휘장의 무게 — 잠시 멈춰선다.', to: 'rin_betrayal_aftermath' },
     ],
     onEnter: { hpDelta: -10, stigmaDelta: 8 },
@@ -242,7 +242,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -8, stigmaDelta: 3 },
   },
 
-  // ───── solwen_grove success 3 분기 → solwen_combat ─────
+  // ----- solwen_grove's 3 success branches -> solwen_combat -----
   {
     id: 'solwen_combat_arrow',
     title: 'Scene 02a-i — 첫 화살',
@@ -280,7 +280,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: 0, stigmaDelta: 2 },
   },
 
-  // ───── solwen_grove failure 3 분기 → solwen_combat_hard (변형) ─────
+  // ----- solwen_grove's 3 failure branches -> solwen_combat_hard (varied) -----
   {
     id: 'solwen_combat_hard_arrow',
     title: 'Scene 02b-fail — 빗나간 화살',
@@ -318,7 +318,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -4, stigmaDelta: 5 },
   },
 
-  // ───── solwen_combat success 2 분기 → solwen_grief ─────
+  // ----- solwen_combat's 2 success branches -> solwen_grief -----
   {
     id: 'solwen_grief_canister',
     title: 'Scene 03a-i — 터진 통',
@@ -344,7 +344,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -1, stigmaDelta: 4 },
   },
 
-  // ───── solwen_combat failure 2 분기 → solwen_grief (변형) ─────
+  // ----- solwen_combat's 2 failure branches -> solwen_grief (varied) -----
   {
     id: 'solwen_grief_canister_fail',
     title: 'Scene 03b-fail — 폭발이 늦었다',
@@ -370,7 +370,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: -5, stigmaDelta: 6 },
   },
 
-  // ───── station_path_steel success 2 분기 → climax_revolution_path ─────
+  // ----- station_path_steel's 2 success branches -> climax_revolution_path -----
   {
     id: 'climax_revolution_path_derail',
     title: 'Scene 07a-i — 탈선의 굉음',
@@ -396,7 +396,7 @@ const NEW_SCENES = [
     onEnter: { hpDelta: 0, stigmaDelta: 2 },
   },
 
-  // ───── station_path_steel failure 2 분기 → climax_fall_path (변형) ─────
+  // ----- station_path_steel's 2 failure branches -> climax_fall_path (varied) -----
   {
     id: 'climax_fall_path_derail',
     title: 'Scene 07b-fail — 빗나간 분기점',
@@ -423,55 +423,55 @@ const NEW_SCENES = [
   },
 ];
 
-// ───────────── 분기 재지정 ─────────────
+// ------------- reassigning the branches -------------
 
 const REDIRECTS = [
-  // kael_infirmary success 3 분기 (kael_corridor → 분리)
+  // kael_infirmary's 3 success branches (kael_corridor -> split)
   { sceneId: 'kael_infirmary', choiceId: 'grab_scalpel',   newSuccess: 'kael_corridor_blade' },
   { sceneId: 'kael_infirmary', choiceId: 'overload_panel', newSuccess: 'kael_corridor_spark' },
   { sceneId: 'kael_infirmary', choiceId: 'fake_flatline',  newSuccess: 'kael_corridor_pale'  },
-  // kael_infirmary failure 2 분기 (kael_struggled → 분리). fake_flatline 은 kael_caught 유지.
+  // kael_infirmary's 2 failure branches (kael_struggled -> split). fake_flatline keeps kael_caught.
   { sceneId: 'kael_infirmary', choiceId: 'grab_scalpel',   newFailure: 'kael_struggled_blade' },
   { sceneId: 'kael_infirmary', choiceId: 'overload_panel', newFailure: 'kael_struggled_spark' },
 
-  // rin_harbor success 3 분기 (rin_evidence → 분리)
+  // rin_harbor's 3 success branches (rin_evidence -> split)
   { sceneId: 'rin_harbor', choiceId: 'shoot_lock',   newSuccess: 'rin_evidence_breach' },
   { sceneId: 'rin_harbor', choiceId: 'sneak_closer', newSuccess: 'rin_evidence_shadow' },
   { sceneId: 'rin_harbor', choiceId: 'badge_arrest', newSuccess: 'rin_evidence_legal'  },
-  // rin_harbor failure 3 분기 (rin_pursued → 분리)
+  // rin_harbor's 3 failure branches (rin_pursued -> split)
   { sceneId: 'rin_harbor', choiceId: 'shoot_lock',   newFailure: 'rin_pursued_lock'    },
   { sceneId: 'rin_harbor', choiceId: 'sneak_closer', newFailure: 'rin_pursued_silence' },
   { sceneId: 'rin_harbor', choiceId: 'badge_arrest', newFailure: 'rin_pursued_badge'   },
 
-  // rin_betrayal success 3 분기 (rin_underground → 분리)
+  // rin_betrayal's 3 success branches (rin_underground -> split)
   { sceneId: 'rin_betrayal', choiceId: 'shoot_first',    newSuccess: 'rin_underground_shot'   },
   { sceneId: 'rin_betrayal', choiceId: 'talk_down',      newSuccess: 'rin_underground_talk'   },
   { sceneId: 'rin_betrayal', choiceId: 'window_escape',  newSuccess: 'rin_underground_window' },
-  // rin_betrayal failure 3 분기 (rin_betrayal_aftermath → 분리)
+  // rin_betrayal's 3 failure branches (rin_betrayal_aftermath -> split)
   { sceneId: 'rin_betrayal', choiceId: 'shoot_first',    newFailure: 'rin_betrayal_aftermath_shot'   },
   { sceneId: 'rin_betrayal', choiceId: 'talk_down',      newFailure: 'rin_betrayal_aftermath_talk'   },
   { sceneId: 'rin_betrayal', choiceId: 'window_escape',  newFailure: 'rin_betrayal_aftermath_window' },
 
-  // solwen_grove success 3 분기 (solwen_combat → 분리)
+  // solwen_grove's 3 success branches (solwen_combat -> split)
   { sceneId: 'solwen_grove', choiceId: 'arrow_first',    newSuccess: 'solwen_combat_arrow'  },
   { sceneId: 'solwen_grove', choiceId: 'wake_spirit',    newSuccess: 'solwen_combat_spirit' },
   { sceneId: 'solwen_grove', choiceId: 'frighten_chant', newSuccess: 'solwen_combat_chant'  },
-  // solwen_grove failure 3 분기 (solwen_combat_hard → 분리)
+  // solwen_grove's 3 failure branches (solwen_combat_hard -> split)
   { sceneId: 'solwen_grove', choiceId: 'arrow_first',    newFailure: 'solwen_combat_hard_arrow'  },
   { sceneId: 'solwen_grove', choiceId: 'wake_spirit',    newFailure: 'solwen_combat_hard_spirit' },
   { sceneId: 'solwen_grove', choiceId: 'frighten_chant', newFailure: 'solwen_combat_hard_chant'  },
 
-  // solwen_combat success 2 분기 (solwen_grief → 분리)
+  // solwen_combat's 2 success branches (solwen_grief -> split)
   { sceneId: 'solwen_combat', choiceId: 'shoot_canister', newSuccess: 'solwen_grief_canister' },
   { sceneId: 'solwen_combat', choiceId: 'shield_spirit',  newSuccess: 'solwen_grief_shield'   },
-  // solwen_combat failure 2 분기 (solwen_grief → 분리)
+  // solwen_combat's 2 failure branches (solwen_grief -> split)
   { sceneId: 'solwen_combat', choiceId: 'shoot_canister', newFailure: 'solwen_grief_canister_fail' },
   { sceneId: 'solwen_combat', choiceId: 'shield_spirit',  newFailure: 'solwen_grief_shield_fail'   },
 
-  // station_path_steel success 2 분기 (climax_revolution_path → 분리)
+  // station_path_steel's 2 success branches (climax_revolution_path -> split)
   { sceneId: 'station_path_steel', choiceId: 'derail', newSuccess: 'climax_revolution_path_derail' },
   { sceneId: 'station_path_steel', choiceId: 'hijack', newSuccess: 'climax_revolution_path_hijack' },
-  // station_path_steel failure 2 분기 (climax_fall_path → 분리)
+  // station_path_steel's 2 failure branches (climax_fall_path -> split)
   { sceneId: 'station_path_steel', choiceId: 'derail', newFailure: 'climax_fall_path_derail' },
   { sceneId: 'station_path_steel', choiceId: 'hijack', newFailure: 'climax_fall_path_hijack' },
 ];
@@ -480,7 +480,7 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // 1. 신규 씬 upsert (illustration 보호 가드).
+  // 1. upserting the new scenes (with the illustration guard).
   for (const scene of NEW_SCENES) {
     const cur = await Scene.findOne({ id: scene.id }).lean();
     const update = { ...scene, illustration: PLACEHOLDER };
@@ -491,9 +491,9 @@ async function main() {
     console.log('upsert:', scene.id, `(hpΔ${scene.onEnter.hpDelta}, stigmaΔ+${scene.onEnter.stigmaDelta})`);
   }
 
-  // 2. 분기 재지정 — onSuccess / onFailure.
-  //    같은 (sceneId, choiceId) 에 onSuccess 와 onFailure 가 각각 별도 record 로 들어와도
-  //    누적 적용되도록 한 씬당 1 번씩만 fetch / update.
+  // 2. reassigning the branches - onSuccess / onFailure.
+  //    Each scene is fetched and updated only once, so that onSuccess and onFailure arriving as separate records
+  //    for the same (sceneId, choiceId) both apply.
   const grouped = new Map(); // sceneId → choiceId → { onSuccess?, onFailure? }
   for (const r of REDIRECTS) {
     if (!grouped.has(r.sceneId)) grouped.set(r.sceneId, new Map());

@@ -1,15 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // 배포/CI 빌드는 NEXT_DISTDIR 미설정 → 기본 '.next' 사용 → .next/cache 재사용.
-  // dev 는 포트별 distDir(.next-3010 등)로 분리.
+  // Deploy and CI builds leave NEXT_DISTDIR unset -> the default '.next' -> .next/cache is reused.
+  // dev separates it per port (.next-3010 and so on).
   distDir: process.env.NEXT_DISTDIR ?? '.next',
-  // X-Powered-By: Next.js 헤더 제거 — 프레임워크 정보 노출 방지(보안).
+  // The X-Powered-By: Next.js header is removed - so the framework is not disclosed (security).
   poweredByHeader: false,
-  // 경량 서버 번들(self-contained) 출력 → 배포 아티팩트 축소·콜드스타트 개선.
+  // A light, self-contained server bundle -> a smaller deploy artefact and a better cold start.
   output: 'standalone',
-  // lint 는 빌드에서 분리(별도 `pnpm run lint` / CI 로 실행) → 빌드 가속.
-  // 타입 체크는 빌드에 유지(typescript.ignoreBuildErrors 는 켜지 않음).
+  // Linting is separated from the build (run as `pnpm run lint` or in CI) -> a faster build.
+  // Type checking stays in the build (typescript.ignoreBuildErrors is never turned on).
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        // 메인 도메인 apex 경로 — 신규 이미지 URL(MINIO_PUBLIC_HOST=handmade.r-e.kr/s3).
+        // The main domain's apex path - the new image URL (MINIO_PUBLIC_HOST=handmade.r-e.kr/s3).
         protocol: 'https',
         hostname: 'handmade.r-e.kr',
         port: '',
@@ -31,7 +31,7 @@ const nextConfig: NextConfig = {
         search: '',
       },
       {
-        // 기존 slowmade apex 경로 하위호환(마이그레이션 완료 후 제거 가능).
+        // Backwards compatibility with the old slowmade apex path (removable once the migration is done).
         protocol: 'https',
         hostname: 'slowmade.duckdns.org',
         port: '',
@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
         search: '',
       },
       {
-        // 기존 이미지 URL 하위호환(마이그레이션 완료 후 제거 가능).
+        // Backwards compatibility with the old image URLs (removable once the migration is done).
         protocol: 'https',
         hostname: 'minio-api.slowmade.duckdns.org',
         port: '',

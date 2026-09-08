@@ -1,14 +1,14 @@
 import { Schema, model, models, Model } from "mongoose";
 import { TOWN_LANDMARKS, TOWN_ENVIRONMENTS, type TownLandmark, type TownEnvironment } from "@/types/town-config";
 
-// 단일 doc 패턴 — collection 에 항상 0개 또는 1개. _id 는 고정 문자열 "default".
-// 게임 측 `TownOptions` (bevy-rogue) 와 1:1 매핑.
-// 시작 마을(Town, ZoneId::Town) 의 generator 옵션을 보관.
+// The single-doc pattern - the collection always holds 0 or 1. _id is the fixed string "default".
+// Mapped 1:1 onto the game's `TownOptions` (bevy-rogue).
+// It holds the generator options for the starting town (Town, ZoneId::Town).
 
 const TownConfigSchema = new Schema(
   {
     _id: { type: String, default: "default" },
-    // string enum — 모델 단계에서 잘못된 값 차단. validation 에서 한번 더 검사.
+    // A string enum - blocking a wrong value at the model level. Validation checks it once more.
     size:     { type: String, required: true, enum: ["hamlet", "village", "town"], default: "village" },
     roads:    { type: String, required: true, enum: ["radial", "linear", "random"], default: "radial" },
     wealth:   { type: String, required: true, enum: ["poor", "common", "wealthy"], default: "common" },
@@ -23,14 +23,14 @@ const TownConfigSchema = new Schema(
       },
     },
     fields:  { type: Boolean, required: true, default: true },
-    // 신규 — Plains/Coastal 분기. Coastal 일 때만 docks landmark 가 노출된다.
+    // New - the Plains/Coastal branch. The docks landmark appears only under Coastal.
     environment: {
       type: String,
       required: true,
       enum: TOWN_ENVIRONMENTS,
       default: "plains" satisfies TownEnvironment,
     },
-    // 신규 — 마을 생성 알고리즘. 기본 Grid (현재 구현). Tinykeep/Watabou 는 stub.
+    // New - the town generation algorithm. Grid by default (the current implementation). Tinykeep and Watabou are stubs.
     algorithm: {
       type: String,
       required: true,

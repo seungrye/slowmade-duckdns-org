@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // #326 kael_cargo_container/climb_in plain → str 12 probability.
-// 컨테이너 측면을 *완력으로 들어 올린다*. 실패 시 신규 우회 씬 + hpΔ-3.
+// *Lifting the container's side by sheer strength*. On failure a new detour scene plus hp -3.
 
 import mongoose from 'mongoose';
 
@@ -22,8 +22,8 @@ const NEW_SCENE = {
 async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
-  // 1. 신규 씬 upsert.
-  //    기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // 1. upserting the new scene.
+  //    An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   const curNew = await Scene.findOne({ id: NEW_SCENE.id }).lean();
   const newUpdate = { ...NEW_SCENE };
   if (curNew && curNew.illustration && !curNew.illustration.includes('placeholder')) {

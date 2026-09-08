@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// scripts/seed-stigma-items.mjs — 정제수/파편 획득 위치 추가 (#261).
+// scripts/seed-stigma-items.mjs - adding places to obtain the refined water and the shard (#261).
 //
-// 현재 mongo 의 어떤 씬도 ether_refined_water / mana_stone_fragment 를 주지 않음.
-// 시스템은 동작하지만 *플레이어가 얻을 수 없음* → 침식 감소/증가 trade-off 불가.
+// No scene in mongo currently gives ether_refined_water or mana_stone_fragment.
+// The system works but *the player cannot obtain them* -> the contamination up-and-down trade-off is impossible.
 //
-// 배치:
-//   1. kael_corridor          — 의무동 약품 캐비닛에서 정제수 1.
-//   2. kael_cargo_container   — 가솔린 통 옆 비상함에서 파편 1 (기존 ether_gas_canister + 추가).
-//   3. rin_evidence           — 사제단 인장 옆에 정제수 1.
-//   4. solwen_grief           — 영수의 마지막 숨결과 함께 파편 1 (영수 결정체).
-//   5. omphalos_blackmarket   — 블랙마켓 정보상이 정제수 1 + 파편 1 패키지로 제공.
+// The placements:
+//   1. kael_corridor          - 1 refined water in the infirmary's medicine cabinet.
+//   2. kael_cargo_container   - 1 shard in the emergency box beside the petrol drum (added to the existing ether_gas_canister).
+//   3. rin_evidence           - 1 refined water beside the priesthood's seal.
+//   4. solwen_grief           - 1 shard with the spirit beast's last breath (its crystal).
+//   5. omphalos_blackmarket   - the black market's informant offers 1 refined water plus 1 shard as a package.
 
 import mongoose from 'mongoose';
 
@@ -50,12 +50,12 @@ async function main() {
       console.log('skip (없음):', u.id);
       continue;
     }
-    // body 끝에 힌트 한 줄 추가 (이미 있으면 skip).
+    // A hint line is appended to the body (skipped when already there).
     const body = [...(cur.body ?? [])];
     if (u.bodyHint && !body.some((p) => p === u.bodyHint)) {
       body.push(u.bodyHint);
     }
-    // onEnter.addItems 병합 (기존 + 새).
+    // onEnter.addItems is merged (the existing plus the new).
     const existingItems = cur.onEnter?.addItems ?? [];
     const merged = [...existingItems];
     for (const id of u.addItems) {

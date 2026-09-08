@@ -13,9 +13,9 @@ vi.mock('next/navigation', () => ({ usePathname: () => pathnameMock() }));
 
 import { useSession } from 'next-auth/react';
 
-// Phase E 이후: quest CMS UI/API 일괄 제거에 따라 navbar 의
-// questLinks 드롭다운 + 모바일 collapsible 도 사라졌다. 남은 인증 전용
-// CMS 는 web-adventure 의 씬 편집뿐이라 평탄한 단일 링크로 노출.
+// After Phase E: with the quest CMS UI and API removed wholesale, the navbar's
+// questLinks dropdown and its mobile collapsible went too. The only authenticated
+// CMS left is web-adventure's scene editing, exposed as a flat single link.
 describe('Navbar — 씬 단일 링크 (인증)', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/');
@@ -34,7 +34,7 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     expect(link.getAttribute('href')).toBe('/scenes');
   });
 
-  // #51 — 하위가 2개 이상(플레이+씬)이면 직행하지 않고 서브메뉴를 유지한다.
+  // #51 - with 2 or more children (play plus scenes) it keeps the submenu rather than going straight there.
   it('데스크탑: 로그인 사용자는 게임 이름이 링크가 아니라 펼침 토글', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('게임 메뉴'));
@@ -54,17 +54,17 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
   it('데스크탑: 마이페이지 드롭다운엔 개인 메뉴만 — 퀘스트 항목 없음', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('마이페이지 메뉴'));
-    // 개인 메뉴는 존재
+    // the personal menu exists
     expect(screen.getByText('내 프로필')).toBeTruthy();
     expect(screen.getByText('내가 올린 유머')).toBeTruthy();
     expect(screen.getByText('설정')).toBeTruthy();
     expect(screen.getByText('유머 업로드')).toBeTruthy();
-    // 과거 quest CMS 항목들은 더 이상 존재하지 않음
+    // the old quest CMS entries no longer exist
     expect(screen.queryByText('Villager 카탈로그')).toBeNull();
     expect(screen.queryByText('Item 카탈로그')).toBeNull();
     expect(screen.queryByText('Zone 카탈로그')).toBeNull();
     expect(screen.queryByText('Monster 카탈로그')).toBeNull();
-    // 옛 퀘스트 드롭다운 트리거도 사라졌어야 함
+    // the old quest dropdown trigger must be gone too
     expect(screen.queryByLabelText('퀘스트 메뉴')).toBeNull();
   });
 
@@ -102,9 +102,9 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
     expect(screen.getByLabelText('모바일 게임 섹션 토글')).toBeTruthy();
     expect(screen.getByLabelText('모바일 마이페이지 섹션 토글')).toBeTruthy();
-    // 옛 퀘스트 모바일 토글은 제거됨
+    // the old quest mobile toggle is removed
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
-    // 마이페이지 collapsible 은 활성 라우트 아니라 자식 접힘
+    // the my-page collapsible is not the active route, so its children are collapsed
     expect(screen.queryByText('내 프로필')).toBeNull();
   });
 
@@ -136,9 +136,9 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
   });
 });
 
-// #219 — navbar 게임 노출은 web-adventure 만(bevy-rogue 라우트 자체는 라이브 유지).
-// #49 — 게임이 여러 개가 될 수 있어 [게임 ▾ → 게임별 ▸ → 항목] 2단 중첩으로 바꿨다.
-//   플레이는 공개, 씬은 인증, 피드백 노트·서버 상태는 owner.
+// #219 - the navbar exposes web-adventure alone (the bevy-rogue route itself stays live).
+// #49 - there can be several games, so it became a two-level nesting [Games -> per game -> the item].
+//   Play is public, the scenes need a login, and the feedback notes and server status are owner-only.
 describe('Navbar — 게임 2단 메뉴 (비로그인)', () => {
   beforeEach(() => {
     pathnameMock.mockReturnValue('/');
@@ -152,14 +152,14 @@ describe('Navbar — 게임 2단 메뉴 (비로그인)', () => {
     expect(screen.getByLabelText('게임 메뉴')).toBeTruthy();
   });
 
-  // #51 — 하위가 "플레이" 하나뿐이면 펼치는 게 헛클릭이라 바로 이동시킨다.
+  // #51 - with "play" as the only child, expanding is a wasted click, so it navigates straight there.
   it('데스크탑: 게임 이름이 곧 플레이 링크 (서브메뉴 안 열림)', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('게임 메뉴'));
 
     const link = screen.getByRole('link', { name: /에테르니아의 추락/ });
     expect(link.getAttribute('href')).toBe('/games/web-adventure');
-    // 펼침 토글 자체가 없어야 한다.
+    // The expand toggle itself must be absent.
     expect(screen.queryByLabelText('에테르니아의 추락 하위 메뉴')).toBeNull();
   });
 
@@ -201,7 +201,7 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
   it('최상위 에테르니아 메뉴는 없다 (게임 아래로 편입됨)', () => {
     render(<Navbar />);
     expect(screen.queryByLabelText('에테르니아 메뉴')).toBeNull();
-    // 게임 메뉴 자체는 공개라 보인다.
+    // The game menu itself is public and visible.
     expect(screen.getByLabelText('게임 메뉴')).toBeTruthy();
   });
 
@@ -213,23 +213,23 @@ describe('Navbar — 비로그인 시 인증 메뉴 미노출', () => {
   it('모바일: 게임 섹션은 보이되 제작 항목·마이페이지 토글은 미노출', () => {
     render(<Navbar />);
     fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
-    // 게임(플레이)은 공개라 섹션이 보인다.
+    // The game (play) is public, so the section is visible.
     expect(screen.getByLabelText('모바일 게임 섹션 토글')).toBeTruthy();
-    // 옛 최상위 에테르니아 섹션·마이페이지·퀘스트 토글은 없다.
+    // The old top-level Eternia section, my page and the quest toggle are gone.
     expect(screen.queryByLabelText('모바일 에테르니아 섹션 토글')).toBeNull();
     expect(screen.queryByLabelText('모바일 마이페이지 섹션 토글')).toBeNull();
     expect(screen.queryByLabelText('모바일 퀘스트 섹션 토글')).toBeNull();
 
-    // 펼쳐도 제작 항목은 없고, 게임 이름이 곧 플레이 링크다(#51).
+    // Expanded, there are no authoring entries and the game's name is the play link itself (#51).
     fireEvent.click(screen.getByLabelText('모바일 게임 섹션 토글'));
     expect(screen.queryByRole('link', { name: '씬' })).toBeNull();
     expect(screen.getByRole('link', { name: /에테르니아의 추락/ }).getAttribute('href')).toBe('/games/web-adventure');
   });
 });
 
-// 자동매매 설정은 owner 전용인데 일반 사용자용 개인 설정 페이지에 얹혀 있었다.
-// 주식 메뉴 아래 전용 페이지(/admin/trading)로 분리하고, 마이페이지 설정엔 테마만
-// 남긴다. (#45 진입점 추가 → #47 분리)
+// The trading settings are owner-only yet sat on the ordinary user's personal settings page.
+// They move to a dedicated page under the stocks menu (/admin/trading), and my page's settings keep
+// the theme alone. (#45 added the entry point -> #47 split it out)
 describe('Navbar — 주식 메뉴의 자동매매 설정 진입점', () => {
   const mockSession = (isOwner: boolean) =>
     vi.mocked(useSession).mockReturnValue({

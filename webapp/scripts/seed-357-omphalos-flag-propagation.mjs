@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-// scripts/seed-357-omphalos-flag-propagation.mjs — #357 옴팔로스 동맹 flag → 클라이맥스 전파.
+// scripts/seed-357-omphalos-flag-propagation.mjs - #357's propagation of the Omphalos alliance flags into the climax.
 //
-// 비선형의 실체: "옴팔로스에서 누구와 손잡았는가"가 후반 도달 가능한 경로를 바꾼다.
-//   - ally_sylvan(네오엘프 동맹)  → station_spirit_branch 에 conditional 추가.
-//       영수의 죽음(spiritBeastDied) 이 없어도 sylvan 경로 해금 → 솔웬 외 주인공도 sylvan.
-//       (단 climax_sylvan_path 는 "너의 종족=네오엘프" 전제라, 비-솔웬 친화 전용
-//        climax_sylvan_allied 로 분기시켜 정체성 상충을 피한다.)
-//   - ally_ironguard(아이언가드 동맹) → climax_revolution_path_derail/hijack 에 전용 분기.
-//       붉은 천의 형제들이 합류하는 *강화된 혁명* 씬(climax_revolution_allied).
-//   - knowsAscensionPlot(ally_spy 가 부여) → 기존 station_knowledge_branch 가 이미 수용
-//       (harmony 해금). 추가 작업 불필요 — 자동 연결.
+// What non-linearity really means: "who you joined hands with in Omphalos" changes which paths are reachable later.
+//   - ally_sylvan (the neo-elf alliance)  -> a conditional added to station_spirit_branch.
+//       The sylvan path unlocks without the spirit beast's death (spiritBeastDied) -> protagonists other than Solwen reach sylvan too.
+//       (But climax_sylvan_path presumes "your race = neo-elf", so the non-Solwen affinity case branches into
+//        climax_sylvan_allied to avoid the identity clash.)
+//   - ally_ironguard (the Ironguard alliance) -> its own branch in climax_revolution_path_derail/hijack.
+//       The *strengthened revolution* scene the brothers of the red cloth join (climax_revolution_allied).
+//   - knowsAscensionPlot (granted by ally_spy) -> the existing station_knowledge_branch already handles it
+//       (unlocking harmony). No further work - it connects automatically.
 //
-// idempotent — 신규 씬 upsert + conditional 추가/갱신.
+// Idempotent - the new scenes are upserted and the conditionals added or updated.
 
 import mongoose from 'mongoose';
 
@@ -46,7 +46,7 @@ const NEW_SCENES = [
   },
 ];
 
-// conditional 추가/갱신 — sceneId 별. (to 가 다르면 갱신, 없으면 추가.)
+// Adding or updating a conditional - per sceneId. (Updated when `to` differs, added when absent.)
 const ADD_CHOICES = [
   {
     sceneId: 'station_spirit_branch',
@@ -105,7 +105,7 @@ async function main() {
     const idx = choices.findIndex((c) => c.id === choice.id);
     if (idx >= 0) {
       if (JSON.stringify(choices[idx]) === JSON.stringify(choice)) { console.log(`  skip: ${sceneId}/${choice.id} (동일)`); continue; }
-      choices[idx] = choice; // to 등 갱신.
+      choices[idx] = choice; // Updating `to` and the rest.
       await Scene.findOneAndUpdate({ id: sceneId }, { choices });
       console.log(`  update: ${sceneId}/${choice.id} → ${choice.to}`);
       continue;

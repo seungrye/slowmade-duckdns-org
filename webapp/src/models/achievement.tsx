@@ -6,8 +6,8 @@ const AchievementSchema = new Schema({
   description: { type: String, required: true }, // e.g., '처음으로 게시글을 작성했습니다.'
   icon: { type: String, required: true }, // e.g., 'FaPencilAlt' or an image URL
   points: { type: Number, required: true, default: 0 }, // e.g., 10
-  // 등급·숨김 (#333). 정의(lib/achievements/definitions.ts)에서 upsert 로 흘러 들어온다 —
-  // 스키마에 없으면 mongoose 가 조용히 버려서 화면이 전부 같은 등급으로 보인다.
+  // The tier and hidden flag (#333). They flow in from the definitions (lib/achievements/definitions.ts) through the upsert -
+  // absent from the schema, mongoose drops them quietly and every achievement looks the same tier on screen.
   tier: { type: String, enum: ['bronze', 'silver', 'gold'], default: 'bronze' },
   hidden: { type: Boolean, default: false },
 });

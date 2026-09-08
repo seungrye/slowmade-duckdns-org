@@ -1,19 +1,19 @@
 #!/usr/bin/env node
-// scripts/web-adventure-lint.mjs — #248 씬 콘텐츠 검토 도구.
+// scripts/web-adventure-lint.mjs - #248's scene content review tool.
 //
-// /api/web-adventure/content/v1 에서 30 씬을 fetch 한 후 다음 규칙으로 검사:
+// It fetches the 30 scenes from /api/web-adventure/content/v1 and checks these rules:
 //   ERROR
-//     - body 가 빈 배열.
-//     - choices 가 비어있는데 isEnding=false.
+//     - an empty body array.
+//     - empty choices with isEnding=false.
 //   WARN
-//     - 한 문단(body 의 한 entry) > 300 자.
-//     - 씬 본문 합계 < 80 자 또는 > 1800 자.
-//     - choice label > 60 자.
-//     - 동일 endingId 가 isEnding 씬 사이 충돌.
+//     - a paragraph (one entry of body) over 300 characters.
+//     - a scene body totalling under 80 or over 1800 characters.
+//     - a choice label over 60 characters.
+//     - the same endingId clashing across isEnding scenes.
 //
-// 사용:
-//   pnpm node scripts/web-adventure-lint.mjs                # 프로덕션 (https://slowmade.duckdns.org)
-//   API_BASE=http://localhost:3010 pnpm node scripts/web-adventure-lint.mjs  # 로컬
+// Usage:
+//   pnpm node scripts/web-adventure-lint.mjs                # production (https://slowmade.duckdns.org)
+//   API_BASE=http://localhost:3010 pnpm node scripts/web-adventure-lint.mjs  # local
 
 const API_BASE = process.env.API_BASE ?? 'https://slowmade.duckdns.org';
 const ENDPOINT = `${API_BASE}/api/web-adventure/content/v1`;
@@ -77,9 +77,9 @@ async function main() {
         }
       }
     }
-    // #317 〈에테르니아〉 — endingId 가 *여러 씬* 에서 사용 가능 (fall 이 rin_chase /
-    //   rin_caught / ending_fall 3 곳, petrification 이 kael_caught / ending_petrification 2 곳).
-    //   이건 *시나리오 다양성* 디자인. 단순 첫 등장만 기록 (충돌 ERROR 제거).
+    // #317 Eternia - an endingId may be used by *several scenes* (fall in rin_chase /
+    //   rin_caught / ending_fall, and petrification in kael_caught / ending_petrification).
+    //   That is a *scenario variety* design. Only the first appearance is recorded (the clash ERROR is gone).
     if (isEnding && s.endingId && !endingMap.has(s.endingId)) {
       endingMap.set(s.endingId, s.id);
     }
@@ -97,7 +97,7 @@ async function main() {
   console.log(`\n총 ${scenes.length} 씬: ${RED}${errors} error${RESET}, ${YELLOW}${warns} warn${RESET}`);
   if (errors === 0 && warns === 0) console.log(`${GREEN}✓ 깔끔${RESET}`);
 
-  // #317 〈에테르니아〉 6 endingId — 옛 사극 endingId 에서 갱신.
+  // #317 Eternia's 6 endingIds - updated from the old historical-drama endingIds.
   for (const expected of ['ascension', 'revolution', 'harmony', 'fall', 'petrification', 'sylvan_bond']) {
     if (!endingMap.has(expected)) {
       console.log(`${RED}MISSING ending '${expected}' — 정의 안 됨${RESET}`);

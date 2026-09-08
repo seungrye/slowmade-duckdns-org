@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/build-variation-catalog-post.mjs — 씬 일러스트 배리에이션 카탈로그 (list view).
+// scripts/build-variation-catalog-post.mjs - the scene illustration variation catalogue (a list view).
 //
-// 지정 Post(POST_ID)에 전체 80씬을 *씬별 행(list view)* 으로 정리:
-//   씬 제목/id → 배리에이션 이미지들(가로 나열) → 사용된 영어 prompt.
-// 향후 사용자가 직접 이미지를 업로드해 배리에이션을 늘리는 확장도 염두.
-// 멱등(POST_ID 덮어쓰기).
+// All 80 scenes are laid out in the given Post (POST_ID) as *one row per scene (a list view)*:
+//   the scene's title and id -> the variation images (side by side) -> the English prompt used.
+// It also has in mind a later extension where users upload their own images to add variations.
+// Idempotent (POST_ID is overwritten).
 
 import mongoose from 'mongoose';
 import fs from 'node:fs';
@@ -65,7 +65,7 @@ async function main() {
       html.push(`<h3>${esc(label)}</h3>`);
 
       const imgs = s.illustrations && s.illustrations.length > 0 ? s.illustrations : (s.illustration ? [s.illustration] : []);
-      // 배리에이션 이미지들을 가로로 (각 image 노드 연속).
+      // The variation images side by side (consecutive image nodes).
       const htmlImgs = [];
       for (const src of imgs) {
         content.push({ type: 'image', attrs: { src, alt: s.id, title: s.id, width: null, height: null } });

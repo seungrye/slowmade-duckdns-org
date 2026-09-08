@@ -16,7 +16,7 @@ const mockScenes = Array.from({ length: 18 }).map((_, i) => ({
   choices: i % 2 === 0 ? [{ kind: 'plain', id: 'c1', label: '계속', to: 'scene_00' }] : [],
   isEnding: i === 17,
   endingId: i === 17 ? 'main' : undefined,
-  // 옛 quest CMS 패턴 — 씬마다 revision 카운트.
+  // The old quest CMS pattern - a revision count per scene.
   revisionCount: i,
 }));
 
@@ -49,7 +49,7 @@ describe('ScenesPage — 목록', () => {
     const search = screen.getByPlaceholderText('씬 검색 (id 또는 제목)') as HTMLInputElement;
     fireEvent.change(search, { target: { value: '씬 5' } });
     expect(search.value).toBe('씬 5');
-    // 필터링 후 보이는 행은 1 개 (씬 5)
+    // after filtering, 1 row is visible (scene 5)
     const visible = document.querySelectorAll('[data-scene-row]');
     expect(visible.length).toBe(1);
   });
@@ -69,15 +69,15 @@ describe('ScenesPage — 목록', () => {
     expect(screen.getByText('+ 새 씬')).toBeTruthy();
   });
 
-  // 옛 quest CMS 패턴 — 각 행에 v{revisionCount} 칩.
+  // The old quest CMS pattern - a v{revisionCount} chip on each row.
   it('각 행에 v{revisionCount} 형식의 리비전 badge 가 노출된다', async () => {
     const { container } = render(<ScenesClient />);
     await act(async () => {});
-    // scene_03 → v3, scene_05 → v5 등.
+    // scene_03 -> v3, scene_05 -> v5 and so on.
     expect(container.textContent).toContain('v3');
     expect(container.textContent).toContain('v5');
     expect(container.textContent).toContain('v17');
-    // v0 도 명시 (scene_00).
+    // v0 is stated too (scene_00).
     expect(container.textContent).toContain('v0');
   });
 });

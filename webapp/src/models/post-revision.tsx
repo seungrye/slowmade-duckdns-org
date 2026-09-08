@@ -13,7 +13,7 @@ const PostRevisionSchema = new Schema(
 });
 
 
-// 타입 자동 추론
+// The type is inferred automatically
 export type PostRevisionType = InferSchemaType<typeof PostRevisionSchema>;
-// 모델 생성
+// Creating the model
 export default models.PostRevision || model("PostRevision", PostRevisionSchema);

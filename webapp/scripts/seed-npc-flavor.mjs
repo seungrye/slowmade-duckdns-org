@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// scripts/seed-npc-flavor.mjs — #267 사이드 NPC 대사로 분위기 보강.
+// scripts/seed-npc-flavor.mjs - #267: strengthening the atmosphere with side-NPC lines.
 //
-// 약한 (≤2줄) 씬에 NPC/내러티브 한 두 줄 추가. 침식/사제단/세계수 단서를 흘려
-// 플레이어가 다음 결정의 *맥락* 을 더 잘 잡도록.
+// One or two NPC or narrative lines added to thin scenes (<=2 lines). Clues about the contamination, the priesthood and the world tree are dropped so
+// the player gets a better grip on *the context* of the next decision.
 
 import mongoose from 'mongoose';
 

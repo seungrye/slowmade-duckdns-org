@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// scripts/seed-story-flow-balance.mjs — #284 스토리 흐름 균형 fix.
+// scripts/seed-story-flow-balance.mjs - #284's story-flow balance fix.
 //
-// A. act1 시작 본문 균질화 (Kael 6줄 ↔ Rin 3줄 / Solwen 3줄):
-//    rin_harbor: +2 줄 (밀수 / 침식 자취)
-//    solwen_grove: +2 줄 (영수 호흡 / 손바닥 마력 흔적)
+// A. evening out the act 1 opening bodies (Kael's 6 lines against Rin's 3 and Solwen's 3):
+//    rin_harbor: +2 lines (the smuggling, the contamination's traces)
+//    solwen_grove: +2 lines (the spirit beast's breathing, the magic residue on the palm)
 //
-// B. Kael 라인 act1 환경 침식 추가 (시한부 80 톤 강화):
-//    kael_corridor: stigmaΔ +1 (정제소 가까이, 마력 누출 증가)
-//    kael_cargo_container: stigmaΔ +1 (가솔린 통 = 마력석 정제 결정 인접)
-//    kael_falling: stigmaΔ +1 (낙하 = 신체 부담)
+// B. environmental contamination added to Kael's act 1 line (strengthening the time-limit tone of 80):
+//    kael_corridor: stigma +1 (close to the refinery, more magic leaking)
+//    kael_cargo_container: stigma +1 (the petrol drum sits next to refined mana-stone crystals)
+//    kael_falling: stigma +1 (the fall strains the body)
 
 import mongoose from 'mongoose';
 
@@ -33,7 +33,7 @@ async function main() {
   await mongoose.connect(process.env.MONGO_URI);
   const Scene = mongoose.model('S', new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }));
 
-  // A. 본문 추가
+  // A. adding to the bodies
   for (const [id, lines] of Object.entries(bodyAdds)) {
     const cur = await Scene.findOne({ id }).lean();
     if (!cur) { console.log('없음:', id); continue; }
@@ -47,7 +47,7 @@ async function main() {
     console.log('updated body:', id, `(${body.length} 줄)`);
   }
 
-  // B. 환경 침식 추가
+  // B. adding the environmental contamination
   for (const [id, delta] of Object.entries(envStigma)) {
     const cur = await Scene.findOne({ id }).lean();
     if (!cur) { console.log('없음:', id); continue; }

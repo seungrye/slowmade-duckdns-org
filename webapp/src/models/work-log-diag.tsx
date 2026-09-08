@@ -1,22 +1,22 @@
-// work_log 진단 자취 (#409).
+// work_log's diagnostic traces (#409).
 //
-// **여러 벌 보관한다.** 릴리스는 최신 하나면 앱이 업데이트를 받는 데 충분하지만,
-// 크래시는 **되풀이되는 것 자체가 단서**다 — 같은 자리에서 세 번 죽었다는 사실이
-// 한 번 죽은 것보다 훨씬 많은 것을 말해 준다.
+// **Several are kept.** For releases the latest alone is enough for the app to get an update, but
+// with crashes **the recurrence is itself the clue** - that it died three times in the same place says
+// far more than dying once.
 //
-// 그래도 무한정 쌓지는 않는다. 최근 스무 벌이면 흐름을 보기에 넉넉하다.
+// Even so they do not pile up without limit. The most recent twenty are plenty to see the pattern.
 
 import { Schema, model, models, Model } from "mongoose";
 
 export interface WorkLogDiagDoc {
-  /** 어느 판에서 났나. 고친 판에서도 나는지 가르는 값이라 중요하다. */
+  /** Which build it happened on. It decides whether the fixed build still shows it, so it matters. */
   versionCode: number;
   versionName: string;
-  /** 어느 기기인가 — 기기를 타는 문제인지 가른다. */
+  /** Which device - telling whether the problem is device-specific. */
   device: string;
-  /** 왜 올렸나 (crash · anr · manual). 목록에서 훑을 때 쓴다. */
+  /** Why it was uploaded (crash, anr or manual). Used when scanning the list. */
   kind: string;
-  /** 자취 본문. 글자라 그대로 담는다. */
+  /** The trace itself. Being text, it is stored as it is. */
   body: string;
   createdAt: Date;
 }

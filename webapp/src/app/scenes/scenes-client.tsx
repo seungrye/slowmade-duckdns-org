@@ -23,7 +23,7 @@ export default function ScenesClient({ initialScenes = [] }: { initialScenes?: S
     setLoading(false);
   }
 
-  // SSR(page.tsx)로 초기 목록이 주입되면 첫 fetch 를 건너뛴다. 없으면 기존 CSR 동작.
+  // When SSR (page.tsx) injects the initial list, the first fetch is skipped. Without it, the previous CSR behaviour.
   useEffect(() => {
     if (initialScenes.length === 0) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps

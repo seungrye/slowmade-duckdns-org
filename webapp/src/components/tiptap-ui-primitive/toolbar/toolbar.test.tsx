@@ -1,4 +1,4 @@
-// 고정 툴바가 넘칠 때 휠로 좌우 스크롤 (#41 — 잘린 아이콘을 클릭할 수 있게).
+// Scrolling a fixed toolbar sideways with the wheel when it overflows (#41 - so a clipped icon can be clicked).
 // @vitest-environment jsdom
 
 import { describe, it, expect } from "vitest";

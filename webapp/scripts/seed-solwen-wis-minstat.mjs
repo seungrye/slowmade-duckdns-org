@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scripts/seed-solwen-wis-minstat.mjs — #324 Solwen 전용 wis 7+ minStat 분기.
+// scripts/seed-solwen-wis-minstat.mjs - #324's Solwen-only wis 7+ minStat branch.
 //
-// solwen_grief (1/3) 에 wis 7+ hidden 분기 추가:
-//   *영수의 마지막 호흡을 *지혜로 해독* — 세계수의 *원천 위치* 시야 획득*.
-//   flag set 'sylvanVisionGranted' — 후속 분기에서 활용 (이번엔 신호만).
+// A hidden wis 7+ branch added to solwen_grief (1 of 3):
+//   *Reading the spirit beast's last breath *through wisdom* - gaining sight of the world tree's *source*.
+//   The flag 'sylvanVisionGranted' is set - used in a later branch (only signalled for now).
 //
-// Solwen baseStats wis=7. Kael wis=5 / Rin wis=6 → Solwen 만 통과.
+// Solwen's baseStats have wis=7. Kael's wis=5 and Rin's wis=6 -> only Solwen passes.
 
 import mongoose from 'mongoose';
 
@@ -31,7 +31,7 @@ async function main() {
   if (choices.find((c) => c.id === BRANCH.choice.id)) { console.log('skip'); process.exit(0); }
   choices.push(BRANCH.choice);
   if (choices.length > 3) process.exit(1);
-  // onEnter.setFlags 에 sylvanVisionGranted 추가 (실제 활용은 후속 시드에서).
+  // sylvanVisionGranted added to onEnter.setFlags (actually used in a later seed).
   const onEnter = { ...cur.onEnter, setFlags: { ...(cur.onEnter?.setFlags ?? {}) } };
   await Scene.findOneAndUpdate({ id: BRANCH.sceneId }, { choices, onEnter });
   console.log('updated:', BRANCH.sceneId, `(${choices.length} 분기)`);

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 /**
- * owner 전용 경로 — server component / API route 에서 `requireOwner` 로
- * 최종 검증되지만, middleware 에서도 *session cookie 자체 미존재* 시
- * 즉시 404 로 끊어 라우트 코드 진입을 막는 빠른 1차 가드.
+ * The owner-only paths - finally verified by `requireOwner` in the server component or API route,
+ * but the middleware also cuts them off with a 404 when *the session cookie itself is absent*,
+ * a fast first guard keeping the request out of the route code.
  *
- * NextAuth 세션 쿠키 명칭은 `authjs.session-token` (v5 dev) 또는
- * `__Secure-authjs.session-token` (prod). 쿠키 존재 = 인증된 *어떤* 사용자
- * — 진짜 owner 검증은 server component 측에서.
+ * NextAuth's session cookie is named `authjs.session-token` (v5 dev) or
+ * `__Secure-authjs.session-token` (prod). The cookie's presence means *some* authenticated user
+ * - the real owner check happens in the server component.
  */
-// `/scenes/` — 〈에테르니아〉 작성 도구 (#179). 진짜 검증은 scenes/layout.tsx 의 requireOwner.
+// `/scenes/` - Eternia's authoring tools (#179). The real check is requireOwner in scenes/layout.tsx.
 const OWNER_ONLY_PREFIXES = ['/admin/', '/api/admin/', '/scenes/']
 
 function isOwnerOnlyPath(pathname: string): boolean {
@@ -20,37 +20,37 @@ function hasSessionCookie(request: NextRequest): boolean {
   return Boolean(
     request.cookies.get('authjs.session-token') ||
       request.cookies.get('__Secure-authjs.session-token') ||
-      // 호환 — v4 next-auth 이름
+      // Compatibility - the v4 next-auth name
       request.cookies.get('next-auth.session-token') ||
       request.cookies.get('__Secure-next-auth.session-token'),
   )
 }
 
 /**
- * 레트로 에뮬레이터 플레이어 (#109) — /games/retro 의 플레이 화면이 iframe 으로 띄우는 문서.
+ * The retro emulator player (#109) - the document /games/retro's play screen opens in an iframe.
  *
- * 이 문서 **하나만** CSP 를 두 군데 낮춘다. 사이트 전체 정책은 그대로다.
+ * The CSP is lowered in two places for **this document alone**. The site-wide policy is unchanged.
  *
- * 1. `frame-ancestors 'self'` — 기본값 'none' 을 그대로 두면 우리 자신이 띄우는 것까지 막힌다.
- *    외부 사이트가 감싸는 건 여전히 안 된다.
+ * 1. `frame-ancestors 'self'` - leaving the default 'none' would block even us from framing it.
+ *    An outside site still cannot wrap it.
  *
- * 2. `'unsafe-eval'` — EmulatorJS 의 코어 파일(`cores/*-wasm.data`)은 **7z 아카이브**라
- *    브라우저에서 풀어야 하는데, 그 일을 하는 emscripten 글루가
- *    `cwrap("extract", "number", ["string"])` 를 부른다. emscripten 의 cwrap 은 인자·반환이
- *    전부 number 일 때만 eval 없이 끝나고, 여기처럼 string 이 끼면 래퍼를 eval 로 만든다.
- *    즉 이게 없으면 **모든 코어 로딩이 조용히 실패한다**(wasm-unsafe-eval 로는 부족 — 그건
- *    WebAssembly 만 허용한다).
- *    이 문서가 부르는 스크립트는 전부 same-origin 이고, 유일한 반사 입력인 `name` 은
- *    player.html 이 정화한다.
+ * 2. `'unsafe-eval'` - EmulatorJS's core files (`cores/*-wasm.data`) are **7z archives** that must be
+ *    unpacked in the browser, and the emscripten glue that does it calls
+ *    `cwrap("extract", "number", ["string"])`. emscripten's cwrap avoids eval only when the arguments and return
+ *    are all numbers; with a string in there, as here, it builds the wrapper through eval.
+ *    That is, without this **every core load fails silently** (wasm-unsafe-eval is not enough - that
+ *    allows WebAssembly alone).
+ *    Every script this document calls is same-origin, and the only reflected input, `name`, is
+ *    sanitised by player.html.
  *
- * 3. `blob:` (script-src·connect-src) — 코어를 7z 에서 푼 뒤 그 결과를 Blob 으로 만들어
- *    `<script>` 로 싣고 fetch 로 읽는다. 둘 중 하나만 열면 "Loading the script 'blob:…'
- *    violates CSP" 또는 "Failed to fetch" 로 부팅이 멈춘다. 헤드리스 브라우저로 다섯 기종을
- *    돌려 가며 확인한 값이다.
+ * 3. `blob:` (script-src and connect-src) - the core is unpacked from the 7z, the result made into a Blob,
+ *    loaded through a `<script>` and read with fetch. Opening only one of the two stalls the boot with "Loading the script 'blob:…'
+ *    violates CSP" or "Failed to fetch". These values were confirmed by running five systems
+ *    through a headless browser.
  *
- * 여기 없는 것은 일부러 없는 것이다 — EmulatorJS 는 시작할 때 cdn.emulatorjs.org 로 버전을
- * 확인하는데, `connect-src` 에 그 호스트를 넣지 않아 **막힌다.** 자체 호스팅이 목적이므로
- * 막히는 게 맞다(그 실패는 player.html 이 조용히 삼킨다).
+ * What is absent here is deliberately absent - EmulatorJS checks its version against cdn.emulatorjs.org at startup,
+ * and that host is not in `connect-src`, so **it is blocked.** Self-hosting being the point,
+ * blocking it is correct (player.html swallows that failure quietly).
  */
 const EMULATOR_PLAYER_PATH = '/games/retro/player.html'
 
@@ -61,13 +61,13 @@ export function middleware(request: NextRequest) {
   const isEmulatorPlayer = request.nextUrl.pathname === EMULATOR_PLAYER_PATH
   const cspHeader = [
     "default-src 'self'",
-    // 'wasm-unsafe-eval' — /games/bevy-rogue 의 Bevy(WASM) 컴파일 허용.
-    // 'unsafe-eval' 보다 안전(JS eval 은 여전히 금지, WebAssembly 만 허용).
+    // 'wasm-unsafe-eval' - allowing /games/bevy-rogue's Bevy (WASM) compilation.
+    // Safer than 'unsafe-eval' (JS eval stays forbidden; only WebAssembly is allowed).
     `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isEmulatorPlayer ? " 'unsafe-eval' blob:" : ''} https://cdn.jsdelivr.net https://www.googletagmanager.com`,
-    // cdn.jsdelivr.net — Pretendard 폰트 CSS(@font-face) 로드 허용(#247).
+    // cdn.jsdelivr.net - allowing the Pretendard font CSS (@font-face) to load (#247).
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
     "img-src 'self' blob: data: https:",
-    // cdn.jsdelivr.net — Pretendard woff2 폰트 파일 로드 허용(#247).
+    // cdn.jsdelivr.net - allowing the Pretendard woff2 font files to load (#247).
     "font-src 'self' https://cdn.jsdelivr.net",
     "object-src 'none'",
     "base-uri 'self'",
@@ -91,21 +91,21 @@ export function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      // 대용량 업로드 라우트(api/attachment/upload·audio/upload·games/retro/rom-upload·
-      // work-log/release)는 제외한다.
-      // middleware 가 매칭되면 Next 가 요청 본문을 버퍼링하며 기본 10MB 로 제한 →
-      // 10MB 초과 업로드가 잘려 req.formData() 파싱 실패(500). 이 라우트에서 middleware 가
-      // 하는 일은 응답 CSP·보안헤더뿐이라(owner 검증은 라우트 requireAuth/requireOwner,
-      // nginx 가 nosniff 추가) 제외해도 안전.
+      // The large-upload routes (api/attachment/upload, audio/upload, games/retro/rom-upload and
+      // work-log/release) are excluded.
+      // A middleware match makes Next buffer the request body and cap it at 10MB by default ->
+      // an upload over 10MB is truncated and req.formData() fails to parse (500). All the middleware does on these
+      // routes is set the response's CSP and security headers (the owner check is the route's requireAuth/requireOwner,
+      // and nginx adds nosniff), so excluding them is safe.
       //
-      // 롬 업로드가 목록(`api/games/retro/roms`)과 **다른 경로**인 이유가 여기 있다 — 접두사로
-      // 빼면 하위 `[id]/file`(롬 내려받기)까지 딸려 빠져 보안 헤더가 사라진다.
-      // attachment 도 같은 이유로 upload 를 따로 뒀다.
+      // This is why the rom upload lives on **a different path** from the list (`api/games/retro/roms`) - excluding by prefix
+      // would drag the nested `[id]/file` (the rom download) out with it and strip its security headers.
+      // attachment keeps its upload separate for the same reason.
       //
-      // work-log/release 는 나중에 합류했다(#407). APK 가 10MB 를 넘는 순간 잘려
-      // `req.formData()` 가 실패했고, 서버 로그가 그대로 말해 줬다:
+      // work-log/release joined later (#407). The moment an APK went over 10MB it was truncated and
+      // `req.formData()` failed, and the server log said so plainly:
       //   "Request body exceeded 10MB for /api/work-log/release."
-      // 여기 목록은 **새 업로드 라우트를 만들 때마다 같이 봐야 한다.**
+      // **This list has to be revisited whenever a new upload route is added.**
       source: '/((?!_next/static|_next/image|favicon.ico|api/attachment/upload|api/web-adventure/audio/upload|api/games/retro/rom-upload|api/work-log/release).*)',
     },
   ],

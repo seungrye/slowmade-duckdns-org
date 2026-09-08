@@ -1,6 +1,6 @@
-// 비공개 표시용 잠긴 자물쇠 아이콘(JSX SVG). 뷰 제목·목록(홈·태그·대시보드) 제목 앞에 공용.
-// 모양은 rich-web-editor/attachment-icon.ts 의 lockIconSvg(true) 닫힌 자물쇠와 동일(시각 일관성).
-// 색·크기는 className(currentColor)로 제어 — 기본은 은은한 회색 1em.
+// The closed padlock icon (a JSX SVG) marking a private post. Shared before the view's title and the list titles (home, tags, the dashboard).
+// The shape matches lockIconSvg(true)'s closed padlock in rich-web-editor/attachment-icon.ts (visual consistency).
+// The colour and size are controlled by className (currentColor) - a soft grey 1em by default.
 
 export function PrivateLockIcon({ className }: { className?: string }) {
   return (

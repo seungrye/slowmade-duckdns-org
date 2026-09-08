@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// scripts/seed-kael-act1.mjs — #252 Kael 1막 4 씬 mongo 적치.
+// scripts/seed-kael-act1.mjs - #252: loading Kael's 4 act 1 scenes into mongo.
 //
-// 외부 AI 기획안 채택 + 〈에테르니아〉 다이스 시스템 매핑.
-//   Scene 01 폐기 처분 통보 (의무실)
-//   Scene 02 의무실 탈출 (성공 시 복도, 실패 시 적발)
-//   Scene 03 가솔린 수송 컨테이너 잠입
-//   Scene 04 추락 — 지상 도착
+// An outside AI's plan adopted and mapped onto Eternia's dice system.
+//   Scene 01 the disposal notice (the infirmary)
+//   Scene 02 escaping the infirmary (the corridor on success, discovery on failure)
+//   Scene 03 infiltrating the petrol transport container
+//   Scene 04 the fall - arriving on the surface
 //
-// 일러스트는 임시 placeholder (Phase 1c 후속에서 painter-bot 생성).
+// The illustrations are temporary placeholders (painter-bot generates them in Phase 1c's follow-up).
 
 import mongoose from 'mongoose';
 
@@ -140,7 +140,7 @@ const scenes = [
       },
     ],
   },
-  // 1막 적발 분기 — 실패 시 도달.
+  // The act 1 discovery branch - reached on failure.
   {
     id: 'kael_caught',
     title: 'Scene 01b — 적발',
@@ -163,8 +163,8 @@ async function main() {
     new mongoose.Schema({}, { strict: false, collection: 'webadventurescenes' }),
   );
 
-  // 멱등 — upsert by id.
-  // 기존 illustration 이 placeholder 가 아니면 painter 가 생성한 실 URL — 보존.
+  // Idempotent - upsert by id.
+  // An existing illustration that is not a placeholder is a real URL painter generated - preserved.
   for (const s of scenes) {
     const cur = await Scene.findOne({ id: s.id }).lean();
     const update = { ...s };

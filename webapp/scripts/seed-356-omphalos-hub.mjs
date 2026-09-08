@@ -1,29 +1,29 @@
 #!/usr/bin/env node
-// scripts/seed-356-omphalos-hub.mjs — #356 옴팔로스 허브화 (슬라이스 A).
+// scripts/seed-356-omphalos-hub.mjs - #356's Omphalos hub (slice A).
 //
-// 비전(사용자):
-//   "옴팔로스까지 가는 길이 너무 직선적이다. 한 가지 목적(=옴팔로스 진입)에 수많은
-//    경우의 수를 두고, 그 수단이 나중에 영향을 주거나 만나는 사람/태도가 달라지게."
+// The vision (the user's):
+//   "The road to Omphalos is too straight. Give one purpose (= entering Omphalos) many
+//    possibilities, and let the means matter later or change who you meet and how they treat you."
 //
-// 슬라이스 A — *다중 진입로 + 중앙 광장 허브 + 세력 동맹*:
-//   - 진입 수단마다 *도착 직후 씬*을 따로 둬서(plain/probability 엔 setFlags 가 없으므로)
-//     onEnter.setFlags 로 흔적(via_*)을 남긴다. 이 도착 씬이 곧 "그 길로 들어왔을 때
-//     만나는 광경/사람".
-//   - 모든 진입 → omphalos_plaza(허브) 합류 → {세력 접촉 / 암시장 / 정거장(메인)}.
-//   - 세력 동맹은 설득 판정(probability) 성공 시 동맹 flag 부여 → 후반(seed-357)에서
-//     클라이맥스 conditional 로 전파.
+// Slice A - *several entrances, a central plaza hub and faction alliances*:
+//   - each means of entry gets its own *arrival scene* (plain and probability have no setFlags), so
+//     onEnter.setFlags can leave a trace (via_*). That arrival scene is "the sight and the people
+//     you meet when you come in that way".
+//   - every entrance converges on omphalos_plaza (the hub) -> {contacting a faction / the black market / the station (main)}.
+//   - a faction alliance grants an alliance flag on a successful persuasion roll (probability) -> propagated into the
+//     climax's conditionals later (seed-357).
 //
-// 도달성(lint): 모든 신규 씬은 plaza/station 으로 복귀. 진입 실패는 기존
-//   omphalos_caught_at_gate(석화 엔딩) 유지. ≤3 선택. blackmarket 은 plaza 에서 접근
-//   (outskirts→market 제거에 따른 orphan 방지).
+// Reachability (lint): every new scene returns to the plaza or the station. A failed entry keeps the existing
+//   omphalos_caught_at_gate (the petrification ending). At most 3 choices. The blackmarket is reached from the plaza
+//   (avoiding the orphan left by removing outskirts->market).
 //
-// idempotent — upsert + 재배선은 정확 일치 검사.
+// Idempotent - upsert plus an exact-match check for the rewiring.
 
 import mongoose from 'mongoose';
 
 const PLACEHOLDER = '/web-adventure/scenes/placeholder-square.svg';
 
-// ───────────── 신규 씬 ─────────────
+// ------------- the new scenes -------------
 
 const NEW_SCENES = [
   {
@@ -150,13 +150,13 @@ const NEW_SCENES = [
   },
 ];
 
-// ───────────── 재배선 ─────────────
+// ------------- the rewiring -------------
 //
 // outskirts: to_station(→infiltration) / to_market(→blackmarket) / iron_lookout(→station)
-//   → [지하통로]tunnel / [게이트]infiltration / iron_lookout(→plaza). to_market 제거
-//   (blackmarket 은 plaza 에서 접근).
-// infiltration: onSuccess 3종을 arrival_* 로 (현재 모두 omphalos_station).
-// blackmarket: to_station_after(→station) 유지 — 변경 없음(plaza 도달로 orphan 해소).
+//   -> [the underground passage] tunnel / [the gate] infiltration / iron_lookout (-> plaza). to_market is removed
+//   (the blackmarket is reached from the plaza).
+// infiltration: the 3 onSuccess targets become arrival_* (all omphalos_station at present).
+// blackmarket: to_station_after (-> station) is kept - unchanged (reaching the plaza resolves the orphan).
 
 const OUTSKIRTS_CHOICES = [
   { kind: 'plain', id: 'to_tunnel', label: '[지하로] 광산 폐갱도를 통해 — 누구의 눈에도 띄지 않는 길.', to: 'omphalos_tunnel' },
@@ -170,7 +170,7 @@ const INFILTRATION_SUCCESS_REMAP = {
   bribe_guard: 'omphalos_arrival_bribe',
 };
 
-// ───────────── 실행 ─────────────
+// ------------- running -------------
 
 async function upsertScene(Scene, spec) {
   const cur = await Scene.findOne({ id: spec.id }).lean();
@@ -178,7 +178,7 @@ async function upsertScene(Scene, spec) {
   if (cur?.illustration && !cur.illustration.includes('placeholder')) {
     update.illustration = cur.illustration;
   }
-  // 본문 확장(seed-355) 보존: 이미 bodyOriginal 이 있으면 body 는 건드리지 않음.
+  // The body expansion (seed-355) is preserved: where bodyOriginal already exists, the body is left alone.
   if (cur?.bodyOriginal) delete update.body;
   await Scene.findOneAndUpdate({ id: spec.id }, update, { upsert: true });
   console.log(`  upsert: ${spec.id} (${spec.choices.length} 분기)`);

@@ -12,12 +12,12 @@ vi.mock('@/hooks/use-mobile', () => ({ useMobile: () => false }));
 import { Editor } from '@tiptap/react';
 import { editorExtensions, looksLikeMarkdown } from './editor.extensions';
 
-// Markdown 모드 → Visual 전환 시 markdown 문자열이 HTML 로 정상 변환되는지 검증.
-// 사용자 보고: "post editor 에서 md 에디트 상태에서 submit 시 정상적으로 html 로
-// 변환되지 않는 거 같다 — 예) `> abc` → <blockquote>abc</blockquote> 처리 안 됨."
-// editor.tsx 의 getContent() / handleToggleMarkdown 흐름이
+// Verifying that a markdown string converts to HTML properly when switching from Markdown mode to Visual.
+// Reported by a user: "submitting from md edit mode in the post editor does not seem to convert to html
+// properly - e.g. `> abc` is not handled as <blockquote>abc</blockquote>."
+// editor.tsx's getContent() / handleToggleMarkdown flow parses the markdown
 //   editor.commands.setContent(md, { contentType: 'markdown' })
-// 를 통해 markdown 을 파싱하므로 그 변환이 실제로 동작하는지 확인.
+// through this, so whether that conversion really works is checked.
 describe('markdown → HTML 변환 (contentType: markdown)', () => {
     const newEditor = () => new Editor({ extensions: editorExtensions, content: '' });
 
@@ -121,9 +121,9 @@ describe('markdown → HTML 변환 (contentType: markdown)', () => {
     });
 });
 
-// editor.tsx 의 getContent() 흐름 모사 — markdown 모드에서 submit 했을 때
-// setContent(md, {contentType: 'markdown'}) → getHTML() 이 동기적으로 변환된
-// HTML 을 돌려주는지 검증. (사용자 보고: md 모드에서 submit 시 변환 안 됨)
+// Imitating editor.tsx's getContent() flow - verifying that on submitting from markdown mode,
+// setContent(md, {contentType: 'markdown'}) -> getHTML() returns the converted
+// HTML synchronously. (Reported by a user: no conversion on submitting in md mode.)
 describe('getContent() 모사 — markdown 모드에서 submit 시 HTML 추출', () => {
     const submitFromMarkdown = (md: string) => {
         const editor = new Editor({ extensions: editorExtensions, content: '' });
@@ -160,7 +160,7 @@ describe('getContent() 모사 — markdown 모드에서 submit 시 HTML 추출',
     });
 });
 
-// looksLikeMarkdown 휴리스틱 — markdown 표현이 명확하면 true, 일반 문장은 false
+// The looksLikeMarkdown heuristic - true on clear markdown, false on an ordinary sentence
 describe('looksLikeMarkdown 휴리스틱', () => {
     it('heading 두 개 이상 — markdown 으로 판단', () => {
         expect(looksLikeMarkdown('# title\n\n## sub\n')).toBe(true);
@@ -195,7 +195,7 @@ describe('looksLikeMarkdown 휴리스틱', () => {
     });
 
     it('bold + inline code 같은 줄 — 약한 신호 1점 (오인 변환 방지를 위해 false)', () => {
-        // 같은 줄의 약한 신호는 1점으로만 누적 (false positive 방지)
+        // Weak signals on the same line accumulate as 1 point only (avoiding false positives)
         expect(looksLikeMarkdown('use `npm` to **install**')).toBe(false);
     });
 
@@ -204,18 +204,18 @@ describe('looksLikeMarkdown 휴리스틱', () => {
     });
 });
 
-// MarkdownPaste extension — paste 한 plain text 가 markdown 패턴이면 변환되어 들어간다.
-// jsdom 에 DataTransfer 가 없으므로 ProseMirror view 의 handlePaste prop 을 직접 호출.
+// The MarkdownPaste extension - pasted plain text matching a markdown pattern is converted as it goes in.
+// jsdom has no DataTransfer, so ProseMirror view's handlePaste prop is called directly.
 describe('MarkdownPaste 익스텐션 — paste 자동 변환', () => {
     const makeClipboardEvent = (dataMap: Record<string, string>): ClipboardEvent => {
-        // DataTransfer 의 setData/getData 를 모킹한 가짜 객체
+        // A fake object mocking DataTransfer's setData/getData
         const data = { ...dataMap };
         const clipboardData = {
             getData: (type: string) => data[type] ?? '',
             setData: (type: string, value: string) => { data[type] = value; },
             types: Object.keys(data),
         } as unknown as DataTransfer;
-        // ClipboardEvent 생성 (jsdom 에는 있을 수도 / 없을 수도 있으므로 fallback)
+        // Creating a ClipboardEvent (jsdom may or may not have one, hence the fallback)
         const ev = {
             clipboardData,
             preventDefault: () => undefined,
@@ -224,7 +224,7 @@ describe('MarkdownPaste 익스텐션 — paste 자동 변환', () => {
         return ev;
     };
 
-    // ProseMirror view.someProp 으로 등록된 handlePaste 들을 직접 호출
+    // Calling the handlePaste handlers registered through ProseMirror's view.someProp directly
     type EditorView = {
         someProp<T>(propName: string, fn: (value: (...args: unknown[]) => unknown) => T | undefined): T | undefined;
     };
@@ -252,8 +252,8 @@ describe('MarkdownPaste 익스텐션 — paste 자동 변환', () => {
         const editor = new Editor({ extensions: editorExtensions, content: '<p></p>' });
         editor.commands.focus();
         const handled = invokeHandlePaste(editor, { 'text/plain': 'hello world' });
-        // looksLikeMarkdown false → 우리 핸들러는 처리하지 않음
-        // someProp 는 truthy 첫 결과만 반환하므로 undefined 또는 false 여야 함
+        // looksLikeMarkdown false -> our handler does not take it
+        // someProp returns only the first truthy result, so it must be undefined or false
         expect(handled).toBeFalsy();
         editor.destroy();
     });
@@ -265,13 +265,13 @@ describe('MarkdownPaste 익스텐션 — paste 자동 변환', () => {
             'text/plain': '# title\n\n> quoted\n',
             'text/html': '<p>different</p>',
         });
-        // text/html 우선 → markdownPaste 는 preventDefault 안 함
+        // text/html takes precedence -> markdownPaste does not preventDefault
         expect(handled).toBeFalsy();
         editor.destroy();
     });
 });
 
-// getMarkdown() 으로 다시 markdown 으로 직렬화했을 때 핵심 표현이 보존되는지 (라운드트립)
+// Whether the key constructs survive being serialised back to markdown with getMarkdown() (the round trip)
 describe('markdown 라운드트립 (md → HTML → md)', () => {
     it('blockquote 가 라운드트립에서 보존된다', () => {
         const editor = new Editor({ extensions: editorExtensions, content: '' });

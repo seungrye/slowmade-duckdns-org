@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// scripts/seed-world-flag-matrix.mjs — #276 6 world flag 매트릭스 완성.
+// scripts/seed-world-flag-matrix.mjs - #276: completing the 6-world-flag matrix.
 //
-// 이전 회차의 모든 6 엔딩이 *다음 회차의 어디선가* hidden 분기로 활용된다.
-// 매트릭스 (world flag → 활용 위치):
-//   world.harmony_kept     → climax_revolution_path / echo_of_harmony   (이미)
-//   world.world_fell       → omphalos_blackmarket / ashen_informant     (이미)
-//   world.solaris_strong   → climax_ascension_path / blessed_descent    (신규)
-//   world.revolution_won   → omphalos_outskirts / iron_lookout          (신규)
-//   world.last_one_fell    → climax_harmony_path / crystal_echo         (신규)
-//   world.sylvan_awoke     → climax_sylvan_path / forest_recognized     (신규)
+// Every one of the previous run's 6 endings is used as a hidden branch *somewhere in the next run*.
+// The matrix (a world flag -> where it is used):
+//   world.harmony_kept     -> climax_revolution_path / echo_of_harmony   (already)
+//   world.world_fell       -> omphalos_blackmarket / ashen_informant     (already)
+//   world.solaris_strong   -> climax_ascension_path / blessed_descent    (new)
+//   world.revolution_won   -> omphalos_outskirts / iron_lookout          (new)
+//   world.last_one_fell    -> climax_harmony_path / crystal_echo         (new)
+//   world.sylvan_awoke     -> climax_sylvan_path / forest_recognized     (new)
 
 import mongoose from 'mongoose';
 

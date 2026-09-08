@@ -83,7 +83,7 @@ export default function CommentInput({
 
   const handleClick = async () => {
     const content = textareaRef.current?.value ?? '';
-    // 마크다운 문법 에러가 있으면 등록하지 않고 토스트로 안내.
+    // A markdown syntax error is reported in a toast rather than submitted.
     const mdError = validateCommentMarkdown(content);
     if (mdError) {
       toast.error(mdError);

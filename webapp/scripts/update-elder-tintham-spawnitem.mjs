@@ -1,13 +1,13 @@
-// One-off: elder_tintham_quest 의 failed → accepted Interact transition 에
-// SpawnItem 액션을 추가한다 — 잠입 실패 후 재시도 시 졸라크래커 재 spawn.
+// One-off: adds a SpawnItem action to elder_tintham_quest's failed -> accepted Interact transition
+// - so the zolar cracker respawns when retrying after a failed infiltration.
 //
-// 사용:
+// Usage:
 //   node scripts/update-elder-tintham-spawnitem.mjs --dry-run
 //   node scripts/update-elder-tintham-spawnitem.mjs
 //
-// 회귀 방지:
-//   - 이미 SpawnItem 액션이 있으면 idempotent (no-op).
-//   - failed → accepted transition 이 없으면 경고하고 skip (다른 형태일 수 있음).
+// Guarding against regressions:
+//   - idempotent when a SpawnItem action is already there (a no-op).
+//   - warns and skips when there is no failed -> accepted transition (it may take another shape).
 
 import path from "node:path";
 import fs from "node:fs";

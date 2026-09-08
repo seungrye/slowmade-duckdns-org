@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/web-adventure-structure-lint.mjs — #271 콘텐츠 구조 lint CLI.
+// scripts/web-adventure-structure-lint.mjs - #271's content structure lint CLI.
 //
-// 기존 web-adventure-lint.mjs (#248) 는 *본문 톤* (길이/문단) 위주. 본 도구는
-// *그래프 구조* — orphan / dead-end / 3 분기 초과 / dangling ref / 6 엔딩 도달성.
+// The existing web-adventure-lint.mjs (#248) is about *the body's tone* (length and paragraphs). This tool covers
+// *the graph's structure* - orphans, dead ends, more than 3 branches, dangling refs and the 6 endings' reachability.
 //
-// 사용:
+// Usage:
 //   MONGO_URI=mongodb://127.0.0.1:27017/handmade-site \
 //     node scripts/web-adventure-structure-lint.mjs
 
@@ -13,14 +13,14 @@ import mongoose from 'mongoose';
 const ALL_ENDINGS = [
   'ascension', 'revolution', 'harmony',
   'fall', 'petrification', 'sylvan_bond',
-  // #359 각성 루트 전용.
+  // #359's awakening route only.
   'liberation', 'usurpation',
-  // #361 린 각성 루트(신념과 타락).
+  // #361's Rin awakening route (conviction and corruption).
   'regency', 'purge', 'wayfarer',
 ];
 const START_SCENES = ['kael_infirmary', 'rin_harbor', 'solwen_grove'];
-// #327 — 자동 ending 잔재 0 (kael_caught/rin_chase/rin_caught 우회 씬에서 재이용,
-//   ending_petrification 삭제). 빈 배열.
+// #327 - 0 leftovers of the automatic endings (kael_caught/rin_chase/rin_caught are reused in the detour scenes,
+//   and ending_petrification is deleted). An empty array.
 const AUTO_ENDING_SCENES = [];
 
 const RESET = '\x1b[0m';

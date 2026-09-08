@@ -1,21 +1,21 @@
 /**
- * strategyHistory(#83) 를 설정 리비전(#350)으로 옮긴다.
+ * Moves strategyHistory (#83) into the settings revisions (#350).
  *
- * 리비전이 strategyHistory 의 상위집합이라 필드를 걷어냈다. 이미 쌓인 줄은 버리지 않고
- * 옮긴다 — #348 복구 때 "언제 전략을 갈아탔는지" 가 실제로 단서가 됐다.
+ * Revisions are a superset of strategyHistory, so the field was removed. The rows already accumulated are moved
+ * rather than discarded - during #348's recovery, "when did the strategy change" was a real clue.
  *
- * ⚠ **당시 config 는 어디에도 없다.** strategyHistory 는 전략 이름과 시각만 남겼다. 그래서
- *   스냅샷에 전략만 넣고, 나머지가 없다는 사실을 _note 로 명시한다. 지어내지 않는다.
+ * Note: **the config of the time exists nowhere.** strategyHistory kept only the strategy's name and the time. So
+ *   the snapshot carries the strategy alone and states in _note that the rest is absent. Nothing is invented.
  *
- * 리비전이 이미 있는 블록은 **건너뛴다** — 옮긴 줄이 뒤 version 을 받으면 시간 순서가
- * 뒤집혀 이력이 거짓말을 한다. 설정을 바꾸기 전에 한 번 돌리는 것을 전제로 한다.
+ * A block that already has revisions is **skipped** - a moved row taking a later version would invert the
+ * chronology and make the history lie. It assumes one run before any settings change.
  *
- * 그리고 살아 있는 블록마다 **지금 값을 기준선으로 한 줄** 남긴다. 리비전은 변경 "후" 값을
- * 담으므로, 기준선이 없으면 이 기능 이전부터 있던 블록은 첫 변경 때 예전 값이 사라진다.
- * 두 단계 모두 여러 번 돌려도 안전하다(이미 있으면 건너뛴다).
+ * It also leaves **one row as a baseline of the current values** on every live block. A revision holds the value "after"
+ * a change, so without a baseline a block older than this feature loses its previous values at the first change.
+ * Both steps are safe to run repeatedly (an existing one is skipped).
  *
- *   node scripts/migrate-strategy-history-to-revisions.mjs           # 보여만 준다
- *   node scripts/migrate-strategy-history-to-revisions.mjs --apply   # 옮기고 필드를 지운다
+ *   node scripts/migrate-strategy-history-to-revisions.mjs           # only shows
+ *   node scripts/migrate-strategy-history-to-revisions.mjs --apply   # moves and removes the field
  */
 import mongoose from 'mongoose';
 
@@ -59,14 +59,14 @@ for (const p of rows) {
 }
 
 /**
- * ── 기준선 ──────────────────────────────────────────────────────────────
+ * -- the baseline --------------------------------------------------------
  *
- * 리비전은 **변경 "후"** 값을 담는다. 그래서 이 기능이 생기기 전부터 있던 블록은
- * **첫 변경 때 예전 값이 그대로 사라진다** — #348 과 똑같은 사고가 한 번 더 가능하다.
+ * A revision holds the value **"after"** a change. So a block that predates this feature
+ * **loses its previous values at the very first change** - the same accident as #348 could happen again.
  *
- * 그래서 지금 값을 기준선으로 한 줄 남긴다. 위에서 옮긴 줄들은 전략 이름뿐이라
- * (당시 config 가 기록되지 않았다) 기준선 노릇을 못 한다 — config 가 든 스냅샷이
- * 하나도 없는 블록만 대상으로 한다.
+ * So one row is left as a baseline of the current values. The rows moved above carry the strategy name alone
+ * (the config of the time was never recorded) and cannot serve as a baseline - only blocks with
+ * no config-bearing snapshot at all are covered.
  */
 const SETTING_KEYS = ['market', 'strategy', 'runAt', 'weekdaysOnly', 'enabled', 'reservedCash', 'config'];
 const live = await pfs.find({ isDeleted: { $ne: true } }).toArray();

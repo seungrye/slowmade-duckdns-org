@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// scripts/seed-wis-activation.mjs — #320 wis 분기 활용 +1.
+// scripts/seed-wis-activation.mjs - #320: one more wis branch in use.
 //
-// 현재 wis 분기 2 곳 — solwen_combat/shield_spirit (wis 13), climax_harmony_path/
-// still_the_engine (wis 17). act1-act2 에 wis 0.
+// There are 2 wis branches at present - solwen_combat/shield_spirit (wis 13) and climax_harmony_path/
+// still_the_engine (wis 17). Acts 1-2 have none.
 //
-// 변경: omphalos_cameo/exchange_intel (plain) → wis 13 probability.
-//   *지혜의 시야로 후드 그림자의 *진짜 정체* 간파*.
+// The change: omphalos_cameo/exchange_intel (plain) -> a wis 13 probability.
+//   *Seeing through to the hooded shadow's *true identity* with wisdom's sight*.
 
 import mongoose from 'mongoose';
 

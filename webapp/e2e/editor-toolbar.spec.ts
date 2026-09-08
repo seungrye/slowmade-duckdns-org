@@ -1,16 +1,16 @@
-// 에디터 툴바 레이아웃 회귀 (#43).
+// The editor toolbar's layout regression (#43).
 //
-// jsdom 에는 레이아웃이 없어(getBoundingClientRect 가 전부 0) 위치·정렬 버그를
-// 단위 테스트로는 잡을 수 없다. 실제 브라우저에서 좌표를 재는 것이 유일한 검증이다.
+// jsdom has no layout (getBoundingClientRect returns all zeros), so position and alignment bugs
+// cannot be caught in unit tests. Measuring the coordinates in a real browser is the only check.
 import { test, expect, type Page } from "@playwright/test";
 
 const openWriter = async (page: Page) => {
   await page.goto("/post/write", { waitUntil: "domcontentloaded" });
   await page.waitForSelector('[role="toolbar"]');
-  await page.waitForTimeout(1000); // 에디터 초기화
+  await page.waitForTimeout(1000); // initialising the editor
 };
 
-/** 툴바 세로 중앙 대비 요소 중심의 오프셋(px). 0 이면 정확히 중앙. */
+/** The element centre's offset (px) from the toolbar's vertical centre. 0 is exactly centred. */
 const centerOffset = async (page: Page, selector: string) => {
   const el = (await page.locator(selector).first().boundingBox())!;
   const tb = (await page.locator('[role="toolbar"]').first().boundingBox())!;
@@ -31,8 +31,8 @@ test.describe("에디터 툴바", () => {
     await expect(menu).toBeVisible();
     const m = (await menu.boundingBox())!;
 
-    // 앵커(reference) 가 끊기면 floating-ui 가 기준점 없이 (0,0) 에 렌더한다.
-    // 정상이면 트리거 바로 아래, 가로로도 인접한 곳에 뜬다.
+    // With the anchor (reference) broken, floating-ui renders at (0,0) with no reference point.
+    // Correctly, it appears just below the trigger and horizontally adjacent to it.
     expect(m.y).toBeGreaterThan(b.y);
     expect(Math.abs(m.x - b.x)).toBeLessThan(200);
   });
@@ -40,19 +40,19 @@ test.describe("에디터 툴바", () => {
   test("좁은 폭 수식 입력은 링크 입력과 같은 세로 중앙에 온다", async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 900 });
 
-    // 기준: 링크 입력 (툴바 세로 중앙)
+    // The reference: the link input (the toolbar's vertical centre)
     await openWriter(page);
     await page.locator('[aria-label="Link"]').click();
     await expect(page.locator(".tiptap-input").first()).toBeVisible();
     const linkOffset = await centerOffset(page, ".tiptap-input");
 
-    // 대상: 수식 입력
+    // The subject: the formula input
     await openWriter(page);
     await page.locator('[aria-label="수식 삽입"]').click();
     await expect(page.locator(".math-popover-input")).toBeVisible();
     const mathOffset = await centerOffset(page, ".math-popover-input");
 
-    // 버그일 때 수식만 6px 위로 붙었다(alignSelf: flex-start).
+    // With the bug, the formula alone sat 6px higher (alignSelf: flex-start).
     expect(Math.abs(mathOffset - linkOffset)).toBeLessThan(2);
     expect(Math.abs(mathOffset)).toBeLessThan(2);
   });
@@ -64,7 +64,7 @@ test.describe("에디터 툴바", () => {
     await page.locator('[aria-label="수식 삽입"]').click();
     await expect(page.locator(".math-popover-input")).toBeVisible();
 
-    // min-width: 18rem(288px) 이 강제되면 툴바가 넘쳐 가로 스크롤이 생겼다.
+    // Forcing min-width: 18rem (288px) overflowed the toolbar and produced horizontal scrolling.
     const { sw, cw } = await page
       .locator('[role="toolbar"]')
       .first()

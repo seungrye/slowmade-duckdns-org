@@ -1,5 +1,5 @@
-// 엔딩 메타 검증 — 기본 6종 + 각성 시스템 신규 5종(cc57088).
-// 엔딩을 추가/삭제하면 아래 ALL_ENDINGS 목록을 함께 갱신할 것.
+// Verifying the ending metadata - the 6 base endings plus the awakening system's 5 new ones (cc57088).
+// Adding or removing an ending means updating the ALL_ENDINGS list below with it.
 
 import { describe, test, expect } from "vitest";
 import { endingsMeta, getEndingMeta, type EndingMeta } from "./endings";

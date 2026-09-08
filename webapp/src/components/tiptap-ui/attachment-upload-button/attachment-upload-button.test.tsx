@@ -1,4 +1,4 @@
-// AttachmentUploadButton — 다중 파일 선택(멀티 첨부).
+// AttachmentUploadButton - selecting several files (multiple attachments).
 // @vitest-environment jsdom
 
 import { describe, it, expect, vi } from "vitest";
@@ -22,7 +22,7 @@ describe("AttachmentUploadButton 멀티 첨부", () => {
     fireEvent.change(input, { target: { files: [f1, f2] } });
     expect(onPick).toHaveBeenCalledTimes(1);
     expect(onPick.mock.calls[0][0]).toHaveLength(2);
-    expect(input.value).toBe(""); // 같은 파일 재선택 허용
+    expect(input.value).toBe(""); // selecting the same file again is allowed
   });
 
   it("파일 없이 change → onPick 미호출", () => {

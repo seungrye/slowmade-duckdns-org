@@ -55,7 +55,7 @@ describe('CommentItem', () => {
   });
 
   it('내 댓글(isOwn)이면 Delete 버튼을 표시한다', () => {
-    // 소유판정은 서버가 isOwn 으로 내려준다(이메일 노출 대체).
+    // Ownership is decided by the server through isOwn (replacing the exposed email).
     const session = { user: { email: 'tester@test.com' }, expires: '' } as never;
     render(<CommentItem {...defaultProps} comment={{ ...baseComment, isOwn: true }} session={session} />);
     expect(screen.getByText('Delete')).toBeInTheDocument();

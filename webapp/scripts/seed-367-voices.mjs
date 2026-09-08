@@ -1,18 +1,18 @@
 #!/usr/bin/env node
-// scripts/seed-367-voices.mjs — #73/#87 트리트먼트 + 문체 변형 적치.
+// scripts/seed-367-voices.mjs - loading #73/#87's treatments and prose-style variants.
 //
-// 왜 이 시드가 필요한가
-//   treatment(사건의 뼈대·집필용 정본)와 variants(문체별 본문)는 그동안 **DB 에만** 있었다.
-//   작업은 gitignore 된 일회성 스크립트로 했고 시드에는 한 줄도 남지 않았다. 그래서
-//   seeds-replay.sh 로 재구축하면 72,458 자(트리트먼트 135 · 톨킨 135 · 에코 1)가 통째로
-//   사라졌다. 재해 복구 경로에 구멍이 나 있던 셈이다.
+// Why this seed is needed
+//   The treatment (an event skeleton, the canonical text for writing) and the variants (the per-style bodies) lived **only in the DB**.
+//   The work was done with gitignored one-off scripts and not a line survived in the seeds. So
+//   a rebuild through seeds-replay.sh lost 72,458 characters whole (135 treatments, 135 Tolkien, 1 echo).
+//   There was a hole in the disaster-recovery path.
 //
-//   데이터는 scripts/seed-voices-data.json 에 둔다(192KB — 시드 파일에 인라인하기엔 크다).
-//   갱신할 때는 DB 에서 다시 덤프해 이 JSON 을 바꾼다.
+//   The data lives in scripts/seed-voices-data.json (192KB - too large to inline in the seed file).
+//   To update it, dump from the DB again and replace that JSON.
 //
-// 멱등: 같은 값을 $set 하므로 두 번 돌려도 상태가 변하지 않는다.
-//   updatedAt 은 **건드리지 않는다** — 그것까지 갱신하면 seed-idempotency 가 "변경됨" 으로
-//   잡아낸다(그게 이 저장소의 규칙이다).
+// Idempotent: it $sets the same values, so a second run leaves the state unchanged.
+//   updatedAt is **left alone** - updating that too would make seed-idempotency report "changed"
+//   (that is this repository's rule).
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -38,7 +38,7 @@ const main = async () => {
     const set = {};
     if (rec.treatment) set.treatment = rec.treatment;
     if (rec.variants) {
-      // variants 는 통째로 덮지 않고 키별로 넣는다 — 시드에 없는 문체를 지우지 않기 위함.
+      // variants are set key by key rather than overwritten wholesale - so a style absent from the seed is not deleted.
       for (const [voice, body] of Object.entries(rec.variants)) set[`variants.${voice}`] = body;
     }
     if (!Object.keys(set).length) continue;

@@ -1,20 +1,20 @@
-// 시작 마을(Town, ZoneId::Town) 생성 옵션.
-// 게임 측 `TownOptions` (bevy-rogue: src/modules/map/generators/town.rs) 와 1:1 매핑.
+// The generation options for the starting town (Town, ZoneId::Town).
+// Mapped 1:1 onto the game's `TownOptions` (bevy-rogue: src/modules/map/generators/town.rs).
 //
-// 게임 카탈로그 read-only — 이 옵션은 코드에 박힌 단일 시스템 zone(Town) 에만
-// 적용된다. 사이트 UI(`SystemZonesPanel`) 에서 편집 → DB 단일 doc(_id="default")
-// 저장 → /api/game/content/v1 RON export 에 포함 → 게임 wasm 이 fetch.
+// The game catalogue is read-only - these options apply only to the single system zone (Town)
+// hard-coded in the code. Edited in the site UI (`SystemZonesPanel`) -> stored as a single DB doc (_id="default")
+// -> included in /api/game/content/v1's RON export -> fetched by the game's wasm.
 
 export type TownSize = "hamlet" | "village" | "town";
 export type TownRoads = "radial" | "linear" | "random";
 export type TownWealth = "poor" | "common" | "wealthy";
 export type TownDefenses = "none" | "wooden" | "stone";
 /**
- * 13 landmark 식별자. 사이즈/환경 조합으로 노출 여부가 분기된다.
- *   - Hamlet+ : inn / smithy / tavern / herbalist / graveyard (+docks if coastal)
- *   - Village+: 위 + temple / guard / market / jail / guild
- *   - Town    : 위 + manor / alchemist
- *   - docks   : Coastal 환경에서만 노출 (Hamlet+).
+ * The 13 landmark identifiers. Whether each is shown branches on the size and environment combination.
+ *   - Hamlet+ : inn / smithy / tavern / herbalist / graveyard (plus docks if coastal)
+ *   - Village+: the above plus temple / guard / market / jail / guild
+ *   - Town    : the above plus manor / alchemist
+ *   - docks   : shown under the Coastal environment only (Hamlet+).
  */
 export type TownLandmark =
   | "inn"
@@ -32,8 +32,8 @@ export type TownLandmark =
   | "docks";
 
 /**
- * 마을의 지리 환경. Plains 는 기본 — 해안 전용 landmark(docks) 가 비활성화된다.
- * Coastal 은 docks 가 노출되고, 게임 측 generator 가 외곽 한 변에 Water 띠를 둔다.
+ * The town's geography. Plains is the default - the coast-only landmark (docks) is disabled.
+ * Coastal shows docks, and the game's generator puts a strip of Water along one outer edge.
  */
 export type TownEnvironment = "plains" | "coastal";
 
@@ -79,7 +79,7 @@ export interface TownConfigDocument extends TownConfig {
   updatedAt: string;
 }
 
-// 한글 라벨 — UI 표시용 (game 측은 kebab-case enum 그대로 사용).
+// The Korean labels - for the UI's display (the game uses the kebab-case enum as it is).
 export const TOWN_SIZE_LABEL: Record<TownSize, string> = {
   hamlet: "Hamlet (작은 촌락)",
   village: "Village (마을)",
@@ -125,11 +125,11 @@ export const TOWN_ENVIRONMENT_LABEL: Record<TownEnvironment, string> = {
   coastal: "Coastal (해안)",
 };
 
-// ── 사이즈/환경별 노출 ────────────────────────────────────────────────────────
+// -- what is shown per size and environment ---------------------------------
 
 /**
- * 사이즈 그룹 — Hamlet ⊂ Village ⊂ Town (Town 은 모든 landmark 의 슈퍼셋).
- * Docks 는 환경 = Coastal 일 때만 추가된다.
+ * The size groups - Hamlet is a subset of Village is a subset of Town (Town is the superset of every landmark).
+ * Docks is added only when the environment is Coastal.
  */
 const HAMLET_BASE: readonly TownLandmark[] = [
   "inn", "smithy", "tavern", "herbalist", "graveyard",
@@ -142,9 +142,9 @@ const TOWN_ADDITIONS: readonly TownLandmark[] = [
 ];
 
 /**
- * 환경에서 선택 가능한 landmark 목록.
- * 정책 변경: size 무시 — 모든 12 종 landmark 가 항상 사용 가능. env 만 의미
- * (Coastal 일 때만 Docks 추가).
+ * The landmarks selectable in an environment.
+ * A policy change: size is ignored - all 12 landmarks are always available. Only env matters
+ * (Docks is added under Coastal alone).
  */
 export function availableLandmarks(
   _size: TownSize,
@@ -159,7 +159,7 @@ export function availableLandmarks(
   return out;
 }
 
-/** 주어진 landmark 가 환경에서 노출/허용되는지 여부 (size 무시). */
+/** Whether the given landmark is shown and allowed in the environment (size ignored). */
 export function isLandmarkAvailable(
   l: TownLandmark, size: TownSize, env: TownEnvironment,
 ): boolean {

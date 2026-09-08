@@ -1,20 +1,20 @@
-// 아이템 사용 규칙 — 앱판 (#103).
+// The item-use rules - the app's copy (#103).
 //
-// 웹 `webapp/src/lib/web-adventure/engine/reducer.ts` 의 USE_ITEM 과 **같은 규칙**이다.
-// 앱은 vanilla JS 번들이라 코드를 공유하지 않는다. 규칙을 바꿀 때는 양쪽을 함께 고쳐야 한다 —
-// 어긋나면 같은 아이템이 웹과 앱에서 다르게 동작한다.
+// **The same rules** as USE_ITEM in the web's `webapp/src/lib/web-adventure/engine/reducer.ts`.
+// The app is a vanilla JS bundle and shares no code. Changing a rule means changing both -
+// out of step, the same item behaves differently on the web and in the app.
 //
-// 카탈로그(items)는 앱에 미러하지 않고 `content/v1` 응답으로 받는다. 아이템을 늘려도 APK 를
-// 다시 만들 필요가 없고, 이중 관리로 어긋나는 사고를 피할 수 있다.
+// The catalogue (items) is not mirrored in the app but received in the `content/v1` response. Adding items needs no new
+// APK, and it avoids the drift that double maintenance brings.
 
 import { clampStigma } from "./rules.js";
 
-/** 쓸 수 있는 물건인가 — 소모품만 쓴다(무기·열쇠·퀘스트 아이템은 아니다). */
+/** Whether the thing can be used - consumables only (not weapons, keys or quest items). */
 export function isUsableItem(item) {
   return !!item && item.kind === "consumable";
 }
 
-/** 배열에서 값 하나만 지운 새 배열. 같은 물건을 여럿 가졌으면 하나만 준다. */
+/** A new array with one value removed. Holding several of the same thing gives up just one. */
 function removeFirst(arr, value) {
   const i = arr.indexOf(value);
   if (i < 0) return arr;
@@ -22,8 +22,8 @@ function removeFirst(arr, value) {
 }
 
 /**
- * 아이템을 쓴다. 쓸 수 없거나 갖고 있지 않으면 **아무것도 바꾸지 않고** 받은 캐릭터를
- * 그대로 돌려준다(참조 동일). 호출측은 `log === null` 로 "아무 일 없었음" 을 알 수 있다.
+ * Uses an item. When it cannot be used or is not held, the character given is returned **unchanged**
+ * (the same reference). The caller can tell "nothing happened" from `log === null`.
  *
  * @returns {{character: object, log: string|null}}
  */

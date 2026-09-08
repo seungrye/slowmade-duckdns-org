@@ -3,23 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * Generator 카탈로그 미리보기 — bevy-rogue 의 `sample_generators` CLI 가
- * `public/generator-samples/<name>.json` 으로 prebuild 한 8 시드 샘플을 로드해
- * Canvas 로 작게 그린다.
+ * The generator catalogue preview - it loads the 8-seed samples bevy-rogue's `sample_generators` CLI
+ * prebuilds into `public/generator-samples/<name>.json` and draws them small
+ * on a Canvas.
  *
- * 데이터 포맷 (사용자가 cargo run --bin sample_generators 으로 갱신):
+ * The data format (refreshed by the user with cargo run --bin sample_generators):
  * ```json
  * { "name": "forest", "width": 80, "height": 50,
  *   "samples": [{ "seed": 42, "grid": ["####...", ...] }, ...] }
  * ```
  *
- * 레이아웃:
- * - 데스크톱(sm 이상): 4-col grid 2 row 로 8 장 모두 표시 (작게).
- * - 모바일(< sm): 한 장 캐로셀 — 좌/우 화살표 + 도트 + swipe. canvas 는
- *   `max-w-full h-auto` 로 컨테이너 폭을 넘지 않게 스케일.
+ * The layout:
+ * - desktop (sm and up): all 8 in a 4-column, 2-row grid (small).
+ * - mobile (< sm): a one-at-a-time carousel - left/right arrows, dots and swipe. The canvas scales
+ *   with `max-w-full h-auto` so it never exceeds the container's width.
  *
- * Site 는 정적 자산만 서빙 — Rust 코드는 직접 실행 불가하므로 prebuild 패턴.
- * generator 추가/변경 시 bevy-rogue 측에서 다시 실행해 JSON 만 갱신하면 된다.
+ * The site serves static assets only - Rust code cannot be run directly, hence the prebuild pattern.
+ * Adding or changing a generator means rerunning it on the bevy-rogue side and refreshing the JSON alone.
  */
 
 interface Sample {
@@ -34,7 +34,7 @@ interface SampleFile {
   samples: Sample[];
 }
 
-/** 타일 문자 → 색 매핑. 게임의 `tile_base_color` 와 시각적으로 일치하도록 선택. */
+/** The tile character -> colour mapping. Chosen to match the game's `tile_base_color` visually. */
 const TILE_COLORS: Record<string, string> = {
   "#": "#3a3a3a", // Wall — 짙은 회색
   ".": "#d4c8a0", // Floor — 베이지
@@ -45,13 +45,13 @@ const TILE_COLORS: Record<string, string> = {
   c: "#b8843e", // Counter — 나무
 };
 
-const TILE_PX_GRID = 3;     // 데스크톱 4-col grid 의 한 칸 — 80×50 → 240×150.
-const TILE_PX_CAROUSEL = 4; // 모바일 캐로셀의 한 장 — 80×50 → 320×200 (CSS 로 max 100%).
+const TILE_PX_GRID = 3;     // One cell of the desktop 4-column grid - 80x50 -> 240x150.
+const TILE_PX_CAROUSEL = 4; // One image of the mobile carousel - 80x50 -> 320x200 (max 100% through CSS).
 
 /**
- * Canvas 로 grid 를 그린다. canvas 의 *intrinsic* 사이즈는 width×tilePx 이지만,
- * CSS `max-w-full h-auto` 로 컨테이너 폭을 넘으면 자동 스케일 다운된다.
- * `imageRendering: pixelated` 로 픽셀이 뭉개지지 않게.
+ * Draws the grid on a Canvas. The canvas's *intrinsic* size is width x tilePx, but
+ * CSS `max-w-full h-auto` scales it down automatically once it exceeds the container's width.
+ * `imageRendering: pixelated` keeps the pixels from blurring.
  */
 function PreviewCanvas({
   sample,
@@ -98,7 +98,7 @@ export function GeneratorPreview({ generator }: { generator: string }) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [idx, setIdx] = useState(0);
-  // 모바일 swipe 시작 X 좌표.
+  // The mobile swipe's starting X coordinate.
   const touchStartX = useRef<number | null>(null);
 
   useEffect(() => {
@@ -106,7 +106,7 @@ export function GeneratorPreview({ generator }: { generator: string }) {
     setData(null);
     setError(null);
     setLoading(true);
-    setIdx(0); // generator 가 바뀌면 캐로셀 처음으로
+    setIdx(0); // A changed generator returns the carousel to the start
     fetch(`/generator-samples/${encodeURIComponent(generator)}.json`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -139,7 +139,7 @@ export function GeneratorPreview({ generator }: { generator: string }) {
   }
   if (!data) return null;
 
-  const samples = data.samples.slice(0, 4); // 시드 4 개만 표시 (데스크톱 4-col 한 줄, 모바일 캐로셀 4 장).
+  const samples = data.samples.slice(0, 4); // Only 4 seeds are shown (one desktop 4-column row, 4 images in the mobile carousel).
   if (samples.length === 0) return null;
   const safeIdx = ((idx % samples.length) + samples.length) % samples.length;
   const current = samples[safeIdx];

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// scripts/build-worldbuilding-post.mjs — 세계관 & 이미지 생성 가이드 Post.
+// scripts/build-worldbuilding-post.mjs - the setting and image-generation guide Post.
 //
-// 〈에테르니아의 추락〉 세계관을 *이미지 생성 일관성* 관점으로 정리.
-//   - 전체 비주얼 스타일(공통 prompt suffix)
-//   - 세력/장소별 비주얼 모티프 + 영어 키워드
-//   - 핵심 사물의 비주얼
-// 다음 이미지 생성 때 [공통 스타일 + 해당 장소 모티프 + 등장 사물] 을 prompt 에
-// 넣어 일관성 확보. 멱등(같은 title update).
+// The Fall of Eternia's setting, organised from the angle of *image-generation consistency*.
+//   - the overall visual style (the shared prompt suffix)
+//   - the visual motifs plus English keywords per faction and place
+//   - the key objects' visuals
+// The next generation puts [the shared style + that place's motif + the objects present] into the prompt
+// for consistency. Idempotent (the same title is updated).
 
 import mongoose from 'mongoose';
 
@@ -15,11 +15,11 @@ const AUTHOR = '안승례';
 const USER_EMAIL = 'seungrye@devguru.co.kr';
 const TAGS = ['web-adventure', '에테르니아의추락', '세계관', '이미지가이드'];
 
-// 공통 스타일 (모든 씬 prompt 에 붙는 suffix).
+// The shared style (the suffix appended to every scene's prompt).
 const STYLE_SUFFIX =
   'dark epic fantasy, steel and steam, celestial magitech, cold blue glow, black smoke, 16-bit RPG dot pixel art, no characters, no people';
 
-// 문서 구조 — 순서대로 노드 생성.
+// The document structure - the nodes are created in order.
 const DOC = [
   { h: 1, t: TITLE },
   {

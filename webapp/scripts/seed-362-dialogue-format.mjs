@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// scripts/seed-362-dialogue-format.mjs — 씬 텍스트 서식 일원화 정정 patch.
+// scripts/seed-362-dialogue-format.mjs - a corrective patch unifying the scene text's formatting.
 //
-// 규약(src/content/web-adventure/FORMAT.md):
-//   대사는 순수 "..."(자동 호박색) — *"..."* 이탤릭 래핑·대사 안 마크업 금지.
-//   지문 이탤릭 안 별표 중첩 금지. 장소·아이템·고유 개념은 [[명사]].
-// 대상: 전수 스캔에서 걸린 2씬(rin_evidence, kael_clue_manifest)의 body 만 교체.
+// The convention (src/content/web-adventure/FORMAT.md):
+//   Speech is plain "..." (amber automatically) - no *"..."* italic wrapping and no markup inside the speech.
+//   No nested asterisks inside an italic stage direction. Places, items and proper concepts are [[nouns]].
+// The subjects: only the bodies of the 2 scenes a full scan caught (rin_evidence, kael_clue_manifest) are replaced.
 
 import mongoose from 'mongoose';
 

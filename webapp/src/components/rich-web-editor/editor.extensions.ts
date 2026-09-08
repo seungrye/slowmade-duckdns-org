@@ -28,7 +28,7 @@ type JSONContent = { type?: string; attrs?: Record<string, unknown>; content?: J
 type RenderHelpers = { renderChildren: (nodes: JSONContent | JSONContent[]) => string }
 type RenderContext = { previousNode?: JSONContent | null }
 
-// Paragraph — textAlign 속성이 있으면 <p style="text-align: ..."> 로 직렬화
+// Paragraph - with a textAlign attribute it serialises as <p style="text-align: ...">
 const ParagraphWithAlign = Paragraph.extend({
     renderMarkdown(node: JSONContent, h: RenderHelpers, ctx: RenderContext) {
         const content = Array.isArray(node.content) ? node.content : [];
@@ -46,7 +46,7 @@ const ParagraphWithAlign = Paragraph.extend({
     },
 });
 
-// Heading — textAlign 속성이 있으면 <hN style="text-align: ..."> 로 직렬화
+// Heading - with a textAlign attribute it serialises as <hN style="text-align: ...">
 const HeadingWithAlign = Heading.extend({
     renderMarkdown(node: JSONContent, h: RenderHelpers) {
         const level = node.attrs?.level ? parseInt(String(node.attrs.level), 10) : 1;
@@ -60,7 +60,7 @@ const HeadingWithAlign = Heading.extend({
     },
 });
 
-// Superscript/Subscript — <sup>/<sub> 인라인 HTML로 직렬화 (왕복 손실 방지)
+// Superscript/Subscript - serialised as inline <sup>/<sub> HTML (avoiding a round-trip loss)
 const SuperscriptWithMarkdown = Superscript.extend({
     renderMarkdown(node: JSONContent, h: RenderHelpers) {
         return `<sup>${h.renderChildren(node)}</sup>`;
@@ -73,8 +73,8 @@ const SubscriptWithMarkdown = Subscript.extend({
     },
 });
 
-// 텍스트가 명백한 markdown 표현(heading/blockquote/list/code/fence 등)을 한 줄 이상 포함하면
-// markdown 으로 간주. 단순히 `*` 만 하나 있다고 markdown 으로 판단하지는 않음(오인 변환 방지).
+// Text holding one or more lines of clear markdown (a heading, blockquote, list, code, fence and so on)
+// counts as markdown. A single `*` alone is not treated as markdown (avoiding a mistaken conversion).
 export const looksLikeMarkdown = (text: string): boolean => {
     if (!text) return false;
     const lines = text.split(/\r?\n/);
@@ -101,12 +101,12 @@ export const looksLikeMarkdown = (text: string): boolean => {
         // link [text](url)
         if (/\[[^\]\n]+\]\([^)\n]+\)/.test(line)) { hits += 1; continue; }
     }
-    // 최소 2점 이상이어야 markdown 으로 간주 (단일 약한 신호는 무시)
+    // At least 2 points are needed to count as markdown (a single weak signal is ignored)
     return hits >= 2;
 };
 
-// Paste 시 plain text 가 markdown 으로 보이면 markdown 파서를 거쳐 삽입.
-// rich text(text/html) 가 같이 들어오면 손대지 않음 — 브라우저/외부 에디터의 서식을 보존.
+// On a paste, plain text that looks like markdown is inserted through the markdown parser.
+// Rich text (text/html) arriving alongside is left alone - preserving the formatting of the browser or the outside editor.
 const markdownPasteKey = new PluginKey('markdownPaste');
 export const MarkdownPaste = Extension.create({
     name: 'markdownPaste',
@@ -124,7 +124,7 @@ export const MarkdownPaste = Extension.create({
                         const text = cd.getData('text/plain');
                         if (!text) return false;
                         if (!looksLikeMarkdown(text)) return false;
-                        // markdown manager 가 없으면 기본 동작 유지
+                        // Without a markdown manager the default behaviour is kept
                         const manager = editor.storage.markdown?.manager;
                         if (!manager || typeof manager.parse !== 'function') return false;
                         try {
@@ -157,7 +157,7 @@ export const editorExtensions = [
     TaskList,
     TaskItem.configure({ nested: true }),
     Highlight.configure({ multicolor: true }),
-    // ImageResize(드래그 크기조절) 를 기존 'image' 노드에 적용 — name 을 image 로 맞춰 호환.
+    // ImageResize (drag resizing) is applied to the existing 'image' node - the name is set to image for compatibility.
     ImageResize.extend({ name: "image" }),
     Typography,
     SuperscriptWithMarkdown,

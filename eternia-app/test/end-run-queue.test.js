@@ -1,5 +1,5 @@
-// 엔딩 전송 재시도 큐 — 앱이 전송 직후 종료되거나 오프라인이면 회차가 유실됐다.
-// 전송 전에 큐에 넣고, 성공해야 지운다. 다음 실행에서 남은 걸 재전송. (#61)
+// The ending-submission retry queue - a run was lost when the app closed right after sending, or was offline.
+// It is queued before sending and removed only on success. What remains is resent on the next launch. (#61)
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   QUEUE_KEY,
@@ -10,7 +10,7 @@ import {
   flushQueue,
 } from "../src/end-run-queue.js";
 
-/** localStorage 흉내 — 테스트에서 상태를 직접 들여다보려고 Map 기반. */
+/** An imitation of localStorage - Map-based, so the tests can inspect the state directly. */
 function fakeStorage(initial) {
   const m = new Map(initial ? Object.entries(initial) : []);
   return {
@@ -51,10 +51,10 @@ describe("큐 적재/삭제", () => {
     for (let i = 0; i < MAX_QUEUED + 5; i++) enqueue(st, { endingId: "e" + i }, "id-" + i);
     const q = readQueue(st);
     expect(q).toHaveLength(MAX_QUEUED);
-    expect(q[q.length - 1].payload.endingId).toBe("e" + (MAX_QUEUED + 4)); // 최신 유지
+    expect(q[q.length - 1].payload.endingId).toBe("e" + (MAX_QUEUED + 4)); // the most recent are kept
   });
 
-  // 저장소가 깨져도 게임이 멈추면 안 된다.
+  // A broken store must not stall the game.
   it("손상된 JSON 이면 빈 큐로 취급", () => {
     const bad = fakeStorage({ [QUEUE_KEY]: "{not json" });
     expect(readQueue(bad)).toEqual([]);
@@ -80,7 +80,7 @@ describe("flushQueue", () => {
     const r = await flushQueue({ storage: st, submit });
 
     expect(r).toEqual({ total: 2, sent: 1 });
-    expect(readQueue(st).map((x) => x.id)).toEqual(["id-ng"]); // 실패분은 다음 기회에
+    expect(readQueue(st).map((x) => x.id)).toEqual(["id-ng"]); // what failed waits for the next chance
   });
 
   it("모두 성공하면 큐가 빈다", async () => {
@@ -109,6 +109,6 @@ describe("flushQueue", () => {
     const r = await flushQueue({ storage: st, submit });
 
     expect(r.sent).toBe(1);
-    expect(readQueue(st).map((x) => x.id)).toEqual(["1"]); // 예외분은 남는다
+    expect(readQueue(st).map((x) => x.id)).toEqual(["1"]); // what threw remains
   });
 });

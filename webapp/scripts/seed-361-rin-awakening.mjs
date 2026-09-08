@@ -1,15 +1,15 @@
 #!/usr/bin/env node
-// seed-361-rin-awakening.mjs — #361 각성 시스템 린 루트(신념과 타락).
+// seed-361-rin-awakening.mjs - #361's awakening system, Rin's route (conviction and corruption).
 //
-// 분기점: rin_underground → 베일 박사 추적(각성 루트, 옴팔로스 우회).
-// 2 축: 신념(진실 폭로) vs 타락(제국 고위층). 침식 초기(10)라 각성하려면
-//   스스로 침식을 끌어올리는 대가(자발적). 결말:
-//   - 신념+각성해방 → liberation(공유)   - 타락+각성 → regency(신규)
-//   - 타살死(추적 발각/권좌 암살) → purge(신규)
-//   - 받아들이고 떠남 → wayfarer(신규)    - 침식死 → petrification(자동)
+// The branch point: rin_underground -> tracking Dr Vale (the awakening route, bypassing Omphalos).
+// Two axes: conviction (exposing the truth) versus corruption (the empire's high command). Her contamination starts low (10), so awakening
+//   costs raising it herself (voluntarily). The endings:
+//   - conviction + an awakened liberation -> liberation (shared)   - corruption + awakening -> regency (new)
+//   - death by another's hand (discovered while tracking, or assassinated on the throne) -> purge (new)
+//   - accepting it and leaving -> wayfarer (new)    - death by contamination -> petrification (automatic)
 //
-// 회차 부메랑: world.regent_rules / world.purged / world.wanderer → 각 conditional 분기.
-// 본문 희곡체(지문 *이탤릭* / **인물** "대사"). 엔딩 씬은 후일담 마커(— 시작).
+// The cross-run boomerang: world.regent_rules / world.purged / world.wanderer -> a conditional branch each.
+// The bodies are in play-script form (*italic* stage directions, **name** "line"). Ending scenes carry the aftermath marker (starting with an em dash).
 
 import mongoose from 'mongoose';
 
@@ -26,7 +26,7 @@ const NEW_SCENES = [
     ],
     choices: [
       { kind: 'plain', id: 'follow_trail', label: '흔적을 따라 — 더 깊은 지하로.', to: 'rin_vale_contact' },
-      // #361 회차 부메랑 — 이전 숙청(world.purged)된 자의 기록이 추적을 단축한다.
+      // #361's cross-run boomerang - the record of someone purged before (world.purged) shortens the search.
       { kind: 'conditional', id: 'purged_trace', label: '[지워진 이름] 지난 세계에서 숙청된 자의 기록이 — 길을 가리킨다.', to: 'rin_vale_contact', condition: { kind: 'flag', key: 'world.purged' }, hidden: true },
     ],
     onEnter: {},
@@ -71,7 +71,7 @@ const NEW_SCENES = [
     choices: [
       { kind: 'plain', id: 'keep_faith', label: '[신념] 진실을 택한다 — 밀사를 등진다.', to: 'rin_creed_teaching' },
       { kind: 'plain', id: 'take_deal', label: '[타락] 제국의 손을 잡는다.', to: 'rin_fall_deal' },
-      // #361 회차 부메랑 — 이전 권좌(world.regent_rules)의 그림자가 길을 이미 안다.
+      // #361's cross-run boomerang - the shadow of a previous regency (world.regent_rules) already knows the way.
       { kind: 'conditional', id: 'regent_echo', label: '[낯익은 그림자] 지난 세계의 타락자가 이미 이 자리를 안다 — 그 길로.', to: 'rin_fall_deal', condition: { kind: 'flag', key: 'world.regent_rules' }, hidden: true },
     ],
     onEnter: {},
@@ -156,7 +156,7 @@ const NEW_SCENES = [
     choices: [
       { kind: 'probability', id: 'secure_power', label: '[정치] 권력을 굳힌다 — 경쟁자를 먼저 제거한다.', stat: 'int', difficulty: 15, onSuccess: 'ending_regency', onFailure: 'ending_purge', stigmaDelta: 0 },
       { kind: 'plain', id: 'doubt_pull_out', label: '의심이 든다 — 발을 뺀다.', to: 'rin_wayfarer' },
-      // #361 회차 부메랑 — 이전 여로(world.wanderer)의 소문이 너를 부른다.
+      // #361's cross-run boomerang - the rumour of a previous journey (world.wanderer) calls you.
       { kind: 'conditional', id: 'wanderer_echo', label: '[떠도는 소문] 지난 세계의 여행자가 손짓한다 — 너도 떠날 수 있다.', to: 'rin_wayfarer', condition: { kind: 'flag', key: 'world.wanderer' }, hidden: true },
     ],
     onEnter: { setFlags: { stigma_treated: true } },
@@ -244,7 +244,7 @@ async function main() {
     }
   }
 
-  // 베일 박사 복선 — rin_evidence(이름 발견) + rin_underground(회상). 뜬금없는 추적 방지.
+  // Dr Vale's foreshadowing - rin_evidence (finding the name) plus rin_underground (the recollection). So the search does not come out of nowhere.
   console.log('── 베일 박사 복선 ──');
   {
     const ev = await Scene.findOne({ id: 'rin_evidence' }).lean();

@@ -1,21 +1,21 @@
-// 문체(voice) 선택 — 앱판 (#87).
+// Choosing the prose style (voice) - the app's copy (#87).
 //
-// 규칙은 웹의 webapp/src/lib/web-adventure/voice.ts 와 같다. 앱은 vanilla JS 번들이라
-// 코드를 공유하지 않고 같은 규칙을 따로 구현한다. **규칙을 바꿀 때는 양쪽을 함께 고쳐야
-// 한다** — 어긋나면 같은 이야기를 웹과 앱에서 다른 문체로 읽게 된다.
+// The rules are the same as the web's webapp/src/lib/web-adventure/voice.ts. The app is a vanilla JS bundle, so it
+// shares no code and implements the same rules separately. **Changing a rule means changing both**
+// - out of step, the same story is read in different styles on the web and in the app.
 //
-// 왜 완비된 문체만 고르는가: 변형이 비어 있는 씬은 기본 본문으로 폴백된다. 미완비 문체를
-// 고르면 한 판 안에서 문체가 씬마다 갈려 몰입이 깨진다.
+// Why only complete styles are chosen: a scene with an empty variant falls back to the default body. Choosing an incomplete
+// style makes the style vary scene by scene within a run and breaks the immersion.
 
 export const DEFAULT_VOICE = "default";
 
-/** 한 판(run) 동안 쓸 문체를 저장해 두는 키. */
+/** The key holding the style to use for one run. */
 export const RUN_VOICE_KEY = "eternia:run-voice";
 
 /**
- * 커버리지에서 문체 하나를 고른다. 후보는 기본 문체 + 완비된 문체.
+ * Picks one style from the coverage. The candidates are the default style plus the complete ones.
  * @param {Record<string, {filled:number,total:number,complete:boolean}>} coverage
- * @param {() => number} [rnd] 0<=x<1 (테스트에서 주입)
+ * @param {() => number} [rnd] 0<=x<1 (injected in tests)
  * @returns {string}
  */
 export function pickVoiceFromCoverage(coverage, rnd) {
@@ -29,12 +29,12 @@ export function pickVoiceFromCoverage(coverage, rnd) {
 }
 
 /**
- * 이번 판에 쓸 문체를 정한다.
- * 우선순위: override > 이 판에서 이미 뽑아 둔 값 > 새로 뽑기.
+ * Decides the style for this run.
+ * The priority: override > a value already drawn for this run > a fresh draw.
  *
  * @param {object} args
  * @param {Record<string, {complete:boolean}>} args.coverage
- * @param {string} [args.override] 강제 지정(디버그·링크 진입)
+ * @param {string} [args.override] forced (debugging, or entry by link)
  * @param {{getItem:(k:string)=>string|null, setItem:(k:string,v:string)=>void}} [args.storage]
  * @param {() => number} [args.rnd]
  * @returns {string}
@@ -50,7 +50,7 @@ export function chooseRunVoice(args) {
   try {
     saved = storage ? storage.getItem(RUN_VOICE_KEY) : null;
   } catch {
-    saved = null; // 저장소 접근 실패는 무시 — 문체 하나 때문에 플레이가 막히면 안 된다.
+    saved = null; // A failed storage access is ignored - play must not be blocked over a prose style.
   }
   if (saved && usable(saved)) return saved;
 

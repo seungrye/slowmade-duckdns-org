@@ -1,17 +1,17 @@
 import mongoose from "mongoose";
 import type { InferSchemaType, Model } from "mongoose";
 
-// ESM interop: named export 는 순수 node ESM 에서 안 풀려 default 로 접근(tsx 스크립트 호환).
+// ESM interop: a named export does not resolve under plain node ESM, so it is reached through default (for tsx script compatibility).
 const { Schema, model, models } = mongoose;
 
 /**
- * 종목 일봉 — 종가 line chart 용 시계열.
+ * A symbol's daily bars - the time series for the closing-price line chart.
  *
- * 키: (ticker, date) 복합 unique. ticker 표기는 KIS 형식과 일치 (Stock.ticker 와 동일).
- * date: "YYYY-MM-DD" 문자열 — 멀티 timezone (KST KOSPI / ET NASDAQ) 혼합 시 시각 잘림
- *       회피. 거래일 기준.
+ * The key: a (ticker, date) compound unique. The ticker's spelling matches the KIS format (the same as Stock.ticker).
+ * date: a "YYYY-MM-DD" string - avoiding a truncated time when mixing time zones (KST KOSPI / ET NASDAQ).
+ *       By trading day.
  *
- * close 만 필수, open/high/low/volume 은 선택 (없는 source 도 수용).
+ * Only close is required; open/high/low/volume are optional (accommodating a source that lacks them).
  */
 const StockDailyPriceSchema = new Schema(
   {
@@ -26,7 +26,7 @@ const StockDailyPriceSchema = new Schema(
   { timestamps: true },
 );
 
-// (ticker, date) 복합 unique — 중복 ingest 방지
+// The (ticker, date) compound unique - preventing a duplicate ingest
 StockDailyPriceSchema.index({ ticker: 1, date: -1 }, { unique: true });
 
 export type StockDailyPriceType = InferSchemaType<typeof StockDailyPriceSchema>;

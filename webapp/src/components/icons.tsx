@@ -5,8 +5,8 @@ import {
   FaGamepad, FaSave, FaCalendarCheck, FaFire, FaCoffee, FaMoon, FaBirthdayCake,
 } from "react-icons/fa";
 
-// 업적 아이콘 이름 → 컴포넌트. lib/achievements/definitions.ts 의 `icon` 이 이 키를 쓴다.
-// 여기 없는 이름을 쓰면 화면에 기본 아이콘만 나오므로, rules.test.ts 가 둘을 대조한다.
+// The achievement icon name -> the component. The `icon` in lib/achievements/definitions.ts uses these keys.
+// A name absent here renders only the default icon on screen, so rules.test.ts checks the two against each other.
 export const achievementIconMap: { [key: string]: IconType } = {
   FaPencilAlt,
   FaAward,

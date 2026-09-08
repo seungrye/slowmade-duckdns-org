@@ -17,8 +17,8 @@ const CommentSchema = new mongoose.Schema(
     { timestamps: true }
   );
   
-  // 타입 자동 추론
+  // The type is inferred automatically
   export type CommentType = InferSchemaType<typeof CommentSchema>
-  // 모델 생성
+  // Creating the model
   export default models.Comment || model("Comment", CommentSchema);
   

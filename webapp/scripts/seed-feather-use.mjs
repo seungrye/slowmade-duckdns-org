@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-// scripts/seed-feather-use.mjs — #322 인벤 활용 — spirit_beast_feather hasItem 분기.
+// scripts/seed-feather-use.mjs - #322: putting the inventory to use - the spirit_beast_feather hasItem branch.
 //
-// solwen_grief 에서 획득 → 그러나 어디서도 *사용* 안 함 (hasItem 조건 0).
-// 시스템적으로 *데코레이션 인벤* 상태.
+// It is obtained in solwen_grief -> but *used* nowhere (0 hasItem conditions).
+// Systemically it is a *decorative inventory* item.
 //
-// 변경: climax_sylvan_path 에 hasItem(spirit_beast_feather) hidden 분기 추가.
-//   *깃털을 손바닥에 쥐고 — 세계수의 완전한 노래를 부른다*.
-//   stigmaDelta -5 (영수의 가호로 침식 진정).
+// The change: a hidden hasItem(spirit_beast_feather) branch added to climax_sylvan_path.
+//   *Holding the feather in your palm, you sing the world tree's complete song*.
+//   stigmaDelta -5 (the contamination calmed by the spirit beast's protection).
 
 import mongoose from 'mongoose';
 

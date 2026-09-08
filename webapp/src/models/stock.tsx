@@ -1,21 +1,21 @@
 import { InferSchemaType, Schema, model, models, Model } from "mongoose";
 
 /**
- * 종목 메타 — universe (KOSPI200 / S&P500 / NASDAQ-100) 멤버십과 표시 정보.
+ * A symbol's metadata - its universe (KOSPI200 / S&P500 / NASDAQ-100) membership and display information.
  *
  * ticker:
- *   - KR: 6자리 코드 (005930 등)
- *   - US: 영문 심볼 (AAPL, BRKB 등). **점을 넣지 않는다** — `BRK.B` 가 아니라 `BRKB`.
- *     라이브 매매 유니버스(lib/trading/universes.ts)와 가격(stockdailyprices)이 전부 점
- *     없는 표기다. 예전 주석은 "점으로 통일" 이라 적혀 있었는데 실제와 반대였고, 그 탓에
- *     BRK.B·BF.B 는 가격을 못 찾아 차트가 비었다 (#335).
+ *   - KR: the 6-digit code (005930 and so on)
+ *   - US: the letter symbol (AAPL, BRKB and so on). **No dots** - `BRKB`, not `BRK.B`.
+ *     The live trading universe (lib/trading/universes.ts) and the prices (stockdailyprices) are all spelled
+ *     without dots. The old comment said "unified with dots", which was the opposite of reality, and because of it
+ *     BRK.B and BF.B could not find their prices and their charts were empty (#335).
  *
  * market:
- *   - "KR" / "US" 만. 다른 시장은 추후 추가.
+ *   - "KR" / "US" only. Other markets come later.
  *
  * indices:
- *   - 종목이 속한 인덱스 배열. 예: ["KOSPI200"], ["SP500", "NASDAQ100"].
- *   - 한 종목이 SP500 ∩ NASDAQ100 둘 다 일 수 있음 (예: AAPL).
+ *   - the array of indices the symbol belongs to. For example ["KOSPI200"], ["SP500", "NASDAQ100"].
+ *   - one symbol can be in both SP500 and NASDAQ100 (AAPL, for instance).
  */
 const StockSchema = new Schema(
   {
