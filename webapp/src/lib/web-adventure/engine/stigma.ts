@@ -22,7 +22,8 @@ export const STIGMA_MAX = 100;
 // 침식을 숫자로만 다룬다. 숫자 층이 없던 동안 덱빌더는 이 함수를 부르려고 관계없는
 // 필드 8개짜리 껍데기 Character 를 지어내야 했다.
 //
-// Character 판은 그대로 두고 알맹이만 꺼낸 것이라 기존 동작은 바뀌지 않는다.
+// **이 층은 성흔을 모른다.** 무흔 면제(#421)는 ability 를 아는 Character 층의 일이다 —
+// 숫자에 성흔을 섞으면 덱빌더가 자기 성흔 규칙을 얹을 자리가 없어진다.
 
 /**
  * 침식도 가감 — clamp [0, 100].
@@ -50,6 +51,18 @@ export function isErosionMax(erosion: number): boolean {
 // ── Character 층 ───────────────────────────────────────────────────────────
 
 /**
+ * 무흔(none)은 성흔이 없다 (#421).
+ *
+ * 설정(`content/web-adventure/abilities.ts`)이 "마력을 거부한 자 … 성흔이 없어 석화 면역"
+ * 이라고 말하는데 코드가 그렇지 않았다. lunar/selene/hecate 는 각각 int/str/cha +2 가
+ * 붙어 있는데 무흔만 설정 대비 비어 있어서, 무흔으로 플레이하면 환경 침식(씬 onEnter)이
+ * 그대로 쌓이고 100 에 닿으면 굳었다.
+ */
+function refusesStigma(character: Character): boolean {
+  return character.ability === "none";
+}
+
+/**
  * 침식도가 임계값 이상이면 con/dex 판정에 -2 디버프.
  * 다른 스탯(str/int/cha/wis)에는 영향 없음.
  */
@@ -59,13 +72,25 @@ export function stigmaDebuff(character: Character, stat: StatKey): number {
   return 0;
 }
 
-/** 침식도 가감 — character 의 *복사본* 반환. 규칙은 [clampErosion]. */
+/**
+ * 침식도 가감 — character 의 *복사본* 반환. 규칙은 [clampErosion].
+ *
+ * 무흔은 **오르지 않는다**(#421). 내려가는 것은 막지 않는다 — 정제수를 못 쓸 이유가 없고,
+ * 이 변경 이전 회차가 침식을 안고 들어올 수도 있다.
+ */
 export function applyStigmaDelta(character: Character, delta: number): Character {
+  if (refusesStigma(character) && Number.isFinite(delta) && delta > 0) return character;
   return { ...character, stigmaErosion: clampErosion(character.stigmaErosion, delta) };
 }
 
-/** 침식도 100 도달 → 자동 petrification 엔딩. */
+/**
+ * 침식도 100 도달 → 자동 petrification 엔딩.
+ *
+ * 무흔은 굳지 않는다 (#421) — 굳을 성흔이 없다. 발각 석화(`kael_caught`·
+ * `omphalos_caught_at_gate` 등 isEnding+endingId 씬)는 이 함수를 타지 않으므로 그대로다.
+ */
 export function isFullyPetrified(character: Character): boolean {
+  if (refusesStigma(character)) return false;
   return isErosionMax(character.stigmaErosion);
 }
 
