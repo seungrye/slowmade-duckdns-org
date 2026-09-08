@@ -7,7 +7,6 @@
 // 전투를 이길 때마다 카드 보상이 한 번 낀다.
 
 import type { Ability, Card, Protagonist, RunResult, RunState } from './types';
-import type { StigmaRules } from './combat';
 import { crystalCard, countCrystals } from './combat';
 import { refine, bossHpBonus } from './refine';
 import { resolveEnding, explainEnding } from './ending';
