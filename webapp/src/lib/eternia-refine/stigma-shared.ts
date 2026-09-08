@@ -5,28 +5,27 @@
 //
 // ── 실제로 공유해 보니 (비교용 기록) ─────────────────────────────────
 //
-// 공짜로 얻은 것:
-//   STIGMA_MAX · STIGMA_DEBUFF_THRESHOLD — 상수라 그냥 import 하면 끝난다.
+// 처음엔 마찰이 있었다. `applyStigmaDelta`·`isFullyPetrified` 가 **Character 객체를 받고
+// 복사본을 돌려주는** 모양이라, 침식을 숫자로만 다루는 덱빌더가 부르려면 관계없는 필드
+// 8개(stats·inventory·rerollsLeft…)를 지어낸 껍데기가 필요했다.
 //
-// 어댑터가 필요했던 것:
-//   `applyStigmaDelta`·`isFullyPetrified` 는 **Character 객체를 받고 복사본을 돌려준다.**
-//   덱빌더는 침식을 그냥 숫자로 다루므로, 부르려면 관계없는 필드 8개(stats·inventory·
-//   rerollsLeft…)를 지어내 껍데기를 만들어야 한다. 아래 `asCharacter` 가 그 비용이다.
-//   CYOA 는 캐릭터가 늘 통째로 있으니 그 모양이 옳고, 잘못 만든 API 가 아니다 — 다만
-//   **모양이 다른 소비자에게는 그대로 안 맞는다**는 것이 이 비교의 관찰이다.
+// 그건 API 가 틀린 게 아니라 **안쪽이 안 열려 있던 것**이었다. CYOA 는 캐릭터가 늘 통째로
+// 있으니 Character 시그니처가 옳다. 그래서 web-adventure 쪽에 숫자 층(`clampErosion`·
+// `isErosionMax`·`isErosionDebuffed`)을 꺼내고 Character 판이 그걸 감싸게 했다 —
+// 기존 동작은 그대로(시험 446개 불변), 어댑터는 사라졌다.
 //
-// 못 가져온 것 (CYOA 에 대응물이 없어 자체 구현):
+// 지금 남은 자체 구현은 **CYOA 에 대응물이 없는 것들뿐**이다:
 //   crystalsGained — 결정선은 덱빌더 고유 개념이다.
 //   effectiveDamage · bonusDraw — 성흔이 침식을 어떻게 읽는지는 카드 게임에만 있다.
-//   **무흔이 침식을 안 쌓는 규칙** — CYOA 의 무흔은 석화 면역일 뿐 침식 수치는 오른다.
-//   그래서 B안도 이 분기는 직접 얹어야 했다.
+//   무흔이 침식을 안 쌓는 규칙 — CYOA 의 무흔은 석화 면역일 뿐 수치는 오른다.
+// 즉 남은 중복은 공유의 한계가 아니라 **두 게임이 정말 다른 부분**이다.
 
-import type { Character } from '@/types/web-adventure';
 import {
   STIGMA_MAX,
   STIGMA_DEBUFF_THRESHOLD,
-  applyStigmaDelta,
-  isFullyPetrified,
+  clampErosion,
+  isErosionMax,
+  isErosionDebuffed,
 } from '@/lib/web-adventure/engine/stigma';
 import type { Ability, Card } from './types';
 
@@ -37,26 +36,12 @@ export const CRYSTAL_INTERVAL = 20;
 const LUNA_DRAW_INTERVAL = 25;
 
 /**
- * 숫자 하나를 Character 껍데기로 감싼다 — 공유의 실제 비용.
+ * A안과 같은 계약.
  *
- * `applyStigmaDelta` 가 Character 를 받으므로 이 8줄이 필요하다. 나머지 필드는 침식
- * 계산에 쓰이지 않지만 타입이 요구한다.
+ * 무흔 분기와 Infinity 정책은 여기서 얹는다 — CYOA 는 비유한 delta 를 0 으로 보는데
+ * (손상된 저장값 방어), 덱빌더는 카드 데이터의 Infinity 를 "끝까지 민다"로 읽는 편이
+ * 규칙 설명에 맞다. 세계의 법칙은 공유하되 게임의 해석은 각자 갖는 자리다.
  */
-function asCharacter(erosion: number): Character {
-  return {
-    stats: { str: 0, dex: 0, int: 0, cha: 0, con: 0, wis: 0 },
-    hp: 1,
-    maxHp: 1,
-    ability: 'none',
-    protagonist: 'kael',
-    stigmaErosion: erosion,
-    inventory: [],
-    flags: {},
-    rerollsLeft: 0,
-  };
-}
-
-/** A안과 같은 계약. 무흔 분기는 CYOA 에 없어 여기서 얹는다. */
 export function applyErosion(current: number, delta: number, ability?: Ability): number {
   if (!Number.isFinite(current)) return 0;
   if (!Number.isFinite(delta)) {
@@ -65,7 +50,7 @@ export function applyErosion(current: number, delta: number, ability?: Ability):
     return current;
   }
   if (ability === 'none' && delta > 0) return current;
-  return applyStigmaDelta(asCharacter(current), delta).stigmaErosion;
+  return clampErosion(current, delta);
 }
 
 /** 결정선 — CYOA 에 대응물이 없어 자체 구현. */
@@ -74,14 +59,14 @@ export function crystalsGained(before: number, after: number, interval = CRYSTAL
   return Math.floor(after / interval) - Math.floor(before / interval);
 }
 
-/** 석화. 무흔 면역은 CYOA 의 뜻과 같지만 그 판정이 함수 밖에 있어 여기서 얹는다. */
+/** 석화. 무흔 면역은 CYOA 에 없는 규칙이라 여기서 얹는다. */
 export function isPetrified(erosion: number, ability?: Ability): boolean {
   if (ability === 'none') return false;
-  return isFullyPetrified(asCharacter(erosion));
+  return isErosionMax(erosion);
 }
 
 export function erosionDebuff(erosion: number): number {
-  return erosion >= EROSION_DEBUFF_AT ? -2 : 0;
+  return isErosionDebuffed(erosion) ? -2 : 0;
 }
 
 /** 성흔이 침식을 어떻게 읽는가 — 덱빌더 고유라 자체 구현. */
