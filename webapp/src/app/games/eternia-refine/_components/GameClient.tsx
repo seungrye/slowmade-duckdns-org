@@ -10,7 +10,7 @@
 // amber-700 강조). 침식만 팔레트 밖의 돌빛(slate)으로 뺐다 — 따뜻한 화면에서 혼자
 // 차가워야 "있으면 안 되는 것"으로 읽힌다.
 
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { StigmaRules } from '@/lib/eternia-refine/combat';
 import { createCombat, countCrystals } from '@/lib/eternia-refine/combat';
 import type { Ability, Card, CombatState, Protagonist } from '@/lib/eternia-refine/types';
@@ -202,9 +202,26 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
           </p>
         </div>
 
-        <p className="mt-3 min-h-[2.5rem] text-xs leading-relaxed text-amber-800">
+        <p className="mt-3 text-xs leading-relaxed text-amber-800">
           {b.log[b.log.length - 1]}
         </p>
+
+        {/* 남는 공간을 적이 채운다 — 비워 두면 화면이 깨진 것처럼 보인다. */}
+        <div className="flex min-h-4 flex-1 items-center justify-center">
+          <svg
+            viewBox="0 0 100 100"
+            className="h-24 w-24 opacity-90 md:h-32 md:w-32"
+            fill="none"
+            stroke="#92400E"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M50 8 L72 30 L64 74 L36 74 L28 30 Z" fill="#FEF3C7" />
+            <path d="M50 8 L50 74M28 30 L72 30" />
+            <circle cx="50" cy="46" r="7" fill="#B45309" stroke="none" />
+          </svg>
+        </div>
 
         {b.outcome ? (
           <button
@@ -221,7 +238,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
               canPlay={(c) => c.kind !== 'crystal' && (c.cost === null || c.cost <= b.ether)}
               onPlay={(i) => setBattle(combat.playCard(b, i, session.run.ability))}
             />
-            <div className="flex items-center justify-between">
+            <div className="mt-2 flex shrink-0 items-center justify-between">
               <span className="font-mono text-[11px] text-amber-800">
                 덱 {b.deck.length} · 버림 {b.discard.length} ·{' '}
                 <span className="text-slate-600">
@@ -433,17 +450,39 @@ function Shell({
   note: string;
   children: React.ReactNode;
 }) {
+  const shell = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState(56);
+
+  // 내비 높이는 화면 폭에 따라 달라질 수 있어 실제로 잰다.
+  useLayoutEffect(() => {
+    const el = shell.current;
+    if (!el) return;
+    const measure = () => setTop(Math.round(el.getBoundingClientRect().top + window.scrollY));
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, []);
+
+  // 루트 레이아웃이 이미 <main> 으로 감싼다 — 여기서 또 쓰면 main 중첩이다 (#239).
+  //
+  // 높이를 `100dvh` 로 잡으면 **위의 내비(56px)와 아래의 사이트 푸터(153px)가 더해져**
+  // 화면을 넘어간다. 실측에서 그 탓에 턴 종료 버튼이 접힌 아래로 밀렸다. 그래서 자기
+  // 상단 오프셋을 뺀 만큼만 차지한다. dvh 라 모바일 주소창이 접혔다 펴져도 따라간다.
   return (
-    <main className="web-adventure-page min-h-screen bg-amber-50 px-4 py-6 text-amber-950">
-      <div className="mx-auto flex max-w-2xl flex-col gap-1">
+    <div
+      ref={shell}
+      style={{ minHeight: `calc(100dvh - ${top}px)` }}
+      className="web-adventure-page flex flex-col bg-amber-50 px-4 py-4 text-amber-950"
+    >
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-amber-200 pb-2">
           <span className="font-mono text-[11px] uppercase tracking-widest text-amber-700">
             에테르니아: 정제 — {variant}
           </span>
           <span className="text-[11px] text-amber-800">{note}</span>
         </div>
-        <div className="pt-3">{children}</div>
+        <div className="flex flex-1 flex-col pt-3">{children}</div>
       </div>
-    </main>
+    </div>
   );
 }
