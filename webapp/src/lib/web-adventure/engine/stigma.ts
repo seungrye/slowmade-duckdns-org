@@ -26,7 +26,22 @@ export function stigmaDebuff(character: Character, stat: StatKey): number {
 }
 
 /**
+ * 무흔(none)은 성흔이 없다 (#421).
+ *
+ * 설정(`content/web-adventure/abilities.ts`)이 "마력을 거부한 자 … 성흔이 없어 석화 면역"
+ * 이라고 말하는데 코드가 그렇지 않았다. lunar/selene/hecate 는 각각 int/str/cha +2 가
+ * 붙어 있는데 무흔만 설정 대비 비어 있어서, 무흔으로 플레이하면 환경 침식(씬 onEnter)이
+ * 그대로 쌓이고 100 에 닿으면 굳었다.
+ */
+function refusesStigma(character: Character): boolean {
+  return character.ability === "none";
+}
+
+/**
  * 침식도 가감 — clamp [0, 100]. character 의 *복사본* 반환.
+ *
+ * 무흔은 **오르지 않는다**(#421). 내려가는 것은 막지 않는다 — 정제수를 못 쓸 이유가 없고,
+ * 이 변경 이전 회차가 침식을 안고 들어올 수도 있다.
  *
  * #290 NaN/Infinity 방어 — 옛 localStorage 또는 손상된 입력에서 NaN 이 들어오면
  * `??` 가 차단 못 함 (NaN 은 nullish 아님). Math.max(0, Math.min(100, NaN)) = NaN
@@ -35,12 +50,19 @@ export function stigmaDebuff(character: Character, stat: StatKey): number {
 export function applyStigmaDelta(character: Character, delta: number): Character {
   const safeStart = Number.isFinite(character.stigmaErosion) ? character.stigmaErosion : 0;
   const safeDelta = Number.isFinite(delta) ? delta : 0;
+  if (refusesStigma(character) && safeDelta > 0) return character;
   const next = Math.max(0, Math.min(STIGMA_MAX, safeStart + safeDelta));
   return { ...character, stigmaErosion: next };
 }
 
-/** 침식도 100 도달 → 자동 petrification 엔딩. */
+/**
+ * 침식도 100 도달 → 자동 petrification 엔딩.
+ *
+ * 무흔은 굳지 않는다 (#421) — 굳을 성흔이 없다. 발각 석화(`kael_caught`·
+ * `omphalos_caught_at_gate` 등 isEnding+endingId 씬)는 이 함수를 타지 않으므로 그대로다.
+ */
 export function isFullyPetrified(character: Character): boolean {
+  if (refusesStigma(character)) return false;
   return character.stigmaErosion >= STIGMA_MAX;
 }
 
