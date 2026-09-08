@@ -206,6 +206,12 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
           {b.log[b.log.length - 1]}
         </p>
 
+        {!b.outcome && (
+          <p className="mt-1 font-mono text-[10.5px] text-amber-700">
+            눌러서 펼치고 · 좌우로 훑고 · 위로 끌거나 튕겨서 낸다
+          </p>
+        )}
+
         {/* 남는 공간을 적이 채운다 — 비워 두면 화면이 깨진 것처럼 보인다. */}
         <div className="flex min-h-4 flex-1 items-center justify-center">
           <svg
