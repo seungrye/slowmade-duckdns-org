@@ -6,16 +6,11 @@
 
 import { describe, it, expect } from 'vitest';
 import { createCombat, shuffle, crystalCard, countCrystals, BASE_DRAW } from './combat';
-import * as ownRules from './stigma';
-import * as sharedRules from './stigma-shared';
+import * as rules from './stigma';
 import type { Card, Enemy } from './types';
 
-// 전투 리듀서는 한 벌이고 **규칙만 갈아끼운다** — 두 라우트가 실제로 그렇게 다르다.
-// 같은 시험을 두 규칙으로 돌려, 갈아끼워도 전투가 똑같이 굴러가는지 본다.
-const RULE_SETS = [
-  ['A안 별도', ownRules],
-  ['B안 공유', sharedRules],
-] as const;
+// 리듀서는 규칙을 **주입받는다**(`createCombat`). 규칙이 한 벌만 남은 지금도 그 이음매는
+// 남긴다 — 시험이 가짜 규칙을 끼워 전투만 따로 재는 자리이기 때문이다.
 
 /** 항등 셔플 — Fisher-Yates 에서 j===i 가 되려면 rng 가 1 에 가까워야 한다.
  *  0 을 주면 매번 앞과 맞바꿔 덱이 뒤집힌다(처음에 그렇게 썼다가 걸렸다). */
@@ -43,7 +38,7 @@ function deckOf(n: number, card: Card): Card[] {
   return Array.from({ length: n }, (_, i) => ({ ...card, id: `${card.id}-${i}` }));
 }
 
-describe.each(RULE_SETS)('%s', (_name, rules) => {
+describe('전투 리듀서', () => {
   const { startCombat, playCard, endTurn, draw } = createCombat(rules);
 
   function fresh(over: Partial<Parameters<typeof startCombat>[0]> = {}) {

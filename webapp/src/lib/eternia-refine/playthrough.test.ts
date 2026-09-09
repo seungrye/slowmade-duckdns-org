@@ -4,12 +4,11 @@
 // 있다. 게임을 확인하자고 그걸 켤 수는 없다. 그래서 화면이 부르는 것과 **같은 함수들**을
 // 같은 순서로 불러 완주를 확인한다.
 //
-// 두 규칙(A안·B안) 모두로 돌린다 — 갈아끼워도 회차가 끝까지 가는지가 이 비교의 전제다.
+// 화면이 부르는 규칙 한 벌로 돌린다(#427 이전에는 A안·B안 둘 다 돌렸다).
 
 import { describe, it, expect } from 'vitest';
 import { createCombat, countCrystals } from './combat';
-import * as ownRules from './stigma';
-import * as sharedRules from './stigma-shared';
+import * as rules from './stigma';
 import {
   startRun,
   afterBattle,
@@ -22,11 +21,6 @@ import {
 import type { Session } from './run';
 import type { Ability, CombatState, Protagonist } from './types';
 import { ENDING_IDS } from '@/types/web-adventure';
-
-const RULE_SETS = [
-  ['A안 별도', ownRules],
-  ['B안 공유', sharedRules],
-] as const;
 
 /** 결정적 rng — 회차마다 같은 길을 걷게 해서 실패를 재현할 수 있게. */
 function seeded(seed: number) {
@@ -46,7 +40,7 @@ interface PlayOptions {
 }
 
 /** 화면이 하는 일을 그대로 — 전투는 카드를 앞에서부터 낼 수 있는 만큼 내고 턴을 넘긴다. */
-function play(rules: typeof ownRules, opts: PlayOptions) {
+function play(opts: PlayOptions) {
   const combat = createCombat(rules);
   const rng = seeded(opts.seed ?? 7);
   let session: Session = startRun(opts.protagonist, opts.ability);
@@ -117,9 +111,9 @@ function play(rules: typeof ownRules, opts: PlayOptions) {
   return session;
 }
 
-describe.each(RULE_SETS)('%s — 회차 완주', (_name, rules) => {
+describe('회차 완주', () => {
   it('린으로 끝까지 간다', () => {
-    const s = play(rules, { protagonist: 'rin', ability: 'lunar', burnPerShop: 0 });
+    const s = play({ protagonist: 'rin', ability: 'lunar', burnPerShop: 0 });
     if (s.phase.kind !== 'ending') throw new Error('엔딩이 아니다');
     expect(ENDING_IDS).toContain(s.phase.endingId);
     expect(s.run.path.length).toBeGreaterThan(0);
@@ -127,25 +121,25 @@ describe.each(RULE_SETS)('%s — 회차 완주', (_name, rules) => {
   });
 
   it('카엘은 침식 80 에서 시작해 대개 굳는다 — 시한부가 규칙으로 드러난다', () => {
-    const s = play(rules, { protagonist: 'kael', ability: 'selene', burnPerShop: 0 });
+    const s = play({ protagonist: 'kael', ability: 'selene', burnPerShop: 0 });
     if (s.phase.kind !== 'ending') throw new Error('엔딩이 아니다');
     expect(s.run.erosion).toBeGreaterThan(80);
   });
 
   it('많이 태우면 정제 누계가 쌓이고 도시가 자란다', () => {
-    const s = play(rules, { protagonist: 'rin', ability: 'selene', burnPerShop: 9 });
+    const s = play({ protagonist: 'rin', ability: 'selene', burnPerShop: 9 });
     expect(s.run.refined).toBeGreaterThan(0);
     expect(s.run.cityPower).toBe(s.run.refined);
   });
 
   it('태운 결정은 덱에서 실제로 빠진다 — 다음 전투에 안 잡힌다', () => {
-    const s = play(rules, { protagonist: 'rin', ability: 'selene', burnPerShop: 9 });
+    const s = play({ protagonist: 'rin', ability: 'selene', burnPerShop: 9 });
     // 정제소를 두 번 다 비웠으면 남은 결정은 마지막 전투에서 생긴 것뿐이다.
     expect(countCrystals(s.run.deck)).toBeLessThan(s.crystalsEverMade);
   });
 
   it('무흔은 침식이 오르지 않아 굳지 않는다', () => {
-    const s = play(rules, { protagonist: 'rin', ability: 'none', burnPerShop: 0 });
+    const s = play({ protagonist: 'rin', ability: 'none', burnPerShop: 0 });
     if (s.phase.kind !== 'ending') throw new Error('엔딩이 아니다');
     // 오르지 *않을* 뿐 내려가는 것은 받는다(정제수·세계수 뿌리) — 그래서 시작값 이하다.
     expect(s.run.erosion).toBeLessThanOrEqual(10);
@@ -153,11 +147,14 @@ describe.each(RULE_SETS)('%s — 회차 완주', (_name, rules) => {
   });
 });
 
-describe('두 규칙이 같은 회차를 낸다', () => {
-  it('같은 씨앗이면 A안과 B안의 결과가 일치한다', () => {
+// 씨앗 고정이 정말 재현을 주는지 — 실패한 회차를 다시 걷지 못하면 디버깅이 불가능하다.
+// (#427 이전에는 여기서 A안·B안의 결과가 일치하는지를 봤다. 규칙이 한 벌이 된 뒤로는
+//  같은 씨앗 두 번이 같은 길을 내는지를 본다.)
+describe('같은 씨앗은 같은 회차를 낸다', () => {
+  it('두 번 돌려도 엔딩·침식·경로가 같다', () => {
     const opts = { protagonist: 'rin' as const, ability: 'selene' as const, burnPerShop: 2, seed: 42 };
-    const a = play(ownRules, opts);
-    const b = play(sharedRules, opts);
+    const a = play(opts);
+    const b = play(opts);
 
     if (a.phase.kind !== 'ending' || b.phase.kind !== 'ending') throw new Error('엔딩이 아니다');
     expect(b.phase.endingId).toBe(a.phase.endingId);

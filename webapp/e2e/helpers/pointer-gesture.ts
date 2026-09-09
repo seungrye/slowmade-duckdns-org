@@ -103,3 +103,74 @@ export async function centerOf(page: Page, selector: string, nth = 0) {
   if (!box) throw new Error(`좌표를 못 잡았다: ${selector} [${nth}]`);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
+
+export interface ScrubOptions {
+  /** 훑기 시작·끝 x (뷰포트 좌표). */
+  fromX: number;
+  toX: number;
+  /** 훑는 높이. 세로로 움직이면 끌기로 읽히므로 고정한다. */
+  y: number;
+  /** 걸음 수. 기본 8. */
+  steps?: number;
+  /** 한 걸음에 머무는 시간(ms). 손가락이 카드 한 장 위를 지나는 시간쯤. 기본 60. */
+  dwellMs?: number;
+  /** 걸음마다 위치를 잴 요소들. */
+  sample: string;
+}
+
+export interface ScrubFrame {
+  /** 이 걸음의 손가락 x. */
+  x: number;
+  /** 잰 요소들의 현재 변환 — translate(x, y) 와 z-index. */
+  items: { x: number; y: number; z: string }[];
+}
+
+/**
+ * 좌우로 훑으면서 **걸음마다 화면을 잰다**.
+ *
+ * 훑기는 끝난 뒤의 모습만 봐서는 검증이 안 된다 — 손을 떼면 어차피 한 장이 서기 때문이다.
+ * 문제는 **지나가는 동안** 무엇이 보이느냐였다(전환이 200ms 라 아무 카드도 끝까지 못
+ * 올라오던 버그). 그래서 중간 프레임을 모아 돌려준다.
+ *
+ * `dragUp` 과 같은 이유로 페이지 안에서 이벤트를 낸다 — 헤더의 설명 참조.
+ */
+export async function scrubAcross(
+  page: Page,
+  selector: string,
+  opts: ScrubOptions,
+): Promise<ScrubFrame[]> {
+  return page.evaluate(
+    async ({ selector, sample, fromX, toX, y, steps, dwellMs }) => {
+      const host = document.querySelector(selector);
+      if (!host) throw new Error(`제스처 대상이 없다: ${selector}`);
+
+      const ev = (type: string, x: number) =>
+        new PointerEvent(type, {
+          pointerId: 1,
+          pointerType: 'touch',
+          isPrimary: true,
+          bubbles: true,
+          clientX: x,
+          clientY: y,
+        });
+      const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const snap = () =>
+        [...document.querySelectorAll<HTMLElement>(sample)].map((el) => {
+          const m = new DOMMatrix(getComputedStyle(el).transform);
+          return { x: Math.round(m.e), y: Math.round(m.f), z: getComputedStyle(el).zIndex };
+        });
+
+      const frames: { x: number; items: ReturnType<typeof snap> }[] = [];
+      host.dispatchEvent(ev('pointerdown', fromX));
+      for (let i = 0; i <= steps; i++) {
+        const x = fromX + ((toX - fromX) * i) / steps;
+        host.dispatchEvent(ev('pointermove', x));
+        await wait(dwellMs);
+        frames.push({ x: Math.round(x), items: snap() });
+      }
+      host.dispatchEvent(ev('pointerup', toX));
+      return frames;
+    },
+    { selector, sample: opts.sample, fromX: opts.fromX, toX: opts.toX, y: opts.y, steps: opts.steps ?? 8, dwellMs: opts.dwellMs ?? 60 },
+  );
+}

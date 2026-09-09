@@ -12,9 +12,8 @@ import type { Ability, Card, CombatState, Enemy } from './types';
 /**
  * 전투가 침식에 대해 알아야 하는 전부.
  *
- * A안(`stigma.ts`)과 B안(`stigma-shared.ts`)이 이 모양을 그대로 만족한다 — 그래서 두
- * 라우트는 **이 객체 하나만 갈아끼우면** 되고, 전투 리듀서는 한 벌만 존재한다.
- * 리듀서를 복사해 두면 중복 지표가 거짓으로 부풀어 비교가 망가진다.
+ * `stigma.ts` 가 이 모양을 만족한다. 규칙이 한 벌만 남은 뒤에도 주입은 남긴다 —
+ * 시험이 가짜 규칙을 끼워 **전투만 따로** 재는 자리이기 때문이다.
  */
 export interface StigmaRules {
   EROSION_MAX: number;
@@ -69,8 +68,7 @@ export interface StartCombatInput {
  * 규칙을 물려 전투 함수 묶음을 만든다.
  *
  * ```
- * const combat = createCombat(ownRules);      // A안
- * const combat = createCombat(sharedRules);   // B안
+ * const combat = createCombat(rules);
  * ```
  */
 export function createCombat(rules: StigmaRules) {
