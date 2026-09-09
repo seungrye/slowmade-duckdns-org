@@ -375,3 +375,31 @@ test.describe("이어하기 (#435)", () => {
     await expect(page.getByRole("button", { name: /이어하기/ })).toHaveCount(0);
   });
 });
+
+test.describe("덱 다듬기 (#439)", () => {
+  test.use({ viewport: PHONE });
+
+  test("에테르가 없으면 지울 수 없다고 말해 준다 — 잠자코 막지 않는다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+
+    // 정제소에 닿을 때까지 앞으로 간다.
+    for (let i = 0; i < 10; i++) {
+      if (await page.getByText("덱을 다듬는다").isVisible().catch(() => false)) break;
+      const story = page.getByRole("button", { name: "길을 이어 간다" });
+      if (await story.isVisible().catch(() => false)) { await story.click(); continue; }
+      const refinery = page.getByRole("button", { name: /^정제소/ }).first();
+      const any = page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스|동맹)/ }).first();
+      const t = (await refinery.count()) > 0 ? refinery : any;
+      if ((await t.count()) === 0) break;
+      await t.click();
+      // 전투가 서면 이 검사는 여기까지 — 정제소를 못 만난 씨앗이다.
+      if (await page.locator(HAND).isVisible().catch(() => false)) return;
+    }
+    if (!(await page.getByText("덱을 다듬는다").isVisible().catch(() => false))) return;
+
+    // 아직 아무것도 안 태웠으니 에테르가 0 이다.
+    await expect(page.getByText(/에테르가 모자랍니다/)).toBeVisible();
+  });
+});

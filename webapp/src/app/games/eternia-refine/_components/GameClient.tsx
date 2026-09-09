@@ -25,6 +25,8 @@ import {
   enterNode,
   leaveRefinery,
   leaveStory,
+  removable,
+  removeCard,
   newSession,
   sceneAt,
   nodeLabel,
@@ -40,7 +42,7 @@ import { loadScenes } from '@/lib/eternia-refine/scenes';
 import type { ScenarioScene } from '@/lib/eternia-refine/scenario';
 import { clearSave, fromSave, isSavable, readSave, writeSave, type SavedRun } from '@/lib/eternia-refine/save';
 import type { Session } from '@/lib/eternia-refine/run';
-import { ETHER_PER_CRYSTAL, bossHpBonus } from '@/lib/eternia-refine/refine';
+import { ETHER_PER_CRYSTAL, ETHER_PER_REMOVAL, bossHpBonus } from '@/lib/eternia-refine/refine';
 import { endingLabel } from '@/content/web-adventure/endings';
 import { FanHand } from './FanHand';
 
@@ -551,6 +553,44 @@ export function GameClient() {
           >
             {willBurn}장 태운다
           </button>
+        </div>
+
+        {/* 덱 다듬기 (#439) — 정제로 얻은 에테르를 여기서 쓴다.
+            더하기만 있고 빼기가 없으면 회차 후반이 묽어진다. */}
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-baseline justify-between">
+            <b className="text-sm">덱을 다듬는다</b>
+            <span className="font-mono text-[11px] text-amber-700">
+              한 장에 에테르 {ETHER_PER_REMOVAL}
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-amber-900">
+            덱이 얇을수록 원하는 카드가 자주 온다. 결정은 태우는 것이 원래 길이라 여기 없다.
+          </p>
+
+          {removable(session).length === 0 ? (
+            <p className="mt-3 text-xs text-amber-700">
+              {session.run.ether < ETHER_PER_REMOVAL
+                ? '에테르가 모자랍니다 — 결정을 태우면 생깁니다.'
+                : '지울 수 있는 카드가 없습니다.'}
+            </p>
+          ) : (
+            <div className="mt-3 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto">
+              {removable(session).map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setSession(removeCard(session, c.id))}
+                  className="min-h-[44px] rounded-md border border-amber-300 bg-amber-100/60 px-3 text-xs font-semibold hover:bg-amber-200"
+                >
+                  {c.name}
+                  <span className="ml-1.5 font-mono text-[10px] font-normal text-amber-700">
+                    {c.cost}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <button
