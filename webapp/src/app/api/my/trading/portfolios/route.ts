@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   // V4 사이클(T·장부현금)을 물려받지 않는다.
   const portfolioId = typeof body.portfolioId === "string" ? body.portfolioId : null;
   const prev = portfolioId
-    ? await TradingPortfolio.findOne({ _id: portfolioId, accountId: body.accountId })
+    ? await TradingPortfolio.findOne({ _id: portfolioId, accountId: String(body.accountId ?? '') })
         // 리비전을 남기려면 이전 값 전체가 필요하다 — 무엇이 바뀌었는지 대조해야 한다.
         .select({
           isDeleted: 1, market: 1, strategy: 1, runAt: 1,

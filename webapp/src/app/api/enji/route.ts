@@ -125,8 +125,12 @@ export async function POST(req: NextRequest) {
     return apiError('Gemini API 키가 설정되지 않았습니다.', 503);
   }
 
+  // **존재가 아니라 신원으로 판단한다** (#447). Auth.js 는 설정 오류 시 `auth()` 가 *에러가
+  // 담긴* 객체를 돌려줄 수 있는데(GHSA, `<=5.0.0-beta.31`), `if (!session?.user)` 같은 존재
+  // 기반 검사는 그걸 통과시킨다 — 이 라우트는 Gemini 를 부르므로 뚫리면 곧 비용이다.
+  // 베타 32 로 올려 뿌리는 막았지만, 검사 자체가 이메일을 요구하면 그 부류에 아예 안 걸린다.
   const session = await auth();
-  if (!session?.user) {
+  if (!session?.user?.email) {
     return apiError('로그인이 필요합니다.', 401);
   }
 
