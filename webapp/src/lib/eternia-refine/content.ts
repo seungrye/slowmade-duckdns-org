@@ -120,6 +120,90 @@ export const POOL: Card[] = [
     kind: 'stigma', cost: 1, erosion: 22, damage: 20, affinity: 'selene',
     faction: 'ironguard',
   }),
+
+  // ── 아이언가드 — 막고 되받는다 ──────────────────────────────────
+  //
+  // 성흔에 기대지 않는다. 침식이 안 오르는 대신 한 방이 작다. **도구가 많아** 무흔으로도
+  // 이 길을 갈 수 있다(성흔 카드를 못 사는 성흔이라 도구가 없으면 굶는다).
+  card({
+    id: 'i1', name: '붉은 천', text: '방어 9.',
+    kind: 'tool', cost: 1, erosion: 0, block: 9, faction: 'ironguard',
+  }),
+  card({
+    id: 'i2', name: '방패 밀치기', text: '피해 5. 방어 5.',
+    kind: 'tool', cost: 1, erosion: 0, damage: 5, block: 5, faction: 'ironguard',
+  }),
+  card({
+    id: 'i3', name: '대열', text: '방어 4. 값이 없다.',
+    kind: 'tool', cost: 0, erosion: 0, block: 4, faction: 'ironguard',
+  }),
+  card({
+    id: 'i4', name: '징발한 소총', text: '피해 14.',
+    kind: 'tool', cost: 2, erosion: 0, damage: 14, faction: 'ironguard',
+  }),
+
+  // ── 사제단 — 태워서 크게 얻는다 ─────────────────────────────────
+  //
+  // 가장 세고 가장 가파르다. 결정을 자원으로 쓰는 길도 여기 있다 — 태우는 것이 축복이라는
+  // 교리가 규칙이 된 자리다.
+  card({
+    id: 'r1', name: '축복', text: '체력 10 회복. 살은 굳는다.',
+    kind: 'stigma', cost: 1, erosion: 14, heal: 10, faction: 'priesthood',
+  }),
+  card({
+    id: 'r2', name: '연료 헌납', text: '손에 든 결정 1장당 방어 7.',
+    kind: 'tool', cost: 1, erosion: 0, blockPerCrystal: 7, faction: 'priesthood',
+  }),
+  card({
+    id: 'r3', name: '정화 의식', text: '피해 16. 카드 1장을 뽑는다.',
+    kind: 'stigma', cost: 2, erosion: 20, damage: 16, draw: 1, faction: 'priesthood',
+  }),
+  card({
+    id: 'r4', name: '집전봉', text: '피해 12.',
+    kind: 'stigma', cost: 1, erosion: 12, damage: 12, faction: 'priesthood',
+  }),
+
+  // ── 네오엘프 — 되돌린다 ────────────────────────────────────────
+  //
+  // 한 방이 가장 약하다. 대신 **침식을 되돌리는 유일한 길**이라 오래 버틴다.
+  // 결정을 안 만들면 정제소에 팔 것도 없고, 그것이 이 길의 결말로 이어진다.
+  card({
+    id: 'y1', name: '숨 고르기', text: '침식 4 내린다. 값이 없다.',
+    kind: 'tool', cost: 0, erosion: 0, soothe: 4, faction: 'sylvan',
+  }),
+  card({
+    id: 'y2', name: '이끼 붕대', text: '체력 6 회복. 침식 2 내린다.',
+    kind: 'tool', cost: 1, erosion: 0, heal: 6, soothe: 2, faction: 'sylvan',
+  }),
+  card({
+    id: 'y3', name: '뿌리 감옥', text: '방어 12. 침식 4 내린다.',
+    kind: 'tool', cost: 2, erosion: 0, block: 12, soothe: 4, faction: 'sylvan',
+  }),
+  card({
+    id: 'y4', name: '달빛 여과', text: '카드 1장을 뽑는다. 침식 3 내린다.',
+    kind: 'tool', cost: 1, erosion: 0, draw: 1, soothe: 3, faction: 'sylvan',
+  }),
+
+  // ── 중립 — 어느 길에서도 나온다 ────────────────────────────────
+  //
+  // 동맹을 고르면 세력 카드는 하나만 남으므로, 중립이 얇으면 보상이 거의 고정된다.
+  // 바닥을 여기서 받친다.
+  card({
+    id: 'n1', name: '날붙이', text: '피해 9.',
+    kind: 'tool', cost: 1, erosion: 0, damage: 9,
+  }),
+  card({
+    id: 'n2', name: '한숨 돌리기', text: '체력 7 회복.',
+    kind: 'tool', cost: 1, erosion: 0, heal: 7,
+  }),
+  card({
+    id: 'n3', name: '틈새', text: '카드 1장을 뽑는다. 값이 없다.',
+    kind: 'tool', cost: 0, erosion: 0, draw: 1,
+  }),
+  card({
+    id: 'n4', name: '버티기', text: '방어 7.',
+    kind: 'tool', cost: 1, erosion: 0, block: 7,
+  }),
 ];
 
 /** 3막 — 슬라이스는 전투 세 판이다. 마지막이 부유도시가 키운 상대. */
@@ -153,6 +237,37 @@ export const ENEMIES: Enemy[] = [
       { damage: 18, block: 8, label: '가속' },
     ],
   },
+
+  // 막마다 상대가 하나뿐이면 15노드를 도는 동안 같은 싸움이 반복된다 (#437).
+  {
+    id: 'automaton',
+    name: '역무원 자동인형',
+    maxHp: 40,
+    intents: [
+      { block: 8, label: '태엽을 감는다' },
+      { damage: 10, label: '집게' },
+    ],
+  },
+  {
+    id: 'patrol_squad',
+    name: '광장 순찰대',
+    maxHp: 62,
+    intents: [
+      { damage: 7, label: '곤봉' },
+      { damage: 7, label: '곤봉' },
+      { damage: 15, label: '합을 맞춘다' },
+    ],
+  },
+  {
+    id: 'overseer',
+    name: '연료 감독관',
+    maxHp: 80,
+    intents: [
+      { erosion: 7, label: '장부를 읽는다' },
+      { damage: 16, label: '낙인' },
+      { damage: 9, block: 6, label: '물러서며 벤다' },
+    ],
+  },
 ];
 
 /** 막 이름 — 회차 경로로 남고, 깊은 공유 시 PastRun.scenePath 가 된다. */
@@ -165,12 +280,16 @@ export const NODE_LABELS = ['정거장', '옴팔로스', '에테르 열차'] as 
  * 여기 배열만 늘리면 지도는 그대로 굴러간다.
  */
 export function actEnemies(act: Act): Enemy[] {
-  if (act === 1) return [ENEMIES[0]];
-  if (act === 2) return [ENEMIES[0], ENEMIES[1]];
-  return [ENEMIES[1], ENEMIES[2]];
+  const by = (id: string) => ENEMIES.find((e) => e.id === id)!;
+  if (act === 1) return [by('patrol'), by('automaton')];
+  if (act === 2) return [by('patrol_squad'), by('purifier')];
+  return [by('overseer'), by('purifier')];
 }
 
 /** 막의 끝에서 기다리는 것. 3막 보스가 부유도시를 업고 나온다. */
 export function bossFor(act: Act): Enemy {
-  return ENEMIES[Math.min(ENEMIES.length - 1, act - 1)];
+  const by = (id: string) => ENEMIES.find((e) => e.id === id)!;
+  if (act === 1) return by('automaton');
+  if (act === 2) return by('purifier');
+  return by('engine');
 }

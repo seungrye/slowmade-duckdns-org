@@ -320,3 +320,42 @@ describe('시나리오 지도', () => {
     expect(enterNode(s, target.id).run.erosion).toBe(s.run.erosion);
   });
 });
+
+/**
+ * 콘텐츠가 선택을 뜻있게 만드는가 (#437).
+ *
+ * 동맹을 고르면 보상 풀이 줄어든다. 줄어든 뒤에도 **고를 것이 남아 있어야** 그 선택이
+ * 의미가 있다 — 풀이 4장이던 때는 보상 3장이 거의 고정이라 되돌릴 수 없는 선택을 시켜
+ * 놓고 바뀌는 것이 없었다.
+ */
+describe('세력별 카드 풀', () => {
+  const poolOf = (f: 'ironguard' | 'priesthood' | 'sylvan') =>
+    POOL.filter((c) => c.faction === undefined || c.faction === f);
+
+  it('동맹을 골라도 보상이 고정되지 않는다 — 내미는 3장보다 넉넉해야 한다', () => {
+    for (const f of ['ironguard', 'priesthood', 'sylvan'] as const) {
+      expect(poolOf(f).length, f).toBeGreaterThanOrEqual(9);
+    }
+  });
+
+  it('세력마다 도구 카드가 있다 — 무흔이 굶지 않게', () => {
+    // 무흔은 성흔 카드를 못 산다. 세력 카드가 전부 성흔이면 그 길이 통째로 막힌다.
+    for (const f of ['ironguard', 'priesthood', 'sylvan'] as const) {
+      const tools = POOL.filter((c) => c.faction === f && c.kind !== 'stigma');
+      expect(tools.length, f).toBeGreaterThan(0);
+    }
+  });
+
+  it('무흔에게도 낼 만한 것이 남는다', () => {
+    for (const f of ['ironguard', 'priesthood', 'sylvan'] as const) {
+      const usable = poolOf(f).filter((c) => c.kind !== 'stigma');
+      expect(usable.length, f).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('침식을 되돌리는 길은 네오엘프에 몰려 있다 — 세력마다 문법이 다르다', () => {
+    const soothers = POOL.filter((c) => (c.soothe ?? 0) > 0);
+    expect(soothers.length).toBeGreaterThan(2);
+    expect(soothers.every((c) => c.faction === 'sylvan' || c.faction === undefined)).toBe(true);
+  });
+});
