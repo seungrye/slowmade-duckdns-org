@@ -190,7 +190,9 @@ describe('같은 씨앗은 같은 회차를 낸다', () => {
  * 동맹이 붙은 지금, **고른 세력이 결말을 실제로 바꾸는지**를 못 박는다.
  */
 describe('동맹이 결말을 가른다', () => {
-  const base = { protagonist: 'rin' as const, ability: 'lunar' as const, burnPerShop: 0, seed: 42 };
+  // **정제를 하는 전략으로 잰다.** 한 번도 안 태우는 판은 침식 시계가 모든 것을 덮어
+  // 셋 다 석화로 끝난다 — 동맹이 뜻을 갖는 것은 회차를 관리할 때다(실측으로 갈랐다).
+  const base = { protagonist: 'rin' as const, ability: 'lunar' as const, burnPerShop: 3, seed: 42 };
 
   it('아이언가드와 손잡으면 그 값이 회차에 남는다', () => {
     expect(play({ ...base, ally: 'ironguard' }).run.ally).toBe('ironguard');
@@ -207,7 +209,7 @@ describe('동맹이 결말을 가른다', () => {
   });
 
   it('아이언가드를 끝까지 데려가면 혁명이다 — 판정이 ally 를 읽는 증거', () => {
-    const s = play({ ...base, ally: 'ironguard', burnPerShop: 0 });
+    const s = play({ ...base, ally: 'ironguard' });
     if (s.phase.kind !== 'ending') throw new Error('엔딩이 아니다');
     // 굳거나 쓰러지면 그것이 먼저다(판정 순서). 끝까지 갔다면 혁명이어야 한다.
     if (s.run.erosion < 100 && s.run.hp > 0) expect(s.phase.endingId).toBe('revolution');
