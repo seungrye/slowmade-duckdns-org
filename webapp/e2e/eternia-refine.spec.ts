@@ -435,19 +435,33 @@ test.describe("더미 들여다보기 (#441)", () => {
 test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
   const DESKTOP = { width: 1440, height: 900 };
 
-  /** 손패가 이 열의 폭을 다 쓰는지. 좌우에 열을 세우면 여기서 줄어든다. */
-  async function handShare(page: Page) {
-    const hand = (await page.locator(HAND).boundingBox())!;
-    const rail = (await page.locator(".h-1.overflow-hidden").first().boundingBox())!;
-    return hand.width / rail.width;
+  /**
+   * 이웃 카드의 중심 간 거리(px) — 이름이 얼마나 드러나는가.
+   *
+   * 처음엔 손패 폭을 `.h-1.overflow-hidden`(침식 띠)으로 나눠 "판의 몇 %인가"를 쟀다.
+   * 그건 두 번 틀렸다 — 내 Tailwind 유틸리티 클래스를 붙잡았고(디자인이 바뀌면 깨진다),
+   * 무엇보다 **폭 비율은 목적이 아니라 대리 지표**였다. 진짜 원하는 것은 "카드 이름이
+   * 보이는가"다. 그러니 그것을 직접 잰다.
+   */
+  async function cardPitch(page: Page) {
+    const boxes = await page.locator(CARD).evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return r.x + r.width / 2;
+      }),
+    );
+    boxes.sort((a, b) => a - b);
+    const gaps = boxes.slice(1).map((x, i) => x - boxes[i]);
+    return gaps.reduce((a, b) => a + b, 0) / gaps.length;
   }
 
-  test("손패가 판의 폭을 다 쓴다 — 자원 열이 카드 자리를 먹지 않게", async ({ page }) => {
-    // 한때 데스크톱에서 좌·우 열을 세웠는데 그 288px 이 손패에서 나가 부채 간격이
-    // 72 → 41 로 줄었다. 이름을 드러내려던 일이 이름을 더 가렸다.
+  test("카드가 이름이 보일 만큼 벌어진다 — 겹침이 절반을 넘지 않게", async ({ page }) => {
+    // 카드 폭이 100 이라 간격이 50 아래면 이웃이 절반 넘게 덮는다. 실측에서 「달의 각인」이
+    // "달의 각" 으로 보였다. 한때 데스크톱에 좌·우 열을 세웠더니 그 288px 이 손패에서 나가
+    // 간격이 41 로 떨어졌다 — 이름을 드러내려던 일이 이름을 더 가렸다.
     await page.setViewportSize(DESKTOP);
     await enterBattle(page);
-    expect(await handShare(page)).toBeGreaterThan(0.95);
+    expect(await cardPitch(page)).toBeGreaterThan(50);
   });
 
   test("에테르는 손패 아래 붙어 있다 — 카드마다 시선이 왕복하지 않게", async ({ page }) => {
@@ -488,6 +502,6 @@ test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
       expect(b.x).toBeGreaterThanOrEqual(0);
       expect(b.x + b.width).toBeLessThanOrEqual(PHONE.width + 1);
     }
-    expect(await handShare(page)).toBeGreaterThan(0.95);
+    expect(await cardPitch(page)).toBeGreaterThan(50);
   });
 });

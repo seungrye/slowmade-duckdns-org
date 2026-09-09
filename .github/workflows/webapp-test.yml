@@ -224,6 +224,35 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3010
 
+      # flake 는 조용히 지나가면 안 된다 (#445).
+      #
+      # `retries: 2` 덕에 두 번째에 통과하면 잡이 초록이고 아무도 모른다. 그런데 flake 는
+      # 대개 진짜 경합(타이밍·포커스)이라 언젠가 실패한다. 여기서 세어 **경고로** 띄운다.
+      # 실패로 만들지 않는 건 의도다 — 그러면 아무도 안 고치고 재시도를 꺼 버린다.
+      - name: 재시도로 통과한 시험을 보고한다
+        if: always()
+        run: |
+          if [ ! -f playwright-report/results.json ]; then
+            echo "보고서가 없다 — 시험이 시작도 못 했을 것이다. 건너뛴다"
+            exit 0
+          fi
+          node -e '
+            const r = require("./playwright-report/results.json");
+            const flaky = [];
+            const walk = (s) => {
+              for (const spec of s.specs ?? []) {
+                for (const t of spec.tests ?? []) {
+                  if (t.status === "flaky") flaky.push(spec.title + " (" + t.results.length + "회 시도)");
+                }
+              }
+              for (const c of s.suites ?? []) walk(c);
+            };
+            for (const s of r.suites ?? []) walk(s);
+            if (flaky.length === 0) { console.log("재시도로 통과한 시험 없음"); process.exit(0); }
+            console.log("::warning::재시도로 통과한 시험 " + flaky.length + "개 — 진짜 경합일 수 있다");
+            for (const t of flaky) console.log("::warning::flaky — " + t);
+          '
+
       - name: 실패하면 자취를 남긴다
         if: failure()
         uses: actions/upload-artifact@v4
