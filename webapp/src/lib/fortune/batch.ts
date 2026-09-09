@@ -20,19 +20,50 @@ import { computeSaju, todayIljin, sajuContext, generateSajuReading } from "./saj
 import User from "@/models/user";
 
 /** KST 시(0-23). 한국은 DST 가 없어 UTC+9 고정. */
-export function kstHour(now: Date): number {
-  return (now.getUTCHours() + 9) % 24;
+/**
+ * 자정(KST)으로부터 몇 분인가.
+ *
+ * 예전엔 시(hour) 단위였는데 **00:10 을 표현할 수 없었다** (#451). 한국은 DST 가 없어
+ * UTC+9 고정이라 오프셋만 더하면 된다.
+ */
+export function kstMinutes(now: Date): number {
+  return (now.getUTCHours() * 60 + now.getUTCMinutes() + 9 * 60) % 1440;
 }
 
 /**
- * 배치를 지금 돌려야 하나(순수). 새벽 시각을 지났고 오늘 아직 안 돌렸으면 true.
+ * 배치를 여는 시각 — 자정 + 10분 (#451).
+ *
+ * 04시였고, 그것이 "사주가 매일 같은 값" 제보의 실제 원인이었다. 사람은 자정 직후에
+ * 운세를 열어 보는데 그때는 배치 전이라 lazy 생성이 넣어 둔 **템플릿 폴백**만 보인다.
+ * DB 가 그대로 말해 줬다 — 9/10 문서는 KST 01:36 에 만들어져 01:36 에 조회됐고 그때
+ * sajuSource 가 template 이었으며, LLM 이 채워진 건 몇 시간 뒤였다.
+ *
+ * 자정 정각이 아니라 10분인 것은 날짜 경계에서 `seoulDateKey` 와 어긋나지 않게 여유를
+ * 두려는 것이다.
+ */
+export const BATCH_AFTER_MINUTES = 10;
+
+/**
+ * 배치를 지금 돌려야 하나(순수). 여는 시각을 지났고 오늘 아직 안 돌렸으면 true.
  * lastRunKey 는 마지막으로 배치를 끝낸 dateKey(인메모리). 재시작하면 null → 한 번 더(멱등).
  */
 export function shouldRunBatch(
-  hour: number, lastRunKey: string | null, todayKey: string, minHour = 4,
+  minutes: number, lastRunKey: string | null, todayKey: string,
+  minMinutes = BATCH_AFTER_MINUTES,
 ): boolean {
-  if (hour < minHour) return false;
+  if (minutes < minMinutes) return false;
   return lastRunKey !== todayKey;
+}
+
+/**
+ * 시각 계산까지 여기서 끝낸다 — 부르는 쪽(스케줄러)은 "지금 돌릴까"만 묻는다.
+ *
+ * 예전엔 스케줄러가 `kstHour`·상수·`seoulDateKey` 를 직접 조립했다. 그러면 시각 규칙이
+ * 두 파일에 걸쳐 있어 바꿀 때마다 양쪽을 봐야 하고, 스케줄러는 타이머·전역 상태 때문에
+ * 단위 시험이 어렵다. 결정을 이리로 내리면 **실제 Date 로 시험할 수 있다.**
+ */
+export function shouldRunNow(now: Date, lastRunKey: string | null): boolean {
+  return shouldRunBatch(kstMinutes(now), lastRunKey, seoulDateKey(now));
 }
 
 /** N일 전 dateKey(KST) — 대상 사용자 조회 하한. */
