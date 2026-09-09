@@ -9,7 +9,7 @@
 // amber-700 강조). 침식만 팔레트 밖의 돌빛(slate)으로 뺐다 — 따뜻한 화면에서 혼자
 // 차가워야 "있으면 안 되는 것"으로 읽힌다.
 
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createCombat, countCrystals } from '@/lib/eternia-refine/combat';
 import * as rules from '@/lib/eternia-refine/stigma';
 import type { Ability, Card, CombatState, Protagonist } from '@/lib/eternia-refine/types';
@@ -24,7 +24,9 @@ import {
   enemyFor,
   enterNode,
   leaveRefinery,
+  leaveStory,
   newSession,
+  sceneAt,
   nodeLabel,
   startRun,
   takeReward,
@@ -34,6 +36,8 @@ import {
 import { FACTIONS, closedBy } from '@/lib/eternia-refine/faction';
 import type { Faction } from '@/lib/eternia-refine/types';
 import { MapScreen } from './MapScreen';
+import { loadScenes } from '@/lib/eternia-refine/scenes';
+import type { ScenarioScene } from '@/lib/eternia-refine/scenario';
 import type { Session } from '@/lib/eternia-refine/run';
 import { ETHER_PER_CRYSTAL, bossHpBonus } from '@/lib/eternia-refine/refine';
 import { endingLabel } from '@/content/web-adventure/endings';
@@ -46,6 +50,23 @@ export function GameClient() {
   const [battle, setBattle] = useState<CombatState | null>(null);
   const [pick, setPick] = useState<{ p: Protagonist; a: Ability }>({ p: 'rin', a: 'lunar' });
   const [burn, setBurn] = useState(1);
+
+  /**
+   * 이야기 원본 (#432).
+   *
+   * 못 받아도 게임은 돈다 — null 이면 절차 생성 지도로 물러선다(`run.mapFor`). 그래서
+   * 로딩 화면을 세우지 않는다. 타이틀을 보는 동안 받아 두면 대개 제때 온다.
+   */
+  const [scenes, setScenes] = useState<readonly ScenarioScene[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void loadScenes().then((s) => {
+      if (alive) setScenes(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const phase = session.phase;
 
@@ -78,7 +99,7 @@ export function GameClient() {
         ? null
         : new URLSearchParams(window.location.search).get('seed');
     const seed = raw !== null && /^\d+$/.test(raw) ? Number(raw) : undefined;
-    setSession(startRun(pick.p, pick.a, seed));
+    setSession(startRun(pick.p, pick.a, seed, scenes));
   }
 
   /** 지도에서 노드를 고른다. 전투 노드면 그 자리에서 전투를 세운다. */
@@ -144,6 +165,31 @@ export function GameClient() {
         <div className="mt-3 flex flex-1 flex-col">
           <MapScreen map={session.map} at={session.run.nodeId} open={choices(session)} onGo={go} />
         </div>
+      </Shell>
+    );
+  }
+
+  // ── 이야기 ───────────────────────────────────────────────────────
+  //
+  // 사건 노드는 CYOA 씬이다 (#432). 침식·체력 효과는 들어설 때 이미 얹혔고, 여기서는
+  // 무슨 일이 있었는지 읽는다.
+  if (phase.kind === 'story') {
+    const scene = sceneAt(session, phase.node);
+    return (
+      <Shell>
+        <h2 className="text-xl font-black tracking-tight">{scene?.title ?? '길 위에서'}</h2>
+        <div className="mt-4 flex-1 space-y-3 overflow-y-auto text-sm leading-relaxed text-amber-900">
+          {(scene?.body ?? ['아무 일도 일어나지 않았다.']).map((line, i) => (
+            <p key={i}>{line}</p>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setSession(leaveStory(session))}
+          className="mt-4 min-h-[48px] w-full rounded-md bg-amber-700 font-bold text-amber-50 hover:bg-amber-800"
+        >
+          길을 이어 간다
+        </button>
       </Shell>
     );
   }

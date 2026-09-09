@@ -27,6 +27,7 @@ import {
   type Session,
 } from './run';
 import { crystalCard, countCrystals } from './combat';
+import type { ScenarioScene } from './scenario';
 import { PROTAGONISTS, POOL } from './content';
 import { ENDING_IDS } from '@/types/web-adventure';
 
@@ -265,5 +266,57 @@ describe('toResult', () => {
     expect(ENDING_IDS).toContain(r.endingId);
     expect(Array.isArray(r.scenePath)).toBe(true);
     expect(typeof r.cityPower).toBe('number');
+  });
+});
+
+/**
+ * 씬이 지도가 될 때 (#432).
+ *
+ * `Scene.onEnter` 가 덱빌더의 침식·체력에 **실제로** 얹히는지를 본다. 얹히지 않으면
+ * 이야기는 장식일 뿐이고, 이 작업의 요지가 사라진다.
+ */
+describe('시나리오 지도', () => {
+  const plain = (to: string) => ({ kind: 'plain', to });
+  const SCENES: ScenarioScene[] = [
+    { id: 'r', title: '가솔린 열차', body: ['기차가 선다.'], choices: [plain('a'), plain('b')] },
+    { id: 'a', title: '강철', choices: [plain('c')], onEnter: { stigmaDelta: 9 } },
+    { id: 'b', title: '지식', choices: [plain('c')], onEnter: { hpDelta: -7 } },
+    { id: 'c', title: '외곽', choices: [plain('d')] },
+    { id: 'd', title: '끝', choices: [] },
+  ];
+
+  const withScenes = () => startRun('rin', 'lunar', 42, SCENES);
+
+  it('씬이 있으면 이야기가 지도가 된다 — 노드가 씬을 담는다', () => {
+    const s = withScenes();
+    expect(s.map.nodes.every((n) => typeof n.sceneId === 'string')).toBe(true);
+    expect(s.map.nodes.some((n) => n.title === '가솔린 열차')).toBe(true);
+  });
+
+  it('씬이 없으면 절차 생성으로 물러선다 — 이야기 없이도 회차는 간다', () => {
+    const s = startRun('rin', 'lunar', 42, null);
+    expect(s.map.nodes.every((n) => n.sceneId === undefined)).toBe(true);
+    expect(choices(s).length).toBeGreaterThan(0);
+  });
+
+  it('노드에 들어서면 씬의 침식이 얹힌다', () => {
+    const s = withScenes();
+    const target = choices(s).find((n) => n.sceneId === 'a');
+    if (!target) return;
+    expect(enterNode(s, target.id).run.erosion).toBe(s.run.erosion + 9);
+  });
+
+  it('씬의 체력 변화도 얹힌다', () => {
+    const s = withScenes();
+    const target = choices(s).find((n) => n.sceneId === 'b');
+    if (!target) return;
+    expect(enterNode(s, target.id).run.hp).toBe(s.run.hp - 7);
+  });
+
+  it('무흔은 씬 침식도 안 받는다 — 성흔 규칙을 그대로 통과한다', () => {
+    const s = startRun('rin', 'none', 42, SCENES);
+    const target = choices(s).find((n) => n.sceneId === 'a');
+    if (!target) return;
+    expect(enterNode(s, target.id).run.erosion).toBe(s.run.erosion);
   });
 });

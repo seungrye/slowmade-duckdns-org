@@ -1,25 +1,26 @@
 'use client';
 
-// 막의 지도 (#430) — 목업 `Map.dc.html` 의 그래프.
+// 막의 지도 (#430 → #432) — 세로로 서고, 넘치면 스크롤한다.
 //
-// 노드를 SVG 로 그리고 **갈 수 있는 것만** 누를 수 있게 한다. 규칙(`run.enterNode`)도
-// 스스로 막지만, 화면이 먼저 보여 주지 않으면 사람은 어디로 갈 수 있는지 모른다.
+// 처음엔 층을 가로로 눕히고 화면에 맞춰 줄였다. 412px 에서 노드가 너무 작아 읽히지 않았다.
+// **작은 화면에 우겨넣을 이유가 없다** — 노드를 읽을 만한 크기로 두고 넘치는 만큼 스크롤한다.
+// 그러면 "좁으면 세로 / 넓으면 가로" 두 벌을 만들 필요도 없어진다. 한 벌로 끝난다.
 //
-// ── 좌표를 왜 여기서 만드나 ──────────────────────────────────────────
+// 방향은 아래에서 위다. 지금 서 있는 자리가 아래에 있고 앞길이 위로 뻗는다 — 손이 닿는
+// 곳에 현재가 있고, 스크롤은 앞을 내다보는 몸짓이 된다.
 //
-// `map.ts` 는 층·칸만 준다(순수 로직이 화면 크기를 알 이유가 없다). 픽셀로 옮기는 일은
-// 화면 몫이다. viewBox 를 고정하고 SVG 가 알아서 줄이므로 폭이 좁아도 안 잘린다 —
-// 손패(#427)에서 폭을 역산해야 했던 것과 달리 여기서는 그럴 필요가 없다.
+// 노드가 씬을 담고 있으면(`sceneId`) 제목을 그대로 쓴다. 「가솔린 열차」가 곧 그 조우의
+// 이름이 되는 것이 이번 작업의 요지다.
 
 import type { ActMap } from '@/lib/eternia-refine/map';
 import type { MapNode, NodeKind } from '@/lib/eternia-refine/types';
 
-const VIEW_W = 880;
-const VIEW_H = 360;
-const PAD_X = 60;
-const PAD_Y = 40;
+/** 층 간격·칸 간격 — 화면에 맞춰 줄이지 않는다. 넘치면 스크롤한다. */
+const ROW_GAP = 96;
+const COL_GAP = 132;
+const PAD = 48;
+const R = 15;
 
-/** 노드 종류를 사람 말로 — 화면이 id 를 그대로 쓰지 않게. */
 const LABEL: Record<NodeKind, string> = {
   start: '출발',
   battle: '전투',
@@ -30,19 +31,9 @@ const LABEL: Record<NodeKind, string> = {
   boss: '보스',
 };
 
-/** 층·칸 → 픽셀. 층이 가로, 칸이 세로다(목업과 같은 방향). */
-function place(node: MapNode, rows: number, widths: number[]) {
-  const x = PAD_X + (node.row / (rows - 1)) * (VIEW_W - PAD_X * 2);
-  const n = widths[node.row];
-  const y = n === 1 ? VIEW_H / 2 : PAD_Y + (node.col / (n - 1)) * (VIEW_H - PAD_Y * 2);
-  return { x, y };
-}
-
 export interface MapScreenProps {
   map: ActMap;
-  /** 지금 서 있는 노드. 막에 막 들어왔으면 null. */
   at: string | null;
-  /** 지금 갈 수 있는 노드들. */
   open: MapNode[];
   onGo: (id: string) => void;
 }
@@ -50,7 +41,18 @@ export interface MapScreenProps {
 export function MapScreen({ map, at, open, onGo }: MapScreenProps) {
   const rows = Math.max(...map.nodes.map((n) => n.row)) + 1;
   const widths = Array.from({ length: rows }, (_, r) => map.nodes.filter((n) => n.row === r).length);
-  const pos = new Map(map.nodes.map((n) => [n.id, place(n, rows, widths)]));
+  const maxWide = Math.max(...widths);
+
+  const w = PAD * 2 + (maxWide - 1) * COL_GAP;
+  const h = PAD * 2 + (rows - 1) * ROW_GAP;
+
+  // 층이 위로 쌓이도록 y 를 뒤집는다 — 뿌리(row 0)가 맨 아래.
+  const place = (n: MapNode) => ({
+    x: PAD + ((maxWide - widths[n.row]) / 2 + n.col) * COL_GAP,
+    y: h - PAD - n.row * ROW_GAP,
+  });
+
+  const pos = new Map(map.nodes.map((n) => [n.id, place(n)]));
   const openIds = new Set(open.map((n) => n.id));
 
   return (
@@ -59,14 +61,14 @@ export function MapScreen({ map, at, open, onGo }: MapScreenProps) {
         {at === null ? '어디로 들어갈지 고른다.' : '다음 길을 고른다.'}
       </p>
 
-      <div className="relative flex-1 overflow-x-auto rounded-md border border-amber-300 bg-amber-100/60 p-3">
-        <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="h-full w-full min-w-[520px]" role="img" aria-label="지도">
-          {/* 길 먼저 — 노드가 그 위에 얹혀야 가려지지 않는다. */}
+      {/* 화면에 맞추지 않는다 — 넘치면 스크롤. 노드는 늘 읽을 만한 크기다. */}
+      <div className="flex-1 overflow-auto rounded-md border border-amber-300 bg-amber-100/60">
+        <svg width={w} height={h} className="block" role="img" aria-label="지도">
           {map.nodes.flatMap((n) =>
             n.next.map((id) => {
               const a = pos.get(n.id)!;
               const b = pos.get(id)!;
-              const live = at === n.id || (at === null && n.row === 0);
+              const live = at === n.id;
               return (
                 <line
                   key={`${n.id}-${id}`}
@@ -86,37 +88,46 @@ export function MapScreen({ map, at, open, onGo }: MapScreenProps) {
             return (
               <g key={n.id}>
                 <circle
-                  cx={p.x} cy={p.y} r={here ? 17 : 14}
+                  cx={p.x} cy={p.y} r={here ? R + 3 : R}
                   fill={here ? '#B45309' : can ? '#FFFBEB' : '#FDE68A'}
                   stroke={can || here ? '#92400E' : '#D4A24C'}
                   strokeWidth={can ? 3 : 1.5}
                 />
                 <text
-                  x={p.x} y={p.y + 34}
-                  textAnchor="middle"
-                  fontSize="13"
+                  x={p.x} y={p.y - R - 8}
+                  textAnchor="middle" fontSize="12"
                   fill={can || here ? '#78350F' : '#B45309'}
                 >
                   {LABEL[n.kind]}
                 </text>
+                {n.title && (
+                  <text
+                    x={p.x} y={p.y + R + 16}
+                    textAnchor="middle" fontSize="10.5" fill="#92400E"
+                  >
+                    {n.title.length > 14 ? `${n.title.slice(0, 13)}…` : n.title}
+                  </text>
+                )}
               </g>
             );
           })}
         </svg>
       </div>
 
-      {/* 갈 수 있는 곳은 **버튼으로도** 낸다 — SVG 안의 작은 원을 손가락으로 정확히
-          누르게 하면 좁은 화면에서 못 쓴다. 44px 이상을 지킨다. */}
+      {/* 갈 수 있는 곳은 버튼으로도 낸다 — SVG 안의 작은 원을 손가락으로 정확히 누르게
+          하면 좁은 화면에서 못 쓴다. 44px 이상을 지킨다. */}
       <div className="flex flex-wrap gap-2">
         {open.map((n) => (
           <button
             key={n.id}
             type="button"
             onClick={() => onGo(n.id)}
-            className="min-h-[44px] flex-1 rounded-md border border-amber-300 bg-amber-50 px-4 text-sm font-bold hover:bg-amber-100"
+            className="min-h-[44px] flex-1 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-left text-sm font-bold hover:bg-amber-100"
           >
             {LABEL[n.kind]}
-            <span className="ml-2 font-mono text-[11px] text-amber-700">{n.id}</span>
+            {n.title && (
+              <span className="ml-2 font-normal text-[11px] text-amber-700">{n.title}</span>
+            )}
           </button>
         ))}
       </div>

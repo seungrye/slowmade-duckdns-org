@@ -139,3 +139,98 @@ jobs:
           MINIO_ACCESSKEY: ci
           MINIO_SECRETKEY: ci-secret
           MINIO_BUCKET: ci
+
+  # 실 브라우저 검사 (#425, #432). 여태 사람이 손으로 돌려야만 결과를 알았다 —
+  # 손패 제스처·지도 배치처럼 **jsdom 이 거짓말하는 것**은 여기서만 잡힌다.
+  #
+  # `next dev` 로는 못 돈다: 사이트 CSP 가 unsafe-eval 을 막는데 HMR 이 eval 을 써서
+  # 하이드레이션이 죽고 버튼이 아무 반응도 안 한다. 그래서 build → start → test 다.
+  e2e:
+    name: playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: webapp
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: webapp/pnpm-lock.yaml
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # 씬을 mongo 에서 읽는 화면들이 있다. 빌드 잡과 같은 재해 복구 경로를 그대로 밟는다.
+      - name: Seed content
+        run: ./scripts/seeds-replay.sh
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
+
+      - name: Install chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build
+        run: pnpm build
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
+          MINIO_ENDPOINT: 127.0.0.1
+          MINIO_ACCESSKEY: ci
+          MINIO_SECRETKEY: ci-secret
+          MINIO_BUCKET: ci
+
+      # 서버를 띄우고 응답할 때까지 기다린다. 매매 스케줄러는 반드시 끈다 —
+      # CI 가 실주문을 낼 이유가 없다.
+      - name: Start server
+        run: |
+          pnpm start &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3010/api/health >/dev/null && exit 0
+            sleep 2
+          done
+          echo "::error::서버가 120초 안에 안 떴다"; exit 1
+        env:
+          MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
+          MINIO_ENDPOINT: 127.0.0.1
+          MINIO_ACCESSKEY: ci
+          MINIO_SECRETKEY: ci-secret
+          MINIO_BUCKET: ci
+          TRADING_SCHEDULER_ENABLED: "false"
+
+      # 기존 9개 스펙은 로컬 전제로 쓰였다(#425 README). CI 에서 처음 도는 것이라
+      # 흔들릴 수 있어, 우선 덱빌딩 스펙만 문지기로 세운다. 나머지는 안정화하며 넓힌다.
+      - name: e2e (eternia-refine)
+        run: pnpm exec playwright test e2e/eternia-refine.spec.ts
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3010
+
+      - name: 실패하면 자취를 남긴다
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            webapp/test-results/
+            webapp/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
