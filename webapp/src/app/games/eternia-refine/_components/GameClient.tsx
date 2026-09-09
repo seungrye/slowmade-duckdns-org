@@ -53,6 +53,8 @@ export function GameClient() {
   const [battle, setBattle] = useState<CombatState | null>(null);
   const [pick, setPick] = useState<{ p: Protagonist; a: Ability }>({ p: 'rin', a: 'lunar' });
   const [burn, setBurn] = useState(1);
+  /** 더미 들여다보기 (#441) — 전투 중에만 쓴다. */
+  const [piles, setPiles] = useState(false);
 
   /**
    * 이야기 원본 (#432).
@@ -427,12 +429,19 @@ export function GameClient() {
               onPlay={(i) => setBattle(combat.playCard(b, i, session.run.ability))}
             />
             <div className="mt-2 flex shrink-0 items-center justify-between">
-              <span className="font-mono text-[11px] text-amber-800">
+              {/* 숫자만 보여 주면 무엇이 남았는지 모른 채 계산해야 한다 (#441).
+                  눌러서 들여다볼 수 있게 한다 — 정보 위계는 그대로, 체력·침식·적의 다음
+                  수가 여전히 위에 크게 있고 이건 그 아래 작게 있다. */}
+              <button
+                type="button"
+                onClick={() => setPiles(true)}
+                className="min-h-[44px] rounded-md px-1 text-left font-mono text-[11px] text-amber-800 underline decoration-amber-300 underline-offset-4 hover:bg-amber-100"
+              >
                 덱 {b.deck.length} · 버림 {b.discard.length} ·{' '}
                 <span className="text-slate-600">
                   결정 {countCrystals([...b.deck, ...b.discard, ...b.hand])}
                 </span>
-              </span>
+              </button>
               <button
                 type="button"
                 onClick={() => setBattle(combat.endTurn(b, session.run.ability))}
@@ -441,6 +450,8 @@ export function GameClient() {
                 턴 종료
               </button>
             </div>
+
+            {piles && <PileView deck={b.deck} discard={b.discard} onClose={() => setPiles(false)} />}
           </>
         )}
       </Shell>
@@ -643,6 +654,75 @@ export function GameClient() {
         다시 시작
       </button>
     </Shell>
+  );
+}
+
+/**
+ * 덱·버림 더미를 들여다본다 (#441).
+ *
+ * **덱은 순서를 감춘다** — 이름순으로 정렬해 보여 준다. 무엇이 남았는지는 알려 주되 다음에
+ * 무엇이 올지는 알려 주지 않는 것이 이 장르의 관습이고, 순서까지 보이면 계산이 아니라
+ * 암기가 된다. 버림 더미는 이미 지나간 것이라 그대로 둔다.
+ */
+function PileView({
+  deck,
+  discard,
+  onClose,
+}: {
+  deck: Card[];
+  discard: Card[];
+  onClose: () => void;
+}) {
+  const sorted = [...deck].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col bg-amber-50 p-4">
+      <div className="flex items-baseline justify-between border-b border-amber-200 pb-2">
+        <b className="text-sm">더미</b>
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-[44px] rounded-md border border-amber-300 bg-amber-50 px-4 text-sm hover:bg-amber-100"
+        >
+          닫는다
+        </button>
+      </div>
+      <div className="mt-3 flex-1 space-y-4 overflow-y-auto">
+        <Pile title={`덱 ${deck.length}장`} note="순서는 감춘다" cards={sorted} />
+        <Pile title={`버림 ${discard.length}장`} note="지나간 것" cards={discard} />
+      </div>
+    </div>
+  );
+}
+
+function Pile({ title, note, cards }: { title: string; note: string; cards: Card[] }) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-2">
+        <b className="text-xs">{title}</b>
+        <span className="font-mono text-[10px] text-amber-700">{note}</span>
+      </div>
+      {cards.length === 0 ? (
+        <p className="mt-1 text-xs text-amber-700">비었다.</p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {cards.map((c) => (
+            <span
+              key={c.id}
+              className={`rounded-md border px-2 py-1 text-[11px] ${
+                c.kind === 'crystal'
+                  ? 'border-slate-300 bg-slate-100 text-slate-500'
+                  : 'border-amber-300 bg-amber-100/60'
+              }`}
+            >
+              {c.name}
+              <span className="ml-1 font-mono text-[10px] text-amber-700">
+                {c.cost === null ? '—' : c.cost}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

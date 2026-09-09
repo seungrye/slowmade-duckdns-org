@@ -403,3 +403,31 @@ test.describe("덱 다듬기 (#439)", () => {
     await expect(page.getByText(/에테르가 모자랍니다/)).toBeVisible();
   });
 });
+
+test.describe("더미 들여다보기 (#441)", () => {
+  test.use({ viewport: PHONE });
+
+  test("숫자를 누르면 무엇이 남았는지 보인다 — 숫자만으로는 계산할 수 없다", async ({ page }) => {
+    await enterBattle(page);
+    await page.getByRole("button", { name: /^덱 \d+ · 버림/ }).click();
+
+    await expect(page.getByText("더미", { exact: true })).toBeVisible();
+    await expect(page.getByText(/덱 \d+장/)).toBeVisible();
+    await expect(page.getByText("순서는 감춘다")).toBeVisible();
+
+    // 손패가 5장이면 덱에는 나머지가 남아 있어야 한다.
+    await expect(page.getByText(/버림 \d+장/)).toBeVisible();
+  });
+
+  test("닫으면 사라지고 손패가 다시 잡힌다 — 덮개가 판을 막지 않는다", async ({ page }) => {
+    await enterBattle(page);
+    const before = await page.locator(CARD).count();
+
+    await page.getByRole("button", { name: /^덱 \d+ · 버림/ }).click();
+    await expect(page.getByText("더미", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "닫는다" }).click();
+
+    await expect(page.getByText("더미", { exact: true })).toHaveCount(0);
+    await expect(page.locator(CARD)).toHaveCount(before);
+  });
+});
