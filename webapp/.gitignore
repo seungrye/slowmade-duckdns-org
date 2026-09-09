@@ -59,3 +59,7 @@ next-env.d.ts
 
 # 일회성/진단 스크립트 모음 (재사용·참조용으로 남기되 커밋하지 않음)
 /scripts/adhoc/
+
+# 변이 시험 보고서 (#445) — 생성물
+reports/
+.stryker-tmp/

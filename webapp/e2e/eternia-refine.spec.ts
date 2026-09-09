@@ -435,19 +435,39 @@ test.describe("더미 들여다보기 (#441)", () => {
 test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
   const DESKTOP = { width: 1440, height: 900 };
 
-  /** 손패가 이 열의 폭을 다 쓰는지. 좌우에 열을 세우면 여기서 줄어든다. */
-  async function handShare(page: Page) {
-    const hand = (await page.locator(HAND).boundingBox())!;
-    const rail = (await page.locator(".h-1.overflow-hidden").first().boundingBox())!;
-    return hand.width / rail.width;
+  /**
+   * 이웃 카드의 중심 간 거리(px) — 이름이 얼마나 드러나는가.
+   *
+   * 처음엔 손패 폭을 `.h-1.overflow-hidden`(침식 띠)으로 나눠 "판의 몇 %인가"를 쟀다.
+   * 그건 두 번 틀렸다 — 내 Tailwind 유틸리티 클래스를 붙잡았고(디자인이 바뀌면 깨진다),
+   * 무엇보다 **폭 비율은 목적이 아니라 대리 지표**였다. 진짜 원하는 것은 "카드 이름이
+   * 보이는가"다. 그러니 그것을 직접 잰다.
+   *
+   * ⚠ **한 번만 재면 안 된다.** 카드에는 200ms 전환이 걸려 있고, FanHand 는 마운트 뒤
+   * 컨테이너 폭을 재서(360 기본값 → 실제 폭) 부채를 다시 편다. 그 사이에 재면 중간값이
+   * 나온다 — CI 에서 실제로 44.7 이 나와 시험이 깨졌다(목표 72). 부르는 쪽이 `expect.poll`
+   * 로 감싸 **자리를 잡을 때까지** 기다린다.
+   */
+  async function cardPitch(page: Page) {
+    const boxes = await page.locator(CARD).evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return r.x + r.width / 2;
+      }),
+    );
+    if (boxes.length < 2) return 0;
+    boxes.sort((a, b) => a - b);
+    const gaps = boxes.slice(1).map((x, i) => x - boxes[i]);
+    return gaps.reduce((a, b) => a + b, 0) / gaps.length;
   }
 
-  test("손패가 판의 폭을 다 쓴다 — 자원 열이 카드 자리를 먹지 않게", async ({ page }) => {
-    // 한때 데스크톱에서 좌·우 열을 세웠는데 그 288px 이 손패에서 나가 부채 간격이
-    // 72 → 41 로 줄었다. 이름을 드러내려던 일이 이름을 더 가렸다.
+  test("넓은 화면에서 카드가 이름이 보일 만큼 벌어진다", async ({ page }) => {
+    // 카드 폭이 100 이라 간격이 50 아래면 이웃이 절반 넘게 덮는다. 실측에서 「달의 각인」이
+    // "달의 각" 으로 보였다. 한때 데스크톱에 좌·우 열을 세웠더니 그 288px 이 손패에서 나가
+    // 간격이 41 로 떨어졌다 — 이름을 드러내려던 일이 이름을 더 가렸다.
     await page.setViewportSize(DESKTOP);
     await enterBattle(page);
-    expect(await handShare(page)).toBeGreaterThan(0.95);
+    await expect.poll(() => cardPitch(page)).toBeGreaterThan(50);
   });
 
   test("에테르는 손패 아래 붙어 있다 — 카드마다 시선이 왕복하지 않게", async ({ page }) => {
@@ -488,6 +508,9 @@ test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
       expect(b.x).toBeGreaterThanOrEqual(0);
       expect(b.x + b.width).toBeLessThanOrEqual(PHONE.width + 1);
     }
-    expect(await handShare(page)).toBeGreaterThan(0.95);
+    // 여기서 간격은 단언하지 않는다. **좁은 화면에서 좁아지는 것이 정상**이다 —
+    // `fit()` 이 부채를 잘리게 두느니 간격을 줄인다(412px·6장이면 44.8). 그 규칙은
+    // `fan-geometry.test.ts` 가 폭을 훑어 가며 덮는다. 여기서 50 을 요구하면 화면이
+    // 좁다는 이유만으로 빨간불이 켜진다 — 실제로 CI 에서 그렇게 깨졌다.
   });
 });

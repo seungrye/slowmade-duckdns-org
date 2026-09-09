@@ -1,0 +1,66 @@
+# 변이 시험 (#445) — 시험이 정말 실패할 수 있는지 검사한다.
+#
+# 커버리지는 "그 줄이 실행됐나"만 본다. 실행됐는데 결과를 단언하지 않으면 초록으로 남는다.
+# 여기서는 코드를 일부러 틀리게 바꿔 보고 시험이 잡는지 본다 — 못 잡는 변이가 곧 빈 단언이다.
+#
+# **PR 마다 돌리지 않는다.** 한 판에 3분 남짓이고, 고쳐야 할 것은 "이번 PR 이 뭘 깼나"가
+# 아니라 "우리 단언이 어디가 무른가"라 주기적으로 보는 편이 맞다. 손으로 돌리려면
+# Actions 탭에서 이 워크플로를 dispatch 하거나 `pnpm test:mutation`.
+#
+# 범위는 `src/lib/eternia-refine` 의 순수 규칙뿐이다(설정: webapp/stryker.config.mjs).
+
+name: mutation
+
+# 이 잡은 코드를 읽고 시험만 돌린다 — 쓸 권한이 필요 없다.
+# 기본 권한은 저장소 설정에 따라 넓을 수 있으므로 여기서 좁혀 못박는다.
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 매주 월요일 새벽(UTC 19:00 일 = KST 04:00 월). 아무도 안 기다리는 시각.
+    - cron: "0 19 * * 0"
+
+jobs:
+  stryker:
+    name: stryker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: webapp
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: webapp/pnpm-lock.yaml
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # 순수 모듈만 보므로 mongo 도 빌드도 필요 없다 — vitest 가 그대로 돈다.
+      - name: Run stryker
+        run: pnpm test:mutation
+
+      # 보고서가 본론이다. 점수 한 줄이 아니라 **살아남은 변이 목록**을 읽어야
+      # 어느 단언이 무른지 알 수 있다.
+      - name: 보고서를 남긴다
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: webapp/reports/mutation/
+          retention-days: 7
+          if-no-files-found: ignore
