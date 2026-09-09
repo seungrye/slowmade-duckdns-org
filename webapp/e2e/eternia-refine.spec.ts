@@ -33,6 +33,9 @@ const CARD = `${HAND} button`;
 /** 사용자가 제보한 기기 폭. 부채가 실제로 잘렸던 화면이다. */
 const PHONE = { width: 412, height: 915 };
 
+/** 시험용 고정 씨앗 — 같은 씨앗이면 같은 지도다. */
+const SEED = 42;
+
 /** FanHand 의 판정 문턱 — 손짓이 정말 그 편에 섰는지 재려고 그대로 들고 있는다. */
 const FLICK_VELOCITY = 0.55;
 
@@ -58,13 +61,38 @@ interface Entry {
  * 필요한 것은 이 결정성이다.
  */
 async function enterBattle(page: Page, { protagonist, path = "/games/eternia-refine" }: Entry = {}) {
-  await page.goto(path);
+  // **씨앗을 고정한다.** 안 그러면 회차마다 지도가 달라 첫 노드가 전투일 수도, 정제소일
+  // 수도 있어 개수 단언이 흔들린다(실제로 흔들렸다).
+  await page.goto(`${path}?seed=${SEED}`);
+  // #430 부터 타이틀 → 주인공 선택 → **지도** 를 지나야 전투에 닿는다.
+  await page.getByRole("button", { name: "새 회차" }).click();
   if (protagonist) {
     await page.locator("button[aria-pressed]").filter({ hasText: protagonist }).click();
   }
   await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+  await gotoBattleFromMap(page);
   await expect(page.locator(HAND)).toBeVisible();
   await expect(page.locator(CARD).first()).toBeVisible();
+}
+
+/**
+ * 지도에서 전투 노드를 골라 들어간다.
+ *
+ * 첫 층이 전투가 아닐 수도 있다(정제소·사건). 전투가 설 때까지 앞으로 간다 — 지도는
+ * 씨앗에서 나오므로 회차마다 첫 노드가 다르다.
+ */
+async function gotoBattleFromMap(page: Page) {
+  for (let i = 0; i < 6; i++) {
+    if (await page.locator(HAND).isVisible().catch(() => false)) return;
+    const battle = page.getByRole("button", { name: /^전투/ }).first();
+    const any = page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스)/ }).first();
+    const target = (await battle.count()) > 0 ? battle : any;
+    if ((await target.count()) === 0) return;
+    await target.click();
+    // 정제소·사건이면 지나가고 다시 지도로 온다.
+    const leave = page.getByRole("button", { name: "정거장으로 돌아간다" });
+    if (await leave.isVisible().catch(() => false)) await leave.click();
+  }
 }
 
 /**
@@ -160,6 +188,9 @@ test.describe("손패 제스처 (#425)", () => {
     await expect(page.locator(CARD)).toHaveCount(before);
     await expectExpanded(page, before - 1);
 
+    // 포커스를 다시 잡고 누른다. 첫 누름 뒤 리렌더가 끼면 포커스가 흔들려 두 번째가
+    // 엉뚱한 데로 갈 수 있다 — 병렬 실행에서 그 경합이 실제로 났다.
+    await page.locator(CARD).nth(before - 1).focus();
     await page.keyboard.press("Enter");
     await expect(page.locator(CARD)).toHaveCount(before - 1);
   });
