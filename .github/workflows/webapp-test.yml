@@ -187,8 +187,18 @@ jobs:
         env:
           MONGO_URI: mongodb://127.0.0.1:27017/webadventure-ci
 
+      # `--with-deps` 는 apt 를 탄다. GitHub 러너의 미러가 종종 죽는데(실측: 40분 동안
+      # `E: Some index files failed to download` → exit 100 으로 세 PR 이 연달아 막혔다),
+      # 그건 우리 코드와 무관하다. 몇 번 다시 해 보고 그래도 안 되면 그때 빨간불을 켠다.
       - name: Install chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          for i in 1 2 3; do
+            pnpm exec playwright install --with-deps chromium && exit 0
+            echo "::warning::chromium 설치 실패 — 재시도 $i/3 (대개 apt 미러)"
+            sleep 25
+          done
+          echo "::error::chromium 설치가 3번 다 실패했다"
+          exit 1
 
       - name: Build
         run: pnpm build
