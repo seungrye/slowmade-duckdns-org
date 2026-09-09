@@ -9,7 +9,7 @@
 
 import type { Ability, Act, Card, Faction, Protagonist, RunResult, RunState } from './types';
 import { crystalCard, countCrystals } from './combat';
-import { refine, bossHpBonus } from './refine';
+import { refine, bossHpBonus, ETHER_PER_REMOVAL } from './refine';
 import { applyErosion } from './stigma';
 import { resolveEnding, explainEnding } from './ending';
 import type { RunSummary } from './ending';
@@ -402,6 +402,45 @@ export function burnCrystals(session: Session, count: number): Session {
         ...session.run.log,
         `정제소 — 결정 ${r.burned}장을 태웠다. 부유도시 강화 ${r.cityPower}.`,
       ],
+    },
+  };
+}
+
+/** 지금 에테르로 지울 수 있는 카드들 — 결정은 태우는 것이 원래 길이라 뺀다. */
+export function removable(session: Session): Card[] {
+  if (session.run.ether < ETHER_PER_REMOVAL) return [];
+  return session.run.deck.filter((c) => c.kind !== 'crystal');
+}
+
+/**
+ * 에테르로 카드 하나를 지운다 (#439).
+ *
+ * 전투마다 카드가 하나씩 붙어 덱이 8장에서 14~18장까지 불어난다. 덱은 순환이라 두꺼워질수록
+ * 원하는 카드가 늦게 오므로, **더하기만 있고 빼기가 없으면 회차 후반이 묽어진다.**
+ * 결정은 이 길로 못 지운다 — 태우는 것이 원래 길이고, 두 길을 다 열면 순환이 된다.
+ */
+export function removeCard(session: Session, cardId: string): Session {
+  if (session.run.ether < ETHER_PER_REMOVAL) return session;
+  const card = session.run.deck.find((c) => c.id === cardId);
+  if (!card || card.kind === 'crystal') return session;
+
+  let dropped = false;
+  const deck = session.run.deck.filter((c) => {
+    if (!dropped && c.id === cardId) {
+      dropped = true;
+      return false;
+    }
+    return true;
+  });
+  if (!dropped) return session;
+
+  return {
+    ...session,
+    run: {
+      ...session.run,
+      deck,
+      ether: session.run.ether - ETHER_PER_REMOVAL,
+      log: [...session.run.log, `${card.name} 을(를) 덱에서 지웠다.`],
     },
   };
 }

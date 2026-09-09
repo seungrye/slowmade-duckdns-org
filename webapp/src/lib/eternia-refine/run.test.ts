@@ -22,6 +22,8 @@ import {
   toResult,
   choices,
   enterNode,
+  removeCard,
+  removable,
   chooseAlly,
   isBossNode,
   type Session,
@@ -318,5 +320,71 @@ describe('시나리오 지도', () => {
     const target = choices(s).find((n) => n.sceneId === 'a');
     if (!target) return;
     expect(enterNode(s, target.id).run.erosion).toBe(s.run.erosion);
+  });
+});
+
+/**
+ * 에테르로 카드 지우기 (#439).
+ *
+ * 이 게임에는 더하기만 있고 빼기가 없었다 — 전투마다 카드가 붙어 덱이 8→14~18장으로
+ * 불어나는데 뺄 길은 결정뿐이었다. 그리고 정제로 쌓이는 에테르는 아무 데도 안 쓰였다.
+ * 둘은 서로의 답이다.
+ */
+describe('에테르로 카드 지우기', () => {
+  const rich = (ether: number): Session => {
+    const s = run();
+    return { ...s, run: { ...s.run, ether } };
+  };
+
+  it('에테르를 내고 덱에서 뺀다', () => {
+    const s = rich(50);
+    const target = s.run.deck.find((c) => c.kind !== 'crystal')!;
+    const after = removeCard(s, target.id);
+    expect(after.run.deck.length).toBe(s.run.deck.length - 1);
+    expect(after.run.deck.some((c) => c.id === target.id)).toBe(false);
+    expect(after.run.ether).toBe(50 - 18);
+  });
+
+  it('한 장만 지운다 — 같은 이름이 여럿이어도', () => {
+    const s = rich(50);
+    const name = s.run.deck[0].name;
+    const before = s.run.deck.filter((c) => c.name === name).length;
+    const after = removeCard(s, s.run.deck[0].id);
+    expect(after.run.deck.filter((c) => c.name === name).length).toBe(before - 1);
+  });
+
+  it('에테르가 모자라면 아무 일도 없다', () => {
+    const s = rich(17);
+    expect(removeCard(s, s.run.deck[0].id)).toBe(s);
+    expect(removable(s)).toHaveLength(0);
+  });
+
+  it('결정은 이 길로 못 지운다 — 태우는 것이 원래 길이다', () => {
+    const base = rich(90);
+    const s: Session = {
+      ...base,
+      run: { ...base.run, deck: [...base.run.deck, crystalCard(1)] },
+    };
+    const crystal = s.run.deck.find((c) => c.kind === 'crystal')!;
+    expect(removeCard(s, crystal.id)).toBe(s);
+    expect(removable(s).some((c) => c.kind === 'crystal')).toBe(false);
+  });
+
+  it('없는 카드를 부르면 아무 일도 없다 — 저장본을 고쳐도 막힌다', () => {
+    const s = rich(90);
+    expect(removeCard(s, '없는카드')).toBe(s);
+  });
+
+  it('덱을 통째로 비울 수는 있지만 도시가 그만큼 자란다 — 상한은 에테르가 아니다', () => {
+    // 에테르는 결정을 태워야 나오고, 태우면 도시가 자란다. 그것이 진짜 값이다.
+    const s = rich(18 * 3);
+    let cur = s;
+    for (let i = 0; i < 3; i++) {
+      const t = removable(cur)[0];
+      if (t) cur = removeCard(cur, t.id);
+    }
+    expect(cur.run.deck.length).toBe(s.run.deck.length - 3);
+    expect(cur.run.ether).toBe(0);
+    expect(removable(cur)).toHaveLength(0);
   });
 });
