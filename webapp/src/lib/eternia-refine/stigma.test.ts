@@ -1,21 +1,15 @@
-// 침식 규칙 (#419) — A안(별도)과 B안(엔진 공유)의 **공통 명세**.
+// 침식 규칙 (#419 → #427).
 //
 // 이 게임의 심장이다. 강해지려면 성흔을 써야 하고, 쓰면 침식이 오르고, 침식이 오르면
 // 덱이 결정으로 막힌다. 그 셋의 관계를 여기서 못 박는다.
 //
-// **두 구현이 같은 시험을 함께 통과한다.** 그게 이 비교의 전제다 — 규칙이 다르면
-// 코드량이나 결합점을 비교해 봐야 사과와 오렌지다. 한쪽만 깨지면 그 순간 갈라진 것이다.
+// 한때 자체 구현과 공유 구현이 이 시험을 **함께** 통과했다(#419 비교). 공유로 결론이
+// 나서 자체 구현은 지웠고, 남은 한 벌을 여기서 지킨다.
 
 import { describe, it, expect } from 'vitest';
-import * as own from './stigma';
-import * as shared from './stigma-shared';
+import * as m from './stigma';
 
-const IMPLS = [
-  ['A안 별도', own],
-  ['B안 공유', shared],
-] as const;
-
-describe.each(IMPLS)('%s', (_name, m) => {
+describe('침식 규칙', () => {
   describe('applyErosion', () => {
     it('더하고 0..100 으로 자른다', () => {
       expect(m.applyErosion(36, 12)).toBe(48);
@@ -101,22 +95,17 @@ describe.each(IMPLS)('%s', (_name, m) => {
 });
 
 /**
- * 변경 추종 — 이 비교의 핵심 실험 (#419).
+ * 변경 추종 — 공유를 고른 이유 (#419 실험, #427 에서 확정).
  *
- * B안은 임계값을 web-adventure 에서 가져오므로, CYOA 가 규칙을 바꾸면 **따라온다.**
- * A안은 자기 상수라 따라오지 않는다. 어느 쪽이 옳은지는 상황에 달렸다 — 따라오는 것이
- * 이득일 수도(한 곳만 고치면 된다), 손해일 수도(카드 밸런스가 CYOA 사정으로 흔들린다) 있다.
- * 여기서는 **그 연결이 실제로 살아 있다는 것**만 못 박는다.
+ * 임계값을 web-adventure 에서 가져오므로 CYOA 가 규칙을 바꾸면 **따라온다.** 자체
+ * 구현은 따라오지 않았고(같은 값을 손으로 두 번 적어 두었을 뿐), 그 차이가 두 안을
+ * 갈랐다. 값이 같은지가 아니라 **출처가 이어져 있는지**를 못 박는다 — 값만 비교하면
+ * 연결이 끊겨도 우연히 통과한다.
  */
-describe('변경 추종 — B안만 CYOA 임계값을 따라간다', () => {
-  it('B안의 상수는 web-adventure 에서 온다', async () => {
+describe('변경 추종 — CYOA 임계값을 따라간다', () => {
+  it('상수는 web-adventure 에서 온다', async () => {
     const wa = await import('@/lib/web-adventure/engine/stigma');
-    expect(shared.EROSION_MAX).toBe(wa.STIGMA_MAX);
-    expect(shared.EROSION_DEBUFF_AT).toBe(wa.STIGMA_DEBUFF_THRESHOLD);
-  });
-
-  it('A안의 상수는 자기 것이다 — 지금은 값이 같지만 출처가 다르다', () => {
-    expect(own.EROSION_MAX).toBe(100);
-    expect(own.EROSION_DEBUFF_AT).toBe(50);
+    expect(m.EROSION_MAX).toBe(wa.STIGMA_MAX);
+    expect(m.EROSION_DEBUFF_AT).toBe(wa.STIGMA_DEBUFF_THRESHOLD);
   });
 });

@@ -1,22 +1,39 @@
 'use client';
 
-// 부채꼴 손패 (#419) — 두 라우트가 함께 쓴다. UI 는 비교 대상이 아니라 한 벌만 둔다.
+// 부채꼴 손패 (#419 → #427).
 //
-// 세로 화면에 카드 다섯 장을 넣는 방법. 가로 스크롤 스트립으로 두면 **드래그가 스크롤과
-// 싸운다** — 카드를 위로 끌어 내려는 손짓이 목록을 옆으로 밀어 버린다. 겹쳐 놓으면
-// 스크롤이 사라지고 그 충돌도 함께 사라진다.
+// 세로 화면에 카드를 넣는 방법. 가로 스크롤 스트립으로 두면 **드래그가 스크롤과 싸운다**
+// — 카드를 위로 끌어 내려는 손짓이 목록을 옆으로 밀어 버린다. 겹쳐 놓으면 스크롤이
+// 사라지고 그 충돌도 함께 사라진다.
 //
 // 조작:
 //   1. 누른다        — 그 카드가 올라오고 본문이 보인다
-//   2. 좌우로 쓴다   — 손가락 밑 카드가 차례로 올라온다 (손을 떼지 않고 훑는다)
+//   2. 좌우로 쓴다   — 손가락 밑 카드가 차례로 올라오고, 이웃은 옆으로 비켜난다
 //   3. 위로 끈다     — DRAG_THRESHOLD 를 넘으면 낼 준비가 된다
 //   4. 도로 내린다   — 제자리로
 //
-// ── 폭 계산 (처음에 여기서 틀렸다) ──────────────────────────────────
+// ── 배치 모델: Godot 팬 레이아웃 이식 ────────────────────────────────
 //
-// 회전 피벗이 카드 **아래쪽**에 있어서(부채 손잡이), 회전은 카드를 옆으로도 밀어낸다.
-// 그 이동량 `PIVOT_BELOW × sin(각도)` 를 안 세는 바람에 412px 기기에서 부채가 좌우로
-// 잘렸다. 그래서 간격·각도를 상수로 두지 않고 **컨테이너 폭에서 역산**한다.
+// stormtoy/card_fan_demo (Slay the Spire 식) 의 모델을 옮겼다:
+//   정규화 위치  t = 2i/(n−1) − 1  ∈ [−1, 1]
+//   회전         rot = t × rotation
+//   포물선 호    y   = −arc × (1 − t²)      (가운데가 가장 높다)
+//   호버         들리고 커진다 + 이웃은 좌우로 비켜난다
+//
+// **크기는 이식하지 않고 실측 폭에서 역산한다.** 원본의 스케일 1.5·흩어짐 120px 을
+// 412px 화면에 그대로 넣으면 부채가 잘린다(실제로 한 번 겪었다). 구조는 그대로 두고
+// 각도·간격·흩어짐만 컨테이너 폭에 맞춘다 — `fanGeometry` 가 그 계산이다.
+//
+// 이전 모델과의 차이: 회전 피벗이 카드 **아래 150px** 에 있었다. 그러면 회전이 카드를
+// 옆으로도 밀어내(`PIVOT_BELOW × sinθ`) 폭을 크게 먹고, 아래로도 끌어내려 버튼을 덮었다.
+// 지금은 피벗이 카드 중심이고 호를 y 로 직접 준다 — 같은 각도에서 폭이 훨씬 덜 든다.
+//
+// ── 훑을 때 전환을 줄이는 이유 (실측) ────────────────────────────────
+//
+// 전환이 200ms 인데 손가락은 60ms 마다 다음 카드로 넘어간다. 그래서 어떤 카드도 끝까지
+// 못 올라오고 −20~−32 에서 되돌아 내려갔다(목표 −56). 손을 떼야 비로소 한 장이 섰다.
+// 그래서 훑는 동안에는 전환을 **끈다**(SCRUB_MS = 0) — 위치를 손가락에서 바로 계산하니
+// 따라올 것이 없다. 되돌아갈 때만 REST_MS 로 부드럽게 내린다.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Card } from '@/lib/eternia-refine/types';
@@ -41,72 +58,135 @@ const FLICK_WINDOW_MS = 80;
 /** 이만큼 위로 끌기 전까지는 좌우 훑기로 본다. */
 const SCRUB_UNTIL = -18;
 
-const CARD_W = 100;
-const CARD_H = 144;
+// 시험이 같은 값을 다시 적지 않도록 내보낸다 — 어긋나면 시험이 거짓으로 통과한다.
+export const CARD_W = 100;
+export const CARD_H = 144;
+export const EDGE_PAD = 10;
 
-/** 카드 중심에서 회전 피벗까지의 거리. 클수록 부채가 넓게 펴진다. */
-const PIVOT_BELOW = 150;
+/** 가장 바깥 카드가 눕는 각도. 눕힐수록 예쁘지만 이름이 안 읽히고 폭을 먹는다. */
+export const MAX_ROTATION_DEG = 12;
 
-/**
- * 카드 한 장당 기울기. 바깥 카드는 이것의 (n−1)/2 배까지 눕는다.
- *
- * 13 → 7 → 4 로 내려왔다. 눕힐수록 부채는 예쁘지만 이름이 안 읽히고 폭을 많이 먹는다.
- * 손패가 5장으로 고정이 아니므로(루나는 더 뽑는다) **덜 눕히고 더 겹치는** 편이
- * 장수가 늘어도 버틴다. 4° 면 8장에서도 바깥이 14° 다.
- */
-const MAX_SPREAD_DEG = 4;
+/** 가운데 카드가 가장자리보다 이만큼 높다 — 손에 쥔 부채의 호. */
+const ARC_HEIGHT = 18;
 
-/** 겹침 정도 — 이 값보다 넓게는 안 벌린다. 작을수록 많이 겹친다. */
-const MAX_GAP = 34;
+/** 겹침 정도 — 이보다 넓게는 안 벌린다. 작을수록 많이 겹친다. */
+const MAX_GAP = 40;
 
 /** 이보다 좁아지면 더는 안 겹치고 각도를 줄인다. */
 const MIN_GAP = 13;
-const LIFT_PX = -56;
-const EDGE_PAD = 10;
+
+/**
+ * 고른 카드가 올라오는 높이 — 카드 높이의 절반.
+ *
+ * 예전엔 −56(38%)이라 "절반쯤 올라온다"에 못 미쳤다.
+ */
+export const HOVER_LIFT = -72;
+
+/**
+ * 고른 카드가 커지는 배율.
+ *
+ * 원본은 1.5 인데 그건 카드가 크고 화면이 넓은 데스크톱 기준이다. 100×144 카드를
+ * 412px 폭에서 1.5배 하면 이웃을 통째로 덮어 무엇을 고르는지 안 보인다. 1.25 로 낮췄다.
+ */
+export const HOVER_SCALE = 1.25;
+
+/** 이웃이 옆으로 비켜서는 거리. 남는 폭이 모자라면 `fanGeometry` 가 줄인다(0 까지). */
+export const SCATTER_MAX = 20;
+
+/**
+ * 훑는 동안의 전환 — **없다.** 손가락 위치에서 바로 계산하므로 따라올 것이 없다.
+ *
+ * 60ms 로도 해 봤는데 한 카드에 머무는 60ms 안에 61%(−44/−72)까지밖에 못 올라왔다.
+ * 리액트가 다시 그리는 시간이 그 안에 들어가기 때문이다. 전환이 남아 있는 한 빠르게
+ * 훑을수록 덜 올라오고, 그게 처음의 어색함이었다.
+ */
+const SCRUB_MS = 0;
+
+/** 손을 뗀 뒤 제자리로 돌아가는 전환. */
+const REST_MS = 200;
 
 const rad = (d: number) => (d * Math.PI) / 180;
 
-/**
- * 컨테이너 폭에 맞는 부채 각도·간격을 구한다.
- *
- * 가장 바깥 카드가 차지하는 가로 반폭 = 회전한 카드의 반폭 + 피벗이 밀어낸 거리 + 간격.
- * 이것이 `폭/2 − 여백` 을 넘지 않게 각도부터 줄이고, 그래도 안 되면 간격을 줄인다.
- */
-export function fanGeometry(width: number, n: number) {
-  if (n <= 1) return { spread: 0, gap: 0, drop: 0, height: CARD_H };
-  const maxOffset = (n - 1) / 2;
-  const budget = width / 2 - EDGE_PAD;
-
-  const pick = (deg: number, gap: number) => ({ spread: deg, gap, ...vertical(deg * maxOffset) });
-
-  for (let deg = MAX_SPREAD_DEG; deg >= 0; deg -= 0.5) {
-    const rot = rad(deg * maxOffset);
-    const halfRotated = (CARD_W * Math.cos(rot) + CARD_H * Math.sin(rot)) / 2;
-    const pivotPush = PIVOT_BELOW * Math.sin(rot);
-    const room = budget - halfRotated - pivotPush;
-    if (room <= 0) continue;
-    const gap = Math.min(MAX_GAP, room / maxOffset);
-    if (gap >= MIN_GAP) return pick(deg, gap);
-  }
-  // 아주 좁은 화면 — 회전 없이 최소 간격으로 겹친다.
-  return pick(0, Math.max(8, (budget - CARD_W / 2) / maxOffset));
+export interface FanGeometry {
+  /** 카드 사이 가로 간격(px). */
+  gap: number;
+  /** 가장 바깥 카드의 회전(도). */
+  rotation: number;
+  /** 가운데 카드가 가장자리보다 높은 정도(px). */
+  arc: number;
+  /** 이웃이 비켜서는 거리(px). 폭이 모자라면 0. */
+  scatter: number;
+  /** 회전 때문에 카드가 제 상자 아래로 내려가는 양(px). */
+  drop: number;
+  /** 손패 상자의 높이(px). */
+  height: number;
 }
 
 /**
- * 회전이 카드를 얼마나 아래로 끌어내리나.
+ * 컨테이너 폭에 맞는 부채를 구한다.
  *
- * 피벗이 카드 밖(아래)에 있어서, 회전하면 아래 모서리가 원래 밑변보다 더 내려간다.
- * 이걸 안 세면 카드가 손패 상자를 뚫고 나가 아래 버튼을 덮고 페이지가 늘어난다 —
- * 실제로 그랬다(30px 삐져나옴).
+ * 가장 바깥 카드의 가로 반폭 = 회전한 카드의 반폭 + 중심에서 밀려난 거리. 이것이
+ * `폭/2 − 여백` 을 넘지 않게 **각도부터** 줄이고, 그래도 안 되면 간격을 줄인다.
+ * 남는 폭이 있으면 그만큼을 이웃 흩어짐에 준다 — 흩어져도 화면을 안 넘게.
  *
- * 밑변의 피벗 기준 높이 `b = CARD_H/2 − PIVOT_BELOW` 일 때
- *   내려간 양 = (CARD_W/2)·sinθ + |b|·(1 − cosθ)
+ * ```
+ * fanGeometry(412, 5)   -> gap 40, rotation 12, scatter 20
+ * fanGeometry(360, 10)  -> 간격이 좁아지고 흩어짐이 0 에 가까워진다
+ * ```
  */
-function vertical(maxDeg: number) {
-  const rot = rad(maxDeg);
-  const b = PIVOT_BELOW - CARD_H / 2;
-  const drop = Math.ceil((CARD_W / 2) * Math.sin(rot) + b * (1 - Math.cos(rot)));
-  return { drop, height: CARD_H + drop };
+export function fanGeometry(width: number, n: number): FanGeometry {
+  if (n <= 1) {
+    return { gap: 0, rotation: 0, arc: 0, scatter: 0, drop: 0, height: CARD_H };
+  }
+  const budget = width / 2 - EDGE_PAD;
+  const half = (n - 1) / 2;
+
+  // 흩어질 자리를 **먼저 떼어 두고** 맞춘다. 남는 폭으로만 주면 손패가 많을 때 —
+  // 즉 비켜서기가 가장 필요할 때 — 흩어짐이 0 이 된다(412px·8장에서 실제로 그랬다).
+  // 쉬는 부채가 조금 좁아지는 값을 치르고 비켜서기를 지킨다.
+  return (
+    fit(budget, half, SCATTER_MAX) ??
+    // 그럴 자리도 없는 좁은 화면 — 부채를 자르느니 비켜서기를 버린다.
+    fit(budget, half, 0) ??
+    // 그마저 안 되면 회전 없이 최소로 겹친다.
+    build(0, Math.max(8, (budget - CARD_W / 2) / half), budget, half, 0)
+  );
+}
+
+/** 흩어짐 몫 `reserve` 를 떼어 두고 각도부터 줄여 맞춰 본다. 못 맞추면 null. */
+function fit(budget: number, half: number, reserve: number): FanGeometry | null {
+  for (let deg = MAX_ROTATION_DEG; deg >= 0; deg -= 0.5) {
+    const room = budget - rotatedHalfWidth(deg) - reserve;
+    if (room <= 0) continue;
+    const gap = Math.min(MAX_GAP, room / half);
+    if (gap >= MIN_GAP) return build(deg, gap, budget, half, reserve);
+  }
+  return null;
+}
+
+export function rotatedHalfWidth(deg: number): number {
+  const rot = rad(deg);
+  return (CARD_W * Math.cos(rot) + CARD_H * Math.sin(rot)) / 2;
+}
+
+function build(
+  deg: number,
+  gap: number,
+  budget: number,
+  half: number,
+  reserve: number,
+): FanGeometry {
+  const rot = rad(deg);
+  const spanHalf = half * gap;
+  const scatter = Math.max(0, Math.min(reserve, budget - spanHalf - rotatedHalfWidth(deg)));
+  // 중심 회전이라 카드가 아래로 내려가는 양은 예전(피벗이 카드 밖) 보다 훨씬 작다.
+  const drop = Math.max(0, Math.ceil((CARD_W * Math.sin(rot) + CARD_H * Math.cos(rot) - CARD_H) / 2));
+  return { gap, rotation: deg, arc: ARC_HEIGHT, scatter, drop, height: CARD_H + drop + ARC_HEIGHT };
+}
+
+/** 카드 i 의 정규화 위치 — 왼쪽 끝 −1, 가운데 0, 오른쪽 끝 +1. */
+export function normalized(i: number, n: number): number {
+  return n <= 1 ? 0 : (i / (n - 1)) * 2 - 1;
 }
 
 export interface FanHandProps {
@@ -121,6 +201,7 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
   const [sel, setSel] = useState(-1);
   const [dy, setDy] = useState(0);
   const [armed, setArmed] = useState(false);
+  const [scrubbing, setScrubbing] = useState(false);
   const [width, setWidth] = useState(360);
   const dragging = useRef(false);
   const startY = useRef(0);
@@ -132,7 +213,9 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
    */
   const samples = useRef<{ y: number; t: number }[]>([]);
   const root = useRef<HTMLDivElement>(null);
-  const cards = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const n = hand.length;
+  const { gap, rotation, arc, scatter, drop, height } = fanGeometry(width, n);
 
   // 폭이 바뀌면 부채를 다시 편다 — 회전으로 화면을 넘지 않게.
   useLayoutEffect(() => {
@@ -151,20 +234,25 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
     setArmed(false);
   }, [hand]);
 
-  const cardAt = useCallback((clientX: number) => {
-    let best = -1;
-    let bestD = Infinity;
-    cards.current.forEach((el, i) => {
-      if (!el) return;
+  /**
+   * 손가락 밑 카드 — **기하로** 계산한다.
+   *
+   * 예전엔 카드의 실제 위치를 재서 가장 가까운 것을 골랐는데, 이웃이 흩어지면 그 위치가
+   * 움직여서 같은 x 에서 고르는 카드가 왔다 갔다 할 수 있다. 쉬는 자리로 계산하면 그
+   * 되먹임이 없다.
+   */
+  const indexAt = useCallback(
+    (clientX: number) => {
+      const el = root.current;
+      if (!el || n === 0) return -1;
+      if (n === 1) return 0;
       const r = el.getBoundingClientRect();
-      const d = Math.abs(clientX - (r.left + r.width / 2));
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    });
-    return best;
-  }, []);
+      const rel = clientX - (r.left + r.width / 2);
+      const i = Math.round(rel / gap + (n - 1) / 2);
+      return Math.max(0, Math.min(n - 1, i));
+    },
+    [gap, n],
+  );
 
   /** 표본을 쌓되 창 밖은 버린다. */
   const pushSample = (y: number) => {
@@ -186,11 +274,12 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
 
   const down = (e: React.PointerEvent) => {
     if (disabled) return;
-    const i = cardAt(e.clientX);
+    const i = indexAt(e.clientX);
     if (i < 0) return;
     dragging.current = true;
     startY.current = e.clientY;
     samples.current = [{ y: e.clientY, t: performance.now() }];
+    setScrubbing(true);
     setSel(i);
     setDy(0);
     setArmed(false);
@@ -205,7 +294,7 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
 
     // 위로 안 끌었으면 좌우 훑기 — 손가락 밑 카드로 갈아탄다.
     if (delta > SCRUB_UNTIL) {
-      const i = cardAt(e.clientX);
+      const i = indexAt(e.clientX);
       if (i >= 0 && i !== sel) {
         setSel(i);
         startY.current = e.clientY;
@@ -231,14 +320,11 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
     const flicked = velocity() <= FLICK_VELOCITY && dy <= FLICK_MIN_DY;
     const shouldPlay = armed || flicked;
 
+    setScrubbing(false);
     setDy(0);
     setArmed(false);
     if (shouldPlay && i >= 0 && hand[i] && canPlay(hand[i])) onPlay(i);
   };
-
-  const n = hand.length;
-  const center = (n - 1) / 2;
-  const { spread, gap, drop, height } = fanGeometry(width, n);
 
   return (
     <div
@@ -260,20 +346,28 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
       )}
 
       {hand.map((card, i) => {
-        const off = i - center;
+        const t = normalized(i, n);
         const isSel = i === sel;
         const playable = canPlay(card);
-        // 호(arc)는 회전 피벗이 만들어 준다 — y 를 따로 더하면 아래로 삐져나간다.
-        const transform = isSel
-          ? `translate(${off * gap}px, ${dy || LIFT_PX}px) rotate(0deg) scale(1.06)`
-          : `translate(${off * gap}px, 0px) rotate(${off * spread}deg)`;
+
+        // 쉬는 자리 — 정규화 위치가 x·회전·호를 한꺼번에 정한다.
+        let x = t * ((n - 1) / 2) * gap;
+        let y = -arc * (1 - t * t);
+        let deg = t * rotation;
+        let scale = 1;
+
+        if (isSel) {
+          // 고른 카드는 똑바로 서서 올라온다. 끌고 있으면 손가락을 따라간다.
+          y = dy || HOVER_LIFT;
+          deg = 0;
+          scale = HOVER_SCALE;
+        } else if (sel >= 0) {
+          x += i < sel ? -scatter : scatter;
+        }
 
         return (
           <button
             key={card.id}
-            ref={(el) => {
-              cards.current[i] = el;
-            }}
             type="button"
             disabled={disabled}
             style={{
@@ -281,14 +375,18 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
               height: CARD_H,
               marginLeft: -CARD_W / 2,
               bottom: drop,
-              transform,
-              transformOrigin: `50% ${PIVOT_BELOW + CARD_H / 2}px`,
+              transform: `translate(${x}px, ${y}px) rotate(${deg}deg) scale(${scale})`,
+              transitionDuration: `${scrubbing ? SCRUB_MS : REST_MS}ms`,
               zIndex: isSel ? 60 : i,
             }}
             onClick={(e) => {
               // 탭·클릭은 **펼치기**다 (사용자 지정). 제출은 위로 끌거나 튕길 때만.
               // 다만 키보드 활성화(detail === 0)는 손짓을 쓸 수 없으므로,
               // 펼쳐 둔 카드에서 한 번 더 누르면 제출로 받는다.
+              //
+              // 포인터로 누르면 이 핸들러는 **불리지 않는다** — pointerdown 이 컨테이너로
+              // 포인터를 캡처해 click 이 재타겟되기 때문이다. 즉 아래 setSel 은 키보드
+              // 전용 경로다(e2e 변형 실험으로 확인).
               if (dragging.current) return;
               const byKeyboard = e.detail === 0;
               if (byKeyboard && sel === i && playable) onPlay(i);
@@ -296,7 +394,7 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
             }}
             className={[
               'absolute left-1/2 flex flex-col gap-1 overflow-hidden rounded-md border p-2 text-left',
-              'transition-transform duration-200 ease-out motion-reduce:transition-none',
+              'transition-transform ease-out motion-reduce:transition-none',
               isSel ? 'shadow-lg' : 'shadow-sm',
               card.kind === 'crystal'
                 ? 'border-slate-300 bg-slate-100 text-slate-500'

@@ -25,7 +25,7 @@
 // 되돌리면 **키보드 검사만** 깨지고 탭 검사는 멀쩡히 통과한다.
 
 import { test, expect, type Page } from "@playwright/test";
-import { dragUp, centerOf } from "./helpers/pointer-gesture";
+import { dragUp, centerOf, scrubAcross } from "./helpers/pointer-gesture";
 
 const HAND = '[aria-label="손패"]';
 const CARD = `${HAND} button`;
@@ -35,6 +35,14 @@ const PHONE = { width: 412, height: 915 };
 
 /** FanHand 의 판정 문턱 — 손짓이 정말 그 편에 섰는지 재려고 그대로 들고 있는다. */
 const FLICK_VELOCITY = 0.55;
+
+/**
+ * 고른 카드가 올라왔다고 인정하는 높이.
+ *
+ * FanHand 의 HOVER_LIFT 는 −72 다. 전환이 막 끝나는 순간의 오차를 감안해 70% 인 −50 을
+ * 문턱으로 둔다. 쉬는 카드는 포물선 호로 최대 −18 까지만 올라가므로 헷갈릴 여지가 없다.
+ */
+const LIFTED_AT = -50;
 
 interface Entry {
   /** 생략하면 기본값(린). 카엘은 결정 2장을 안고 시작한다. */
@@ -49,7 +57,7 @@ interface Entry {
  * 없다. 그래서 손패는 늘 5장이고 전부 낼 수 있다(전부 비용 ≤1, 에테르 3). 손짓 검사에
  * 필요한 것은 이 결정성이다.
  */
-async function enterBattle(page: Page, { protagonist, path = "/games/eternia-refine/shared" }: Entry = {}) {
+async function enterBattle(page: Page, { protagonist, path = "/games/eternia-refine" }: Entry = {}) {
   await page.goto(path);
   if (protagonist) {
     await page.locator("button[aria-pressed]").filter({ hasText: protagonist }).click();
@@ -156,6 +164,53 @@ test.describe("손패 제스처 (#425)", () => {
     await expect(page.locator(CARD)).toHaveCount(before - 1);
   });
 
+  test("좌우로 훑으면 지나는 카드가 그때그때 끝까지 올라온다", async ({ page }) => {
+    await enterBattle(page);
+    const n = await page.locator(CARD).count();
+    const from = await centerOf(page, CARD, 0);
+    const to = await centerOf(page, CARD, n - 1);
+
+    const frames = await scrubAcross(page, HAND, {
+      fromX: from.x,
+      toX: to.x,
+      y: from.y,
+      steps: 8,
+      dwellMs: 60,
+      sample: CARD,
+    });
+
+    // 이 검사가 잡으려는 회귀: 전환이 200ms 였을 때는 한 장이 −20 쯤 올라가다 다음
+    // 카드로 넘어가며 도로 내려갔다. 걸음마다 **아무것도 안 올라온** 프레임이 섞였다.
+    for (const f of frames) {
+      const lifted = f.items.filter((c) => c.y <= LIFTED_AT);
+      expect(lifted, `x=${f.x} 의 세로 위치 ${JSON.stringify(f.items.map((c) => c.y))}`).toHaveLength(
+        1,
+      );
+    }
+  });
+
+  test("훑는 동안 이웃은 좌우로 비켜난다", async ({ page }) => {
+    await enterBattle(page);
+    const n = await page.locator(CARD).count();
+    const from = await centerOf(page, CARD, 0);
+    const to = await centerOf(page, CARD, n - 1);
+
+    const frames = await scrubAcross(page, HAND, {
+      fromX: from.x,
+      toX: to.x,
+      y: from.y,
+      steps: 8,
+      dwellMs: 60,
+      sample: CARD,
+    });
+
+    // 카드 1 은 손가락이 왼쪽 끝에 있을 때 오른쪽으로, 오른쪽 끝에 있을 때 왼쪽으로
+    // 비켜난다. 그래서 훑는 동안 x 가 뚜렷이 줄어야 한다(2 × scatter 만큼).
+    const early = frames[0].items[1].x;
+    const late = frames[frames.length - 1].items[1].x;
+    expect(late).toBeLessThan(early - 20);
+  });
+
   test("굳은 결정은 펼쳐지되 나가지 않는다", async ({ page }) => {
     // 카엘만 결정을 안고 시작한다(2장). 10장 덱에서 8장을 뽑으니 거의 늘 손에 들어온다.
     await enterBattle(page, { protagonist: "카엘" });
@@ -237,20 +292,4 @@ test.describe("손패 배치 — 화면을 넘지 않는다 (#425)", () => {
     expect(m.docWidth).toBeLessThanOrEqual(m.docClientWidth);
     expect(m.cardBottom).toBeLessThanOrEqual(m.handBottom + 1);
   });
-});
-
-test.describe("두 라우트가 같은 화면을 낸다 (#425)", () => {
-  test.use({ viewport: PHONE });
-
-  // UI 는 비교 대상이 아니다 — 규칙만 다르고 화면은 한 벌이라는 것을 못 박는다.
-  for (const [path, label] of [
-    ["/games/eternia-refine", "A안 별도"],
-    ["/games/eternia-refine/shared", "B안 공유"],
-  ] as const) {
-    test(`${label} — 같은 손패로 전투에 들어간다`, async ({ page }) => {
-      await enterBattle(page, { path });
-      await expect(page.getByText(label).first()).toBeVisible();
-      await expect(page.locator(CARD)).toHaveCount(5);
-    });
-  }
 });

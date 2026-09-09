@@ -2,17 +2,16 @@
 
 // 〈에테르니아: 정제〉 화면 (#419).
 //
-// **두 라우트가 이 컴포넌트 하나를 함께 쓴다.** 다른 것은 `rules` prop 뿐이다 —
-// A안은 자체 침식 규칙을, B안은 web-adventure 에서 가져온 규칙을 넘긴다. UI 는 비교
-// 대상이 아니므로 한 벌만 둔다.
+// 화면 한 벌, 규칙 한 벌 (#427). 한때 두 라우트가 `rules` prop 만 바꿔 이 컴포넌트를
+// 함께 썼는데, 비교가 끝나 규칙이 하나가 되면서 prop 도 사라졌다.
 //
 // 색은 web-adventure 플레이 화면 그대로다(bg-amber-50 양피지, amber-300 테두리,
 // amber-700 강조). 침식만 팔레트 밖의 돌빛(slate)으로 뺐다 — 따뜻한 화면에서 혼자
 // 차가워야 "있으면 안 되는 것"으로 읽힌다.
 
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { StigmaRules } from '@/lib/eternia-refine/combat';
 import { createCombat, countCrystals } from '@/lib/eternia-refine/combat';
+import * as rules from '@/lib/eternia-refine/stigma';
 import type { Ability, Card, CombatState, Protagonist } from '@/lib/eternia-refine/types';
 import { ABILITIES, PROTAGONISTS } from '@/lib/eternia-refine/content';
 import {
@@ -33,15 +32,9 @@ import { ETHER_PER_CRYSTAL, bossHpBonus } from '@/lib/eternia-refine/refine';
 import { endingLabel } from '@/content/web-adventure/endings';
 import { FanHand } from './FanHand';
 
-export interface GameClientProps {
-  rules: StigmaRules;
-  /** 화면 위에 어느 판인지 적는다 — 두 라우트를 번갈아 볼 때 헷갈리지 않게. */
-  variant: string;
-  variantNote: string;
-}
-
-export function GameClient({ rules, variant, variantNote }: GameClientProps) {
-  const combat = useMemo(() => createCombat(rules), [rules]);
+export function GameClient() {
+  // 규칙은 모듈이라 바뀌지 않는다 — 한 번만 묶는다.
+  const combat = useMemo(() => createCombat(rules), []);
   const [session, setSession] = useState<Session>(newSession);
   const [battle, setBattle] = useState<CombatState | null>(null);
   const [pick, setPick] = useState<{ p: Protagonist; a: Ability }>({ p: 'rin', a: 'lunar' });
@@ -88,7 +81,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
   // ── 주인공 선택 ──────────────────────────────────────────────────
   if (phase.kind === 'select') {
     return (
-      <Shell variant={variant} note={variantNote}>
+      <Shell>
         <h2 className="text-xl font-black tracking-tight">누구로 시작할 것인가</h2>
         <p className="mt-1 text-sm text-amber-800">시작 조건이 곧 난이도다.</p>
 
@@ -154,7 +147,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
       // 정제소에서 막 나왔거나 새로 들어온 노드 — 전투를 세운다.
       beginBattle(session, phase.node);
       return (
-        <Shell variant={variant} note={variantNote}>
+        <Shell>
           <p className="text-sm text-amber-800">{nodeLabel(phase.node)} — 채비를 한다…</p>
         </Shell>
       );
@@ -163,7 +156,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
     const intent = b.enemy.intents[b.turn % b.enemy.intents.length];
 
     return (
-      <Shell variant={variant} note={variantNote}>
+      <Shell>
         <Rail erosion={b.erosion} max={rules.EROSION_MAX} />
 
         <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs">
@@ -273,7 +266,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
       if (next.phase.kind === 'battle') beginBattle(next, next.phase.node);
     };
     return (
-      <Shell variant={variant} note={variantNote}>
+      <Shell>
         <h2 className="text-xl font-black tracking-tight">무엇을 가져갈 것인가</h2>
         <p className="mt-1 text-sm text-amber-800">
           침식 {session.run.erosion} · 덱 {session.run.deck.length}장
@@ -318,7 +311,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
       if (next.phase.kind === 'battle') beginBattle(next, next.phase.node);
     };
     return (
-      <Shell variant={variant} note={variantNote}>
+      <Shell>
         <h2 className="text-xl font-black tracking-tight">옴팔로스 정제소</h2>
         <p className="mt-1 text-sm text-amber-800">태울 것을 가져오면, 태울 힘을 판다.</p>
 
@@ -386,7 +379,7 @@ export function GameClient({ rules, variant, variantNote }: GameClientProps) {
 
   // ── 엔딩 ─────────────────────────────────────────────────────────
   return (
-    <Shell variant={variant} note={variantNote}>
+    <Shell>
       <p className="font-mono text-[11px] uppercase tracking-widest text-amber-700">회차 종료</p>
       <h2 className="mt-1 text-3xl font-black tracking-tight">{endingLabel(phase.endingId)}</h2>
       <p className="mt-3 border-l-4 border-amber-700 pl-4 text-sm leading-relaxed">{phase.why}</p>
@@ -447,15 +440,7 @@ function Rail({ erosion, max }: { erosion: number; max: number }) {
   );
 }
 
-function Shell({
-  variant,
-  note,
-  children,
-}: {
-  variant: string;
-  note: string;
-  children: React.ReactNode;
-}) {
+function Shell({ children }: { children: React.ReactNode }) {
   const shell = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(56);
 
@@ -481,11 +466,10 @@ function Shell({
       className="web-adventure-page flex flex-col bg-amber-50 px-4 py-4 text-amber-950"
     >
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-amber-200 pb-2">
+        <div className="border-b border-amber-200 pb-2">
           <span className="font-mono text-[11px] uppercase tracking-widest text-amber-700">
-            에테르니아: 정제 — {variant}
+            에테르니아: 정제
           </span>
-          <span className="text-[11px] text-amber-800">{note}</span>
         </div>
         <div className="flex flex-1 flex-col pt-3">{children}</div>
       </div>
