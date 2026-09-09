@@ -10,11 +10,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 
-type Pillar = { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: string; zhiEl: string };
+type Pillar = { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: WuXing; zhiEl: WuXing };
 type SajuBlock = {
   pillars: { year: Pillar; month: Pillar; day: Pillar; time: Pillar | null };
-  dayGanKr: string; dayEl: string; elements: Record<string, number>;
-  iljin: { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: string };
+  dayGanKr: string; dayEl: WuXing; elements: Record<WuXing, number>;
+  iljin: { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: WuXing; zhiEl: WuXing };
+  /** 오행 저울 — 타고난 몫 위에 오늘이 얹힌 상태 (#449). 서버가 계산해 준다. */
+  bars: Record<WuXing, { base: number; add: number; total: number }>;
   relation: { key: string; meaning: string };
   reading: string; readingSource: 'llm' | 'template'; hasBirthTime: boolean;
 };
@@ -28,8 +30,7 @@ type Fortune = {
   saju: SajuBlock | null;
 };
 
-import { EL_COLOR, ELEMENTS, meaningOf, ZHI_EL } from '@/lib/fortune/saju-labels';
-const ZHI_EL_OF = (z: string) => ZHI_EL[z] ?? '토';
+import { EL_COLOR, ELEMENTS, meaningOf, type WuXing } from '@/lib/fortune/saju-labels';
 // 사주 글자 수 — 시주가 있으면 4기둥×2=8, 없으면 3기둥×2=6.
 const sajuTotal = (saju: SajuBlock) => (saju.pillars.time ? 8 : 6);
 
@@ -238,69 +239,140 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
       </div>
     );
   }
-  const { pillars } = saju;
+  const { pillars, bars } = saju;
+  // 저울 눈금 — 오늘 얹은 것까지 담아야 막대가 안 잘린다.
+  const scale = Math.max(1, ...ELEMENTS.map((el) => bars?.[el]?.total ?? 0));
   return (
     <div>
-      {/* 미니 사주판 — 년·월·일·시(일주 강조) */}
-      <div className="grid grid-cols-4 gap-2">
-        <PillarBox label="년주" p={pillars.year} />
-        <PillarBox label="월주" p={pillars.month} />
-        <PillarBox label="일주 · 나" p={pillars.day} me />
-        <PillarBox label="시주" p={pillars.time} />
-      </div>
+      {/* ── 오늘 ─────────────────────────────────────────────────
+          매일 바뀌는 것만 보라 테두리 안에 모은다 (#449). 예전엔 이 자리에 평생 안 바뀌는
+          사주판이 있었고 오늘은 맨 아래 12px 한 줄이었다 — 그래서 "매일 같은 값"으로 읽혔다.
 
-      {/* 오행 분포 */}
-      <div className="mt-4 flex items-center gap-1.5">
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">오행 분포</span>
-        <span className="group/oh relative inline-flex cursor-help text-gray-400" tabIndex={0} aria-label="오행 분포란">
-          <span className="grid h-4 w-4 place-items-center rounded-full border border-gray-300 text-[10px] dark:border-gray-600">?</span>
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute bottom-full left-0 z-20 mb-1 w-max max-w-[240px] rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/oh:opacity-100 group-focus/oh:opacity-100 dark:bg-gray-700"
+          카드와 저울은 같은 것을 두 번 말한다: 카드의 두 글자가 곧 저울에 얹히는 두 기운
+          이고, 글자 색과 빗금 색이 같다. 색이 곧 범례라 설명이 따로 필요 없다. */}
+      <div className="rounded-xl border-2 border-violet-500 p-3">
+        <div className="grid grid-cols-[104px_minmax(0,1fr)] items-center gap-3 sm:grid-cols-[112px_200px_minmax(0,1fr)] sm:items-start">
+          {/* 오늘의 일진 카드 — 타로 카드와 같은 비율 */}
+          <div
+            className="grid aspect-[60/103] place-content-center rounded-xl border-2 border-violet-500 text-center"
+            style={{
+              background: `linear-gradient(160deg, ${EL_COLOR[saju.iljin.ganEl]}22, ${EL_COLOR[saju.iljin.zhiEl]}18)`,
+            }}
+            aria-label={`오늘의 일진 ${saju.iljin.ganKr}${saju.iljin.zhiKr}, ${saju.relation.key}`}
           >
-            사주 {sajuTotal(saju)}글자 중 각 오행이 몇 개인지예요. 많거나 없는 기운이 그 사람의 균형을 말해 줍니다.
-          </span>
-        </span>
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {ELEMENTS.map((el) => {
-          const n = saju.elements[el] ?? 0;
-          return (
-            <span
-              key={el}
-              tabIndex={0}
-              className="group/chip relative inline-flex cursor-help items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
-            >
-              <span className="h-2 w-2 rounded-full" style={{ background: EL_COLOR[el] }} />{el} {n}
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-max max-w-[220px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/chip:opacity-100 group-focus/chip:opacity-100 dark:bg-gray-700"
-              >
-                사주 {sajuTotal(saju)}글자 중 {el} 기운이 {n}개{n === 0 ? ' — 이 기운은 없어요' : ''}
-              </span>
-            </span>
-          );
-        })}
-      </div>
+            <div className="text-[34px] font-black leading-none" style={{ color: EL_COLOR[saju.iljin.ganEl] }}>
+              {saju.iljin.gan}
+            </div>
+            <div className="text-[34px] font-black leading-none" style={{ color: EL_COLOR[saju.iljin.zhiEl] }}>
+              {saju.iljin.zhi}
+            </div>
+            <div className="mt-1.5 text-[11.5px] text-gray-500 dark:text-gray-400">
+              {saju.iljin.ganKr}{saju.iljin.zhiKr}
+            </div>
+            <div className="mt-1.5 justify-self-center rounded-full bg-violet-600 px-2.5 py-0.5 text-[11px] font-bold text-white">
+              {saju.relation.key}
+            </div>
+          </div>
 
-      {/* 오늘의 사주 풀이 */}
-      <div className="mt-4">
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          <span className="text-violet-600 dark:text-violet-400 font-bold">{saju.dayGanKr}({saju.pillars.day.gan})</span> 일간 · 오늘의 일진{' '}
-          <span className="inline-flex items-baseline">
-            <ElChar hanja={saju.iljin.gan} kr={saju.iljin.ganKr} el={saju.iljin.ganEl} />
-            <ElChar hanja={saju.iljin.zhi} kr={saju.iljin.zhiKr} el={ZHI_EL_OF(saju.iljin.zhi)} />
-          </span>{' '}· <b>{saju.relation.key}</b>
+          {/* 오행 저울 — 본체는 고정, 빗금만 오늘 */}
+          <div>
+            <div className="grid gap-1.5">
+              {ELEMENTS.map((el) => {
+                const b = bars?.[el] ?? { base: saju.elements[el] ?? 0, add: 0, total: saju.elements[el] ?? 0 };
+                const pc = (n: number) => `${(n / scale) * 100}%`;
+                return (
+                  <div key={el} className="grid grid-cols-[16px_1fr_auto] items-center gap-1.5 text-[11.5px]">
+                    <span style={{ color: EL_COLOR[el] }}>{el}</span>
+                    <span className="flex h-2.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                      <i className="h-full" style={{ width: pc(b.base), background: EL_COLOR[el] }} />
+                      {b.add > 0 && (
+                        <i
+                          className="h-full opacity-60"
+                          style={{
+                            width: pc(b.add),
+                            color: EL_COLOR[el],
+                            backgroundImage:
+                              'repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 6px)',
+                          }}
+                        />
+                      )}
+                    </span>
+                    <span className="font-mono text-[11px] tabular-nums text-gray-500 dark:text-gray-400">
+                      {b.add > 0 ? <>{b.base}<b className="text-gray-800 dark:text-gray-100">→{b.total}</b></> : b.base}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            {/* 이건 비유다 — 일진을 원국에 산술로 더하는 건 명리학의 계산이 아니다. */}
+            <p className="mt-2 text-[10.5px] text-gray-400">빗금 = 오늘 더해지는 기운(비유)</p>
+          </div>
+
+          {/* 풀이 — 좁은 화면에선 아래 전폭으로 내려간다.
+              카드 옆 한 칸에 같이 넣으면 폭이 190px 라 한 줄 13자가 된다(실측). */}
+          <p className="col-span-2 mt-1 text-[15px] leading-8 sm:col-span-1 sm:mt-0">{saju.reading}</p>
         </div>
-        <p className="mt-2 text-[15px] leading-8">{saju.reading}</p>
         {saju.readingSource === 'template' && (
           <p className="mt-2 text-xs text-gray-400">오늘 밤 더 정성 들인 풀이로 채워져요.</p>
         )}
-        {!saju.hasBirthTime && (
-          <p className="mt-2 text-xs text-gray-400">태어난 시를 남기면 시주까지 완성돼요. (설정에서)</p>
-        )}
-        <p className="mt-3 text-xs text-gray-400">표준시(KST) 기준이라 진태양시·서머타임 보정은 하지 않아요.</p>
       </div>
+
+      {/* ── 태어날 때 정해진 것 ───────────────────────────────────
+          지우지 않는다. 접어 둘 뿐이고 펼치면 예전 그대로다. */}
+      <details className="group mt-4 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
+        <summary className="cursor-pointer list-none px-3 py-2.5 text-[12.5px] text-gray-500 marker:content-none dark:text-gray-400">
+          <span className="mr-1.5 inline-block transition-transform group-open:rotate-90">▸</span>
+          내 사주 여덟 글자 · 오행 분포
+          <span className="ml-1.5 text-gray-400">— 태어날 때 정해진 값</span>
+        </summary>
+        <div className="px-3 pb-3">
+          <div className="grid grid-cols-4 gap-2">
+            <PillarBox label="년주" p={pillars.year} />
+            <PillarBox label="월주" p={pillars.month} />
+            <PillarBox label="일주 · 나" p={pillars.day} me />
+            <PillarBox label="시주" p={pillars.time} />
+          </div>
+          <div className="mt-4 flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">오행 분포</span>
+            <span className="group/oh relative inline-flex cursor-help text-gray-400" tabIndex={0} aria-label="오행 분포란">
+              <span className="grid h-4 w-4 place-items-center rounded-full border border-gray-300 text-[10px] dark:border-gray-600">?</span>
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute bottom-full left-0 z-20 mb-1 w-max max-w-[240px] rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/oh:opacity-100 group-focus/oh:opacity-100 dark:bg-gray-700"
+              >
+                사주 {sajuTotal(saju)}글자 중 각 오행이 몇 개인지예요. 많거나 없는 기운이 그 사람의 균형을 말해 줍니다.
+              </span>
+            </span>
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {ELEMENTS.map((el) => {
+              const n = saju.elements[el] ?? 0;
+              return (
+                <span
+                  key={el}
+                  tabIndex={0}
+                  className="group/chip relative inline-flex cursor-help items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: EL_COLOR[el] }} />{el} {n}
+                  <span
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-max max-w-[220px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/chip:opacity-100 group-focus/chip:opacity-100 dark:bg-gray-700"
+                  >
+                    사주 {sajuTotal(saju)}글자 중 {el} 기운이 {n}개{n === 0 ? ' — 이 기운은 없어요' : ''}
+                  </span>
+                </span>
+              );
+            })}
+          </div>
+          <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+            <span className="font-bold text-violet-600 dark:text-violet-400">{saju.dayGanKr}({saju.pillars.day.gan})</span> 일간 — 나의 기운은 {saju.dayEl}
+          </div>
+          {!saju.hasBirthTime && (
+            <p className="mt-2 text-xs text-gray-400">태어난 시를 남기면 시주까지 완성돼요. (설정에서)</p>
+          )}
+        <p className="mt-3 text-xs text-gray-400">표준시(KST) 기준이라 진태양시·서머타임 보정은 하지 않아요.</p>
+        </div>
+      </details>
     </div>
   );
 }

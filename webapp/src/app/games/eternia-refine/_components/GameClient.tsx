@@ -12,7 +12,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createCombat, countCrystals } from '@/lib/eternia-refine/combat';
 import * as rules from '@/lib/eternia-refine/stigma';
-import type { Ability, Card, CombatState, Protagonist } from '@/lib/eternia-refine/types';
+import type {
+  Ability,
+  Card,
+  CombatState,
+  EnemyIntent,
+  Protagonist,
+} from '@/lib/eternia-refine/types';
 import { ABILITIES, PROTAGONISTS } from '@/lib/eternia-refine/content';
 import {
   afterBattle,
@@ -39,7 +45,7 @@ import { FACTIONS, closedBy } from '@/lib/eternia-refine/faction';
 import type { Faction } from '@/lib/eternia-refine/types';
 import { MapScreen } from './MapScreen';
 import { loadScenes } from '@/lib/eternia-refine/scenes';
-import type { ScenarioScene } from '@/lib/eternia-refine/scenario';
+import { displayTitle, type ScenarioScene } from '@/lib/eternia-refine/scenario';
 import { clearSave, fromSave, isSavable, readSave, writeSave, type SavedRun } from '@/lib/eternia-refine/save';
 import type { Session } from '@/lib/eternia-refine/run';
 import { ETHER_PER_CRYSTAL, ETHER_PER_REMOVAL, bossHpBonus } from '@/lib/eternia-refine/refine';
@@ -53,6 +59,8 @@ export function GameClient() {
   const [battle, setBattle] = useState<CombatState | null>(null);
   const [pick, setPick] = useState<{ p: Protagonist; a: Ability }>({ p: 'rin', a: 'lunar' });
   const [burn, setBurn] = useState(1);
+  /** 더미 들여다보기 (#441) — 전투 중에만 쓴다. */
+  const [piles, setPiles] = useState(false);
 
   /**
    * 이야기 원본 (#432).
@@ -217,7 +225,10 @@ export function GameClient() {
     const scene = sceneAt(session, phase.node);
     return (
       <Shell>
-        <h2 className="text-xl font-black tracking-tight">{scene?.title ?? '길 위에서'}</h2>
+        {/* 지도와 같은 규칙으로 벗긴다 — 이야기 화면은 원본 씬을 읽으므로 여기서도 (#443). */}
+        <h2 className="text-xl font-black tracking-tight">
+          {scene ? displayTitle(scene.title) : '길 위에서'}
+        </h2>
         <div className="mt-4 flex-1 space-y-3 overflow-y-auto text-sm leading-relaxed text-amber-900">
           {(scene?.body ?? ['아무 일도 일어나지 않았다.']).map((line, i) => (
             <p key={i}>{line}</p>
@@ -344,103 +355,105 @@ export function GameClient() {
     const b = battle;
     const intent = b.enemy.intents[b.turn % b.enemy.intents.length];
 
+    const enemyMax = b.enemy.maxHp + bonusHpFor(session, phase.node);
+
     return (
       <Shell>
         <Rail erosion={b.erosion} max={rules.EROSION_MAX} />
 
-        <div className="mt-3 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-xs">
-          <span className="text-slate-600">
-            침식 <b className="text-sm">{b.erosion}</b>/{rules.EROSION_MAX}
-          </span>
-          <span className="text-rose-700">
-            HP <b className="text-sm">{b.hp}</b>/{b.maxHp}
-          </span>
-          <span className="text-amber-700">
-            에테르 <b className="text-sm">{b.ether}</b>
-          </span>
-          {b.block > 0 && <span className="text-amber-800">방어 {b.block}</span>}
-        </div>
-
-        <div className="mt-3 rounded-md border border-amber-300 bg-amber-100/70 p-3">
-          <div className="flex items-baseline justify-between">
-            <b className="text-sm">{b.enemy.name}</b>
-            <span className="font-mono text-xs font-semibold">
-              {b.enemyHp}/{b.enemy.maxHp + bonusHpFor(session, phase.node)}
-            </span>
+        {/* ── 무대 ──────────────────────────────────────────────────
+            적이 남는 높이를 **차지한다**. 전에는 적이 얇은 패널이고 그 아래에 정체 모를
+            오각형이 따로 떠 있었다 — 실측(1440px)에서 그 사이가 250px 공백이었다. */}
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-2">
+          <IntentBadge intent={intent} block={b.enemyBlock} />
+          <EnemyFigure id={b.enemy.id} />
+          <div className="w-full max-w-sm">
+            <div className="flex items-baseline justify-between">
+              <b className="text-sm">{b.enemy.name}</b>
+              <span className="font-mono text-xs font-semibold tabular-nums">
+                {b.enemyHp}/{enemyMax}
+              </span>
+            </div>
+            <div className="mt-1 h-2 overflow-hidden rounded bg-amber-200">
+              <div
+                className="h-full bg-rose-600/80 transition-[width] duration-300 motion-reduce:transition-none"
+                style={{ width: `${(b.enemyHp / enemyMax) * 100}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded bg-amber-200">
-            <div
-              className="h-full bg-rose-600/80 transition-[width] duration-300 motion-reduce:transition-none"
-              style={{
-                width: `${(b.enemyHp / (b.enemy.maxHp + bonusHpFor(session, phase.node))) * 100}%`,
-              }}
-            />
-          </div>
-          <p className="mt-2 text-xs text-amber-900">
-            다음 수 — {intent.label}
-            {intent.damage ? ` · 피해 ${intent.damage}` : ''}
-            {intent.erosion ? ` · 침식 +${intent.erosion}` : ''}
-            {b.enemyBlock > 0 ? ` · 방어 ${b.enemyBlock}` : ''}
+          <p className="max-w-md text-center text-xs leading-relaxed text-amber-800">
+            {b.log[b.log.length - 1]}
           </p>
-        </div>
-
-        <p className="mt-3 text-xs leading-relaxed text-amber-800">
-          {b.log[b.log.length - 1]}
-        </p>
-
-        {!b.outcome && (
-          <p className="mt-1 font-mono text-[10.5px] text-amber-700">
-            눌러서 펼치고 · 좌우로 훑고 · 위로 끌거나 튕겨서 낸다
-          </p>
-        )}
-
-        {/* 남는 공간을 적이 채운다 — 비워 두면 화면이 깨진 것처럼 보인다. */}
-        <div className="flex min-h-4 flex-1 items-center justify-center">
-          <svg
-            viewBox="0 0 100 100"
-            className="h-24 w-24 opacity-90 md:h-32 md:w-32"
-            fill="none"
-            stroke="#92400E"
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M50 8 L72 30 L64 74 L36 74 L28 30 Z" fill="#FEF3C7" />
-            <path d="M50 8 L50 74M28 30 L72 30" />
-            <circle cx="50" cy="46" r="7" fill="#B45309" stroke="none" />
-          </svg>
         </div>
 
         {b.outcome ? (
           <button
             type="button"
             onClick={() => settleBattle(b, phase.node)}
-            className="mt-3 min-h-[48px] w-full rounded-md bg-amber-700 font-bold text-amber-50 hover:bg-amber-800"
+            className="mt-3 min-h-[48px] w-full shrink-0 rounded-md bg-amber-700 font-bold text-amber-50 hover:bg-amber-800"
           >
             {b.outcome === 'win' ? '이어서 간다' : '회차를 끝낸다'}
           </button>
         ) : (
           <>
+            {/* ── 조작대 ────────────────────────────────────────────
+                **손패가 폭을 다 쓴다.** 한때 데스크톱에서 좌·우에 자원·버튼 열을 세워
+                봤는데, 그 288px 이 그대로 손패에서 나가 부채 간격이 72 → 41 로 줄었다 —
+                카드 이름을 드러내려고 시작한 일이 이름을 더 가렸다. 자원은 아래 줄로
+                내리고 폭은 손패에 준다. */}
             <FanHand
               hand={b.hand}
               canPlay={(c) => c.kind !== 'crystal' && (c.cost === null || c.cost <= b.ether)}
               onPlay={(i) => setBattle(combat.playCard(b, i, session.run.ability))}
             />
-            <div className="mt-2 flex shrink-0 items-center justify-between">
-              <span className="font-mono text-[11px] text-amber-800">
-                덱 {b.deck.length} · 버림 {b.discard.length} ·{' '}
-                <span className="text-slate-600">
-                  결정 {countCrystals([...b.deck, ...b.discard, ...b.hand])}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setBattle(combat.endTurn(b, session.run.ability))}
-                className="min-h-[44px] rounded-md border border-amber-300 bg-amber-50 px-5 text-sm font-bold hover:bg-amber-100"
-              >
-                턴 종료
-              </button>
+
+            <div className="mt-2 flex shrink-0 items-center justify-between gap-3">
+              {/* **에테르는 손패 옆에 있어야 한다.** 카드를 고르는 시선이 손패에 있는데
+                  낼 수 있는지 판단할 자원이 화면 최상단에 있으면 매 카드마다 시선이
+                  왕복한다 — 덱빌더가 대체로 에너지를 손패 옆 큰 원으로 두는 이유다. */}
+              <div className="flex items-center gap-3">
+                <EtherOrb value={b.ether} />
+                <div className="flex flex-col gap-0.5 font-mono text-[11px] leading-tight">
+                  <span className="text-rose-700">
+                    체력 <b className="text-sm tabular-nums">{b.hp}</b>
+                    <span className="text-rose-700/60">/{b.maxHp}</span>
+                    {b.block > 0 && <span className="ml-2 text-amber-800">방어 {b.block}</span>}
+                  </span>
+                  <span className="text-slate-600">
+                    침식 <b className="text-sm tabular-nums">{b.erosion}</b>/{rules.EROSION_MAX}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  type="button"
+                  onClick={() => setBattle(combat.endTurn(b, session.run.ability))}
+                  className="min-h-[44px] rounded-md border border-amber-300 bg-amber-50 px-5 text-sm font-bold hover:bg-amber-100"
+                >
+                  턴 종료
+                </button>
+                {/* 숫자만 보여 주면 무엇이 남았는지 모른 채 계산해야 한다 (#441).
+                    눌러서 들여다볼 수 있게 한다 — 정보 위계는 그대로, 체력·침식·적의 다음
+                    수가 여전히 위에 크게 있고 이건 그 아래 작게 있다. */}
+                <button
+                  type="button"
+                  onClick={() => setPiles(true)}
+                  className="min-h-[44px] rounded-md px-1 text-right font-mono text-[11px] text-amber-800 underline decoration-amber-300 underline-offset-4 hover:bg-amber-100"
+                >
+                  덱 {b.deck.length} · 버림 {b.discard.length} ·{' '}
+                  <span className="text-slate-600">
+                    결정 {countCrystals([...b.deck, ...b.discard, ...b.hand])}
+                  </span>
+                </button>
+              </div>
             </div>
+
+            <p className="mt-1 shrink-0 text-center font-mono text-[10.5px] text-amber-700">
+              눌러서 펼치고 · 좌우로 훑고 · 위로 끌거나 튕겨서 낸다
+            </p>
+
+            {piles && <PileView deck={b.deck} discard={b.discard} onClose={() => setPiles(false)} />}
           </>
         )}
       </Shell>
@@ -646,6 +659,75 @@ export function GameClient() {
   );
 }
 
+/**
+ * 덱·버림 더미를 들여다본다 (#441).
+ *
+ * **덱은 순서를 감춘다** — 이름순으로 정렬해 보여 준다. 무엇이 남았는지는 알려 주되 다음에
+ * 무엇이 올지는 알려 주지 않는 것이 이 장르의 관습이고, 순서까지 보이면 계산이 아니라
+ * 암기가 된다. 버림 더미는 이미 지나간 것이라 그대로 둔다.
+ */
+function PileView({
+  deck,
+  discard,
+  onClose,
+}: {
+  deck: Card[];
+  discard: Card[];
+  onClose: () => void;
+}) {
+  const sorted = [...deck].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col bg-amber-50 p-4">
+      <div className="flex items-baseline justify-between border-b border-amber-200 pb-2">
+        <b className="text-sm">더미</b>
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-[44px] rounded-md border border-amber-300 bg-amber-50 px-4 text-sm hover:bg-amber-100"
+        >
+          닫는다
+        </button>
+      </div>
+      <div className="mt-3 flex-1 space-y-4 overflow-y-auto">
+        <Pile title={`덱 ${deck.length}장`} note="순서는 감춘다" cards={sorted} />
+        <Pile title={`버림 ${discard.length}장`} note="지나간 것" cards={discard} />
+      </div>
+    </div>
+  );
+}
+
+function Pile({ title, note, cards }: { title: string; note: string; cards: Card[] }) {
+  return (
+    <div>
+      <div className="flex items-baseline gap-2">
+        <b className="text-xs">{title}</b>
+        <span className="font-mono text-[10px] text-amber-700">{note}</span>
+      </div>
+      {cards.length === 0 ? (
+        <p className="mt-1 text-xs text-amber-700">비었다.</p>
+      ) : (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {cards.map((c) => (
+            <span
+              key={c.id}
+              className={`rounded-md border px-2 py-1 text-[11px] ${
+                c.kind === 'crystal'
+                  ? 'border-slate-300 bg-slate-100 text-slate-500'
+                  : 'border-amber-300 bg-amber-100/60'
+              }`}
+            >
+              {c.name}
+              <span className="ml-1 font-mono text-[10px] text-amber-700">
+                {c.cost === null ? '—' : c.cost}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Stat({ k, v }: { k: string; v: number }) {
   return (
     <div className="flex justify-between border-b border-amber-200 pb-1">
@@ -667,6 +749,148 @@ function Rail({ erosion, max }: { erosion: number; max: number }) {
   );
 }
 
+/**
+ * 남은 에테르 (#443).
+ *
+ * 전에는 화면 **최상단**에 침식·체력과 같은 12px 텍스트였다. 그런데 카드를 고를 때 보는
+ * 것은 손패이고, 낼 수 있는지 판단하는 값은 이것 하나다 — 둘이 화면 양 끝에 있으면 카드
+ * 한 장마다 시선이 왕복한다. 덱빌더가 대체로 에너지를 손패 옆 큰 원으로 두는 이유다.
+ *
+ * 그래서 크기가 아니라 **자리가** 요점이다. 부르는 쪽이 손패 옆에 놓는다.
+ */
+function EtherOrb({ value }: { value: number }) {
+  return (
+    <span
+      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 border-amber-700 bg-amber-100 font-mono text-xl font-black tabular-nums text-amber-800"
+      aria-label={`에테르 ${value}`}
+    >
+      {value}
+    </span>
+  );
+}
+
+/** intent 표식 하나 — 도형과 숫자. */
+function Mark({ d, n, tone }: { d: string; n: number; tone: string }) {
+  return (
+    <span className={`flex items-center gap-1 ${tone}`}>
+      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+        <path d={d} />
+      </svg>
+      <b className="font-mono text-sm tabular-nums">{n}</b>
+    </span>
+  );
+}
+
+/**
+ * 적이 다음 턴에 할 일 (#443).
+ *
+ * 전에는 `다음 수 — 곤봉 · 피해 8` 한 줄이었다. **턴마다 확인하는 정보라 읽기 비용이
+ * 쌓인다** — 그래서 덱빌더는 대체로 이것을 적 머리 위 심볼로 둔다(텍스트는 읽어야 하고
+ * 도형은 본다).
+ *
+ * 도형만 남기지는 않는다. 「곤봉」·「정화 의식」은 이 게임의 목소리라 아래 작게 남긴다 —
+ * 숫자는 한눈에, 이름은 읽고 싶은 사람에게.
+ */
+function IntentBadge({ intent, block }: { intent: EnemyIntent; block: number }) {
+  const words = [
+    intent.damage ? `피해 ${intent.damage}` : '',
+    intent.block ? `방어 ${intent.block}` : '',
+    intent.erosion ? `침식 +${intent.erosion}` : '',
+  ].filter(Boolean);
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div
+        className="flex items-center gap-3 rounded-full border-2 border-amber-700 bg-amber-100 px-3 py-1"
+        aria-label={`다음 수 — ${intent.label}${words.length ? ` · ${words.join(' · ')}` : ''}`}
+      >
+        {intent.damage ? (
+          <Mark d="M3 3 L21 3 L12 21 Z" n={intent.damage} tone="text-rose-700" />
+        ) : null}
+        {intent.block ? (
+          <Mark
+            d="M12 2 L20 5 V12 C20 16.4 16.4 19.8 12 22 C7.6 19.8 4 16.4 4 12 V5 Z"
+            n={intent.block}
+            tone="text-amber-800"
+          />
+        ) : null}
+        {intent.erosion ? (
+          <Mark d="M12 1.5 L19.5 12 L12 22.5 L4.5 12 Z" n={intent.erosion} tone="text-slate-600" />
+        ) : null}
+      </div>
+      <span className="text-[11px] text-amber-800">
+        {intent.label}
+        {block > 0 ? ` · 이미 방어 ${block}` : ''}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * 적의 모습 (#443).
+ *
+ * 전에는 어느 적이든 같은 오각형이었고, 코드 주석이 그 까닭을 실토했다 — "남는 공간을
+ * 적이 채운다. 비워 두면 화면이 깨진 것처럼 보인다." 자리를 메우려고 둔 도형이라 적
+ * 패널과 따로 떠 있었고, 무엇을 그린 것인지도 알 수 없었다.
+ *
+ * 적이 셋뿐이라([content.ENEMIES]) 하나씩 그린다. 모르는 id 는 예전 도형으로 물러선다 —
+ * 적이 늘어도 화면이 비지 않는다.
+ */
+function EnemyFigure({ id }: { id: string }) {
+  const art: Record<string, React.ReactNode> = {
+    // 정거장 경비 — 방패와 곤봉.
+    patrol: (
+      <>
+        <path d="M38 22 L62 22 L62 52 C62 66 50 76 50 76 C50 76 38 66 38 52 Z" fill="#FEF3C7" />
+        <path d="M50 22 L50 76M38 40 L62 40" />
+        <path d="M72 30 L72 62" strokeWidth="4" strokeLinecap="round" />
+      </>
+    ),
+    // 사제단 정화관 — 뾰족한 제의 두건과 향로.
+    purifier: (
+      <>
+        <path d="M50 12 L68 78 L32 78 Z" fill="#FEF3C7" />
+        <circle cx="50" cy="44" r="8" fill="#B45309" stroke="none" />
+        <path d="M50 12 L50 32M36 66 L64 66" />
+      </>
+    ),
+    // 에테르 기관차 — 보일러와 굴뚝, 바퀴.
+    engine: (
+      <>
+        <path d="M22 34 L70 34 L70 66 L22 66 Z" fill="#FEF3C7" />
+        <path d="M28 34 L28 18 L42 18 L42 34" fill="#FEF3C7" />
+        <circle cx="34" cy="72" r="7" fill="#FEF3C7" />
+        <circle cx="58" cy="72" r="7" fill="#FEF3C7" />
+        <path d="M70 42 L82 42 L82 58 L70 58" />
+      </>
+    ),
+  };
+
+  return (
+    <svg
+      viewBox="0 0 100 90"
+      className="h-24 w-24 opacity-90 md:h-32 md:w-32 lg:h-44 lg:w-44"
+      fill="none"
+      stroke="#92400E"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {art[id] ?? (
+        <>
+          <path d="M50 8 L72 30 L64 74 L36 74 L28 30 Z" fill="#FEF3C7" />
+          <path d="M50 8 L50 74M28 30 L72 30" />
+          <circle cx="50" cy="46" r="7" fill="#B45309" stroke="none" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// 판을 이 열보다 넓히려고 해 봤지만 되지 않았다 (#443). `max-w-5xl` 은 이 프로젝트에서
+// 672px(=`max-w-2xl`)로 나오고, `max-w-[64rem]` 도 인라인 `max-width: 1024px !important`
+// 도 computed 가 672px 이었다 — 실측이다. 사이트 전체가 이 폭으로 읽히므로 게임만 뚫는
+// 것은 어차피 틀린 방향이었다. 남는 폭 대신 **손패에 폭을 다 주는** 쪽으로 갔다.
 function Shell({ children }: { children: React.ReactNode }) {
   const shell = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(56);
@@ -692,7 +916,9 @@ function Shell({ children }: { children: React.ReactNode }) {
       style={{ minHeight: `calc(100dvh - ${top}px)` }}
       className="web-adventure-page flex flex-col bg-amber-50 px-4 py-4 text-amber-950"
     >
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
+      <div
+        className="mx-auto flex w-full max-w-2xl flex-1 flex-col"
+      >
         <div className="border-b border-amber-200 pb-2">
           <span className="font-mono text-[11px] uppercase tracking-widest text-amber-700">
             에테르니아: 정제
