@@ -199,10 +199,10 @@ test.describe("손패 제스처 (#425)", () => {
     await expect(page.locator(CARD)).toHaveCount(before);
     await expectExpanded(page, before - 1);
 
-    // 포커스를 다시 잡고 누른다. 첫 누름 뒤 리렌더가 끼면 포커스가 흔들려 두 번째가
-    // 엉뚱한 데로 갈 수 있다 — 병렬 실행에서 그 경합이 실제로 났다.
-    await page.locator(CARD).nth(before - 1).focus();
-    await page.keyboard.press("Enter");
+    // 첫 누름 뒤 리렌더가 끼면 포커스가 흔들려 두 번째가 엉뚱한 데로 간다 — 병렬 실행에서
+    // 실제로 났다. `focus()` 와 `keyboard.press()` 사이에도 그 틈이 있어서(전체 실행 3회 중
+    // 1회 실패) 로케이터에 직접 누른다 — 누르는 순간에 그 요소를 잡는다.
+    await page.locator(CARD).nth(before - 1).press("Enter");
     await expect(page.locator(CARD)).toHaveCount(before - 1);
   });
 
@@ -401,5 +401,116 @@ test.describe("덱 다듬기 (#439)", () => {
 
     // 아직 아무것도 안 태웠으니 에테르가 0 이다.
     await expect(page.getByText(/에테르가 모자랍니다/)).toBeVisible();
+  });
+});
+
+test.describe("더미 들여다보기 (#441)", () => {
+  test.use({ viewport: PHONE });
+
+  test("숫자를 누르면 무엇이 남았는지 보인다 — 숫자만으로는 계산할 수 없다", async ({ page }) => {
+    await enterBattle(page);
+    await page.getByRole("button", { name: /^덱 \d+ · 버림/ }).click();
+
+    await expect(page.getByText("더미", { exact: true })).toBeVisible();
+    await expect(page.getByText(/덱 \d+장/)).toBeVisible();
+    await expect(page.getByText("순서는 감춘다")).toBeVisible();
+
+    // 손패가 5장이면 덱에는 나머지가 남아 있어야 한다.
+    await expect(page.getByText(/버림 \d+장/)).toBeVisible();
+  });
+
+  test("닫으면 사라지고 손패가 다시 잡힌다 — 덮개가 판을 막지 않는다", async ({ page }) => {
+    await enterBattle(page);
+    const before = await page.locator(CARD).count();
+
+    await page.getByRole("button", { name: /^덱 \d+ · 버림/ }).click();
+    await expect(page.getByText("더미", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "닫는다" }).click();
+
+    await expect(page.getByText("더미", { exact: true })).toHaveCount(0);
+    await expect(page.locator(CARD)).toHaveCount(before);
+  });
+});
+
+test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
+  const DESKTOP = { width: 1440, height: 900 };
+
+  /**
+   * 이웃 카드의 중심 간 거리(px) — 이름이 얼마나 드러나는가.
+   *
+   * 처음엔 손패 폭을 `.h-1.overflow-hidden`(침식 띠)으로 나눠 "판의 몇 %인가"를 쟀다.
+   * 그건 두 번 틀렸다 — 내 Tailwind 유틸리티 클래스를 붙잡았고(디자인이 바뀌면 깨진다),
+   * 무엇보다 **폭 비율은 목적이 아니라 대리 지표**였다. 진짜 원하는 것은 "카드 이름이
+   * 보이는가"다. 그러니 그것을 직접 잰다.
+   *
+   * ⚠ **한 번만 재면 안 된다.** 카드에는 200ms 전환이 걸려 있고, FanHand 는 마운트 뒤
+   * 컨테이너 폭을 재서(360 기본값 → 실제 폭) 부채를 다시 편다. 그 사이에 재면 중간값이
+   * 나온다 — CI 에서 실제로 44.7 이 나와 시험이 깨졌다(목표 72). 부르는 쪽이 `expect.poll`
+   * 로 감싸 **자리를 잡을 때까지** 기다린다.
+   */
+  async function cardPitch(page: Page) {
+    const boxes = await page.locator(CARD).evaluateAll((els) =>
+      els.map((e) => {
+        const r = e.getBoundingClientRect();
+        return r.x + r.width / 2;
+      }),
+    );
+    if (boxes.length < 2) return 0;
+    boxes.sort((a, b) => a - b);
+    const gaps = boxes.slice(1).map((x, i) => x - boxes[i]);
+    return gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  }
+
+  test("넓은 화면에서 카드가 이름이 보일 만큼 벌어진다", async ({ page }) => {
+    // 카드 폭이 100 이라 간격이 50 아래면 이웃이 절반 넘게 덮는다. 실측에서 「달의 각인」이
+    // "달의 각" 으로 보였다. 한때 데스크톱에 좌·우 열을 세웠더니 그 288px 이 손패에서 나가
+    // 간격이 41 로 떨어졌다 — 이름을 드러내려던 일이 이름을 더 가렸다.
+    await page.setViewportSize(DESKTOP);
+    await enterBattle(page);
+    await expect.poll(() => cardPitch(page)).toBeGreaterThan(50);
+  });
+
+  test("에테르는 손패 아래 붙어 있다 — 카드마다 시선이 왕복하지 않게", async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await enterBattle(page);
+    const orb = (await page.getByLabel(/^에테르 \d+$/).boundingBox())!;
+    const hand = (await page.locator(HAND).boundingBox())!;
+    const enemy = (await page.getByLabel(/^다음 수 —/).boundingBox())!;
+    // 손패에 붙어 있어야 한다 — 적(무대 위쪽)보다 손패에 훨씬 가까운지로 잰다.
+    expect(Math.abs(orb.y - (hand.y + hand.height))).toBeLessThan(60);
+    expect(orb.y - enemy.y).toBeGreaterThan(200);
+  });
+
+  test("이야기·지도에 저작용 씬 번호가 안 보인다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    // 지도든 이야기든, 화면 어디에도 `Scene 04 — ` 같은 내부 ID 가 남으면 안 된다.
+    await expect(page.getByText(/Scene\s+[\w-]+\s*[—–-]/)).toHaveCount(0);
+    const story = page.getByRole("button", { name: "길을 이어 간다" });
+    if (await story.isVisible().catch(() => false)) {
+      await expect(page.getByText(/Scene\s+[\w-]+\s*[—–-]/)).toHaveCount(0);
+    }
+  });
+
+  test("적의 다음 수가 도형과 숫자로 선다 — 턴마다 읽지 않게", async ({ page }) => {
+    await enterBattle(page);
+    // 접근성 이름으로는 여전히 말이 남는다 — 도형만 남기지 않았다.
+    await expect(page.getByLabel(/^다음 수 —/)).toBeVisible();
+    expect(await page.getByLabel(/^다음 수 —/).locator("svg").count()).toBeGreaterThan(0);
+  });
+
+  test("모바일에서 조작대가 화면을 넘지 않는다", async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await enterBattle(page);
+    for (const l of [page.locator(HAND), page.getByRole("button", { name: "턴 종료" })]) {
+      const b = (await l.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(PHONE.width + 1);
+    }
+    // 여기서 간격은 단언하지 않는다. **좁은 화면에서 좁아지는 것이 정상**이다 —
+    // `fit()` 이 부채를 잘리게 두느니 간격을 줄인다(412px·6장이면 44.8). 그 규칙은
+    // `fan-geometry.test.ts` 가 폭을 훑어 가며 덮는다. 여기서 50 을 요구하면 화면이
+    // 좁다는 이유만으로 빨간불이 켜진다 — 실제로 CI 에서 그렇게 깨졌다.
   });
 });

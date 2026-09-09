@@ -157,3 +157,25 @@ describe('각도', () => {
     expect(fanGeometry(260, 10).rotation).toBeLessThan(MAX_ROTATION_DEG);
   });
 });
+
+describe('넓은 화면에서는 이름이 드러난다 (#443)', () => {
+  // 카드 폭이 100 이라 간격 40 이면 이웃이 60% 를 가린다 — 실측에서 「달의 각인」이
+  // "달의 각" 으로 보였다. 잘린 것이 아니라 **가려진** 것이라 글자 크기로는 못 고친다.
+  it('자리가 남으면 이웃이 가리는 폭이 카드의 절반 아래다', () => {
+    const { gap } = fanGeometry(1000, 5);
+    expect(CARD_W - gap).toBeLessThan(CARD_W / 2);
+  });
+
+  it('좁은 화면은 그대로 — 폭이 정하지 상한이 정하지 않는다', () => {
+    // 412px 에 8장이면 상한이 아니라 [fit] 의 폭 계산이 간격을 정한다.
+    expect(fanGeometry(412, 8).gap).toBeLessThan(40);
+  });
+
+  it('넓어진 뒤에도 부채는 화면 안에 있다', () => {
+    for (const w of [412, 768, 1000, 1400]) {
+      const { gap, rotation, scatter } = fanGeometry(w, 5);
+      const outer = Math.abs(restX(4, 5, gap)) + rotatedHalfWidth(rotation) + scatter;
+      expect(outer, `width ${w}`).toBeLessThanOrEqual(w / 2);
+    }
+  });
+});
