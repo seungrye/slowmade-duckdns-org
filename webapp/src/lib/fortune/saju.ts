@@ -9,7 +9,7 @@
  */
 import { Solar } from "lunar-javascript";
 import { todayInSeoul } from "@/lib/birthday";
-import { GAN_EL, ZHI_EL, GAN_KR, ZHI_KR, type WuXing } from "./saju-labels";
+import { GAN_EL, ZHI_EL, GAN_KR, ZHI_KR, ZHI_MOOD, ELEMENTS, type WuXing } from "./saju-labels";
 import { generatePolite, type LlmMessage, type GeneratedReading } from "./reading";
 
 export interface Pillar {
@@ -108,9 +108,25 @@ const RELATION_LINE: Record<RelationKey, string> = {
   관성: "나를 다잡아 주는 기운이 드는",
 };
 
+/**
+ * 관계별 마무리 한 줄 (#449).
+ *
+ * 첫 문장은 관계(5), 둘째 문장은 지지(12)가 정한다. 셋째인 이 조언은 관계에 매단다 —
+ * "오늘이 어떤 날인가"와 "그래서 무엇을 하면 좋은가"가 같은 뿌리에서 나와야 말이 된다.
+ */
+const RELATION_ADVICE: Record<RelationKey, string> = {
+  비화: "닮은 사람과 나란히 걷되, 내 몫만 챙기시면 충분합니다.",
+  식상: "떠오른 것을 아껴 두지 말고 한 가지는 꺼내 보세요.",
+  인성: "도움을 받는 데 미안해하지 않으셔도 괜찮습니다.",
+  재성: "욕심을 넓히기보다 손에 잡히는 하나를 끝내 보세요.",
+  관성: "무리해서 앞서기보다 오늘의 자리를 지키시면 됩니다.",
+};
+
 export interface SajuContext {
   dayGanKr: string; dayEl: WuXing;
   iljinKr: string; iljinEl: WuXing;
+  /** 오늘 일진의 **지지** — 한자와 오행 (#449). 예전엔 계산해 놓고 버렸다. */
+  iljinZhi: string; iljinZhiEl: WuXing;
   relation: { key: RelationKey; meaning: string };
 }
 
@@ -126,6 +142,7 @@ export function buildSajuPrompt(ctx: SajuContext): LlmMessage[] {
   const user =
     `이 분은 ${ctx.dayGanKr}(日干) — ${ctx.dayEl}의 기운을 타고난 분이에요.\n` +
     `오늘의 일진은 ${ctx.iljinKr}이고, 오늘의 기운은 ${ctx.iljinEl}입니다.\n` +
+    `일진의 지지는 ${ctx.iljinZhi}(${ctx.iljinZhiEl}) — ${ZHI_MOOD[ctx.iljinZhi] ?? ""}\n` +
     `내 기운(${ctx.dayEl})과 오늘(${ctx.iljinEl})의 관계는 '${ctx.relation.key}' — ${ctx.relation.meaning}.\n` +
     "이 흐름으로 오늘의 운세를 써 줘.";
   return [
@@ -134,12 +151,19 @@ export function buildSajuPrompt(ctx: SajuContext): LlmMessage[] {
   ];
 }
 
-/** LLM 실패·미생성 시 폴백(항상 존댓말). */
+/**
+ * LLM 실패·미생성 시 폴백(항상 존댓말).
+ *
+ * **관계(5) × 지지(12) = 60가지** (#449). 예전엔 관계만 썼고 그래서 30일에 5가지였다 —
+ * 게다가 천간 오행이 2일 주기라 이틀 연속 문장이 완전히 같았다. 지지는 매일 한 칸씩
+ * 도므로 연속한 이틀은 반드시 갈린다.
+ *
+ * 오행 이름을 문장에서 뺐다. 이제 카드와 저울이 그것을 눈으로 보여 주므로(#449 화면),
+ * 글까지 "화의 기운을 타고난 분에게 오늘의 화 기운이" 를 되풀이할 이유가 없다.
+ */
 export function templateSajuReading(ctx: SajuContext): string {
-  const line = RELATION_LINE[ctx.relation.key];
-  return `오늘은 ${line} 하루예요. ${ctx.dayEl}의 기운을 타고난 분에게 오늘의 ${ctx.iljinEl} 기운이 ` +
-    `${ctx.relation.meaning.split(" — ")[0]}으로 다가옵니다. 서두르기보다 한 걸음 천천히, ` +
-    `오늘 할 수 있는 작은 일 하나에 마음을 두어 보세요.`;
+  const mood = ZHI_MOOD[ctx.iljinZhi] ?? "오늘의 기운이 조용히 함께합니다.";
+  return `오늘은 ${RELATION_LINE[ctx.relation.key]} 하루예요. ${mood} ${RELATION_ADVICE[ctx.relation.key]}`;
 }
 
 /** 오늘의 사주 풀이 생성(LLM→존댓말 가드→템플릿). */
@@ -155,8 +179,38 @@ export function sajuContext(saju: Saju, iljin: Pillar): SajuContext {
   return {
     dayGanKr: saju.dayGanKr, dayEl: saju.dayEl,
     iljinKr: `${iljin.ganKr}${iljin.zhiKr}(${iljin.ganzhi})`, iljinEl: iljin.ganEl,
+    iljinZhi: iljin.zhi, iljinZhiEl: iljin.zhiEl,
     relation: elementRelation(saju.dayEl, iljin.ganEl),
   };
+}
+
+/** 오행 한 칸 — 타고난 몫과 오늘 얹히는 몫. */
+export interface ElementBar { base: number; add: number; total: number }
+
+/**
+ * 오행 저울에 **오늘을 얹는다** (#449).
+ *
+ * 원국(타고난 오행 분포)은 평생 안 바뀐다. 그래서 그 숫자만 보면 매일 같은 화면이다.
+ * 오늘 일진의 두 기운(천간·지지)을 그 위에 얹어 보여 주면, **안 변하던 값이 매일 다른
+ * 의미를 갖는다** — 토가 원래 많은 사람에게 오늘 화가 더해지는 것이 한눈에 보인다.
+ *
+ * ⚠ 이건 **비유**다. 일진을 원국에 산술로 더하는 것은 명리학의 계산이 아니다. 화면에도
+ * 그렇게 밝힌다(`빗금 = 오늘 더해지는 기운`).
+ *
+ * 천간과 지지가 같은 오행인 날(戊辰 등)은 2가 얹힌다 — 그날은 그 기운이 그만큼 짙다.
+ */
+export function todayOverlay(
+  base: Record<WuXing, number>,
+  ganEl: WuXing,
+  zhiEl: WuXing,
+): Record<WuXing, ElementBar> {
+  const out = {} as Record<WuXing, ElementBar>;
+  for (const el of ELEMENTS) {
+    const b = base[el] ?? 0;
+    const add = (ganEl === el ? 1 : 0) + (zhiEl === el ? 1 : 0);
+    out[el] = { base: b, add, total: b + add };
+  }
+  return out;
 }
 
 // ── 클라이언트 DTO 블록 (서버에서 조립) ──────────────────────────────
@@ -164,7 +218,9 @@ export interface SajuPillarDTO { ganzhi: string; gan: string; zhi: string; ganKr
 export interface SajuBlockDTO {
   pillars: { year: SajuPillarDTO; month: SajuPillarDTO; day: SajuPillarDTO; time: SajuPillarDTO | null };
   dayGanKr: string; dayEl: WuXing; elements: Record<WuXing, number>;
-  iljin: { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: WuXing };
+  iljin: { ganzhi: string; gan: string; zhi: string; ganKr: string; zhiKr: string; ganEl: WuXing; zhiEl: WuXing };
+  /** 오행 저울 — 타고난 몫 위에 오늘이 얹힌 상태 (#449). 화면이 다시 계산하지 않게. */
+  bars: Record<WuXing, ElementBar>;
   relation: { key: RelationKey; meaning: string };
   reading: string; readingSource: "llm" | "template";
   hasBirthTime: boolean;
@@ -187,7 +243,11 @@ export function sajuBlock(
       day: pillarDTO(saju.pillars.day), time: saju.pillars.time ? pillarDTO(saju.pillars.time) : null,
     },
     dayGanKr: saju.dayGanKr, dayEl: saju.dayEl, elements: saju.elements,
-    iljin: { ganzhi: iljin.ganzhi, gan: iljin.gan, zhi: iljin.zhi, ganKr: iljin.ganKr, zhiKr: iljin.zhiKr, ganEl: iljin.ganEl },
+    iljin: {
+      ganzhi: iljin.ganzhi, gan: iljin.gan, zhi: iljin.zhi,
+      ganKr: iljin.ganKr, zhiKr: iljin.zhiKr, ganEl: iljin.ganEl, zhiEl: iljin.zhiEl,
+    },
+    bars: todayOverlay(saju.elements, iljin.ganEl, iljin.zhiEl),
     relation: ctx.relation,
     reading, readingSource: cached?.sajuReading && cached.sajuReading.trim() ? (cached.sajuSource ?? "template") : "template",
     hasBirthTime: saju.pillars.time !== null,
