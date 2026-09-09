@@ -17,6 +17,40 @@ export type Ability = 'lunar' | 'selene' | 'hecate' | 'none';
 /** 주인공 — 시작 침식이 곧 난이도다. */
 export type Protagonist = 'kael' | 'rin' | 'solwen';
 
+/** 막 — 1 정거장 · 2 옴팔로스 · 3 에테르 열차 (#430). */
+export type Act = 1 | 2 | 3;
+
+/**
+ * 손잡을 세력 (#430).
+ *
+ * **하나만 고를 수 있고 되돌릴 수 없다.** 고른 순간 나머지 둘의 카드가 보상 풀에서
+ * 사라지므로(→ [faction.ts]), 이 선택이 3막의 덱을 정한다. 값은
+ * `ending.ts:RunSummary.ally` 와 같아야 한다 — 엔딩 판정이 이것을 읽는다.
+ */
+export type Faction = 'ironguard' | 'priesthood' | 'sylvan';
+
+/**
+ * 지도 노드의 종류 (#430).
+ *   start     — 막의 입구. 싸우지 않는다.
+ *   battle    — 보통 전투.
+ *   elite     — 정예. 더 세고 보상도 크다.
+ *   refinery  — 정제소. 결정을 뺄 **유일한** 자리.
+ *   event     — 사건. 다음 PR 에서 내용이 붙는다(지금은 지나간다).
+ *   alliance  — 세력 동맹. 2막 합류 층에만 있다.
+ *   boss      — 막의 끝.
+ */
+export type NodeKind = 'start' | 'battle' | 'elite' | 'refinery' | 'event' | 'alliance' | 'boss';
+
+export interface MapNode {
+  /** `층-칸` (보기: `2-1`). 저장·복원이 문자열 하나로 끝난다. */
+  id: string;
+  row: number;
+  col: number;
+  kind: NodeKind;
+  /** 여기서 갈 수 있는 다음 층 노드들. */
+  next: string[];
+}
+
 /**
  * 카드 종류.
  *   stigma   — 가장 강하다. 쓸 때마다 침식이 오른다.
@@ -53,6 +87,12 @@ export interface Card {
   affinity?: Ability;
   /** 사용 후 덱에서 영구히 사라진다. */
   exhaust?: boolean;
+  /**
+   * 이 카드를 내주는 세력 (#430). 없으면 중립 — 어느 동맹에서도 나온다.
+   *
+   * 동맹을 고르면 **다른 세력의 카드는 보상 풀에서 사라진다**([faction.ts]).
+   */
+  faction?: Faction;
 }
 
 export interface Enemy {
@@ -116,6 +156,14 @@ export interface RunState {
   log: string[];
   /** world.* 부메랑 플래그. web-adventure 와 같은 모양. */
   flags: Record<string, boolean>;
+  /** 지금 막 (#430). */
+  act: Act;
+  /** 이 회차의 씨앗 — 지도가 여기서 나온다. 같은 씨앗이면 같은 지도. */
+  seed: number;
+  /** 지금 서 있는 노드. 막에 막 들어왔으면 null(첫 층을 고르기 전). */
+  nodeId: string | null;
+  /** 손잡은 세력. 아직 안 골랐으면 null — 엔딩 판정이 이것을 읽는다. */
+  ally: Faction | null;
 }
 
 /**

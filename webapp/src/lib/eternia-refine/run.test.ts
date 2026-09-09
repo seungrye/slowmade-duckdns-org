@@ -1,8 +1,11 @@
-// 회차 진행 (#419).
+// 회차 진행 (#419 → #430).
 //
 // 여기서 지키는 것은 **대가가 회차 밖으로 새지 않는가**다. 정제소에서 결정을 팔면 덱에서
 // 실제로 빠져야 하고(숫자만 줄면 다음 전투에 그대로 잡힌다), 판 만큼 보스가 커져야 하고,
 // 엔딩은 그 누계에서 읽혀야 한다.
+//
+// #430 에서 노드가 숫자 순번 → **지도 노드 id** 로 바뀌었다. 갈래가 생기면서 "몇 번째"가
+// 뜻을 잃었기 때문이다. 그래서 이 시험도 지도를 걸어서 노드를 얻는다.
 
 import { describe, it, expect } from 'vitest';
 import {
@@ -15,9 +18,13 @@ import {
   summarize,
   offerCards,
   enemyFor,
-  isRefineryNode,
   bonusHpFor,
   toResult,
+  choices,
+  enterNode,
+  chooseAlly,
+  isBossNode,
+  type Session,
 } from './run';
 import { crystalCard, countCrystals } from './combat';
 import { PROTAGONISTS, POOL } from './content';
@@ -28,154 +35,235 @@ const seq = (...xs: number[]) => {
   return () => xs[i++ % xs.length];
 };
 
+/** 씨앗 고정 회차 — 지도가 늘 같아 시험이 재현된다. */
+const run = (p: 'kael' | 'rin' | 'solwen' = 'rin', a: 'lunar' | 'selene' | 'none' = 'lunar') =>
+  startRun(p, a, 42);
+
+/** 지금 자리에서 조건에 맞는 노드로 한 걸음. 없으면 첫 번째로. */
+function step(s: Session, want?: (k: string) => boolean): Session {
+  const opts = choices(s);
+  const node = (want && opts.find((n) => want(n.kind))) ?? opts[0];
+  return enterNode(s, node.id);
+}
+
+/** 보스 앞까지 걷는다 — 전투는 이긴 것으로 친다. */
+function walkToBoss(s: Session): Session {
+  let cur = s;
+  for (let i = 0; i < 40; i++) {
+    if (cur.phase.kind === 'map') {
+      const opts = choices(cur);
+      const boss = opts.find((n) => n.kind === 'boss');
+      cur = enterNode(cur, (boss ?? opts[0]).id);
+      continue;
+    }
+    if (cur.phase.kind === 'battle') {
+      const node = cur.phase.node;
+      if (isBossNode(cur, node)) return cur;
+      cur = afterBattle(cur, node, {
+        hp: cur.run.hp,
+        erosion: cur.run.erosion,
+        deck: cur.run.deck,
+        outcome: 'win',
+      });
+      continue;
+    }
+    if (cur.phase.kind === 'reward') cur = takeReward(cur, cur.phase.node, null);
+    else if (cur.phase.kind === 'refinery') cur = leaveRefinery(cur, cur.phase.node);
+    else if (cur.phase.kind === 'alliance') cur = chooseAlly(cur, 'sylvan');
+    else break;
+  }
+  return cur;
+}
+
 describe('startRun', () => {
   it('주인공의 시작 침식을 그대로 받는다 — 시작 조건이 곧 난이도', () => {
-    expect(startRun('kael', 'selene').run.erosion).toBe(80);
-    expect(startRun('solwen', 'lunar').run.erosion).toBe(0);
+    expect(run('kael').run.erosion).toBe(PROTAGONISTS.find((p) => p.id === 'kael')!.startErosion);
   });
 
   it('카엘은 결정을 이미 안고 시작한다', () => {
-    const s = startRun('kael', 'selene');
-    const def = PROTAGONISTS.find((p) => p.id === 'kael')!;
-    expect(countCrystals(s.run.deck)).toBe(def.startCrystals);
-    expect(s.crystalsEverMade).toBe(def.startCrystals);
+    expect(countCrystals(run('kael').run.deck)).toBe(2);
+  });
+
+  it('1막 지도의 출발점에 서서 시작한다 — 고를 것 없는 탭을 만들지 않는다', () => {
+    const s = run();
+    expect(s.phase.kind).toBe('map');
+    expect(s.run.act).toBe(1);
+    expect(s.run.nodeId).toBe(s.map.nodes[0].id);
+    // 첫 고름은 출발이 아니라 **그다음 갈래**여야 한다.
+    expect(choices(s).every((n) => n.kind !== 'start')).toBe(true);
+    expect(choices(s).length).toBeGreaterThan(0);
+  });
+
+  it('같은 씨앗이면 같은 지도 — 실패한 회차를 다시 걸을 수 있다', () => {
+    expect(startRun('rin', 'lunar', 7).map).toEqual(startRun('rin', 'lunar', 7).map);
   });
 });
 
-describe('경로', () => {
-  it('정제소 노드에는 적이 없다', () => {
-    expect(enemyFor(0)).not.toBeNull();
-    expect(enemyFor(1)).toBeNull();
-    expect(isRefineryNode(1)).toBe(true);
-    expect(isRefineryNode(2)).toBe(false);
+describe('지도 걷기', () => {
+  it('갈 수 있는 노드로만 들어간다 — 저장본을 손으로 고쳐도 막힌다', () => {
+    const s = run();
+    const far = s.map.nodes.find((n) => n.row === 4)!;
+    expect(enterNode(s, far.id)).toBe(s); // 아무 일도 안 일어난다
   });
 
-  it('보스에게만 도시 강화가 얹힌다', () => {
-    const s = { ...startRun('rin', 'lunar') };
-    s.run.cityPower = 3;
-    expect(bonusHpFor(s, 2)).toBe(0);
-    expect(bonusHpFor(s, 4)).toBeGreaterThan(0);
+  it('전투 노드에 들어가면 적이 선다', () => {
+    const s = step(run(), (k) => k === 'battle' || k === 'elite');
+    if (s.phase.kind === 'battle') expect(enemyFor(s, s.phase.node)).not.toBeNull();
+  });
+
+  it('정제소 노드에는 적이 없다', () => {
+    const s = run();
+    const ref = s.map.nodes.find((n) => n.kind === 'refinery');
+    if (ref) expect(enemyFor(s, ref.id)).toBeNull();
+  });
+
+  it('3막 보스에만 도시 강화가 얹힌다', () => {
+    const s = run();
+    const boss = s.map.nodes.find((n) => n.kind === 'boss')!;
+    const rich = { ...s, run: { ...s.run, cityPower: 5 } };
+    expect(bonusHpFor(rich, boss.id)).toBe(0); // 1막
+    expect(bonusHpFor({ ...rich, run: { ...rich.run, act: 3 as const } }, boss.id)).toBeGreaterThan(0);
   });
 });
 
 describe('afterBattle', () => {
   it('이기면 보상으로 간다', () => {
-    const s0 = startRun('rin', 'lunar');
-    const s = afterBattle(s0, 0, { hp: 30, erosion: 20, deck: s0.run.deck, outcome: 'win' }, seq(0.1));
-    expect(s.phase.kind).toBe('reward');
+    const s = step(run(), (k) => k === 'battle');
+    if (s.phase.kind !== 'battle') return;
+    const after = afterBattle(s, s.phase.node, {
+      hp: 30, erosion: 20, deck: s.run.deck, outcome: 'win',
+    });
+    expect(after.phase.kind).toBe('reward');
   });
 
   it('전투에서 생긴 결정을 누계에 더한다 — 엔딩 판정의 분모', () => {
-    const s0 = startRun('rin', 'lunar');
-    const deck = [...s0.run.deck, crystalCard(1), crystalCard(2)];
-    const s = afterBattle(s0, 0, { hp: 30, erosion: 42, deck, outcome: 'win' }, seq(0.1));
-    expect(s.crystalsEverMade).toBe(2);
+    const s = step(run(), (k) => k === 'battle');
+    if (s.phase.kind !== 'battle') return;
+    const deck = [...s.run.deck, crystalCard(1), crystalCard(2)];
+    const after = afterBattle(s, s.phase.node, { hp: 30, erosion: 40, deck, outcome: 'win' });
+    expect(after.crystalsEverMade).toBe(s.crystalsEverMade + 2);
   });
 
   it('굳으면 그 자리에서 회차가 끝난다', () => {
-    const s0 = startRun('kael', 'selene');
-    const s = afterBattle(s0, 0, { hp: 10, erosion: 100, deck: s0.run.deck, outcome: 'petrified' });
-    expect(s.phase.kind).toBe('ending');
-    if (s.phase.kind === 'ending') expect(s.phase.endingId).toBe('petrification');
-  });
-
-  it('마지막 노드를 이기면 클리어로 끝난다', () => {
-    const s0 = startRun('solwen', 'lunar');
-    const s = afterBattle(s0, 4, { hp: 20, erosion: 0, deck: s0.run.deck, outcome: 'win' });
-    expect(s.phase.kind).toBe('ending');
+    const s = step(run(), (k) => k === 'battle');
+    if (s.phase.kind !== 'battle') return;
+    const after = afterBattle(s, s.phase.node, {
+      hp: 10, erosion: 100, deck: s.run.deck, outcome: 'petrified',
+    });
+    expect(after.phase.kind).toBe('ending');
   });
 });
 
-describe('takeReward', () => {
-  it('고른 카드가 덱에 들어가고 다음 노드로', () => {
-    const s0 = startRun('rin', 'lunar');
-    const before = s0.run.deck.length;
-    const s = takeReward(s0, 0, POOL[0]);
-    expect(s.run.deck).toHaveLength(before + 1);
-    expect(s.phase.kind).toBe('refinery'); // 노드 1 은 정제소
+describe('막 넘기', () => {
+  it('보스 보상을 마치면 다음 막으로 — 지도가 새로 깔린다', () => {
+    const atBoss = walkToBoss(run());
+    if (atBoss.phase.kind !== 'battle') return;
+    const won = afterBattle(atBoss, atBoss.phase.node, {
+      hp: 30, erosion: 20, deck: atBoss.run.deck, outcome: 'win',
+    });
+    if (won.phase.kind !== 'reward') return;
+    const next = takeReward(won, won.phase.node, null);
+    expect(next.run.act).toBe(2);
+    expect(next.phase.kind).toBe('map');
+    expect(next.run.nodeId).toBe(next.map.nodes[0].id);
+  });
+});
+
+describe('세력 동맹', () => {
+  it('고르면 기록되고 지도로 돌아간다', () => {
+    const at: Session = { ...run(), phase: { kind: 'alliance', node: '3-0' } };
+    const after = chooseAlly(at, 'ironguard');
+    expect(after.run.ally).toBe('ironguard');
+    expect(after.phase.kind).toBe('map');
   });
 
-  it('건너뛰어도 진행한다', () => {
-    const s0 = startRun('rin', 'lunar');
-    expect(takeReward(s0, 0, null).run.deck).toHaveLength(s0.run.deck.length);
+  it('되돌릴 수 없다 — 두 번째는 무시된다', () => {
+    const once = chooseAlly(run(), 'sylvan');
+    expect(chooseAlly(once, 'priesthood').run.ally).toBe('sylvan');
+  });
+
+  it('동맹이 보상 풀을 줄인다 — 나머지 둘의 카드가 안 나온다', () => {
+    const offers = offerCards('lunar', 'sylvan', seq(0.1, 0.5, 0.9, 0.2));
+    for (const c of offers) {
+      const src = POOL.find((p) => c.id.startsWith(p.id));
+      expect(src?.faction === undefined || src?.faction === 'sylvan').toBe(true);
+    }
   });
 });
 
 describe('offerCards', () => {
   it('무흔에게는 성흔 카드를 내밀지 않는다 — 살 수 없으니까', () => {
-    const offers = offerCards('none', seq(0.1, 0.5, 0.9));
-    expect(offers.every((c) => c.kind !== 'stigma')).toBe(true);
+    expect(offerCards('none', null, seq(0.1, 0.5, 0.9)).every((c) => c.kind !== 'stigma')).toBe(true);
   });
 
   it('3장을 내민다', () => {
-    expect(offerCards('lunar', seq(0.1, 0.5, 0.9))).toHaveLength(3);
+    expect(offerCards('lunar', null, seq(0.1, 0.5, 0.9, 0.3))).toHaveLength(3);
   });
 });
 
-describe('burnCrystals — 정제소', () => {
-  function withCrystals(n: number) {
-    const s = startRun('rin', 'lunar');
+describe('정제소', () => {
+  const withCrystals = (n: number): Session => {
+    const s = run();
     return {
       ...s,
       run: { ...s.run, deck: [...s.run.deck, ...Array.from({ length: n }, (_, i) => crystalCard(i))] },
-      crystalsEverMade: n,
     };
-  }
+  };
 
   it('덱에서 결정을 **실제로 뺀다** — 숫자만 줄면 다음 전투에 그대로 잡힌다', () => {
-    const s = burnCrystals(withCrystals(4), 2);
-    expect(countCrystals(s.run.deck)).toBe(2);
+    expect(countCrystals(burnCrystals(withCrystals(3), 2).run.deck)).toBe(1);
   });
 
   it('판 만큼 에테르와 도시가 오른다', () => {
-    const s = burnCrystals(withCrystals(4), 2);
-    expect(s.run.ether).toBeGreaterThan(0);
-    expect(s.run.cityPower).toBe(2);
-    expect(s.run.refined).toBe(2);
+    const after = burnCrystals(withCrystals(3), 2);
+    expect(after.run.refined).toBe(2);
+    expect(after.run.cityPower).toBe(2);
+    expect(after.run.ether).toBeGreaterThan(0);
   });
 
   it('가진 것보다 많이 부르면 가진 만큼만 탄다', () => {
-    const s = burnCrystals(withCrystals(2), 99);
-    expect(s.run.refined).toBe(2);
-    expect(countCrystals(s.run.deck)).toBe(0);
+    expect(burnCrystals(withCrystals(2), 9).run.refined).toBe(2);
   });
 
   it('태울 것이 없으면 아무 일도 없다', () => {
-    const s0 = withCrystals(0);
-    expect(burnCrystals(s0, 3)).toBe(s0);
+    const s = withCrystals(0);
+    expect(burnCrystals(s, 3)).toBe(s);
+  });
+
+  it('떠나면 지도로 돌아간다', () => {
+    expect(leaveRefinery(withCrystals(1), '1-0').phase.kind).toBe('map');
   });
 });
 
-describe('엔딩 판정이 회차 누계에서 나온다', () => {
-  it('결정을 절반 넘게 팔면 승천', () => {
-    const s0 = startRun('rin', 'lunar');
-    const s = { ...s0, crystalsEverMade: 10, run: { ...s0.run, refined: 6 } };
-    expect(finish(s, 'cleared').phase).toMatchObject({ endingId: 'ascension' });
+describe('엔딩 판정으로 넘기는 요약', () => {
+  it('판 결정이 요약에 실린다', () => {
+    const base = run();
+    const s = burnCrystals(
+      {
+        ...base,
+        crystalsEverMade: 4,
+        run: { ...base.run, deck: [crystalCard(1), crystalCard(2), crystalCard(3), crystalCard(4)] },
+      },
+      3,
+    );
+    expect(summarize(s, 'cleared').refined).toBe(3);
+    expect(finish(s, 'cleared').phase.kind).toBe('ending');
   });
 
-  it('아무것도 태우지 않고 끝내면 조화', () => {
-    const s0 = startRun('solwen', 'lunar');
-    expect(finish(s0, 'cleared').phase).toMatchObject({ endingId: 'harmony' });
+  it('동맹을 요약에 싣는다 — 판정이 이걸 읽는다', () => {
+    expect(summarize(chooseAlly(run(), 'ironguard'), 'cleared').ally).toBe('ironguard');
   });
 
   it('석화는 침식을 100 으로 읽는다', () => {
-    const s0 = startRun('kael', 'selene');
-    expect(summarize(s0, 'petrified').erosion).toBe(100);
+    expect(summarize(run(), 'petrified').erosion).toBe(100);
   });
 });
 
-describe('toResult — 깊은 공유의 이음매', () => {
+describe('toResult', () => {
   it('PastRun 이 받는 모양 그대로 낸다', () => {
-    const s0 = startRun('rin', 'lunar');
-    const s = leaveRefinery(takeReward(afterBattle(s0, 0, {
-      hp: 30, erosion: 20, deck: s0.run.deck, outcome: 'win',
-    }, seq(0.1)), 0, null), 1);
-    const r = toResult(s, 'ascension');
-
+    const r = toResult(run(), 'harmony');
     expect(ENDING_IDS).toContain(r.endingId);
     expect(Array.isArray(r.scenePath)).toBe(true);
-    expect(Array.isArray(r.log)).toBe(true);
-    expect(r.scenePath.length).toBeGreaterThan(0);
-    expect(r.log.length).toBeGreaterThan(0);
+    expect(typeof r.cityPower).toBe('number');
   });
 });

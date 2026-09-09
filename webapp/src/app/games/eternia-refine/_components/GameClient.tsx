@@ -16,9 +16,13 @@ import type { Ability, Card, CombatState, Protagonist } from '@/lib/eternia-refi
 import { ABILITIES, PROTAGONISTS } from '@/lib/eternia-refine/content';
 import {
   afterBattle,
+  beginSelect,
   bonusHpFor,
   burnCrystals,
+  choices,
+  chooseAlly,
   enemyFor,
+  enterNode,
   leaveRefinery,
   newSession,
   nodeLabel,
@@ -27,6 +31,9 @@ import {
   toResult,
   localSink,
 } from '@/lib/eternia-refine/run';
+import { FACTIONS, closedBy } from '@/lib/eternia-refine/faction';
+import type { Faction } from '@/lib/eternia-refine/types';
+import { MapScreen } from './MapScreen';
 import type { Session } from '@/lib/eternia-refine/run';
 import { ETHER_PER_CRYSTAL, bossHpBonus } from '@/lib/eternia-refine/refine';
 import { endingLabel } from '@/content/web-adventure/endings';
@@ -42,8 +49,8 @@ export function GameClient() {
 
   const phase = session.phase;
 
-  function beginBattle(s: Session, node: number) {
-    const enemy = enemyFor(node);
+  function beginBattle(s: Session, node: string) {
+    const enemy = enemyFor(s, node);
     if (!enemy) return;
     setBattle(
       combat.startCombat({
@@ -58,13 +65,30 @@ export function GameClient() {
     );
   }
 
+  /**
+   * 회차를 시작한다.
+   *
+   * 주소에 `?seed=42` 가 있으면 그 씨앗으로 — **같은 씨앗이면 같은 지도**다(map.ts).
+   * 회차를 남에게 그대로 건네거나 실패한 회차를 다시 걷는 길이고, e2e 가 흔들리지 않게
+   * 붙잡는 손잡이이기도 하다. 없으면 매번 새로 뽑는다.
+   */
   function begin() {
-    const s = startRun(pick.p, pick.a);
-    setSession(s);
-    beginBattle(s, 0);
+    const raw =
+      typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('seed');
+    const seed = raw !== null && /^\d+$/.test(raw) ? Number(raw) : undefined;
+    setSession(startRun(pick.p, pick.a, seed));
   }
 
-  function settleBattle(b: CombatState, node: number) {
+  /** 지도에서 노드를 고른다. 전투 노드면 그 자리에서 전투를 세운다. */
+  function go(id: string) {
+    const next = enterNode(session, id);
+    setSession(next);
+    if (next.phase.kind === 'battle') beginBattle(next, next.phase.node);
+  }
+
+  function settleBattle(b: CombatState, node: string) {
     if (!b.outcome) return;
     const deck = [...b.deck, ...b.discard, ...b.hand];
     const next = afterBattle(session, node, {
@@ -76,6 +100,83 @@ export function GameClient() {
     setBattle(null);
     setSession(next);
     if (next.phase.kind === 'ending') void localSink.submit(toResult(next, next.phase.endingId));
+  }
+
+  // ── 타이틀 ───────────────────────────────────────────────────────
+  if (phase.kind === 'title') {
+    return (
+      <Shell>
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
+          <div>
+            <h1 className="text-4xl font-black tracking-tight">에테르니아: 정제</h1>
+            <p className="mt-3 text-sm leading-relaxed text-amber-800">
+              침식이 오르면 몸이 결정으로 굳는다.
+              <br />
+              그 결정을 정제소에 팔면 부유도시의 연료가 된다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSession(beginSelect(session))}
+            className="min-h-[48px] rounded-md bg-amber-700 px-10 font-bold text-amber-50 hover:bg-amber-800"
+          >
+            새 회차
+          </button>
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── 지도 ─────────────────────────────────────────────────────────
+  if (phase.kind === 'map') {
+    return (
+      <Shell>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-xl font-black tracking-tight">
+            {session.run.act}막 — {nodeLabel(session.run.nodeId ?? '', session.run.act).split(' ')[1]}
+          </h2>
+          <span className="font-mono text-xs text-amber-800">
+            침식 <b className="text-slate-600">{session.run.erosion}</b> · 체력{' '}
+            <b className="text-rose-700">{session.run.hp}</b> · 강화{' '}
+            <b className="text-red-700">{session.run.cityPower}</b>
+          </span>
+        </div>
+        <div className="mt-3 flex flex-1 flex-col">
+          <MapScreen map={session.map} at={session.run.nodeId} open={choices(session)} onGo={go} />
+        </div>
+      </Shell>
+    );
+  }
+
+  // ── 세력 동맹 ────────────────────────────────────────────────────
+  //
+  // 별도 화면을 만들지 않고 노드에서 그 자리에 고른다. **되돌릴 수 없으므로** 고르기 전에
+  // 무엇이 닫히는지 먼저 보여 준다.
+  if (phase.kind === 'alliance') {
+    return (
+      <Shell>
+        <h2 className="text-xl font-black tracking-tight">세력 하나와 손잡는다</h2>
+        <p className="mt-1 text-sm text-amber-800">
+          되돌릴 수 없다. 고른 순간 나머지 둘의 카드가 재고에서 사라진다.
+        </p>
+        <div className="mt-4 grid gap-2 md:grid-cols-3">
+          {FACTIONS.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setSession(chooseAlly(session, f.id as Faction))}
+              className="min-h-[44px] rounded-md border border-amber-300 bg-amber-50 p-3 text-left hover:bg-amber-100"
+            >
+              <span className="block font-bold">{f.name}</span>
+              <span className="mt-1 block text-xs leading-relaxed text-amber-900">{f.reading}</span>
+              <span className="mt-2 block font-mono text-[10.5px] text-red-700">
+                닫힌다 — {closedBy(f.id).map((x) => x.name).join(' · ')}
+              </span>
+            </button>
+          ))}
+        </div>
+      </Shell>
+    );
   }
 
   // ── 주인공 선택 ──────────────────────────────────────────────────
@@ -148,7 +249,9 @@ export function GameClient() {
       beginBattle(session, phase.node);
       return (
         <Shell>
-          <p className="text-sm text-amber-800">{nodeLabel(phase.node)} — 채비를 한다…</p>
+          <p className="text-sm text-amber-800">
+            {nodeLabel(phase.node, session.run.act)} — 채비를 한다…
+          </p>
         </Shell>
       );
     }

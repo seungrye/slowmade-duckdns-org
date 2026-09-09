@@ -6,7 +6,7 @@
 // 카드 비용·침식량은 **이 게임의 밸런스**라 web-adventure 와 공유하지 않는다. 공유하는
 // 것은 세계의 법칙(침식 0~100, 100 이면 석화)뿐이다.
 
-import type { Ability, Card, Enemy, Protagonist } from './types';
+import type { Ability, Act, Card, Enemy, Protagonist } from './types';
 
 /** 성흔 — 침식을 어떻게 읽는가. */
 export const ABILITIES: { id: Ability; name: string; reading: string }[] = [
@@ -87,6 +87,7 @@ export const POOL: Card[] = [
   card({
     id: 'p1', name: '셀레네의 완력', text: '피해 9 + (침식 ÷ 10).',
     kind: 'stigma', cost: 2, erosion: 18, damage: 9, scaling: 10, affinity: 'selene',
+    faction: 'priesthood',
   }),
   card({
     id: 'p2', name: '세 달의 정렬', text: '피해 11. 카드 2장을 뽑는다.',
@@ -98,23 +99,26 @@ export const POOL: Card[] = [
   }),
   card({
     id: 'p4', name: '에테르 정제수', text: '침식 6 내린다.',
-    kind: 'tool', cost: 1, erosion: 0, soothe: 6,
+    kind: 'tool', cost: 1, erosion: 0, soothe: 6, faction: 'sylvan',
   }),
   card({
     id: 'p5', name: '헤카테의 거울', text: '방어 10. 카드 1장을 뽑는다.',
     kind: 'stigma', cost: 2, erosion: 14, block: 10, draw: 1, affinity: 'hecate',
+    faction: 'ironguard',
   }),
   card({
     id: 'p6', name: '기꺼이 타오른다', text: '피해 34. 쓰면 덱에서 사라진다.',
     kind: 'stigma', cost: 2, erosion: 26, damage: 34, exhaust: true, affinity: 'selene',
+    faction: 'priesthood',
   }),
   card({
     id: 'p7', name: '세계수의 뿌리', text: '방어 8. 침식 3 내린다.',
-    kind: 'tool', cost: 1, erosion: 0, block: 8, soothe: 3,
+    kind: 'tool', cost: 1, erosion: 0, block: 8, soothe: 3, faction: 'sylvan',
   }),
   card({
     id: 'p8', name: '과부하', text: '피해 20. 침식이 크게 오른다.',
     kind: 'stigma', cost: 1, erosion: 22, damage: 20, affinity: 'selene',
+    faction: 'ironguard',
   }),
 ];
 
@@ -151,5 +155,22 @@ export const ENEMIES: Enemy[] = [
   },
 ];
 
-/** 노드 이름 — 회차 경로로 남고, 깊은 공유 시 PastRun.scenePath 가 된다. */
-export const NODE_LABELS = ['정거장', '정제소', '의식장', '정제소', '기관차'] as const;
+/** 막 이름 — 회차 경로로 남고, 깊은 공유 시 PastRun.scenePath 가 된다. */
+export const NODE_LABELS = ['정거장', '옴팔로스', '에테르 열차'] as const;
+
+/**
+ * 막마다 나오는 잡졸들 (#430). 뒤로 갈수록 험해진다.
+ *
+ * 지금은 적이 셋뿐이라 막마다 하나씩 나눠 쓴다 — 콘텐츠 확장은 다음 PR 몫이고,
+ * 여기 배열만 늘리면 지도는 그대로 굴러간다.
+ */
+export function actEnemies(act: Act): Enemy[] {
+  if (act === 1) return [ENEMIES[0]];
+  if (act === 2) return [ENEMIES[0], ENEMIES[1]];
+  return [ENEMIES[1], ENEMIES[2]];
+}
+
+/** 막의 끝에서 기다리는 것. 3막 보스가 부유도시를 업고 나온다. */
+export function bossFor(act: Act): Enemy {
+  return ENEMIES[Math.min(ENEMIES.length - 1, act - 1)];
+}
