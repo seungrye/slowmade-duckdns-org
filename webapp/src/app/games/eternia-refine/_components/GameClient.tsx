@@ -38,6 +38,7 @@ import type { Faction } from '@/lib/eternia-refine/types';
 import { MapScreen } from './MapScreen';
 import { loadScenes } from '@/lib/eternia-refine/scenes';
 import type { ScenarioScene } from '@/lib/eternia-refine/scenario';
+import { clearSave, fromSave, isSavable, readSave, writeSave, type SavedRun } from '@/lib/eternia-refine/save';
 import type { Session } from '@/lib/eternia-refine/run';
 import { ETHER_PER_CRYSTAL, bossHpBonus } from '@/lib/eternia-refine/refine';
 import { endingLabel } from '@/content/web-adventure/endings';
@@ -67,6 +68,21 @@ export function GameClient() {
       alive = false;
     };
   }, []);
+
+  /** 이어할 것이 있나 — 타이틀에서만 쓴다. 마운트 때 한 번 읽는다. */
+  const [saved, setSaved] = useState<SavedRun | null>(null);
+  useEffect(() => setSaved(readSave()), []);
+
+  /**
+   * 노드 사이에서 저장한다 (#435).
+   *
+   * 전투 중에는 저장하지 않는다(`isSavable`) — 허용하면 불리한 턴에서 되감는 길이 열린다.
+   * 회차가 끝나면 지운다. 끝난 판을 다시 열 이유가 없다.
+   */
+  useEffect(() => {
+    if (session.phase.kind === 'ending') clearSave();
+    else if (isSavable(session.phase)) writeSave(session);
+  }, [session]);
 
   const phase = session.phase;
 
@@ -136,13 +152,35 @@ export function GameClient() {
               그 결정을 정제소에 팔면 부유도시의 연료가 된다.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setSession(beginSelect(session))}
-            className="min-h-[48px] rounded-md bg-amber-700 px-10 font-bold text-amber-50 hover:bg-amber-800"
-          >
-            새 회차
-          </button>
+          <div className="flex flex-col items-center gap-3">
+            {saved && (
+              <button
+                type="button"
+                onClick={() => setSession(fromSave(saved, scenes))}
+                className="min-h-[48px] rounded-md bg-amber-700 px-10 font-bold text-amber-50 hover:bg-amber-800"
+              >
+                이어하기
+                <span className="ml-2 font-mono text-xs font-normal opacity-80">
+                  {saved.run.act}막 · 침식 {saved.run.erosion}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                clearSave();
+                setSaved(null);
+                setSession(beginSelect(session));
+              }}
+              className={
+                saved
+                  ? 'min-h-[44px] rounded-md border border-amber-300 bg-amber-50 px-8 text-sm hover:bg-amber-100'
+                  : 'min-h-[48px] rounded-md bg-amber-700 px-10 font-bold text-amber-50 hover:bg-amber-800'
+              }
+            >
+              새 회차
+            </button>
+          </div>
         </div>
       </Shell>
     );

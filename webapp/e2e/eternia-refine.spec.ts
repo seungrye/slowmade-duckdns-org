@@ -335,3 +335,43 @@ test.describe("손패 배치 — 화면을 넘지 않는다 (#425)", () => {
     expect(m.cardBottom).toBeLessThanOrEqual(m.handBottom + 1);
   });
 });
+
+test.describe("이어하기 (#435)", () => {
+  test.use({ viewport: PHONE });
+
+  test("지도에서 나갔다 들어오면 이어할 수 있다 — 회차가 날아가지 않는다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    // 지도까지 왔다 — 여기서 저장돼 있어야 한다.
+    await expect(page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스|동맹)/ }).first())
+      .toBeVisible();
+
+    // 브라우저를 닫은 셈 치고 다시 연다.
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    const resume = page.getByRole("button", { name: /이어하기/ });
+    await expect(resume).toBeVisible();
+    await resume.click();
+
+    // 지도로 돌아왔다.
+    await expect(page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스|동맹)/ }).first())
+      .toBeVisible();
+  });
+
+  test("새 회차를 고르면 저장본이 사라진다 — 두 판이 섞이지 않는다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    await expect(page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스|동맹)/ }).first())
+      .toBeVisible();
+
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await expect(page.getByRole("button", { name: /이어하기/ })).toBeVisible();
+    await page.getByRole("button", { name: "새 회차" }).click();
+
+    // 주인공 선택으로 갔고, 돌아와도 이어할 것이 없다.
+    await expect(page.getByRole("button", { name: "운명으로 발을 내딛는다" })).toBeVisible();
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await expect(page.getByRole("button", { name: /이어하기/ })).toHaveCount(0);
+  });
+});
