@@ -82,16 +82,27 @@ async function enterBattle(page: Page, { protagonist, path = "/games/eternia-ref
  * 씨앗에서 나오므로 회차마다 첫 노드가 다르다.
  */
 async function gotoBattleFromMap(page: Page) {
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 10; i++) {
     if (await page.locator(HAND).isVisible().catch(() => false)) return;
+
+    // 사건 노드는 이야기를 보여 준다 (#432) — 읽고 나가면 지도로 돌아온다.
+    const story = page.getByRole("button", { name: "길을 이어 간다" });
+    if (await story.isVisible().catch(() => false)) {
+      await story.click();
+      continue;
+    }
+    // 정제소면 지나간다.
+    const leave = page.getByRole("button", { name: "정거장으로 돌아간다" });
+    if (await leave.isVisible().catch(() => false)) {
+      await leave.click();
+      continue;
+    }
+
     const battle = page.getByRole("button", { name: /^전투/ }).first();
-    const any = page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스)/ }).first();
+    const any = page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스|동맹)/ }).first();
     const target = (await battle.count()) > 0 ? battle : any;
     if ((await target.count()) === 0) return;
     await target.click();
-    // 정제소·사건이면 지나가고 다시 지도로 온다.
-    const leave = page.getByRole("button", { name: "정거장으로 돌아간다" });
-    if (await leave.isVisible().catch(() => false)) await leave.click();
   }
 }
 

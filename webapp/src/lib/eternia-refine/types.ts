@@ -49,6 +49,15 @@ export interface MapNode {
   kind: NodeKind;
   /** 여기서 갈 수 있는 다음 층 노드들. */
   next: string[];
+  /**
+   * 이 노드가 어느 CYOA 씬인가 (#432). 절차 생성 지도(폴백)에서는 없다.
+   *
+   * 있으면 노드는 **씬이면서 동시에 조우**다 — 「Scene 07 — 가솔린 열차」가 곧 그 전투의
+   * 무대가 된다.
+   */
+  sceneId?: string;
+  /** 씬 제목. 화면이 노드 이름으로 쓴다. */
+  title?: string;
 }
 
 /**

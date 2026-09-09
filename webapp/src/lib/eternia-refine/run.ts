@@ -10,10 +10,12 @@
 import type { Ability, Act, Card, Faction, Protagonist, RunResult, RunState } from './types';
 import { crystalCard, countCrystals } from './combat';
 import { refine, bossHpBonus } from './refine';
+import { applyErosion } from './stigma';
 import { resolveEnding, explainEnding } from './ending';
 import type { RunSummary } from './ending';
 import { actEnemies, bossFor, NODE_LABELS, POOL, PROTAGONISTS, STARTER } from './content';
 import { makeMap, reachable, type ActMap } from './map';
+import { scenarioMap, onEnterEffect, type ScenarioScene } from './scenario';
 import { allowedCards } from './faction';
 import { newSeed, seeded } from './rng';
 
@@ -31,6 +33,7 @@ export type Phase =
   | { kind: 'reward'; node: string; offers: Card[] }
   | { kind: 'refinery'; node: string }
   | { kind: 'alliance'; node: string }
+  | { kind: 'story'; node: string }
   | { kind: 'ending'; endingId: RunResult['endingId']; why: string };
 
 export interface Session {
@@ -40,6 +43,13 @@ export interface Session {
   crystalsEverMade: number;
   /** 지금 막의 지도. 씨앗과 막에서 나오므로 저장할 필요가 없다(다시 만들면 같다). */
   map: ActMap;
+  /**
+   * 이야기 원본 (#432). 없으면 절차 생성 지도로 간다.
+   *
+   * 회차 상태가 아니라 **콘텐츠**다 — 저장할 것이 아니라 매번 받아 오면 되는 것이라
+   * `RunState` 가 아니라 여기 둔다.
+   */
+  scenes: readonly ScenarioScene[] | null;
 }
 
 export function newSession(): Session {
@@ -48,6 +58,7 @@ export function newSession(): Session {
     phase: { kind: 'title' },
     crystalsEverMade: 0,
     map: makeMap(1, 0),
+    scenes: null,
   };
 }
 
@@ -83,9 +94,14 @@ export function beginSelect(session: Session): Session {
  * 씨앗을 여기서 한 번 뽑는다 — 이후 지도도 보상도 전부 이 값에서 나오므로, 회차 전체가
  * 씨앗 하나로 재현된다.
  */
-export function startRun(protagonist: Protagonist, ability: Ability, seed = newSeed()): Session {
+export function startRun(
+  protagonist: Protagonist,
+  ability: Ability,
+  seed = newSeed(),
+  scenes: readonly ScenarioScene[] | null = null,
+): Session {
   const def = PROTAGONISTS.find((p) => p.id === protagonist)!;
-  const map1 = makeMap(1, seed);
+  const map1 = mapFor(1, seed, scenes);
   const deck: Card[] = [
     ...STARTER.map((c, i) => ({ ...c, id: `${c.id}-${i}` })),
     ...Array.from({ length: def.startCrystals }, (_, i) => crystalCard(900 + i)),
@@ -109,7 +125,18 @@ export function startRun(protagonist: Protagonist, ability: Ability, seed = newS
     phase: { kind: 'map' },
     crystalsEverMade: def.startCrystals,
     map: map1,
+    scenes,
   };
+}
+
+/**
+ * 막의 지도를 만든다 (#432).
+ *
+ * 씬이 있으면 **이야기가 지도가 되고**(`scenario.ts`), 없거나 자를 수 없으면 절차 생성으로
+ * 물러선다(`map.ts`). 폴백이 있어야 오프라인·API 장애에도 회차가 끝까지 간다.
+ */
+export function mapFor(act: Act, seed: number, scenes: readonly ScenarioScene[] | null): ActMap {
+  return (scenes && scenarioMap(scenes, act, seed)) ?? makeMap(act, seed);
 }
 
 /** 지금 자리에서 갈 수 있는 노드들 — 화면이 누를 수 있는 것을 이걸로 정한다. */
@@ -126,8 +153,8 @@ export function choices(session: Session) {
 export function enterNode(session: Session, nodeId: string): Session {
   if (!choices(session).some((n) => n.id === nodeId)) return session;
   const node = session.map.nodes.find((n) => n.id === nodeId)!;
-  const run: RunState = { ...session.run, nodeId };
-  const at = { ...session, run };
+  const at = { ...session, run: applySceneEffect({ ...session.run, nodeId }, session, node.sceneId) };
+  const run = at.run;
 
   switch (node.kind) {
     case 'battle':
@@ -138,8 +165,14 @@ export function enterNode(session: Session, nodeId: string): Session {
       return { ...at, phase: { kind: 'refinery', node: nodeId } };
     case 'alliance':
       return { ...at, phase: { kind: 'alliance', node: nodeId } };
-    // 사건은 아직 내용이 없다(#430 범위 밖) — 지나간 것으로 두고 지도로 돌아간다.
+    // 사건에는 이야기가 붙는다 (#432). 씬이 없으면(폴백 지도) 보여 줄 것이 없으니 지나간다.
     case 'event':
+      return node.sceneId
+        ? { ...at, phase: { kind: 'story', node: nodeId } }
+        : backToMap({
+            ...at,
+            run: { ...run, log: [...run.log, `${nodeLabel(nodeId, session.map.act)} — 지나갔다.`] },
+          });
     case 'start':
     default:
       return backToMap({
@@ -147,6 +180,34 @@ export function enterNode(session: Session, nodeId: string): Session {
         run: { ...run, log: [...run.log, `${nodeLabel(nodeId, session.map.act)} — 지나갔다.`] },
       });
   }
+}
+
+/**
+ * 씬에 들어설 때의 효과를 회차에 얹는다 (#432).
+ *
+ * `Scene.onEnter` 의 `stigmaDelta`·`hpDelta`·`setFlags` 가 덱빌더의 침식·체력·플래그와
+ * 1:1 로 대응한다 — 번역이 필요 없다. 침식은 성흔 규칙을 그대로 통과시켜야 무흔 면제 같은
+ * 것이 여기서도 지켜진다.
+ */
+function applySceneEffect(run: RunState, session: Session, sceneId?: string): RunState {
+  if (!sceneId || !session.scenes) return run;
+  const scene = session.scenes.find((s) => s.id === sceneId);
+  const e = onEnterEffect(scene);
+  if (e.stigmaDelta === 0 && e.hpDelta === 0 && Object.keys(e.setFlags).length === 0) return run;
+
+  const erosion = applyErosion(run.erosion, e.stigmaDelta, run.ability);
+  const hp = Math.max(0, Math.min(run.maxHp, run.hp + e.hpDelta));
+  const bits: string[] = [];
+  if (erosion !== run.erosion) bits.push(`침식 ${run.erosion} → ${erosion}`);
+  if (hp !== run.hp) bits.push(`체력 ${run.hp} → ${hp}`);
+
+  return {
+    ...run,
+    erosion,
+    hp,
+    flags: { ...run.flags, ...e.setFlags },
+    log: bits.length > 0 ? [...run.log, `${scene?.title ?? sceneId} — ${bits.join(', ')}.`] : run.log,
+  };
 }
 
 /** 노드를 마치고 지도로. 보스를 넘었으면 다음 막(3막이면 엔딩). */
@@ -172,11 +233,22 @@ export function chooseAlly(session: Session, ally: Faction): Session {
   });
 }
 
+/** 이야기를 다 읽고 지도로. 효과는 들어설 때 이미 얹혔다([applySceneEffect]). */
+export function leaveStory(session: Session): Session {
+  return backToMap(session);
+}
+
+/** 지금 노드의 씬 — 화면이 본문을 그릴 때 쓴다. */
+export function sceneAt(session: Session, nodeId: string): ScenarioScene | undefined {
+  const sceneId = session.map.nodes.find((n) => n.id === nodeId)?.sceneId;
+  return sceneId && session.scenes ? session.scenes.find((s) => s.id === sceneId) : undefined;
+}
+
 /** 다음 막으로. 3막을 넘었으면 회차가 끝난다. */
 function nextAct(session: Session): Session {
   const act = (session.run.act + 1) as Act;
   if (act > 3) return finish(session, 'cleared');
-  const next = makeMap(act, session.run.seed);
+  const next = mapFor(act, session.run.seed, session.scenes);
   // 막 사이에 회복은 없다. 한때 "3막이 완주 불가" 로 보여 쉼을 넣었는데, 실제로는 시험의
   // 자동 플레이어가 침식 카드를 무조건 내던 탓이었다(사람처럼 아끼게 하니 침식 72~87 로
   // 완주했다). 회복을 주면 침식이 안 무서워지고, 그러면 이 게임의 시계가 멈춘다.
