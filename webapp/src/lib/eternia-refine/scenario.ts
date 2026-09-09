@@ -43,6 +43,23 @@ const DEPTH = 3;
 /** 뿌리로 쓸 만한 최소 크기. 너무 얕으면 갈래가 없어 지도가 아니다. */
 const MIN_NODES = 5;
 
+/**
+ * 씬 제목에서 **저작용 번호를 벗긴다** (#443).
+ *
+ * 〈에테르니아의 추락〉의 제목은 `Scene 05a — 광장의 소문` 처럼 앞에 씬 번호를 달고 있다.
+ * CYOA 를 쓰는 사람에게는 필요한 표지이지만 덱빌더 지도에서는 **플레이어에게 보이는 내부
+ * ID** 다. 게다가 지도 라벨은 14자에서 자르므로 번호가 제목을 통째로 밀어낸다 —
+ * 실측에서 `Scene 05a — 광...` 이 되어 어디로 가는 길인지 알 수 없었다.
+ *
+ * 표시하는 자리마다 벗기지 않고 **여기 한 곳에서** 벗긴다. 지도·이야기·저장본이 모두
+ * 같은 제목을 쓰게 된다.
+ *
+ * 번호가 없는 제목은 그대로 둔다 — 벗길 것이 없으면 아무 일도 안 한다.
+ */
+export function displayTitle(title: string): string {
+  return title.replace(/^\s*Scene\s+[\w-]+\s*(?:[—–-]\s*)?/i, '').trim() || title;
+}
+
 /** 스탯을 요구하는 `probability` 는 덱빌더에 대응물이 없다 — 전진 길만 쓴다. */
 function forwardTargets(s: ScenarioScene): string[] {
   return (s.choices ?? [])
@@ -105,7 +122,7 @@ export function sliceScenario(
       kind: 'battle', // 역할은 [assignRoles] 가 덧씌운다
       next: [],
       sceneId: id,
-      title: s.title,
+      title: displayTitle(s.title),
     };
   });
 

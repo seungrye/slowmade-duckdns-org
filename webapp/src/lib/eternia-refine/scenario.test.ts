@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
+  displayTitle,
   sliceScenario,
   scenarioMap,
   rootCandidates,
@@ -147,5 +148,35 @@ describe('씨앗', () => {
     // 표본이 작아 같을 수도 있다. 적어도 던지지 않고 지도를 낸다.
     expect(typeof a).toBe('string');
     expect(typeof b).toBe('string');
+  });
+});
+
+describe('displayTitle — 저작용 번호는 플레이어의 것이 아니다 (#443)', () => {
+  it('앞의 씬 번호를 벗긴다', () => {
+    expect(displayTitle('Scene 05a — 광장의 소문')).toBe('광장의 소문');
+    expect(displayTitle('Scene R-04e — 정제 현장')).toBe('정제 현장');
+    expect(displayTitle('Scene 04 - 지하 잠적')).toBe('지하 잠적');
+  });
+
+  it('번호가 없으면 그대로 둔다 — 벗길 것이 없으면 아무 일도 안 한다', () => {
+    expect(displayTitle('가솔린 열차')).toBe('가솔린 열차');
+    expect(displayTitle('강철의 결단')).toBe('강철의 결단');
+  });
+
+  it('번호뿐인 제목은 통째로 지우지 않는다 — 빈 라벨보다 낫다', () => {
+    expect(displayTitle('Scene 05a')).toBe('Scene 05a');
+  });
+
+  it('지도가 그것을 쓴다 — 표시하는 자리마다 벗기지 않는다', () => {
+    const scenes: ScenarioScene[] = [
+      { id: 'r', title: 'Scene 01 — 뿌리', choices: [plain('a'), plain('b')] },
+      { id: 'a', title: 'Scene 02 — 왼쪽', choices: [plain('c')] },
+      { id: 'b', title: 'Scene 03 — 오른쪽', choices: [plain('c')] },
+      { id: 'c', title: 'Scene 04 — 만남', choices: [plain('d')] },
+      { id: 'd', title: 'Scene 05 — 끝', choices: [] },
+    ];
+    const cut = sliceScenario(scenes, 'r')!;
+    expect(cut.nodes.map((n) => n.title)).not.toContain('Scene 01 — 뿌리');
+    expect(cut.nodes.find((n) => n.id === 'r')!.title).toBe('뿌리');
   });
 });

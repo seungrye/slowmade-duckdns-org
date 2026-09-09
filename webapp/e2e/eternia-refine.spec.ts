@@ -199,10 +199,10 @@ test.describe("손패 제스처 (#425)", () => {
     await expect(page.locator(CARD)).toHaveCount(before);
     await expectExpanded(page, before - 1);
 
-    // 포커스를 다시 잡고 누른다. 첫 누름 뒤 리렌더가 끼면 포커스가 흔들려 두 번째가
-    // 엉뚱한 데로 갈 수 있다 — 병렬 실행에서 그 경합이 실제로 났다.
-    await page.locator(CARD).nth(before - 1).focus();
-    await page.keyboard.press("Enter");
+    // 첫 누름 뒤 리렌더가 끼면 포커스가 흔들려 두 번째가 엉뚱한 데로 간다 — 병렬 실행에서
+    // 실제로 났다. `focus()` 와 `keyboard.press()` 사이에도 그 틈이 있어서(전체 실행 3회 중
+    // 1회 실패) 로케이터에 직접 누른다 — 누르는 순간에 그 요소를 잡는다.
+    await page.locator(CARD).nth(before - 1).press("Enter");
     await expect(page.locator(CARD)).toHaveCount(before - 1);
   });
 
@@ -429,5 +429,65 @@ test.describe("더미 들여다보기 (#441)", () => {
 
     await expect(page.getByText("더미", { exact: true })).toHaveCount(0);
     await expect(page.locator(CARD)).toHaveCount(before);
+  });
+});
+
+test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
+  const DESKTOP = { width: 1440, height: 900 };
+
+  /** 손패가 이 열의 폭을 다 쓰는지. 좌우에 열을 세우면 여기서 줄어든다. */
+  async function handShare(page: Page) {
+    const hand = (await page.locator(HAND).boundingBox())!;
+    const rail = (await page.locator(".h-1.overflow-hidden").first().boundingBox())!;
+    return hand.width / rail.width;
+  }
+
+  test("손패가 판의 폭을 다 쓴다 — 자원 열이 카드 자리를 먹지 않게", async ({ page }) => {
+    // 한때 데스크톱에서 좌·우 열을 세웠는데 그 288px 이 손패에서 나가 부채 간격이
+    // 72 → 41 로 줄었다. 이름을 드러내려던 일이 이름을 더 가렸다.
+    await page.setViewportSize(DESKTOP);
+    await enterBattle(page);
+    expect(await handShare(page)).toBeGreaterThan(0.95);
+  });
+
+  test("에테르는 손패 아래 붙어 있다 — 카드마다 시선이 왕복하지 않게", async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+    await enterBattle(page);
+    const orb = (await page.getByLabel(/^에테르 \d+$/).boundingBox())!;
+    const hand = (await page.locator(HAND).boundingBox())!;
+    const enemy = (await page.getByLabel(/^다음 수 —/).boundingBox())!;
+    // 손패에 붙어 있어야 한다 — 적(무대 위쪽)보다 손패에 훨씬 가까운지로 잰다.
+    expect(Math.abs(orb.y - (hand.y + hand.height))).toBeLessThan(60);
+    expect(orb.y - enemy.y).toBeGreaterThan(200);
+  });
+
+  test("이야기·지도에 저작용 씬 번호가 안 보인다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    // 지도든 이야기든, 화면 어디에도 `Scene 04 — ` 같은 내부 ID 가 남으면 안 된다.
+    await expect(page.getByText(/Scene\s+[\w-]+\s*[—–-]/)).toHaveCount(0);
+    const story = page.getByRole("button", { name: "길을 이어 간다" });
+    if (await story.isVisible().catch(() => false)) {
+      await expect(page.getByText(/Scene\s+[\w-]+\s*[—–-]/)).toHaveCount(0);
+    }
+  });
+
+  test("적의 다음 수가 도형과 숫자로 선다 — 턴마다 읽지 않게", async ({ page }) => {
+    await enterBattle(page);
+    // 접근성 이름으로는 여전히 말이 남는다 — 도형만 남기지 않았다.
+    await expect(page.getByLabel(/^다음 수 —/)).toBeVisible();
+    expect(await page.getByLabel(/^다음 수 —/).locator("svg").count()).toBeGreaterThan(0);
+  });
+
+  test("모바일에서 조작대가 화면을 넘지 않는다", async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await enterBattle(page);
+    for (const l of [page.locator(HAND), page.getByRole("button", { name: "턴 종료" })]) {
+      const b = (await l.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(0);
+      expect(b.x + b.width).toBeLessThanOrEqual(PHONE.width + 1);
+    }
+    expect(await handShare(page)).toBeGreaterThan(0.95);
   });
 });
