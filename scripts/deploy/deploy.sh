@@ -169,6 +169,28 @@ main() {
     ensure_bevy_wasm
     ensure_retro_assets
 
+    # **다른 슬롯의 생성 타입을 치운다** (#429).
+    #
+    # tsconfig.json 의 include 에 `.next-3010/types` `.next-3011/types` 가 들어 있다.
+    # 그런데 배포는 **비활성 슬롯**에 빌드하고, 타입 검사는 include 전체를 본다. 그래서
+    # **살아 있는 슬롯의 낡은 산출물**이 이번에 지운 라우트를 참조하면 빌드가 깨진다:
+    #
+    #   .next-3011/types/app/games/.../shared/page.ts
+    #   Type error: Cannot find module '.../shared/page.js'
+    #
+    # 라우트를 **추가**할 때는 안 걸리고 **지울** 때만 걸려서 여태 안 드러났다. CI 는 새
+    # 체크아웃이라 `.next-*` 가 없어 통과한다 — 배포에서만 터진다(#427 배포에서 실제로 겪음).
+    #
+    # 슬롯 A 를 빌드하면서 슬롯 B 의 생성 타입을 검사할 이유가 없다. 지워도 그 슬롯을 다시
+    # 빌드할 때 재생성되고, **런타임은 types/ 를 읽지 않으므로** 서비스 중인 인스턴스에
+    # 영향이 없다(라이브가 200 을 유지하는 것을 확인하고 넣었다).
+    for d in "$WEBAPP_DIR"/.next-*/types; do
+        [[ -d "$d" ]] || continue
+        [[ "$d" == "$WEBAPP_DIR/.next-${inactive}/types" ]] && continue
+        log "낡은 생성 타입 정리: ${d#"$WEBAPP_DIR/"}"
+        rm -rf "$d"
+    done
+
     log "build (NEXT_DISTDIR=.next-${inactive})"
     NEXT_DISTDIR=".next-${inactive}" pnpm install --frozen-lockfile
     NEXT_DISTDIR=".next-${inactive}" pnpm build
