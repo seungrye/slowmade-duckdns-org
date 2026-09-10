@@ -9,17 +9,21 @@
 // 방향은 아래에서 위다. 지금 서 있는 자리가 아래에 있고 앞길이 위로 뻗는다 — 손이 닿는
 // 곳에 현재가 있고, 스크롤은 앞을 내다보는 몸짓이 된다.
 //
+// **가로로는 안 넘친다** (#457). 세로로 넘치는 것은 앞을 내다보는 것이지만 가로로 넘치면
+// 지도를 읽을 수 없다. 좌표는 컨테이너 폭에서 역산한다 — `map-geometry.ts`.
+//
 // 노드가 씬을 담고 있으면(`sceneId`) 제목을 그대로 쓴다. 「가솔린 열차」가 곧 그 조우의
 // 이름이 되는 것이 이번 작업의 요지다.
 
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { ActMap } from '@/lib/eternia-refine/map';
 import type { MapNode, NodeKind } from '@/lib/eternia-refine/types';
+import { clipLabel, mapGeometry } from './map-geometry';
 
-/** 층 간격·칸 간격 — 화면에 맞춰 줄이지 않는다. 넘치면 스크롤한다. */
-const ROW_GAP = 96;
-const COL_GAP = 132;
-const PAD = 48;
 const R = 15;
+
+/** 폭을 재기 전에 쓸 값. 첫 프레임에만 보이고 곧 실제 폭으로 바뀐다. */
+const FALLBACK_W = 360;
 
 const LABEL: Record<NodeKind, string> = {
   start: '출발',
@@ -39,17 +43,33 @@ export interface MapScreenProps {
 }
 
 export function MapScreen({ map, at, open, onGo }: MapScreenProps) {
+  const box = useRef<HTMLDivElement>(null);
+  const [boxW, setBoxW] = useState(FALLBACK_W);
+
+  // 폭이 바뀌면 좌표를 다시 잡는다 — 화면을 돌리거나 창을 줄일 때.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const measure = () => setBoxW(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const rows = Math.max(...map.nodes.map((n) => n.row)) + 1;
   const widths = Array.from({ length: rows }, (_, r) => map.nodes.filter((n) => n.row === r).length);
   const maxWide = Math.max(...widths);
 
-  const w = PAD * 2 + (maxWide - 1) * COL_GAP;
-  const h = PAD * 2 + (rows - 1) * ROW_GAP;
+  const g = mapGeometry(boxW, rows, maxWide);
+  const w = g.width;
+  const h = g.height;
 
   // 층이 위로 쌓이도록 y 를 뒤집는다 — 뿌리(row 0)가 맨 아래.
+  // 층마다 칸 수가 다르므로 좁은 층은 가운데로 모은다.
   const place = (n: MapNode) => ({
-    x: PAD + ((maxWide - widths[n.row]) / 2 + n.col) * COL_GAP,
-    y: h - PAD - n.row * ROW_GAP,
+    x: g.pad + ((maxWide - widths[n.row]) / 2 + n.col) * g.colGap,
+    y: h - (h - (rows - 1) * g.rowGap) / 2 - n.row * g.rowGap,
   });
 
   const pos = new Map(map.nodes.map((n) => [n.id, place(n)]));
@@ -61,8 +81,11 @@ export function MapScreen({ map, at, open, onGo }: MapScreenProps) {
         {at === null ? '어디로 들어갈지 고른다.' : '다음 길을 고른다.'}
       </p>
 
-      {/* 화면에 맞추지 않는다 — 넘치면 스크롤. 노드는 늘 읽을 만한 크기다. */}
-      <div className="flex-1 overflow-auto rounded-md border border-amber-300 bg-amber-100/60">
+      {/* 세로만 스크롤한다 (#457). 가로는 폭에 맞춰 좌표를 잡으므로 넘칠 일이 없다. */}
+      <div
+        ref={box}
+        className="flex-1 overflow-y-auto overflow-x-hidden rounded-md border border-amber-300 bg-amber-100/60"
+      >
         <svg width={w} height={h} className="block" role="img" aria-label="지도">
           {map.nodes.flatMap((n) =>
             n.next.map((id) => {
@@ -105,7 +128,7 @@ export function MapScreen({ map, at, open, onGo }: MapScreenProps) {
                     x={p.x} y={p.y + R + 16}
                     textAnchor="middle" fontSize="10.5" fill="#92400E"
                   >
-                    {n.title.length > 14 ? `${n.title.slice(0, 13)}…` : n.title}
+                    {clipLabel(n.title, g.labelWidth)}
                   </text>
                 )}
               </g>

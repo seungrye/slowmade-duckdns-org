@@ -180,3 +180,70 @@ describe('displayTitle — 저작용 번호는 플레이어의 것이 아니다 
     expect(cut.nodes.find((n) => n.id === 'r')!.title).toBe('뿌리');
   });
 });
+
+// 막다른 길 (#457) — 정제소에 들어갔더니 다음 길이 없다는 제보.
+//
+// `sliceScenario` 는 뿌리에서 닿는 것은 보장하지만 **보스까지 가는 것은 보장하지 않았다.**
+// forward target 이 전부 엔딩이거나 이미 앞 층에서 번호가 매겨졌으면(`depth[t] !== undefined`
+// 로 건너뛴다) 그 노드는 `next: []` 로 남는다.
+describe('막다른 길은 지도에 없다 (#457)', () => {
+  /**
+   * `dead` 는 앞 층에서 이미 쓰인 곳(`b1`)으로만 간다 → 전진 간선이 하나도 안 남는다.
+   * 예전에는 그대로 지도에 실려 들어가면 나올 수 없었다.
+   */
+  const WITH_DEAD: ScenarioScene[] = [
+    { id: 'root', title: '뿌리', choices: [plain('a1'), plain('a2')] },
+    { id: 'a1', title: '왼쪽', choices: [plain('b1')] },
+    { id: 'a2', title: '오른쪽', choices: [plain('dead'), plain('b1')] },
+    { id: 'b1', title: '만남', choices: [plain('c1')] },
+    { id: 'dead', title: '막다른 곳', choices: [plain('b1')] }, // 뒤로만 간다 → 전진 0
+    { id: 'c1', title: '끝', choices: [] },
+  ];
+
+  it('마지막 층이 아닌데 나갈 길이 없는 노드는 빠진다', () => {
+    const cut = sliceScenario(WITH_DEAD, 'root')!;
+    expect(cut).not.toBeNull();
+    expect(cut.nodes.some((n) => n.id === 'dead')).toBe(false);
+  });
+
+  it('남은 노드는 전부 마지막 층까지 갈 수 있다', () => {
+    const cut = sliceScenario(WITH_DEAD, 'root')!;
+    const maxRow = Math.max(...cut.nodes.map((n) => n.row));
+    const byId = new Map(cut.nodes.map((n) => [n.id, n]));
+    const canReach = (id: string, seen = new Set<string>()): boolean => {
+      const n = byId.get(id);
+      if (!n) return false;
+      if (n.row === maxRow) return true;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return n.next.some((t) => canReach(t, seen));
+    };
+    for (const n of cut.nodes) {
+      expect(canReach(n.id), `${n.id}(row ${n.row}) 에서 보스까지`).toBe(true);
+    }
+  });
+
+  it('실제 씬으로 만든 지도에도 막다른 길이 없다', () => {
+    for (const act of [1, 2, 3] as const) {
+      for (const seed of [1, 7, 42, 99, 123, 2026]) {
+        const m = scenarioMap(SCENES, act, seed);
+        if (!m) continue;
+        const maxRow = Math.max(...m.nodes.map((n) => n.row));
+        for (const n of m.nodes) {
+          if (n.row === maxRow) continue;
+          expect(n.next.length, `act${act} seed${seed} ${n.id}(row ${n.row})`).toBeGreaterThan(0);
+        }
+      }
+    }
+  });
+
+  it('추려 낸 뒤 너무 작아지면 null — 절차 생성으로 물러선다', () => {
+    // 뿌리에서 두 갈래가 다 막다른 길이면 남는 게 없다.
+    const allDead: ScenarioScene[] = [
+      { id: 'root', title: '뿌리', choices: [plain('x'), plain('y')] },
+      { id: 'x', title: '막힘1', choices: [] },
+      { id: 'y', title: '막힘2', choices: [] },
+    ];
+    expect(sliceScenario(allDead, 'root')).toBeNull();
+  });
+});
