@@ -249,8 +249,12 @@ export default function Navbar() {
 
                 {/* 메뉴 + 알림 종을 한 묶음으로 (#243).
                     컨테이너가 justify-between 이라 자식이 넷이면 넷 다 균등하게 벌어져
-                    종이 메뉴에서 멀어진다. 묶으면 [로고] ——여백—— [메뉴][종] 이 된다. */}
-                <div className="flex items-center gap-4">
+                    종이 메뉴에서 멀어진다. 묶으면 [로고] ——여백—— [메뉴][종] 이 된다.
+
+                    `ml-3` 은 모바일 몫이다 (#455). justify-between 은 남는 폭이 있을 때만
+                    벌려 주는데, 좁은 화면에서는 제목이 길어 남는 폭이 0 이 된다. 그러면
+                    calendar badge 가 "Handmade Site" 에 딱 붙는다(제보). 최소 간격을 준다. */}
+                <div className="flex items-center gap-4 ml-3">
                 {/* 데스크탑 메뉴 */}
                 <ul className="hidden md:flex space-x-6 items-center">
                     {navLinks.map((link) => (
