@@ -108,6 +108,22 @@ describe('Navbar — 씬 단일 링크 (인증)', () => {
     expect(screen.queryByText('내 프로필')).toBeNull();
   });
 
+  /**
+   * `gameLinks[0]` 은 모바일에서 **기본으로 펴지는** 묶음이다. navbar 주석이 "맨 앞에
+   * 끼우지 말라"고 경고하는데 그걸 지키는 시험이 없었다 — #453 에서 새 게임을 맨 앞으로
+   * 옮기는 변이를 넣어 봤더니 26개가 전부 통과했다.
+   *
+   * 앞에 끼우면 조용히 나빠진다: 하위가 하나뿐인 게임이 첫 자리에 오면 펼칠 것이 없어
+   * **아무것도 안 펴지고**, 씬·제작 항목이 클릭 한 번 뒤로 숨는다.
+   */
+  it('모바일: 게임 경로에서 첫 게임의 하위가 이미 펴져 있다 (#453)', () => {
+    pathnameMock.mockReturnValue('/scenes');
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    // 게임 섹션도, 첫 게임의 하위도 클릭 없이 이미 열려 있어야 한다.
+    expect(screen.getByRole('link', { name: '씬' })).toBeTruthy();
+  });
+
   it('모바일 마이페이지 헤더 탭하면 자식 4개가 펴짐', () => {
     pathnameMock.mockReturnValue('/');
     render(<Navbar />);
@@ -161,6 +177,27 @@ describe('Navbar — 게임 2단 메뉴 (비로그인)', () => {
     expect(link.getAttribute('href')).toBe('/games/web-adventure');
     // 펼침 토글 자체가 없어야 한다.
     expect(screen.queryByLabelText('에테르니아의 추락 하위 메뉴')).toBeNull();
+  });
+
+  // #453 — 배포돼 돌고 있는데 메뉴에 없어서 주소를 아는 사람만 들어갔다.
+  it('데스크탑: 에테르니아: 정제가 있고 이름이 곧 플레이 링크', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('게임 메뉴'));
+
+    const link = screen.getByRole('link', { name: /에테르니아: 정제/ });
+    expect(link.getAttribute('href')).toBe('/games/eternia-refine');
+    // 하위가 하나뿐이라 펼침 토글이 없어야 한다 (#51).
+    expect(screen.queryByLabelText('에테르니아: 정제 하위 메뉴')).toBeNull();
+  });
+
+  it('모바일: 게임 섹션에 에테르니아: 정제가 보인다', () => {
+    render(<Navbar />);
+    fireEvent.click(screen.getByLabelText('모바일 메뉴 열기'));
+    fireEvent.click(screen.getByLabelText('모바일 게임 섹션 토글'));
+
+    const links = screen.getAllByRole('link');
+    expect(links.filter((l) => l.getAttribute('href') === '/games/eternia-refine').length)
+      .toBeGreaterThanOrEqual(1);
   });
 
   it('데스크탑: 비로그인에겐 제작 항목이 어디에도 없다', () => {

@@ -25,6 +25,7 @@ import {
     FileText,
     Server,
     Joystick,
+    Gem,
 } from "lucide-react";
 
 const navLinks = [
@@ -91,6 +92,29 @@ const gameLinks = [
                 description: "홈브류 모음 + 내가 올린 롬",
                 icon: <Joystick size={20} />,
                 authOnly: true,
+                ownerOnly: false,
+            },
+        ],
+    },
+    {
+        // #453 — 배포돼 돌고 있는데 메뉴에 없어서 주소를 아는 사람만 들어갔다.
+        //
+        // 자리는 **retro 다음, 서버 상태 앞**이다. 서버 상태는 맨 끝이어야 하고(아래 주석),
+        // 맨 앞은 모바일 기본 펼침 대상(`gameLinks[0].key`)이라 둘 다 건드리면 안 된다.
+        //
+        // 하위가 "플레이" 하나뿐이라 이름 자체가 링크로 그려진다 (#51). 로그인은 필요 없다 —
+        // 회차는 localStorage 에 저장되고 씬은 공개 API 를 읽는다.
+        key: "eternia-refine",
+        label: "에테르니아: 정제",
+        description: "결정을 태워 덱을 벼리는 로그라이크",
+        icon: <Gem size={20} />,
+        children: [
+            {
+                href: "/games/eternia-refine",
+                label: "플레이",
+                description: "회차 시작",
+                icon: <Gem size={20} />,
+                authOnly: false,
                 ownerOnly: false,
             },
         ],
