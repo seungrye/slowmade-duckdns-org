@@ -82,6 +82,64 @@ describe('CalendarBadge', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
   });
 
+  // #455 — catalog 에 없는 이름은 description 이 비고 fallback 아이콘(📌)이 붙는다.
+  // 눌러 봐도 이름만 나오니 badge 를 띄울 이유가 없다.
+  describe('설명 있는 것만', () => {
+    it('설명이 없으면 badge 를 안 그린다', async () => {
+      mockEvents([UNKNOWN]);
+      const { container } = render(<CalendarBadge />);
+      await waitFor(() => expect(container).toBeEmptyDOMElement());
+    });
+
+    it('설명 있는 것만 남긴다', async () => {
+      mockEvents([HOLIDAY, UNKNOWN, SEASON]);
+      render(<CalendarBadge />);
+      await waitFor(() => expect(icons()).toHaveLength(2));
+      expect(screen.getByLabelText('광복절')).toBeTruthy();
+      expect(screen.queryByLabelText('조달의 날')).toBeNull();
+    });
+
+    it('전부 설명이 없으면 아무것도 안 그린다', async () => {
+      mockEvents([UNKNOWN, { ...UNKNOWN, name: '다른 날' }]);
+      const { container } = render(<CalendarBadge />);
+      await waitFor(() => expect(container).toBeEmptyDOMElement());
+    });
+  });
+
+  // #455 — badge 는 89.3% 겹쳐 있어 첫 칸 말고는 hover 판정이 2.8px 다(#413). 하나씩
+  // 짚게 두면 사실상 못 짚는다. 어디를 짚든 겹친 것 전부를 한 번에 보여준다.
+  describe('hover 하면 전부 한 번에', () => {
+    it('아무 badge 나 짚으면 겹친 것이 모두 설명된다', async () => {
+      mockEvents([HOLIDAY, SEASON, ANNIV]);
+      render(<CalendarBadge />);
+      await waitFor(() => expect(icons()).toHaveLength(3));
+
+      fireEvent.mouseEnter(icons()[0]);
+      expect(screen.getByText('광복절')).toBeTruthy();
+      expect(screen.getByText('백로')).toBeTruthy();
+      expect(screen.getByText('푸른하늘의날')).toBeTruthy();
+    });
+
+    it('마지막 badge 를 짚어도 똑같이 전부 보인다', async () => {
+      mockEvents([HOLIDAY, SEASON, ANNIV]);
+      render(<CalendarBadge />);
+      await waitFor(() => expect(icons()).toHaveLength(3));
+
+      fireEvent.mouseEnter(icons()[2]);
+      expect(screen.getByText('광복절')).toBeTruthy();
+      expect(screen.getByText('백로')).toBeTruthy();
+    });
+
+    it('+N 이 있어도 잘린 것까지 설명한다', async () => {
+      mockEvents([HOLIDAY, SEASON, ANNIV, EXTRA]);
+      render(<CalendarBadge />);
+      await waitFor(() => expect(screen.getByLabelText(/외 1건/)).toBeTruthy());
+
+      fireEvent.mouseEnter(icons()[0]);
+      expect(screen.getByText('식목일')).toBeTruthy();
+    });
+  });
+
   describe('스택', () => {
     it('겹칠 이벤트마다 칸을 하나씩 그린다', async () => {
       mockEvents([HOLIDAY, SEASON]);
@@ -114,8 +172,11 @@ describe('CalendarBadge', () => {
     });
   });
 
-  describe('데스크톱 — 짚은 것만', () => {
-    it('마우스를 올리면 그 날만 설명한다', async () => {
+  describe('데스크톱 — 짚으면 전부', () => {
+    // #455 — 예전엔 짚은 칸 하나만 설명했다(그래서 짚은 칸을 맨 앞으로 끌어올리는 연출도
+    // 있었다). 89.3% 겹침에서는 못 짚으니 전부 보여주는 쪽으로 바꿨고, 그 연출도 뜻을 잃어
+    // 같이 뺐다.
+    it('마우스를 올리면 겹친 것을 전부 설명한다', async () => {
       mockEvents([HOLIDAY, SEASON]);
       render(<CalendarBadge />);
       const season = await screen.findByLabelText('백로');
@@ -123,18 +184,7 @@ describe('CalendarBadge', () => {
       fireEvent.mouseEnter(season);
       const tooltip = screen.getByRole('tooltip');
       expect(tooltip).toHaveTextContent('이슬이 맺히기');
-      expect(tooltip).not.toHaveTextContent('1945년');
-    });
-
-    it('짚은 칸이 맨 앞으로 나온다', async () => {
-      mockEvents([HOLIDAY, SEASON]);
-      render(<CalendarBadge />);
-      const season = await screen.findByLabelText('백로');
-      const before = Number(season.style.zIndex);
-
-      fireEvent.mouseEnter(season);
-      expect(Number(season.style.zIndex)).toBeGreaterThan(before);
-      expect(season.className).toContain('ring-white');
+      expect(tooltip).toHaveTextContent('1945년');
     });
 
     it('벗어나면 닫힌다', async () => {
@@ -155,6 +205,7 @@ describe('CalendarBadge', () => {
 
       fireEvent.focus(season);
       expect(screen.getByRole('tooltip')).toHaveTextContent('이슬이 맺히기');
+      expect(screen.getByRole('tooltip')).toHaveTextContent('1945년');
       fireEvent.blur(season);
       expect(screen.queryByRole('tooltip')).toBeNull();
     });
@@ -179,17 +230,6 @@ describe('CalendarBadge', () => {
 
       fireEvent.click(more);
       expect(screen.getByRole('tooltip')).toHaveTextContent('식목일');
-    });
-
-    it('설명이 없는 날은 이름만 보여준다 — 표에 없다고 안 뜨면 안 된다', async () => {
-      mockEvents([UNKNOWN]);
-      render(<CalendarBadge />);
-
-      fireEvent.click(await screen.findByLabelText('조달의 날'));
-      const tooltip = screen.getByRole('tooltip');
-      expect(tooltip).toHaveTextContent('조달의 날');
-      // 빈 설명 문단을 그리지 않는다.
-      expect(tooltip.querySelectorAll('p')).toHaveLength(1);
     });
 
     it('다시 누르면 닫힌다', async () => {

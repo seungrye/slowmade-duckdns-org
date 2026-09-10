@@ -35,9 +35,14 @@ const VISIBLE = 3;
 
 export default function CalendarBadge() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  /** 마우스·포커스가 짚은 칸. null 이면 아무것도 안 짚은 상태. */
-  const [hovered, setHovered] = useState<number | null>(null);
-  /** 눌러서 연 상태(모바일). hover 가 없는 기기에서 툴팁을 여는 유일한 길이다. */
+  /**
+   * 마우스·포커스가 스택 위에 있나 (#455).
+   *
+   * 예전엔 짚은 **칸의 index** 를 들고 그 칸만 설명했다. 그런데 badge 는 89.3% 겹쳐 있어
+   * (#413) 첫 칸 말고는 hover 판정이 2.8px 라 사실상 못 짚는다. 어디를 짚든 전부 보여준다.
+   */
+  const [hovering, setHovering] = useState(false);
+  /** 눌러서 연 상태(모바일). hover 가 없는 기기에서 tooltip 을 여는 유일한 길이다. */
   const [pinned, setPinned] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -96,29 +101,27 @@ export default function CalendarBadge() {
     };
   }, [pinned]);
 
-  // 해당 없는 날엔 자리도 차지하지 않는다.
-  if (events.length === 0) return null;
-
-  const shown = events.slice(0, VISIBLE);
-  const overflow = events.length - shown.length;
-  const open = hovered !== null || pinned;
-  // 짚은 칸이 있으면 그것만, 없으면(=탭으로 연 모바일) 전부 보여준다.
-  const listed = hovered !== null ? [events[hovered]] : events;
-
   /**
-   * 누르면 "전부 보기". 데스크톱에선 hover 로 하나씩 보다가 누르면 전체가 되고,
-   * 모바일은 hover 가 없어 탭이 곧 전체 보기가 된다.
+   * 설명이 있는 것만 남긴다 (#455).
+   *
+   * `catalog.ts` 에 없는 이름은 `description: ''` 에 fallback 아이콘(📌)이 붙는다. 눌러 봐도
+   * 이름만 나오니 badge 를 띄울 이유가 없다 — 제목 옆 자리만 먹는다.
    */
-  const showAll = () => {
-    setHovered(null);
-    setPinned((v) => !v);
-  };
+  const listed = events.filter((e) => e.description);
+
+  // 해당 없는 날엔 자리도 차지하지 않는다.
+  if (listed.length === 0) return null;
+
+  const shown = listed.slice(0, VISIBLE);
+  const overflow = listed.length - shown.length;
+  const open = hovering || pinned;
 
   return (
     <div
       ref={rootRef}
       className="relative flex items-center"
-      onMouseLeave={() => setHovered(null)}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
     >
       <div className="flex items-center">
         {shown.map((event, i) => (
@@ -126,10 +129,9 @@ export default function CalendarBadge() {
             key={`${event.name}-${i}`}
             type="button"
             aria-label={event.name}
-            onMouseEnter={() => setHovered(i)}
-            onFocus={() => setHovered(i)}
-            onBlur={() => setHovered(null)}
-            onClick={showAll}
+            onFocus={() => setHovering(true)}
+            onBlur={() => setHovering(false)}
+            onClick={() => setPinned((v) => !v)}
             // 겹쳐 쌓되 링으로 경계를 그어 이모지끼리 뭉개지지 않게 한다.
             // 링 색은 navbar 배경과 같아야 오려낸 것처럼 보인다.
             //
@@ -141,10 +143,8 @@ export default function CalendarBadge() {
             // 실오라기라 색도 +N 개수도 안 읽히고, 배지별 hover 판정도 그만큼 좁다.
             // 짚어 보기가 아주 죽지는 않는다 — **누르면 "전부 보기"** 이고, 모바일은 원래
             // hover 가 없어 그 길로만 썼다. 짚어 보기는 데스크톱에서 덤이었다.
-            style={{ zIndex: hovered === i ? 30 : shown.length - i }}
-            className={`relative -ml-[25px] flex h-7 w-7 items-center justify-center rounded-full text-sm leading-none ring-2 ring-gray-900 transition first:ml-0 focus:outline-none ${TONE[event.kind]} ${
-              hovered === i ? 'scale-110 ring-white' : ''
-            }`}
+            style={{ zIndex: shown.length - i }}
+            className={`relative -ml-[25px] flex h-7 w-7 items-center justify-center rounded-full text-sm leading-none ring-2 ring-gray-900 transition first:ml-0 focus:outline-none focus-visible:ring-white ${TONE[event.kind]}`}
           >
             <span aria-hidden="true">{event.icon}</span>
           </button>
@@ -154,9 +154,9 @@ export default function CalendarBadge() {
           <button
             type="button"
             aria-label={`외 ${overflow}건 더 보기`}
-            onMouseEnter={() => setHovered(null)}
-            onFocus={() => setHovered(null)}
-            onClick={showAll}
+            onFocus={() => setHovering(true)}
+            onBlur={() => setHovering(false)}
+            onClick={() => setPinned((v) => !v)}
             style={{ zIndex: 0 }}
             className="relative -ml-[25px] flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-xs font-semibold leading-none text-gray-100 ring-2 ring-gray-900 focus:outline-none focus-visible:ring-white"
           >
