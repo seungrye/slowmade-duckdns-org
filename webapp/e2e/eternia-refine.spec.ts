@@ -514,3 +514,52 @@ test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
     // 좁다는 이유만으로 빨간불이 켜진다 — 실제로 CI 에서 그렇게 깨졌다.
   });
 });
+
+test.describe("지도 — 가로로 안 넘친다 (#457)", () => {
+  test.use({ viewport: PHONE });
+
+  test("모바일에서 지도에 가로 스크롤이 없다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    await expect(page.getByRole("img", { name: "지도" })).toBeVisible();
+
+    const box = page.locator('div:has(> svg[aria-label="지도"])').last();
+    const over = await box.evaluate((el) => ({
+      scrollW: el.scrollWidth,
+      clientW: el.clientWidth,
+    }));
+    // 1px 은 반올림 몫이다. 그 이상 넘으면 손가락으로 옆으로 밀 수 있다는 뜻이다.
+    expect(over.scrollW).toBeLessThanOrEqual(over.clientW + 1);
+  });
+
+  test("문서 전체도 가로로 안 넘친다 — 루트에 스크롤바가 생기면 안 된다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    await expect(page.getByRole("img", { name: "지도" })).toBeVisible();
+
+    const doc = await page.evaluate(() => ({
+      scrollW: document.documentElement.scrollWidth,
+      clientW: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollW).toBeLessThanOrEqual(doc.clientW + 1);
+  });
+
+  test("노드 이름이 지도 밖으로 안 나간다", async ({ page }) => {
+    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.getByRole("button", { name: "새 회차" }).click();
+    await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+    const svg = page.getByRole("img", { name: "지도" });
+    await expect(svg).toBeVisible();
+
+    const svgBox = (await svg.boundingBox())!;
+    const texts = await svg.locator("text").all();
+    expect(texts.length).toBeGreaterThan(0);
+    for (const t of texts) {
+      const b = (await t.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(svgBox.x - 1);
+      expect(b.x + b.width).toBeLessThanOrEqual(svgBox.x + svgBox.width + 1);
+    }
+  });
+});

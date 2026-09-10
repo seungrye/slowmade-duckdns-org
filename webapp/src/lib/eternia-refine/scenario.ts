@@ -133,7 +133,49 @@ export function sliceScenario(
     n.next = forwardTargets(s).filter((t) => node.has(t) && depth[t] === n.row + 1);
   }
 
-  return { nodes, depth };
+  return prune(nodes, depth, rootId);
+}
+
+/**
+ * 보스까지 못 가는 노드를 걷어낸다 (#457).
+ *
+ * BFS 는 **뿌리에서 닿는 것**만 보장한다. 나가는 길은 보장하지 않는다 — 어떤 노드의 forward
+ * target 이 전부 엔딩이거나 이미 앞 층에서 번호가 매겨졌으면(`depth[t] !== undefined` 로
+ * 건너뛴다) `next: []` 로 남는다. 그런 노드에 들어가면 다음 길이 없어 회차가 끊긴다.
+ * 정제소에서 실제로 그렇게 막혔다.
+ *
+ * 마지막 층에서 **거꾸로** 훑는다. 마지막 층이거나, 살아남은 노드로 가는 길이 있으면 산다.
+ * 한 층씩 내려오므로 한 번만 훑으면 된다(간선이 전부 +1 층이라 순환이 없다).
+ */
+function prune(
+  nodes: MapNode[],
+  depth: Record<string, number>,
+  rootId: string,
+): { nodes: MapNode[]; depth: Record<string, number> } | null {
+  const maxRow = Math.max(...nodes.map((n) => n.row));
+  const alive = new Set(nodes.filter((n) => n.row === maxRow).map((n) => n.id));
+
+  for (let row = maxRow - 1; row >= 0; row--) {
+    for (const n of nodes) {
+      if (n.row === row && n.next.some((t) => alive.has(t))) alive.add(n.id);
+    }
+  }
+
+  const kept = nodes.filter((n) => alive.has(n.id));
+  // 뿌리가 잘려 나가거나 너무 작아지면 지도로 못 쓴다 — 부르는 쪽이 절차 생성으로 물러선다.
+  if (kept.length < MIN_NODES || !alive.has(rootId)) return null;
+
+  // 칸 번호를 다시 매긴다. 사이가 비면 화면이 어긋난 자리에 그린다.
+  const perRow = new Map<number, number>();
+  for (const n of kept) {
+    n.next = n.next.filter((t) => alive.has(t));
+    n.col = perRow.get(n.row) ?? 0;
+    perRow.set(n.row, n.col + 1);
+  }
+
+  const left: Record<string, number> = {};
+  for (const n of kept) left[n.id] = depth[n.id];
+  return { nodes: kept, depth: left };
 }
 
 /**
