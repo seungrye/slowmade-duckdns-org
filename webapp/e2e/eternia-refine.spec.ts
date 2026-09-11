@@ -618,11 +618,26 @@ test.describe("손패는 어느 폭에서도 부채다 (#459)", () => {
   test("좁아져도 손패가 화면 밖으로 안 나간다", async ({ page }) => {
     await page.setViewportSize(NARROW[0]);
     await enterBattle(page);
-    const hand = (await page.locator(HAND).boundingBox())!;
-    for (const c of await page.locator(CARD).all()) {
-      const b = (await c.boundingBox())!;
-      expect(b.x).toBeGreaterThanOrEqual(hand.x - 1);
-      expect(b.x + b.width).toBeLessThanOrEqual(hand.x + hand.width + 1);
-    }
+
+    // **한 번만 재면 안 된다.** FanHand 는 마운트 뒤 컨테이너 폭을 재서(기본값 → 실제 폭)
+    // 부채를 다시 편다. 그 전 프레임은 기본값 기준이라 좁은 화면에서 잠깐 삐져나온다.
+    // 자리를 잡은 뒤의 값을 본다 — 비율 시험도 같은 이유로 `expect.poll` 을 쓴다.
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          ([handSel, cardSel]) => {
+            const hand = document.querySelector(handSel as string)!.getBoundingClientRect();
+            const cards = [...document.querySelectorAll(cardSel as string)].map((c) =>
+              c.getBoundingClientRect(),
+            );
+            // 좌우로 가장 많이 삐져나온 양. 0 이하면 다 안에 있다.
+            return Math.max(
+              ...cards.map((b) => Math.max(hand.left - b.left, b.right - hand.right)),
+            );
+          },
+          [HAND, CARD],
+        ),
+      )
+      .toBeLessThanOrEqual(1);
   });
 });
