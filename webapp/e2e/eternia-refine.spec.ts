@@ -615,6 +615,35 @@ test.describe("손패는 어느 폭에서도 부채다 (#459)", () => {
     });
   }
 
+  /**
+   * 카드가 실제로 **누워 있는지** (#467).
+   *
+   * 제보: "이거는 그냥 세워둔거잖아, 앵커가 없는데?" — 좁은 화면에서 회전이 0 이라 부채가
+   * 아니라 계단으로 보였다.
+   *
+   * `fanGeometry` 값이 아니라 **그려진 transform** 을 읽는다. 계산이 12° 를 내도 화면에
+   * 안 붙으면 소용없다 — 이 파일이 그 함정을 세 번 밟았다.
+   */
+  for (const vp of NARROW) {
+    test(`${vp.width}px 에서 카드가 눕는다`, async ({ page }) => {
+      await page.setViewportSize(vp);
+      await enterBattle(page);
+
+      await expect
+        .poll(async () =>
+          page.locator(CARD).evaluateAll((els) => {
+            const deg = els.map((e) => {
+              const m = /rotate\((-?[\d.]+)deg\)/.exec((e as HTMLElement).style.transform);
+              return m ? Math.abs(Number(m[1])) : 0;
+            });
+            // 양 끝 카드가 가장 많이 눕는다. 그중 큰 값을 본다.
+            return Math.max(...deg);
+          }),
+        )
+        .toBeGreaterThan(0);
+    });
+  }
+
   test("좁아져도 손패가 화면 밖으로 안 나간다", async ({ page }) => {
     await page.setViewportSize(NARROW[0]);
     await enterBattle(page);

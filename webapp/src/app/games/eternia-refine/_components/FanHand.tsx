@@ -170,19 +170,27 @@ export function fanGeometry(width: number, n: number): FanGeometry {
    * 카드의 **75%** 가 가려졌다(#460 재현). 회전은 폭을 크게 먹는데(12° 면 63.9px, 0° 면
    * 50px) 그 차이가 간격으로 갔어야 했다.
    *
-   * 양보 순서는 **회전 → 카드 크기 → 흩어짐**. 회전은 값이 싸다(폭만 먹고 읽기에 보탬이
-   * 없다). 흩어짐이 마지막인 건 손패가 많을 때 비켜서기가 가장 필요해서다 — 예전에도 그
-   * 이유로 흩어질 자리를 먼저 떼어 뒀다(412px·8장에서 0 이 되어 겪었다).
+   * 양보 순서는 **흩어짐 → 카드 크기 → 회전**이다.
+   *
+   * 처음엔 회전을 제일 먼저 내놨다(#459). 회전이 폭을 많이 먹으니(12° 면 63.9px, 0° 면
+   * 50px) 싸다고 봤다. 그런데 **회전이야말로 부채를 부채로 만드는 것**이라, 먼저 버리니
+   * 340px 이하에서 카드가 그냥 서 있고 계단처럼 보였다 — 부채로 보이게 하려던 일이 부채를
+   * 없앴다(#467 제보: "이거는 그냥 세워둔거잖아").
+   *
+   * 그래서 회전은 끝까지 지키고 **카드를 줄여** 자리를 낸다. 288px·5장이면 12° 를 지키면서
+   * 배율 0.74 가 된다 — 카드가 조금 작아지는 값을 치르고 부채를 지킨다.
    */
   for (const reserve of [SCATTER_MAX, 0]) {
-    // 회전이 클수록 폭을 먹어 카드를 더 줄여야 한다. 크기를 안 줄여도 되는 각도가 있으면
-    // 그중 가장 큰 것을 쓴다 — 넓은 화면에서 예전과 똑같은 값이 나오는 이유다.
-    for (let deg = MAX_ROTATION_DEG; deg >= 0; deg -= 0.5) {
-      if (maxScale(budget, half, deg, reserve) >= 1) return fit(budget, half, deg, reserve, 1);
-    }
-    // 크기를 줄여야 한다면 회전은 0 이 가장 유리하다(폭을 가장 덜 먹는다).
-    const s = maxScale(budget, half, 0, reserve);
-    if (s >= MIN_SCALE) return fit(budget, half, 0, reserve, Math.min(1, s));
+    const s = maxScale(budget, half, MAX_ROTATION_DEG, reserve);
+    if (s >= 1) return fit(budget, half, MAX_ROTATION_DEG, reserve, 1);
+    if (s >= MIN_SCALE) return fit(budget, half, MAX_ROTATION_DEG, reserve, s);
+  }
+
+  // 가장 작은 카드로도 각도를 못 지키는 극단(아주 좁은데 장수까지 많다) — 그때야 눕힌 각도를
+  // 줄인다. 흔한 손패(3~6장)에서는 여기까지 안 온다.
+  for (let deg = MAX_ROTATION_DEG; deg >= 0; deg -= 0.5) {
+    const s = maxScale(budget, half, deg, 0);
+    if (s >= MIN_SCALE) return fit(budget, half, deg, 0, Math.min(1, s));
   }
 
   // 목표를 못 채우는 아주 좁은 화면 — 가장 작은 카드로 최대한 벌린다.

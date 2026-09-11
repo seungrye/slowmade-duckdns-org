@@ -213,10 +213,13 @@ describe('부채는 어느 폭에서도 부채다 (#459)', () => {
     }
   });
 
-  it('좁아지면 회전을 먼저 내놓는다 — 간격이 더 중요하다', () => {
+  // #459 에서는 "좁아지면 회전을 먼저 내놓는다"를 걸었다. 그게 틀렸다 — 회전을 버리니
+  // 카드가 그냥 서서 부채가 아니게 됐다(#467). 이제는 **크기를 먼저 내놓는다.**
+  it('좁아지면 카드를 먼저 줄인다 — 회전은 부채의 정체다', () => {
     const narrow = fanGeometry(300, 6);
     const wide = fanGeometry(672, 6);
-    expect(narrow.rotation).toBeLessThan(wide.rotation);
+    expect(narrow.scale).toBeLessThan(wide.scale);
+    expect(narrow.rotation).toBe(wide.rotation);
   });
 
   it('넓은 화면에서는 예전 그대로다 — 좁을 때만 양보한다', () => {
@@ -272,6 +275,47 @@ describe('아주 좁은 화면 — 되는 만큼은 한다 (#459)', () => {
   it('그래도 화면 밖으로는 안 나간다', () => {
     for (const n of [7, 8, 10]) {
       expect(maxHalfExtent(280, n), `n=${n}`).toBeLessThanOrEqual(280 / 2 - EDGE_PAD + 0.5);
+    }
+  });
+});
+
+// 카드가 안 눕던 것 (#467).
+//
+// 제보: "이거는 그냥 세워둔거잖아, 앵커가 없는데?" — 340px 이하에서 회전이 0 이라 부채가
+// 아니라 계단으로 보였다.
+//
+// #459 에서 내가 순서를 잘못 잡았다. "회전 → 크기 → 흩어짐" 으로 양보하게 했는데, 회전이
+// 폭을 많이 먹으니 먼저 내놓는 게 싸다고 본 것이다. 그런데 **회전이야말로 부채를 부채로
+// 만드는 것**이다. 먼저 버리면 목표를 이루려다 목표를 잃는다.
+describe('카드는 눕는다 — 부채의 정체 (#467)', () => {
+  /** 흔한 손패 크기. 이 범위에서는 어떤 폭이든 부채로 보여야 한다. */
+  const COMMON = [3, 4, 5, 6];
+
+  it('흔한 손패에서는 어느 폭에서도 카드가 눕는다', () => {
+    for (const w of SWEEP) {
+      for (const n of COMMON) {
+        // 각도 **값**을 적지 않는다 — 각도를 조정해도 "눕는다"는 성질은 남아야 한다.
+        expect(fanGeometry(w, n).rotation, `w=${w} n=${n}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('좁은 폰에서도 눕는다 — 제보가 나온 자리', () => {
+    for (const w of [288, 300, 320, 340]) {
+      expect(fanGeometry(w, 5).rotation, `w=${w}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('넓으면 최대 각도 그대로', () => {
+    expect(fanGeometry(672, 5).rotation).toBe(MAX_ROTATION_DEG);
+    expect(fanGeometry(672, 5).scale).toBe(1);
+  });
+
+  it('회전을 지키느라 카드가 작아지는 것은 받아들인다 — 다만 읽을 만큼은 남긴다', () => {
+    for (const w of [288, 320]) {
+      const g = fanGeometry(w, 5);
+      expect(g.scale, `w=${w}`).toBeLessThan(1);
+      expect(g.scale, `w=${w}`).toBeGreaterThan(0.6);
     }
   });
 });
