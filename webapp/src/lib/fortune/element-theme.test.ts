@@ -13,10 +13,10 @@ import { ELEMENTS, EL_VAR } from './saju-labels';
 
 const css = readFileSync(new URL('../../app/globals.css', import.meta.url), 'utf8');
 
-/** `--el-xxx: #rrggbb;` 을 블록에서 뽑는다. */
+/** `--이름: #rrggbb;` 을 블록에서 뽑는다. 오행뿐 아니라 액센트도 읽는다 (#465). */
 function varsIn(block: string): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const m of block.matchAll(/(--el-[a-z]+)\s*:\s*(#[0-9a-fA-F]{6})/g)) out[m[1]] = m[2];
+  for (const m of block.matchAll(/(--[a-z-]+)\s*:\s*(#[0-9a-fA-F]{6})/g)) out[m[1]] = m[2];
   return out;
 }
 
@@ -96,5 +96,74 @@ describe('막대가 트랙과 떨어진다', () => {
       return light[n] === dark[n];
     });
     expect(same, '두 테마가 같은 오행').toHaveLength(0);
+  });
+});
+
+// ── OLED 청색 부담 (#465) ─────────────────────────────────────────
+//
+// 제보: 기기가 OLED 라 청색 계열이 부담될 것 같다. 근거가 맞다 — 청색 서브픽셀의 열화율은
+// 적·녹의 2~3배다. 그래서 다크 테마에서 줄여야 할 것은 "어두움"이 아니라 **청색 채널**이다.
+//
+// 색은 화면에서만 판단되지만 이 화면은 로그인 뒤라 e2e 로 못 잡는다. 성질로 건다.
+
+/** 청색이 이보다 높으면서 적·녹보다 확실히 앞서면 OLED 에 부담이다. */
+const BLUE_HEAVY = 170;
+const BLUE_LEAD = 25;
+
+function channels(hex: string): [number, number, number] {
+  return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+function isBlueHeavy(hex: string): boolean {
+  const [r, g, b] = channels(hex);
+  return b > BLUE_HEAVY && b > Math.max(r, g) + BLUE_LEAD;
+}
+
+describe('다크 오행에 청색 부담이 없다 (#465)', () => {
+  it('어느 오행도 청색에 기대지 않는다', () => {
+    for (const el of ELEMENTS) {
+      const hex = dark[EL_VAR[el].slice(4, -1)];
+      const [r, g, b] = channels(hex);
+      expect(isBlueHeavy(hex), `${el} ${hex} (R${r} G${g} B${b})`).toBe(false);
+    }
+  });
+
+  it('라이트는 건드리지 않았다 — OLED 부담은 다크에서만 생긴다', () => {
+    // 밝은 배경에서는 화소가 어차피 다 켜져 있어 청색만 줄일 이유가 없다.
+    // 여기서는 "라이트에도 값이 있다"만 본다(위 블록이 대비를 이미 지킨다).
+    for (const el of ELEMENTS) {
+      expect(light[EL_VAR[el].slice(4, -1)], `light ${el}`).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+});
+
+describe('액센트도 테마를 탄다 (#465)', () => {
+  const NAMES = ['--accent', '--accent-ink', '--accent-line'];
+
+  it('세 토큰이 두 테마 모두에 있다', () => {
+    for (const n of NAMES) {
+      expect(light[n], `light ${n}`).toBeDefined();
+      expect(dark[n], `dark ${n}`).toBeDefined();
+    }
+  });
+
+  it('다크 액센트가 라이트보다 청색이 낮다 — 이게 이번 변경의 요지다', () => {
+    const [, , lb] = channels(light['--accent']);
+    const [, , db] = channels(dark['--accent']);
+    expect(db, `light B=${lb} → dark B=${db}`).toBeLessThan(lb);
+  });
+
+  it('액센트에 청색 부담이 없다', () => {
+    expect(isBlueHeavy(dark['--accent']), dark['--accent']).toBe(false);
+    expect(isBlueHeavy(dark['--accent-line']), dark['--accent-line']).toBe(false);
+  });
+
+  it('액센트 위에 올린 글자가 읽힌다 — 알약·배지가 그렇게 칠해진다', () => {
+    for (const [name, vars] of [['light', light], ['dark', dark]] as const) {
+      expect(
+        contrast(vars['--accent-ink'], vars['--accent']),
+        `${name}: ${vars['--accent-ink']} on ${vars['--accent']}`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });
