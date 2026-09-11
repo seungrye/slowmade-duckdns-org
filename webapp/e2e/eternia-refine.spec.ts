@@ -563,3 +563,66 @@ test.describe("지도 — 가로로 안 넘친다 (#457)", () => {
     }
   });
 });
+
+/**
+ * 좁은 화면에서 손패가 더미가 되던 것 (#459).
+ *
+ * 제보: "카드가 부채가 아니고 겹쳐있어".
+ *
+ * **브라우저에서 잰다.** `fanGeometry` 값만 보고 넘어가면 안 된다 — 이 파일이 이미 한 번
+ * 그렇게 데였다(계산상 72인 간격이 화면에서는 전환 중간값 44.7 로 나왔다). 여기서는 실제로
+ * 그려진 카드의 사각형을 읽어 **이웃 카드가 얼마나 가리는지**를 본다.
+ */
+test.describe("손패는 어느 폭에서도 부채다 (#459)", () => {
+  /** 카드가 이 비율보다 더 가려지면 이름이 안 읽혀 부채로 안 보인다. */
+  const MIN_VISIBLE_RATIO = 0.45;
+
+  /** 실제로 쓰이는 폰 폭들. 좁은 쪽이 무너진다. */
+  const NARROW = [
+    { width: 320, height: 720 },
+    { width: 360, height: 800 },
+    { width: 390, height: 844 },
+  ];
+
+  /**
+   * 그려진 카드에서 잰 "보이는 비율".
+   *
+   * 카드는 회전해 있어 `getBoundingClientRect` 가 축정렬 상자를 준다. 중심 간 거리를
+   * 카드 **실폭**(= 회전 전 폭 × 배율)으로 나눈다. 실폭은 회전이 0 인 가운데 카드에서
+   * 읽는다 — 그 카드만 상자 폭이 곧 카드 폭이다.
+   */
+  async function visibleRatio(page: Page) {
+    // 전환이 끝나고 자리를 잡을 때까지 기다린다(#445 에서 겪은 함정).
+    await expect(page.locator(CARD).first()).toBeVisible();
+    return await page.locator(CARD).evaluateAll((els) => {
+      const rects = els.map((e) => e.getBoundingClientRect());
+      const centers = rects.map((r) => r.x + r.width / 2).sort((a, b) => a - b);
+      const gaps = centers.slice(1).map((x, i) => x - centers[i]);
+      const pitch = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+      // 회전이 가장 작은 카드 = 가운데. 그 상자 폭이 카드 실폭에 가장 가깝다.
+      const cardW = Math.min(...rects.map((r) => r.width));
+      return pitch / cardW;
+    });
+  }
+
+  for (const vp of NARROW) {
+    test(`${vp.width}px 에서 카드가 절반 넘게 가려지지 않는다`, async ({ page }) => {
+      await page.setViewportSize(vp);
+      await enterBattle(page);
+      await expect
+        .poll(() => visibleRatio(page), { message: `${vp.width}px 에서 보이는 비율` })
+        .toBeGreaterThanOrEqual(MIN_VISIBLE_RATIO);
+    });
+  }
+
+  test("좁아져도 손패가 화면 밖으로 안 나간다", async ({ page }) => {
+    await page.setViewportSize(NARROW[0]);
+    await enterBattle(page);
+    const hand = (await page.locator(HAND).boundingBox())!;
+    for (const c of await page.locator(CARD).all()) {
+      const b = (await c.boundingBox())!;
+      expect(b.x).toBeGreaterThanOrEqual(hand.x - 1);
+      expect(b.x + b.width).toBeLessThanOrEqual(hand.x + hand.width + 1);
+    }
+  });
+});
