@@ -10,12 +10,31 @@
   /* light dark: 사이트가 두 스킴을 모두 지원한다고 명시 → 모바일 크롬 자동 다크(force-dark)가
      사이트를 자체 알고리즘으로 강제 변환(뿌연 회색)하지 않고 앱의 실제 팔레트를 쓰게 한다. */
   color-scheme: light dark;
+
+  /* 오행 색 (#461) — 밝은 배경에 맞춘 한 벌.
+     inline style 로는 테마를 못 타서 변수로 둔다. `.dark` 가 아래에서 덮는다. */
+  --el-mok: #2f8a63;
+  --el-hwa: #c14338;
+  /* 토만 트랙(#e5e7eb) 대비가 2.60 이라 3 을 못 넘겼다 — 조금 낮춰 3.04 로 맞췄다. */
+  --el-to: #a77c35;
+  --el-geum: #78839a;
+  --el-su: #3a58a6;
 }
 
 .dark {
   --background: #0a0a0a;
   --foreground: #ededed;
   color-scheme: dark;
+
+  /* 어두운 배경에서는 밝은 쪽으로 (#461).
+     제보: 다크모드에서 막대가 트랙과 구분이 안 된다. 라이트용 색을 그대로 쓰면 수는
+     트랙(#374151) 대비가 1.53:1, 화는 2.03:1 이라 막대가 어디서 끝나는지 안 보인다.
+     아래 값은 3.3~4.9:1 이다 — `element-theme.test.ts` 가 하한을 지킨다. */
+  --el-mok: #5cbb8d;
+  --el-hwa: #e2726a;
+  --el-to: #d8ab63;
+  --el-geum: #a6b0c4;
+  --el-su: #7590d8;
 }
 
 @theme inline {

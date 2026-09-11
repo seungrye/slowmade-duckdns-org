@@ -72,6 +72,23 @@ export const ZHI_EL: Record<string, WuXing> = Object.fromEntries(Object.entries(
 export const ELEMENTS: readonly WuXing[] = ["목", "화", "토", "금", "수"] as const;
 
 /** 화면 오행 색(라이트/다크 공용, 사이트 톤). */
+/**
+ * 화면에서 쓰는 오행 색 (#461) — 테마를 타는 CSS 변수.
+ *
+ * `EL_COLOR` 는 밝은 배경에 맞춘 한 벌이라 inline `style` 로 넣으면 다크모드에서도 그대로
+ * 쓰인다. 그래서 어두운 트랙 위에서 막대가 어디서 끝나는지 안 보였다(수는 대비 1.53:1).
+ * **화면에 그리는 자리는 이 변수를 쓴다.** 실제 값은 `globals.css` 의 `:root` / `.dark`.
+ *
+ * `EL_COLOR` 는 남긴다 — 알파를 붙여 쓰거나(`${EL_COLOR[x]}22`) 색 자체가 필요한 자리가 있다.
+ */
+export const EL_VAR: Record<WuXing, string> = {
+  목: "var(--el-mok)",
+  화: "var(--el-hwa)",
+  토: "var(--el-to)",
+  금: "var(--el-geum)",
+  수: "var(--el-su)",
+};
+
 export const EL_COLOR: Record<WuXing, string> = {
   목: "#2f8a63", 화: "#c14338", 토: "#b6873a", 금: "#78839a", 수: "#3a58a6",
 };
