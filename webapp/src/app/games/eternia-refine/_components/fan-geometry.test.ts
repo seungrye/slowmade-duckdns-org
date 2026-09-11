@@ -33,12 +33,13 @@ function restX(i: number, n: number, gap: number) {
  * ③ 바깥 카드를 골라 커진 경우. 고르는 순간 넘치면 그것도 넘치는 것이다.
  */
 function maxHalfExtent(width: number, n: number) {
-  const { gap, rotation, scatter } = fanGeometry(width, n);
+  // 카드 크기는 좁은 화면에서 줄어든다 (#459) — 그만큼 실제로 덜 나간다.
+  const { gap, rotation, scatter, scale } = fanGeometry(width, n);
   const outer = Math.abs(restX(n - 1, n, gap));
   return Math.max(
-    outer + rotatedHalfWidth(rotation),
-    outer + scatter + rotatedHalfWidth(rotation),
-    outer + (CARD_W * HOVER_SCALE) / 2,
+    outer + rotatedHalfWidth(rotation) * scale,
+    outer + scatter + rotatedHalfWidth(rotation) * scale,
+    outer + (CARD_W * scale * HOVER_SCALE) / 2,
   );
 }
 
@@ -121,8 +122,8 @@ describe('이웃 흩어짐 — 남는 폭 안에서만', () => {
   });
 
   it('음수가 되지 않는다', () => {
-    for (const w of WIDTHS) {
-      for (const n of COUNTS) {
+    for (const w of SWEEP) {
+      for (const n of TIMES) {
         expect(fanGeometry(w, n).scatter).toBeGreaterThanOrEqual(0);
       }
     }
@@ -132,7 +133,7 @@ describe('이웃 흩어짐 — 남는 폭 안에서만', () => {
 describe('세로 — 회전이 카드를 끌어내리는 만큼 상자가 커진다', () => {
   it('상자 높이 = 카드 + 내려간 양 + 호', () => {
     const g = fanGeometry(412, 8);
-    expect(g.height).toBe(CARD_H + g.drop + g.arc);
+    expect(g.height).toBe(CARD_H * g.scale + g.drop + g.arc);
   });
 
   it('한 장이면 내려갈 것도 호도 없다', () => {
@@ -176,6 +177,101 @@ describe('넓은 화면에서는 이름이 드러난다 (#443)', () => {
       const { gap, rotation, scatter } = fanGeometry(w, 5);
       const outer = Math.abs(restX(4, 5, gap)) + rotatedHalfWidth(rotation) + scatter;
       expect(outer, `width ${w}`).toBeLessThanOrEqual(w / 2);
+    }
+  });
+});
+
+// 좁은 화면에서 더미가 되던 것 (#459).
+//
+// 제보: "카드가 부채가 아니고 겹쳐있어". 재 보니 회전이 어느 폭에서도 12° 로 고정이고
+// 좁아질수록 간격만 깎였다 — 320px·5장에서 67%, 300px·6장에서 78% 가 가려졌다.
+//
+// 여기서 지키는 것은 **"각 카드가 이만큼은 보인다"** 하나다. 그걸 어떻게 얻는지(각도를
+// 줄이든 카드를 줄이든)는 구현이 정하게 둔다 — 값을 베껴 적으면 구현을 못 고친다.
+
+/** 카드가 이 비율보다 더 가려지면 이름이 안 읽혀 부채로 안 보인다. */
+const MIN_VISIBLE_RATIO = 0.45;
+/** 부동소수점 허용치. 목표를 딱 맞추면 0.44999999999999996 이 나온다. */
+const EPS = 1e-9;
+
+/**
+ * 실제로 쓰이는 폰 폭부터 판까지. 320px 이 하한이다 — 그보다 좁으면 카드 7~8장을 읽을
+ * 만한 크기로 늘어놓는 것이 물리적으로 안 된다(아래 '아주 좁은 화면' 참고).
+ */
+const SWEEP = [320, 340, 360, 380, 412, 480, 560, 672];
+const TIMES = [2, 3, 4, 5, 6, 7, 8];
+
+describe('부채는 어느 폭에서도 부채다 (#459)', () => {
+  it('카드가 절반 넘게 가려지지 않는다', () => {
+    for (const w of SWEEP) {
+      for (const n of TIMES) {
+        const g = fanGeometry(w, n);
+        const cardW = CARD_W * g.scale;
+        expect(g.gap / cardW, `w=${w} n=${n} (gap ${g.gap.toFixed(1)} / card ${cardW.toFixed(1)})`)
+          .toBeGreaterThanOrEqual(MIN_VISIBLE_RATIO - EPS);
+      }
+    }
+  });
+
+  it('좁아지면 회전을 먼저 내놓는다 — 간격이 더 중요하다', () => {
+    const narrow = fanGeometry(300, 6);
+    const wide = fanGeometry(672, 6);
+    expect(narrow.rotation).toBeLessThan(wide.rotation);
+  });
+
+  it('넓은 화면에서는 예전 그대로다 — 좁을 때만 양보한다', () => {
+    const g = fanGeometry(672, 5);
+    expect(g.scale).toBe(1);
+    expect(g.rotation).toBe(MAX_ROTATION_DEG);
+  });
+
+  it('카드를 줄이더라도 알아볼 만큼은 남긴다', () => {
+    for (const w of SWEEP) {
+      for (const n of TIMES) {
+        expect(fanGeometry(w, n).scale, `w=${w} n=${n}`).toBeGreaterThan(0.6);
+        expect(fanGeometry(w, n).scale).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  it('넓어질수록 나빠지지 않는다 — 폭을 늘렸는데 더 가려지면 안 된다', () => {
+    for (const n of TIMES) {
+      for (let i = 1; i < SWEEP.length; i++) {
+        const a = fanGeometry(SWEEP[i - 1], n);
+        const b = fanGeometry(SWEEP[i], n);
+        const ratio = (g: typeof a) => g.gap / (CARD_W * g.scale);
+        expect(ratio(b), `n=${n} ${SWEEP[i - 1]}→${SWEEP[i]}`)
+          .toBeGreaterThanOrEqual(ratio(a) - 0.001);
+      }
+    }
+  });
+
+  it('줄인 카드도 화면 안에 있다', () => {
+    for (const w of SWEEP) {
+      for (const n of TIMES) {
+        const g = fanGeometry(w, n);
+        const outer = Math.abs(restX(n - 1, n, g.gap))
+          + rotatedHalfWidth(g.rotation) * g.scale
+          + g.scatter;
+        expect(outer, `w=${w} n=${n}`).toBeLessThanOrEqual(w / 2 + 0.001);
+      }
+    }
+  });
+});
+
+describe('아주 좁은 화면 — 되는 만큼은 한다 (#459)', () => {
+  // 280px 에 8장은 물리적으로 안 된다. 그래도 예전(78% 가림)보다는 나아야 하고, 화면
+  // 밖으로 나가면 안 된다. 목표를 못 채울 때 어떻게 무너지는지를 적어 둔다.
+  it('목표는 못 채워도 예전보다 낫다', () => {
+    for (const n of [7, 8, 10]) {
+      const g = fanGeometry(280, n);
+      expect(g.gap / (CARD_W * g.scale), `n=${n}`).toBeGreaterThan(0.3);
+    }
+  });
+
+  it('그래도 화면 밖으로는 안 나간다', () => {
+    for (const n of [7, 8, 10]) {
+      expect(maxHalfExtent(280, n), `n=${n}`).toBeLessThanOrEqual(280 / 2 - EDGE_PAD + 0.5);
     }
   });
 });

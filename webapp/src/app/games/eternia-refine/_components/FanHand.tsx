@@ -129,6 +129,8 @@ export interface FanGeometry {
   drop: number;
   /** 손패 상자의 높이(px). */
   height: number;
+  /** 카드 크기 배율 (#459). 좁은 화면에서만 1 아래로 내려간다. */
+  scale: number;
 }
 
 /**
@@ -143,39 +145,89 @@ export interface FanGeometry {
  * fanGeometry(360, 10)  -> 간격이 좁아지고 흩어짐이 0 에 가까워진다
  * ```
  */
+/**
+ * 카드가 이 비율보다 더 가려지면 이름이 안 읽힌다 — 부채가 아니라 더미로 보인다 (#459).
+ *
+ * 제보로 잡았다: 320px·5장에서 67%, 300px·6장에서 78% 가 가려졌다.
+ */
+const MIN_VISIBLE_RATIO = 0.45;
+
+/** 카드를 이보다 더 줄이면 글자를 못 읽는다. */
+const MIN_SCALE = 0.65;
+
 export function fanGeometry(width: number, n: number): FanGeometry {
   if (n <= 1) {
-    return { gap: 0, rotation: 0, arc: 0, scatter: 0, drop: 0, height: CARD_H };
+    return { gap: 0, rotation: 0, arc: 0, scatter: 0, drop: 0, height: CARD_H, scale: 1 };
   }
   const budget = width / 2 - EDGE_PAD;
   const half = (n - 1) / 2;
 
-  // 흩어질 자리를 **먼저 떼어 두고** 맞춘다. 남는 폭으로만 주면 손패가 많을 때 —
-  // 즉 비켜서기가 가장 필요할 때 — 흩어짐이 0 이 된다(412px·8장에서 실제로 그랬다).
-  // 쉬는 부채가 조금 좁아지는 값을 치르고 비켜서기를 지킨다.
-  return (
-    fit(budget, half, SCATTER_MAX) ??
-    // 그럴 자리도 없는 좁은 화면 — 부채를 자르느니 비켜서기를 버린다.
-    fit(budget, half, 0) ??
-    // 그마저 안 되면 회전 없이 최소로 겹친다.
-    build(0, Math.max(8, (budget - CARD_W / 2) / half), budget, half, 0)
-  );
-}
-
-/** 흩어짐 몫 `reserve` 를 떼어 두고 각도부터 줄여 맞춰 본다. 못 맞추면 null. */
-function fit(budget: number, half: number, reserve: number): FanGeometry | null {
-  for (let deg = MAX_ROTATION_DEG; deg >= 0; deg -= 0.5) {
-    const room = budget - rotatedHalfWidth(deg) - reserve;
-    if (room <= 0) continue;
-    const gap = Math.min(MAX_GAP, room / half);
-    if (gap >= MIN_GAP) return build(deg, gap, budget, half, reserve);
+  /**
+   * **가려지는 비율을 목표로 두고 순서대로 양보한다** (#459).
+   *
+   * 예전에는 각도를 12° 부터 내리다가 간격이 `MIN_GAP` 만 넘으면 바로 멈췄다. 그래서 회전은
+   * 어느 폭에서도 12° 로 남고 좁아질수록 **간격만** 깎였다 — 브라우저에서 재니 320px 에서
+   * 카드의 **75%** 가 가려졌다(#460 재현). 회전은 폭을 크게 먹는데(12° 면 63.9px, 0° 면
+   * 50px) 그 차이가 간격으로 갔어야 했다.
+   *
+   * 양보 순서는 **회전 → 카드 크기 → 흩어짐**. 회전은 값이 싸다(폭만 먹고 읽기에 보탬이
+   * 없다). 흩어짐이 마지막인 건 손패가 많을 때 비켜서기가 가장 필요해서다 — 예전에도 그
+   * 이유로 흩어질 자리를 먼저 떼어 뒀다(412px·8장에서 0 이 되어 겪었다).
+   */
+  for (const reserve of [SCATTER_MAX, 0]) {
+    // 회전이 클수록 폭을 먹어 카드를 더 줄여야 한다. 크기를 안 줄여도 되는 각도가 있으면
+    // 그중 가장 큰 것을 쓴다 — 넓은 화면에서 예전과 똑같은 값이 나오는 이유다.
+    for (let deg = MAX_ROTATION_DEG; deg >= 0; deg -= 0.5) {
+      if (maxScale(budget, half, deg, reserve) >= 1) return fit(budget, half, deg, reserve, 1);
+    }
+    // 크기를 줄여야 한다면 회전은 0 이 가장 유리하다(폭을 가장 덜 먹는다).
+    const s = maxScale(budget, half, 0, reserve);
+    if (s >= MIN_SCALE) return fit(budget, half, 0, reserve, Math.min(1, s));
   }
-  return null;
+
+  // 목표를 못 채우는 아주 좁은 화면 — 가장 작은 카드로 최대한 벌린다.
+  return fit(budget, half, 0, 0, MIN_SCALE);
 }
 
+/** 회전한 카드의 가로 반폭 — 회전이 폭을 얼마나 먹는지. 12° 면 63.9px, 0° 면 50px. */
 export function rotatedHalfWidth(deg: number): number {
   const rot = rad(deg);
   return (CARD_W * Math.cos(rot) + CARD_H * Math.sin(rot)) / 2;
+}
+
+/**
+ * 목표(가려지는 비율)를 채우는 **가장 큰 배율**. 0.02 씩 훑지 않고 직접 푼다 — 훑으면 폭이
+ * 조금 늘 때 한 칸 건너뛰며 결과가 아주 작게 뒤집힌다(단조성이 깨진다).
+ *
+ * ```
+ * gap = room / half  >=  RATIO · CARD_W · s
+ * room = min(budget − HW(deg)·s − reserve,  budget − (CARD_W·HOVER_SCALE/2)·s)
+ * ```
+ *
+ * 두 갈래 각각을 s 에 대해 풀고 작은 쪽을 쓴다.
+ */
+function maxScale(budget: number, half: number, deg: number, reserve: number): number {
+  const need = MIN_VISIBLE_RATIO * CARD_W * half;
+  const selHalf = (CARD_W * HOVER_SCALE) / 2;
+  const byRotation = (budget - reserve) / (need + rotatedHalfWidth(deg));
+  const bySelected = budget / (need + selHalf);
+  return Math.min(byRotation, bySelected);
+}
+
+/** 정해진 각도·배율로 간격을 최대한 벌린다. */
+function fit(
+  budget: number,
+  half: number,
+  deg: number,
+  reserve: number,
+  scale: number,
+): FanGeometry {
+  const room = Math.min(
+    budget - rotatedHalfWidth(deg) * scale - reserve,
+    budget - (CARD_W * scale * HOVER_SCALE) / 2,
+  );
+  const gap = Math.max(MIN_GAP * scale, Math.min(MAX_GAP * scale, room / half));
+  return build(deg, gap, budget, half, reserve, scale);
 }
 
 function build(
@@ -184,13 +236,20 @@ function build(
   budget: number,
   half: number,
   reserve: number,
+  scale: number,
 ): FanGeometry {
   const rot = rad(deg);
   const spanHalf = half * gap;
-  const scatter = Math.max(0, Math.min(reserve, budget - spanHalf - rotatedHalfWidth(deg)));
+  const scatter = Math.max(0, Math.min(reserve, budget - spanHalf - rotatedHalfWidth(deg) * scale));
   // 중심 회전이라 카드가 아래로 내려가는 양은 예전(피벗이 카드 밖) 보다 훨씬 작다.
-  const drop = Math.max(0, Math.ceil((CARD_W * Math.sin(rot) + CARD_H * Math.cos(rot) - CARD_H) / 2));
-  return { gap, rotation: deg, arc: ARC_HEIGHT, scatter, drop, height: CARD_H + drop + ARC_HEIGHT };
+  const drop = Math.max(
+    0,
+    Math.ceil(((CARD_W * Math.sin(rot) + CARD_H * Math.cos(rot)) * scale - CARD_H * scale) / 2),
+  );
+  return {
+    gap, rotation: deg, arc: ARC_HEIGHT, scatter, drop, scale,
+    height: CARD_H * scale + drop + ARC_HEIGHT,
+  };
 }
 
 /** 카드 i 의 정규화 위치 — 왼쪽 끝 −1, 가운데 0, 오른쪽 끝 +1. */
@@ -224,7 +283,7 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
   const root = useRef<HTMLDivElement>(null);
 
   const n = hand.length;
-  const { gap, rotation, arc, scatter, drop, height } = fanGeometry(width, n);
+  const { gap, rotation, arc, scatter, drop, height, scale: baseScale } = fanGeometry(width, n);
 
   // 폭이 바뀌면 부채를 다시 편다 — 회전으로 화면을 넘지 않게.
   useLayoutEffect(() => {
@@ -363,13 +422,14 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
         let x = t * ((n - 1) / 2) * gap;
         let y = -arc * (1 - t * t);
         let deg = t * rotation;
-        let scale = 1;
+        // 좁은 화면에서는 카드 자체가 줄어 있다 (#459). 고른 카드는 거기에 더 커진다.
+        let scale = baseScale;
 
         if (isSel) {
           // 고른 카드는 똑바로 서서 올라온다. 끌고 있으면 손가락을 따라간다.
           y = dy || HOVER_LIFT;
           deg = 0;
-          scale = HOVER_SCALE;
+          scale = baseScale * HOVER_SCALE;
         } else if (sel >= 0) {
           x += i < sel ? -scatter : scatter;
         }
