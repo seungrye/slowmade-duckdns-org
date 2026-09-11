@@ -9,6 +9,7 @@
 
 import type { Ability, Act, Card, Faction, Protagonist, RunResult, RunState } from './types';
 import { crystalCard, countCrystals } from './combat';
+import { withJosa } from './josa';
 import { refine, bossHpBonus, ETHER_PER_REMOVAL } from './refine';
 import { applyErosion } from './stigma';
 import { resolveEnding, explainEnding } from './ending';
@@ -358,7 +359,7 @@ export function takeReward(session: Session, nodeId: string, card: Card | null):
     ? {
         ...session.run,
         deck: [...session.run.deck, card],
-        log: [...session.run.log, `${card.name} 을(를) 가져갔다.`],
+        log: [...session.run.log, `${withJosa(card.name)} 가져갔다.`],
       }
     : { ...session.run, log: [...session.run.log, '아무것도 가져가지 않았다.'] };
   const at = { ...session, run };
@@ -440,7 +441,7 @@ export function removeCard(session: Session, cardId: string): Session {
       ...session.run,
       deck,
       ether: session.run.ether - ETHER_PER_REMOVAL,
-      log: [...session.run.log, `${card.name} 을(를) 덱에서 지웠다.`],
+      log: [...session.run.log, `${withJosa(card.name)} 덱에서 지웠다.`],
     },
   };
 }
