@@ -30,7 +30,7 @@ type Fortune = {
   saju: SajuBlock | null;
 };
 
-import { EL_COLOR, ELEMENTS, meaningOf, type WuXing } from '@/lib/fortune/saju-labels';
+import { EL_VAR, ELEMENTS, meaningOf, type WuXing } from '@/lib/fortune/saju-labels';
 // 사주 글자 수 — 시주가 있으면 4기둥×2=8, 없으면 3기둥×2=6.
 const sajuTotal = (saju: SajuBlock) => (saju.pillars.time ? 8 : 6);
 
@@ -193,7 +193,7 @@ function ElChar({ hanja, kr, el }: { hanja: string; kr: string; el: string }) {
   const meaning = meaningOf(hanja);
   return (
     <span className="group/char relative inline-flex cursor-help items-baseline gap-0.5" tabIndex={0}>
-      <span style={{ color: EL_COLOR[el as keyof typeof EL_COLOR] }} className="font-bold">{hanja}</span>
+      <span style={{ color: EL_VAR[el as WuXing] }} className="font-bold">{hanja}</span>
       <span className="text-[10px] text-gray-400">{kr}</span>
       {meaning && (
         <span
@@ -256,14 +256,17 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
           <div
             className="grid aspect-[60/103] place-content-center rounded-xl border-2 border-violet-500 text-center"
             style={{
-              background: `linear-gradient(160deg, ${EL_COLOR[saju.iljin.ganEl]}22, ${EL_COLOR[saju.iljin.zhiEl]}18)`,
+              // 변수에는 hex 알파(`#rrggbb22`)를 못 붙인다 — color-mix 로 옅게 한다.
+              background: `linear-gradient(160deg,
+                color-mix(in srgb, ${EL_VAR[saju.iljin.ganEl]} 14%, transparent),
+                color-mix(in srgb, ${EL_VAR[saju.iljin.zhiEl]} 10%, transparent))`,
             }}
             aria-label={`오늘의 일진 ${saju.iljin.ganKr}${saju.iljin.zhiKr}, ${saju.relation.key}`}
           >
-            <div className="text-[34px] font-black leading-none" style={{ color: EL_COLOR[saju.iljin.ganEl] }}>
+            <div className="text-[34px] font-black leading-none" style={{ color: EL_VAR[saju.iljin.ganEl] }}>
               {saju.iljin.gan}
             </div>
-            <div className="text-[34px] font-black leading-none" style={{ color: EL_COLOR[saju.iljin.zhiEl] }}>
+            <div className="text-[34px] font-black leading-none" style={{ color: EL_VAR[saju.iljin.zhiEl] }}>
               {saju.iljin.zhi}
             </div>
             <div className="mt-1.5 text-[11.5px] text-gray-500 dark:text-gray-400">
@@ -282,15 +285,15 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
                 const pc = (n: number) => `${(n / scale) * 100}%`;
                 return (
                   <div key={el} className="grid grid-cols-[16px_1fr_auto] items-center gap-1.5 text-[11.5px]">
-                    <span style={{ color: EL_COLOR[el] }}>{el}</span>
+                    <span style={{ color: EL_VAR[el] }}>{el}</span>
                     <span className="flex h-2.5 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                      <i className="h-full" style={{ width: pc(b.base), background: EL_COLOR[el] }} />
+                      <i className="h-full" style={{ width: pc(b.base), background: EL_VAR[el] }} />
                       {b.add > 0 && (
                         <i
                           className="h-full opacity-60"
                           style={{
                             width: pc(b.add),
-                            color: EL_COLOR[el],
+                            color: EL_VAR[el],
                             backgroundImage:
                               'repeating-linear-gradient(45deg, currentColor 0 3px, transparent 3px 6px)',
                           }}
@@ -353,7 +356,7 @@ function SajuPanel({ saju }: { saju: SajuBlock | null }) {
                   tabIndex={0}
                   className="group/chip relative inline-flex cursor-help items-center gap-1.5 rounded-full border border-gray-200 px-2.5 py-1 text-xs text-gray-500 dark:border-gray-700 dark:text-gray-400"
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: EL_COLOR[el] }} />{el} {n}
+                  <span className="h-2 w-2 rounded-full" style={{ background: EL_VAR[el] }} />{el} {n}
                   <span
                     role="tooltip"
                     className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1 w-max max-w-[220px] -translate-x-1/2 rounded-md bg-gray-900 px-2.5 py-1.5 text-[11px] font-normal leading-snug text-gray-50 opacity-0 shadow-lg transition-opacity group-hover/chip:opacity-100 group-focus/chip:opacity-100 dark:bg-gray-700"
