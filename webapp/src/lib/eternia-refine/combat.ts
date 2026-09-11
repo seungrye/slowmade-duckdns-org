@@ -8,6 +8,7 @@
 // 태운 대가를 몇 턴 안에 몸으로 겪는다.
 
 import type { Ability, Card, CombatState, Enemy } from './types';
+import { withJosa } from './josa';
 
 /**
  * 전투가 침식에 대해 알아야 하는 전부.
@@ -169,7 +170,7 @@ export function createCombat(rules: StigmaRules) {
         s.log.push(`${card.name} — 침식 ${before} → ${s.erosion}.`);
       }
     } else {
-      s.log.push(`${card.name} 을(를) 썼다.`);
+      s.log.push(`${withJosa(card.name)} 썼다.`);
     }
 
     // 쓴 카드의 행방.
