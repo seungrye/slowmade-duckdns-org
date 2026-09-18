@@ -8,6 +8,7 @@ import User from '@/models/user';
 import { connectToDB } from '@/lib/db';
 import { canCommentOn } from '@/lib/post-access';
 import { env } from '@/lib/env';
+import { TEXT_MODELS } from '@/lib/gemini-text';
 import { nanoid } from 'nanoid';
 import { parseImageCommand } from '@/lib/enji/imageGen';
 
@@ -36,8 +37,8 @@ function isAllowedOrigin(req: NextRequest): boolean {
 const GEMINI_MODEL_CHAIN = [
   'gemma-4-31b-it',
   'gemma-4-26b-a4b-it',
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash-lite',
+  // Gemini 폴백은 한 곳에서 관리한다 (#473).
+  ...TEXT_MODELS,
 ];
 
 function isTransientGeminiError(err: unknown): boolean {

@@ -3,6 +3,7 @@ import Post from '@/models/post';
 import { connectToDB } from '@/lib/db';
 import { getAllTags } from '@/lib/posts';
 import { env } from '@/lib/env';
+import { TEXT_MODELS } from '@/lib/gemini-text';
 
 // 본문 기반 AI 태그 추천 — 신규 글 제출 후 서버 백그라운드에서 호출(fire-and-forget).
 // 포스트는 이미 저장돼 있고, 여기서는 Gemini 응답을 받아 리비전 없이 tags/aiTags 만 갱신한다.
@@ -11,8 +12,8 @@ import { env } from '@/lib/env';
 const GEMINI_MODEL_CHAIN = [
   'gemma-4-31b-it',
   'gemma-4-26b-a4b-it',
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash-lite',
+  // Gemini 폴백은 한 곳에서 관리한다 (#473) — 세대를 올릴 때 여기만 놓치는 일이 없게.
+  ...TEXT_MODELS,
 ];
 
 /**
@@ -22,11 +23,11 @@ const GEMINI_MODEL_CHAIN = [
  *   gemma-4-31b-it        → "A screenshot from a pixel art style game."
  *   gemini-3.1-flash-lite → "블루 슬라임과 전투하는 게임 화면"
  * 그대로 두면 영어 태그가 달린다. 텍스트만인 글은 기존 체인 그대로 — 바꿀 이유가 없다.
+ *
+ * 세대를 올릴 때도 이 성질이 유지되는지 다시 쟀다 (#473):
+ *   gemini-3.5-flash-lite → ["픽셀아트","게임그래픽","도트","배경그래픽","인디게임"] (1408ms)
  */
-const GEMINI_VISION_CHAIN = [
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash-lite',
-];
+const GEMINI_VISION_CHAIN = [...TEXT_MODELS];
 
 /** 태깅에 두 장이면 충분하다. 더 보내도 태그가 나아지지 않고 지연만 는다. */
 const MAX_IMAGES = 2;

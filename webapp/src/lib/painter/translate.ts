@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { TEXT_MODELS } from '@/lib/gemini-text';
 
 /**
  * Pollinations FLUX 가 한글 prompt 를 잘 못 이해하므로,
@@ -27,8 +28,8 @@ const TRANSLATE_SYSTEM_PROMPT = `You are a translator that converts Korean image
 const TRANSLATE_MODEL_CHAIN = [
   'gemma-4-26b-a4b-it',
   'gemma-4-31b-it',
-  'gemini-3.1-flash-lite',
-  'gemini-2.5-flash-lite',
+  // Gemini 폴백은 한 곳에서 관리한다 (#473).
+  ...TEXT_MODELS,
 ];
 
 function isTransientGeminiError(err: unknown): boolean {
