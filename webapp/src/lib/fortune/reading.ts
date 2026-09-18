@@ -1,17 +1,24 @@
 /**
- * 타로 오늘의 풀이 생성 — 로컬 LLM + 존댓말 가드 + 템플릿 폴백 (#388).
+ * 타로 오늘의 풀이 생성 — 제미니 + 존댓말 가드 + 템플릿 폴백 (#388, #471).
  *
- * 실측(3장) 결과 로컬 Qwen 의 내용·뉘앙스는 양호했지만 **존댓말/반말 편차**가 있었다
- * (존댓말로 시켰는데 한 장이 반말로 샜다). 그래서:
+ * ── 왜 제미니인가 ────────────────────────────────────────────────────
+ *
+ * 전에는 로컬 Qwen(shim)을 썼다. 내용·뉘앙스는 양호했지만 **존댓말/반말 편차**가 있었고
+ * (존댓말로 시켰는데 한 장이 반말로 샜다) 장당 ~30초라 타임아웃을 200초로 잡아야 했다.
+ *
+ * 타로·사주는 **밖에 물어도 되는 것**이다 — 보내는 것이 뽑힌 카드와 방향, 계산으로 나온
+ * 사주 기둥뿐이고 노트 본문 같은 개인 내용은 안 나간다.
+ *
+ * ── 겹겹이는 그대로 둔다 ─────────────────────────────────────────────
+ *
  *   1. buildPrompt 가 존댓말을 예시까지 넣어 강하게 요구하고,
- *   2. isPolite 가 결과를 검사해 반말이면 배치가 1회 재생성,
- *   3. 그래도 실패하면 templateReading(항상 존댓말)으로 떨어진다.
+ *   2. isPolite 가 결과를 검사해 반말이면 1회 재생성,
+ *   3. 그래도 안 되면 templateReading(항상 존댓말)으로 떨어진다.
  *
- * LLM 호출은 web-adventure 피드백 노트와 같은 스트리밍 방식이다(sseDeltaContent 재사용).
+ * 제미니는 지시를 훨씬 잘 따르지만, **폴백은 모델 품질이 아니라 API 가 죽었을 때**를
+ * 위한 것이다. 없애면 장애 나는 날 빈 풀이가 나간다.
  */
-import { Agent } from "undici";
-import { env } from "@/lib/env";
-import { sseDeltaContent } from "@/lib/web-adventure/feedback-note";
+import { askGemini } from "@/lib/gemini-text";
 import { keywordsOf, type Orientation, type TarotCard } from "./tarot-deck";
 
 export type ReadingSource = "llm" | "template";
@@ -72,44 +79,6 @@ export function templateReading(card: TarotCard, orientation: Orientation): stri
   return `오늘은 ${lead}이 마음에 스치는 날이에요. 서두르기보다 한 박자 쉬어 가 보세요. 무리하지 않아도 괜찮으니, 스스로를 다정하게 대해 주세요.`;
 }
 
-// 로컬 shim 은 생성이 느려(장당 ~30초) 여유 있게 잡는다. 밤 배치라 길어도 무방.
-const dispatcher = new Agent({ headersTimeout: 200_000, bodyTimeout: 200_000 });
-
-async function callLocalLlm(messages: LlmMessage[], signal?: AbortSignal): Promise<string> {
-  const res = await fetch(`${env.llmBaseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "Qwen3-30B-A3B-Q4_K_M",
-      messages,
-      max_tokens: 240,
-      // 창작이라 다양성은 두되(shim 이 temp 0.9 고정), think 는 꺼 직답을 받는다.
-      think: false,
-      stream: true,
-    }),
-    signal,
-    dispatcher,
-  } as RequestInit & { dispatcher?: unknown });
-  if (!res.ok) throw new Error(`shim ${res.status}`);
-  if (!res.body) throw new Error("shim 응답 본문 없음");
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  let content = "";
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let nl: number;
-    while ((nl = buf.indexOf("\n")) >= 0) {
-      content += sseDeltaContent(buf.slice(0, nl));
-      buf = buf.slice(nl + 1);
-    }
-  }
-  content += sseDeltaContent(buf);
-  return content.trim();
-}
-
 export interface GeneratedReading {
   reading: string;
   source: ReadingSource;
@@ -127,11 +96,11 @@ export async function generatePolite(
   const attempts = (opts?.retries ?? 1) + 1;
   for (let i = 0; i < attempts; i++) {
     try {
-      const out = await callLocalLlm(messages, opts?.signal);
+      const out = await askGemini(messages, { signal: opts?.signal, maxOutputTokens: 400, tag: "fortune" });
       if (out && isPolite(out)) return { reading: out, source: "llm" };
-      // 반말이 새면 재시도(shim temp 0.9 라 다음엔 존댓말일 확률이 높다).
+      // 반말이 새면 재시도 — 창작이라 온도가 있어 다음엔 존댓말일 확률이 높다.
     } catch {
-      break; // 네트워크·shim 오류 — 폴백으로 간다.
+      break; // 네트워크·제미니 오류 — 폴백으로 간다.
     }
   }
   return { reading: fallback, source: "template" };
