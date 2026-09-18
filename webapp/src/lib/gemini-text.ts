@@ -18,8 +18,35 @@ import { env } from '@/lib/env';
  *
  * 값이 잘못된 요청(400 류)에서는 다음 모델도 똑같이 실패하므로 넘기지 않는다 —
  * 헛되이 두 번 부르고 두 번 기다릴 뿐이다.
+ *
+ * ── 왜 Lite 계열만 두나 (#473) ──────────────────────────────────────
+ *
+ * 같은 타로 프롬프트로 실제로 재 봤다:
+ *
+ * | 모델 | 시간 | 결과 |
+ * |---|---|---|
+ * | gemini-3.5-flash-lite | 1315ms | 정상 |
+ * | gemini-3.1-flash-lite | 4657ms | 정상 |
+ * | gemini-3.5-flash      | 6199ms | **잘림** |
+ * | gemini-3.8-flash      | 8623ms | **잘림**, 게다가 과부하로 실패하기도 |
+ *
+ * 비-Lite `flash` 는 **생각(thinking) 모델**이라 생각 토큰이 `maxOutputTokens` 를 먹고
+ * 답이 중간에서 끊긴다(3.8 은 단어 중간부터 시작했다). `thinkingBudget: 0` 을 주면
+ * 정상으로 나오지만 그래도 7.8초라 Lite 보다 6배 느리다.
+ *
+ * 그래서 **더 새 세대의 Lite** 로만 올린다.
+ *
+ * ── 무료 등급 (2026-09 확인) ────────────────────────────────────────
+ *
+ * Flash·Flash-Lite 는 무료 등급이 유지된다(분당 10~15건, Flash 하루 1,500건).
+ * **Pro 는 2026-04-01 부터 유료 전용**이라 체인에 넣지 않는다.
+ * 여기 호출량은 하루 2건(타로·사주)이라 한도와는 거리가 멀다.
+ *
+ * ⚠ 무료 등급은 **보낸 내용이 구글 제품 개선에 쓰인다**(유료 등급은 안 쓰인다).
+ * 타로·사주는 뽑힌 카드와 계산으로 나온 사주 기둥뿐이라 괜찮지만, **개인 글을
+ * 여기로 보내면 안 된다** — 노트 본문 같은 것은 이 길로 흘리지 말 것.
  */
-export const TEXT_MODELS = ['gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'] as const;
+export const TEXT_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'] as const;
 
 export interface ChatMessage {
   role: 'system' | 'user';
