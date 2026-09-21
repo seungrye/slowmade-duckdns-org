@@ -36,7 +36,7 @@ describe('isSavable — 전투 중에는 저장하지 않는다', () => {
   });
 
   it('끝난 회차·시작 전은 안 한다', () => {
-    expect(isSavable({ kind: 'ending', endingId: 'harmony', why: '' })).toBe(false);
+    expect(isSavable({ kind: 'ending', endingId: 'harmony', why: '', cleared: true })).toBe(false);
     expect(isSavable({ kind: 'title' })).toBe(false);
     expect(isSavable({ kind: 'select' })).toBe(false);
   });

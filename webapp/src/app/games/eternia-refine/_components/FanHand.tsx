@@ -37,6 +37,9 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Card } from '@/lib/eternia-refine/types';
+import type { Face } from '@/lib/eternia-refine/ui-variant';
+import { EffectMarks } from './EffectMarks';
+import { Sigil } from './Sigil';
 
 /** 위로 이만큼 끌면 낸다. 짧으면 오발이 나고 길면 답답하다. */
 const DRAG_THRESHOLD = -84;
@@ -271,16 +274,58 @@ export interface FanHandProps {
   canPlay: (card: Card) => boolean;
   onPlay: (index: number) => void;
   disabled?: boolean;
+  /** 안 고른 카드의 앞면에 무엇을 그릴지 (#475). 기본은 지금까지의 모습. */
+  face?: Face;
+  /** 못 내는 카드를 끌어올렸을 때 보여 줄 이유. 에테르를 아는 쪽이 준다. */
+  reason?: (card: Card) => string;
 }
 
-export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
+/**
+ * 왜 못 내는지 — 「놓으면 낸다」 대신 이걸 보여 준다.
+ *
+ * 손패는 에테르를 모르므로 여기서는 아는 만큼만 말한다. 부르는 쪽이 `reason` 을 주면
+ * 「에테르 2 모자람」처럼 더 정확해진다.
+ */
+function defaultReason(card: Card): string {
+  return card.kind === 'crystal' ? '결정은 낼 수 없다' : '지금은 낼 수 없다';
+}
+
+export function FanHand({
+  hand,
+  canPlay,
+  onPlay,
+  disabled,
+  face = 'plain',
+  reason = defaultReason,
+}: FanHandProps) {
   const [sel, setSel] = useState(-1);
   const [dy, setDy] = useState(0);
   const [armed, setArmed] = useState(false);
+  /**
+   * 문턱을 넘었나 — **낼 수 있는지와 따로** 센다 (#475).
+   *
+   * 예전엔 `armed` 하나로 「문턱을 넘었다」와 「나갈 것이다」를 겸했다. 그래서 결정 카드를
+   * 끝까지 끌어올려도 「놓으면 낸다」가 떴고, 손을 떼면 말없이 아무 일도 안 일어났다
+   * (실측 재현). 이제 넘긴 것은 `over`, 나갈 것은 `armed` 다.
+   */
+  const [over, setOver] = useState(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [width, setWidth] = useState(360);
   const dragging = useRef(false);
   const startY = useRef(0);
+  /**
+   * 고른 카드의 번호를 **ref 로도** 들고 있는다.
+   *
+   * `pointermove` 는 리렌더 사이에 여러 번 온다. 그 핸들러는 마지막 렌더의 `sel` 을
+   * 보므로, 누르자마자 빠르게 끌면 아직 `-1` 인 값을 본다. `armed` 가 그 값을 쓰기
+   * 시작하면서(낼 수 없는 카드를 걸러내려고) 빠른 드래그가 간헐적으로 안 나가게 됐다 —
+   * e2e 「충분히 멀리 끌면 낸다」가 부하가 걸릴 때 그렇게 깨졌다.
+   *
+   * `dragging`·`startY` 와 같은 이유로 ref 다: **이벤트가 상태보다 빠르다.**
+   */
+  const selRef = useRef(-1);
+  /** 끌어올린 거리. `up()` 이 판단에 쓰므로 상태로는 늦다 — `selRef` 와 같은 이유. */
+  const dyRef = useRef(0);
   /**
    * 최근 움직임 표본 — 플릭 속도를 재려고 들고 있는다.
    *
@@ -305,9 +350,12 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
   }, []);
 
   useEffect(() => {
+    selRef.current = -1;
+    dyRef.current = 0;
     setSel(-1);
     setDy(0);
     setArmed(false);
+    setOver(false);
   }, [hand]);
 
   /**
@@ -356,9 +404,12 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
     startY.current = e.clientY;
     samples.current = [{ y: e.clientY, t: performance.now() }];
     setScrubbing(true);
+    selRef.current = i;
+    dyRef.current = 0;
     setSel(i);
     setDy(0);
     setArmed(false);
+    setOver(false);
     root.current?.setPointerCapture(e.pointerId);
   };
 
@@ -371,35 +422,61 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
     // 위로 안 끌었으면 좌우 훑기 — 손가락 밑 카드로 갈아탄다.
     if (delta > SCRUB_UNTIL) {
       const i = indexAt(e.clientX);
-      if (i >= 0 && i !== sel) {
+      if (i >= 0 && i !== selRef.current) {
+        selRef.current = i;
+        dyRef.current = 0;
         setSel(i);
         startY.current = e.clientY;
         setDy(0);
         setArmed(false);
+        setOver(false);
         return;
       }
-      setDy(Math.min(0, delta));
+      dyRef.current = Math.min(0, delta);
+      setDy(dyRef.current);
       setArmed(false);
+      setOver(false);
       return;
     }
+    dyRef.current = delta;
     setDy(delta);
-    setArmed(delta < DRAG_THRESHOLD);
+    const past = delta < DRAG_THRESHOLD;
+    const i = selRef.current;
+    setOver(past);
+    // **낼 수 없는 카드는 armed 가 안 된다.** 안 되는 손짓을 끝까지 시키고 침묵으로
+    // 거절하던 것을 여기서 끊는다 — 배지가 대신 이유를 말한다.
+    setArmed(past && i >= 0 && Boolean(hand[i]) && canPlay(hand[i]));
   };
 
   const up = () => {
     if (!dragging.current) return;
     dragging.current = false;
-    const i = sel;
+
+    /**
+     * 판단은 **ref 에서만** 읽는다 (#475).
+     *
+     * 예전엔 `sel`·`dy`·`armed` 상태를 봤다. 그런데 `pointermove` 는 리렌더 사이에 여러
+     * 번 오므로, 빠르게 끌거나 튕기면 마지막 움직임이 아직 상태에 안 들어와 있다 —
+     * `dy` 가 −40 인데 상태로는 −15 여서 플릭이 **조용히 거절**됐다. 기계가 바쁠수록
+     * 자주 그랬고(e2e 가 간헐 실패로 잡았다), 사람 손에서도 같은 일이 난다.
+     *
+     * `dragging`·`startY` 가 ref 인 것과 같은 까닭이다: **이벤트가 상태보다 빠르다.**
+     */
+    const i = selRef.current;
+    const lifted = dyRef.current;
+    const card = i >= 0 ? hand[i] : undefined;
 
     // 제출은 **두 길뿐**이다: 충분히 끌어 올렸거나, 위로 튕겼거나.
     // 탭은 펼치기이므로 여기서 제출로 새면 안 된다.
-    const flicked = velocity() <= FLICK_VELOCITY && dy <= FLICK_MIN_DY;
-    const shouldPlay = armed || flicked;
+    const dragged = lifted < DRAG_THRESHOLD;
+    const flicked = velocity() <= FLICK_VELOCITY && lifted <= FLICK_MIN_DY;
 
+    dyRef.current = 0;
     setScrubbing(false);
     setDy(0);
     setArmed(false);
-    if (shouldPlay && i >= 0 && hand[i] && canPlay(hand[i])) onPlay(i);
+    setOver(false);
+    if ((dragged || flicked) && card && canPlay(card)) onPlay(i);
   };
 
   return (
@@ -413,10 +490,17 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
       className="relative w-full shrink-0 touch-none select-none"
       aria-label="손패"
     >
-      {armed && (
+      {over && sel >= 0 && hand[sel] && (
         <div className="pointer-events-none absolute inset-x-0 -top-10 z-[70] flex justify-center">
-          <span className="rounded-md border-2 border-amber-700 bg-amber-100/95 px-4 py-2 text-sm font-bold text-amber-800">
-            놓으면 낸다
+          <span
+            className={[
+              'rounded-md border-2 px-4 py-2 text-sm font-bold',
+              armed
+                ? 'border-amber-700 bg-amber-100/95 text-amber-800'
+                : 'border-rose-700 bg-rose-50 text-rose-700',
+            ].join(' ')}
+          >
+            {armed ? '놓으면 낸다' : reason(hand[sel])}
           </span>
         </div>
       )}
@@ -466,8 +550,15 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
               // 전용 경로다(e2e 변형 실험으로 확인).
               if (dragging.current) return;
               const byKeyboard = e.detail === 0;
-              if (byKeyboard && sel === i && playable) onPlay(i);
-              else setSel(i);
+              // `sel`(상태) 이 아니라 ref 를 본다. Enter 가 빠르게 두 번 들어오면 두 번째
+              // 핸들러가 아직 옛 `sel` 을 보고 또 펼치기만 한다 — e2e 가 그렇게 잡았다.
+              if (byKeyboard && selRef.current === i && playable) {
+                selRef.current = -1;
+                onPlay(i);
+                return;
+              }
+              selRef.current = i;
+              setSel(i);
             }}
             className={[
               'absolute left-1/2 flex flex-col gap-1 overflow-hidden rounded-md border p-2 text-left',
@@ -481,22 +572,48 @@ export function FanHand({ hand, canPlay, onPlay, disabled }: FanHandProps) {
               !playable && card.kind !== 'crystal' ? 'opacity-60' : '',
             ].join(' ')}
           >
-            <span className="flex justify-between font-mono text-[10px] font-semibold">
-              <span className={card.kind === 'crystal' ? 'text-slate-400' : 'text-amber-700'}>
-                {card.cost === null ? '—' : card.cost}
-              </span>
-              <span className="text-slate-500">{card.erosion > 0 ? `+${card.erosion}` : '—'}</span>
-            </span>
-            <span className="text-[12px] font-bold leading-tight">{card.name}</span>
-            <span
-              className={[
-                'overflow-hidden text-[10px] leading-snug transition-opacity duration-150 motion-reduce:transition-none',
-                isSel ? 'opacity-100' : 'opacity-0',
-                card.kind === 'crystal' ? 'text-slate-500' : 'text-amber-900',
-              ].join(' ')}
-            >
-              {card.text}
-            </span>
+            {/* 고른 카드는 늘 온전한 앞면이다. 앞면 설정은 **가려지는 카드**를 위한 것이다.
+                코너 인덱스·문양은 안 가려지는 왼쪽 띠(실측 34~54px)에 들어간다. */}
+            {!isSel && face !== 'plain' ? (
+              <>
+                <span
+                  className={`font-mono text-[13px] font-semibold leading-none ${
+                    card.kind === 'crystal' ? 'text-slate-400' : 'text-amber-700'
+                  }`}
+                >
+                  {card.cost === null ? '—' : card.cost}
+                </span>
+                {face === 'sigil' ? (
+                  <Sigil card={card} size={30} />
+                ) : (
+                  <EffectMarks card={card} size={9.5} />
+                )}
+                <span className="overflow-hidden text-[9.5px] font-semibold leading-tight opacity-70">
+                  {card.name}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="flex justify-between font-mono text-[10px] font-semibold">
+                  <span className={card.kind === 'crystal' ? 'text-slate-400' : 'text-amber-700'}>
+                    {card.cost === null ? '—' : card.cost}
+                  </span>
+                  <span className="text-slate-500">
+                    {card.erosion > 0 ? `+${card.erosion}` : '—'}
+                  </span>
+                </span>
+                <span className="text-[12px] font-bold leading-tight">{card.name}</span>
+                <span
+                  className={[
+                    'overflow-hidden text-[10px] leading-snug transition-opacity duration-150 motion-reduce:transition-none',
+                    isSel ? 'opacity-100' : 'opacity-0',
+                    card.kind === 'crystal' ? 'text-slate-500' : 'text-amber-900',
+                  ].join(' ')}
+                >
+                  {card.text}
+                </span>
+              </>
+            )}
           </button>
         );
       })}

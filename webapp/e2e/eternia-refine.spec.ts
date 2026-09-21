@@ -36,6 +36,22 @@ const PHONE = { width: 412, height: 915 };
 /** 시험용 고정 씨앗 — 같은 씨앗이면 같은 지도다. */
 const SEED = 42;
 
+/**
+ * 손패 UI 를 **박는다** (#475).
+ *
+ * 회차마다 배치·앞면이 랜덤으로 바뀌므로(셔플 백), 안 박으면 이 파일의 단언이 회차마다
+ * 다른 화면을 보게 된다. 아래 검사들은 **부채 + 이름만** 을 전제로 쓰였다 —
+ * 겹침·z-index·부채 각도가 전부 그 배치의 성질이다.
+ *
+ * 다른 배치는 `손패 배치 (#475)` 묶음이 따로 본다.
+ */
+const UI = "fan:plain";
+
+/** 회차를 결정적으로 시작하는 주소 — 씨앗과 UI 를 함께 박는다. */
+function entry(path = "/games/eternia-refine"): string {
+  return `${path}?seed=${SEED}&ui=${UI}`;
+}
+
 /** FanHand 의 판정 문턱 — 손짓이 정말 그 편에 섰는지 재려고 그대로 들고 있는다. */
 const FLICK_VELOCITY = 0.55;
 
@@ -63,7 +79,7 @@ interface Entry {
 async function enterBattle(page: Page, { protagonist, path = "/games/eternia-refine" }: Entry = {}) {
   // **씨앗을 고정한다.** 안 그러면 회차마다 지도가 달라 첫 노드가 전투일 수도, 정제소일
   // 수도 있어 개수 단언이 흔들린다(실제로 흔들렸다).
-  await page.goto(`${path}?seed=${SEED}`);
+  await page.goto(entry(path));
   // #430 부터 타이틀 → 주인공 선택 → **지도** 를 지나야 전투에 닿는다.
   await page.getByRole("button", { name: "새 회차" }).click();
   if (protagonist) {
@@ -340,7 +356,7 @@ test.describe("이어하기 (#435)", () => {
   test.use({ viewport: PHONE });
 
   test("지도에서 나갔다 들어오면 이어할 수 있다 — 회차가 날아가지 않는다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
     // 지도까지 왔다 — 여기서 저장돼 있어야 한다.
@@ -348,7 +364,7 @@ test.describe("이어하기 (#435)", () => {
       .toBeVisible();
 
     // 브라우저를 닫은 셈 치고 다시 연다.
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     const resume = page.getByRole("button", { name: /이어하기/ });
     await expect(resume).toBeVisible();
     await resume.click();
@@ -359,19 +375,19 @@ test.describe("이어하기 (#435)", () => {
   });
 
   test("새 회차를 고르면 저장본이 사라진다 — 두 판이 섞이지 않는다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
     await expect(page.getByRole("button", { name: /^(전투|정예|사건|정제소|보스|동맹)/ }).first())
       .toBeVisible();
 
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await expect(page.getByRole("button", { name: /이어하기/ })).toBeVisible();
     await page.getByRole("button", { name: "새 회차" }).click();
 
     // 주인공 선택으로 갔고, 돌아와도 이어할 것이 없다.
     await expect(page.getByRole("button", { name: "운명으로 발을 내딛는다" })).toBeVisible();
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await expect(page.getByRole("button", { name: /이어하기/ })).toHaveCount(0);
   });
 });
@@ -380,7 +396,7 @@ test.describe("덱 다듬기 (#439)", () => {
   test.use({ viewport: PHONE });
 
   test("에테르가 없으면 지울 수 없다고 말해 준다 — 잠자코 막지 않는다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
 
@@ -482,7 +498,7 @@ test.describe("전투 판 — 데스크톱·모바일 (#443)", () => {
   });
 
   test("이야기·지도에 저작용 씬 번호가 안 보인다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
     // 지도든 이야기든, 화면 어디에도 `Scene 04 — ` 같은 내부 ID 가 남으면 안 된다.
@@ -519,7 +535,7 @@ test.describe("지도 — 가로로 안 넘친다 (#457)", () => {
   test.use({ viewport: PHONE });
 
   test("모바일에서 지도에 가로 스크롤이 없다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
     await expect(page.getByRole("img", { name: "지도" })).toBeVisible();
@@ -534,7 +550,7 @@ test.describe("지도 — 가로로 안 넘친다 (#457)", () => {
   });
 
   test("문서 전체도 가로로 안 넘친다 — 루트에 스크롤바가 생기면 안 된다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
     await expect(page.getByRole("img", { name: "지도" })).toBeVisible();
@@ -547,7 +563,7 @@ test.describe("지도 — 가로로 안 넘친다 (#457)", () => {
   });
 
   test("노드 이름이 지도 밖으로 안 나간다", async ({ page }) => {
-    await page.goto(`/games/eternia-refine?seed=${SEED}`);
+    await page.goto(entry());
     await page.getByRole("button", { name: "새 회차" }).click();
     await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
     const svg = page.getByRole("img", { name: "지도" });
@@ -605,13 +621,23 @@ test.describe("손패는 어느 폭에서도 부채다 (#459)", () => {
     });
   }
 
+  /**
+   * 부동소수 여유 (#475).
+   *
+   * `fanGeometry` 는 목표 비율을 **정확히** 0.45 로 맞춰 간격을 정한다. 그 값이 브라우저의
+   * 서브픽셀 반올림을 거치면 가끔 머리카락만큼 아래로 떨어진다 —
+   * 실측 `0.4499999382111383` vs `0.45`, 차이 6e-8. 사람 눈으로는 같은 화면인데
+   * 시험만 죽는다(6회 중 1회). 1e-6 이면 이 오차는 덮고, 진짜 가려짐(0.01 단위)은 못 덮는다.
+   */
+  const RATIO_EPSILON = 1e-6;
+
   for (const vp of NARROW) {
     test(`${vp.width}px 에서 카드가 절반 넘게 가려지지 않는다`, async ({ page }) => {
       await page.setViewportSize(vp);
       await enterBattle(page);
       await expect
         .poll(() => visibleRatio(page), { message: `${vp.width}px 에서 보이는 비율` })
-        .toBeGreaterThanOrEqual(MIN_VISIBLE_RATIO);
+        .toBeGreaterThanOrEqual(MIN_VISIBLE_RATIO - RATIO_EPSILON);
     });
   }
 
@@ -668,5 +694,157 @@ test.describe("손패는 어느 폭에서도 부채다 (#459)", () => {
         ),
       )
       .toBeLessThanOrEqual(1);
+  });
+});
+
+// ── 배치·앞면 아홉 조합 (#475) ────────────────────────────────────────
+//
+// 위 묶음들은 전부 **부채 + 이름만**(`UI` 상수)을 박고 돈다 — 겹침·z-index·부채 각도가
+// 그 배치의 성질이라, 다른 배치에서 같은 단언을 하면 거짓으로 실패한다.
+//
+// 여기서는 **세 배치가 저마다 제 약속을 지키는지**만 본다. 약속은 셋 다 같다:
+//   ① `aria-label="손패"` 로 찾을 수 있다  ② 탭이 곧 제출이 아니다  ③ 낼 수는 있다.
+
+/** 회차를 특정 조합으로 시작한다. */
+async function enterWith(page: Page, ui: string, protagonist?: string) {
+  await page.goto(`/games/eternia-refine?seed=${SEED}&ui=${ui}`);
+  await page.getByRole("button", { name: "새 회차" }).click();
+  if (protagonist) {
+    await page.locator("button[aria-pressed]").filter({ hasText: protagonist }).click();
+  }
+  await page.getByRole("button", { name: "운명으로 발을 내딛는다" }).click();
+  await gotoBattleFromMap(page);
+  await expect(page.locator(HAND)).toBeVisible();
+}
+
+test.describe("배치 (#475)", () => {
+  test.use({ viewport: PHONE });
+
+  test("띠 — 쓸어 고르고, 「낸다」로 낸다", async ({ page }) => {
+    await enterWith(page, "rail:sigil");
+    const tokens = page.locator(`${HAND} [data-token]`);
+    await expect(tokens).toHaveCount(5);
+
+    // 고르기 전에는 자세히 칸이 비어 있다.
+    await expect(page.getByText("아래 띠에서 고르면")).toBeVisible();
+
+    await tokens.nth(0).click();
+    const play = page.getByRole("button", { name: "낸다" });
+    await expect(play).toBeVisible();
+
+    // 탭 한 번으로는 안 나간다 — 고르기까지다.
+    await expect(tokens).toHaveCount(5);
+    await play.click();
+    await expect(tokens).toHaveCount(4);
+  });
+
+  test("띠 — 고를 때 이웃이 안 움직인다 (Dock 식 확대의 함정을 피한다)", async ({ page }) => {
+    await enterWith(page, "rail:sigil");
+    const xs = () =>
+      page.evaluate(
+        (sel) =>
+          [...document.querySelectorAll(`${sel} [data-token]`)].map((t) =>
+            Math.round(t.getBoundingClientRect().x),
+          ),
+        HAND,
+      );
+
+    const before = await xs();
+    await page.locator(`${HAND} [data-token]`).nth(2).click();
+    await page.waitForTimeout(300);
+    const after = await xs();
+
+    // 고른 것만 위로 뜬다. 가로 위치는 **하나도** 안 움직여야 한다.
+    expect(after).toEqual(before);
+  });
+
+  test("격자 — 한 번은 고르기, 한 번 더가 내기", async ({ page }) => {
+    await enterWith(page, "grid:sigil");
+    const cards = page.locator(`${HAND} button`);
+    await expect(cards).toHaveCount(5);
+
+    await cards.nth(0).click();
+    // 화면 아래 조작 안내에도 같은 말이 있다 — **카드 안에서** 찾아야 한다.
+    await expect(cards.nth(0)).toContainText("한 번 더 누르면 낸다");
+    await expect(cards).toHaveCount(5); // 아직 안 나갔다
+
+    await cards.nth(0).click();
+    await expect(cards).toHaveCount(4);
+  });
+
+  test("격자 — 모든 카드의 본문이 가려지지 않고 보인다", async ({ page }) => {
+    await enterWith(page, "grid:plain");
+
+    // 이 검사가 이번 작업의 근거다. 부채에서는 이 값이 0/5 였다.
+    const readable = await page.evaluate((sel) => {
+      const cards = [...document.querySelectorAll<HTMLElement>(`${sel} button`)];
+      return cards.filter((c) => {
+        const tx = c.querySelector("span:last-child") as HTMLElement | null;
+        if (!tx || Number(getComputedStyle(tx).opacity) < 0.9) return false;
+        const b = tx.getBoundingClientRect();
+        // 요소의 가운데가 제 카드 것이면 안 가려진 것이다.
+        const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+        return Boolean(top && top.closest("button") === c);
+      }).length;
+    }, HAND);
+
+    expect(readable).toBe(5);
+  });
+
+  test("아홉 조합이 전부 뜨고 카드를 그린다", async ({ page }) => {
+    for (const layout of ["fan", "rail", "grid"]) {
+      for (const face of ["plain", "index", "sigil"]) {
+        await enterWith(page, `${layout}:${face}`);
+        const items = page.locator(
+          layout === "rail" ? `${HAND} [data-token]` : `${HAND} button`,
+        );
+        await expect(items, `${layout}:${face} 가 손패를 안 그린다`).toHaveCount(5);
+      }
+    }
+  });
+
+  test("문양 앞면은 카드마다 다른 인장을 그린다", async ({ page }) => {
+    await enterWith(page, "grid:sigil");
+    const shapes = await page.evaluate((sel) =>
+      [...document.querySelectorAll(`${sel} button svg`)].map((s) => s.innerHTML),
+      HAND,
+    );
+    expect(shapes).toHaveLength(5);
+    // 시작 덱은 메스 3·웅크린다 2 라 서로 다른 이름이 둘이다 — 문양도 둘이어야 한다.
+    expect(new Set(shapes).size).toBeGreaterThanOrEqual(2);
+  });
+
+  test("모르는 ?ui= 는 고정이 안 될 뿐, 회차는 평소대로 돈다", async ({ page }) => {
+    // 처음엔 「기본(부채)으로 돈다」고 썼는데 **틀렸다.** 모르는 값이면 고정이 안 되고
+    // 그 뒤는 평소 경로 — 즉 셔플 백에서 **랜덤으로** 뽑힌다. 격리 실행에서는 우연히
+    // 부채가 나와 통과했고 전체 실행에서 깨졌다. 값 검증은 `parseVariant` 단위 시험이
+    // 이미 덮으므로, 여기서는 **어느 배치가 걸려도 손패가 서는지**만 본다.
+    await enterWith(page, "fan:fancy");
+    const items = page.locator(`${HAND} [data-token], ${HAND} button`);
+    await expect(items).toHaveCount(5);
+  });
+});
+
+test.describe("못 내는 카드는 이유를 말한다 (#475)", () => {
+  test.use({ viewport: PHONE });
+
+  test("결정을 끌어올려도 「놓으면 낸다」가 안 뜬다", async ({ page }) => {
+    // 카엘은 결정 2장을 안고 시작한다 — 낼 수 없는 카드가 손에 있다.
+    await enterWith(page, "fan:plain", "카엘");
+
+    const idx = await page.evaluate(
+      (sel) =>
+        [...document.querySelectorAll(`${sel} button`)].findIndex((c) =>
+          (c.textContent ?? "").includes("굳은 결정"),
+        ),
+      HAND,
+    );
+    expect(idx).toBeGreaterThanOrEqual(0);
+
+    const at = await centerOf(page, CARD, idx);
+    await dragUp(page, HAND, { atX: at.x, atY: at.y, distance: 110, durationMs: 400 });
+
+    // 예전엔 여기서 「놓으면 낸다」가 떴고, 놓으면 아무 일도 안 일어났다.
+    await expect(page.getByText("놓으면 낸다")).toHaveCount(0);
   });
 });

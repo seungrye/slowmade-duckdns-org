@@ -35,7 +35,19 @@ export type Phase =
   | { kind: 'refinery'; node: string }
   | { kind: 'alliance'; node: string }
   | { kind: 'story'; node: string }
-  | { kind: 'ending'; endingId: RunResult['endingId']; why: string };
+  | {
+      kind: 'ending';
+      endingId: RunResult['endingId'];
+      why: string;
+      /**
+       * 끝까지 갔나 (#475).
+       *
+       * `finish` 는 알고 있었는데 버리고 있었다. 조작 평가를 받으면서 필요해졌다 —
+       * **진 판의 불만과 조작의 불만은 다른 것**이라 갈라 봐야 한다.
+       * 엔딩은 저장 대상이 아니므로(`isSavable`) 저장본 마이그레이션은 없다.
+       */
+      cleared: boolean;
+    };
 
 export interface Session {
   run: RunState;
@@ -460,7 +472,12 @@ export function finish(session: Session, how: 'cleared' | 'lose' | 'petrified'):
   const endingId = resolveEnding(summary);
   return {
     ...session,
-    phase: { kind: 'ending', endingId, why: explainEnding(summary, endingId) },
+    phase: {
+      kind: 'ending',
+      endingId,
+      why: explainEnding(summary, endingId),
+      cleared: summary.cleared,
+    },
   };
 }
 

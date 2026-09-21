@@ -47,10 +47,17 @@ import { MapScreen } from './MapScreen';
 import { loadScenes } from '@/lib/eternia-refine/scenes';
 import { displayTitle, type ScenarioScene } from '@/lib/eternia-refine/scenario';
 import { clearSave, fromSave, isSavable, readSave, writeSave, type SavedRun } from '@/lib/eternia-refine/save';
+import { DEFAULT_VARIANT, type Layout, type Variant } from '@/lib/eternia-refine/ui-variant';
+import { currentVariant, nextVariant } from '@/lib/eternia-refine/variant-store';
+import { variantLabel } from '@/lib/eternia-refine/ui-variant';
+import { buildVote, type Vote } from '@/lib/eternia-refine/ui-vote';
+import { submitVote } from '@/lib/eternia-refine/vote-sink';
 import type { Session } from '@/lib/eternia-refine/run';
 import { ETHER_PER_CRYSTAL, ETHER_PER_REMOVAL, bossHpBonus } from '@/lib/eternia-refine/refine';
 import { endingLabel } from '@/content/web-adventure/endings';
 import { FanHand } from './FanHand';
+import { HandGrid } from './HandGrid';
+import { HandRail } from './HandRail';
 
 export function GameClient() {
   // 규칙은 모듈이라 바뀌지 않는다 — 한 번만 묶는다.
@@ -82,6 +89,19 @@ export function GameClient() {
   /** 이어할 것이 있나 — 타이틀에서만 쓴다. 마운트 때 한 번 읽는다. */
   const [saved, setSaved] = useState<SavedRun | null>(null);
   useEffect(() => setSaved(readSave()), []);
+
+  /**
+   * 이 회차가 쓰는 손패 UI (#475).
+   *
+   * 서버에서는 localStorage 를 못 읽으므로 기본값으로 그리고, 마운트 뒤에 실제 값으로
+   * 바꾼다(`saved` 와 같은 방식) — 그래야 하이드레이션이 안 어긋난다.
+   * **새 회차를 시작할 때만 새로 뽑는다**([begin]).
+   */
+  const [variant, setVariant] = useState<Variant>(DEFAULT_VARIANT);
+  useEffect(() => setVariant(currentVariant()), []);
+
+  /** 이번 회차의 조작 평가 (#475). 한 회차에 한 번만 받는다. */
+  const [voted, setVoted] = useState<Vote | null>(null);
 
   /**
    * 노드 사이에서 저장한다 (#435).
@@ -125,6 +145,9 @@ export function GameClient() {
         ? null
         : new URLSearchParams(window.location.search).get('seed');
     const seed = raw !== null && /^\d+$/.test(raw) ? Number(raw) : undefined;
+    // 손패 UI 는 회차 단위로 바뀐다 (#475) — 같은 사람이 여러 배치를 겪고 견주게.
+    setVariant(nextVariant());
+    setVoted(null);
     setSession(startRun(pick.p, pick.a, seed, scenes));
   }
 
@@ -401,9 +424,12 @@ export function GameClient() {
                 봤는데, 그 288px 이 그대로 손패에서 나가 부채 간격이 72 → 41 로 줄었다 —
                 카드 이름을 드러내려고 시작한 일이 이름을 더 가렸다. 자원은 아래 줄로
                 내리고 폭은 손패에 준다. */}
-            <FanHand
+            <Hand
+              layout={variant.layout}
+              face={variant.face}
               hand={b.hand}
               canPlay={(c) => c.kind !== 'crystal' && (c.cost === null || c.cost <= b.ether)}
+              reason={(c) => whyNot(c, b.ether)}
               onPlay={(i) => setBattle(combat.playCard(b, i, session.run.ability))}
             />
 
@@ -450,7 +476,7 @@ export function GameClient() {
             </div>
 
             <p className="mt-1 shrink-0 text-center font-mono text-[10.5px] text-amber-700">
-              눌러서 펼치고 · 좌우로 훑고 · 위로 끌거나 튕겨서 낸다
+              {HINT[variant.layout]}
             </p>
 
             {piles && <PileView deck={b.deck} discard={b.discard} onClose={() => setPiles(false)} />}
@@ -645,18 +671,91 @@ export function GameClient() {
         </p>
       </details>
 
+      {/* 조작 평가 (#475).
+          **투표 전에는 어떤 조합이었는지 안 알려 준다** — 「띠 + 문양」이라 써 두면
+          답이 그 이름 쪽으로 휜다. 누른 뒤에 밝힌다. */}
+      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-100/50 p-3">
+        {voted ? (
+          <p className="text-sm text-amber-900" data-testid="ui-vote-done">
+            고맙습니다 — <b>{variantLabel(variant)}</b> 이었습니다.
+          </p>
+        ) : (
+          <>
+            <span className="text-sm font-bold">이번 조작, 어땠나요?</span>
+            <div className="ml-auto flex gap-2">
+              {(['up', 'down'] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  aria-label={v === 'up' ? '조작이 좋았다' : '조작이 불편했다'}
+                  onClick={() => {
+                    setVoted(v);
+                    submitVote(
+                      buildVote({
+                        variantId: variant.id,
+                        layout: variant.layout,
+                        face: variant.face,
+                        vote: v,
+                        endingId: phase.endingId,
+                        protagonist: session.run.protagonist,
+                        cleared: phase.cleared,
+                        erosion: session.run.erosion,
+                        now: Date.now(),
+                      }),
+                    );
+                  }}
+                  className="min-h-[44px] rounded-md border border-amber-300 bg-amber-50 px-5 text-lg hover:bg-amber-100"
+                >
+                  {v === 'up' ? '👍' : '👎'}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
       <button
         type="button"
         onClick={() => {
           setSession(newSession());
           setBattle(null);
+          setVoted(null);
         }}
-        className="mt-5 min-h-[48px] w-full rounded-md bg-amber-700 font-bold text-amber-50 hover:bg-amber-800 md:w-auto md:px-8"
+        className="mt-3 min-h-[48px] w-full rounded-md bg-amber-700 font-bold text-amber-50 hover:bg-amber-800 md:w-auto md:px-8"
       >
         다시 시작
       </button>
     </Shell>
   );
+}
+
+/** 배치마다 손짓이 다르다 — 안내도 따라간다. */
+const HINT: Record<Layout, string> = {
+  fan: '눌러서 펼치고 · 좌우로 훑고 · 위로 끌거나 튕겨서 낸다',
+  rail: '띠를 쓸어 고르고 · 위로 끌거나 「낸다」',
+  grid: '눌러서 고르고 · 한 번 더 누르면 낸다',
+};
+
+/** 못 내는 이유 — 에테르를 아는 곳에서만 정확히 말할 수 있다. */
+function whyNot(card: Card, ether: number): string {
+  if (card.kind === 'crystal') return '결정은 낼 수 없다';
+  if (card.cost !== null && card.cost > ether) return `에테르 ${card.cost - ether} 모자람`;
+  return '지금은 낼 수 없다';
+}
+
+/**
+ * 배치 세 가지를 한 자리에서 고른다 (#475).
+ *
+ * 셋은 **같은 약속**을 지킨다 — `aria-label="손패"`, 탭이 곧 제출이 아님, 낼 수 없는
+ * 카드는 이유를 말함. 그래서 부르는 쪽은 어느 배치인지 몰라도 된다.
+ */
+function Hand({
+  layout,
+  ...props
+}: { layout: Layout } & React.ComponentProps<typeof FanHand>) {
+  if (layout === 'rail') return <HandRail {...props} />;
+  if (layout === 'grid') return <HandGrid {...props} />;
+  return <FanHand {...props} />;
 }
 
 /**
