@@ -36,13 +36,22 @@ sudo nginx -t && sudo nginx -s reload
 
 | zone | rate | 적용 경로 | burst |
 |---|---|---|---|
-| `web` | 40r/s | `/`, `/s3/`, bevy-rogue 정적 | 200 / 100 |
+| `web` | 100r/s | `/`, bevy-rogue 정적 / `/s3/` | 400 / 200 |
 | `api` | 20r/s | `/api/` | 60 |
 | `auth` | 30r/m | `/api/auth/(callback\|signin\|signout)` | 10 |
 | `upload` | 60r/m | 첨부·APK·롬 업로드 exact location 3곳 | 20 |
 
+키는 `$binary_remote_addr` 가 아니라 `$rl_key` 다 — **내부망(192.168.0.0/24)은 빈 키를 받아
+리밋에서 빠진다.** 집 안 기기가 도메인으로 접속하면 공유기 NAT loopback 때문에 소스가 전부
+게이트웨이 하나로 합쳐져 서로의 몫을 잡아먹기 때문이다. 실제로 그 상태에서 브라우저가 429 를
+맞았다. `127.0.0.1` 은 일부러 면제하지 않았다 — 리밋이 살아 있어야 검증할 수 있다.
+
 주의할 점 몇 가지:
 
+- **`web` 의 rate 를 40r/s 로 잡았다가 실사용자를 튕겼다.** 태그 클라우드가 `<Link>` 400개를
+  한 화면에 그려서 Next 가 전부 prefetch 했고, 그게 **초당 190건**이었다(#481). 앱에서
+  `prefetch={false}` 로 근본을 고쳤지만, 페이지 트래픽은 원래 이런 파도를 친다는 걸 전제로
+  잡아야 한다. **정상 사용 로그를 먼저 보고 값을 정할 것.**
 - **`/api/auth/session`·`csrf` 는 `auth` zone 에 넣으면 안 된다.** 화면 전환마다 불리는
   정상 트래픽이라, 조이는 순간 로그인한 사용자가 429 를 맞는다. `api` zone 으로 충분하다.
 - **exact-match(`= /api/...`) location 은 `/api/` 의 설정을 상속하지 않는다.** 업로드 경로
@@ -63,6 +72,40 @@ done; echo
 # api zone — 120 병렬이면 일부가 429
 seq 1 120 | xargs -P 30 -I{} curl -sk -o /dev/null -w "%{http_code}\n" \
   https://handmade.r-e.kr/api/auth/csrf | sort | uniq -c
+
+# 내부망 면제 — LAN IP 로 붙으면 80연타를 해도 429 가 없어야 한다
+for i in $(seq 1 80); do
+  curl -sk -o /dev/null -w "%{http_code}\n" https://handmade.r-e.kr/api/auth/signin \
+    --resolve handmade.r-e.kr:443:192.168.0.11
+done | sort | uniq -c
+```
+
+**429 가 나왔다면 `limit_req` 인지 `limit_conn` 인지부터 가른다.** 둘 다 429 라 응답만
+봐서는 구분이 안 된다 — 동시 연결 40을 넘겨 놓고 "속도 제한이 너무 빡빡하다"고 오판하기 쉽다.
+
+```bash
+sudo grep -E "limiting (requests|connections)" /var/log/nginx/error.log | tail -5
+```
+
+### zone 의 **키**를 바꿀 때는 reload 로 안 된다
+
+`limit_req_zone` 의 키를 바꾸면 `nginx -s reload` 가 거부한다:
+
+```
+[emerg] limit_req "web" uses the "$rl_key" key while previously it used the "$binary_remote_addr" key
+```
+
+**`nginx -t` 는 별도 프로세스라 실행 중인 zone 을 몰라서 통과시킨다.** 그래서 "문법 OK →
+reload 성공"으로 보이지만 실제로는 옛 설정이 계속 돈다. 실제로 그걸 모르고 적용됐다고
+판단했다가, worker PID 가 그대로인 걸 보고서야 알았다.
+
+```bash
+# reload 가 먹었는지는 worker PID 로 본다 — 그대로면 안 먹은 것이다.
+pgrep -P "$(systemctl show nginx -p MainPID --value)"
+sudo grep emerg /var/log/nginx/error.log | tail -3
+
+# rate·burst 만 바꿨으면 reload 로 충분하다. **키를 바꿨다면** restart 해야 한다.
+sudo systemctl restart nginx
 ```
 
 ## 2. Slowloris / 느린 연결
