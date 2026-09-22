@@ -157,9 +157,26 @@ body {
 /* #253 — mermaid 의존 전체 제거 (사용자 결정). 관련 CSS rule 도 함께 제거. */
 
 /*
- * #247 — Web Adventure 페이지에만 Pretendard 폰트 적용 (양피지 색감은 기존
- * amber-50/100 톤 그대로). 사이트 전체 폰트는 영향 없음.
+ * Pretendard Variable (Kil Hyung-jin, OFL-1.1 — 고지: /fonts/pretendard-variable.LICENSE.txt)
+ * #247 — Web Adventure 페이지에만 적용 (양피지 색감은 기존 amber-50/100 톤 그대로).
+ * 사이트 전체 폰트는 영향 없음.
+ *
+ * 처음엔 jsdelivr CDN 의 CSS 를 layout 의 <link> 로 불렀는데, 그러려고 CSP 의
+ * **script-src 까지** jsdelivr 에 열어 줬다 (#477). 폰트에 script 권한은 필요 없고,
+ * CDN 이 털리면 그게 임의 JS 실행 경로가 된다. D2Coding 처럼 자체 호스팅으로 옮기고
+ * CSP 에서 걷어냈다 — 외부 CSS 가 사라지니 그게 끌고 오던 sourceMappingURL 요청
+ * (connect-src 위반)과 추적방지 경고도 같이 없어진다.
+ *
+ * @font-face 는 실제로 쓰이는 페이지에서만 내려받으므로 web-adventure 밖에선 부담이 없다.
  */
+@font-face {
+  font-family: 'Pretendard Variable';
+  src: url('/fonts/pretendard-variable.woff2') format('woff2-variations');
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
 .web-adventure-page {
   font-family: 'Pretendard Variable', 'Pretendard', sans-serif;
 }

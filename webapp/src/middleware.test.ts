@@ -12,13 +12,19 @@ describe('middleware', () => {
     expect(res.headers.get('Content-Security-Policy')).toContain("default-src 'self'");
   });
 
-  it("script-src에 'unsafe-inline'과 cdn.jsdelivr.net, googletagmanager.com을 허용한다", () => {
+  it("script-src에 'unsafe-inline'과 googletagmanager.com을 허용한다", () => {
     const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
     // 개별 토큰으로 단언 — 미들웨어 정책이 항목 추가에 유연하도록.
     expect(csp).toMatch(/script-src [^;]*'self'/);
     expect(csp).toMatch(/script-src [^;]*'unsafe-inline'/);
-    expect(csp).toMatch(/script-src [^;]*https:\/\/cdn\.jsdelivr\.net/);
     expect(csp).toMatch(/script-src [^;]*https:\/\/www\.googletagmanager\.com/);
+  });
+
+  it('어느 지시어에도 jsdelivr CDN 을 허용하지 않는다', () => {
+    // Pretendard 를 자체 호스팅으로 옮기며 걷어냈다 (#477). 폰트 하나 때문에
+    // script-src 까지 CDN 에 열려 있었으므로, 되살아나지 않게 여기서 막는다.
+    const csp = middleware(makeRequest('/')).headers.get('Content-Security-Policy') ?? '';
+    expect(csp).not.toContain('jsdelivr');
   });
 
   it("script-src에 'wasm-unsafe-eval' 을 허용한다 (bevy-rogue WASM)", () => {

@@ -63,12 +63,13 @@ export function middleware(request: NextRequest) {
     "default-src 'self'",
     // 'wasm-unsafe-eval' — /games/bevy-rogue 의 Bevy(WASM) 컴파일 허용.
     // 'unsafe-eval' 보다 안전(JS eval 은 여전히 금지, WebAssembly 만 허용).
-    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isEmulatorPlayer ? " 'unsafe-eval' blob:" : ''} https://cdn.jsdelivr.net https://www.googletagmanager.com`,
-    // cdn.jsdelivr.net — Pretendard 폰트 CSS(@font-face) 로드 허용(#247).
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isEmulatorPlayer ? " 'unsafe-eval' blob:" : ''} https://www.googletagmanager.com`,
+    // cdn.jsdelivr.net 은 걷어냈다 (#477) — Pretendard 를 자체 호스팅으로 옮겼다.
+    // 폰트 하나 때문에 style-src 는 물론 **script-src 까지** CDN 에 열려 있었는데,
+    // 폰트에 script 권한은 필요 없고 CDN 이 털리면 그게 곧 임의 JS 실행 경로가 된다.
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
-    // cdn.jsdelivr.net — Pretendard woff2 폰트 파일 로드 허용(#247).
-    "font-src 'self' https://cdn.jsdelivr.net",
+    "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
