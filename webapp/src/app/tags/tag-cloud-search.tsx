@@ -30,9 +30,15 @@ export default function TagCloudSearch({ initialTags }: { initialTags: TagInfo[]
       <div className="flex flex-wrap items-center gap-1">
         {filteredTags.length > 0 ? (
           filteredTags.map((item) => (
+            // prefetch={false} — 이 화면은 태그를 **전부** 한 번에 그린다(457개). Next 의
+            // 자동 prefetch 를 그대로 두면 페이지를 여는 것만으로 `?_rsc=` 요청이 400건 넘게
+            // 쏟아진다 (#481, 실측 초당 190건). 정작 사용자가 누르는 건 하나다 —
+            // 나머지의 RSC 페이로드는 서버가 만들어 보내고 브라우저가 버린다.
+            // 태그 목록은 단일 조회라 클릭 후 받아도 체감 지연이 거의 없다.
             <Link
               key={item.tag}
               href={`/tags/${encodeURIComponent(item.tag)}`}
+              prefetch={false}
               className="inline-flex items-center px-3 text-gray-800 dark:text-gray-200 transition-colors duration-200 hover:text-blue-700 dark:hover:text-blue-400 break-all"
               style={{ fontSize: `${getTagSize(item.count, minCount, maxCount)}rem` }}
             >
