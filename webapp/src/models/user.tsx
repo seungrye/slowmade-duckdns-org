@@ -15,8 +15,12 @@ const UserSettingsSchema = new Schema({
 
 const UserSchema = new mongoose.Schema(
   {
-    username: { type: String, required: false, unique: true }, // 유저 닉네임
-    email: { type: String, required: false, unique: true }, // 이메일
+    // 표시용 닉네임. **unique 를 걸지 않는다** (#478) — 걸어 두면 이름이 같은 사람은
+    // 뒤에 오는 쪽이 아예 가입을 못 한다. auth.ts 의 signIn 콜백이 새 문서를 저장하다
+    // E11000 으로 터지고 NextAuth 가 AccessDenied 를 낸다. 실제로 그렇게 막혔었다.
+    // 계정 식별자는 아래 email 이고, username 으로 조회하는 코드는 없다.
+    username: { type: String, required: false }, // 유저 닉네임
+    email: { type: String, required: false, unique: true }, // 이메일 — 계정 식별자
     password: { type: String, required: false }, // 비밀번호 (해싱 필요) // optional
     profileImage: { type: String }, // 프로필 이미지 URL
     providers: { type: [String], default: [] }, // 소셜 로그인 제공자 (ex. google, kakao)
