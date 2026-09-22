@@ -44,12 +44,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         {/* FOUC 방지 — localStorage 테마를 hydration 전에 동기 적용(light/dark/system 3분기). */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        {/* #247 — Pretendard 폰트 (jsdelivr CDN). web-adventure 페이지의
-            .web-adventure-page 클래스에서만 font-family 로 사용. */}
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
-        />
+        {/* Pretendard 폰트는 여기서 CDN 을 부르지 않는다 — globals.css 의 @font-face 가
+            /fonts/pretendard-variable.woff2 를 자체 호스팅으로 로드한다 (#477). */}
       </head>
       <body>
         <Providers>
