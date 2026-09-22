@@ -12,13 +12,24 @@
 
 ## 1. nginx 레이트리밋
 
-설정은 저장소 밖 호스트에 있다.
+설정은 호스트에 있고, **zone 정의는 저장소에도 사본을 둔다** — `minio-guard.conf`·
+`mongo-firewall.service` 와 같은 방식이다. 없으면 호스트를 재설치할 때 리밋이 통째로 사라진다.
 
-| 파일 | 역할 |
-|---|---|
-| `/etc/nginx/conf.d/ratelimit.conf` | zone 4종 + `limit_conn` zone 정의, 429 응답 |
-| `/etc/nginx/sites-enabled/handmade.r-e.kr` | 각 location 에 `limit_req` 적용 |
-| `/etc/nginx/sites-enabled/slowmade.duckdns.org` | 같음 |
+| 호스트 | 저장소 사본 | 역할 |
+|---|---|---|
+| `/etc/nginx/conf.d/ratelimit.conf` | `scripts/deploy/ratelimit.conf` | zone 4종 + `limit_conn` zone 정의, 429 응답 |
+| `/etc/nginx/sites-enabled/handmade.r-e.kr` | — | 각 location 에 `limit_req` 적용 |
+| `/etc/nginx/sites-enabled/slowmade.duckdns.org` | — | 같음 |
+
+```bash
+sudo install -o root -g root -m 0644 scripts/deploy/ratelimit.conf /etc/nginx/conf.d/
+sudo nginx -t && sudo nginx -s reload
+```
+
+사이트 파일에 거는 `limit_req` 는 사본을 두지 않았다 — `scripts/deploy/handmade.r-e.kr.nginx`
+는 **최초 셋업용 템플릿이고 이미 실제 호스트와 어긋나 있다**(work-log APK 업로드 블록 등이
+빠져 있다). 뒤처진 파일에 새 내용을 얹으면 어느 쪽이 정본인지 더 헷갈린다. 아래 표와 호스트
+파일이 정본이다.
 
 **zone 은 정의만으로 아무 효과가 없다.** 전에 `zone=llm` 을 정의해 두고 어느 location 에서도
 참조하지 않아 리밋이 전혀 걸리지 않았다(40연타가 전부 200 이었다). 지금은 아래처럼 건다.
@@ -78,7 +89,13 @@ reset_timedout_connection on;
 
 ## 3. fail2ban
 
-`/etc/fail2ban/jail.d/nginx.local`. 전에는 `sshd` jail 하나뿐이었다.
+`/etc/fail2ban/jail.d/nginx.local` (저장소 사본 `scripts/deploy/fail2ban-nginx.local`).
+전에는 `sshd` jail 하나뿐이었다.
+
+```bash
+sudo install -o root -g root -m 0644 scripts/deploy/fail2ban-nginx.local /etc/fail2ban/jail.d/nginx.local
+sudo fail2ban-client -t && sudo systemctl restart fail2ban
+```
 
 | jail | 로그 | maxretry / findtime | bantime |
 |---|---|---|---|
