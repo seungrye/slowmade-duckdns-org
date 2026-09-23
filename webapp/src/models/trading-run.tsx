@@ -26,6 +26,12 @@ const TradingRunSchema = new Schema(
     status: { type: String, required: true, enum: ["running", "done", "failed"], default: "running" },
     dryRun: { type: Boolean, default: true },
     catchUp: { type: Boolean, default: false },
+    /**
+     * 실패 뒤 다시 잡은 횟수 (#487). 일시 오류(KIS 5xx·빈 응답·배포 중 종료)로 실패한
+     * 사이클은 그날 다시 돌아야 하지만, 설정 오류처럼 고쳐지지 않는 실패로 하루 종일
+     * 돌면 안 된다. 재시도 자체는 **그 런에서 실주문이 한 건도 안 나갔을 때만** 한다.
+     */
+    attempts: { type: Number, default: 0 },
     startedAt: { type: Date, default: Date.now },
     finishedAt: { type: Date, default: null },
     summary: { type: String, default: "" }, // 사람이 읽는 결과 한 줄

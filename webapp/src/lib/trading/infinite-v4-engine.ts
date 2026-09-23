@@ -10,7 +10,7 @@
 // 상태는 TradingPortfolio.state.v4 에 영속(파이썬 v4-state-*.json 대체).
 
 import TradingOrderLog from "@/models/trading-order-log";
-import TradingPortfolio from "@/models/trading-portfolio";
+import { savePortfolioState, type StateSaver } from "./state-saver";
 import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
 import { TossClient } from "./toss-client";
@@ -90,7 +90,10 @@ export function makeV4KisBroker(client: KisClient, market: "kr" | "us"): V4Broke
       return fills;
     },
     async openOrders(sym) {
-      const rows = market === "kr" ? await client.krOpenOrders() : await client.usOpenOrders();
+      // 주문은 종목 거래소로 나간다(place 의 usExcd) — 조회도 같은 거래소여야 미체결이
+      // 잡힌다. 기본 NASD 로 두면 AMEX/NYSE 종목의 취소 안전망이 통째로 no-op 이 된다 (#489).
+      const rows = market === "kr"
+        ? await client.krOpenOrders() : await client.usOpenOrders(usExcd(sym));
       const out: OpenRow[] = [];
       for (const r of rows as Json[]) {
         if (String(r.pdno ?? "") !== sym) continue;
@@ -215,6 +218,8 @@ export async function runInfiniteV4(
   broker: V4Broker,
   phase: "both" | "sell" | "buy",
   log: CycleLogger,
+  // 상태를 남기는 문 (#488) — 일회성 실행(run-now)은 버리는 구현을 받는다.
+  saveState: StateSaver = savePortfolioState(portfolio._id),
 ): Promise<string> {
   const market = portfolio.market as "kr" | "us";
   const cfg = parseCfg((portfolio.config ?? {}) as Json);
@@ -367,7 +372,7 @@ export async function runInfiniteV4(
   // '어제'(= 마지막으로 완전 반영된 날)로 남기면 다음 실행 창이 전일 체결을 포함해 대사가 이어진다.
   // 2단계(sell 09:30 / buy 15:20 동일일)는 sell 이 어제로 올려도 buy 창은 비어 중복반영이 없다.
   state.lastRunDate = prevMarketDay(today);
-  await TradingPortfolio.updateOne({ _id: portfolio._id }, { $set: { "state.v4": state } });
+  await saveState({ "state.v4": state });
 
   const line = `V4 ${sym}[${phase}]: 주문 ${orders.length}건 (T=${state.t.toFixed(2)} ` +
     `mode=${state.mode} 보유 ${holding})`;

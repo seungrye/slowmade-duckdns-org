@@ -12,7 +12,7 @@
 // 남긴다(강제 청산 없음 — 사용자가 자금 보충/조정).
 
 import TradingOrderLog from "@/models/trading-order-log";
-import TradingPortfolio from "@/models/trading-portfolio";
+import { savePortfolioState, type StateSaver } from "./state-saver";
 import type { Types } from "mongoose";
 import type { ValueRebalancingConfig } from "@/lib/backtest/types";
 import {
@@ -68,6 +68,9 @@ export async function runValueRebalancing(
   runId: Types.ObjectId,
   broker: V4Broker,
   log: CycleLogger,
+  // 상태를 남기는 문 (#488) — 일회성 실행(run-now)은 버리는 구현을 받는다.
+  // VR 은 sinceCycle 이 실행마다 오르므로 이게 없으면 버튼 한 번에 사이클이 앞당겨진다.
+  saveState: StateSaver = savePortfolioState(portfolio._id),
 ): Promise<string> {
   const market = portfolio.market as "kr" | "us";
   const cfg = parseVRCfg((portfolio.config ?? {}) as Json);
@@ -103,8 +106,7 @@ export async function runValueRebalancing(
       }
       await sendOrders(orders, broker, { account, runId, market, sym, live, log });
       // 시드 발주만 하고, 체결(보유>0)은 다음 실행에서 채택. 상태는 미초기화로 유지.
-      await TradingPortfolio.updateOne({ _id: portfolio._id },
-        { $set: { "state.vr": { symbol: sym, vInit: false, lastRunDate: today } } });
+      await saveState({ "state.vr": { symbol: sym, vInit: false, lastRunDate: today } });
       const line = `VR ${sym}: 시드 매수 ${seeded.qty}주 발주(체결 후 다음 실행에서 채택)`;
       log(line);
       return line;
@@ -182,7 +184,7 @@ export async function runValueRebalancing(
 
   // ── 상태 저장 — lastRunDate='어제'로 남겨 오늘 LOC 체결을 다음 실행이 대사(v4 와 동일 창) ──
   const persist: VRPersist = { ...state, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };
-  await TradingPortfolio.updateOne({ _id: portfolio._id }, { $set: { "state.vr": persist } });
+  await saveState({ "state.vr": persist });
 
   const line = `VR ${sym}: 주문 ${orders.length}건 (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`;
   log(line);

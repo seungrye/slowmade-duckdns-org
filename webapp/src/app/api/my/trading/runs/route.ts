@@ -6,6 +6,7 @@ import TradingOrderLog from "@/models/trading-order-log";
 import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
 import { runPortfolioCycle } from "@/lib/trading/engines";
+import { firstTradingPhase } from "@/lib/trading/scheduler";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +51,14 @@ export async function GET(req: NextRequest) {
 }
 
 /** 수동 1회 실행 — 멱등 키를 "manual-{ts}" 로 별도 발급(당일 정규 실행과 충돌 없음).
- *  설정 검증용이므로 **항상 dry-run 으로 강제**한다(liveEnabled 와 무관). */
+ *  설정 검증용이므로 **항상 dry-run 으로 강제**하고(liveEnabled 와 무관),
+ *  **영속 상태도 남기지 않는다**(#488 — 예전엔 VR 의 sinceCycle 이 버튼마다 올랐다).
+ *
+ *  phase 는 그 포트폴리오가 **실제로 도는** 다음 매매 사이클이 기본이다(국장 v4 는 sell).
+ *  body.phase 로 다른 단계(국장 buy 등)를 골라 확인할 수 있다. 마감(close)은 차트·메일을
+ *  건드리므로 수동 실행 대상이 아니다. */
+const MANUAL_PHASES = ["main", "both", "sell", "buy"] as const;
+
 export async function POST(req: NextRequest) {
   const owner = await requireOwner();
   if (owner instanceof NextResponse) return owner;
@@ -62,8 +70,15 @@ export async function POST(req: NextRequest) {
   const account = await TradingAccount.findOne({ _id: portfolio.accountId, isDeleted: { $ne: true } }).lean();
   if (!account) return NextResponse.json({ error: "계정 없음" }, { status: 404 });
 
+  const asked = String(body.phase ?? "");
+  const phase = (MANUAL_PHASES as readonly string[]).includes(asked)
+    ? (asked as (typeof MANUAL_PHASES)[number])
+    : firstTradingPhase({
+        strategy: portfolio.strategy, market: portfolio.market, runAt: portfolio.runAt,
+      }) as (typeof MANUAL_PHASES)[number];
+
   const run = await TradingRun.create({
-    portfolioId, accountId: portfolio.accountId,
+    portfolioId, accountId: portfolio.accountId, phase,
     dateKey: `manual-${Date.now()}`, status: "running", dryRun: true, catchUp: false,
   });
   const logs: string[] = [];
@@ -72,7 +87,7 @@ export async function POST(req: NextRequest) {
     // 수동 실행은 라이브 게이트를 우회하지 않도록 liveEnabled 를 강제로 끈 사본으로 돈다.
     const dryAccount = { ...account, liveEnabled: false };
     const summary = await runPortfolioCycle(
-      dryAccount as never, portfolio as never, run._id as never, log,
+      dryAccount as never, portfolio as never, run._id as never, log, phase, { ephemeral: true },
     );
     await TradingRun.updateOne(
       { _id: run._id },
