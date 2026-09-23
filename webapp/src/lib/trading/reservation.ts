@@ -16,6 +16,8 @@
  * 순서는 만든 순서(`createdAt`)다 — 사람이 먼저 정한 것이 먼저다.
  */
 
+import { formatMoney } from "@/lib/format";
+
 export type ReservationBlock = {
   id: string;
   /** 쓰겠다고 적어 둔 금액. 비우면(0·음수·없음) **그 시점 잔여 전액**. */
@@ -66,4 +68,44 @@ export function planReservations(accountCash: number, blocks: ReservationBlock[]
 
     return { id, granted, short: granted < asked, held: granted <= 0 };
   });
+}
+
+/**
+ * 설정 화면에 띄울 예약 경고 (#495) — **순수**.
+ *
+ * 예전엔 두 경고가 다 사람 눈에 안 닿았다. `overReservedMessage` 는 호출자가 없었고,
+ * "예약을 안 적어 남은 전액을 쓴다" 는 사이클 로그에만 남아 뒤져야 보였다. 실계좌로
+ * 넘기기 전에 **설정 화면에서** 보여야 할 정보다.
+ *
+ * `accountCash` 는 브로커를 부르지 않고 **close-sync 가 매일 적어 둔 마지막 값**을 쓴다
+ * (설정 페이지가 KIS 를 때리면 유량·지연이 생긴다). 그래서 기준일(`asOf`)을 문구에 싣는다 —
+ * 오늘 잔고가 아니라는 걸 읽는 사람이 알아야 한다. 현금을 모르면 그 경고는 조용히 생략한다.
+ */
+export function reservationWarnings(args: {
+  blocks: { reserved?: number | null }[];
+  accountCash: number | null;
+  market: "kr" | "us";
+  asOf?: string | null;
+}): string[] {
+  const { blocks, accountCash, market, asOf } = args;
+  const out: string[] = [];
+
+  // 블록이 하나뿐이면 "전액" 이 정상이다 — 예전과 같은 동작이라 경고하지 않는다.
+  const uncapped = blocks.filter((b) => wants(b.reserved) === null).length;
+  if (blocks.length > 1 && uncapped > 0) {
+    out.push(
+      `예약을 안 적은 블록이 ${uncapped}개 있습니다 — 그 블록이 남은 현금을 전부 씁니다.`,
+    );
+  }
+
+  if (accountCash !== null && Number.isFinite(accountCash)) {
+    const sum = blocks.reduce((a, b) => a + (wants(b.reserved) ?? 0), 0);
+    if (sum > accountCash) {
+      out.push(
+        `예약 합계 ${formatMoney(sum, market)} 가 현금 ${formatMoney(accountCash, market)}` +
+        `${asOf ? `(${asOf} 기준)` : ""} 보다 큽니다 — 뒤 블록이 그날 보류될 수 있습니다.`,
+      );
+    }
+  }
+  return out;
 }

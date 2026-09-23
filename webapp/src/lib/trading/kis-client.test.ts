@@ -4,15 +4,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // DB·유량제한은 목킹하고 fetch 만 갈아 끼워 재시도 규칙 자체를 본다.
 
 vi.mock("@/lib/db", () => ({ connectToDB: async () => {} }));
+// 토큰 캐시를 들고 있는 가짜 컬렉션 — 무엇이 저장됐는지 봐야 #492 를 검증할 수 있다.
+const store = vi.hoisted(() => ({
+  doc: null as null | { token: string; expiresAt: number },
+  writes: [] as string[],
+}));
 vi.mock("@/models/trading-token", () => ({
   default: {
-    findOne: () => ({ lean: async () => ({ token: "TOKEN", expiresAt: Date.now() + 86_400_000 }) }),
-    updateOne: async () => {},
+    findOne: () => ({ lean: async () => store.doc }),
+    updateOne: async (_q: unknown, u: { $set: { token: string; expiresAt: number } }) => {
+      store.writes.push(u.$set.token);
+      store.doc = { token: u.$set.token, expiresAt: u.$set.expiresAt };
+    },
   },
 }));
 vi.mock("./rate-limit", () => ({ throttle: async () => {} }));
 
+process.env.TRADING_SECRET_KEY = "a".repeat(64);
+
 import { KisClient } from "./kis-client";
+import { decryptSecret, encryptSecret } from "./crypto";
 
 const OK = { rt_cd: "0", output: { ODNO: "0001234" } };
 const RATE_LIMITED = { rt_cd: "1", msg_cd: "EGW00201", msg1: "초당 거래건수를 초과하였습니다." };
@@ -40,6 +51,9 @@ beforeEach(() => {
   vi.useFakeTimers();
   fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
+  // 캐시에는 **암호화된** 토큰이 들어 있다(#492) — 그래야 재발급 없이 바로 쓴다.
+  store.doc = { token: encryptSecret("TOKEN"), expiresAt: Date.now() + 86_400_000 };
+  store.writes.length = 0;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -93,5 +107,36 @@ describe("KisClient.post — 유량제한 재시도(접수 전 거부에 한해�
     expect(await settle(order())).toBeInstanceOf(Error);
     const tokenCalls = fetchMock.mock.calls.filter((c) => String(c[0]).includes("tokenP"));
     expect(tokenCalls).toHaveLength(1);
+  });
+});
+
+// #492 — 자격증명은 암호화하면서 그걸로 받은 토큰은 평문으로 DB 에 뒀다.
+// 암호화의 위협 모델(DB 만 털린 경우)이 최대 23시간 무력해진다.
+describe("KisClient 토큰 캐시 — 저장은 암호화", () => {
+  it("발급받은 토큰을 평문으로 저장하지 않는다", async () => {
+    store.doc = null; // 캐시 비움 → 발급 경로
+    fetchMock
+      .mockResolvedValueOnce(res({ access_token: "SECRET-TOKEN" }))
+      .mockResolvedValueOnce(res(OK));
+    await settle(order());
+    expect(store.writes).toHaveLength(1);
+    expect(store.writes[0]).not.toContain("SECRET-TOKEN");
+    expect(decryptSecret(store.writes[0])).toBe("SECRET-TOKEN");
+  });
+
+  it("암호화된 캐시는 재발급 없이 그대로 쓴다", async () => {
+    fetchMock.mockResolvedValueOnce(res(OK));
+    await settle(order());
+    expect(fetchMock).toHaveBeenCalledTimes(1); // 토큰 발급 호출 없음
+    expect(store.writes).toHaveLength(0);
+  });
+
+  it("예전에 저장된 평문 캐시는 캐시 미스로 떨어져 재발급된다(자가치유)", async () => {
+    store.doc = { token: "LEGACY-PLAINTEXT", expiresAt: Date.now() + 86_400_000 };
+    fetchMock
+      .mockResolvedValueOnce(res({ access_token: "NEW-TOKEN" }))
+      .mockResolvedValueOnce(res(OK));
+    expect(await settle(order())).toBe("0001234");
+    expect(decryptSecret(store.writes[0])).toBe("NEW-TOKEN");
   });
 });

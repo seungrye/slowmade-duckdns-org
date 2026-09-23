@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { planReservations, usableCash, type ReservationBlock } from "./reservation";
+import {
+  planReservations, reservationWarnings, usableCash, type ReservationBlock,
+} from "./reservation";
 
 const blocks = (...specs: [string, number | null | undefined][]): ReservationBlock[] =>
   specs.map(([id, reserved]) => ({ id, reserved: reserved ?? undefined }));
@@ -100,5 +102,35 @@ describe("planReservations — 여러 블록에 나눠 준다", () => {
       const sum = rows.reduce((s, r) => s + r.granted, 0);
       expect(sum, `현금 ${cash}`).toBeLessThanOrEqual(Math.max(cash, 0));
     }
+  });
+});
+
+// #495 — 예약 경고가 만들어만 두고 화면에 안 떴다. 판정은 순수하게 여기서 한다.
+describe("reservationWarnings — 설정 화면에 띄울 경고", () => {
+  const W = (blocks: { reserved: number }[], accountCash: number | null, asOf?: string) =>
+    reservationWarnings({ blocks, accountCash, market: "kr", asOf: asOf ?? null });
+
+  it("형제가 있는데 예약을 안 적은 블록이 있으면 '전액을 쓴다'고 알린다", () => {
+    const out = W([{ reserved: 1000 }, { reserved: 0 }], 5000);
+    expect(out.some((m) => m.includes("전부"))).toBe(true);
+  });
+  it("블록이 하나뿐이면 그 경고를 안 띄운다(예전과 같은 동작 — 새 소음 금지)", () => {
+    expect(W([{ reserved: 0 }], 5000).some((m) => m.includes("전부"))).toBe(false);
+  });
+  it("예약 합이 현금을 넘으면 알린다", () => {
+    expect(W([{ reserved: 4000 }, { reserved: 3000 }], 5000).some((m) => m.includes("보다 큽니다"))).toBe(true);
+  });
+  it("예약 합이 현금 이내면 안 알린다", () => {
+    expect(W([{ reserved: 2000 }, { reserved: 1000 }], 5000).some((m) => m.includes("보다 큽니다"))).toBe(false);
+  });
+  it("현금을 모르면(기록 없음) 초과 경고는 조용히 생략한다", () => {
+    expect(W([{ reserved: 4000 }, { reserved: 3000 }], null).some((m) => m.includes("보다 큽니다"))).toBe(false);
+  });
+  it("현금 기준일을 문구에 실어 오해를 막는다", () => {
+    const out = W([{ reserved: 9000 }, { reserved: 1000 }], 5000, "2026-09-23");
+    expect(out.join(" ")).toContain("2026-09-23");
+  });
+  it("경고가 없으면 빈 배열", () => {
+    expect(W([{ reserved: 3000 }], 5000)).toEqual([]);
   });
 });

@@ -76,10 +76,6 @@ export const env = {
     clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
   },
 
-  // stock-automator 데몬이 /api/ingest/* 호출 시 X-Ingest-Key 헤더로 검증.
-  // 빈 문자열이면 ingest 전부 차단 (Default secure).
-  stockIngestKey: process.env.STOCK_INGEST_KEY ?? '',
-
   // 로컬 LLM 서버(shim) /llm/* 를 nginx auth_request 로 게이트할 때, 비-브라우저(opencode 등)가
   // Authorization: Bearer 로 제시하는 키. 관리자 세션(OWNER_EMAIL)은 이 키 없이도 통과.
   // 빈 문자열이면 키 경로 비활성(세션만 허용, Default secure).

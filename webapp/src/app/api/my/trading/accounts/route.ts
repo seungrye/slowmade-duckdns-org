@@ -6,7 +6,8 @@ import TradingPortfolio from "@/models/trading-portfolio";
 import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
 import { encryptSecret } from "@/lib/trading/crypto";
-import { maskedCreds } from "@/lib/trading/settings-data";
+import { maskedCreds, lastLiveChange } from "@/lib/trading/settings-data";
+import { appendLiveLog, liveChangeEntry } from "@/lib/trading/live-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,7 @@ export async function GET() {
       liveEnabled: a.liveEnabled,
       memo: a.memo,
       credentials: maskedCreds(a.credentials as Record<string, string>),
+      lastLiveChange: lastLiveChange(a.liveLog as never),
     })),
     liveAllowed: process.env.TRADING_LIVE_ALLOWED === "true",
   });
@@ -94,7 +96,13 @@ export async function PUT(req: NextRequest) {
   await connectToDB();
   const acct = await TradingAccount.findById(id);
   if (!acct) return NextResponse.json({ error: "계정 없음" }, { status: 404 });
-  if (typeof body.liveEnabled === "boolean") acct.liveEnabled = body.liveEnabled;
+  // 실주문 토글은 이력을 남긴다 (#493) — 값이 실제로 바뀔 때만.
+  const change = liveChangeEntry(acct.liveEnabled, body.liveEnabled, owner.email, new Date());
+  if (change) {
+    acct.liveEnabled = change.enabled;
+    acct.liveLog = appendLiveLog(acct.liveLog as never, change) as never;
+    acct.markModified("liveLog");
+  }
   if (typeof body.memo === "string") acct.memo = body.memo;
   // 자격증명 갱신은 전달된 필드만 덮어쓴다(마스킹 값 재전송 방지를 위해 빈 값 무시).
   for (const f of CRED_FIELDS[acct.broker] ?? []) {

@@ -1,7 +1,6 @@
 import { Types } from "mongoose";
 import TradingPortfolio from "@/models/trading-portfolio";
 import { planReservations } from "./reservation";
-import { formatMoney } from "@/lib/format";
 
 /**
  * 이 블록이 실제로 쓸 수 있는 현금 (#339) — 부수효과 경계(DB 조회).
@@ -44,15 +43,4 @@ export async function grantedCashFor(
     return null;
   }
   return reserved;
-}
-
-/** 저장 화면·로그에서 쓸 요약 — 예약 합이 현금을 넘는지 알린다. */
-export function overReservedMessage(
-  accountCash: number,
-  reservations: number[],
-  market: "kr" | "us",
-): string | null {
-  const sum = reservations.reduce((a, b) => a + b, 0);
-  if (sum <= accountCash) return null;
-  return `예약 합계 ${formatMoney(sum, market)} 가 현금 ${formatMoney(accountCash, market)} 보다 큽니다 — 뒤 블록이 그날 보류될 수 있습니다.`;
 }

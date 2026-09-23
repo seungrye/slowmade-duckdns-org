@@ -228,6 +228,15 @@ export async function runInfiniteV4(
   const today = marketToday(market);
 
   const { holding, avg, price, cash } = await broker.snapshot(sym);
+  // 오염된 입력은 조용히 넘기지 않는다 (#491). 예전엔 price=0 이면 매도 조건이 전부 탈락해
+  // **주문 0건으로 done** 이 됐다 — 익절이 하루 빠졌는데 어디에도 안 남는다. 던져야 #487
+  // 재시도가 걸리고 실패 메일이 나간다. (KIS 는 장 마감·휴장 시 현재가 0 을 줄 수 있다.)
+  if (!(price > 0)) {
+    throw new Error(`v4 ${sym}: 현재가가 ${price} — 사이클 중단(휴장·응답 오류 추정)`);
+  }
+  if (holding > 0 && !(avg > 0)) {
+    throw new Error(`v4 ${sym}: 보유 ${holding}주인데 평단이 ${avg} — 잔고 응답 오염, 사이클 중단`);
+  }
 
   // ── 1) 대사 — 마지막 실행일 이후(오늘 제외) 체결을 일자별 적용 ──
   let state = loadState((portfolio.state as Json | undefined)?.v4, cfg);
