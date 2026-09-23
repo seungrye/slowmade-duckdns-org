@@ -45,6 +45,8 @@ const TR: Record<string, [string, string]> = {
 };
 
 const MAX_GET_RETRIES = 4;
+// 주문(POST)은 비멱등이라 **접수 전 거부가 확실한 경우에만** 재시도한다 — 아래 post() 참조.
+const MAX_POST_RETRIES = 3;
 const backoffMs = (attempt: number) => Math.min(1000 * 2 ** (attempt - 1), 8000);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -200,21 +202,37 @@ export class KisClient {
     return rows;
   }
 
+  /** 주문 전송. **비멱등이라 "접수되지 않은 것이 확실한" 거부만 재시도한다:**
+   *
+   *  - 유량제한(`EGW00201`) — 게이트웨이가 문전에서 막은 것이라 주문이 접수되지 않았다.
+   *    예전엔 이 재시도가 GET 에만 있어(`getRaw`) 주문은 한 번 걸리면 그대로 버려졌고,
+   *    엔진의 주문 단위 격리가 "다음 주문 계속" 으로 삼켰다 — 매도 165주가 사라진 적이 있다 (#484).
+   *    ⚠ KIS 는 이걸 **HTTP 200 + rt_cd=1** 로 주므로 status 로는 못 가린다.
+   *  - 토큰만료(5xx + `EGW00123`) — 마찬가지로 미접수. 발급 1분 1회 제한이 있어 **재발급은 1회만.**
+   *
+   *  그 밖의 거부(잔고부족·호가단위 등)·네트워크 오류·정체불명 5xx 는 **접수 여부를 알 수 없으므로
+   *  재시도하지 않는다** — 중복 주문이 유실보다 위험하다. */
   private async post(path: string, trId: string, body: Json): Promise<Json> {
     const url = `${this.base}${path}`;
-    const doPost = async () =>
-      fetch(url, { method: "POST", headers: await this.headers(trId), body: JSON.stringify(body) });
-    await throttle();
-    let resp = await doPost();
-    let text = await resp.text();
-    if (resp.status >= 500 && KisClient.isTokenExpired(text)) {
-      // 토큰 만료 = 주문 미접수 → 재발급 후 1회만 재전송(중복 위험 없음).
-      await this.getToken(true);
+    let tokenRefreshed = false;
+    for (let attempt = 1; attempt <= MAX_POST_RETRIES; attempt++) {
       await throttle();
-      resp = await doPost();
-      text = await resp.text();
+      const resp = await fetch(url, {
+        method: "POST", headers: await this.headers(trId), body: JSON.stringify(body),
+      });
+      const text = await resp.text();
+      if (resp.status >= 500 && KisClient.isTokenExpired(text) && !tokenRefreshed) {
+        tokenRefreshed = true;
+        await this.getToken(true);
+        continue;
+      }
+      if (KisClient.isRateLimited(text) && attempt < MAX_POST_RETRIES) {
+        await sleep(backoffMs(attempt) + 700); // throttle(1s) 위에 추가 백오프 — getRaw 와 같은 규칙
+        continue;
+      }
+      return KisClient.handle(resp.status, text);
     }
-    return KisClient.handle(resp.status, text);
+    throw new KisError("retry-exhausted", `POST ${path}`);
   }
 
   private static handle(status: number, text: string): Json {
