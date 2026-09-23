@@ -4,6 +4,7 @@
 
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
+import { decryptSecret, encryptSecret } from "./crypto";
 import { krTickRound } from "./kr-tick";
 import { throttle } from "./rate-limit";
 import { feeInclusiveQty } from "./buyable";
@@ -45,8 +46,12 @@ export class TossClient {
     if (!force) {
       const cached = await TradingToken.findOne({ cacheKey: this.cacheKey }).lean();
       if (cached && cached.expiresAt - 60_000 > Date.now()) {
-        this.token = cached.token;
-        return this.token;
+        try {
+          this.token = decryptSecret(cached.token);
+          return this.token;
+        } catch {
+          // 예전에 평문으로 저장된 캐시 (#492) — 캐시 미스로 보고 재발급한다(자가치유).
+        }
       }
     }
     await throttle();
@@ -63,9 +68,10 @@ export class TossClient {
     const body = (await resp.json()) as Json;
     this.token = String(body.access_token);
     const expiresIn = Number(body.expires_in ?? 3600) * 1000;
+    // 토큰도 암호화해 둔다 (#492) — kis-client 와 같은 이유.
     await TradingToken.updateOne(
       { cacheKey: this.cacheKey },
-      { $set: { token: this.token, expiresAt: Date.now() + expiresIn } },
+      { $set: { token: encryptSecret(this.token), expiresAt: Date.now() + expiresIn } },
       { upsert: true },
     );
     return this.token;

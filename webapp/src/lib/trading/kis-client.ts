@@ -9,6 +9,7 @@
 
 import { connectToDB } from "@/lib/db";
 import TradingToken from "@/models/trading-token";
+import { decryptSecret, encryptSecret } from "./crypto";
 import { krTickRound, type KrTickKind } from "./kr-tick";
 import { pickField } from "./buyable";
 import { throttle } from "./rate-limit";
@@ -89,8 +90,12 @@ export class KisClient {
     if (!force) {
       const cached = await TradingToken.findOne({ cacheKey: this.cacheKey }).lean();
       if (cached && cached.expiresAt - 600_000 > Date.now()) {
-        this.token = cached.token;
-        return this.token;
+        try {
+          this.token = decryptSecret(cached.token);
+          return this.token;
+        } catch {
+          // 예전에 평문으로 저장된 캐시 (#492) — 캐시 미스로 보고 재발급한다(자가치유).
+        }
       }
     }
     await throttle();
@@ -106,9 +111,11 @@ export class KisClient {
     if (!resp.ok) throw new KisError(`http-${resp.status}`, "토큰 발급 실패");
     const body = (await resp.json()) as Json;
     this.token = String(body.access_token);
+    // 토큰도 암호화해 둔다 (#492) — 자격증명만 암호화하고 토큰을 평문으로 두면
+    // DB 만 털린 경우에 최대 23시간짜리 전체 매매 권한이 그대로 넘어간다.
     await TradingToken.updateOne(
       { cacheKey: this.cacheKey },
-      { $set: { token: this.token, expiresAt: Date.now() + 23 * 3600_000 } },
+      { $set: { token: encryptSecret(this.token), expiresAt: Date.now() + 23 * 3600_000 } },
       { upsert: true },
     );
     return this.token;
