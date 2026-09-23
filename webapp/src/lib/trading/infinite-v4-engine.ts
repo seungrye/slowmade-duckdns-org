@@ -15,7 +15,7 @@ import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
 import { TossClient } from "./toss-client";
 import {
-  absorbIdleCash, emptyPending, newV4State, reconcileDay,
+  absorbIdleCash, emptyPending, mergePending, newV4State, reconcileDay,
   type V4Fill, type V4State,
 } from "./infinite-v4-state";
 import { v4PlanDay, type V4PlannedOrder } from "./v4-plan";
@@ -246,7 +246,7 @@ export async function runInfiniteV4(
   const reinvest = ((portfolio.config ?? {}) as Json).reinvestIdleCash !== false; // 기본 활성
   {
     const before = state.cycleCash;
-    state = absorbIdleCash(state, cash, holding, reinvest);
+    state = absorbIdleCash(state, cash, holding, reinvest, cfg.principal);
     if (state.cycleCash !== before) {
       log(`[v4:${sym}] 유휴현금 반영 cycleCash ${formatMoney(before, market)}→${formatMoney(state.cycleCash, market)}(플랫 — 입금/미투입 흡수)`);
     }
@@ -358,7 +358,9 @@ export async function runInfiniteV4(
     });
   }
 
-  state.pending = pend;
+  // 국장 2단계(sell 09:30 / buy 15:20)는 하루의 예약을 나눠 적는다 — buy 가 통째로 덮으면
+  // sell 의 q75(¾ 익절)가 사라져 다음 날 대사가 그 체결을 q25 로 잘못 읽는다 (#483).
+  state.pending = mergePending(state.pending, pend, phase);
   // 왜 '어제'인가: LOC 주문은 그날 종가에 체결돼 체결일 == 실행일(today)이 된다. 대사 필터는
   // `lastRunDate < date < today`(양쪽 strict)라, lastRunDate=today 로 남기면 다음 실행의
   // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를

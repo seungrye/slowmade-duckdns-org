@@ -36,14 +36,44 @@ export function newV4State(symbol: string, splits: number, principal: number): V
 }
 
 /** 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션이 **플랫(holding===0)** 일 때만, 계좌 가용현금이
- *  사이클 장부(cycleCash)보다 크면 cycleCash 를 계좌현금으로 재시드한다(사이클 경계/최초 진입 전).
- *  플랫 시점엔 포지션이 없어 계좌현금=이 종목의 가용 드라이파우더이므로 이중반영·상한위반 없이 안전.
- *  보유 중(holding>0)엔 손대지 않음(진행 사이클의 분할 스케줄 보호). enabled=false 면 무변경. 순수(불변). */
-export function absorbIdleCash(state: V4State, accountCash: number, holding: number, enabled: boolean): V4State {
-  if (enabled && holding === 0 && Number.isFinite(accountCash) && accountCash > state.cycleCash) {
-    return { ...state, cycleCash: accountCash };
-  }
-  return state;
+ *  사이클 장부(cycleCash)보다 크면 cycleCash 를 끌어올린다(사이클 경계/최초 진입 전).
+ *  보유 중(holding>0)엔 손대지 않음(진행 사이클의 분할 스케줄 보호). enabled=false 면 무변경.
+ *
+ *  **상한 = max(principal, cycleCash)** (#485). 예전엔 상한이 없어서 플랫이 되는 순간
+ *  `cycleCash = 계좌현금` 이었다 — config 에 원금을 적어 둬도 계좌에 있는 돈을 전부 다음 사이클
+ *  원금으로 삼았다는 뜻이고, 다른 용도의 입금이 섞여 있으면 그대로 물린다. 이제:
+ *    - 장부 < 원금: 원금까지 채운다(현금 드래그 제거라는 원래 의도는 그대로)
+ *    - 장부 > 원금: 복리로 제 힘에 불린 몫이라 그 장부가 상한 — 계좌에 더 있어도 안 집는다
+ *    - 계좌현금 < 상한: 계좌현금까지만 — 없는 돈을 있다고 하지 않는다
+ *  순수(불변). */
+export function absorbIdleCash(
+  state: V4State, accountCash: number, holding: number, enabled: boolean, principal: number,
+): V4State {
+  if (!enabled || holding !== 0 || !Number.isFinite(accountCash)) return state;
+  const base = Number.isFinite(principal) ? principal : state.cycleCash;
+  const next = Math.min(accountCash, Math.max(base, state.cycleCash));
+  return next > state.cycleCash ? { ...state, cycleCash: next } : state;
+}
+
+/**
+ * phase 로 나뉜 하루의 예약(pending) 합치기 (#483).
+ *
+ * 국장 v4 는 하루가 두 사이클이다 — 09:30 `sell` 이 ¾ 익절 지정가(q75)를, 15:20 `buy` 가
+ * ¼ 별지점 LOC(q25)·매수 레그를 낸다(LOC 가 없어 두 시점으로 에뮬). 그런데 phase 마다
+ * pending 을 새로 만들어 통째로 저장하면 **나중에 도는 buy 가 sell 의 q75 를 0 으로 덮는다.**
+ *
+ * 그러면 다음 날 `reconcileDay` 가 매도 종류를 **수량으로** 가릴 때 q75 분기를 놓치고,
+ * `soldQty(¾) >= q25(¼)` 는 언제나 참이라 T 를 ×0.25 대신 ×0.75 한다. T 가 커지면
+ * 1회매수금이 커지고 별지점이 낮아진다 — 두 방향 다 틀린 쪽이다.
+ *
+ * 그래서 buy 는 자기가 만들지 않는 칸(q75·reverseFirst)을 앞 phase 것으로 이어받는다.
+ * both(미장)·sell 은 하루의 시작이라 이어받을 앞 phase 가 없다. 순수(불변).
+ */
+export function mergePending(
+  prev: V4Pending, next: V4Pending, phase: "both" | "sell" | "buy",
+): V4Pending {
+  if (phase !== "buy") return next;
+  return { ...next, q75: prev.q75, reverseFirst: prev.reverseFirst };
 }
 
 export type V4Fill = { side: "buy" | "sell"; qty: number; price: number };
