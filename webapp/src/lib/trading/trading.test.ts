@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
-import { isDue, marketClock } from "./scheduler";
+import { canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
 import { valueHoldings } from "./close-sync";
 
@@ -176,5 +176,53 @@ describe("close-sync valueHoldings — 현재가 실패 원가 폴백", () => {
   });
   it("보유 없음: 0·failRatio 0(0나눗셈 안전)", () => {
     expect(valueHoldings({}, () => 1)).toMatchObject({ hv: 0, failRatio: 0 });
+  });
+});
+
+// #487 — 일시 오류로 실패한 사이클은 그날 다시 돌아야 한다. 단, **주문이 이미 나갔으면 안 된다** —
+// engines.ts 의 execute() 는 취소 단계가 없어 재실행하면 중복 주문이 난다.
+describe("scheduler.canRetryRun — 실패한 사이클 재시도 가늠(순수)", () => {
+  const failed = (over: Record<string, unknown> = {}) => ({ status: "failed", attempts: 0, ...over });
+
+  it("실패 + 실주문 0건 + 재시도 여유 → 다시 잡는다", () => {
+    expect(canRetryRun(failed(), 0)).toBe(true);
+  });
+  it("실주문이 한 건이라도 나갔으면 안 잡는다(중복 주문 방지)", () => {
+    expect(canRetryRun(failed(), 1)).toBe(false);
+  });
+  it("재시도 상한에 닿으면 안 잡는다(설정 오류로 하루 종일 돌지 않게)", () => {
+    expect(canRetryRun(failed({ attempts: 2 }), 0, 2)).toBe(false);
+    expect(canRetryRun(failed({ attempts: 1 }), 0, 2)).toBe(true);
+  });
+  it("attempts 가 없는 옛 문서는 0 으로 본다", () => {
+    expect(canRetryRun({ status: "failed" }, 0)).toBe(true);
+  });
+  it("성공했거나 아직 도는 중이면 안 잡는다", () => {
+    expect(canRetryRun(failed({ status: "done" }), 0)).toBe(false);
+    expect(canRetryRun(failed({ status: "running" }), 0)).toBe(false);
+  });
+  // 원장 조회 전 싼 가드 — 매 틱 countDocuments 를 때리지 않으려는 것.
+  it("mayRetryRun 은 주문 원장 없이 status·attempts 만으로 거른다", () => {
+    expect(mayRetryRun({ status: "failed", attempts: 0 })).toBe(true);
+    expect(mayRetryRun({ status: "done" })).toBe(false);
+    expect(mayRetryRun({ status: "running" })).toBe(false);
+    expect(mayRetryRun({ status: "failed", attempts: 2 }, 2)).toBe(false);
+  });
+});
+
+// #488 — run-now 는 **실제로 도는** 사이클을 보여줘야 한다. 예전엔 기본 main → v4 에서 both 로
+// 매핑돼, 국장(sell/buy 2단계)은 돌지도 않는 계획을 냈다.
+describe("scheduler.firstTradingPhase — run-now 기본 phase", () => {
+  it("국장 v4 는 sell(09:30) — both 가 아니다", () => {
+    expect(firstTradingPhase({ strategy: "infinite_v4", market: "kr", runAt: "09:30" })).toBe("sell");
+  });
+  it("미장 v4 는 both", () => {
+    expect(firstTradingPhase({ strategy: "infinite_v4", market: "us", runAt: "09:35" })).toBe("both");
+  });
+  it("그 외 전략은 main", () => {
+    expect(firstTradingPhase({ strategy: "value_rebalancing", market: "us", runAt: "10:50" })).toBe("main");
+  });
+  it("마감(close)은 매매가 아니라 고르지 않는다", () => {
+    expect(firstTradingPhase({ strategy: "lrs_v1", market: "us", runAt: "09:35" })).not.toBe("close");
   });
 });

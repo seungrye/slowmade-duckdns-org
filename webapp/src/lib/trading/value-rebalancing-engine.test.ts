@@ -20,6 +20,7 @@ vi.mock("./engines", () => ({ marketToday: () => "20260722" }));
 
 import { runValueRebalancing } from "./value-rebalancing-engine";
 import type { V4Broker } from "./infinite-v4-engine";
+import { discardState } from "./state-saver";
 
 type Fill = { date: string; side: "buy" | "sell"; qty: number; price: number };
 const placeSpy = vi.fn(async () => "ORDER1");
@@ -115,5 +116,27 @@ describe("VR 엔진 — 사이클 경계·게이트", () => {
     await run(fakeBroker({ holding: 0, price: 100, cash: 10000 }), CFG, undefined, true);
     expect(placeSpy).toHaveBeenCalledTimes(1);
     expect(orderLogs[0]).toMatchObject({ dryRun: false, orderNo: "ORDER1" });
+  });
+});
+
+// #488 — VR 이 특히 위험하다. sinceCycle += 1 이 무조건 돌고 그대로 저장돼,
+// 설정 검증용 버튼을 누를 때마다 사이클 경계가 앞당겨진다.
+describe("VR 엔진 — 일회성 실행(run-now)은 장부를 건드리지 않는다", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 9, cumBuy: 8500, cumSell: 0, lastRunDate: "20260721" };
+  const once = (saveState?: unknown) => runValueRebalancing(
+    acct(false) as never, pf(CFG, { vr: seeded }) as never, "run1" as never,
+    fakeBroker({ holding: 85, price: 100, cash: 1500 }), () => {}, saveState as never,
+  );
+
+  it("기본(스케줄 사이클)은 종전대로 저장한다", async () => {
+    await once();
+    expect(persisted).toHaveLength(1);
+  });
+  it("discardState 를 주면 여러 번 눌러도 sinceCycle 이 안 오른다", async () => {
+    await once(discardState);
+    await once(discardState);
+    expect(persisted).toHaveLength(0);
+    expect(seeded.sinceCycle).toBe(9); // 원본도 그대로
   });
 });

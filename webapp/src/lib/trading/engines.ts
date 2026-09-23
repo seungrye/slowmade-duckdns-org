@@ -14,7 +14,8 @@ import { lrsDecide, rotationDecide, trendDecide, type OrderIntent } from "./stra
 import { TossClient } from "./toss-client";
 import { UNIVERSES, EXCD_MAPS } from "./universes";
 import TradingOrderLog from "@/models/trading-order-log";
-import TradingPortfolio from "@/models/trading-portfolio";
+// 상태 쓰기는 state-saver 한 곳으로만 나간다 (#488) — 엔진이 모델을 직접 부르지 않는다.
+import { discardState, savePortfolioState, type StateSaver } from "./state-saver";
 import { formatMoney } from "@/lib/format";
 import type { TradingAccountType } from "@/models/trading-account";
 import type { TradingPortfolioType } from "@/models/trading-portfolio";
@@ -191,6 +192,7 @@ async function runLrs(
 
 async function runRotation(
   account: AccountDoc, p: PortfolioDoc, runId: Types.ObjectId, broker: LiveBroker, log: CycleLogger,
+  saveState: StateSaver,
 ): Promise<string> {
   const cfg = p.config as Cfg;
   const signal = String(cfg.signal ?? (p.market === "kr" ? "069500" : "QQQ"));
@@ -236,7 +238,7 @@ async function runRotation(
       else log(`[rotation] 후보 자동선발${saved.length ? " — 구성 유지" : "(초기)"}: ${newPool.join(",")}`);
       pool = changed ? newPool : saved;
       if (changed) {
-        await TradingPortfolio.updateOne({ _id: p._id }, { $set: { "state.autoPool": newPool } });
+        await saveState({ "state.autoPool": newPool });
       }
     }
   }
@@ -286,7 +288,7 @@ async function runRotation(
   }
   const { executed } = await execute(account, p, runId, intents, broker, log);
   if (d.rebalanced) {
-    await TradingPortfolio.updateOne({ _id: p._id }, { $set: { "state.lastRebalance": today } });
+    await saveState({ "state.lastRebalance": today });
   }
   return `rotation: ${d.action} · 신호 ${executed}건`;
 }
@@ -369,7 +371,11 @@ async function runTrend(
 export async function runPortfolioCycle(
   account: AccountDoc, portfolio: PortfolioDoc, runId: Types.ObjectId, log: CycleLogger,
   phase: "main" | "both" | "sell" | "buy" | "close" = "main",
+  // ephemeral: 설정 검증용 일회성 실행(run-now) — 주문도 상태도 남기지 않는다 (#488).
+  // 스케줄 사이클은 dry-run 이라도 상태를 쌓아야 한다(모의 운용이 얼지 않게) → 기본 false.
+  opts: { ephemeral?: boolean } = {},
 ): Promise<string> {
+  const saveState = opts.ephemeral ? discardState : savePortfolioState(portfolio._id);
   if (phase === "close") {
     const { runCloseSync } = await import("./close-sync");
     return runCloseSync(account as never, portfolio as never, runId, log);
@@ -388,7 +394,7 @@ export async function runPortfolioCycle(
       ? makeV4TossBroker(makeTossClient(account), market, account._id)
       : makeV4KisBroker(makeKisClient(account), market), granted);
     const v4Phase = phase === "main" ? "both" : phase;
-    return runInfiniteV4(account, portfolio, runId, v4Broker, v4Phase, log);
+    return runInfiniteV4(account, portfolio, runId, v4Broker, v4Phase, log, saveState);
   }
   if (portfolio.strategy === "value_rebalancing") {
     // VR 도 v4 의 V4Broker 어댑터를 재사용(snapshot·executions·place — KIS·토스 자동)
@@ -398,14 +404,14 @@ export async function runPortfolioCycle(
     const vrBroker = capV4Broker(account.broker === "toss"
       ? makeV4TossBroker(makeTossClient(account), market, account._id)
       : makeV4KisBroker(makeKisClient(account), market), granted);
-    return runValueRebalancing(account, portfolio, runId, vrBroker, log);
+    return runValueRebalancing(account, portfolio, runId, vrBroker, log, saveState);
   }
   const broker = capLiveBroker(makeBroker(account, portfolio.market as "kr" | "us"), granted);
   switch (portfolio.strategy) {
     case "lrs_v1":
       return runLrs(account, portfolio, runId, broker, log);
     case "rotation_v1":
-      return runRotation(account, portfolio, runId, broker, log);
+      return runRotation(account, portfolio, runId, broker, log, saveState);
     case "trend_v1":
       return runTrend(account, portfolio, runId, broker, log);
     default:
