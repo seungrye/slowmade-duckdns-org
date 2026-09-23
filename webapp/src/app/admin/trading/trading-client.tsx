@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { LIVE_STRATEGY_IDS, LIVE_STRATEGY_LABEL, isLiveStrategy, type LiveStrategyId } from "@/types/trading";
+import { reservationWarnings } from "@/lib/trading/reservation";
 
 /**
  * 자동매매 설정 — 계정(다수)·포트폴리오 블록·wire 토글·실행 이력.
@@ -11,12 +12,15 @@ import { LIVE_STRATEGY_IDS, LIVE_STRATEGY_LABEL, isLiveStrategy, type LiveStrate
 type Account = {
   id: string; broker: "kis" | "toss"; env: string; name: string; envKey: string;
   liveEnabled: boolean; memo: string; credentials: Record<string, string>;
+  /** 실주문 토글 마지막 변경 (#493). */
+  lastLiveChange?: { at: string; by: string; enabled: boolean } | null;
 };
 type Portfolio = {
   id: string; accountId: string; market: "kr" | "us"; strategy: string; runAt: string;
   weekdaysOnly: boolean; enabled: boolean; config: Record<string, unknown>;
   state: Record<string, unknown>; reservedCash?: number;
 };
+type LastCash = Record<string, { cash: number; asOf: string }>;
 // 설정 이력 한 줄 (#350) — 보기 전용.
 type Revision = {
   version: number; action: "create" | "update" | "delete";
@@ -56,7 +60,7 @@ const DEFAULT_RUN_AT: Record<LiveStrategyId, { kr: string; us: string }> = {
   value_rebalancing: { kr: "15:20", us: "15:50" }, // VR 은 종가 근처(LOC 종가 체결) 실행 권장
 };
 
-type InitialData = { accounts: Account[]; portfolios: Portfolio[]; liveAllowed: boolean };
+type InitialData = { accounts: Account[]; portfolios: Portfolio[]; lastCash?: LastCash; liveAllowed: boolean };
 
 export default function TradingSettingsClient({ initial }: { initial: InitialData }) {
   // SSR 주입 초기값 — 마운트 후 재조회 없음(변이 시에만 reload). ISR 은 부적합:
@@ -64,6 +68,29 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
   const [accounts, setAccounts] = useState<Account[]>(initial.accounts);
   const [portfolios, setPortfolios] = useState<Portfolio[]>(initial.portfolios);
   const [liveAllowed, setLiveAllowed] = useState(initial.liveAllowed);
+  // 계좌 현금은 close-sync 가 매일 적어 둔 마지막 값이다 (#495) — 설정 화면이 KIS 를
+  // 때리지 않으려고 이렇게 한다. 그래서 경고 문구에 기준일을 같이 적는다.
+  // useMemo 로 감싸는 이유: `?? {}` 를 그냥 두면 렌더마다 새 객체가 돼 아래 useMemo 가 매번 다시 돈다.
+  const lastCash = useMemo<LastCash>(() => initial.lastCash ?? {}, [initial.lastCash]);
+
+  // 자금 예약 경고 — 판정은 순수 함수(reservationWarnings)가 한다. 예약을 편집하면
+  // 새로고침 없이 바로 반영된다.
+  const reservationAlerts = useMemo(() => {
+    const out: { label: string; msgs: string[] }[] = [];
+    for (const a of accounts) {
+      for (const market of ["kr", "us"] as const) {
+        const blocks = portfolios.filter((p) => p.accountId === a.id && p.market === market);
+        if (!blocks.length) continue;
+        const c = lastCash[`${a.envKey}:${market === "kr" ? "KRW" : "USD"}`];
+        const msgs = reservationWarnings({
+          blocks: blocks.map((b) => ({ reserved: b.reservedCash ?? 0 })),
+          accountCash: c ? c.cash : null, market, asOf: c?.asOf ?? null,
+        });
+        if (msgs.length) out.push({ label: `${a.envKey} · ${market.toUpperCase()}`, msgs });
+      }
+    }
+    return out;
+  }, [accounts, portfolios, lastCash]);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -272,6 +299,11 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                   >
                     {a.liveEnabled ? "LIVE ON" : "dry-run"}
                   </button>
+                  {a.lastLiveChange && (
+                    <span className="text-[11px] text-gray-400" title={`${a.lastLiveChange.by} 가 바꿈`}>
+                      {a.lastLiveChange.enabled ? "켬" : "끔"} {a.lastLiveChange.at.slice(0, 16).replace("T", " ")}
+                    </span>
+                  )}
                   <button onClick={() => removeAccount(a)} className="text-xs text-red-500 cursor-pointer hover:underline hover:text-red-600">삭제</button>
                 </div>
               </div>
@@ -311,6 +343,16 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
       {/* 포트폴리오 블록 */}
       <section>
         <h2 className="text-lg font-semibold mb-2">포트폴리오 (계정×시장, {portfolios.length})</h2>
+        {reservationAlerts.length > 0 && (
+          <div className="mb-3 space-y-1">
+            {reservationAlerts.flatMap((w) =>
+              w.msgs.map((m, i) => (
+                <p key={`${w.label}-${i}`} className="text-xs text-amber-700 dark:text-amber-400">
+                  ⚠ <b>{w.label}</b> — {m}
+                </p>
+              )))}
+          </div>
+        )}
         <ul className="space-y-2 mb-4">
           {portfolios.map((p) => {
             const acct = accounts.find((a) => a.id === p.accountId);

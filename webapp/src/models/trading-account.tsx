@@ -28,6 +28,19 @@ const TradingAccountSchema = new Schema(
     envKey: { type: String, required: true, unique: true },
     credentials: { type: Schema.Types.Mixed, required: true }, // {필드: 암호화블롭}
     liveEnabled: { type: Boolean, default: false },
+    /**
+     * 실주문 스위치 변경 이력 (#493). 서버 게이트가 이미 켜져 있으면 이 토글이 주문의
+     * 마지막 관문인데, 예전엔 누가 언제 켰는지 아무 데도 안 남았다. 값이 실제로 바뀔 때만
+     * 쌓이고 상한은 50(`lib/trading/live-audit.ts`).
+     */
+    liveLog: {
+      type: [new Schema(
+        { at: { type: Date, required: true }, by: { type: String, default: "" },
+          enabled: { type: Boolean, required: true } },
+        { _id: false },
+      )],
+      default: [],
+    },
     memo: { type: String, default: "" },
     // 소프트 삭제 — 삭제해도 문서를 지우지 않고 숨긴다. envKey 가 unique 라 같은 envKey 로
     // 재생성 시엔 소프트 삭제된 문서를 재사용(undelete)한다. 조회는 { isDeleted: { $ne: true } }.
