@@ -66,7 +66,7 @@ function buyLadder(
   return orders;
 }
 
-export function v4PlanDay(args: {
+export type V4PlanArgs = {
   mode: "normal" | "reverse";
   t: number;
   avg: number;
@@ -77,7 +77,24 @@ export function v4PlanDay(args: {
   prev5: number[]; // 직전 5거래일 종가(리버스 별지점R)
   reverseFirstDay: boolean;
   cfg: V4PlanConfig;
-}): V4PlannedOrder[] {
+};
+
+/**
+ * 하루 주문 계획. **값이 0 이하인 주문은 내보내지 않는다** (#491).
+ *
+ * 평단이나 참조가가 0 이면(잔고·현재가 응답을 빈 문자열로 파싱한 경우 — `Number("") === 0`)
+ * ¾ 익절이 `avg × 1.10 = 0` 이 돼 **0원 매도**로 나갔다. 국장이면 호가단위 라운딩으로 5원
+ * 지정가가 되고, 시장가 아래 지정가 매도는 기존 매수호가에 체결되므로 보유 전량이 사실상
+ * 시장가로 투매된다.
+ *
+ * 계산이 틀린 게 아니라 **입력이 오염된** 경우다. 규칙을 바꾸면(예: q75 에도 하한을 넣으면)
+ * 갭상승 때 정상 익절까지 죽으므로, 규칙은 두고 산출물에서 거른다.
+ */
+export function v4PlanDay(args: V4PlanArgs): V4PlannedOrder[] {
+  return planDay(args).filter((o) => o.price > 0 && o.qty >= 1);
+}
+
+function planDay(args: V4PlanArgs): V4PlannedOrder[] {
   const { mode, t, avg, holding, cash, refPrice, cfg } = args;
   const orders: V4PlannedOrder[] = [];
   const floorP = refPrice * (1 - BROKER_GAP);

@@ -174,3 +174,41 @@ describe("runInfiniteV4 — 일회성 실행은 상태를 남기지 않는다", 
     expect(persisted).toHaveLength(0);
   });
 });
+
+// #491 — 오염된 입력은 조용히 넘기지 말고 실패시킨다. 그래야 #487 재시도가 걸리고
+// 실패 메일이 나간다. 예전엔 price=0 이면 매도 0건으로 "done" 이 돼 결번이 안 보였다.
+describe("runInfiniteV4 — 오염된 입력은 사이클을 실패시킨다", () => {
+  const CFG = { symbol: "069500", principal: 10_000_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const state: V4State = {
+    ...newV4State("069500", 20, 10_000_000), t: 6.93, cycleCash: 6_000_000, lastRunDate: "20260921",
+  };
+  const brokerOf = (o: { holding: number; avg: number; price: number }): V4Broker => ({
+    snapshot: async () => ({ ...o, cash: 6_000_000 }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {}, place: async () => "ORD1",
+  });
+  const call = (o: { holding: number; avg: number; price: number }) => runInfiniteV4(
+    { _id: "acc1", envKey: "paper-1", liveEnabled: false } as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
+    "run1" as never, brokerOf(o), "sell", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; });
+
+  it("현재가가 0 이면 던진다(장 마감·휴장 응답)", async () => {
+    await expect(call({ holding: 32, avg: 100_000, price: 0 })).rejects.toThrow(/현재가/);
+  });
+  it("보유가 있는데 평단이 0 이면 던진다(빈 응답 파싱)", async () => {
+    await expect(call({ holding: 32, avg: 0, price: 110_000 })).rejects.toThrow(/평단/);
+  });
+  it("실패한 사이클은 상태를 남기지 않는다", async () => {
+    await call({ holding: 32, avg: 0, price: 110_000 }).catch(() => {});
+    expect(persisted).toHaveLength(0);
+  });
+  it("보유 0 + 평단 0 은 정상이다(진입 전) — 던지지 않는다", async () => {
+    await expect(call({ holding: 0, avg: 0, price: 110_000 })).resolves.toContain("V4");
+  });
+  it("정상 입력은 종전대로 돈다", async () => {
+    await expect(call({ holding: 32, avg: 100_000, price: 110_000 })).resolves.toContain("V4");
+  });
+});
