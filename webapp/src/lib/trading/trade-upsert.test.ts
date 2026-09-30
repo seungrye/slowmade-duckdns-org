@@ -47,10 +47,11 @@ describe('buildTradeUpsertOp', () => {
     expect(a.filter((k) => b.includes(k))).toEqual([]);
   });
 
-  it('필터는 env+ticker+정규화된 time 이고 upsert 다', () => {
+  // action 은 #502 에서 키에 들어왔다 — 같은 종목·같은 초의 매수·매도가 서로 덮지 않게.
+  it('필터는 env+ticker+정규화된 time+action 이고 upsert 다', () => {
     const op = buildTradeUpsertOp(rec());
     expect(op.updateOne.filter).toEqual({
-      env: 'paper-50194613', ticker: 'SOXL', time: expect.anything(),
+      env: 'paper-50194613', ticker: 'SOXL', time: expect.anything(), action: expect.anything(),
     });
     expect(op.updateOne.upsert).toBe(true);
   });
@@ -115,5 +116,29 @@ describe('buildTradeUpsertOp — portfolioId 타입 (#384)', () => {
   it('ObjectId 로 볼 수 없는 값은 손대지 않는다 — 조용히 바꿔치기하지 않는다', () => {
     const op = buildTradeUpsertOp(rec({ portfolioId: 'not-an-object-id' }));
     expect(op.updateOne.update.$set.portfolioId).toBe('not-an-object-id');
+  });
+});
+
+// #502 — 멱등키에 action 이 없어 같은 종목·같은 초의 매수·매도 중 한 건이 덮여 사라졌다.
+// 누적손익은 stocktrades 를 입력으로 계산하므로(#500 이후 전체 원장이 진실 원천), 매수 기록이
+// 사라지면 그 물량의 원가가 사라지고 이후 매도의 평단이 틀어진다.
+describe("buildTradeUpsertOp — 멱등키에 action 이 들어간다 (#502)", () => {
+  const base = { env: "paper-1", ticker: "TQQQ", time: "2026-09-29T15:20:00", qty: 5, price: 100 };
+
+  it("필터에 action 이 포함된다", () => {
+    const op = buildTradeUpsertOp({ ...base, action: "buy" });
+    expect(op.updateOne.filter).toMatchObject({ env: "paper-1", ticker: "TQQQ", action: "buy" });
+  });
+
+  it("같은 (env,ticker,time) 의 매수·매도는 서로 다른 문서를 겨냥한다", () => {
+    const buy = buildTradeUpsertOp({ ...base, action: "buy" });
+    const sell = buildTradeUpsertOp({ ...base, action: "sell" });
+    expect(buy.updateOne.filter).not.toEqual(sell.updateOne.filter);
+  });
+
+  it("같은 키·같은 action 재푸시는 같은 문서를 겨냥한다(멱등성 보존)", () => {
+    const a = buildTradeUpsertOp({ ...base, action: "sell", price: 100 });
+    const b = buildTradeUpsertOp({ ...base, action: "sell", price: 101 });
+    expect(a.updateOne.filter).toEqual(b.updateOne.filter);
   });
 });

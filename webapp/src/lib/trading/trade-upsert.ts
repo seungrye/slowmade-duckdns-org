@@ -18,7 +18,7 @@ type Json = Record<string, unknown>;
 
 export interface TradeUpsertOp {
   updateOne: {
-    filter: { env: unknown; ticker: unknown; time: string };
+    filter: { env: unknown; ticker: unknown; time: string; action: unknown };
     update: { $set: Json; $setOnInsert?: Json };
     upsert: true;
   };
@@ -26,7 +26,15 @@ export interface TradeUpsertOp {
 
 /**
  * 체결 레코드 하나를 bulkWrite 용 updateOne 연산으로 만든다.
- * 고유키는 (env, ticker, time) — ingest API 와 같은 키를 쓴다.
+ * 고유키는 **(env, ticker, time, action)** 이다.
+ *
+ * `action` 은 나중에 들어왔다 (#502). 예전 키 `(env, ticker, time)` 은 close-sync 가
+ * 부분체결을 `ticker|time|side` 로 합산해 **매수·매도 레코드를 각각 만드는데**(side 를 키에
+ * 넣는다) DB 키에는 side 가 없어서, 같은 종목·같은 초의 두 건 중 **나중 것이 앞 것을 덮었다.**
+ * `ord_tmd` 가 초 단위라 해상도가 낮고, 미장 v4 는 매도·매수를 같은 사이클에 낸다.
+ *
+ * 누적손익은 이 원장을 입력으로 계산하므로(#500 이후 전체 원장이 유일한 진실 원천),
+ * 매수 기록이 사라지면 **그 물량의 원가가 사라지고** 이후 매도의 평단이 틀어진다.
  */
 export function buildTradeUpsertOp(record: Json): TradeUpsertOp {
   const { strategy, portfolioId, ...rest } = record;
@@ -54,7 +62,7 @@ export function buildTradeUpsertOp(record: Json): TradeUpsertOp {
   }
   return {
     updateOne: {
-      filter: { env: record.env, ticker: record.ticker, time },
+      filter: { env: record.env, ticker: record.ticker, time, action: record.action },
       update,
       upsert: true,
     },
