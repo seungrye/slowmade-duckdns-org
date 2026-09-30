@@ -11,6 +11,8 @@
 
 import TradingOrderLog from "@/models/trading-order-log";
 import { savePortfolioState, type StateSaver } from "./state-saver";
+import { isStillLive } from "./killswitch";
+import { summarizeRejects } from "./reject-reason";
 import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
 import { TossClient } from "./toss-client";
@@ -366,11 +368,18 @@ export async function runInfiniteV4(
 
   // ── 4) 주문 전송(dry-run 게이트) + 상태 저장 ──
   let accepted = 0, rejected = 0;
+  const rejectMsgs: string[] = [];
   for (const o of orders) {
     let orderNo = "";
     let error = "";
     try {
       if (live) {
+        // **주문 직전 재확인** (#509). live 는 사이클 시작 때 한 번 계산되므로, 킬스위치를
+        // 눌러도 도는 사이클은 계속 주문한다 — VR 은 1초 간격으로 20건 넘게 낸다.
+        if (!(await isStillLive(account._id))) {
+          log(`⛔ 킬스위치 — 남은 주문 중단(${orders.length - accepted - rejected}건 미전송)`);
+          break;
+        }
         orderNo = await broker.place(sym, o);
         accepted++;
         log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, market)} (${o.ordType})`);
@@ -381,6 +390,7 @@ export async function runInfiniteV4(
       // 주문 단위 격리 — 한 건 거부(호가단위 등)가 나머지 주문·상태 저장을 막지 않게.
       rejected++;
       error = e instanceof Error ? e.message : String(e);
+      rejectMsgs.push(error);
       log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${error}`);
     }
     // 거부도 남긴다 (#507). 예전엔 `continue` 로 건너뛰어 **흔적이 0** 이었다 — 6영업일간
@@ -427,9 +437,19 @@ export async function runInfiniteV4(
   // 모니터링에 남는다. ⚠ dry-run 은 애초에 place() 를 안 부르므로 반드시 live 로 게이트한다
   // (안 그러면 모든 검증 실행이 failed 로 찍히고 #487 재시도까지 붙는다).
   if (live && orders.length > 0 && accepted === 0) {
-    throw new Error(
-      `${sym}[${phase}]: 주문 ${orders.length}건이 전부 거부됐다 — 접수 0건. `
-      + `익절·사다리가 통째로 빠졌다(마지막 사유는 위 로그 참조)`);
+    // **거부 사유를 분류해서 말한다** (#509). 휴장일이면 조치할 게 없고, 계좌 문제면 사람이
+    // 증권사에서 고쳐야 매일 반복이 멈춘다 — 같은 "전량 거부" 라도 할 일이 전혀 다르다.
+    const why = summarizeRejects(rejectMsgs);
+    const 내역 = Object.entries(why.counts).map(([k, n]) => `${k} ${n}건`).join(" · ");
+    const line2 = `${sym}[${phase}]: 주문 ${orders.length}건 전부 거부 — 접수 0건 [${내역}]\n`
+      + `${why.advice}\n마지막 사유: ${rejectMsgs[rejectMsgs.length - 1] ?? "(없음)"}`;
+    if (!why.needsAction) {
+      // 사람이 할 일이 없으면 사이클을 실패로 만들지 않는다 — 휴장일마다 가짜 경보가 쌓이면
+      // 진짜 신호가 묻힌다. 로그에는 남겨서 나중에 추적할 수 있게 한다.
+      log(`ℹ ${line2}`);
+      return line;
+    }
+    throw new Error(line2);
   }
   return line;
 }

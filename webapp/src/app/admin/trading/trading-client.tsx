@@ -245,6 +245,23 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     }
   };
 
+  // 되돌리기 어려운 동작이라 두 번 묻는다 — 취소는 주문당 ~1초라 시간이 걸린다.
+  const killAll = async () => {
+    if (!confirm("모든 계정의 실주문을 끄고 오늘 낸 주문을 취소합니다.\n계속할까요?")) return;
+    setBusy(true);
+    setMsg("비상 정지 중… 신규 주문은 이미 차단됐습니다. 취소는 주문당 1초쯤 걸립니다.");
+    try {
+      const r = await fetch("/api/my/trading/kill", { method: "POST" });
+      const d = await r.json();
+      setMsg(`정지 완료 — 차단 ${d.disabled?.length ?? 0}계정 · `
+        + `취소 ${d.cancelled?.length ?? 0}/${d.scanned ?? 0}건`
+        + (d.failed?.length ? ` · ⚠ 실패 ${d.failed.length}건` : ""));
+      await reload();
+    } catch (e) {
+      setMsg(`정지 실패 — ${e instanceof Error ? e.message : e}. 증권사 앱에서 직접 확인하세요.`);
+    } finally { setBusy(false); }
+  };
+
   const runNow = async (portfolioId: string) => {
     setBusy(true);
     setMsg("dry-run 실행 중…(시세 조회로 수십 초 걸릴 수 있음)");
@@ -272,6 +289,23 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
           모드와 무관하게 항상 dry. 시크릿은 암호화 저장·마스킹 표시.
         </p>
         {msg && <p className="text-sm text-amber-600 mt-2">{msg}</p>}
+      </div>
+
+      {/* 킬스위치 (#509) — 실주문을 즉시 끊고 오늘 낸 지정가·LOC 를 거둔다. */}
+      <div className="mb-4 p-3 border border-red-300 dark:border-red-800 rounded bg-red-50 dark:bg-red-950/30">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm">
+            <b className="text-red-700 dark:text-red-400">비상 정지</b>
+            <span className="text-gray-600 dark:text-gray-400 ml-2">
+              모든 계정의 실주문을 끄고, <b>우리가 오늘 낸</b> 지정가·LOC 를 취소합니다.
+              (계좌 전체 미체결이 아니라 주문 원장 기준 — 직접 내신 주문은 안 건드립니다)
+            </span>
+          </div>
+          <button onClick={killAll} disabled={busy}
+            className="text-sm px-3 py-1.5 rounded bg-red-600 text-white font-semibold cursor-pointer hover:bg-red-700 active:scale-95 transition disabled:opacity-50 shrink-0">
+            {busy ? "처리 중…" : "전체 정지 · 주문 취소"}
+          </button>
+        </div>
       </div>
 
       {/* 계정 목록 */}
