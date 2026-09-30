@@ -404,3 +404,58 @@ describe("runInfiniteV4 — 거부 사유별로 다르게 다룬다 (#509)", () 
     expect(String(orderLogs[0].reason)).toContain("40910001");
   });
 });
+
+// #515 — 계좌를 옮기면 state 가 초기화되고 lastRunDate 가 빈 문자열이 된다. 그러면
+// `start = 오늘−14일` 이 되고 필터 `"" < f.date` 는 그 14일을 전부 통과시킨다.
+// 새 계좌의 **우리와 무관한 체결**이 reconcileDay 에 들어가 cycleCash 만 깎는다
+// (갓 만든 상태는 entryLimit=0·pending.one=0 이라 T 증가 분기가 전부 false).
+//
+// 새 상태에는 대사할 '우리 체결'이 없다. 조회 자체를 하지 않는 게 맞다.
+describe("infinite-v4-engine — 새 상태(lastRunDate 없음)는 대사하지 않는다 (#515)", () => {
+  const CFG = { symbol: "TQQQ", principal: 10_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-new", liveEnabled: false };
+
+  const makeBroker = (execs: { date: string; side: "buy" | "sell"; qty: number; price: number }[],
+                      seen: string[]): V4Broker => ({
+    snapshot: async () => ({ holding: 0, avg: 0, price: 100, cash: 10_000 }),
+    historyLong: async () => [],
+    executions: async (_s, start) => { seen.push(start); return execs; },
+    openOrders: async () => [],
+    cancel: async () => {},
+    place: async () => "ORD1",
+  });
+
+  const run = (state: V4State, b: V4Broker) =>
+    runInfiniteV4(
+      account as never,
+      { _id: "pf1", market: "us", strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
+      "run1" as never, b, "both", () => {},
+    );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("체결 조회를 아예 하지 않는다 — 옮겨 온 계좌의 남의 체결을 긁지 않는다", async () => {
+    const seen: string[] = [];
+    await run(newV4State("TQQQ", 20, 10_000), makeBroker([], seen));
+    expect(seen).toEqual([]);
+  });
+
+  it("새 계좌에 무관한 체결이 있어도 cycleCash 가 안 깎인다", async () => {
+    const seen: string[] = [];
+    const b = makeBroker([
+      { date: "20260915", side: "buy", qty: 10, price: 50 },   // 사람이 손매매한 것
+      { date: "20260916", side: "buy", qty: 10, price: 50 },
+    ], seen);
+    await run(newV4State("TQQQ", 20, 10_000), b);
+    const saved = persisted.at(-1) as V4State | undefined;
+    expect(saved?.cycleCash).toBe(10_000); // 1,000 안 깎임
+    expect(saved?.t).toBe(0);
+  });
+
+  it("lastRunDate 가 있으면 종전대로 그 날짜부터 대사한다 — 회귀 방지", async () => {
+    const seen: string[] = [];
+    const state: V4State = { ...newV4State("TQQQ", 20, 10_000), lastRunDate: "20260920" };
+    await run(state, makeBroker([], seen));
+    expect(seen).toEqual(["20260920"]);
+  });
+});

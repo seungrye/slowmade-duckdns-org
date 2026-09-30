@@ -15,9 +15,11 @@ type Env = string;
 type Currency = "KRW" | "USD";
 
 export default function PortfolioChartClient({ initialData, envs = ["paper", "real"], tabs }:
-  { initialData?: PortfolioResponse; envs?: string[]; tabs?: { env: string; currency: Currency }[] }) {
-  // 탭 조합 — tabs(숨김 아닌 기록이 실존하는 (env,currency)) 우선. 없으면 envs × [KRW,USD] 폴백(하위호환).
-  const combos = tabs && tabs.length
+  { initialData?: PortfolioResponse; envs?: string[];
+    tabs?: { env: string; currency: Currency; archived?: boolean }[] }) {
+  // 탭 조합 — tabs(살아있는 블록 ∪ 기록이 있는 조합, #515) 우선.
+  // 없으면 envs × [KRW,USD] 폴백(하위호환).
+  const combos: { env: string; currency: Currency; archived?: boolean }[] = tabs && tabs.length
     ? tabs
     : envs.flatMap((e) => (["KRW", "USD"] as const).map((c) => ({ env: e, currency: c })));
   const router = useRouter();
@@ -114,9 +116,11 @@ export default function PortfolioChartClient({ initialData, envs = ["paper", "re
     <div>
       {/* env × currency 탭 */}
       <div {...tabScroll} className="flex flex-nowrap gap-2 border-b mb-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
-        {combos.map(({ env: e, currency: c }) => {
+        {combos.map(({ env: e, currency: c, archived }) => {
             const active = env === e && currency === c;
-            const label = `${envLabel(e)} · ${c === "KRW" ? "국장" : "미장"}`;
+            // 보관 = 기록은 있는데 살아있는 블록이 없는 조합(계좌를 옮겼거나 블록을 지웠다).
+            // 표시가 없으면 "지금도 돌고 있다" 로 읽힌다 (#515).
+            const label = `${envLabel(e)} · ${c === "KRW" ? "국장" : "미장"}${archived ? " · 보관" : ""}`;
             return (
               <button
                 key={`${e}-${c}`}

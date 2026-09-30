@@ -16,7 +16,10 @@ const { Schema, model, models } = mongoose;
  */
 const PortfolioHistorySchema = new Schema(
   {
-    env: { type: String, required: true, enum: ["paper", "real"], index: true },
+    // env 에는 **계정 envKey**(예: "paper-50194613")가 들어간다 — close-sync 가
+    // `env: account.envKey` 로 쓴다. enum: ["paper","real"] 은 거짓이었고, upsert 는
+    // validator 를 안 돌려서 안 터졌을 뿐이다. 옛 단일계정 기록은 "paper"/"real" 이다 (#515).
+    env: { type: String, required: true, index: true },
     currency: { type: String, required: true, default: "KRW", index: true },
     date: { type: String, required: true }, // ISO
     dateStr: { type: String, required: true, index: true }, // YYYY-MM-DD

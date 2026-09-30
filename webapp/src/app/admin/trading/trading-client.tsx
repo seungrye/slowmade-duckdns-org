@@ -211,6 +211,20 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
   };
 
   const savePortfolio = async () => {
+    // 계좌를 바꿔 저장하는가 (#515). 바꾸면 전략 상태(T·장부현금·예약)가 archive 로 가고
+    // 새 계좌에서 1회차부터 다시 시작한다 — 되돌릴 수 있지만 모르고 하면 안 된다.
+    const cur = pEditing ? portfolios.find((x) => x.id === pEditing) : null;
+    const moving = !!cur && !!pAccount && cur.accountId !== pAccount;
+    if (moving) {
+      const to = accounts.find((a) => a.id === pAccount);
+      if (!confirm(
+        `이 블록을 [${accounts.find((a) => a.id === cur!.accountId)?.envKey ?? "?"}] →`
+        + ` [${to?.envKey ?? "?"}] 로 옮깁니다.\n\n`
+        + `· 전략 상태(회차·장부현금·예약)가 보관되고 새 계좌에서 1회차부터 시작합니다\n`
+        + `· 옛 계좌의 보유·미체결은 그대로 남습니다 — 직접 정리하세요\n`
+        + `· 대상 계좌 실주문: ${to?.liveEnabled ? "켜짐(LIVE)" : "꺼짐(dry-run)"}\n\n계속할까요?`,
+      )) return;
+    }
     setBusy(true);
     setMsg("");
     try {
@@ -225,6 +239,8 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           ...(pEditing ? { portfolioId: pEditing } : {}),
+          // 계좌 이동은 **명시 의도**로만 (#515) — 안 그러면 활성 토글까지 이동이 된다.
+          ...(moving ? { moveAccount: true } : {}),
           accountId: pAccount, market: pMarket, strategy: pStrategy,
           runAt: pRunAt, config,
           reservedCash: Number(pReserved) || 0,
@@ -476,13 +492,20 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
           <div className="flex gap-2 flex-wrap">
             <select value={pAccount} onChange={(e) => setPAccount(e.target.value)} className={inputCls + " !w-52"}>
               <option value="">계정 선택…</option>
-              {accounts.map((a) => <option key={a.id} value={a.id}>{a.envKey}</option>)}
+              {/* LIVE 표시 — dry 계좌 블록을 실주문 계좌로 옮기면 그 순간 무장된다 (#515) */}
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.envKey}{a.liveEnabled ? " · LIVE" : ""}</option>
+              ))}
             </select>
-            <select value={pMarket} onChange={(e) => {
+            {/* 편집 중엔 시장을 못 바꾼다 (#515) — 예전엔 runAt 만 저장돼 실행 시각이
+                조용히 옮겨졌다(미장 블록이 09:30 을 ET 로). 서버도 400 으로 거절한다. */}
+            <select value={pMarket} disabled={!!pEditing}
+              title={pEditing ? "시장은 편집으로 못 바꿉니다 — 새 블록으로 만드세요" : undefined}
+              onChange={(e) => {
               const m = e.target.value as "kr" | "us";
               setPMarket(m);
               setPRunAt(DEFAULT_RUN_AT[pStrategy]?.[m] ?? (m === "kr" ? "09:05" : "09:35"));
-            }} className={inputCls + " !w-24"}>
+            }} className={inputCls + " !w-24" + (pEditing ? " opacity-50" : "")}>
               <option value="us">미장</option>
               <option value="kr">국장</option>
             </select>

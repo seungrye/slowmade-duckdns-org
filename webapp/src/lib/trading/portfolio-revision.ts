@@ -7,11 +7,15 @@
 // 여기는 DB 를 모른다 — 무엇이 설정이고 무엇이 바뀌었는지만 판단한다.
 
 /** 리비전에 담는 것 = 사람이 정하는 값. 엔진이 정하는 값은 여기 없다. */
+// accountId 가 여기 있어야 **계좌 이동이 이력에 남는다** (#515). 없을 땐 계좌만 바꾼
+// 저장이 changed=[] 가 되어 리비전이 아예 안 만들어졌다 — 가장 파괴적인 변경(계좌 교체 +
+// 상태 아카이브)이 감사 흔적 0건으로 지나갔다.
 export const SETTING_KEYS = [
-  "market", "strategy", "runAt", "weekdaysOnly", "enabled", "reservedCash", "config",
+  "accountId", "market", "strategy", "runAt", "weekdaysOnly", "enabled", "reservedCash", "config",
 ] as const;
 
 export interface PortfolioSettings {
+  accountId: string;
   market: string;
   strategy: string;
   runAt: string;
@@ -30,6 +34,7 @@ export interface PortfolioSettings {
  */
 export function snapshotOf(doc: Record<string, unknown>): PortfolioSettings {
   return {
+    accountId: String(doc.accountId ?? ""),
     market: String(doc.market ?? ""),
     strategy: String(doc.strategy ?? ""),
     runAt: String(doc.runAt ?? ""),
