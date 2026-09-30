@@ -426,3 +426,41 @@ describe("리비전 — 계좌 이동이 이력에 남는다 (#515)", () => {
     expect(rev.snapshot.accountId).toBe("acc-2");
   });
 });
+
+// #519 ① — 예약현금(reservedCash)은 UI 가 "이 블록이 쓸 현금" 이라 설명하는데, v4 는
+// principal 로 사이징한다. 런타임 게이트(엔진)로 초과 매수를 막았지만, **애초에 어긋난
+// 값을 저장하게 두면** 매번 "현금 부족 — 매수 보류" 로 절반만 도는 블록이 된다.
+// 실측: kr 예약 678만 vs principal 1,091만(61% 초과), TQQQ 52,000 vs 93,300(79% 초과).
+describe("POST — 예약현금보다 큰 원금은 저장 안 된다 (#519)", () => {
+  const vr = (over: Record<string, unknown> = {}) => body({
+    strategy: "value_rebalancing",
+    config: { symbol: "SOXL", principal: 8000, gradient: 10 }, ...over,
+  });
+
+  it("principal 이 예약현금보다 크면 400 — 실행 때 매번 잘릴 설정을 저장하지 않는다", async () => {
+    const res = await post(body({ config: { symbol: "TQQQ", principal: 93_300 }, reservedCash: 52_000 }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/예약/);
+  });
+
+  it("같거나 작으면 통과한다", async () => {
+    expect((await post(body({ config: { symbol: "TQQQ", principal: 52_000 }, reservedCash: 52_000 }))).status).toBe(200);
+    expect((await post(body({ config: { symbol: "TQQQ", principal: 10_000 }, reservedCash: 52_000 }))).status).toBe(200);
+  });
+
+  it("예약금 0(전액)이면 검사하지 않는다 — 한도를 안 건 것이다", async () => {
+    expect((await post(body({ config: { symbol: "TQQQ", principal: 999_999 }, reservedCash: 0 }))).status).toBe(200);
+  });
+
+  it("VR 도 같은 규칙", async () => {
+    expect((await post(vr({ reservedCash: 5_000 }))).status).toBe(400);
+    expect((await post(vr({ reservedCash: 10_000 }))).status).toBe(200);
+  });
+
+  it("principal 이 없는 전략(trend)은 영향 없다", async () => {
+    const res = await post(body({
+      strategy: "trend_v1", config: { universe: ["AAPL"] }, reservedCash: 1_000,
+    }));
+    expect(res.status).toBe(200);
+  });
+});
