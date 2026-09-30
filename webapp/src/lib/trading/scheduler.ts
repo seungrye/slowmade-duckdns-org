@@ -105,6 +105,7 @@ type ClaimResult = { runId: string } | null;
  */
 export function canRetryRun(
   run: { status: string; attempts?: number | null },
+  /** **접수된** 실주문 수. 거부 행(orderNo="")은 세지 않는다 (#511). */
   liveOrdersSent: number,
   maxRetries = MAX_RETRIES,
 ): boolean {
@@ -148,7 +149,12 @@ async function claimRun(
     // 일시 오류(KIS 5xx·빈 응답·배포 중 종료)로 실패한 사이클은 그날 다시 잡는다 (#487).
     // 주문이 이미 나갔으면 잡지 않는다 — 판단 근거는 KIS 가 아니라 우리 주문 원장이다.
     if (!mayRetryRun(existing)) return null; // 원장 조회 전 싼 가드
-    const sent = await TradingOrderLog.countDocuments({ runId: existing._id, dryRun: false });
+    // **실제로 접수된 것만** 센다 (#511). #507 이 거부도 원장에 남기게 하면서(`orderNo: ""`)
+    // 이 가드가 깨졌다 — 첫 주문의 일시 오류 하나로 거부 행이 생기면 "주문이 나갔다" 로
+    // 오판해 그날 사이클을 영구 포기했다. 국장 v4 sell 은 주문이 q75 하나뿐이라 특히 치명적이다.
+    const sent = await TradingOrderLog.countDocuments({
+      runId: existing._id, dryRun: false, orderNo: { $nin: ["", null] },
+    });
     if (!canRetryRun(existing, sent)) return null;
     // 원자 재클레임 — blue/green 두 인스턴스가 같은 틱에 들어와도 한쪽만 성공한다.
     const re = await TradingRun.findOneAndUpdate(

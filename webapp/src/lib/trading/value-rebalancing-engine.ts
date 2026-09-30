@@ -109,10 +109,12 @@ export async function runValueRebalancing(
       if (seeded.qty >= 1) {
         orders.push({ side: "buy", qty: seeded.qty, price: price * 1.1, reason: `VR 시드 매수(${Math.round((cfg.initStockRatio ?? 0.85) * 100)}% 진입)` });
       }
-      await sendOrders(orders, broker, { account, runId, market, sym, live, log });
+      const seed = await sendOrders(orders, broker, { account, runId, market, sym, live, log });
       // 시드 발주만 하고, 체결(보유>0)은 다음 실행에서 채택. 상태는 미초기화로 유지.
       await saveState({ "state.vr": { symbol: sym, vInit: false, lastRunDate: today } });
-      const line = `VR ${sym}: 시드 매수 ${seeded.qty}주 발주(체결 후 다음 실행에서 채택)`;
+      const line = `VR ${sym}: 시드 매수 ${seeded.qty}주 `
+        + (live ? `— 접수 ${seed.accepted}건/계획 ${orders.length}건` : "[DRY-RUN]")
+        + "(체결 후 다음 실행에서 채택)";
       log(line);
       return line;
     }
@@ -198,7 +200,8 @@ export async function runValueRebalancing(
       reason: `VR 사다리 매도 ${r.qtyAfter}주째(밴드상단 ${formatMoney(band.high, market)})` });
   }
 
-  await sendOrders(degraded ? [] : orders, broker, { account, runId, market, sym, live, log });
+  const sent = await sendOrders(degraded ? [] : orders, broker,
+                                { account, runId, market, sym, live, log });
 
   // ── 상태 저장 — lastRunDate='어제'로 남겨 오늘 LOC 체결을 다음 실행이 대사(v4 와 동일 창) ──
   const persist: VRPersist = {
@@ -207,7 +210,12 @@ export async function runValueRebalancing(
   };
   await saveState({ "state.vr": persist });
 
-  const line = `VR ${sym}: 주문 ${orders.length}건 (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`;
+  // 요약은 **접수 수**를 말한다 (#511). #507 이 v4·engines 는 고쳤는데 VR 만 계획 수가
+  // 남아 있었다 — 전량 거부돼도 "주문 19건" 으로 성공처럼 보이던 그 증상 그대로다.
+  const 상태 = live
+    ? `접수 ${sent.accepted}건/계획 ${orders.length}건` + (sent.rejected ? ` · 거부 ${sent.rejected}건` : "")
+    : `계획 ${orders.length}건 [DRY-RUN]`;
+  const line = `VR ${sym}: ${상태} (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`;
   log(line);
   return line;
 }
@@ -220,7 +228,7 @@ async function sendOrders(
     account: { _id: Types.ObjectId; envKey: string };
     runId: Types.ObjectId; market: "kr" | "us"; sym: string; live: boolean; log: CycleLogger;
   },
-): Promise<void> {
+): Promise<{ accepted: number; rejected: number }> {
   let accepted = 0, rejected = 0;
   const rejectMsgs: string[] = [];
   for (const o of orders) {
@@ -266,7 +274,8 @@ async function sendOrders(
     const 내역 = Object.entries(why.counts).map(([k, n]) => `${k} ${n}건`).join(" · ");
     const msg = `${ctx.sym}: 주문 ${orders.length}건 전부 거부 — 접수 0건 [${내역}]\n`
       + `${why.advice}\n마지막 사유: ${rejectMsgs[rejectMsgs.length - 1] ?? "(없음)"}`;
-    if (!why.needsAction) { ctx.log(`ℹ ${msg}`); return; }
+    if (!why.needsAction) { ctx.log(`ℹ ${msg}`); return { accepted, rejected }; }
     throw new Error(msg);
   }
+  return { accepted, rejected };
 }

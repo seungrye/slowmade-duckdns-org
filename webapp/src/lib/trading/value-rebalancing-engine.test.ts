@@ -256,3 +256,38 @@ describe("VR 엔진 — 거부 사유별로 다르게 다룬다 (#509)", () => {
     expect(String(orderLogs[0].reason)).toContain("40910001");
   });
 });
+
+// #511 — #507 이 v4·engines 요약은 '접수 N건' 으로 고쳤는데 **VR 만 계획 수 그대로**였다.
+// 전량 거부돼도 "주문 19건" 으로 성공처럼 보이던 바로 그 증상이 VR 에 남아 있었다.
+describe("VR 엔진 — 요약이 접수 수를 말한다 (#511)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 0, cumBuy: 8500, cumSell: 0, lastRunDate: "20260721" };
+  const brokerWith = (place: () => Promise<string>): V4Broker => ({
+    snapshot: async () => ({ holding: 85, avg: 100, price: 130, cash: 1500 }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {}, place,
+  });
+  const run511 = (place: () => Promise<string>, live = true) => runValueRebalancing(
+    acct(live) as never, pf(CFG, { vr: seeded }) as never, "run1" as never,
+    brokerWith(place), () => {},
+  );
+
+  it("접수되면 '접수 N건/계획 M건' 으로 말한다", async () => {
+    const line = await run511(async () => "ORD1");
+    expect(line).toMatch(/접수 \d+건\/계획 \d+건/);
+  });
+
+  it("일부 거부되면 거부 수도 말한다", async () => {
+    let n = 0;
+    const line = await run511(async () => {
+      if (++n % 2 === 0) throw new Error("40030000: 호가단위 오류");
+      return "ORD1";
+    });
+    expect(line).toMatch(/거부 \d+건/);
+  });
+
+  it("dry-run 은 계획 수를 말하되 그렇다고 밝힌다", async () => {
+    const line = await run511(async () => "ORD1", false);
+    expect(line).toContain("DRY-RUN");
+  });
+});
