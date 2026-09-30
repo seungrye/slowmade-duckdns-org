@@ -17,6 +17,7 @@ vi.mock("@/models/trading-portfolio", () => ({
   },
 }));
 vi.mock("./engines", () => ({ marketToday: () => "20260722" }));
+vi.mock("./killswitch", () => ({ isStillLive: async () => true }));
 
 import { runValueRebalancing } from "./value-rebalancing-engine";
 import type { V4Broker } from "./infinite-v4-engine";
@@ -220,5 +221,38 @@ describe("VR 엔진 — 주문 거부를 숨기지 않는다 (#507)", () => {
   });
   it("dry-run 은 던지지 않는다", async () => {
     await expect(run507(false)).resolves.toContain("VR");
+  });
+});
+
+// #509 — VR 도 사유별로 다르게 다룬다(v4·engines 와 같은 규칙).
+describe("VR 엔진 — 거부 사유별로 다르게 다룬다 (#509)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 0, cumBuy: 8500, cumSell: 0, lastRunDate: "20260721" };
+  const runWith = (err: string) => runValueRebalancing(
+    acct(true) as never, pf(CFG, { vr: seeded }) as never, "run1" as never,
+    {
+      snapshot: async () => ({ holding: 85, avg: 100, price: 130, cash: 1500 }),
+      historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+      cancel: async () => {}, place: async () => { throw new Error(err); },
+    } as never,
+    () => {},
+  );
+
+  it("휴장일 거부는 던지지 않는다", async () => {
+    await expect(runWith("40910001: 장운영일이 아닙니다")).resolves.toContain("VR");
+  });
+  it("일시 오류도 던지지 않는다", async () => {
+    await expect(runWith("EGW00201: 초당 거래건수를 초과하였습니다.")).resolves.toContain("VR");
+  });
+  it("계좌 문제는 던진다", async () => {
+    await expect(runWith("40910000: 모의투자 주문이 불가한 계좌입니다.")).rejects.toThrow(/증권사/);
+  });
+  it("모르는 사유는 던진다", async () => {
+    await expect(runWith("99999999: 처음 보는 것")).rejects.toThrow(/전부 거부/);
+  });
+  it("안 던져도 거부는 원장에 남는다", async () => {
+    await runWith("40910001: 장운영일이 아닙니다");
+    expect(orderLogs.length).toBeGreaterThan(0);
+    expect(String(orderLogs[0].reason)).toContain("40910001");
   });
 });

@@ -13,6 +13,8 @@
 
 import TradingOrderLog from "@/models/trading-order-log";
 import { savePortfolioState, type StateSaver } from "./state-saver";
+import { isStillLive } from "./killswitch";
+import { summarizeRejects } from "./reject-reason";
 import type { Types } from "mongoose";
 import type { ValueRebalancingConfig } from "@/lib/backtest/types";
 import {
@@ -220,11 +222,17 @@ async function sendOrders(
   },
 ): Promise<void> {
   let accepted = 0, rejected = 0;
+  const rejectMsgs: string[] = [];
   for (const o of orders) {
     let orderNo = "";
     let error = "";
     try {
       if (ctx.live) {
+        // 주문 직전 재확인 (#509) — VR 은 사다리를 1초 간격으로 20건 넘게 낸다.
+        if (!(await isStillLive(ctx.account._id))) {
+          ctx.log(`⛔ 킬스위치 — 남은 주문 중단(${orders.length - accepted - rejected}건 미전송)`);
+          break;
+        }
         const 형식 = o.ordType ?? "loc";
         orderNo = await broker.place(ctx.sym, { side: o.side, qty: o.qty, price: o.price, ordType: 형식, reason: o.reason });
         accepted++;
@@ -235,6 +243,7 @@ async function sendOrders(
     } catch (e) {
       rejected++;
       error = e instanceof Error ? e.message : String(e);
+      rejectMsgs.push(error);
       ctx.log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)}) — 다음 주문 계속: ${error}`);
     }
     // 거부도 남기고, 기록은 전송과 같은 반복 안에서 한다 (#507) — v4 와 같은 이유.
@@ -253,6 +262,11 @@ async function sendOrders(
     }
   }
   if (ctx.live && orders.length > 0 && accepted === 0) {
-    throw new Error(`${ctx.sym}: 주문 ${orders.length}건이 전부 거부됐다 — 접수 0건 (거부 ${rejected}건)`);
+    const why = summarizeRejects(rejectMsgs); // 사유별로 할 일이 다르다 (#509)
+    const 내역 = Object.entries(why.counts).map(([k, n]) => `${k} ${n}건`).join(" · ");
+    const msg = `${ctx.sym}: 주문 ${orders.length}건 전부 거부 — 접수 0건 [${내역}]\n`
+      + `${why.advice}\n마지막 사유: ${rejectMsgs[rejectMsgs.length - 1] ?? "(없음)"}`;
+    if (!why.needsAction) { ctx.log(`ℹ ${msg}`); return; }
+    throw new Error(msg);
   }
 }

@@ -14,6 +14,8 @@ vi.mock("@/models/trading-portfolio", () => ({
   },
 }));
 vi.mock("./engines", () => ({ marketToday: () => "20260922" }));
+// 킬스위치의 주문 직전 재확인은 DB 를 읽는다 — 단위 테스트에선 항상 live 로 둔다 (#509).
+vi.mock("./killswitch", () => ({ isStillLive: async () => true }));
 
 import { makeV4KisBroker, prevMarketDay, runInfiniteV4, type V4Broker } from "./infinite-v4-engine";
 import { discardState } from "./state-saver";
@@ -350,5 +352,55 @@ describe("runInfiniteV4 — 주문 거부를 숨기지 않는다 (#507)", () => 
   it("요약은 계획 수가 아니라 접수 수를 말한다", async () => {
     const line = await run(async () => "ORD1");
     expect(line).toMatch(/접수/);
+  });
+});
+
+// #509 — 거부 사유에 따라 **할 일이 다르다**. 휴장일이면 사람이 할 게 없으므로 사이클을
+// 실패로 만들지 않는다(공휴일마다 가짜 경보가 쌓이면 진짜 신호가 묻힌다). 계좌 문제면
+// 사람이 증권사에서 고쳐야 반복이 멈추므로 실패로 올려 메일을 태운다.
+describe("runInfiniteV4 — 거부 사유별로 다르게 다룬다 (#509)", () => {
+  const CFG = { symbol: "TQQQ", principal: 10_000, splits: 20, starBase: 15, sellTarget: 15 };
+  const state: V4State = {
+    ...newV4State("TQQQ", 20, 10_000), t: 6.0, cycleCash: 6_000, lastRunDate: "20260921",
+  };
+  const runWith = (err: string) => runInfiniteV4(
+    { _id: "acc1", envKey: "paper-1", liveEnabled: true } as never,
+    { _id: "pf1", market: "us", strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
+    "run1" as never,
+    {
+      snapshot: async () => ({ holding: 32, avg: 100, price: 110, cash: 6_000 }),
+      historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+      cancel: async () => {}, place: async () => { throw new Error(err); },
+    } as never,
+    "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; process.env.TRADING_LIVE_ALLOWED = "true"; });
+
+  it("휴장일 거부는 던지지 않는다 — 조치할 게 없다", async () => {
+    await expect(runWith("40910001: 장운영일이 아닙니다")).resolves.toContain("V4");
+  });
+
+  it("일시 오류도 던지지 않는다 — 다음 사이클에 풀린다", async () => {
+    await expect(runWith("EGW00201: 초당 거래건수를 초과하였습니다.")).resolves.toContain("V4");
+  });
+
+  it("계좌 문제는 던진다 — 사람이 고쳐야 반복이 멈춘다", async () => {
+    await expect(runWith("40910000: 모의투자 주문이 불가한 계좌입니다."))
+      .rejects.toThrow(/증권사/);
+  });
+
+  it("자금 부족도 던진다", async () => {
+    await expect(runWith("40250000: 주문가능금액이 부족합니다")).rejects.toThrow(/전부 거부/);
+  });
+
+  it("모르는 사유는 던진다 — 조용히 넘기는 쪽이 더 위험하다", async () => {
+    await expect(runWith("99999999: 처음 보는 무엇")).rejects.toThrow(/전부 거부/);
+  });
+
+  it("안 던지는 경우에도 거부는 원장에 남는다 — 흔적 없이 넘어가지 않는다", async () => {
+    await runWith("40910001: 장운영일이 아닙니다");
+    expect(orderLogs.length).toBeGreaterThan(0);
+    expect(String(orderLogs[0].reason)).toContain("40910001");
   });
 });

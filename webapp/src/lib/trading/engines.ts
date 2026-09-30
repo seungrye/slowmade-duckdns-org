@@ -16,6 +16,8 @@ import { UNIVERSES, EXCD_MAPS } from "./universes";
 import TradingOrderLog from "@/models/trading-order-log";
 // 상태 쓰기는 state-saver 한 곳으로만 나간다 (#488) — 엔진이 모델을 직접 부르지 않는다.
 import { discardState, savePortfolioState, type StateSaver } from "./state-saver";
+import { isStillLive } from "./killswitch";
+import { summarizeRejects } from "./reject-reason";
 import { formatMoney } from "@/lib/format";
 import type { TradingAccountType } from "@/models/trading-account";
 import type { TradingPortfolioType } from "@/models/trading-portfolio";
@@ -120,12 +122,18 @@ async function execute(
 ): Promise<{ executed: number; live: boolean }> {
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
   let executed = 0, rejected = 0;
+  const rejectMsgs: string[] = [];
   for (const it of intents) {
     // 주문 단위 격리 — 한 종목의 주문 거부가 나머지(특히 trend 유니버스)를 죽이지 않게.
     let orderNo = "";
     let error = "";
     try {
       if (live) {
+        // 주문 직전 재확인 (#509) — trend 는 유니버스 전체를 돌며 여러 건을 낸다.
+        if (!(await isStillLive(account._id))) {
+          log(`⛔ 킬스위치 — 남은 주문 중단(${intents.length - executed - rejected}건 미전송)`);
+          break;
+        }
         orderNo = await broker.submit(it.symbol, it.qty, it.side, it.price);
         executed++;
         log(`주문 접수 ${orderNo} — ${it.side} ${it.symbol} x${it.qty}`);
@@ -138,6 +146,7 @@ async function execute(
     } catch (e) {
       rejected++;
       error = e instanceof Error ? e.message : String(e);
+      rejectMsgs.push(error);
       log(`[${it.symbol}] 주문 실패 — 다음 주문 계속: ${error}`);
     }
     // 거부도 남긴다 (#507) — 예전엔 catch 가 원장 기록까지 건너뛰어 흔적이 0이었다.
@@ -159,7 +168,12 @@ async function execute(
   // 낼 게 있었는데 한 건도 못 냈으면 사이클을 실패로 만든다 (#507). dry-run 은 제외 —
   // 애초에 submit 을 안 부르므로 게이트하지 않으면 모든 검증 실행이 failed 로 찍힌다.
   if (live && intents.length > 0 && executed === 0) {
-    throw new Error(`주문 ${intents.length}건이 전부 거부됐다 — 접수 0건 (거부 ${rejected}건)`);
+    const why = summarizeRejects(rejectMsgs); // 사유별로 할 일이 다르다 (#509)
+    const 내역 = Object.entries(why.counts).map(([k, n]) => `${k} ${n}건`).join(" · ");
+    const msg = `주문 ${intents.length}건 전부 거부 — 접수 0건 [${내역}]\n`
+      + `${why.advice}\n마지막 사유: ${rejectMsgs[rejectMsgs.length - 1] ?? "(없음)"}`;
+    if (!why.needsAction) { log(`ℹ ${msg}`); return { executed, live }; }
+    throw new Error(msg);
   }
   return { executed, live };
 }
@@ -391,7 +405,8 @@ export async function runPortfolioCycle(
   phase: "main" | "both" | "sell" | "buy" | "close" = "main",
   // ephemeral: 설정 검증용 일회성 실행(run-now) — 주문도 상태도 남기지 않는다 (#488).
   // 스케줄 사이클은 dry-run 이라도 상태를 쌓아야 한다(모의 운용이 얼지 않게) → 기본 false.
-  opts: { ephemeral?: boolean } = {},
+  // broker 주입 — 테스트가 KIS 없이 execute() 경로를 돌리기 위한 것(운영은 안 넘긴다).
+  opts: { ephemeral?: boolean; broker?: LiveBroker } = {},
 ): Promise<string> {
   const saveState = opts.ephemeral ? discardState : savePortfolioState(portfolio._id);
   if (phase === "close") {
@@ -424,7 +439,8 @@ export async function runPortfolioCycle(
       : makeV4KisBroker(makeKisClient(account), market), granted);
     return runValueRebalancing(account, portfolio, runId, vrBroker, log, saveState);
   }
-  const broker = capLiveBroker(makeBroker(account, portfolio.market as "kr" | "us"), granted);
+  const broker = opts.broker
+    ?? capLiveBroker(makeBroker(account, portfolio.market as "kr" | "us"), granted);
   switch (portfolio.strategy) {
     case "lrs_v1":
       return runLrs(account, portfolio, runId, broker, log);
