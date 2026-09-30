@@ -373,6 +373,37 @@ export async function runInfiniteV4(
     }
   }
 
+  // ── 3.5) 주문 전 현금 게이트 (#519) ──────────────────────────────
+  //
+  // 예약현금(reservedCash)이 v4 주문 크기에 **전혀 상한으로 작동하지 않았다.** 사이징은
+  // `state.cycleCash` 만 쓰고(위 v4PlanDay), 브로커 cash 는 `absorbIdleCash` 한 곳에만
+  // 들어가는데 그 함수는 `next > cycleCash` 일 때만 반영이라 캡이 **구조적으로 못
+  // 내려간다**. 실측: kr 예약 678만 vs principal 1,091만(61% 초과), TQQQ 52,000 vs
+  // 93,300(79% 초과). 같은 계좌의 VR 은 cash 를 하드 캡으로 쓰는데 v4 만 안 썼다.
+  //
+  // **cycleCash 를 런타임에 깎지 않는다** — 복리로 불어난 장부(#485)가 잘리고, 사이클
+  // 도중 `shot = cycleCash/(splits−t)` 스케줄이 끊긴다. 대신 파이썬 `engine.run_once` 와
+  // 같이 **전송 직전에 가용현금 안에서만 매수를 내보낸다.** 매도(익절)는 보호 주문이라
+  // 현금과 무관하게 항상 보낸다.
+  {
+    let left = Number.isFinite(cash) ? cash : 0;
+    const kept: typeof orders = [];
+    let skipped = 0, skippedCost = 0;
+    for (const o of orders) {
+      if (o.side !== "buy") { kept.push(o); continue; }
+      const cost = o.qty * o.price;
+      if (cost > left) { skipped++; skippedCost += cost; continue; }
+      left -= cost;
+      kept.push(o);
+    }
+    if (skipped) {
+      log(`[v4:${sym}] 현금 부족 — 매수 ${skipped}건 보류(${formatMoney(skippedCost, market)} `
+        + `> 가용 ${formatMoney(cash, market)}). 장부 ${formatMoney(state.cycleCash, market)} 는 그대로 둔다.`);
+      orders.length = 0;
+      orders.push(...kept);
+    }
+  }
+
   // ── 4) 주문 전송(dry-run 게이트) + 상태 저장 ──
   let accepted = 0, rejected = 0;
   const rejectMsgs: string[] = [];
@@ -422,7 +453,12 @@ export async function runInfiniteV4(
 
   // 국장 2단계(sell 09:30 / buy 15:20)는 하루의 예약을 나눠 적는다 — buy 가 통째로 덮으면
   // sell 의 q75(¾ 익절)가 사라져 다음 날 대사가 그 체결을 q25 로 잘못 읽는다 (#483).
-  state.pending = mergePending(state.pending, pend, phase);
+  // degraded 면 **예약을 덮지 않는다** (#519). 대사가 실패하면 t·cycleCash 가 낡았고,
+  // 그 낡은 값으로 계산한 pend 가 전일 예약을 덮으면 다음 날 대사가 매도 종류를 수량으로
+  // 가릴 때 q75/q25 를 잘못 읽어 T 를 ×0.25 대신 ×0.75 한다(#483 과 같은 경로).
+  // 실제로 2026-08-14 kr 에서 OPSQ0003 으로 대사가 깨진 이력이 있다. 주문은 위에서 이미
+  // q75 만 내보냈으므로, 예약도 전일 것을 그대로 두는 쪽이 정합적이다.
+  if (!degraded) state.pending = mergePending(state.pending, pend, phase);
   // 왜 '어제'인가: LOC 주문은 그날 종가에 체결돼 체결일 == 실행일(today)이 된다. 대사 필터는
   // `lastRunDate < date < today`(양쪽 strict)라, lastRunDate=today 로 남기면 다음 실행의
   // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를

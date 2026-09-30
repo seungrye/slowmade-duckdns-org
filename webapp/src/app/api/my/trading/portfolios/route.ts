@@ -106,6 +106,20 @@ export async function POST(req: NextRequest) {
   // 못 막는다(`Number("") === 0`, #491 과 같은 계열). 여기서 막는 게 가장 싸다.
   const cfgErr = validateStrategyConfig(strategy, (body.config ?? {}) as Record<string, unknown>);
   if (cfgErr) return NextResponse.json({ error: cfgErr }, { status: 400 });
+  // 원금이 예약현금보다 크면 거절한다 (#519). UI 는 예약현금을 "이 블록이 쓸 현금" 이라
+  // 설명하는데 v4 의 주문 크기는 config.principal 이 정한다 — 둘이 어긋나 있으면 실행 때마다
+  // 엔진의 현금 게이트에 걸려 절반만 도는 블록이 된다(실측: kr 678만 vs 1,091만 = 61% 초과,
+  // TQQQ 52,000 vs 93,300 = 79% 초과). 예약 0 은 "전액" 이라 한도를 안 건 것이므로 검사 제외.
+  {
+    const principal = Number((body.config as { principal?: unknown } | undefined)?.principal ?? 0);
+    const reserved = Number(body.reservedCash ?? 0) || 0;
+    if (reserved > 0 && Number.isFinite(principal) && principal > reserved) {
+      return NextResponse.json({
+        error: `원금(${principal.toLocaleString()})이 예약현금(${reserved.toLocaleString()})보다 `
+          + "큽니다 — 예약현금을 늘리거나 원금을 줄이세요(예약 0 은 전액)",
+      }, { status: 400 });
+    }
+  }
   // 계정·시장에 블록을 **여럿** 둘 수 있다 (#339).
   //
   // 예전엔 (accountId, market) 로 upsert 해서, 포트폴리오를 "추가" 하면 기존 것이 조용히

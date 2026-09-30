@@ -197,3 +197,35 @@ describe("usAccount — 거래소 순회가 같은 보유를 두 번 세지 않�
     expect(await settle(client().usAccount())).toBeInstanceOf(Error);
   });
 });
+
+// #519 ③ — psamount(매수가능금액) 조회 실패를 `cash = 0` 으로 삼켰다.
+// 바로 위 `if (!balOk) throw`(「조회 실패와 실제 0 을 구분해야 한다」)와 모순이고,
+// 주석의 "파이썬과 동일" 이 사실이 아니다 — 파이썬은 WARNING + 예수금 폴백이다.
+// 실측: 미장 잔고 응답 output2 에 **예수금 필드가 없다**(매입금액·손익만) → 폴백할 값이
+// 없으므로 바로 위와 같은 정책(던지기)으로 맞춘다.
+//
+// 삼키면 VR 은 **매수만 전멸하고 매도는 정상 접수**돼 accepted===0 가드에도 안 걸린다 —
+// 포지션이 조용히 단조 감소한다.
+describe("usAccount — 매수가능금액 조회 실패를 삼키지 않는다 (#519)", () => {
+  const H = [{ ovrs_pdno: "TQQQ", ovrs_cblc_qty: "10", pchs_avg_pric: "80",
+               ovrs_stck_evlu_amt: "900" }];
+
+  it("psamount 가 실패하면 던진다 — 현금 0 으로 계속 가면 매수만 조용히 사라진다", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes("inquire-psamount")
+        ? res({ rt_cd: "1", msg_cd: "OPSQ0003", msg1: "서비스 라우팅 오류" })
+        : res({ rt_cd: "0", output1: H }));
+    const e = await settle(client().usAccount());
+    expect(e).toBeInstanceOf(Error);
+    expect(String((e as Error).message)).toMatch(/매수가능금액/);
+  });
+
+  it("psamount 가 성공하면 그 값을 쓴다 — 회귀 방지", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes("inquire-psamount")
+        ? res({ rt_cd: "0", output: { ord_psbl_frcr_amt: "1234.5" } })
+        : res({ rt_cd: "0", output1: H }));
+    const [, cash] = await settle(client().usAccount()) as [unknown, number, number];
+    expect(cash).toBeGreaterThan(0);
+  });
+});

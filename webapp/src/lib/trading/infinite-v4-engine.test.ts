@@ -459,3 +459,100 @@ describe("infinite-v4-engine — 새 상태(lastRunDate 없음)는 대사하지 
     expect(seen).toEqual(["20260920"]);
   });
 });
+
+// #519 ① — 예약현금(reservedCash)이 v4 주문 크기에 상한으로 작동하지 않았다.
+// 사이징은 state.cycleCash 만 쓰고, 브로커 cash 는 absorbIdleCash 한 곳에만 들어가는데
+// 그 함수는 `next > cycleCash` 일 때만 반영이라 **캡이 구조적으로 못 내려간다**.
+// 실측: kr 예약 678만 vs principal 1,091만(61% 초과), TQQQ 52,000 vs 93,300(79% 초과).
+//
+// cycleCash 를 런타임에 깎으면 복리 장부(#485)와 사이클 중 분할 스케줄이 깨진다.
+// 그래서 **주문 전 현금 게이트**로 막는다(파이썬 engine.run_once 의 "현금 부족 — 매수 보류").
+describe("infinite-v4-engine — 매수는 가용현금 안에서만 나간다 (#519)", () => {
+  const CFG = { symbol: "TQQQ", principal: 100_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
+
+  // dry-run 이라 broker.place 는 안 불린다 — 주문은 원장(TradingOrderLog)에 남는다.
+  const buys = () => orderLogs.filter((o) => o.side === "buy");
+  const sells = () => orderLogs.filter((o) => o.side === "sell");
+  const buyCost = () => buys().reduce((a, o) => a + Number(o.qty) * Number(o.price), 0);
+
+  const brokerWith = (cash: number, holding = 0, avg = 0): V4Broker => ({
+    snapshot: async () => ({ holding, avg, price: 100, cash }),
+    historyLong: async () => [],
+    executions: async () => [],
+    openOrders: async () => [],
+    cancel: async () => {},
+    place: async () => "ORD",
+  });
+
+  const run = (b: V4Broker) => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "us", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("TQQQ", 20, 100_000), lastRunDate: "20260921" } } } as never,
+    "run1" as never, b, "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("가용현금이 장부보다 작으면 그 안에서만 산다", async () => {
+    await run(brokerWith(5_000));
+    expect(buys().length).toBeGreaterThan(0);
+    expect(buyCost()).toBeLessThanOrEqual(5_000);
+  });
+
+  it("현금이 충분하면 더 많이 산다 — 게이트가 정상 매수를 깎으면 안 된다", async () => {
+    await run(brokerWith(5_000));
+    const small = buyCost();
+    orderLogs.length = 0; persisted.length = 0;
+    await run(brokerWith(1_000_000));
+    expect(buyCost()).toBeGreaterThan(small);
+  });
+
+  it("현금이 0 이면 매수는 한 건도 안 나간다", async () => {
+    await run(brokerWith(0));
+    expect(buys()).toHaveLength(0);
+  });
+
+  it("현금이 없어도 매도(익절)는 막지 않는다 — 보호 주문이다", async () => {
+    await run(brokerWith(0, 100, 50)); // 평단 50 · 현재가 100 → 익절 대상
+    expect(sells().length).toBeGreaterThan(0);
+  });
+});
+
+// #519 ② — 대사 실패(degraded)·크래시 때 mergePending·saveState 가 무조건 실행돼
+// **전일 예약이 당일 계산값으로 덮였다**. lastRunDate 만 가드돼 있었다.
+// T 는 하루 매수액·별지점·reverse 전환을 직접 정한다. 2026-08-14 kr OPSQ0003 실사례 있음.
+describe("infinite-v4-engine — degraded 면 예약(pending)을 덮지 않는다 (#519)", () => {
+  const CFG = { symbol: "069500", principal: 10_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
+  const PEND = { one: 493_886, q25: 7, q75: 18, reverseSell: 0, reverseFirst: false };
+
+  const broker = (fail: boolean): V4Broker => ({
+    snapshot: async () => ({ holding: 32, avg: 100, price: 110, cash: 6_000 }),
+    historyLong: async () => [],
+    executions: async () => { if (fail) throw new Error("OPSQ0003: 서비스 라우팅 오류"); return []; },
+    openOrders: async () => [],
+    cancel: async () => {},
+    place: async () => "ORD",
+  });
+
+  const run = (fail: boolean) => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("069500", 20, 10_000), t: 6.93, cycleCash: 6_000,
+                     lastRunDate: "20260921", pending: PEND } } } as never,
+    "run1" as never, broker(fail), "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("대사가 실패하면 전일 예약이 그대로 남는다", async () => {
+    await run(true);
+    expect((persisted.at(-1) as V4State).pending).toEqual(PEND);
+  });
+
+  it("대사가 성공하면 종전대로 새 예약으로 갱신된다 — 회귀 방지", async () => {
+    await run(false);
+    expect((persisted.at(-1) as V4State).pending).not.toEqual(PEND);
+  });
+});

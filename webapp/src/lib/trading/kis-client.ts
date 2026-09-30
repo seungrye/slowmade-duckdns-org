@@ -543,11 +543,21 @@ export class KisClient {
     // **전부 실패하면 던진다.** 빈 보유를 "보유 없음" 으로 돌려주면 엔진이 처음부터 다시
     // 진입한다 — 조회 실패와 실제 0 을 구분해야 한다.
     if (!balOk) throw new KisError("us-balance-all-failed", `잔고 조회 전 거래소 실패: ${errs.join(" · ")}`);
-    let cash = 0;
+    // **매수가능금액 조회 실패도 던진다** (#519). 예전엔 `catch { cash = 0 }` 이었는데,
+    // 그러면 VR 은 **매수만 전멸하고 매도는 정상 접수**돼 `accepted===0` 가드에도 안 걸린다
+    // — 포지션이 조용히 단조 감소한다. 바로 위 잔고 실패와 같은 원칙이다:
+    // **조회 실패와 실제 0 을 구분해야 한다.**
+    //
+    // 폴백은 없다 — 실측으로 미장 잔고 응답 `output2` 에 예수금 필드가 없다(매입금액·손익만).
+    // (주석에 "파이썬과 동일" 이라 적혀 있었는데 사실이 아니었다. 파이썬 `_buyable()` 은
+    //  WARNING + 예수금 폴백이고, 국장은 그 필드가 있어서 가능한 것이다.)
+    let cash: number;
     try {
       cash = await this.usBuyable("SPY", 1.0);
-    } catch {
-      cash = 0; // 파이썬과 동일: psamount 실패 시 현금 0(매수 스킵) — 보유는 유지
+    } catch (e) {
+      throw new KisError("us-buyable-failed",
+        `매수가능금액 조회 실패 — 현금을 모르는 채로 주문하지 않는다: `
+        + `${e instanceof Error ? e.message : e}`);
     }
     return [pos, cash, hvBroker];
   }
