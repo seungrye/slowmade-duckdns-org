@@ -527,7 +527,16 @@ export class KisClient {
       for (const r of (d.output1 as Json[]) ?? []) {
         const q = Math.trunc(Number(r.ovrs_cblc_qty ?? 0));
         const sym = String(r.ovrs_pdno);
-        if (q > 0 && !pos[sym]) pos[sym] = [q, Number(r.pchs_avg_pric ?? 0)];
+        if (q <= 0) continue;
+        // ⚠ KIS 모의 해외잔고는 `OVRS_EXCG_CD` 와 무관하게 **보유를 다 돌려준다** — NASD 로
+        //   물어도 AMEX 상장 SOXL 이 나온다. 그래서 거래소를 순회하면 같은 보유가 여러 번
+        //   온다. `pos` 는 처음부터 막았는데 `hvBroker` 는 `+=` 만 해서 **평가금액이 중복
+        //   합산**됐다(실측: 23,133 → 30,504, +31.9%).
+        //   그 값은 close-sync 의 `totalValue` 로 portfoliohistories 에 박히므로 총자산
+        //   스냅샷이 영구히 부푼다 — #500·#501 이 고친 것과 같은 계열이다.
+        //   **보유와 평가금액을 같은 기준으로 dedup 한다**: 처음 본 종목만 센다.
+        if (pos[sym]) continue;
+        pos[sym] = [q, Number(r.pchs_avg_pric ?? 0)];
         hvBroker += Number(r.ovrs_stck_evlu_amt ?? 0);
       }
     }

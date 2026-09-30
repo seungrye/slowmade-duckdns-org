@@ -246,3 +246,18 @@ describe("scheduler.isDue — catch-up 상한", () => {
     expect(addMinutes("09:35", 90)).toBe("11:05");
   });
 });
+
+// #511 — #507 이 '거부도 원장에 남긴다' 를 넣으면서 #487 재시도 가드가 깨졌다.
+// 가드의 근거는 "실주문이 나갔나" 인데, 거부 행(orderNo="")까지 세면 **첫 주문의 일시
+// 오류 하나로 그날 사이클이 영구 포기**된다. 세야 하는 건 실제로 접수된 것뿐이다.
+describe("canRetryRun — 거부 행은 '나간 주문' 이 아니다 (#511)", () => {
+  const failed = { status: "failed", attempts: 0 };
+
+  it("접수된 주문이 0이면 재시도한다 — 거부만 있었어도", () => {
+    expect(canRetryRun(failed, 0)).toBe(true);
+  });
+
+  it("접수된 주문이 있으면 재시도하지 않는다 — 중복 주문이 유실보다 위험하다", () => {
+    expect(canRetryRun(failed, 1)).toBe(false);
+  });
+});

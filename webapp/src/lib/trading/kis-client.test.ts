@@ -140,3 +140,60 @@ describe("KisClient 토큰 캐시 — 저장은 암호화", () => {
     expect(decryptSecret(store.writes[0])).toBe("NEW-TOKEN");
   });
 });
+
+// #511 — #507 이 잔고를 거래소 순회로 바꾸면서 평가금액을 **중복합산**했다.
+// KIS 모의 해외잔고는 OVRS_EXCG_CD 와 무관하게 보유를 다 돌려준다:
+//   NASD → SOXL 51 + TQQQ 204 · AMEX → SOXL 51 (같은 것)
+// pos 는 `!pos[sym]` 로 막았는데 hvBroker 는 `+=` 만 해서 SOXL 이 두 번 더해졌다.
+// totalValue 로 portfoliohistories 에 박히므로 총자산이 영구히 부푼다(#500·#501 과 같은 계열).
+describe("usAccount — 거래소 순회가 같은 보유를 두 번 세지 않는다 (#511)", () => {
+  const holding = (sym: string, qty: number, avg: number, evlu: number) => ({
+    ovrs_pdno: sym, ovrs_cblc_qty: String(qty),
+    pchs_avg_pric: String(avg), ovrs_stck_evlu_amt: String(evlu),
+  });
+  /** 거래소별 응답을 순서대로 돌려준다. psamount(현금)는 마지막에 한 번. */
+  const balances = (byExcd: Record<string, unknown[]>) => {
+    fetchMock.mockImplementation(async (url: string) => {
+      const u = String(url);
+      if (u.includes("inquire-psamount")) {
+        return res({ rt_cd: "0", output: { ord_psbl_frcr_amt: "1000" } });
+      }
+      const excd = /OVRS_EXCG_CD=([A-Z]+)/.exec(u)?.[1] ?? "";
+      return res({ rt_cd: "0", output1: byExcd[excd] ?? [] });
+    });
+  };
+
+  it("같은 종목이 두 거래소에 나와도 평가금액을 한 번만 더한다", async () => {
+    balances({
+      NASD: [holding("SOXL", 51, 120, 7371.54), holding("TQQQ", 204, 70, 15761.35)],
+      NYSE: [],
+      AMEX: [holding("SOXL", 51, 120, 7371.54)], // 같은 보유가 또 온다
+    });
+    const [pos, , hv] = await settle(client().usAccount()) as [Record<string, [number, number]>, number, number];
+    expect(pos).toEqual({ SOXL: [51, 120], TQQQ: [204, 70] });
+    expect(hv).toBeCloseTo(7371.54 + 15761.35, 2); // 23,132.89 — 30,504 가 아니다
+  });
+
+  it("거래소마다 다른 종목이면 전부 더한다", async () => {
+    balances({
+      NASD: [holding("TQQQ", 10, 70, 700)],
+      NYSE: [holding("XOM", 5, 100, 500)],
+      AMEX: [holding("SOXL", 2, 120, 240)],
+    });
+    const [pos, , hv] = await settle(client().usAccount()) as [Record<string, [number, number]>, number, number];
+    expect(Object.keys(pos).sort()).toEqual(["SOXL", "TQQQ", "XOM"]);
+    expect(hv).toBeCloseTo(1440, 2);
+  });
+
+  it("수량 0 인 행은 보유도 평가금액도 안 센다", async () => {
+    balances({ NASD: [holding("TQQQ", 0, 70, 0), holding("SOXL", 3, 120, 360)], NYSE: [], AMEX: [] });
+    const [pos, , hv] = await settle(client().usAccount()) as [Record<string, [number, number]>, number, number];
+    expect(pos).toEqual({ SOXL: [3, 120] });
+    expect(hv).toBeCloseTo(360, 2);
+  });
+
+  it("전 거래소가 실패하면 던진다 — 빈 보유를 '보유 없음' 으로 돌려주면 안 된다", async () => {
+    fetchMock.mockImplementation(async () => res({ rt_cd: "1", msg_cd: "MCA00000", msg1: "서비스 없음" }));
+    expect(await settle(client().usAccount())).toBeInstanceOf(Error);
+  });
+});
