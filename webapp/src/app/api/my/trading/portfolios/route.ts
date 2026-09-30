@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireOwner } from "@/lib/require-owner";
+import { validateStrategyConfig } from "@/lib/trading/config-validate";
 import { connectToDB } from "@/lib/db";
 import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
@@ -97,18 +98,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "runAt 은 HH:MM" }, { status: 400 });
   }
   await connectToDB();
-  if (strategy === "infinite_v4") {
-    const cfg = (body.config ?? {}) as Record<string, unknown>;
-    if (!cfg.symbol || !(Number(cfg.principal) > 0)) {
-      return NextResponse.json({ error: "infinite_v4 는 config.symbol·principal(양수) 필수" }, { status: 400 });
-    }
-  }
-  if (strategy === "value_rebalancing") {
-    const cfg = (body.config ?? {}) as Record<string, unknown>;
-    if (!cfg.symbol || !(Number(cfg.principal) > 0) || !(Number(cfg.gradient) > 0)) {
-      return NextResponse.json({ error: "value_rebalancing 은 config.symbol·principal(양수)·gradient(양수) 필수" }, { status: 400 });
-    }
-  }
+  // config 의 숫자 필드를 검증한다 (#507). 예전엔 필수 몇 개만 봐서 `splits: 0` 이나
+  // `sellTarget: ""` 이 그대로 저장되고 **주문 파라미터가 됐다** — `??` 는 빈문자열을
+  // 못 막는다(`Number("") === 0`, #491 과 같은 계열). 여기서 막는 게 가장 싸다.
+  const cfgErr = validateStrategyConfig(strategy, (body.config ?? {}) as Record<string, unknown>);
+  if (cfgErr) return NextResponse.json({ error: cfgErr }, { status: 400 });
   // 계정·시장에 블록을 **여럿** 둘 수 있다 (#339).
   //
   // 예전엔 (accountId, market) 로 upsert 해서, 포트폴리오를 "추가" 하면 기존 것이 조용히

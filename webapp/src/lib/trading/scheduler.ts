@@ -21,6 +21,9 @@ const STALE_MS = 45 * 60_000;
 // 실패한 사이클을 그날 다시 잡아 볼 최대 횟수 (#487). 설정 오류처럼 고쳐지지 않는
 // 실패로 하루 종일 돌지 않게 막는 상한이다.
 const MAX_RETRIES = 2;
+// 매매 사이클을 늦게라도 돌려 줄 창(분) (#507). 이 안에 못 돌면 그날은 건너뛴다 —
+// 종가 기준으로 짠 주문이 장 마감 뒤에 나가는 것보다 안 나가는 게 낫다.
+const CATCH_UP_WINDOW_MIN = 90;
 
 // ── 순수 헬퍼(테스트 대상) ───────────────────────────────────────
 
@@ -65,13 +68,26 @@ export function firstTradingPhase(
 }
 
 /** 실행해야 하는 시점인가 — 시각 경과(당일) && (주중 조건). 기록 유무는 클레임이 판단. */
+/** "HH:MM" 에 분을 더한다(24시 넘으면 23:59 로 고정 — 그날 안에서만 유효하다). */
+export function addMinutes(hhmm: string, minutes: number): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  const t = h * 60 + m + minutes;
+  if (t >= 24 * 60) return "23:59";
+  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
+}
+
 export function isDue(
-  p: { runAt: string; weekdaysOnly?: boolean | null; enabled?: boolean | null },
+  p: { runAt: string; weekdaysOnly?: boolean | null; enabled?: boolean | null; phase?: string },
   clock: MarketClock,
 ): boolean {
   if (p.enabled === false) return false;
   if ((p.weekdaysOnly ?? true) && !clock.isWeekday) return false;
-  return clock.hhmm >= p.runAt;
+  if (clock.hhmm < p.runAt) return false;
+  // **상한** (#507) — 예전엔 시각이 지나기만 하면 하루 종일 due 였다. 재시작·배포 catch-up 이
+  // 장 마감 뒤에 그날 계획을 그대로 주문하면, 종가 기준으로 짠 LOC·지정가가 엉뚱한 시점에
+  // 나간다. 마감 sync(close)는 늦게 돌아도 무해하므로 예외로 둔다.
+  if (p.phase === "close") return true;
+  return clock.hhmm <= addMinutes(p.runAt, CATCH_UP_WINDOW_MIN);
 }
 
 // ── 클레임(멱등의 핵심) ──────────────────────────────────────────
@@ -159,7 +175,8 @@ export async function tradingTick(now = new Date()): Promise<void> {
     if (!account) continue;
     const clock = marketClock(p.market as "kr" | "us", now);
     for (const cycle of cyclesFor({ strategy: p.strategy, market: p.market, runAt: p.runAt })) {
-      if (!isDue({ runAt: cycle.at, weekdaysOnly: p.weekdaysOnly, enabled: p.enabled }, clock)) continue;
+      if (!isDue({ runAt: cycle.at, weekdaysOnly: p.weekdaysOnly, enabled: p.enabled,
+                   phase: cycle.phase }, clock)) continue;
 
       const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
       const catchUp = clock.hhmm > cycle.at; // 정시 틱(≤1분 지연)이 아니면 catch-up 성격
@@ -208,7 +225,12 @@ declare global {
 }
 
 export function startTradingScheduler(): void {
-  if (process.env.TRADING_SCHEDULER_ENABLED === "false") return;
+  // **명시적 opt-in** (#507). 예전엔 `=== "false"` 일 때만 꺼서, env 를 읽는 아무 node
+  // 프로세스나(`pnpm dev` 포함) 실주문 주체가 됐다 — 프로덕션과 중복 주문이 나갈 수 있다.
+  if (process.env.TRADING_SCHEDULER_ENABLED !== "true") {
+    console.log("[trading] 스케줄러 비활성 — TRADING_SCHEDULER_ENABLED=true 여야 돈다");
+    return;
+  }
   if (globalThis.__tradingSchedulerStarted) return; // dev HMR·중복 register 가드
   globalThis.__tradingSchedulerStarted = true;
   // 재진입 가드 — 장시간 사이클(미장 유니버스 스캔 ~수 분)이 60초 틱과 겹쳐

@@ -14,6 +14,21 @@ export interface InfiniteV4Config {
   // V(변동성 계수, %) — 포스트 Tier-0 원자 팩터. 종목별 고유값(TQQQ 15 / SOXL 20 / KODEX레버리지 8).
   // 별% base·최종매도 목표(+V%)·리버스 탈출선(−V%)을 전부 구동한다. 미지정/0 이면 §5.3.2 로 자동 유도.
   v?: number;
+  /**
+   * 익절 목표(%) — 안 적으면 `v` 를 쓴다 (#507).
+   *
+   * 라이브(`infinite-v4-engine.parseCfg`)는 `starBase` 와 `sellTarget` 을 **따로** 받는데
+   * 백테스트는 V 하나가 둘을 동시에 구동했다. 그래서 운영 중인 국장 설정
+   * (starBase 15 / sellTarget 10)은 **백테스트가 만들어낼 수 없는 조합**이었다 —
+   * 같은 입력에 익절가가 라이브 11,000 / 백테스트 11,500 으로 갈렸다.
+   * "백테스트가 실거래의 예측" 이라는 전제가 그 블록에 대해 성립하지 않았다.
+   *
+   * ⚠ 라이브를 V 단일 소스로 되돌리는 쪽은 택하지 않았다 — 그러면 지금 돌고 있는 포지션의
+   *   익절이 +10%→+15% 로 바뀐다. 백테스트가 라이브를 따라가는 방향만 안전하다.
+   */
+  sellTarget?: number;
+  /** 리버스 탈출선(%) — 안 적으면 `sellTarget`, 그것도 없으면 `v`. 라이브와 같은 기준. */
+  recoverPct?: number;
 }
 
 /** 포스트 §5.3.2 — 일간 로그수익률 표준편차 σ 로 변동성 계수 V 를 유도한다.
@@ -45,9 +60,12 @@ export function revSellDecay(splits: number): number {
 export function runInfiniteV4Backtest(bars: Bar[], cfg: InfiniteV4Config): BacktestResult {
   const { principal, splits } = cfg;
   const V = cfg.v && cfg.v > 0 ? cfg.v : deriveVFromBars(bars); // 미지정/0 → §5.3.2 자동 유도
-  const planCfg = { splits, starBase: V, sellTarget: V / 100 }; // V 하나가 별%·최종매도를 구동
+  // 별%는 V, 익절·탈출선은 따로 받을 수 있다 (#507) — 라이브가 그렇게 받는다.
+  // 안 적으면 종전대로 V 하나가 셋을 다 구동한다(기존 백테스트 결과 불변).
+  const SELL_TARGET = cfg.sellTarget && cfg.sellTarget > 0 ? cfg.sellTarget : V;
+  const planCfg = { splits, starBase: V, sellTarget: SELL_TARGET / 100 };
   const REV_SELL_DECAY = revSellDecay(splits);
-  const RECOVER_PCT = V / 100; // 리버스 탈출선 −V%
+  const RECOVER_PCT = (cfg.recoverPct && cfg.recoverPct > 0 ? cfg.recoverPct : SELL_TARGET) / 100;
 
   const trades: BtTrade[] = [];
   const equityCurve: EquityPoint[] = [];

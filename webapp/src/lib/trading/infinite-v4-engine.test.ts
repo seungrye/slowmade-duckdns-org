@@ -301,3 +301,54 @@ describe("runInfiniteV4 — 대사 실패일엔 유휴현금 흡수도 하지 �
     expect(persisted.at(-1)).toMatchObject({ cycleCash: 9_000_000 });
   });
 });
+
+// #507 — 주문이 전량 거부돼도 "정상"으로 기록됐다. 실측으로 2026-09-25~09-30 6영업일간
+// 접수 0건 / 실패 76건인데 전부 status=done, 요약은 "주문 17건"(계획 수), 메일 0통.
+// 실전에선 증거금 부족·호가단위·휴장일 거부가 같은 방식으로 은폐된다.
+describe("runInfiniteV4 — 주문 거부를 숨기지 않는다 (#507)", () => {
+  const CFG = { symbol: "TQQQ", principal: 10_000, splits: 20, starBase: 15, sellTarget: 15 };
+  const state: V4State = {
+    ...newV4State("TQQQ", 20, 10_000), t: 6.0, cycleCash: 6_000, lastRunDate: "20260921",
+  };
+  const brokerOf = (place: () => Promise<string>): V4Broker => ({
+    snapshot: async () => ({ holding: 32, avg: 100, price: 110, cash: 6_000 }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {}, place,
+  });
+  const run = (place: () => Promise<string>, live = true) => runInfiniteV4(
+    { _id: "acc1", envKey: "paper-1", liveEnabled: live } as never,
+    { _id: "pf1", market: "us", strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
+    "run1" as never, brokerOf(place), "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; process.env.TRADING_LIVE_ALLOWED = "true"; });
+
+  it("전량 거부되면 던진다 — 사이클이 done 으로 남으면 안 된다", async () => {
+    await expect(run(async () => { throw new Error("40910000: 모의투자 주문이 불가한 계좌입니다."); }))
+      .rejects.toThrow(/주문/);
+  });
+
+  it("거부도 원장에 남긴다 — 지금은 흔적이 0이라 무슨 일이 있었는지 모른다", async () => {
+    await run(async () => { throw new Error("40910000"); }).catch(() => {});
+    expect(orderLogs.length).toBeGreaterThan(0);
+    expect(orderLogs.every((o) => o.orderNo === "")).toBe(true);
+    expect(String(orderLogs[0].reason)).toContain("40910000");
+  });
+
+  it("일부라도 접수되면 던지지 않는다 — 주문 단위 격리는 유지", async () => {
+    let n = 0;
+    await expect(run(async () => {
+      if (++n === 1) throw new Error("40030000: 호가단위 오류");
+      return "ORD1";
+    })).resolves.toContain("V4");
+  });
+
+  it("dry-run 은 접수가 0 이어도 던지지 않는다 — 안 그러면 모든 검증 실행이 실패로 찍힌다", async () => {
+    await expect(run(async () => { throw new Error("안 불림"); }, false)).resolves.toContain("V4");
+  });
+
+  it("요약은 계획 수가 아니라 접수 수를 말한다", async () => {
+    const line = await run(async () => "ORD1");
+    expect(line).toMatch(/접수/);
+  });
+});

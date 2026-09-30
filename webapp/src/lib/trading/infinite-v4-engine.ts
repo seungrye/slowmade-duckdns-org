@@ -365,26 +365,42 @@ export async function runInfiniteV4(
   }
 
   // ── 4) 주문 전송(dry-run 게이트) + 상태 저장 ──
+  let accepted = 0, rejected = 0;
   for (const o of orders) {
     let orderNo = "";
+    let error = "";
     try {
       if (live) {
         orderNo = await broker.place(sym, o);
+        accepted++;
         log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, market)} (${o.ordType})`);
       } else {
         log(`[DRY-RUN] ${o.side} ${sym} x${o.qty} @${formatMoney(o.price, market)} (${o.ordType}) — ${o.reason}`);
       }
     } catch (e) {
       // 주문 단위 격리 — 한 건 거부(호가단위 등)가 나머지 주문·상태 저장을 막지 않게.
-      log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
-      continue;
+      rejected++;
+      error = e instanceof Error ? e.message : String(e);
+      log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${error}`);
     }
-    await TradingOrderLog.create({
-      accountId: account._id, runId, envKey: account.envKey,
-      market, strategy: "infinite_v4",
-      symbol: sym, side: o.side, qty: o.qty, price: Math.round(o.price * 100) / 100,
-      ordType: o.ordType, reason: o.reason, dryRun: !live, orderNo,
-    });
+    // 거부도 남긴다 (#507). 예전엔 `continue` 로 건너뛰어 **흔적이 0** 이었다 — 6영업일간
+    // 100% 거부된 것이 어디에도 안 남고 요약은 "주문 17건" 으로 성공처럼 찍혔다.
+    //
+    // ⚠ 기록은 전송과 **같은 반복 안**에서 한다. 이 원장이 `canRetryRun` 의 "실주문 0건"
+    //   판정 근거라, 접수는 됐는데 기록이 빠지면 재시도 가드가 오판해 **같은 주문을 다시**
+    //   낸다. 기록 실패는 조용히 넘기지 말고 크게 남긴다.
+    try {
+      await TradingOrderLog.create({
+        accountId: account._id, runId, envKey: account.envKey,
+        market, strategy: "infinite_v4",
+        symbol: sym, side: o.side, qty: o.qty, price: Math.round(o.price * 100) / 100,
+        ordType: o.ordType, reason: error ? `${o.reason} — 거부: ${error}` : o.reason,
+        dryRun: !live, orderNo,
+      });
+    } catch (e) {
+      log(`⚠ 주문 원장 기록 실패(orderNo=${orderNo || "없음"}) — 중복주문 가드가 이 주문을 `
+        + `못 본다: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   // 국장 2단계(sell 09:30 / buy 15:20)는 하루의 예약을 나눠 적는다 — buy 가 통째로 덮으면
@@ -398,8 +414,22 @@ export async function runInfiniteV4(
   if (!degraded) state.lastRunDate = prevMarketDay(today);
   await saveState({ "state.v4": state });
 
-  const line = `V4 ${sym}[${phase}]: 주문 ${orders.length}건 (T=${state.t.toFixed(2)} ` +
-    `mode=${state.mode} 보유 ${holding})`;
+  // 요약은 **접수 수**를 말한다 (#507). 예전엔 `orders.length`(계획 수)라 전량 거부돼도
+  // "주문 17건" 으로 성공처럼 보였다.
+  const line = live
+    ? `V4 ${sym}[${phase}]: 접수 ${accepted}건/계획 ${orders.length}건`
+      + (rejected ? ` · 거부 ${rejected}건` : "")
+      + ` (T=${state.t.toFixed(2)} mode=${state.mode} 보유 ${holding})`
+    : `V4 ${sym}[${phase}]: 계획 ${orders.length}건 [DRY-RUN] (T=${state.t.toFixed(2)} `
+      + `mode=${state.mode} 보유 ${holding})`;
   log(line);
+  // 낼 게 있었는데 **한 건도 못 냈으면** 사이클을 실패로 만든다 — 그래야 실패 메일이 나가고
+  // 모니터링에 남는다. ⚠ dry-run 은 애초에 place() 를 안 부르므로 반드시 live 로 게이트한다
+  // (안 그러면 모든 검증 실행이 failed 로 찍히고 #487 재시도까지 붙는다).
+  if (live && orders.length > 0 && accepted === 0) {
+    throw new Error(
+      `${sym}[${phase}]: 주문 ${orders.length}건이 전부 거부됐다 — 접수 0건. `
+      + `익절·사다리가 통째로 빠졌다(마지막 사유는 위 로그 참조)`);
+  }
   return line;
 }

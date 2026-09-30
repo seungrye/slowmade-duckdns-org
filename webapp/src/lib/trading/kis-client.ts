@@ -500,21 +500,40 @@ export class KisClient {
 
   /** 미국 보유맵 + 매수가능 USD(psamount — 미체결 반영. 실패 시 현금 0 폴백은 호출측). */
   async usAccount(): Promise<[Record<string, [number, number]>, number, number]> {
-    const d = await this.get("/uapi/overseas-stock/v1/trading/inquire-balance", this.tr("us_balance"), {
-      CANO: this.cano,
-      ACNT_PRDT_CD: this.prdt,
-      OVRS_EXCG_CD: "NASD",
-      TR_CRCY_CD: "USD",
-      CTX_AREA_FK200: "",
-      CTX_AREA_NK200: "",
-    });
+    // 거래소별로 순회한다 (#507). `NASD` 고정이면 **AMEX 상장 SOXL·NYSE 보유가 잔고에서
+    // 빠진다** — 그러면 엔진이 보유 0 으로 보고 진입을 다시 하거나 익절을 못 건다.
+    // 주문·체결은 이미 종목 거래소로 나가므로(usExcd) 잔고만 어긋나 있었다.
+    // usExecutionsAll 이 같은 이유로 이미 거래소를 순회한다 — 그 선례를 따른다.
     const pos: Record<string, [number, number]> = {};
     let hvBroker = 0; // 증권사 평가금액 합(우리가 현재가를 재조회하지 않는다)
-    for (const r of (d.output1 as Json[]) ?? []) {
-      const q = Math.trunc(Number(r.ovrs_cblc_qty ?? 0));
-      if (q > 0) pos[String(r.ovrs_pdno)] = [q, Number(r.pchs_avg_pric ?? 0)];
-      hvBroker += Number(r.ovrs_stck_evlu_amt ?? 0);
+    let balOk = false;
+    const errs: string[] = [];
+    for (const excd of ["NASD", "NYSE", "AMEX"]) {
+      let d: Json;
+      try {
+        d = await this.get("/uapi/overseas-stock/v1/trading/inquire-balance", this.tr("us_balance"), {
+          CANO: this.cano,
+          ACNT_PRDT_CD: this.prdt,
+          OVRS_EXCG_CD: excd,
+          TR_CRCY_CD: "USD",
+          CTX_AREA_FK200: "",
+          CTX_AREA_NK200: "",
+        });
+      } catch (e) {
+        errs.push(`${excd}: ${e instanceof Error ? e.message : e}`);
+        continue;
+      }
+      balOk = true;
+      for (const r of (d.output1 as Json[]) ?? []) {
+        const q = Math.trunc(Number(r.ovrs_cblc_qty ?? 0));
+        const sym = String(r.ovrs_pdno);
+        if (q > 0 && !pos[sym]) pos[sym] = [q, Number(r.pchs_avg_pric ?? 0)];
+        hvBroker += Number(r.ovrs_stck_evlu_amt ?? 0);
+      }
     }
+    // **전부 실패하면 던진다.** 빈 보유를 "보유 없음" 으로 돌려주면 엔진이 처음부터 다시
+    // 진입한다 — 조회 실패와 실제 0 을 구분해야 한다.
+    if (!balOk) throw new KisError("us-balance-all-failed", `잔고 조회 전 거래소 실패: ${errs.join(" · ")}`);
     let cash = 0;
     try {
       cash = await this.usBuyable("SPY", 1.0);
@@ -622,12 +641,19 @@ export class KisClient {
    *  (거래소를 지정하지 않으면 KIS 가 NASD 만 반환 → NYSE 상장 보유의 체결을 놓친다.) */
   async usExecutionsAll(startDate: string, endDate: string): Promise<Json[]> {
     const out: Json[] = [];
+    const errs: string[] = [];
     for (const excd of ["NASD", "NYSE", "AMEX"]) {
       try {
         out.push(...await this.usExecutions("", startDate, endDate, excd));
-      } catch {
-        // 거래소별 실패는 스킵(부분 결과라도 반영) — 유량제한은 하위 getRaw 가 이미 재시도.
+      } catch (e) {
+        // 거래소별 실패는 부분 결과라도 반영한다 — 유량제한은 하위 getRaw 가 이미 재시도.
+        errs.push(`${excd}: ${e instanceof Error ? e.message : e}`);
       }
+    }
+    // **전부 실패하면 던진다** (#507). 예전엔 조용히 빈 배열을 돌려줘 호출측의 `fillsOk`
+    // 게이트(#501)가 **절대 안 걸렸다** — 그날 runPnl 이 0 으로 기록됐다.
+    if (errs.length === 3) {
+      throw new KisError("us-executions-all-failed", `체결내역 전 거래소 실패: ${errs.join(" · ")}`);
     }
     return out;
   }
@@ -644,7 +670,15 @@ export class KisClient {
       },
     );
     const o2 = (Array.isArray(d.output2) ? d.output2[0] : d.output2) as Json | undefined;
-    return Number(o2?.ovrs_rlzt_pfls_amt ?? o2?.rlzt_pfls_amt ?? 0);
+    // 필드가 없으면 **던진다** (#507). `?? 0` 이면 200 응답인데 output2 가 비어도 0 을
+    // "증권사가 손익 0 이라 했다" 로 확정해 누적손익을 덮어쓴다. 이 경로는 paper 에서 한 번도
+    // 성공한 적이 없어(항상 OPSQ0002) **real 전환 순간이 첫 실행**이다 — 필드명이 다르면
+    // 조용히 0 이 박힌다. 던지면 호출측이 자체계산 폴백으로 떨어진다.
+    const v = o2?.ovrs_rlzt_pfls_amt ?? o2?.rlzt_pfls_amt;
+    if (v === undefined || v === null || v === "") {
+      throw new KisError("period-profit-empty", `기간손익 응답에 값이 없다: ${Object.keys(o2 ?? {}).join(",") || "output2 없음"}`);
+    }
+    return Number(v);
   }
 
   /** 국내 기간 실현손익 총액(inquire-period-trade-profit output2). 모의 미지원 → throw. */
@@ -658,7 +692,11 @@ export class KisClient {
       },
     );
     const o2 = (Array.isArray(d.output2) ? d.output2[0] : d.output2) as Json | undefined;
-    return Number(o2?.tot_rlzt_pfls ?? o2?.rlzt_pfls ?? 0);
+    const v = o2?.tot_rlzt_pfls ?? o2?.rlzt_pfls; // 빈 값을 0 으로 믿지 않는다 (#507)
+    if (v === undefined || v === null || v === "") {
+      throw new KisError("period-profit-empty", `기간손익 응답에 값이 없다: ${Object.keys(o2 ?? {}).join(",") || "output2 없음"}`);
+    }
+    return Number(v);
   }
 
   /** 미국 미체결내역(취소 대상). */
