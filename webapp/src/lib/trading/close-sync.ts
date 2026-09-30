@@ -10,6 +10,8 @@
 
 import StockDailyPrice from "@/models/stock-daily-price";
 import StockTrade from "@/models/stock-trade";
+import { walkLedger as _walkLedger, walkBooks as _walkBooks,
+         reconcileBooks as _reconcileBooks, type LedgerRow as _LedgerRow, type LedgerWalk as _LedgerWalk } from "./pnl-walk";
 import PortfolioHistory from "@/models/portfolio-history";
 import { blockSnapshot } from "./block-snapshot";
 import TradingOrderLog from "@/models/trading-order-log";
@@ -92,99 +94,27 @@ export function parseFill(f: Json): Fill | null {
   };
 }
 
-/** 원장 한 행 — 우리 DB(stocktrades)의 기록과 오늘 새로 들어온 체결이 같은 모양으로 섞인다. */
-export type LedgerRow = {
-  ticker: string; date: string; time: string; side: "buy" | "sell";
-  qty: number; price: number; currency: string;
-};
-
-export type LedgerWalk = {
-  /** 오늘(today) 실현손익 */
-  run: number;
-  /** **전체** 실현손익. 먹인 원장이 전부여야 뜻이 있다 */
-  cum: number;
-  /** `${ticker}|${time}|${side}` → 그 행 직후 보유수량 */
-  cumQty: Map<string, number>;
-  /** 원가를 모르는 매도 — 손익에서 **제외**했다. 0 으로 채우지 않는다 */
-  unknownCost: string[];
-};
-
-const ledgerKey = (r: { ticker: string; time: string; side: string }) =>
-  `${r.ticker}|${r.time}|${r.side}`;
-
-/**
- * 평균단가 회계로 원장을 훑어 실현손익과 누적수량을 낸다 — **순수** (#500).
- *
- * ── 왜 떼어냈나 ────────────────────────────────────────────────────
- *
- * 예전엔 이 계산이 `fillsToTradesAndPnl` 안에 있었고 **KIS 90일 조회 결과**만 먹었다.
- * 그래서 `cum` 이 "누적" 이 아니라 **"최근 90일 창을 매일 재계산한 값"** 이었다. 창 시작 전에
- * 산 물량은 매수 기록이 없어 원가가 0 이 되고, 그걸 팔면 매도대금 전액이 이익으로 잡혔다.
- * 창이 매일 밀리니 옛 매수가 빠질 때마다 누적이 점프했다 — 매매가 없는 날에도.
- *
- *   실측: USD DB +86,384 / 참값 −2,238 (오차 +88,623) · KRW 335,993 / 244,996 (+90,997)
- *   창 시작일만 바꿔 운영 함수를 돌리면 DB 값이 소수점 4자리까지 재현됐다.
- *
- * 그래서 **먹이는 쪽이 전체 원장을 책임지고**, 이 함수는 "준 것만 본다" 는 순수 함수로 둔다.
- * 그러면 "구간을 잘라도 결과가 같은가" 를 테스트로 못박을 수 있다 — 그 불변식이 없어서
- * 3개월 동안 안 드러났다.
- *
- * 원가를 모르는 매도는 **0 으로 대체하지 않는다.** 손익에서 빼고 `unknownCost` 에 남긴다.
- * 모르는 값을 0 으로 채우면 그게 곧 유령이익이 된다(`blockSnapshot` 이 `cash: null` 을
- * 쓰는 것과 같은 원칙).
- */
-export function walkLedger(rows: LedgerRow[], today: string): LedgerWalk {
-  // 결정적으로 정렬한다. 같은 초 안의 실제 체결 순서는 **알 수 없다** — 알 수 없다는 사실을
-  // 매번 같은 방식으로 처리하는 것이 목표다(예전엔 입력 순서에 좌우됐다).
-  const sorted = [...rows].sort((a, b) =>
-    a.date !== b.date ? (a.date < b.date ? -1 : 1)
-      : a.time !== b.time ? (a.time < b.time ? -1 : 1)
-        : a.side !== b.side ? (a.side < b.side ? -1 : 1)
-          : a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0);
-
-  const pos = new Map<string, [number, number]>(); // ticker -> [qty, cost]
-  const cumQty = new Map<string, number>();
-  const unknownCost: string[] = [];
-  let run = 0, cum = 0;
-
-  for (const r of sorted) {
-    const st = pos.get(r.ticker) ?? [0, 0];
-    if (r.side === "buy") {
-      st[0] += r.qty;
-      st[1] += r.qty * r.price;
-    } else {
-      // 보유분만 손익을 낸다. 초과분(원장보다 많이 팔린 수량)은 원가를 모르므로 제외한다.
-      const known = Math.min(r.qty, Math.max(0, st[0]));
-      if (known > 0) {
-        const avg = st[1] / st[0];
-        const pnl = (r.price - avg) * known;
-        cum += pnl;
-        if (r.date === today) run += pnl;
-        st[1] = Math.max(0, st[1] - avg * known);
-        st[0] = st[0] - known;
-      }
-      if (known < r.qty) {
-        unknownCost.push(`${r.ticker} ${r.date} 매도 ${r.qty - known}주 원가 미상(손익 제외)`);
-      }
-    }
-    pos.set(r.ticker, st);
-    cumQty.set(ledgerKey(r), st[0]);
-  }
-  return { run, cum, cumQty, unknownCost };
-}
+// 원장 워크는 순수 모듈로 옮겼다 (#505) — 화면(lib/portfolio.ts)이 블록별 손익을 파생하려면
+// 이 계산이 필요한데, close-sync 를 import 하면 mongoose 모델·KIS 클라이언트·mailer 가
+// 페이지 렌더 그래프로 끌려온다. 기존 import 가 깨지지 않게 여기서 re-export 한다.
+export { walkLedger, cumAsOf, walkBooks, reconcileBooks, ledgerKey } from "./pnl-walk";
+export type { LedgerRow, LedgerWalk, BookRow } from "./pnl-walk";
 
 export function fillsToTradesAndPnl(
   fills: Fill[],
   opts: {
     env: string; market: "kr" | "us"; today: string;
     /** 전체 원장 워크 결과 (#500) — 누적수량을 여기서 가져온다. 없으면 창 기준 폴백. */
-    walk?: LedgerWalk;
+    walk?: _LedgerWalk;
     /**
      * 종목 → 그 체결을 낸 블록 (#372). 예전엔 여기에 `strategy: portfolio.strategy` 가
      * 들어와 **계좌 전체 체결을 자기 전략으로 통째 태깅**했다 — 블록이 둘이 되자
      * 먼저 도는 쪽이 선점했다. 이제 주인이 분명한 체결만 태그를 받는다.
      */
-    owner: (ticker: string, date: string) => FillOwner | null;
+    owner: (ticker: string, date: string, recordedStrategy?: string,
+            side?: "buy" | "sell") => FillOwner | null;
+    /** `ticker|time|action` → 이미 기록된 전략 (#505). veto 판정에 쓴다. */
+    recorded?: Map<string, string>;
   },
 ): { records: Json[]; run: number; cum: number } {
   const defaultCur = opts.market === "kr" ? "KRW" : "USD";
@@ -226,7 +156,10 @@ export function fillsToTradesAndPnl(
   const records = recent.map(({ r, cumQty, price }) => {
     // 주인이 없으면(옛 유니버스 청산분·겹치는 종목) 태그 없이 기록만 남긴다.
     // buildTradeUpsertOp 이 undefined 를 걸러 빈 값을 박지 않는다.
-    const own = opts.owner(r.ticker, r.date);
+    // 기록 전략·방향을 함께 넘긴다 (#505) — 이게 없으면 블록 생성 당일 매도 veto 가
+    // **재푸시에서 안 먹어** 오늘 고친 귀속이 오늘 밤 마감에 되돌아간다.
+    const own = opts.owner(
+      r.ticker, r.date, opts.recorded?.get(`${r.ticker}|${r.time}|${r.side}`), r.side);
     // 누적수량은 **전체 원장** 기준이어야 한다 (#500). 창 기준으로 내면 창 밖 매수가 빠진
     // 만큼 낮게 박히고, RECENT_TRADES 를 지난 옛 기록은 다시 갱신되지 않아 영구히 남는다
     // (실측: 069500 저장 21 / 실제 24 — 오차 −3 이 창 밖 매수분과 정확히 일치).
@@ -461,9 +394,13 @@ export async function runCloseSync(
   // **새 체결 줍기 전용**이고, 손익·누적수량은 우리 DB 전체 이력에서 나온다.
   // 전 이력에서 종목별 매수 ≥ 매도가 전부 성립하므로(청산 종목은 정확히 0) 원가 미상
   // 매도는 발생하지 않아야 한다 — 발생하면 그건 신호이므로 경고로 드러낸다.
-  const ledger: LedgerRow[] = [];
+  const ledger: _LedgerRow[] = [];
   const seen = new Set<string>();
-  const pushRow = (r: LedgerRow) => {
+  // `ticker|time|side` → 이미 기록된 전략·블록 (#505). 앞의 것은 귀속 veto 판정에,
+  // 뒤의 것은 book 별 손익 분해 검사에 쓴다.
+  const recorded = new Map<string, string>();
+  const bookOf = new Map<string, string>();
+  const pushRow = (r: _LedgerRow) => {
     const k = `${r.ticker}|${r.time}|${r.side}`;
     if (seen.has(k)) return; // 오늘 체결이 이미 DB 에 있으면 한 번만
     seen.add(k);
@@ -481,27 +418,58 @@ export async function runCloseSync(
     // 사실이므로 표시 설정이 바꾸면 안 된다. 실측으로 이 계좌엔 숨겨진 완결 포지션이 68건
     // 있고(옛 trend_v1 유니버스, 종목별 순수량 전부 0) 합계 +2,774 를 실현했다.
     const past = await StockTrade.find({ env: account.envKey })
-      .select({ ticker: 1, date: 1, time: 1, action: 1, qty: 1, price: 1, currency: 1, _id: 0 })
+      .select({ ticker: 1, date: 1, time: 1, action: 1, qty: 1, price: 1, currency: 1,
+                strategy: 1, portfolioId: 1, _id: 0 })
       .lean();
     for (const t of past) {
       if ((t.currency || currency) !== currency) continue; // 통화가 섞이면 회계가 무의미하다
-      pushRow({ ticker: String(t.ticker), date: String(t.date), time: String(t.time),
-                side: t.action === "sell" ? "sell" : "buy",
+      const side = t.action === "sell" ? "sell" as const : "buy" as const;
+      const time = String(t.time);
+      pushRow({ ticker: String(t.ticker), date: String(t.date), time, side,
                 qty: Number(t.qty ?? 0), price: Number(t.price ?? 0), currency });
+      if (t.strategy) recorded.set(`${t.ticker}|${time}|${side}`, String(t.strategy));
+      bookOf.set(`${t.ticker}|${time}|${side}`, t.portfolioId ? String(t.portfolioId) : "");
     }
   } catch (e) {
     fillsOk = false;
     log(`⚠ 매매원장 조회 실패 — 누적손익을 기록하지 않는다: ${e instanceof Error ? e.message : e}`);
   }
-  const walk = walkLedger(ledger, today);
+  const walk = _walkLedger(ledger, today);
   if (walk.unknownCost.length) {
     log(`⚠ 원가 미상 매도 ${walk.unknownCost.length}건 — 손익에서 제외했다(0 으로 채우지 않는다): `
       + walk.unknownCost.slice(0, 3).join(" · "));
   }
 
   const out = fillsToTradesAndPnl(fills, {
-    env: account.envKey, market, today, owner: ownerLookup(siblings), walk,
+    env: account.envKey, market, today, owner: ownerLookup(siblings), walk, recorded,
   });
+
+  // ── 분해 점검 2개 (#505) — 조용히 어긋나지 않게 ──
+  //
+  // 42.06 이 3개월 숨은 이유는 이 검사가 없었던 것뿐이다. 값을 고치는 게 아니라 **어긋났다는
+  // 사실을 드러내는** 것이 목적이라, 실패해도 사이클을 멈추지 않고 경고만 남긴다.
+  try {
+    const { books, pooled } = _walkBooks(
+      ledger.map((r) => ({ ...r, book: bookOf.get(`${r.ticker}|${r.time}|${r.side}`) ?? "" })),
+      today);
+    const rec = _reconcileBooks(books, pooled);
+    if (rec.residual !== 0) {
+      log(`⚠ 손익 분해 불일치 ${formatMoney(rec.residual, market)} — ${rec.reasons.slice(0, 3).join(" · ")}`);
+    }
+    // book 별 원장 순수량 vs 증권사 보유수량. 이 체크가 있었으면 TQQQ 4주 구멍이 첫날 울렸다.
+    const ledgerQty = new Map<string, number>();
+    for (const w of Object.values(books)) {
+      for (const [t, q] of w.netQty) ledgerQty.set(t, (ledgerQty.get(t) ?? 0) + q);
+    }
+    for (const [sym, [held]] of Object.entries(holdings)) {
+      const mine = Math.round(ledgerQty.get(sym) ?? 0);
+      if (mine !== Math.round(held)) {
+        log(`⚠ 원장 수량 불일치 ${sym}: 원장 ${mine} vs 보유 ${held} — 체결 기록에 구멍이 있다`);
+      }
+    }
+  } catch (e) {
+    log(`손익 분해 점검 실패(운용은 계속): ${e instanceof Error ? e.message : e}`);
+  }
   run = walk.run;
   cum = walk.cum;
   tradeCount = await upsertTrades(out.records);

@@ -66,7 +66,6 @@ for (const [scope, blocks] of byScope) {
 }
 
 const lookups = new Map([...byScope].map(([k, v]) => [k, ownerLookup(v)]));
-const strategyOfBlock = new Map(ports.map((p) => [String(p._id), String(p.strategy ?? "")]));
 
 // ── 주문 로그로 교차검증 — 실제 주문을 낸 전략과 어긋나는지 본다 ─────────
 const orderStrategies = new Map(); // `${envKey}|${market}|${symbol}` -> Set(strategy)
@@ -75,7 +74,9 @@ for (const l of await db.collection("tradingorderlogs").find({}).toArray()) {
   (orderStrategies.get(k) ?? orderStrategies.set(k, new Set()).get(k)).add(l.strategy);
 }
 
-const trades = await db.collection("stocktrades").find({ hidden: { $ne: true } }).toArray();
+// ⚠ `hidden` 으로 거르지 않는다 (#505). 문제의 행(TQQQ 2026-07-17 sell 4)이 `hidden: true` 라
+//    이 스크립트는 그 행을 **한 번도 본 적이 없다.** hidden 은 표시 설정이지 회계 대상 여부가 아니다.
+const trades = await db.collection("stocktrades").find({}).toArray();
 const ops = [];
 let 손대지않음 = 0;
 const 요약 = new Map();
@@ -83,8 +84,22 @@ const 요약 = new Map();
 for (const t of trades) {
   const market = t.currency === "KRW" ? "kr" : "us";
   const lookup = lookups.get(`${t.env}|${market}`);
-  const own = lookup ? lookup(t.ticker, t.date, t.strategy) : null;
-  if (!own) { 손대지않음++; continue; }
+  // 방향까지 넘긴다 (#505) — 블록 생성 당일의 매도는 앞 전략의 청산일 수 있다.
+  const side = t.action === "sell" ? "sell" : "buy";
+  const own = lookup ? lookup(t.ticker, t.date, t.strategy, side) : null;
+
+  if (!own) {
+    // **잘못 붙은 귀속은 떼어낸다** (#505). 예전엔 `$set` 만 해서 한 번 잘못 붙은 태그를
+    // 영영 못 고쳤다. `null` 을 박으면 안 된다 — `buildTradeUpsertOp` 이 null 은 안 지우고,
+    // 다음 마감이 되돌린다. `$unset` 이어야 한다.
+    if (t.portfolioId) {
+      요약.set(`${t.env}|${t.ticker}|${t.strategy ?? ""}→(무주)`,
+               (요약.get(`${t.env}|${t.ticker}|${t.strategy ?? ""}→(무주)`) ?? 0) + 1);
+      console.log(`  ${t.date} ${t.ticker} ${t.action} — 귀속 해제(기록 전략 ${t.strategy})`);
+      ops.push({ updateOne: { filter: { _id: t._id }, update: { $unset: { portfolioId: "" } } } });
+    } else 손대지않음++;
+    continue;
+  }
 
   const set = {};
   if (String(t.portfolioId ?? "") !== own.id) set.portfolioId = new mongoose.Types.ObjectId(own.id);

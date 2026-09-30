@@ -44,7 +44,8 @@ type Claim = FillOwner & { since?: string };
  */
 export function ownerLookup(
   blocks: AttributionBlock[],
-): (ticker: string, date: string, recordedStrategy?: string) => FillOwner | null {
+): (ticker: string, date: string, recordedStrategy?: string,
+    side?: "buy" | "sell") => FillOwner | null {
   const claims = new Map<string, Claim[]>();
   for (const b of blocks) {
     for (const sym of blockSymbols(b.config) ?? []) {
@@ -56,10 +57,33 @@ export function ownerLookup(
     }
   }
   const 벗기기 = (c: Claim): FillOwner => ({ id: c.id, strategy: c.strategy });
-  return (ticker: string, date: string, recordedStrategy?: string) => {
+  return (ticker: string, date: string, recordedStrategy?: string,
+          side?: "buy" | "sell") => {
     const all = claims.get(ticker) ?? [];
     const live = all.filter((c) => !c.since || date >= c.since);
-    if (live.length === 1) return 벗기기(live[0]);
+    if (live.length === 1) {
+      // **블록이 생긴 날의 매도는 앞 전략의 청산일 수 있다** (#505).
+      //
+      // `since` 판정이 `date >= since`(생성 당일 포함)라, 옛 전략의 마지막 청산이 새 블록
+      // 생성 당일에 걸리면 새 블록 것이 됐다. 실제로 그랬다 — TQQQ 2026-07-17 sell 4 는
+      // 기록이 trend_v1 인데 그날 생긴 v4 블록에 귀속됐고, 대응 매수 3건은 무주라
+      // 손익 −42.06 이 매수·매도로 갈려 사라졌다(3개월간 조용히).
+      //
+      // ⚠ "기록 전략이 다르면 무조건 거부" 로는 못 고친다. 바로 아래 케이스와 **구조가 같고
+      //   원하는 결과가 반대**이기 때문이다:
+      //     SOXL 2026-09-01 · 기록 infinite_v4(잘못) · VR 블록 since 09-01 → VR 이 가져가야 한다
+      //     TQQQ 2026-07-17 · 기록 trend_v1(맞음)   · v4 블록 since 07-17 → v4 가 가져가면 안 된다
+      //   구분자는 **방향**이다. 블록의 첫날 **매수**는 그 블록의 진입이고(VR 시드),
+      //   첫날 **매도**는 들고 있지도 않던 물량의 청산이다.
+      //
+      // 그래서 조건을 최대한 좁힌다 — 생성 당일 && 매도 && 기록 전략이 다름. 실측으로
+      // 운영 데이터 300건 중 이 조건에 걸리는 행은 문제의 1건뿐이다.
+      if (side === "sell" && recordedStrategy
+          && live[0].since === date && live[0].strategy !== recordedStrategy) {
+        return null;
+      }
+      return 벗기기(live[0]);
+    }
     if (recordedStrategy) {
       const 같은전략 = all.filter((c) => c.strategy === recordedStrategy);
       if (같은전략.length === 1) return 벗기기(같은전략[0]);
