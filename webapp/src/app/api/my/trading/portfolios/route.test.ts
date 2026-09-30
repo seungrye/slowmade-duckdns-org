@@ -14,7 +14,8 @@ vi.mock("@/models/trading-portfolio", () => ({
   },
 }));
 vi.mock("@/models/trading-account", () => ({ default: { findById: vi.fn() } }));
-vi.mock("@/models/trading-run", () => ({ default: { countDocuments: vi.fn() } }));
+vi.mock("@/models/trading-run", () => ({ default: { find: vi.fn() } }));
+vi.mock("@/models/trading-order-log", () => ({ default: { countDocuments: vi.fn() } }));
 vi.mock("@/models/trading-portfolio-revision", () => ({
   default: { findOne: vi.fn(), create: vi.fn() },
 }));
@@ -27,12 +28,16 @@ import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
 import TradingPortfolioRevision from "@/models/trading-portfolio-revision";
 import TradingRun from "@/models/trading-run";
+import TradingOrderLog from "@/models/trading-order-log";
 
 const mockOwner = requireOwner as unknown as ReturnType<typeof vi.fn>;
 const P = TradingPortfolio as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const A = TradingAccount as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const R = TradingPortfolioRevision as unknown as Record<string, ReturnType<typeof vi.fn>>;
 const TR = TradingRun as unknown as Record<string, ReturnType<typeof vi.fn>>;
+const OL = TradingOrderLog as unknown as Record<string, ReturnType<typeof vi.fn>>;
+/** TradingRun.find().select().lean() 체인 */
+const runsLean = (v: unknown[]) => ({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(v) }) });
 /** revision 모델의 findOne().sort().select().lean() 체인 */
 const revLean = (v: unknown) => ({
   sort: vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(v) }) }),
@@ -65,7 +70,8 @@ beforeEach(() => {
   A.findById.mockReturnValue(lean({ envKey: "paper-50194613" }));
   R.findOne.mockReturnValue(revLean(null));
   R.create.mockResolvedValue({});
-  TR.countDocuments.mockResolvedValue(0);
+  TR.find.mockReturnValue(runsLean([]));
+  OL.countDocuments.mockResolvedValue(0);
 });
 
 describe("POST — 추가와 수정을 가른다 (#339)", () => {
@@ -308,11 +314,22 @@ describe("POST — 안전하지 않은 이동은 거부한다 (#515)", () => {
     expect(P.findOneAndUpdate).not.toHaveBeenCalled();
   });
 
-  it("오늘 이미 사이클이 돌았으면 409 — 옛 계좌에 건 주문이 고아가 된다", async () => {
-    TR.countDocuments.mockResolvedValue(1); // 오늘 TradingRun 존재
+  it("오늘 **접수된 주문**이 있으면 409 — 옛 계좌에 건 주문이 고아가 된다", async () => {
+    TR.find.mockReturnValue(runsLean([{ _id: "run-1" }]));
+    OL.countDocuments.mockResolvedValue(3); // 접수 3건
     const res = await post(moveBody());
     expect(res.status).toBe(409);
     expect(P.findOneAndUpdate).not.toHaveBeenCalled();
+  });
+
+  it("오늘 런이 있어도 **전부 거부**였으면 옮길 수 있다 — 고아가 될 주문이 없다", async () => {
+    // 실측: 2026-09-30 미장 사이클은 16건 계획·접수 0건(계좌 만료로 전부 40910000).
+    // 그 상태에서 막으면 계좌를 못 옮겨 문제를 고칠 수가 없다.
+    TR.find.mockReturnValue(runsLean([{ _id: "run-1" }]));
+    OL.countDocuments.mockResolvedValue(0);
+    const res = await post(moveBody());
+    expect(res.status).toBe(200);
+    expect(P.findOneAndUpdate).toHaveBeenCalled();
   });
 
   it("대상 계정이 없으면 400 — 스케줄러가 조용히 건너뛰는 상태로 만들지 않는다", async () => {
