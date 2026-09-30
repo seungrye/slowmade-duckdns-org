@@ -119,6 +119,8 @@ export default function BacktestClient() {
   const [takeProfitPct, setTakeProfitPct] = useState(10);
   const [locPremiumPct, setLocPremiumPct] = useState(12);
   const [iv4V, setIv4V] = useState(0); // v4 변동성 계수 V(%). 0=비움 → §5.3.2 자동 유도
+  // 익절 목표(%) — 라이브는 starBase 와 따로 받는다 (#507). 0=비움 → V 를 쓴다(종전 동작).
+  const [iv4Sell, setIv4Sell] = useState(0);
   // 추세추종 v1·v3·v4 공통(MA 크로스) / v2 는 단일 MA
   const [shortMa, setShortMa] = useState(20);
   const [longMa, setLongMa] = useState(60);
@@ -361,7 +363,7 @@ export default function BacktestClient() {
       const variantVer = INFINITE_VARIANT_VER[strategy];
       const r = (() => {
         if (variantVer) return runInfiniteVariantBacktest(bars, { principal, splits, version: variantVer });
-        if (strategy === "infinite_v4_0") return runInfiniteV4Backtest(bars, { principal, splits, v: iv4V || undefined });
+        if (strategy === "infinite_v4_0") return runInfiniteV4Backtest(bars, { principal, splits, v: iv4V || undefined, sellTarget: iv4Sell || undefined });
         switch (strategy) {
           case "infinite_v1":
             return runBacktest(bars, { principal, splits, takeProfitPct: takeProfitPct / 100, locPremiumPct: locPremiumPct / 100 });
@@ -510,6 +512,8 @@ export default function BacktestClient() {
         {strategy === "infinite_v4_0" && (
           <Field label="V (변동성 계수, %)" hint="비우면 자동(V≈4×일간σ%, §5.3.2). 종목별: TQQQ 15 · SOXL 20 · KODEX레버리지 8. ⚠σ→V는 미검증 추론(§5.5)">
             <input type="number" value={iv4V || ""} min={0} placeholder="자동" onChange={(e) => setIv4V(Number(e.target.value))} className="input" />
+            <label className="text-sm text-gray-500" title="라이브 config.sellTarget 과 같은 값. 비우면 V 를 쓴다">익절 목표(%)</label>
+            <input type="number" value={iv4Sell || ""} min={0} placeholder="V" onChange={(e) => setIv4Sell(Number(e.target.value))} className="input" />
           </Field>
         )}
         {strategy === "trend_v2" && (

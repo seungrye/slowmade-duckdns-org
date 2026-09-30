@@ -119,29 +119,47 @@ async function execute(
   intents: OrderIntent[], broker: LiveBroker, log: CycleLogger,
 ): Promise<{ executed: number; live: boolean }> {
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
-  let executed = 0;
+  let executed = 0, rejected = 0;
   for (const it of intents) {
     // 주문 단위 격리 — 한 종목의 주문 거부가 나머지(특히 trend 유니버스)를 죽이지 않게.
+    let orderNo = "";
+    let error = "";
     try {
-      let orderNo = "";
       if (live) {
         orderNo = await broker.submit(it.symbol, it.qty, it.side, it.price);
+        executed++;
         log(`주문 접수 ${orderNo} — ${it.side} ${it.symbol} x${it.qty}`);
         // 매매기록(stocktrades)은 주문 시점이 아니라 **장 마감 sync 의 실제 체결내역**으로
         // 기록한다(정확한 체결가·수량). 여기서 즉시 기록하지 않는다.
       } else {
         log(`[DRY-RUN] ${it.side} ${it.symbol} x${it.qty} @${formatMoney(it.price, broker.market)} — ${it.reason}`);
+        executed++;
       }
+    } catch (e) {
+      rejected++;
+      error = e instanceof Error ? e.message : String(e);
+      log(`[${it.symbol}] 주문 실패 — 다음 주문 계속: ${error}`);
+    }
+    // 거부도 남긴다 (#507) — 예전엔 catch 가 원장 기록까지 건너뛰어 흔적이 0이었다.
+    // 기록은 전송과 같은 반복 안에서 한다(중복주문 가드의 유일한 근거다).
+    try {
       await TradingOrderLog.create({
         accountId: account._id, runId, envKey: account.envKey,
         market: portfolio.market, strategy: portfolio.strategy,
         symbol: it.symbol, side: it.side, qty: it.qty, price: it.price,
-        ordType: "market", reason: it.reason, dryRun: !live, orderNo,
+        ordType: "market",
+        reason: error ? `${it.reason} — 거부: ${error}` : it.reason,
+        dryRun: !live, orderNo,
       });
-      executed++;
     } catch (e) {
-      log(`[${it.symbol}] 주문 실패 — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
+      log(`⚠ [${it.symbol}] 주문 원장 기록 실패 — 중복주문 가드가 못 본다: `
+        + `${e instanceof Error ? e.message : e}`);
     }
+  }
+  // 낼 게 있었는데 한 건도 못 냈으면 사이클을 실패로 만든다 (#507). dry-run 은 제외 —
+  // 애초에 submit 을 안 부르므로 게이트하지 않으면 모든 검증 실행이 failed 로 찍힌다.
+  if (live && intents.length > 0 && executed === 0) {
+    throw new Error(`주문 ${intents.length}건이 전부 거부됐다 — 접수 0건 (거부 ${rejected}건)`);
   }
   return { executed, live };
 }

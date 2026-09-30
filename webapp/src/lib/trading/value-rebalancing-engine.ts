@@ -166,6 +166,12 @@ export async function runValueRebalancing(
   try {
     const open = degraded ? [] : await broker.openOrders(sym);
     for (const o of open) {
+      // dry-run 은 **취소도 하지 않는다** (#507). 검증용 「지금 실행」이 실제 미체결을
+      // 지우면 그건 검증이 아니라 운용 개입이다(#488 이 상태 저장에 대해 한 것과 같은 규율).
+      if (!live) {
+        log(`[DRY-RUN] 묵은 주문 취소 ${o.orderNo} x${o.qty}`);
+        continue;
+      }
       await broker.cancel(sym, o.orderNo, o.qty);
       log(`[vr:${sym}] 묵은 주문 취소 ${o.orderNo} x${o.qty}`);
     }
@@ -213,25 +219,40 @@ async function sendOrders(
     runId: Types.ObjectId; market: "kr" | "us"; sym: string; live: boolean; log: CycleLogger;
   },
 ): Promise<void> {
+  let accepted = 0, rejected = 0;
   for (const o of orders) {
     let orderNo = "";
+    let error = "";
     try {
       if (ctx.live) {
         const 형식 = o.ordType ?? "loc";
         orderNo = await broker.place(ctx.sym, { side: o.side, qty: o.qty, price: o.price, ordType: 형식, reason: o.reason });
+        accepted++;
         ctx.log(`주문 접수 ${orderNo} — ${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)} (${형식})`);
       } else {
         ctx.log(`[DRY-RUN] ${o.side} ${ctx.sym} x${o.qty} @${formatMoney(o.price, ctx.market)} (${o.ordType ?? "loc"}) — ${o.reason}`);
       }
     } catch (e) {
-      ctx.log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)}) — 다음 주문 계속: ${e instanceof Error ? e.message : e}`);
-      continue;
+      rejected++;
+      error = e instanceof Error ? e.message : String(e);
+      ctx.log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)}) — 다음 주문 계속: ${error}`);
     }
-    await TradingOrderLog.create({
-      accountId: ctx.account._id, runId: ctx.runId, envKey: ctx.account.envKey,
-      market: ctx.market, strategy: "value_rebalancing",
-      symbol: ctx.sym, side: o.side, qty: o.qty, price: Math.round(o.price * 100) / 100,
-      ordType: o.ordType ?? "loc", reason: o.reason, dryRun: !ctx.live, orderNo,
-    });
+    // 거부도 남기고, 기록은 전송과 같은 반복 안에서 한다 (#507) — v4 와 같은 이유.
+    try {
+      await TradingOrderLog.create({
+        accountId: ctx.account._id, runId: ctx.runId, envKey: ctx.account.envKey,
+        market: ctx.market, strategy: "value_rebalancing",
+        symbol: ctx.sym, side: o.side, qty: o.qty, price: Math.round(o.price * 100) / 100,
+        ordType: o.ordType ?? "loc",
+        reason: error ? `${o.reason} — 거부: ${error}` : o.reason,
+        dryRun: !ctx.live, orderNo,
+      });
+    } catch (e) {
+      ctx.log(`⚠ 주문 원장 기록 실패(orderNo=${orderNo || "없음"}) — 중복주문 가드가 못 본다: `
+        + `${e instanceof Error ? e.message : e}`);
+    }
+  }
+  if (ctx.live && orders.length > 0 && accepted === 0) {
+    throw new Error(`${ctx.sym}: 주문 ${orders.length}건이 전부 거부됐다 — 접수 0건 (거부 ${rejected}건)`);
   }
 }

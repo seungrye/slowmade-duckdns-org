@@ -194,3 +194,31 @@ describe("VR 엔진 — 대사 실패일엔 사이클도 진행하지 않는다"
     expect(persisted.at(-1)).toMatchObject({ sinceCycle: 9, V: 8500 });
   });
 });
+
+// #507 — 주문 거부 은폐는 VR 에도 있다. 전략을 가리지 않는 구조적 문제다.
+describe("VR 엔진 — 주문 거부를 숨기지 않는다 (#507)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 0, cumBuy: 8500, cumSell: 0, lastRunDate: "20260721" };
+  const brokerRejecting: V4Broker = {
+    snapshot: async () => ({ holding: 85, avg: 100, price: 130, cash: 1500 }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {},
+    place: async () => { throw new Error("40910000: 주문 불가"); },
+  };
+  const run507 = (live = true) => runValueRebalancing(
+    acct(live) as never, pf(CFG, { vr: seeded }) as never, "run1" as never,
+    brokerRejecting, () => {},
+  );
+
+  it("전량 거부되면 던진다", async () => {
+    await expect(run507()).rejects.toThrow(/거부|주문/);
+  });
+  it("거부도 원장에 남긴다", async () => {
+    await run507().catch(() => {});
+    expect(orderLogs.length).toBeGreaterThan(0);
+    expect(orderLogs.every((o) => o.orderNo === "")).toBe(true);
+  });
+  it("dry-run 은 던지지 않는다", async () => {
+    await expect(run507(false)).resolves.toContain("VR");
+  });
+});

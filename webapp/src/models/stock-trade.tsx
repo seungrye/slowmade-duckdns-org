@@ -13,7 +13,7 @@ const { Schema, model, models } = mongoose;
  * date: "YYYY-MM-DD" — 차트의 x 축 (일봉 데이터와 join).
  * time: ISO 문자열(마이크로초) — 같은 날 여러 건 구분 + unique 키.
  *
- * 복합 unique: (env, ticker, time). v2 의 time 은 마이크로초라 같은 사이클 다건도 고유.
+ * 복합 unique: (env, ticker, time, action). v2 의 time 은 마이크로초라 같은 사이클 다건도 고유.
  */
 const StockTradeSchema = new Schema(
   {
@@ -44,7 +44,11 @@ const StockTradeSchema = new Schema(
   { timestamps: true },
 );
 
-StockTradeSchema.index({ env: 1, ticker: 1, time: 1 }, { unique: true });
+// (env, ticker, time, **action**) — action 은 #502 에서 들어왔다. 같은 종목·같은 초의
+// 매수·매도가 서로 덮지 않게 한다(close-sync 는 ticker|time|side 로 합산해 둘을 각각 만든다).
+// ⚠ DB 인덱스는 scripts/fix-trade-action-index.mjs 로 이미 교체했다 — 스키마만 옛 키로 남으면
+//   새 환경에서 syncIndexes 가 옛 unique 를 되살린다.
+StockTradeSchema.index({ env: 1, ticker: 1, time: 1, action: 1 }, { unique: true });
 StockTradeSchema.index({ ticker: 1, date: 1 });
 
 export type StockTradeType = InferSchemaType<typeof StockTradeSchema>;

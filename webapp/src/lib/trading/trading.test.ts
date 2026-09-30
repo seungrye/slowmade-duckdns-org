@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
-import { canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun } from "./scheduler";
+import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
 import { valueHoldings } from "./close-sync";
 
@@ -224,5 +224,25 @@ describe("scheduler.firstTradingPhase — run-now 기본 phase", () => {
   });
   it("마감(close)은 매매가 아니라 고르지 않는다", () => {
     expect(firstTradingPhase({ strategy: "lrs_v1", market: "us", runAt: "09:35" })).not.toBe("close");
+  });
+});
+
+// #507 — catch-up 에 상한이 없어 장 마감 뒤에도 그날 계획이 그대로 주문됐다.
+describe("scheduler.isDue — catch-up 상한", () => {
+  const clock = (hhmm: string) => ({ dateKey: "2026-09-30", hhmm, isWeekday: true });
+  it("정시~90분 안이면 돈다", () => {
+    expect(isDue({ runAt: "09:35" }, clock("09:35"))).toBe(true);
+    expect(isDue({ runAt: "09:35" }, clock("11:05"))).toBe(true);
+  });
+  it("90분을 넘기면 그날은 건너뛴다 — 종가 기준 주문이 마감 뒤에 나가면 안 된다", () => {
+    expect(isDue({ runAt: "09:35" }, clock("11:06"))).toBe(false);
+    expect(isDue({ runAt: "09:35" }, clock("16:30"))).toBe(false);
+  });
+  it("마감 sync(close)는 늦어도 돈다 — 차트·메일이라 무해하다", () => {
+    expect(isDue({ runAt: "16:10", phase: "close" }, clock("23:50"))).toBe(true);
+  });
+  it("자정을 넘기면 23:59 로 고정한다", () => {
+    expect(addMinutes("23:30", 90)).toBe("23:59");
+    expect(addMinutes("09:35", 90)).toBe("11:05");
   });
 });
