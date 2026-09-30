@@ -93,7 +93,8 @@ export default async function PortfolioDetailPage(props: {
   for (const tk of tickers) if (!names[tk] && ETF_NAMES[tk]) names[tk] = ETF_NAMES[tk];
 
   // 블록을 고르면 그 블록의 스냅샷을, 아니면 계좌 스냅샷을 보여준다 (#374).
-  const { history, blocks: series } = await getPortfolioData(env, currency);
+  const { history, blocks: series, pnlBreakdown } = await getPortfolioData(env, currency);
+  const block = selected ? series.find((b) => b.portfolioId === selected) : null;
   const shown = selected
     ? (series.find((b) => b.portfolioId === selected)?.history ?? [])
     : history;
@@ -108,6 +109,10 @@ export default async function PortfolioDetailPage(props: {
       names={names}
       history={shown}
       blocks={blocks}
+      isBlock={Boolean(selected)}
+      attributedCum={block?.attributedCum}
+      unknownCost={block?.unknownCost ?? []}
+      pnlBreakdown={pnlBreakdown}
       portfolioId={selected}
     />
   );

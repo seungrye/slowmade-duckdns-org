@@ -147,3 +147,49 @@ describe("ownerLookup — 이미 기록된 전략이 생성일보다 강한 증�
     expect(ownerLookup([kr, kr2])("069500", "2026-06-29", "infinite_v4")).toBeNull();
   });
 });
+
+// #505 — 귀속 버그 실수정. 옛 전략의 마지막 청산이 새 블록 생성 **당일**에 걸려 새 블록 것이
+// 됐다(판정이 `date >= since`). 그 1건 때문에 블록 손익 분해가 42.06 만큼 안 맞았다:
+//   TQQQ 2026-07-17 sell 4 @65.96 · 기록 전략 trend_v1 · v4 블록(since 07-17)에 귀속
+//   대응 매수 3건은 무주 → 매수는 무주, 매도는 블록으로 갈려 손익이 사라졌다
+describe("ownerLookup — 기록 전략이 다르면 귀속하지 않는다 (#505)", () => {
+  const v4 = {
+    id: "blk-v4", strategy: "infinite_v4", since: "2026-07-17",
+    config: { symbol: "TQQQ" },
+  };
+  const owner = ownerLookup([v4]);
+
+  it("생성 당일의 **매도** 이고 기록 전략이 다르면 거부한다 — 앞 전략의 청산이다", () => {
+    expect(owner("TQQQ", "2026-07-17", "trend_v1", "sell")).toBeNull();
+  });
+
+  it("생성 당일의 **매수** 는 귀속한다 — 그 블록의 진입이다(VR 시드 같은)", () => {
+    expect(owner("TQQQ", "2026-07-17", "trend_v1", "buy")).toMatchObject({ id: "blk-v4" });
+  });
+
+  it("생성일 이후의 매도는 기록 전략이 달라도 귀속한다 — 잘못 붙은 태그를 고칠 수 있어야 한다", () => {
+    expect(owner("TQQQ", "2026-08-01", "trend_v1", "sell")).toMatchObject({ id: "blk-v4" });
+  });
+
+  it("기록 전략이 같으면 생성 당일 매도라도 귀속한다", () => {
+    expect(owner("TQQQ", "2026-07-17", "infinite_v4", "sell")).toMatchObject({ id: "blk-v4" });
+  });
+
+  it("방향이나 기록 전략을 모르면 종전대로 귀속한다 — 옛 기록까지 놓지 않는다", () => {
+    expect(owner("TQQQ", "2026-07-17")).toMatchObject({ id: "blk-v4" });
+    expect(owner("TQQQ", "2026-07-17", "trend_v1")).toMatchObject({ id: "blk-v4" });
+    expect(owner("TQQQ", "2026-07-17", "", "sell")).toMatchObject({ id: "blk-v4" });
+  });
+
+  it("069500 처럼 기록 전략이 이미 맞는 경우는 영향 없다", () => {
+    // v1→v4 편입 케이스. 실측으로 그 81건은 전부 strategy=infinite_v4 로 기록돼 있어
+    // veto 가 걸리지 않는다 — 걱정하던 경우는 애초에 위험하지 않았다.
+    const kr = ownerLookup([{ id: "blk-kr", strategy: "infinite_v4", since: "2026-07-12",
+                              config: { symbol: "069500" } }]);
+    expect(kr("069500", "2026-08-01", "infinite_v4")).toMatchObject({ id: "blk-kr" });
+  });
+
+  it("since 이전이어도 기록 전략이 같으면 귀속한다 — 기존 폴백(v1→v4 편입) 그대로", () => {
+    expect(owner("TQQQ", "2026-07-16", "infinite_v4", "sell")).toMatchObject({ id: "blk-v4" });
+  });
+});

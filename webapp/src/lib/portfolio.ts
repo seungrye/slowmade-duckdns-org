@@ -1,5 +1,7 @@
 import { connectToDB } from "@/lib/db";
 import PortfolioHistory from "@/models/portfolio-history";
+// ⚠ close-sync 를 import 하면 mongoose 모델·KIS 클라이언트·mailer 가 페이지 그래프로 끌려온다.
+import { cumAsOf, reconcileBooks, walkBooks } from "@/lib/trading/pnl-walk";
 import StockTrade from "@/models/stock-trade";
 import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
@@ -46,6 +48,8 @@ export type HistoryPoint = {
   cash: number;
   holdingsValue: number;
   cumulativePnl: number;
+  /** 그 날짜까지의 **귀속** 실현손익 (#505). 블록 시리즈에만 붙는다. */
+  attributedCumPnl?: number;
   /**
    * 매매기록·일봉으로 되살린 행 (#373). 이 행의 현금·총재산·누적손익은 **모르는 값**이라
    * 화면이 숫자 대신 `—` 로 보여야 한다. 되살릴 수 있는 건 보유 평가액뿐이다.
@@ -69,6 +73,10 @@ export type BlockSeries = {
   history: HistoryPoint[];
   /** 그 블록에 귀속된 매매만 (#372·#373). 마커를 블록 선 위에 찍는다. */
   tradesByDate: Record<string, TradeStats>;
+  /** 귀속 실현손익 — 원장에서 파생한다(저장 안 함). 계좌 탭의 「누적 손익」과 **다른 정의**다. */
+  attributedCum?: number;
+  /** 원가를 모르는 매도. 있으면 그 블록 숫자가 실제보다 유리/불리하게 보인다 */
+  unknownCost?: string[];
 };
 
 export type PortfolioData = {
@@ -84,6 +92,10 @@ export type PortfolioData = {
    * 남긴다 — 안 그러면 같은 매매가 계좌 선과 블록 선에 두 번 찍힌다.
    */
   unownedTradesByDate: Record<string, TradeStats>;
+  /** 블록 손익 분해 검사 (#505). */
+  pnlBreakdown?: {
+    residual: number; reasons: string[]; unattributedCum: number; pooledCum: number;
+  };
 };
 
 type HistDoc = HistoryPoint & Record<string, unknown>;
@@ -98,6 +110,8 @@ type BlockDoc = HistDoc & { portfolioId: unknown; strategy?: string; backfilled?
 export function groupBlocks(
   docs: BlockDoc[],
   tradesByBlock: Record<string, Record<string, TradeStats>> = {},
+  /** 블록별 원장 워크 (#505) — 손익은 저장하지 않고 여기서 파생해 실어 준다. */
+  books: Record<string, { cum: number; cumByDate: Map<string, number>; unknownCost: string[] }> = {},
 ): BlockSeries[] {
   const by = new Map<string, BlockDoc[]>();
   for (const d of docs) {
@@ -108,8 +122,15 @@ export function groupBlocks(
     portfolioId,
     // 백필 행에는 strategy 를 같이 넣지만, 라이브 행이 있으면 그쪽이 최신이다.
     strategy: rows.map((r) => r.strategy).filter(Boolean).pop() ?? "",
-    history: dedupeHistory(rows),
+    // 저장된 cumulativePnl 은 블록 행에 **없다**(#382). 원장에서 파생한 값을 날짜마다 얹는다.
+    history: dedupeHistory(rows).map((h) => ({
+      ...h,
+      attributedCumPnl: books[portfolioId]
+        ? cumAsOf(books[portfolioId].cumByDate, h.dateStr) : undefined,
+    })),
     tradesByDate: tradesByBlock[portfolioId] ?? {},
+    attributedCum: books[portfolioId]?.cum,
+    unknownCost: books[portfolioId]?.unknownCost ?? [],
   }));
 }
 type TradeDoc = {
@@ -132,6 +153,7 @@ export function dedupeHistory(histDocs: HistDoc[]): HistoryPoint[] {
     cash: h.cash,
     holdingsValue: h.holdingsValue,
     cumulativePnl: h.cumulativePnl,
+    ...(h.attributedCumPnl !== undefined ? { attributedCumPnl: h.attributedCumPnl } : {}),
     ...(h.backfilled ? { backfilled: true } : {}),
   }));
 }
@@ -204,10 +226,18 @@ export async function getPortfolioData(env: Env, currency: Currency): Promise<Po
     .select({ date: 1, dateStr: 1, totalValue: 1, cash: 1, holdingsValue: 1, portfolioId: 1, strategy: 1, backfilled: 1, _id: 0 })
     .sort({ date: 1 })
     .lean();
-  const trades = await StockTrade.find({ env, currency, hidden: { $ne: true } })
-    .select({ ticker: 1, action: 1, amount: 1, price: 1, qty: 1, date: 1, portfolioId: 1, _id: 0 })
+  // ⚠ `hidden` 을 **쿼리 조건으로 쓰지 않는다** (#505). hidden 은 표시 설정인데 회계 원장에서
+  //   거르면 블록 하나를 숨기는 순간 손익이 튄다(실측: pooled −2,238 → −5,012, 무주는 2,815 이동).
+  //   #500 이 가르친 병과 같다 — 집합이 바뀌면 누적이 바뀐다. 그래서 전량을 읽고
+  //   **표시 집계에서만** 메모리로 거른다.
+  const tradeDocs = await StockTrade.find({ env, currency })
+    .select({ ticker: 1, action: 1, amount: 1, price: 1, qty: 1, date: 1, time: 1,
+              portfolioId: 1, hidden: 1, _id: 0 })
     .lean();
-  const all = trades as unknown as TradeDoc[];
+  const ledgerRows = tradeDocs as unknown as (TradeDoc & {
+    time?: string; hidden?: boolean; price?: number; qty?: number;
+  })[];
+  const all = ledgerRows.filter((t) => !t.hidden) as TradeDoc[];
   // 블록에 귀속된 매매(#372)는 그 블록 선 위에, 주인 없는 매매는 계좌 선 위에 찍는다.
   const 블록별 = splitTradesByBlock(all);
   const 블록집계: Record<string, Record<string, TradeStats>> = {};
@@ -215,11 +245,33 @@ export async function getPortfolioData(env: Env, currency: Currency): Promise<Po
     블록집계[id] = aggregateTradesByDate(rows);
   }
 
+  // 블록별 누적손익은 **저장하지 않고 읽을 때 파생한다** (#505·#382).
+  // 블록 행에 쓰면 `recalc-cumulative-pnl.mjs` 의 $unset 과 서로 반대로 쓰게 된다.
+  const books = walkBooks(
+    ledgerRows.map((t) => ({
+      book: t.portfolioId ? String(t.portfolioId) : "",
+      ticker: String(t.ticker), date: String(t.date),
+      time: String(t.time ?? `${t.date}T00:00:00`),
+      side: t.action === "sell" ? "sell" as const : "buy" as const,
+      qty: Number(t.qty ?? 0), price: Number(t.price ?? 0), currency,
+    })),
+    histDocs.length ? String(histDocs[histDocs.length - 1].dateStr) : "",
+  );
+  const 분해 = reconcileBooks(books.books, books.pooled);
+
   return {
     env,
     currency,
     history: dedupeHistory(histDocs as unknown as HistDoc[]),
-    blocks: groupBlocks(blockDocs as unknown as BlockDoc[], 블록집계),
+    blocks: groupBlocks(blockDocs as unknown as BlockDoc[], 블록집계, books.books),
+    /** 블록 손익 분해가 닫히는지 (#505). 잔차 0 이어도 화면이 찍는다 — 정상 모양을 학습시켜야
+     *  비정상이 눈에 걸린다. 무주 몫도 함께 준다(숨기면 블록 합만 보고 계좌를 오해한다). */
+    pnlBreakdown: {
+      residual: 분해.residual,
+      reasons: 분해.reasons,
+      unattributedCum: books.books[""]?.cum ?? 0,
+      pooledCum: books.pooled.cum,
+    },
     tradesByDate: aggregateTradesByDate(all),
     unownedTradesByDate: aggregateTradesByDate(블록별.unowned),
   };

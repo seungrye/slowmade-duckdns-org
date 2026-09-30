@@ -38,6 +38,8 @@ type HistoryPoint = {
   cash?: number;
   holdingsValue?: number;
   cumulativePnl?: number;
+  /** 그 날짜까지의 **귀속** 실현손익 (#505) — 블록 시리즈에만 있다. */
+  attributedCumPnl?: number;
   /** 매매기록·일봉으로 되살린 행 (#373). 현금·총재산·누적손익은 모르는 값이라 `—` 로 낸다. */
   backfilled?: boolean;
 };
@@ -52,6 +54,13 @@ type Props = {
   history: HistoryPoint[];
   /** 이 계정·시장의 블록들 — 상단 탭 (#374). */
   blocks?: { portfolioId: string; strategy: string }[];
+  /** 블록 탭인가 (#505). 손익의 **정의가 다르므로** 열 이름도 달라야 한다. */
+  isBlock?: boolean;
+  /** 귀속 실현손익(원장 파생) — 블록 탭에서만 */
+  attributedCum?: number;
+  /** 원가를 모르는 매도. 있으면 그 블록 숫자가 실제보다 유리/불리하게 보인다 */
+  unknownCost?: string[];
+  pnlBreakdown?: { residual: number; reasons: string[]; unattributedCum: number; pooledCum: number };
   /** 지금 고른 블록. null 이면 전체. */
   portfolioId?: string | null;
 };
@@ -108,6 +117,10 @@ export default function PortfolioDetailClient({
   names,
   history,
   blocks = [],
+  isBlock = false,
+  attributedCum,
+  unknownCost = [],
+  pnlBreakdown,
   portfolioId = null,
 }: Props) {
   const isMobile = useMobile();
@@ -316,6 +329,35 @@ export default function PortfolioDetailClient({
       {/* 매매 기록 표 */}
       <h2 className="text-lg font-semibold mt-8 mb-3">매매 기록</h2>
       <div className="overflow-x-auto">
+        {/* 분해 정합 줄 (#505) — **잔차 0 이어도 찍는다.** 정상 모양을 학습시켜야 비정상이
+            눈에 걸린다. 42.06 이 3개월 숨은 이유가 이 줄이 없었던 것이다. */}
+        {pnlBreakdown && (
+          <div className="mb-2 text-xs">
+            <span className={pnlBreakdown.residual === 0 ? "text-gray-500" : "text-red-600 font-medium"}>
+              {pnlBreakdown.residual === 0
+                ? "분해 검증 ✓ 0.00"
+                : `⚠ 분해 불일치 ${money(pnlBreakdown.residual, currency)}`}
+            </span>
+            <span className="text-gray-400 ml-2">
+              계좌 {money(pnlBreakdown.pooledCum, currency)}
+              {" · "}미귀속(옛 전략) {money(pnlBreakdown.unattributedCum, currency)}
+            </span>
+            {pnlBreakdown.reasons.length > 0 && (
+              <div className="text-red-500 mt-0.5">{pnlBreakdown.reasons.slice(0, 3).join(" · ")}</div>
+            )}
+          </div>
+        )}
+        {isBlock && (
+          <div className="mb-2 text-xs text-gray-400">
+            귀속 실현손익 {money(attributedCum, currency)}
+            {unknownCost.length > 0 && (
+              <span className="text-amber-600 ml-2">
+                ⚠ 원가 미상 {unknownCost.length}건 — 손익에서 제외했다(이 블록 숫자가 실제와 다르게 보인다)
+              </span>
+            )}
+            {" · "}이 값은 **그 블록에 귀속된 체결만** 으로 계산한다(계좌 누적과 정의가 다르다)
+          </div>
+        )}
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b text-gray-500 text-left">
@@ -371,7 +413,13 @@ export default function PortfolioDetailClient({
               <th className="py-2 pr-3 text-right">추정 총재산</th>
               <th className="py-2 pr-3 text-right">현금</th>
               <th className="py-2 pr-3 text-right">보유 평가액</th>
-              <th className="py-2 pr-3 text-right">누적 손익</th>
+              {/* 계좌 탭과 **다른 헤더**를 쓴다 (#505). real 계좌에선 계좌 = 증권사 net
+                  (수수료·세금·최근 5년), 블록 = 우리 원장 gross(전체 기간)다. 같은 이름으로
+                  두 정의를 내보내는 게 이 화면의 가장 조용한 거짓말이다. */}
+              <th className="py-2 pr-3 text-right whitespace-nowrap">
+                {isBlock ? "귀속 실현손익" : "누적 손익"}
+                {isBlock && <span className="ml-1 text-[10px] font-normal text-gray-400">원장 파생</span>}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -391,8 +439,13 @@ export default function PortfolioDetailClient({
                   {h.backfilled ? "—" : money(h.cash, currency)}
                 </td>
                 <td className="py-1.5 pr-3 text-right">{money(h.holdingsValue, currency)}</td>
-                <td className={`py-1.5 pr-3 text-right ${(h.cumulativePnl ?? 0) >= 0 ? "text-red-600" : "text-blue-600"}`}>
-                  {h.backfilled ? "—" : money(h.cumulativePnl, currency)}
+                {/* 블록은 원장 파생값을 쓴다 — 블록 행에는 저장된 손익이 없다(#382).
+                    되살린 행이어도 손익은 원장에서 알 수 있으므로 backfilled 게이트를
+                    **손익에서만** 푼다(현금·총재산은 계속 `—`). */}
+                <td className={`py-1.5 pr-3 text-right ${((isBlock ? h.attributedCumPnl : h.cumulativePnl) ?? 0) >= 0 ? "text-red-600" : "text-blue-600"}`}>
+                  {isBlock
+                    ? money(h.attributedCumPnl, currency)
+                    : (h.backfilled ? "—" : money(h.cumulativePnl, currency))}
                 </td>
               </tr>
             ))}

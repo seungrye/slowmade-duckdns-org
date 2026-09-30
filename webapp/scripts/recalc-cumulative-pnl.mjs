@@ -72,7 +72,7 @@ async function main() {
   const db = mongoose.connection.db;
 
   const envs = await db.collection("stocktrades").distinct("env");
-  let tradeFixes = 0, histFixes = 0;
+  let tradeFixes = 0, histFixes = 0, blockCleans = 0;
 
   for (const env of envs) {
     for (const currency of ["KRW", "USD"]) {
@@ -108,10 +108,15 @@ async function main() {
         tradeFixes += res.modifiedCount ?? 0;
       }
 
-      // ① portfoliohistories.cumulativePnl (계좌 행·블록 행 모두 — 블록 행은 이 필드를 안 쓰지만
-      //    저장돼 있으면 같이 맞춘다. 되살린 행(backfilled)은 건드리지 않는다.)
+      // ① portfoliohistories.cumulativePnl — **계좌 행만** (portfolioId: null).
+      //
+      // ⚠ 블록 행에 넣으면 안 된다 (#382). 여기서 구한 cum 은 계좌 전체 체결에서 나온
+      //   **계좌 단위** 값이라, 블록 행에 그대로 박으면 블록마다 계좌 전체 손익을 제 것이라
+      //   주장하게 된다. (이 스크립트 첫 판이 실제로 그렇게 써서 두 블록 행이 똑같이
+      //   −2,238 을 들고 있었다. 아래 ③ 이 그걸 걷어낸다.)
+      //   블록별 손익은 그 블록에 귀속된 체결로 따로 계산해야 한다 — 별건이다.
       const hist = await db.collection("portfoliohistories")
-        .find({ env, currency, hidden: { $ne: true }, backfilled: { $ne: true } })
+        .find({ env, currency, hidden: { $ne: true }, backfilled: { $ne: true }, portfolioId: null })
         .sort({ date: 1 }).toArray();
       const histOps = [];
       for (const h of hist) {
@@ -124,16 +129,29 @@ async function main() {
           }
         }
       }
-      console.log(`  누적손익: ${histOps.length}/${hist.length}개 스냅샷 수정 필요`);
+      console.log(`  누적손익(계좌 행): ${histOps.length}/${hist.length}개 수정 필요`);
       if (histOps.length && APPLY) {
         const res = await db.collection("portfoliohistories").bulkWrite(histOps, { ordered: false });
         histFixes += res.modifiedCount ?? 0;
+      }
+
+      // ③ 블록 행에서 손익 필드를 **걷어낸다** (#382). 0 으로 되돌리지 않고 지운다 —
+      //    0 은 "손익이 0 이었다" 는 거짓말이고, 없는 것이 "모른다" 는 사실이다.
+      const blockDirty = await db.collection("portfoliohistories")
+        .countDocuments({ env, currency, portfolioId: { $ne: null },
+                          $or: [{ cumulativePnl: { $exists: true } }, { runPnl: { $exists: true } }] });
+      console.log(`  블록 행 손익 필드 제거 대상: ${blockDirty}개`);
+      if (blockDirty && APPLY) {
+        const res = await db.collection("portfoliohistories").updateMany(
+          { env, currency, portfolioId: { $ne: null } },
+          { $unset: { cumulativePnl: "", runPnl: "" } });
+        blockCleans += res.modifiedCount ?? 0;
       }
     }
   }
 
   console.log(APPLY
-    ? `\n✓ 적용: 매매기록 ${tradeFixes}건 · 스냅샷 ${histFixes}건`
+    ? `\n✓ 적용: 매매기록 ${tradeFixes}건 · 계좌 스냅샷 ${histFixes}건 · 블록 손익필드 제거 ${blockCleans}개`
     : "\n--apply 를 주면 실제로 고칩니다.");
   await mongoose.disconnect();
 }
