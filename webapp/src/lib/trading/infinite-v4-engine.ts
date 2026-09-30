@@ -244,10 +244,17 @@ export async function runInfiniteV4(
   // degraded = 대사를 못 했다 → t·cycleCash·mode 가 낡았다 (#497).
   let degraded = false;
   let state = loadState((portfolio.state as Json | undefined)?.v4, cfg);
+  // 새 상태(lastRunDate 없음)는 **대사하지 않는다** (#515). 예전엔 start 가 '오늘−14일' 이
+  // 되고 필터의 `"" < f.date` 가 그 14일을 전부 통과시켰다. 계좌를 옮겨 상태를 초기화한
+  // 직후라면 그 체결은 **우리 것이 아니다** — 남이 손매매한 것까지 reconcileDay 에 들어가
+  // `cycleCash += sellAmt − buyAmt` 로 장부만 깎는다(갓 만든 상태는 entryLimit=0·
+  // pending.one=0 이라 T 증가 분기가 전부 false 라 회차는 안 오른다). 새 상태엔 대사할
+  // 우리 체결이 없으므로 조회 자체를 안 한다.
+  const fresh = !state.lastRunDate;
   const start = state.lastRunDate ||
     new Date(Date.now() - LOOKBACK_DAYS * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
   try {
-    const fills = (await broker.executions(sym, start, today))
+    const fills = fresh ? [] : (await broker.executions(sym, start, today))
       .filter((f) => state.lastRunDate < f.date && f.date < today);
     for (const date of [...new Set(fills.map((f) => f.date))].sort()) {
       const day = fills.filter((f) => f.date === date);

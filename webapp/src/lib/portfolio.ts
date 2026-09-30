@@ -5,40 +5,52 @@ import { cumAsOf, reconcileBooks, walkBooks } from "@/lib/trading/pnl-walk";
 import StockTrade from "@/models/stock-trade";
 import TradingPortfolio from "@/models/trading-portfolio";
 import TradingAccount from "@/models/trading-account";
+import { buildTabs, type Tab } from "@/lib/portfolio-tabs";
 
-// 멀티 포트폴리오: env 는 "paper" | "real" | "{env}-{계좌명}" (예: paper-main, paper-sub)
+// 멀티 포트폴리오: env 는 계정의 envKey — "{paper|real}-{계좌번호}"(예: paper-50194613).
+// 옛 단일계정 기록은 "paper"/"real" 도 있을 수 있어 좁히지 않는다.
 export type Env = string;
+export type { Tab };
 
-/** DB 에 존재하는 env 목록(포트폴리오 ∪ 매매기록) — 탭을 동적으로 만든다. */
-export async function listEnvs(): Promise<string[]> {
+/**
+ * 탭용 (env, currency) 조합 — **살아있는 블록 ∪ 기록이 있는 조합** (#515).
+ *
+ * 예전엔 살아있는 포트폴리오만 봤다. 그래서 블록을 다른 계좌로 옮기면 옛 계좌 탭이 통째로
+ * 사라졌다 — 매매기록 300건·이력 275건이 DB 에 그대로 있는데 볼 방법이 없어진다.
+ * 기록이 있는 조합은 `archived: true` 로 남겨 계속 볼 수 있게 한다.
+ *
+ * 합치는 규칙은 `portfolio-tabs.buildTabs`(순수, 테스트 있음)가 정한다. 여기는 조회만.
+ * (예전의 `listEnvs()` 는 이 데이터 소스를 이미 갖고 있었지만 아무도 안 썼다 — 걷어냈다.)
+ */
+export async function listEnvCurrencies(): Promise<Tab[]> {
   await connectToDB();
-  const [a, b] = await Promise.all([
-    PortfolioHistory.distinct("env", { hidden: { $ne: true } }),
-    StockTrade.distinct("env", { hidden: { $ne: true } }),
+  const [ports, histPairs] = await Promise.all([
+    TradingPortfolio.find({ isDeleted: { $ne: true } }).select({ accountId: 1, market: 1 }).lean(),
+    // 기록이 있는 (env, currency) — 차트는 이력 위에 그리므로 이력이 기준이다.
+    PortfolioHistory.aggregate<{ _id: { env: string; currency: Currency } }>([
+      { $match: { hidden: { $ne: true } } },
+      { $group: { _id: { env: "$env", currency: "$currency" } } },
+    ]),
   ]);
-  const set = new Set<string>([...a, ...b].filter(Boolean));
-  return [...set].sort();
-}
 
-/** 탭용 (env, currency) 조합 — 살아있는(삭제 안 된) 포트폴리오 기준. 계정 envKey × market→통화.
- *  포트폴리오를 만들면(매매 전이어도) 탭이 생기고, 삭제하면 탭이 사라진다. */
-export async function listEnvCurrencies(): Promise<{ env: string; currency: Currency }[]> {
-  await connectToDB();
-  const ports = await TradingPortfolio.find({ isDeleted: { $ne: true } })
-    .select({ accountId: 1, market: 1 }).lean();
-  if (!ports.length) return [];
-  const accts = await TradingAccount.find({
-    _id: { $in: ports.map((p) => p.accountId) }, isDeleted: { $ne: true },
-  }).select({ envKey: 1 }).lean();
+  const accts = ports.length
+    ? await TradingAccount.find({
+        _id: { $in: ports.map((p) => p.accountId) }, isDeleted: { $ne: true },
+      }).select({ envKey: 1 }).lean()
+    : [];
   const envKeyOf = new Map(accts.map((a) => [String(a._id), a.envKey as string]));
-  const map = new Map<string, { env: string; currency: Currency }>();
+
+  const live: { env: string; currency: Currency }[] = [];
   for (const p of ports) {
     const env = envKeyOf.get(String(p.accountId));
-    const currency: Currency = p.market === "kr" ? "KRW" : "USD";
-    if (env) map.set(`${env}|${currency}`, { env, currency });
+    if (env) live.push({ env, currency: p.market === "kr" ? "KRW" : "USD" });
   }
-  return [...map.values()].sort((x, y) =>
-    x.env === y.env ? (x.currency < y.currency ? -1 : 1) : x.env < y.env ? -1 : 1);
+  const withData = histPairs
+    .map((h) => ({ env: h._id?.env, currency: h._id?.currency }))
+    .filter((h): h is { env: string; currency: Currency } =>
+      Boolean(h.env) && (h.currency === "KRW" || h.currency === "USD"));
+
+  return buildTabs(live, withData);
 }
 export type Currency = "KRW" | "USD";
 

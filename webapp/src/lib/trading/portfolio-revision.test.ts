@@ -14,13 +14,16 @@ describe("snapshotOf — 설정만 뽑는다", () => {
     expect(snap).not.toHaveProperty("state");
   });
 
-  it("_id·타임스탬프·소프트삭제 플래그도 안 담는다 — 설정이 아니다", () => {
+  it("_id·타임스탬프·소프트삭제 플래그는 안 담는다 — 설정이 아니다", () => {
     const snap = snapshotOf({
       ...base, _id: "abc", createdAt: new Date(), updatedAt: new Date(),
       isDeleted: false, deletedAt: null, accountId: "acc-1",
     });
+    // accountId 는 **설정이다** (#515). 예전엔 빠져 있어서 계좌만 바꾼 저장이 changed=[] 로
+    // 잡혀 리비전이 아예 안 남았다 — 가장 파괴적인 변경이 감사 흔적 0건으로 지나갔다.
     expect(Object.keys(snap).sort()).toEqual(
-      ["config", "enabled", "market", "reservedCash", "runAt", "strategy", "weekdaysOnly"]);
+      ["accountId", "config", "enabled", "market", "reservedCash", "runAt", "strategy", "weekdaysOnly"]);
+    expect(snap.accountId).toBe("acc-1");
   });
 
   it("없는 값은 기본값으로 채운다 — 옛 문서에도 스냅샷이 온전하다", () => {

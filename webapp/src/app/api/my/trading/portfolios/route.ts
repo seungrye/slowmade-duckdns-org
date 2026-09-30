@@ -8,6 +8,8 @@ import StockTrade from "@/models/stock-trade";
 import PortfolioHistory from "@/models/portfolio-history";
 import TradingPortfolioRevision from "@/models/trading-portfolio-revision";
 import { snapshotOf, changedKeys } from "@/lib/trading/portfolio-revision";
+import { planStateReset } from "@/lib/trading/state-reset";
+import TradingRun from "@/models/trading-run";
 import { LIVE_STRATEGY_IDS, isLiveStrategy } from "@/types/trading";
 
 /**
@@ -112,18 +114,86 @@ export async function POST(req: NextRequest) {
   // 편집이면 state(진행 중 사이클)를 보존하고, 신규일 때만 비운다 — 그래야 새 블록이 옛
   // V4 사이클(T·장부현금)을 물려받지 않는다.
   const portfolioId = typeof body.portfolioId === "string" ? body.portfolioId : null;
+  // accountId 는 **조회 키가 아니다** (#515). 예전엔 필터에 들어 있어서, 편집 폼에서 계정을
+  // 바꿔 저장하면 `(_id, 새 accountId)` 로 찾다가 못 찾고 404 가 났다 — UI 는 바꿀 수 있는
+  // 것처럼 보여 주는데 서버가 조용히 거절하는 모양이었다. 이 라우트는 requireOwner() 로
+  // 전체가 owner 전용이라 accountId 가 필터에 있어야 할 보안상 이유도 없다.
+  //
+  // select 에 accountId·state 가 **반드시** 있어야 한다. 없으면 아래 이동 판정이
+  // `undefined !== "acc-2"` 로 **항상 참**이 되어 평범한 저장·활성 토글까지 이동으로 읽고,
+  // planStateReset 은 undefined 를 받아 아카이브 없이 상태를 날린다.
   const prev = portfolioId
-    ? await TradingPortfolio.findOne({ _id: portfolioId, accountId: String(body.accountId ?? '') })
+    ? await TradingPortfolio.findOne({ _id: portfolioId })
         // 리비전을 남기려면 이전 값 전체가 필요하다 — 무엇이 바뀌었는지 대조해야 한다.
         .select({
-          isDeleted: 1, market: 1, strategy: 1, runAt: 1,
-          weekdaysOnly: 1, enabled: 1, reservedCash: 1, config: 1,
+          isDeleted: 1, accountId: 1, market: 1, strategy: 1, runAt: 1,
+          weekdaysOnly: 1, enabled: 1, reservedCash: 1, config: 1, state: 1,
         }).lean()
     : null;
   if (portfolioId && !prev) {
     return NextResponse.json({ error: "포트폴리오를 찾을 수 없습니다" }, { status: 404 });
   }
+  // market 은 편집으로 못 바꾼다 (#515). 예전엔 setFields 에 market 이 없어 **runAt 만**
+  // 저장됐다 — 미장 블록이 09:30 을 ET 로, 국장 블록이 09:35 를 KST 로 해석해 실행 시각만
+  // 조용히 옮겨졌고(scheduler 는 DB 의 market 을 본다), 리비전에는 바뀐 것처럼 거짓으로
+  // 남았다. 조용히 무시하느니 거절한다 — 시장을 바꾸려면 새 블록을 만들어야 한다.
+  const prevMarket = String((prev as { market?: string } | null)?.market ?? "");
+  if (prev && !(prev as { isDeleted?: boolean }).isDeleted && prevMarket && prevMarket !== market) {
+    return NextResponse.json(
+      { error: "시장(kr/us)은 편집으로 바꿀 수 없습니다 — 새 블록으로 만드세요" }, { status: 400 },
+    );
+  }
   const isRecreate = !prev || (prev as { isDeleted?: boolean }).isDeleted === true;
+
+  // ── 계좌 이동 (#515) ────────────────────────────────────────────
+  //
+  // **명시 의도(moveAccount)일 때만** 옮긴다. 그냥 "accountId 가 다르면 이동" 으로 하면
+  // 활성/비활성 토글도 accountId 를 싣기 때문에 **모든 POST 가 이동 명령**이 된다 —
+  // 탭 두 개를 열어 두고 한쪽에서 옮긴 뒤 다른 쪽에서 토글만 눌러도 계좌가 되돌아가고
+  // 상태가 또 초기화된다.
+  const nextAccountId = typeof body.accountId === "string" ? body.accountId : "";
+  const prevAccountId = String((prev as { accountId?: unknown } | null)?.accountId ?? "");
+  const wantsMove = body.moveAccount === true && !!prev
+    && !!nextAccountId && nextAccountId !== prevAccountId;
+  if (wantsMove) {
+    const p = prev as { enabled?: boolean; market?: string };
+    // ① 켜져 있으면 안 된다 — 장중에 옮기면 사이클이 두 계좌로 쪼개지고, 옛 계좌에 건
+    //    익절 지정가가 체결돼도 어느 상태에도(대사는 새 계좌만 본다) 어느 원장에도
+    //    (close-sync 는 새 envKey 로 쓴다) 안 잡힌다.
+    if (p.enabled !== false) {
+      return NextResponse.json(
+        { error: "계좌를 옮기려면 먼저 이 블록을 비활성화하세요 (장 시간 밖 권장)" },
+        { status: 409 },
+      );
+    }
+    // ② 오늘 이미 사이클이 돌았으면 안 된다 — 옛 계좌에 남은 주문·체결이 고아가 된다.
+    const tz = p.market === "kr" ? "Asia/Seoul" : "America/New_York";
+    const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+    if (await TradingRun.countDocuments({ portfolioId, dateKey })) {
+      return NextResponse.json(
+        { error: `오늘(${dateKey}) 이미 사이클이 돌았습니다 — 다음 거래일 전에 옮기세요` },
+        { status: 409 },
+      );
+    }
+    // ③ 대상 계정이 실존해야 한다 — 없으면 스케줄러가 아무 말 없이 건너뛴다(매매 정지).
+    const target = await TradingAccount.findById(nextAccountId)
+      .select({ envKey: 1, isDeleted: 1 }).lean();
+    if (!target || (target as { isDeleted?: boolean }).isDeleted) {
+      return NextResponse.json({ error: "대상 계정을 찾을 수 없습니다" }, { status: 400 });
+    }
+  }
+
+  // 상태를 물려주면 안 되는 변경 = **전략 정체성이 바뀐 것** (#515). 계좌만의 문제가 아니다 —
+  // symbol 만 바꿔도 보유 0인 새 종목이 옛 T·장부현금을 물려받아 '3회차 진행 중' 처럼 주문한다.
+  const prevSymbol = String(((prev as { config?: { symbol?: unknown } } | null)?.config?.symbol) ?? "");
+  const nextSymbol = String(((body.config ?? {}) as { symbol?: unknown }).symbol ?? "");
+  const identityChanged = !!prev && !isRecreate && (
+    wantsMove
+    || String((prev as { strategy?: string }).strategy) !== strategy
+    // 양쪽에 symbol 이 있을 때만 본다 — trend_v1 처럼 symbol 이 없는 전략에서
+    // "" vs "" 는 같고, 한쪽만 있는 경우는 strategy 변경 쪽이 이미 잡는다.
+    || (!!prevSymbol && !!nextSymbol && prevSymbol !== nextSymbol)
+  );
   const reservedCash = Math.max(0, Number(body.reservedCash ?? 0) || 0);
   const setFields: Record<string, unknown> = {
     strategy, runAt,
@@ -136,9 +206,19 @@ export async function POST(req: NextRequest) {
     isDeleted: false, deletedAt: null,
   };
   if (isRecreate) setFields.state = {}; // 재생성/신규 — 사이클 상태 초기화
+  if (wantsMove) setFields.accountId = nextAccountId;
+  if (identityChanged) {
+    // 지우지 않고 state.archive 로 옮긴다(#513). patch 가 없으면(옮길 것이 없으면)
+    // **아무것도 $set 하지 않는다** — 빈 객체로 덮으면 아카이브 없는 유실이 된다.
+    const plan = planStateReset(
+      (prev as { state?: Record<string, unknown> }).state,
+      { at: new Date().toISOString(), reason: wantsMove ? "계좌 교체" : "전략·종목 변경" },
+    );
+    if (plan.patch) setFields.state = plan.patch.state;
+  }
   const doc = portfolioId
     ? await TradingPortfolio.findOneAndUpdate(
-        { _id: portfolioId, accountId: body.accountId },
+        { _id: portfolioId },
         { $set: setFields },
         { new: true },
       )
@@ -148,10 +228,18 @@ export async function POST(req: NextRequest) {
   }
   // 값이 바뀐 경우에만 리비전 한 줄 (#350). **안 바뀌면 안 남긴다** — 저장 버튼만 눌러도
   // 여기를 지나므로, 그러지 않으면 같은 값이 도배돼 이력이 쓸모없어진다.
-  const after = snapshotOf({ market, ...setFields });
-  const changed = prev ? changedKeys(snapshotOf(prev as Record<string, unknown>), after) : [];
+  // accountId 를 스냅샷에 싣는다 (#515). 예전엔 SETTING_KEYS 에 없어서 **계좌만 바꾸면
+  // changed 가 빈 배열**이 되고 리비전이 아예 안 남았다 — 가장 위험한 변경(계좌 교체 +
+  // 상태 아카이브)이 감사 흔적 0건으로 지나갔다.
+  const after = snapshotOf({
+    market, accountId: prev ? (wantsMove ? nextAccountId : prevAccountId) : nextAccountId,
+    ...setFields,
+  });
+  const changed = prev
+    ? changedKeys(snapshotOf({ ...(prev as Record<string, unknown>), accountId: prevAccountId }), after)
+    : [];
   if (!prev || changed.length > 0) {
-    await recordRevision(doc._id, body.accountId, prev ? "update" : "create", after, changed);
+    await recordRevision(doc._id, doc.accountId, prev ? "update" : "create", after, changed);
   }
   // 재생성 시 옛 기록을 자동 복구하지 않는다 — 지운 포트폴리오를 같은 계정·시장으로 다시
   // 만들면 '깨끗한 새 차트'를 기대하므로(#피드백). 숨김은 삭제 시점에 고정되고, 복구가
