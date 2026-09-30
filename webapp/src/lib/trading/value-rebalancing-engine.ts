@@ -85,6 +85,9 @@ export async function runValueRebalancing(
   if (!(price > 0)) throw new Error(`VR ${sym}: 현재가 조회 실패`);
 
   const orders: { side: "buy" | "sell"; qty: number; price: number; reason: string; ordType?: "loc" | "limit" }[] = [];
+  // degraded = 대사를 못 했다 → V·pool·buyBudget 이 낡았다 (#497). VR 의 사다리는 전부
+  // 그 장부에서 나오므로 **낼 수 있는 주문이 하나도 없다** — 어제 사다리를 살려 두는 게 낫다.
+  let degraded = false;
   let persisted = loadState((portfolio.state as Json | undefined)?.vr);
 
   // ── 미초기화: 보유가 있으면 채택, 없으면 시드 매수 후 다음 실행에서 채택 ──
@@ -128,13 +131,19 @@ export async function runValueRebalancing(
       log(`[vr:${sym}] ${f.date} 체결 반영: ${f.side} ${f.qty}@${formatMoney(f.price, market)} → Pool=${formatMoney(state.pool, market)}`);
     }
   } catch (e) {
-    log(`[vr:${sym}] 체결 반영 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
+    // 창을 전진시키지 않는다 (#497) — 아래 persist 가 무조건 '어제'로 올리면 대사 필터가
+    // 실패한 날의 체결을 영영 건너뛴다. 그대로 두면 다음 창이 넓어져 자가치유된다.
+    degraded = true;
+    log(`[vr:${sym}] ⚠ 체결 반영 실패 — 대사 창을 유지하고 오늘 주문은 보류한다: `
+      + `${e instanceof Error ? e.message : e}`);
   }
   state.qty = holding; // 보유수량은 브로커가 진실원 — 대사 누락 대비 동기화
 
   // ── 사이클 경계: V 갱신 + 밴드/예산 리셋(라이브는 인출 자동청산 대신 Pool 클램프) ──
-  state.sinceCycle += 1;
-  if (state.sinceCycle >= cycleDays) {
+  // 대사 실패일엔 사이클도 멈춘다 (#497) — 낡은 pool 로 V 를 재계산하면 값이 틀리고,
+  // sinceCycle 이 0 으로 리셋돼 다음 경계까지 일정이 통째로 밀린다.
+  if (!degraded) state.sinceCycle += 1;
+  if (!degraded && state.sinceCycle >= cycleDays) {
     const cf = cfg.cashflow ?? 0;
     if (cf < 0 && state.pool + cf < 0) {
       log(`[vr:${sym}] ⚠ 인출 ${formatMoney(cf, market)} 이 Pool(${formatMoney(state.pool, market)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
@@ -153,8 +162,9 @@ export async function runValueRebalancing(
 
   // 묵은 주문부터 지운다(v4 와 같은 취소 후 재등록). 매일 밴드가 새로 계산되므로 어제 건
   // 사다리는 값이 틀리다. 조회 실패는 삼키고 계속 — 못 지웠다고 오늘 주문을 안 낼 이유는 없다.
+  // 대사가 낡았으면 취소도 하지 않는다 — 지우고 못 거는 것보다 어제 것을 살려 두는 게 낫다.
   try {
-    const open = await broker.openOrders(sym);
+    const open = degraded ? [] : await broker.openOrders(sym);
     for (const o of open) {
       await broker.cancel(sym, o.orderNo, o.qty);
       log(`[vr:${sym}] 묵은 주문 취소 ${o.orderNo} x${o.qty}`);
@@ -180,10 +190,13 @@ export async function runValueRebalancing(
       reason: `VR 사다리 매도 ${r.qtyAfter}주째(밴드상단 ${formatMoney(band.high, market)})` });
   }
 
-  await sendOrders(orders, broker, { account, runId, market, sym, live, log });
+  await sendOrders(degraded ? [] : orders, broker, { account, runId, market, sym, live, log });
 
   // ── 상태 저장 — lastRunDate='어제'로 남겨 오늘 LOC 체결을 다음 실행이 대사(v4 와 동일 창) ──
-  const persist: VRPersist = { ...state, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };
+  const persist: VRPersist = {
+    ...state, symbol: sym, vInit: true,
+    lastRunDate: degraded ? persisted.lastRunDate : prevMarketDay(today),
+  };
   await saveState({ "state.vr": persist });
 
   const line = `VR ${sym}: 주문 ${orders.length}건 (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`;

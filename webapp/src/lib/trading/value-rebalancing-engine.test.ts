@@ -140,3 +140,57 @@ describe("VR 엔진 — 일회성 실행(run-now)은 장부를 건드리지 않�
     expect(seeded.sinceCycle).toBe(9); // 원본도 그대로
   });
 });
+
+// #497 — VR 도 대사 실패에 창을 전진시켜 체결을 잃었다. VR 은 사다리가 전부 장부(V·pool·
+// buyBudget)에서 나오므로 낡으면 **낼 수 있는 주문이 없다** — 어제 사다리를 살려 두는 게
+// 낫다(취소도 건너뛴다).
+describe("VR 엔진 — 대사 실패는 창을 전진시키지 않고 주문도 안 낸다", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 2, cumBuy: 8500, cumSell: 0, lastRunDate: "20260718" };
+  const cancelSpy = vi.fn(async () => {});
+  const failing: V4Broker = {
+    snapshot: async () => ({ holding: 85, avg: 0, price: 100, cash: 1500 }),
+    historyLong: async () => [],
+    executions: async () => { throw new Error("OPSQ0003: 서비스 라우팅 오류"); },
+    openOrders: async () => [{ orderNo: "OLD1", side: "sell" as const, qty: 1 }],
+    cancel: cancelSpy,
+    place: placeSpy,
+  };
+  const run497 = () => runValueRebalancing(
+    acct(false) as never, pf(CFG, { vr: seeded }) as never, "run1" as never, failing, () => {},
+  );
+
+  beforeEach(() => { cancelSpy.mockClear(); });
+
+  it("lastRunDate 를 그대로 둔다", async () => {
+    await run497();
+    expect(persisted.at(-1)).toMatchObject({ lastRunDate: "20260718" });
+  });
+  it("주문을 내지 않는다(낡은 밴드로 사다리를 걸지 않는다)", async () => {
+    await run497();
+    expect(orderLogs).toHaveLength(0);
+  });
+  it("묵은 주문도 취소하지 않는다 — 어제 사다리를 살려 둔다", async () => {
+    await run497();
+    expect(cancelSpy).not.toHaveBeenCalled();
+  });
+});
+
+// #497 후속 — 낡은 장부로 사이클 경계를 넘기면 V 가 틀린 값으로 재계산되고 다음 경계까지
+// 일정이 통째로 밀린다. 대사에 실패한 날은 사이클도 멈춘다.
+describe("VR 엔진 — 대사 실패일엔 사이클도 진행하지 않는다", () => {
+  const atBoundary = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                       buyBudget: 750, sinceCycle: 9, cumBuy: 8500, cumSell: 0, lastRunDate: "20260718" };
+  const failing: V4Broker = {
+    snapshot: async () => ({ holding: 85, avg: 0, price: 100, cash: 1500 }),
+    historyLong: async () => [],
+    executions: async () => { throw new Error("OPSQ0003"); },
+    openOrders: async () => [], cancel: async () => {}, place: placeSpy,
+  };
+  it("sinceCycle 이 안 오르고 V 도 그대로다", async () => {
+    await runValueRebalancing(
+      acct(false) as never, pf(CFG, { vr: atBoundary }) as never, "run1" as never, failing, () => {},
+    );
+    expect(persisted.at(-1)).toMatchObject({ sinceCycle: 9, V: 8500 });
+  });
+});

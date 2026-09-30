@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // 모델·시계 목킹 — DB/네트워크 없이 엔진 오케스트레이션만 본다(VR 엔진 테스트와 같은 방식).
 const persisted: Array<Record<string, unknown>> = [];
-vi.mock("@/models/trading-order-log", () => ({ default: { create: vi.fn(async () => {}) } }));
+const orderLogs: Array<Record<string, unknown>> = [];
+vi.mock("@/models/trading-order-log", () => ({
+  default: { create: vi.fn(async (d: Record<string, unknown>) => { orderLogs.push(d); }) },
+}));
 vi.mock("@/models/trading-portfolio", () => ({
   default: {
     updateOne: vi.fn(async (_q: unknown, u: { $set: Record<string, unknown> }) => {
@@ -210,5 +213,91 @@ describe("runInfiniteV4 — 오염된 입력은 사이클을 실패시킨다", (
   });
   it("정상 입력은 종전대로 돈다", async () => {
     await expect(call({ holding: 32, avg: 100_000, price: 110_000 })).resolves.toContain("V4");
+  });
+});
+
+// #497 — 대사가 실패해도 창(lastRunDate)이 전진해 그날 체결이 영영 유실됐다.
+// 2026-08-14 에 실제로 났다(OPSQ0003): 08-13 의 12주 매도가 T 에 반영되지 않았고
+// 그 뒤로 장부가 어긋난 채 굳었다.
+describe("runInfiniteV4 — 대사 실패는 창을 전진시키지 않는다", () => {
+  const CFG = { symbol: "069500", principal: 10_000_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const state: V4State = {
+    ...newV4State("069500", 20, 10_000_000), t: 9.18, cycleCash: 6_000_000, lastRunDate: "20260812",
+  };
+  const brokerOf = (failExecutions: boolean): V4Broker => ({
+    snapshot: async () => ({ holding: 48, avg: 100_000, price: 110_000, cash: 6_000_000 }),
+    historyLong: async () => [],
+    executions: async () => {
+      if (failExecutions) throw new Error("OPSQ0003: 서비스 라우팅 오류");
+      return [];
+    },
+    openOrders: async () => [], cancel: async () => {}, place: async () => "ORD1",
+  });
+  const call = (fail: boolean, phase: "both" | "sell" | "buy" = "both") => runInfiniteV4(
+    { _id: "acc1", envKey: "paper-1", liveEnabled: false } as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
+    "run1" as never, brokerOf(fail), phase, () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("대사가 던지면 lastRunDate 를 그대로 둔다(다음 창이 놓친 날을 다시 읽는다)", async () => {
+    await call(true);
+    expect(persisted.at(-1)).toMatchObject({ lastRunDate: "20260812" });
+  });
+
+  it("대사가 성공하면 종전대로 '어제'로 전진한다", async () => {
+    await call(false);
+    expect(persisted.at(-1)).toMatchObject({ lastRunDate: prevMarketDay("20260922") });
+  });
+
+  it("대사 실패면 낡은 상태에 안 기대는 주문(¾ 익절)만 낸다", async () => {
+    await call(true);
+    expect(orderLogs).toHaveLength(1);
+    expect(orderLogs[0]).toMatchObject({ side: "sell", qty: 36 }); // 48 − floor(48/4)
+  });
+
+  it("대사가 성공하면 매수 사다리·¼ 매도가 그대로 나간다", async () => {
+    await call(false);
+    expect(orderLogs.length).toBeGreaterThan(1);
+    expect(orderLogs.some((o) => o.side === "buy")).toBe(true);
+  });
+
+  it("대사 실패 + 국장 매수 phase 는 주문이 없다(q75 는 sell phase 몫)", async () => {
+    await call(true, "buy");
+    expect(orderLogs).toHaveLength(0);
+  });
+});
+
+// #497 후속 — 대사가 낡은 날엔 **장부를 건드리는 다른 경로도 막아야** 한다.
+// absorbIdleCash 는 cycleCash 를 계좌현금으로 **덮어쓴다**. 그런데 못 읽은 체결의 대금은
+// 이미 계좌현금에 들어 있으므로, 덮어쓴 뒤 내일 그 체결을 대사하면 같은 돈을 두 번 센다.
+describe("runInfiniteV4 — 대사 실패일엔 유휴현금 흡수도 하지 않는다", () => {
+  const CFG = { symbol: "069500", principal: 10_000_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const state: V4State = {
+    ...newV4State("069500", 20, 10_000_000), t: 0, cycleCash: 3_000_000, lastRunDate: "20260812",
+  };
+  const brokerOf = (fail: boolean): V4Broker => ({
+    // 플랫(전량 매도 직후) + 계좌엔 매도대금이 들어와 있다
+    snapshot: async () => ({ holding: 0, avg: 0, price: 110_000, cash: 9_000_000 }),
+    historyLong: async () => [],
+    executions: async () => { if (fail) throw new Error("OPSQ0003"); return []; },
+    openOrders: async () => [], cancel: async () => {}, place: async () => "ORD1",
+  });
+  const call = (fail: boolean) => runInfiniteV4(
+    { _id: "acc1", envKey: "paper-1", liveEnabled: false } as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
+    "run1" as never, brokerOf(fail), "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("대사 실패면 cycleCash 를 그대로 둔다(이중계상 방지)", async () => {
+    await call(true);
+    expect(persisted.at(-1)).toMatchObject({ cycleCash: 3_000_000 });
+  });
+  it("대사 성공이면 종전대로 흡수한다(계좌현금 9M < 원금 10M → 9M 까지)", async () => {
+    await call(false);
+    expect(persisted.at(-1)).toMatchObject({ cycleCash: 9_000_000 });
   });
 });

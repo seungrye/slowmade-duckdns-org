@@ -239,6 +239,8 @@ export async function runInfiniteV4(
   }
 
   // ── 1) 대사 — 마지막 실행일 이후(오늘 제외) 체결을 일자별 적용 ──
+  // degraded = 대사를 못 했다 → t·cycleCash·mode 가 낡았다 (#497).
+  let degraded = false;
   let state = loadState((portfolio.state as Json | undefined)?.v4, cfg);
   const start = state.lastRunDate ||
     new Date(Date.now() - LOOKBACK_DAYS * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
@@ -253,14 +255,23 @@ export async function runInfiniteV4(
           `mode=${state.mode} cash=${formatMoney(state.cycleCash, market)}`);
     }
   } catch (e) {
-    log(`[v4:${sym}] 체결 반영 실패 → 상태 유지: ${e instanceof Error ? e.message : e}`);
+    // 창을 전진시키지 않는다 (#497). 예전엔 아래에서 무조건 lastRunDate 를 '어제'로
+    // 올려, 대사 필터(`lastRunDate < date < today`)가 **실패한 날의 체결을 영영 건너뛰었다.**
+    // 2026-08-14 에 실제로 났다(OPSQ0003) — 08-13 의 12주 매도가 T 에 반영되지 않았다.
+    // 그대로 두면 다음 실행의 창이 놓친 날까지 넓어져 자가치유된다.
+    degraded = true;
+    log(`[v4:${sym}] ⚠ 체결 반영 실패 — 대사 창을 유지하고, 낡은 상태에 기대는 주문은 보류한다: `
+      + `${e instanceof Error ? e.message : e}`);
   }
 
   // ── 1.5) 유휴현금(입금) 흡수 — 현금 드래그 제거. 포지션 플랫일 때만 cycleCash 를 계좌현금으로 재시드.
   const reinvest = ((portfolio.config ?? {}) as Json).reinvestIdleCash !== false; // 기본 활성
   {
     const before = state.cycleCash;
-    state = absorbIdleCash(state, cash, holding, reinvest, cfg.principal);
+    // 대사 실패일엔 건너뛴다 (#497). absorb 는 cycleCash 를 계좌현금으로 **덮어쓰는데**,
+    // 못 읽은 체결의 대금이 이미 계좌현금에 들어 있으므로 내일 그 체결을 대사하면
+    // 같은 돈을 두 번 세게 된다.
+    state = degraded ? state : absorbIdleCash(state, cash, holding, reinvest, cfg.principal);
     if (state.cycleCash !== before) {
       log(`[v4:${sym}] 유휴현금 반영 cycleCash ${formatMoney(before, market)}→${formatMoney(state.cycleCash, market)}(플랫 — 입금/미투입 흡수)`);
     }
@@ -319,6 +330,10 @@ export async function runInfiniteV4(
     rev_sell: "V4 리버스 등분 매도(별지점R 위)", rev_qbuy: "V4 리버스 쿼터매수(별지점R 아래)",
   };
   for (const o of plan) {
+    // 대사가 낡았으면 q75 만 낸다 (#497). q75 는 `avg`·`holding` 만 쓰고 둘 다 브로커에서
+    // 방금 받은 값이라 상태와 무관하다. 나머지는 전부 t·cycleCash·mode 에 기댄다 —
+    // 별지점(q25)·매수 사다리·리버스 매도. 출구는 열어 두고 신규 노출만 막는다.
+    if (degraded && o.tag !== "q75") continue;
     if (o.side === "sell") {
       // q75(장중 지정가)·rev_first(MOC)는 sell phase, LOC 매도(q25/rev_sell)는 buy phase(에뮬)
       if (o.tag === "q75" || o.tag === "rev_first") {
@@ -380,7 +395,7 @@ export async function runInfiniteV4(
   // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를
   // '어제'(= 마지막으로 완전 반영된 날)로 남기면 다음 실행 창이 전일 체결을 포함해 대사가 이어진다.
   // 2단계(sell 09:30 / buy 15:20 동일일)는 sell 이 어제로 올려도 buy 창은 비어 중복반영이 없다.
-  state.lastRunDate = prevMarketDay(today);
+  if (!degraded) state.lastRunDate = prevMarketDay(today);
   await saveState({ "state.v4": state });
 
   const line = `V4 ${sym}[${phase}]: 주문 ${orders.length}건 (T=${state.t.toFixed(2)} ` +
