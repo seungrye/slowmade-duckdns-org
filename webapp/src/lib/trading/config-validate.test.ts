@@ -35,3 +35,47 @@ describe("validateStrategyConfig — 0·빈문자열을 입구에서 끊는다",
     expect(v("unknown", {})).toBeNull();
   });
 });
+
+// #517 — #507 의 검증기가 **0 이 의미를 갖는 필드**까지 양수로 묶었다.
+// 실 DB 의 VR 블록(SOXL)이 `feeRate: 0` 이라 그 블록은 **어떤 저장도 안 됐다** —
+// 활성 토글조차 400 으로 튕겼고, toggleEnabled 는 응답을 안 봐서 화면엔 아무 말도 없었다.
+//
+// #507 이 막으려던 건 `splits: 0`·`sellTarget: ""` 같은 **주문 파라미터**가 0 으로
+// 저장되는 것이다. "수수료 0%"·"밴드 0" 은 그 부류가 아니다.
+
+const VR_REAL = {
+  symbol: "SOXL", principal: 8000, gradient: 10, bandPct: 0.15,
+  cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0, formula: "skill",
+};
+
+describe("0 이 의미를 갖는 필드는 0 을 받는다 (#517)", () => {
+  it("실 DB 의 VR 블록이 저장된다 — 이게 안 되면 비활성화도 못 한다", () => {
+    expect(v("value_rebalancing", VR_REAL)).toBeNull();
+  });
+
+  it("feeRate: 0 은 '수수료 없음' 이다", () => {
+    expect(v("value_rebalancing", { symbol: "A", principal: 1, gradient: 1, feeRate: 0 })).toBeNull();
+  });
+
+  it("band: 0 은 '밴드 없음' 이다 — lrs·rotation 둘 다", () => {
+    expect(v("lrs_v1", { signal: "QQQ", target: "TQQQ", band: 0 })).toBeNull();
+    expect(v("rotation_v1", { signal: "QQQ", band: 0 })).toBeNull();
+  });
+
+  it("음수는 여전히 막는다 — 0 을 허용한 것이지 아무 값이나 받는 게 아니다", () => {
+    expect(v("value_rebalancing", { symbol: "A", principal: 1, gradient: 1, feeRate: -1 })).toBeTruthy();
+    expect(v("lrs_v1", { signal: "QQQ", target: "TQQQ", band: -0.1 })).toBeTruthy();
+  });
+
+  it("빈 문자열은 여전히 막는다 — Number(\"\")===0 으로 새어 들어오면 안 된다", () => {
+    expect(v("value_rebalancing", { symbol: "A", principal: 1, gradient: 1, feeRate: "" })).toBeTruthy();
+    expect(v("lrs_v1", { signal: "QQQ", target: "TQQQ", band: "" })).toBeTruthy();
+  });
+
+  it("주문 크기를 정하는 값은 0 을 계속 거부한다 — #507 이 막으려던 바로 그것", () => {
+    expect(v("infinite_v4", { symbol: "T", principal: 100, splits: 0 })).toBeTruthy();
+    expect(v("infinite_v4", { symbol: "T", principal: 100, sellTarget: 0 })).toBeTruthy();
+    expect(v("value_rebalancing", { symbol: "A", principal: 1, gradient: 1, cycleDays: 0 })).toBeTruthy();
+    expect(v("value_rebalancing", { symbol: "A", principal: 1, gradient: 0 })).toBeTruthy();
+  });
+});

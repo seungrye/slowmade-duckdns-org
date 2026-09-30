@@ -10,6 +10,7 @@ import TradingPortfolioRevision from "@/models/trading-portfolio-revision";
 import { snapshotOf, changedKeys } from "@/lib/trading/portfolio-revision";
 import { planStateReset } from "@/lib/trading/state-reset";
 import TradingRun from "@/models/trading-run";
+import TradingOrderLog from "@/models/trading-order-log";
 import { LIVE_STRATEGY_IDS, isLiveStrategy } from "@/types/trading";
 
 /**
@@ -166,14 +167,27 @@ export async function POST(req: NextRequest) {
         { status: 409 },
       );
     }
-    // ② 오늘 이미 사이클이 돌았으면 안 된다 — 옛 계좌에 남은 주문·체결이 고아가 된다.
+    // ② 오늘 **접수된 주문**이 있으면 안 된다 — 옛 계좌에 걸린 지정가·LOC 가 고아가 된다.
+    //
+    // 런이 돌았다는 사실만으로 막으면 안 된다 (#517). 실측 2026-09-30 미장 사이클은
+    // 16건을 계획했지만 계좌 만료로 **전부 거부돼 접수 0건**이었다 — 고아가 될 주문이
+    // 없는데 막으면 계좌를 못 옮겨 그 문제를 고칠 수가 없다. 기준은 #511 의 재시도
+    // 가드와 같다: **실제로 접수된 주문(orderNo 가 있는 것)** 만 센다.
     const tz = p.market === "kr" ? "Asia/Seoul" : "America/New_York";
     const dateKey = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
-    if (await TradingRun.countDocuments({ portfolioId, dateKey })) {
-      return NextResponse.json(
-        { error: `오늘(${dateKey}) 이미 사이클이 돌았습니다 — 다음 거래일 전에 옮기세요` },
-        { status: 409 },
-      );
+    const todayRuns = await TradingRun.find({ portfolioId, dateKey }).select({ _id: 1 }).lean();
+    if (todayRuns.length) {
+      const accepted = await TradingOrderLog.countDocuments({
+        runId: { $in: todayRuns.map((r) => r._id) },
+        dryRun: false, orderNo: { $nin: ["", null] },
+      });
+      if (accepted) {
+        return NextResponse.json(
+          { error: `오늘(${dateKey}) 접수된 주문 ${accepted}건이 옛 계좌에 있습니다 — `
+            + "정리한 뒤 다음 거래일에 옮기세요" },
+          { status: 409 },
+        );
+      }
     }
     // ③ 대상 계정이 실존해야 한다 — 없으면 스케줄러가 아무 말 없이 건너뛴다(매매 정지).
     const target = await TradingAccount.findById(nextAccountId)

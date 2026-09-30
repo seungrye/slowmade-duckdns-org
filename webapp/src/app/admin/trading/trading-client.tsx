@@ -140,21 +140,39 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
     }
   };
 
+  /** 응답을 보고 실패를 화면에 띄운다 (#517).
+   *
+   *  예전엔 토글·삭제가 응답을 버리고 곧바로 reload 했다. 그래서 400 이 나도 **버튼이
+   *  안 먹는 것처럼만 보이고 이유를 못 봤다** — 실제로 VR 블록이 feeRate:0 때문에 저장이
+   *  전부 튕기는데 화면엔 아무 말도 없었다. 저장 경로만 res.ok 를 보고 있었다. */
+  const call = async (input: string, init: RequestInit, what: string): Promise<boolean> => {
+    try {
+      const res = await fetch(input, init);
+      if (res.ok) return true;
+      const d = await res.json().catch(() => ({}));
+      setMsg(`${what} 실패: ${d.error ?? res.status}`);
+      return false;
+    } catch (e) {
+      setMsg(`${what} 실패: ${e instanceof Error ? e.message : e}`);
+      return false;
+    }
+  };
+
   const toggleLive = async (a: Account) => {
     if (!a.liveEnabled && !confirm(
       `[${a.envKey}] 실주문(wire)을 켭니다.\n서버 게이트(TRADING_LIVE_ALLOWED=${liveAllowed}) 와 AND 로 동작합니다. 계속할까요?`,
     )) return;
-    await fetch("/api/my/trading/accounts", {
+    await call("/api/my/trading/accounts", {
       method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id: a.id, liveEnabled: !a.liveEnabled }),
-    });
+    }, "실주문 토글");
     await reload();
   };
 
   const removeAccount = async (a: Account) => {
     if (!confirm(`[${a.envKey}] 계정과 그 포트폴리오·이력을 삭제할까요?`)) return;
-    await fetch(`/api/my/trading/accounts?id=${a.id}`, { method: "DELETE" });
+    await call(`/api/my/trading/accounts?id=${a.id}`, { method: "DELETE" }, "계정 삭제");
     await reload();
   };
 
@@ -196,7 +214,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
   /** 활성/비활성 토글. 저장과 같은 길목을 지나므로 이 변경도 이력에 한 줄 남는다. */
   const toggleEnabled = async (p: Portfolio) => {
     setBusy(true);
-    await fetch("/api/my/trading/portfolios", {
+    await call("/api/my/trading/portfolios", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
@@ -204,7 +222,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
         runAt: p.runAt, config: p.config, reservedCash: p.reservedCash ?? 0,
         enabled: !p.enabled,
       }),
-    });
+    }, `${p.enabled ? "비활성화" : "활성화"}`);
     setHistory((h) => { const n = { ...h }; delete n[p.id]; return n; }); // 이력 다시 불러오게
     await reload();
     setBusy(false);
@@ -445,7 +463,7 @@ export default function TradingSettingsClient({ initial }: { initial: InitialDat
                     </button>
                     <button
                       onClick={async () => {
-                        await fetch(`/api/my/trading/portfolios?id=${p.id}`, { method: "DELETE" });
+                        await call(`/api/my/trading/portfolios?id=${p.id}`, { method: "DELETE" }, "블록 삭제");
                         await reload();
                       }}
                       className="text-xs text-red-500 cursor-pointer hover:underline hover:text-red-600"
