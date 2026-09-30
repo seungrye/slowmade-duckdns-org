@@ -92,10 +92,93 @@ export function parseFill(f: Json): Fill | null {
   };
 }
 
+/** 원장 한 행 — 우리 DB(stocktrades)의 기록과 오늘 새로 들어온 체결이 같은 모양으로 섞인다. */
+export type LedgerRow = {
+  ticker: string; date: string; time: string; side: "buy" | "sell";
+  qty: number; price: number; currency: string;
+};
+
+export type LedgerWalk = {
+  /** 오늘(today) 실현손익 */
+  run: number;
+  /** **전체** 실현손익. 먹인 원장이 전부여야 뜻이 있다 */
+  cum: number;
+  /** `${ticker}|${time}|${side}` → 그 행 직후 보유수량 */
+  cumQty: Map<string, number>;
+  /** 원가를 모르는 매도 — 손익에서 **제외**했다. 0 으로 채우지 않는다 */
+  unknownCost: string[];
+};
+
+const ledgerKey = (r: { ticker: string; time: string; side: string }) =>
+  `${r.ticker}|${r.time}|${r.side}`;
+
+/**
+ * 평균단가 회계로 원장을 훑어 실현손익과 누적수량을 낸다 — **순수** (#500).
+ *
+ * ── 왜 떼어냈나 ────────────────────────────────────────────────────
+ *
+ * 예전엔 이 계산이 `fillsToTradesAndPnl` 안에 있었고 **KIS 90일 조회 결과**만 먹었다.
+ * 그래서 `cum` 이 "누적" 이 아니라 **"최근 90일 창을 매일 재계산한 값"** 이었다. 창 시작 전에
+ * 산 물량은 매수 기록이 없어 원가가 0 이 되고, 그걸 팔면 매도대금 전액이 이익으로 잡혔다.
+ * 창이 매일 밀리니 옛 매수가 빠질 때마다 누적이 점프했다 — 매매가 없는 날에도.
+ *
+ *   실측: USD DB +86,384 / 참값 −2,238 (오차 +88,623) · KRW 335,993 / 244,996 (+90,997)
+ *   창 시작일만 바꿔 운영 함수를 돌리면 DB 값이 소수점 4자리까지 재현됐다.
+ *
+ * 그래서 **먹이는 쪽이 전체 원장을 책임지고**, 이 함수는 "준 것만 본다" 는 순수 함수로 둔다.
+ * 그러면 "구간을 잘라도 결과가 같은가" 를 테스트로 못박을 수 있다 — 그 불변식이 없어서
+ * 3개월 동안 안 드러났다.
+ *
+ * 원가를 모르는 매도는 **0 으로 대체하지 않는다.** 손익에서 빼고 `unknownCost` 에 남긴다.
+ * 모르는 값을 0 으로 채우면 그게 곧 유령이익이 된다(`blockSnapshot` 이 `cash: null` 을
+ * 쓰는 것과 같은 원칙).
+ */
+export function walkLedger(rows: LedgerRow[], today: string): LedgerWalk {
+  // 결정적으로 정렬한다. 같은 초 안의 실제 체결 순서는 **알 수 없다** — 알 수 없다는 사실을
+  // 매번 같은 방식으로 처리하는 것이 목표다(예전엔 입력 순서에 좌우됐다).
+  const sorted = [...rows].sort((a, b) =>
+    a.date !== b.date ? (a.date < b.date ? -1 : 1)
+      : a.time !== b.time ? (a.time < b.time ? -1 : 1)
+        : a.side !== b.side ? (a.side < b.side ? -1 : 1)
+          : a.ticker < b.ticker ? -1 : a.ticker > b.ticker ? 1 : 0);
+
+  const pos = new Map<string, [number, number]>(); // ticker -> [qty, cost]
+  const cumQty = new Map<string, number>();
+  const unknownCost: string[] = [];
+  let run = 0, cum = 0;
+
+  for (const r of sorted) {
+    const st = pos.get(r.ticker) ?? [0, 0];
+    if (r.side === "buy") {
+      st[0] += r.qty;
+      st[1] += r.qty * r.price;
+    } else {
+      // 보유분만 손익을 낸다. 초과분(원장보다 많이 팔린 수량)은 원가를 모르므로 제외한다.
+      const known = Math.min(r.qty, Math.max(0, st[0]));
+      if (known > 0) {
+        const avg = st[1] / st[0];
+        const pnl = (r.price - avg) * known;
+        cum += pnl;
+        if (r.date === today) run += pnl;
+        st[1] = Math.max(0, st[1] - avg * known);
+        st[0] = st[0] - known;
+      }
+      if (known < r.qty) {
+        unknownCost.push(`${r.ticker} ${r.date} 매도 ${r.qty - known}주 원가 미상(손익 제외)`);
+      }
+    }
+    pos.set(r.ticker, st);
+    cumQty.set(ledgerKey(r), st[0]);
+  }
+  return { run, cum, cumQty, unknownCost };
+}
+
 export function fillsToTradesAndPnl(
   fills: Fill[],
   opts: {
     env: string; market: "kr" | "us"; today: string;
+    /** 전체 원장 워크 결과 (#500) — 누적수량을 여기서 가져온다. 없으면 창 기준 폴백. */
+    walk?: LedgerWalk;
     /**
      * 종목 → 그 체결을 낸 블록 (#372). 예전엔 여기에 `strategy: portfolio.strategy` 가
      * 들어와 **계좌 전체 체결을 자기 전략으로 통째 태깅**했다 — 블록이 둘이 되자
@@ -144,10 +227,14 @@ export function fillsToTradesAndPnl(
     // 주인이 없으면(옛 유니버스 청산분·겹치는 종목) 태그 없이 기록만 남긴다.
     // buildTradeUpsertOp 이 undefined 를 걸러 빈 값을 박지 않는다.
     const own = opts.owner(r.ticker, r.date);
+    // 누적수량은 **전체 원장** 기준이어야 한다 (#500). 창 기준으로 내면 창 밖 매수가 빠진
+    // 만큼 낮게 박히고, RECENT_TRADES 를 지난 옛 기록은 다시 갱신되지 않아 영구히 남는다
+    // (실측: 069500 저장 21 / 실제 24 — 오차 −3 이 창 밖 매수분과 정확히 일치).
+    const fullCumQty = opts.walk?.cumQty.get(`${r.ticker}|${r.time}|${r.side}`);
     return {
     env: opts.env, ticker: r.ticker, action: r.side,
     ...(own ? { strategy: own.strategy, portfolioId: own.id } : {}),
-    qty: r.qty, cumulativeQty: cumQty,
+    qty: r.qty, cumulativeQty: fullCumQty ?? cumQty,
     price: Math.round(price * 10000) / 10000,
     amount: Math.round(r.amount * 10000) / 10000,
     currency: r.currency || defaultCur,
@@ -280,6 +367,10 @@ export async function runCloseSync(
     ...Object.keys(holdings),
   ]);
   let run = 0, cum = 0, tradeCount = 0;
+  // 체결내역 조회가 실패했나 (#501). 예전엔 실패해도 fills=[] 로 진행해 run=0·cum=0 이
+  // 그대로 스냅샷에 박혔다 — **조회 실패와 "진짜 손익 0" 이 구분되지 않았다.**
+  // 실측 09-18: 실제 29,961원 실현이 0 으로 기록되고 영구 유실(runPnl 합 215,035 ≠ cum 335,993).
+  let fillsOk = true;
   const start = new Date(now.getTime() - LOOKBACK_DAYS * 86400_000)
     .toISOString().slice(0, 10).replace(/-/g, "");
   const fills: Fill[] = [];
@@ -321,7 +412,8 @@ export async function runCloseSync(
         if (p) fills.push(p);
       }
     } catch (e) {
-      log(`미장 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
+      fillsOk = false;
+      log(`⚠ 미장 체결내역 조회 실패 — 오늘 실현손익을 기록하지 않는다: ${e instanceof Error ? e.message : e}`);
     }
   } else {
     for (const sym of tradeSyms) {
@@ -331,7 +423,8 @@ export async function runCloseSync(
           if (p) fills.push(p);
         }
       } catch (e) {
-        log(`[${sym}] 체결내역 조회 실패 — 스킵: ${e instanceof Error ? e.message : e}`);
+        fillsOk = false;
+        log(`⚠ [${sym}] 체결내역 조회 실패 — 오늘 실현손익을 기록하지 않는다: ${e instanceof Error ? e.message : e}`);
       }
     }
   }
@@ -361,26 +454,79 @@ export async function runCloseSync(
   if (contested.length) {
     log(`⚠ 두 블록이 함께 무는 종목 — 귀속 보류(계좌 귀속): ${contested.join(", ")}`);
   }
+  // ── 누적은 **전체 원장**으로 계산한다 (#500) ──
+  //
+  // 예전엔 KIS 90일 조회 결과만으로 원장을 빈 상태에서 쌓아, 창 밖 매수의 원가를 잃고
+  // 매도대금 전액을 이익으로 잡았다(USD +88,623 · KRW +90,997 과대). 90일 조회는 이제
+  // **새 체결 줍기 전용**이고, 손익·누적수량은 우리 DB 전체 이력에서 나온다.
+  // 전 이력에서 종목별 매수 ≥ 매도가 전부 성립하므로(청산 종목은 정확히 0) 원가 미상
+  // 매도는 발생하지 않아야 한다 — 발생하면 그건 신호이므로 경고로 드러낸다.
+  const ledger: LedgerRow[] = [];
+  const seen = new Set<string>();
+  const pushRow = (r: LedgerRow) => {
+    const k = `${r.ticker}|${r.time}|${r.side}`;
+    if (seen.has(k)) return; // 오늘 체결이 이미 DB 에 있으면 한 번만
+    seen.add(k);
+    ledger.push(r);
+  };
+  // 오늘 새로 들어온 체결을 먼저 넣어 DB 의 옛 값보다 우선한다(정정 반영).
+  for (const f of fills) {
+    pushRow({ ticker: f.ticker, date: f.date, time: f.time, side: f.side,
+              qty: f.qty, price: f.price, currency: f.currency || currency });
+  }
+  try {
+    // ⚠ `hidden` 으로 걸러내지 않는다. hidden 은 **표시 설정**(블록·계정을 지우면 차트에서
+    // 가린다)인데, 그것을 회계 필터로 쓰면 **숨기는 순간 누적손익이 점프한다** — #500 이
+    // 가르쳐 준 것과 같은 병(집합이 바뀌면 누적이 바뀐다)이다. 계좌의 실현손익은 계좌의
+    // 사실이므로 표시 설정이 바꾸면 안 된다. 실측으로 이 계좌엔 숨겨진 완결 포지션이 68건
+    // 있고(옛 trend_v1 유니버스, 종목별 순수량 전부 0) 합계 +2,774 를 실현했다.
+    const past = await StockTrade.find({ env: account.envKey })
+      .select({ ticker: 1, date: 1, time: 1, action: 1, qty: 1, price: 1, currency: 1, _id: 0 })
+      .lean();
+    for (const t of past) {
+      if ((t.currency || currency) !== currency) continue; // 통화가 섞이면 회계가 무의미하다
+      pushRow({ ticker: String(t.ticker), date: String(t.date), time: String(t.time),
+                side: t.action === "sell" ? "sell" : "buy",
+                qty: Number(t.qty ?? 0), price: Number(t.price ?? 0), currency });
+    }
+  } catch (e) {
+    fillsOk = false;
+    log(`⚠ 매매원장 조회 실패 — 누적손익을 기록하지 않는다: ${e instanceof Error ? e.message : e}`);
+  }
+  const walk = walkLedger(ledger, today);
+  if (walk.unknownCost.length) {
+    log(`⚠ 원가 미상 매도 ${walk.unknownCost.length}건 — 손익에서 제외했다(0 으로 채우지 않는다): `
+      + walk.unknownCost.slice(0, 3).join(" · "));
+  }
+
   const out = fillsToTradesAndPnl(fills, {
-    env: account.envKey, market, today, owner: ownerLookup(siblings),
+    env: account.envKey, market, today, owner: ownerLookup(siblings), walk,
   });
-  run = out.run;   // 폴백값(체결내역 avg-cost 자체계산)
-  cum = out.cum;
+  run = walk.run;
+  cum = walk.cum;
   tradeCount = await upsertTrades(out.records);
   // 실현손익은 **증권사 기간손익 API 우선**(KIS 실계좌) — 실패(모의 미지원)면 위 자체계산 유지.
   // 토스는 기간손익 API 가 없어 체결내역 자체계산(run/cum)을 그대로 쓴다.
+  // 손익을 장부에 적어도 되는가 (#501) — 자체계산은 체결·원장 조회가 온전할 때만 뜻이 있다.
+  let pnlOk = fillsOk;
   if (!isToss) {
     try {
       const base = new Date(now.getTime() - 1825 * 86400_000).toISOString().slice(0, 10).replace(/-/g, "");
       cum = market === "kr" ? await kis!.krRealizedPnl(base, todayKey) : await kis!.usRealizedPnl(base, todayKey);
       run = market === "kr" ? await kis!.krRealizedPnl(todayKey, todayKey) : await kis!.usRealizedPnl(todayKey, todayKey);
+      pnlOk = true; // 증권사 값이므로 체결 조회 실패와 무관하게 신뢰한다
       log(`실현손익: 증권사 기간손익 API 사용 (오늘 ${formatMoney(run, market)} · 누적 ${formatMoney(cum, market)})`);
     } catch (e) {
       log(`실현손익: 기간손익 API 미지원(모의 등) → 체결내역 자체계산 유지 (누적 ${formatMoney(cum, market)}): `
         + `${e instanceof Error ? e.message : e}`);
     }
   }
-  log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${formatMoney(run, market)} · 누적 ${formatMoney(cum, market)}`);
+  if (pnlOk) {
+    log(`매매기록: ${tradeCount}건 upsert · 오늘 실현 ${formatMoney(run, market)} · 누적 ${formatMoney(cum, market)}`);
+  } else {
+    log(`매매기록: ${tradeCount}건 upsert · ⚠ 실현손익 **미상** — 조회가 실패해 스냅샷에 적지 않는다`
+      + `(0 으로 적으면 그 날 손익이 0 이었다는 거짓말이 된다)`);
+  }
 
   // ③ 포트폴리오 스냅샷 — 보유 평가는 **증권사 API 가 준 평가금액**(hvBroker)을 그대로
   // 사용한다(우리가 종목별 현재가를 재조회해 곱하지 않는다 → 유량제한에 총자산이
@@ -423,8 +569,13 @@ export async function runCloseSync(
             totalValue: Math.round((cash + hv) * 10000) / 10000,
             cash: Math.round(cash * 10000) / 10000,
             holdingsValue: Math.round(hv * 10000) / 10000,
-            runPnl: Math.round(run * 10000) / 10000,
-            cumulativePnl: Math.round(cum * 10000) / 10000,
+            // 손익은 **알 때만** 적는다 (#501). 조회가 실패한 날 0 을 적으면 그 값이 영속되고
+            // (실측 09-18: 실제 29,961원이 0 으로 기록) 누적 곡선이 그 날부터 어긋난다.
+            // 필드를 생략하면 기존 값도 덮지 않는다 — 총자산·현금은 잔고에서 왔으니 그대로 적는다.
+            ...(pnlOk ? {
+              runPnl: Math.round(run * 10000) / 10000,
+              cumulativePnl: Math.round(cum * 10000) / 10000,
+            } : {}),
           } },
         { upsert: true },
       );
