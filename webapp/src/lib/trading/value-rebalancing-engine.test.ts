@@ -291,3 +291,29 @@ describe("VR 엔진 — 요약이 접수 수를 말한다 (#511)", () => {
     expect(line).toContain("DRY-RUN");
   });
 });
+
+// #521 — VR 은 사다리가 그날의 유일한 체결 수단이라 대사 실패 = 리밸런싱 완전 정지인데
+// status=done 에 표기도 없었다. 요약은 모니터링·마감 메일에 실리는 유일한 한 줄이다.
+describe("VR 엔진 — degraded 는 요약에 드러난다 (#521)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 2, cumBuy: 8500, cumSell: 0, lastRunDate: "20260718" };
+  const mk = (fail: boolean): V4Broker => ({
+    snapshot: async () => ({ holding: 85, avg: 0, price: 100, cash: 1500 }),
+    historyLong: async () => [],
+    executions: async () => { if (fail) throw new Error("OPSQ0003"); return []; },
+    openOrders: async () => [],
+    cancel: async () => {},
+    place: placeSpy,
+  });
+  const run = (fail: boolean) => runValueRebalancing(
+    acct(false) as never, pf(CFG, { vr: seeded }) as never, "run1" as never, mk(fail), () => {},
+  );
+
+  it("대사 실패면 요약에 '대사실패' 가 붙는다", async () => {
+    expect(String(await run(true))).toMatch(/대사실패/);
+  });
+
+  it("정상이면 안 붙는다", async () => {
+    expect(String(await run(false))).not.toMatch(/대사실패/);
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  absorbIdleCash, emptyPending, mergePending, newV4State, reconcileDay, type V4State,
+  absorbIdleCash, emptyPending, mergeDegradedPending, mergePending, newV4State, reconcileDay,
+  type V4Pending, type V4State,
 } from "./infinite-v4-state";
 import { cyclesFor } from "./scheduler";
 
@@ -162,5 +163,56 @@ describe("scheduler.cyclesFor — 매매 phase + 마감 sync 사이클", () => {
     expect(cyclesFor({ strategy: "lrs_v1", market: "us", runAt: "09:35" })).toEqual([
       { phase: "main", at: "09:35" }, close,
     ]);
+  });
+});
+
+// #521 ① — degraded(대사 실패) 때 예약을 통째로 안 저장한 것은 **너무 넓었다**(#519 회귀).
+// degraded 사이클도 q75(¾ 익절)는 실제로 내보낸다. 그런데 예약에 안 남으니, 같은 날 buy
+// 사이클이 `mergePending(..., "buy")` 로 prev.q75=0 을 승계하고 다음 날 ¾ 체결이 q25 분기로
+// 읽혀 **T 를 ×0.25 대신 ×0.75** 한다.
+//
+// 슬롯마다 요구가 다르다:
+//   one            전일 값 보존 — 낡은 cycleCash 로 다시 계산하면 안 된다(T 증분 분모)
+//   q75·reverseFirst  당일 발주값으로 갱신 — 실제로 내보냈다
+//   q25·reverseSell   당일 발주 없음 → 0
+describe("mergeDegradedPending — degraded 때 슬롯마다 다르게 다룬다 (#521)", () => {
+  const prev: V4Pending = { one: 500_000, q25: 7, q75: 18, reverseSell: 3, reverseFirst: false };
+  const sent = (over: Partial<V4Pending> = {}): V4Pending =>
+    ({ one: 999, q25: 0, q75: 0, reverseSell: 0, reverseFirst: false, ...over });
+
+  it("오늘 낸 q75 를 기록한다 — 이게 안 남아서 T 가 틀어졌다", () => {
+    expect(mergeDegradedPending(prev, sent({ q75: 24 }), "sell").q75).toBe(24);
+  });
+
+  it("전일 one 을 보존한다 — 낡은 cycleCash 로 계산한 값을 쓰면 T 증분이 틀린다", () => {
+    expect(mergeDegradedPending(prev, sent({ q75: 24 }), "sell").one).toBe(500_000);
+  });
+
+  it("오늘 안 낸 칸은 0 — 어제 LOC 는 종가에 소멸해 남아 있지 않다", () => {
+    const r = mergeDegradedPending(prev, sent({ q75: 24 }), "sell");
+    expect(r.q25).toBe(0);
+    expect(r.reverseSell).toBe(0);
+  });
+
+  it("q75 를 안 냈으면 0 으로 — 어제 것을 남겨 두면 없는 주문을 있다고 한다", () => {
+    expect(mergeDegradedPending(prev, sent(), "sell").q75).toBe(0);
+  });
+
+  it("buy phase 는 q75 를 앞 phase(sell) 것으로 이어받는다 — #483 과 같은 이유", () => {
+    // 국장 buy(15:20)는 q75 를 아예 안 낸다(phase 가드). 0 으로 덮으면 sell 이 건 ¾ 익절이 사라진다.
+    const r = mergeDegradedPending(prev, sent(), "buy");
+    expect(r.q75).toBe(18);
+    expect(r.one).toBe(500_000);
+  });
+
+  it("reverseFirst 도 q75 와 같은 규칙", () => {
+    expect(mergeDegradedPending(prev, sent({ reverseFirst: true }), "sell").reverseFirst).toBe(true);
+    expect(mergeDegradedPending({ ...prev, reverseFirst: true }, sent(), "buy").reverseFirst).toBe(true);
+  });
+
+  it("입력을 건드리지 않는다", () => {
+    const snap = JSON.stringify(prev);
+    mergeDegradedPending(prev, sent({ q75: 1 }), "sell");
+    expect(JSON.stringify(prev)).toBe(snap);
   });
 });

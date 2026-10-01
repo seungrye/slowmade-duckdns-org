@@ -223,6 +223,78 @@ export async function tradingTick(now = new Date()): Promise<void> {
   }
 }
 
+/**
+ * 어제 돌았어야 할 사이클이 비었는지 — **순수** (#521).
+ *
+ * 사이클이 **아예 안 돈 날**을 잡는 장치가 없었다. 실측으로 2026-09-04 미장 하루가
+ * run·메일·에러 0건으로 통째 유실됐다(호스트 다운 + catch-up 90분 상한 + 다음 날 토요일).
+ * 어디에도 흔적이 없으니 운영자는 시스템이 돌고 있다고 믿는다.
+ *
+ * ⚠ `CATCH_UP_WINDOW_MIN` 을 늘려 고치면 안 된다 — 늘리면 복구된 사이클이 마감 후에
+ *   LOC 를 내보내 종가가 아닌 엉뚱한 가격에 걸린다. 고칠 지점은 **감지·통보**다.
+ *
+ * `ranDates` 는 그 포트폴리오의 run 이 있는 dateKey 목록(YYYY-MM-DD).
+ * 돌았어야 했는데 없는 날을 돌려준다(없으면 빈 배열).
+ */
+export function missingRunDates(
+  p: { market: string; weekdaysOnly?: boolean | null },
+  ranDates: string[],
+  todayKey: string,
+): string[] {
+  const seen = new Set(ranDates);
+  const d = new Date(`${todayKey}T12:00:00Z`);
+  // 어제부터 거슬러 올라가며 '돌았어야 할 가장 가까운 날' 하나를 찾는다.
+  for (let i = 1; i <= 7; i++) {
+    const c = new Date(d.getTime() - i * 86_400_000);
+    const dow = c.getUTCDay();
+    if (p.weekdaysOnly !== false && (dow === 0 || dow === 6)) continue;
+    const key = c.toISOString().slice(0, 10);
+    return seen.has(key) ? [] : [key];
+  }
+  return [];
+}
+
+/**
+ * 어제 사이클이 비었으면 메일로 알린다 (#521) — 부수효과 경계.
+ *
+ * 돌지 **않은** 것은 어디에도 흔적이 없다. run 도 로그도 메일도 0건이라, 지금까지는 사람이
+ * 한참 뒤에야 알았다(2026-09-04 미장 하루가 그렇게 유실됐다). 기동할 때마다 한 번 본다 —
+ * 호스트가 죽었다 살아나는 경우가 바로 그 상황이다.
+ *
+ * 실패는 삼킨다. 점검 때문에 스케줄러가 안 뜨면 안 된다.
+ */
+async function reportMissingRuns(): Promise<void> {
+  try {
+    await connectToDB();
+    const ports = await TradingPortfolio.find({ isDeleted: { $ne: true }, enabled: true })
+      .select({ market: 1, strategy: 1, weekdaysOnly: 1, config: 1 }).lean();
+    const missing: string[] = [];
+    for (const p of ports) {
+      const market = p.market as "kr" | "us";
+      const todayKey = marketClock(market).dateKey;
+      const runs = await TradingRun.find({ portfolioId: p._id })
+        .select({ dateKey: 1 }).sort({ _id: -1 }).limit(20).lean();
+      const gaps = missingRunDates(
+        { market, weekdaysOnly: p.weekdaysOnly as boolean | undefined },
+        runs.map((r) => String(r.dateKey)), todayKey,
+      );
+      const sym = (p.config as { symbol?: string } | undefined)?.symbol ?? "";
+      for (const d of gaps) missing.push(`${market}/${p.strategy}${sym ? ` ${sym}` : ""} — ${d}`);
+    }
+    if (!missing.length) return;
+    console.warn("[trading] 결손 사이클:", missing.join(" · "));
+    const { sendTradingMail } = await import("./mailer");
+    await sendTradingMail(
+      `⚠ 사이클 결손 ${missing.length}건 — 돌았어야 할 날에 실행 기록이 없습니다`,
+      "아래 블록은 그날 사이클이 **아예 실행되지 않았습니다**(주문·메일·에러 모두 없음).\n"
+      + "호스트 다운이나 배포 중단일 수 있습니다. 보유가 있으면 익절 주문도 안 나갔습니다.\n\n"
+      + missing.join("\n"),
+    );
+  } catch (e) {
+    console.warn("[trading] 결손 점검 실패(삼킴):", e instanceof Error ? e.message : e);
+  }
+}
+
 // ── 기동(instrumentation 에서 호출) ──────────────────────────────
 
 declare global {
@@ -253,6 +325,8 @@ export function startTradingScheduler(): void {
       globalThis.__tradingTickRunning = false;
     }
   };
+  // 기동 직후 **결손 점검** (#521) — 어제 돌았어야 할 사이클이 비었으면 메일. 실패는 삼킨다.
+  setTimeout(() => { void reportMissingRuns(); }, 20_000);
   // 첫 틱 = 기동 catch-up. DB/설정 미비 등 어떤 실패도 서버를 죽이지 않는다.
   setTimeout(safeTick, 10_000); // 서버 워밍업 직후
   setInterval(safeTick, TICK_MS);

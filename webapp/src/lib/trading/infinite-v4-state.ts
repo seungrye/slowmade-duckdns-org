@@ -76,6 +76,36 @@ export function mergePending(
   return { ...next, q75: prev.q75, reverseFirst: prev.reverseFirst };
 }
 
+/**
+ * 대사 실패(degraded) 사이클의 예약 합치기 — **순수** (#521).
+ *
+ * #519 는 degraded 면 예약을 **통째로** 안 저장하게 했는데 너무 넓었다. degraded 사이클도
+ * q75(¾ 익절)는 실제로 내보낸다(엔진의 `degraded && o.tag !== "q75"` 가드). 그런데 예약에
+ * 안 남으니 같은 날 buy 사이클이 `mergePending(..., "buy")` 로 `prev.q75 = 0` 을 승계하고,
+ * 다음 날 ¾ 체결이 `q25` 분기로 읽혀 **T 를 ×0.25 대신 ×0.75** 한다.
+ *
+ * 슬롯마다 요구가 다르다:
+ *
+ *   one              **전일 값 보존.** 엔진의 `pend.one = cycleCash/(splits−t)` 는 degraded 와
+ *                    무관하게 돌아 낡은 장부로 계산된다. 이 값은 전일 매수 체결의 T 증분
+ *                    분모(`s.t += buyAmt / pend.one`)라 틀리면 회차가 어긋난다.
+ *   q75·reverseFirst **당일 발주값으로 갱신.** 실제로 내보낸 주문이다. 단 buy phase 는 이
+ *                    주문을 아예 안 내므로 앞 phase(sell) 것을 이어받는다(#483 과 같은 이유).
+ *   q25·reverseSell  당일 발주가 없으니 0. 어제 LOC 는 종가에 소멸해 남아 있지 않다.
+ */
+export function mergeDegradedPending(
+  prev: V4Pending, sent: V4Pending, phase: "both" | "sell" | "buy",
+): V4Pending {
+  const carry = phase === "buy"; // buy 는 q75·reverseFirst 를 앞 phase 것으로 이어받는다
+  return {
+    one: prev.one,
+    q25: 0,
+    reverseSell: 0,
+    q75: carry ? prev.q75 : sent.q75,
+    reverseFirst: carry ? prev.reverseFirst : sent.reverseFirst,
+  };
+}
+
 export type V4Fill = { side: "buy" | "sell"; qty: number; price: number };
 
 /** 하루치 체결을 상태에 적용(순수 — 원본 불변). holdingAfter: 그 날 이후 보유수량 근사. */
