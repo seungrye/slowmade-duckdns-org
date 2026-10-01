@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
-import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates, staleRunNotice } from "./scheduler";
+import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates, staleRunNotice, isUnknownAck } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
 import { valueHoldings } from "./close-sync";
 
@@ -191,8 +191,9 @@ describe("scheduler.canRetryRun — 실패한 사이클 재시도 가늠(순수)
     expect(canRetryRun(failed(), 1)).toBe(false);
   });
   it("재시도 상한에 닿으면 안 잡는다(설정 오류로 하루 종일 돌지 않게)", () => {
-    expect(canRetryRun(failed({ attempts: 2 }), 0, 2)).toBe(false);
-    expect(canRetryRun(failed({ attempts: 1 }), 0, 2)).toBe(true);
+    // 3번째 인자는 #525 부터 '접수 불명 수' 다 — maxRetries 는 4번째.
+    expect(canRetryRun(failed({ attempts: 2 }), 0, 0, 2)).toBe(false);
+    expect(canRetryRun(failed({ attempts: 1 }), 0, 0, 2)).toBe(true);
   });
   it("attempts 가 없는 옛 문서는 0 으로 본다", () => {
     expect(canRetryRun({ status: "failed" }, 0)).toBe(true);
@@ -272,29 +273,29 @@ describe("missingRunDates — 어제 돌았어야 할 사이클이 비었는지 
   const pf = { market: "kr" as const, runAt: "09:30", weekdaysOnly: true };
 
   it("어제가 평일인데 run 이 하나도 없으면 결손", () => {
-    expect(missingRunDates(pf, [], "2026-10-01")).toEqual(["2026-09-30"]);
+    expect(missingRunDates(pf, [], "2026-10-01", ["sell"])).toEqual(["2026-09-30"]);
   });
 
   it("어제 run 이 있으면 결손 아님", () => {
-    expect(missingRunDates(pf, ["2026-09-30"], "2026-10-01")).toEqual([]);
+    expect(missingRunDates(pf, [{ dateKey: "2026-09-30", phase: "sell", status: "done" }], "2026-10-01", ["sell"])).toEqual([]);
   });
 
   it("어제가 주말이면 보지 않는다 — weekdaysOnly", () => {
     // 2026-10-04(일) → 어제 10-03(토). 가장 가까운 평일은 10-02(금).
-    expect(missingRunDates(pf, ["2026-10-02"], "2026-10-04")).toEqual([]);
-    expect(missingRunDates(pf, [], "2026-10-04")).toEqual(["2026-10-02"]);
+    expect(missingRunDates(pf, [{ dateKey: "2026-10-02", phase: "sell", status: "done" }], "2026-10-04", ["sell"])).toEqual([]);
+    expect(missingRunDates(pf, [], "2026-10-04", ["sell"])).toEqual(["2026-10-02"]);
   });
 
   it("weekdaysOnly 가 아니면 주말도 본다", () => {
-    expect(missingRunDates({ ...pf, weekdaysOnly: false }, [], "2026-10-04")).toEqual(["2026-10-03"]);
+    expect(missingRunDates({ ...pf, weekdaysOnly: false }, [], "2026-10-04", ["sell"])).toEqual(["2026-10-03"]);
   });
 
   it("월 경계를 넘어간다", () => {
-    expect(missingRunDates(pf, [], "2026-10-01")).toEqual(["2026-09-30"]);
+    expect(missingRunDates(pf, [], "2026-10-01", ["sell"])).toEqual(["2026-09-30"]);
   });
 
   it("빈 날짜 목록이 와도 던지지 않는다", () => {
-    expect(() => missingRunDates(pf, [], "2026-10-01")).not.toThrow();
+    expect(() => missingRunDates(pf, [], "2026-10-01", ["sell"])).not.toThrow();
   });
 });
 
@@ -322,5 +323,76 @@ describe("staleRunNotice — 죽은 사이클을 사람에게 알린다 (#523)",
     expect(() => staleRunNotice(
       { envKey: "paper-1", market: "us", strategy: "trend_v1" }, "2026-10-01", "main", at,
     )).not.toThrow();
+  });
+});
+
+// #525 ① — 주문 POST 가 타임아웃·네트워크로 끊기면 **KIS 가 받았는지 모른다**.
+// 그런데 거부와 똑같이 orderNo:"" 로 적혀서, 재시도 가드가 "주문 안 나갔다" 로 읽고
+// 같은 수량을 다시 낸다. 중복 주문이 유실보다 위험하다.
+describe("isUnknownAck — 접수 여부를 모르는 실패를 가린다 (#525)", () => {
+  it("타임아웃은 접수 불명이다", () => {
+    expect(isUnknownAck("The operation was aborted due to timeout")).toBe(true);
+    expect(isUnknownAck("TimeoutError: signal timed out")).toBe(true);
+  });
+
+  it("네트워크 끊김도 접수 불명이다 — 요청이 갔는지 모른다", () => {
+    expect(isUnknownAck("fetch failed")).toBe(true);
+    expect(isUnknownAck("ECONNRESET")).toBe(true);
+    expect(isUnknownAck("socket hang up")).toBe(true);
+  });
+
+  it("증권사가 분명히 거부한 것은 접수 불명이 아니다 — 안 나갔다", () => {
+    expect(isUnknownAck("40910000: 모의투자 주문이 불가한 계좌입니다.")).toBe(false);
+    expect(isUnknownAck("40250000: 주문가능금액이 부족합니다")).toBe(false);
+    expect(isUnknownAck("EGW00201: 초당 거래건수를 초과하였습니다.")).toBe(false);
+  });
+
+  it("빈 문자열은 모른다고 보지 않는다 — 과잉 차단을 피한다", () => {
+    expect(isUnknownAck("")).toBe(false);
+  });
+});
+
+// 가드는 "접수된 것" + "접수 불명" 을 **둘 다** 나갔을 수 있는 것으로 세야 한다.
+describe("canRetryRun — 접수 불명이면 재시도하지 않는다 (#525)", () => {
+  const failed = { status: "failed", attempts: 0 };
+  it("접수 0건이면 재시도한다 — 종전과 같다", () => {
+    expect(canRetryRun(failed, 0)).toBe(true);
+  });
+  it("접수가 있으면 안 한다", () => {
+    expect(canRetryRun(failed, 1)).toBe(false);
+  });
+  it("접수 불명 1건만 있어도 안 한다 — 중복 주문이 유실보다 위험하다", () => {
+    expect(canRetryRun(failed, 0, 1)).toBe(false);
+  });
+});
+
+// #525 ② — 결손 점검이 "그 날 run 문서가 있나" 만 봐서, running 1건이 그날 전체를 가렸다.
+// 국장 v4 는 하루 3사이클(sell/buy/close)이라 phase 단위로 봐야 한다.
+describe("missingRunDates — status·phase 를 본다 (#525)", () => {
+  const pf = { market: "kr" as const, runAt: "09:30", weekdaysOnly: true };
+
+  it("done 인 phase 만 '돌았다' 로 센다 — running/failed 는 안 돈 것과 같다", () => {
+    expect(missingRunDates(pf, [{ dateKey: "2026-09-30", phase: "sell", status: "running" }],
+      "2026-10-01", ["sell"])).toEqual(["2026-09-30"]);
+    expect(missingRunDates(pf, [{ dateKey: "2026-09-30", phase: "sell", status: "done" }],
+      "2026-10-01", ["sell"])).toEqual([]);
+  });
+
+  it("phase 하나가 비면 결손이다 — sell 만 돌고 buy 가 빠진 날", () => {
+    const runs = [{ dateKey: "2026-09-30", phase: "sell", status: "done" }];
+    expect(missingRunDates(pf, runs, "2026-10-01", ["sell", "buy"])).toEqual(["2026-09-30"]);
+  });
+
+  it("필요한 phase 가 다 done 이면 결손 아님", () => {
+    const runs = [
+      { dateKey: "2026-09-30", phase: "sell", status: "done" },
+      { dateKey: "2026-09-30", phase: "buy", status: "done" },
+    ];
+    expect(missingRunDates(pf, runs, "2026-10-01", ["sell", "buy"])).toEqual([]);
+  });
+
+  it("주말은 그대로 건너뛴다 — 회귀 방지", () => {
+    expect(missingRunDates(pf, [{ dateKey: "2026-10-02", phase: "sell", status: "done" }],
+      "2026-10-04", ["sell"])).toEqual([]);
   });
 });

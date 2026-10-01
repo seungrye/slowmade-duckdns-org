@@ -17,6 +17,7 @@ import TradingOrderLog from "@/models/trading-order-log";
 // 상태 쓰기는 state-saver 한 곳으로만 나간다 (#488) — 엔진이 모델을 직접 부르지 않는다.
 import { discardState, savePortfolioState, type StateSaver } from "./state-saver";
 import { isStillLive } from "./killswitch";
+import { isUnknownAck, UNKNOWN_ACK } from "./scheduler";
 import { summarizeRejects } from "./reject-reason";
 import { formatMoney } from "@/lib/format";
 import type { TradingAccountType } from "@/models/trading-account";
@@ -119,9 +120,9 @@ export function marketToday(market: "kr" | "us", now = new Date()): string {
 async function execute(
   account: AccountDoc, portfolio: PortfolioDoc, runId: Types.ObjectId,
   intents: OrderIntent[], broker: LiveBroker, log: CycleLogger,
-): Promise<{ executed: number; live: boolean }> {
+): Promise<{ executed: number; live: boolean; unknownAck: number }> {
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
-  let executed = 0, rejected = 0;
+  let executed = 0, rejected = 0, unknownAck = 0;
   const rejectMsgs: string[] = [];
   for (const it of intents) {
     // 주문 단위 격리 — 한 종목의 주문 거부가 나머지(특히 trend 유니버스)를 죽이지 않게.
@@ -146,6 +147,8 @@ async function execute(
     } catch (e) {
       rejected++;
       error = e instanceof Error ? e.message : String(e);
+      // 접수 여부를 모르는 실패는 거부와 다르게 적는다 (#525) — 같은 주문을 다시 내면 안 된다.
+      if (isUnknownAck(error)) { orderNo = UNKNOWN_ACK; unknownAck++; }
       rejectMsgs.push(error);
       log(`[${it.symbol}] 주문 실패 — 다음 주문 계속: ${error}`);
     }
@@ -172,10 +175,10 @@ async function execute(
     const 내역 = Object.entries(why.counts).map(([k, n]) => `${k} ${n}건`).join(" · ");
     const msg = `주문 ${intents.length}건 전부 거부 — 접수 0건 [${내역}]\n`
       + `${why.advice}\n마지막 사유: ${rejectMsgs[rejectMsgs.length - 1] ?? "(없음)"}`;
-    if (!why.needsAction) { log(`ℹ ${msg}`); return { executed, live }; }
+    if (!why.needsAction) { log(`ℹ ${msg}`); return { executed, live, unknownAck }; }
     throw new Error(msg);
   }
-  return { executed, live };
+  return { executed, live, unknownAck };
 }
 
 // ── 전략별 사이클 ────────────────────────────────────────────────
@@ -218,8 +221,8 @@ async function runLrs(
       log(`[LRS ${target}] 유휴현금 추가 투입 — ${q}주(레짐 유지)`);
     }
   }
-  const { executed } = await execute(account, p, runId, sized, broker, log);
-  return `LRS ${target}: 신호 ${executed}건`;
+  const { executed, unknownAck } = await execute(account, p, runId, sized, broker, log);
+  return `LRS ${target}: 신호 ${executed}건` + (unknownAck ? ` · ⚠접수불명 ${unknownAck}건` : "");
 }
 
 async function runRotation(
@@ -318,11 +321,11 @@ async function runRotation(
       log(`[rotation] 유휴현금 추가 투입 — ${holding} ${q}주(레짐 유지)`);
     }
   }
-  const { executed } = await execute(account, p, runId, intents, broker, log);
+  const { executed, unknownAck } = await execute(account, p, runId, intents, broker, log);
   if (d.rebalanced) {
     await saveState({ "state.lastRebalance": today });
   }
-  return `rotation: ${d.action} · 신호 ${executed}건`;
+  return `rotation: ${d.action} · 신호 ${executed}건` + (unknownAck ? ` · ⚠접수불명 ${unknownAck}건` : "");
 }
 
 async function runTrend(

@@ -105,11 +105,14 @@ type ClaimResult = { runId: string } | null;
  */
 export function canRetryRun(
   run: { status: string; attempts?: number | null },
-  /** **접수된** 실주문 수. 거부 행(orderNo="")은 세지 않는다 (#511). */
+  /** **접수된** 실주문 수. 증권사가 거부한 행(orderNo="")은 세지 않는다 (#511). */
   liveOrdersSent: number,
+  /** **접수 불명** 주문 수(orderNo=UNKNOWN_ACK) — 타임아웃·네트워크 끊김 (#525).
+   *  KIS 가 받았는지 모르므로 "나갔을 수 있는 것" 으로 센다. 중복 주문이 유실보다 위험하다. */
+  unknownAck = 0,
   maxRetries = MAX_RETRIES,
 ): boolean {
-  return mayRetryRun(run, maxRetries) && liveOrdersSent === 0;
+  return mayRetryRun(run, maxRetries) && liveOrdersSent === 0 && unknownAck === 0;
 }
 
 /** 주문 원장을 보기 **전에** 싸게 거른다 — 성공했거나 아직 돌거나 상한에 닿았으면 셀 필요도 없다.
@@ -175,10 +178,14 @@ async function claimRun(
     // **실제로 접수된 것만** 센다 (#511). #507 이 거부도 원장에 남기게 하면서(`orderNo: ""`)
     // 이 가드가 깨졌다 — 첫 주문의 일시 오류 하나로 거부 행이 생기면 "주문이 나갔다" 로
     // 오판해 그날 사이클을 영구 포기했다. 국장 v4 sell 은 주문이 q75 하나뿐이라 특히 치명적이다.
-    const sent = await TradingOrderLog.countDocuments({
-      runId: existing._id, dryRun: false, orderNo: { $nin: ["", null] },
-    });
-    if (!canRetryRun(existing, sent)) return null;
+    const [sent, unknown] = await Promise.all([
+      TradingOrderLog.countDocuments({
+        runId: existing._id, dryRun: false, orderNo: { $nin: ["", null, UNKNOWN_ACK] },
+      }),
+      // 접수 불명(#525) — 타임아웃·네트워크로 끊겨 KIS 가 받았는지 모르는 주문.
+      TradingOrderLog.countDocuments({ runId: existing._id, dryRun: false, orderNo: UNKNOWN_ACK }),
+    ]);
+    if (!canRetryRun(existing, sent, unknown)) return null;
     // 원자 재클레임 — blue/green 두 인스턴스가 같은 틱에 들어와도 한쪽만 성공한다.
     const re = await TradingRun.findOneAndUpdate(
       { _id: existing._id, status: "failed", attempts: { $lt: MAX_RETRIES } },
@@ -261,10 +268,19 @@ export async function tradingTick(now = new Date()): Promise<void> {
  */
 export function missingRunDates(
   p: { market: string; weekdaysOnly?: boolean | null },
-  ranDates: string[],
+  runs: { dateKey: string; phase: string; status: string }[],
   todayKey: string,
+  /** 그 날 돌았어야 할 phase 들(cyclesFor 가 정한다). */
+  needPhases: string[],
 ): string[] {
-  const seen = new Set(ranDates);
+  // **done 인 phase 만** '돌았다' 로 센다 (#525). 예전엔 run 문서가 있기만 하면 넘어가서,
+  // `running` 1건이 그날(sell+buy+close) 전체를 가렸다 — 운영 DB 에 그런 문서가 실제로 있다.
+  const doneBy = new Map<string, Set<string>>();
+  for (const r of runs) {
+    if (r.status !== "done") continue;
+    if (!doneBy.has(r.dateKey)) doneBy.set(r.dateKey, new Set());
+    doneBy.get(r.dateKey)!.add(r.phase);
+  }
   const d = new Date(`${todayKey}T12:00:00Z`);
   // 어제부터 거슬러 올라가며 '돌았어야 할 가장 가까운 날' 하나를 찾는다.
   for (let i = 1; i <= 7; i++) {
@@ -272,7 +288,8 @@ export function missingRunDates(
     const dow = c.getUTCDay();
     if (p.weekdaysOnly !== false && (dow === 0 || dow === 6)) continue;
     const key = c.toISOString().slice(0, 10);
-    return seen.has(key) ? [] : [key];
+    const done = doneBy.get(key) ?? new Set<string>();
+    return needPhases.every((ph) => done.has(ph)) ? [] : [key];
   }
   return [];
 }
@@ -286,20 +303,75 @@ export function missingRunDates(
  *
  * 실패는 삼킨다. 점검 때문에 스케줄러가 안 뜨면 안 된다.
  */
+/**
+ * 창 밖에서 멈춘 사이클을 **통보만** 한다 (#525) — 부수효과 경계.
+ *
+ * stale→failed 전환은 `claimRun` 안에 있고 `claimRun` 은 `isDue` 게이트 뒤에서만 불린다.
+ * 그래서 **매매 창(runAt+45~90분)을 넘긴 다운은 중단 메일이 구조적으로 불가능**했다.
+ * 보유가 있는 날 익절 지정가·사다리가 전부 빠졌는데 운영자는 정상으로 본다.
+ *
+ * ⚠ **재클레임은 열지 않는다.** close 사이클 실측 325초, 유니버스 스캔은 수 분이다 —
+ *   살아 있는 런을 stale 로 보고 다시 잡으면 중복 주문이 난다. 여기서는 알리기만 하고,
+ *   재시도는 종전대로 창 안의 `claimRun` 이 가드(접수·접수불명 수)를 보고 정한다.
+ */
+async function sweepStuckRuns(): Promise<void> {
+  try {
+    await connectToDB();
+    const cutoff = new Date(Date.now() - STALE_MS);
+    const stuck = await TradingRun.find({
+      status: "running", startedAt: { $lt: cutoff }, stuckNotifiedAt: null,
+    }).select({ portfolioId: 1, accountId: 1, dateKey: 1, phase: 1, startedAt: 1 })
+      .limit(20).lean();
+    if (!stuck.length) return;
+    for (const r of stuck) {
+      // **status 를 바꾸지 않는다.** failed 로 내리면 창 안의 claimRun 이 재클레임할 수 있고,
+      // 아직 살아 있는 장시간 사이클이었다면 **중복 주문**이 난다(close 실측 325초).
+      // 알림 표식만 찍어 중복 통보를 막는다 — 상태 판단은 종전 경로가 그대로 한다.
+      const flipped = await TradingRun.updateOne(
+        { _id: r._id, status: "running", stuckNotifiedAt: null },
+        { $set: { stuckNotifiedAt: new Date() } },
+      );
+      if (!flipped.modifiedCount) continue; // 다른 인스턴스가 먼저 알렸다
+      const [pf, acct] = await Promise.all([
+        TradingPortfolio.findById(r.portfolioId).select({ market: 1, strategy: 1, config: 1 }).lean(),
+        TradingAccount.findById(r.accountId).select({ envKey: 1 }).lean(),
+      ]);
+      const n = staleRunNotice(
+        {
+          envKey: String((acct as { envKey?: string } | null)?.envKey ?? r.accountId),
+          market: String((pf as { market?: string } | null)?.market ?? "?"),
+          strategy: String((pf as { strategy?: string } | null)?.strategy ?? "?"),
+          symbol: (pf as { config?: { symbol?: string } } | null)?.config?.symbol,
+        },
+        String(r.dateKey), String(r.phase), r.startedAt as Date,
+      );
+      const { sendTradingMail } = await import("./mailer");
+      await sendTradingMail(n.subject, n.body);
+    }
+  } catch (e) {
+    console.warn("[trading] 중단 사이클 점검 실패(삼킴):", e instanceof Error ? e.message : e);
+  }
+}
+
 async function reportMissingRuns(): Promise<void> {
   try {
     await connectToDB();
     const ports = await TradingPortfolio.find({ isDeleted: { $ne: true }, enabled: true })
-      .select({ market: 1, strategy: 1, weekdaysOnly: 1, config: 1 }).lean();
+      .select({ market: 1, strategy: 1, weekdaysOnly: 1, runAt: 1, config: 1 }).lean();
     const missing: string[] = [];
     for (const p of ports) {
       const market = p.market as "kr" | "us";
       const todayKey = marketClock(market).dateKey;
       const runs = await TradingRun.find({ portfolioId: p._id })
-        .select({ dateKey: 1 }).sort({ _id: -1 }).limit(20).lean();
+        .select({ dateKey: 1, phase: 1, status: 1 }).sort({ _id: -1 }).limit(30).lean();
+      // 그 날 돌았어야 할 phase 는 cyclesFor 가 정한다(국장 v4 는 sell/buy/close 3개).
+      const need = cyclesFor({
+        strategy: String(p.strategy), market, runAt: String(p.runAt ?? "09:30"),
+      }).map((c) => c.phase);
       const gaps = missingRunDates(
         { market, weekdaysOnly: p.weekdaysOnly as boolean | undefined },
-        runs.map((r) => String(r.dateKey)), todayKey,
+        runs.map((r) => ({ dateKey: String(r.dateKey), phase: String(r.phase), status: String(r.status) })),
+        todayKey, need,
       );
       const sym = (p.config as { symbol?: string } | undefined)?.symbol ?? "";
       for (const d of gaps) missing.push(`${market}/${p.strategy}${sym ? ` ${sym}` : ""} — ${d}`);
@@ -340,6 +412,28 @@ export function staleRunNotice(
   };
 }
 
+/** 접수 불명 주문의 원장 표식 — 거부("")와 **다른 값**이어야 가드가 가린다 (#525). */
+export const UNKNOWN_ACK = "?";
+
+/**
+ * 이 실패가 "증권사가 받았는지 모르는" 종류인가 — **순수** (#525).
+ *
+ * 주문 POST 가 타임아웃(#523 이 넣은 45초)이나 네트워크 오류로 끊기면 요청이 KIS 에
+ * 도달했는지 알 수 없다. 그런데 엔진은 이걸 다른 거부와 똑같이 `orderNo: ""` 로 적었고,
+ * 재시도 가드는 **접수된 것만** 세므로 "주문 안 나갔다" 로 읽고 같은 수량을 다시 냈다.
+ *
+ * 증권사가 코드로 거부한 것(잔고부족·계좌·유량)은 **안 나간 게 분명**하므로 여기 해당 없다.
+ * 애매하면 false 로 둔다 — 과잉 차단은 그날 매매를 통째로 포기시킨다.
+ */
+export function isUnknownAck(message: string): boolean {
+  const m = message ?? "";
+  if (!m) return false;
+  // 증권사가 분명히 답한 것(코드가 붙은 거부)은 접수 불명이 아니다.
+  if (/\b(?:EGW|OPSQ|MCA)\d|\b4\d{7}\b|\b9\d{7}\b/.test(m)) return false;
+  return /timeout|timed out|aborted|abort|fetch failed|ECONNRESET|ECONNREFUSED|ETIMEDOUT|socket hang up|network/i
+    .test(m);
+}
+
 // ── 기동(instrumentation 에서 호출) ──────────────────────────────
 
 declare global {
@@ -363,6 +457,7 @@ export function startTradingScheduler(): void {
     if (globalThis.__tradingTickRunning) return;
     globalThis.__tradingTickRunning = true;
     try {
+      await sweepStuckRuns(); // 창 밖 중단 통보 (#525) — 재클레임은 안 한다
       await tradingTick();
     } catch (e) {
       console.error("[trading] tick 실패:", e);
