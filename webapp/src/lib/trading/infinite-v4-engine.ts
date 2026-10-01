@@ -17,7 +17,7 @@ import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
 import { TossClient } from "./toss-client";
 import {
-  absorbIdleCash, emptyPending, mergePending, newV4State, reconcileDay,
+  absorbIdleCash, emptyPending, mergeDegradedPending, mergePending, newV4State, reconcileDay,
   type V4Fill, type V4State,
 } from "./infinite-v4-state";
 import { v4PlanDay, type V4PlannedOrder } from "./v4-plan";
@@ -388,17 +388,33 @@ export async function runInfiniteV4(
   {
     let left = Number.isFinite(cash) ? cash : 0;
     const kept: typeof orders = [];
+    const held: typeof orders = [];
     let skipped = 0, skippedCost = 0;
     for (const o of orders) {
       if (o.side !== "buy") { kept.push(o); continue; }
       const cost = o.qty * o.price;
-      if (cost > left) { skipped++; skippedCost += cost; continue; }
+      if (cost > left) { skipped++; skippedCost += cost; held.push(o); continue; }
       left -= cost;
       kept.push(o);
     }
     if (skipped) {
       log(`[v4:${sym}] 현금 부족 — 매수 ${skipped}건 보류(${formatMoney(skippedCost, market)} `
         + `> 가용 ${formatMoney(cash, market)}). 장부 ${formatMoney(state.cycleCash, market)} 는 그대로 둔다.`);
+      // **떨어낸 주문도 원장에 남긴다** (#521). 예전엔 orders 에서 빼기만 해서 원장이 0줄이고,
+      // 전량 skip 이면 `orders.length === 0` 이라 아래 실패 게이트에도 안 걸려 done 으로 끝났다 —
+      // "왜 안 샀는지" 를 사후에 볼 방법이 없었다. 주문번호 없는 행으로 사유와 함께 남긴다.
+      for (const o of held) {
+        try {
+          await TradingOrderLog.create({
+            runId, accountId: account._id, portfolioId: portfolio._id, envKey: account.envKey,
+            market, symbol: sym, side: o.side, qty: o.qty, price: o.price, ordType: o.ordType,
+            reason: `${o.reason} — 현금 부족 보류(가용 ${formatMoney(cash, market)})`,
+            dryRun: !live, orderNo: "",
+          });
+        } catch (e) {
+          log(`⚠ 보류 주문 기록 실패: ${e instanceof Error ? e.message : e}`);
+        }
+      }
       orders.length = 0;
       orders.push(...kept);
     }
@@ -453,12 +469,14 @@ export async function runInfiniteV4(
 
   // 국장 2단계(sell 09:30 / buy 15:20)는 하루의 예약을 나눠 적는다 — buy 가 통째로 덮으면
   // sell 의 q75(¾ 익절)가 사라져 다음 날 대사가 그 체결을 q25 로 잘못 읽는다 (#483).
-  // degraded 면 **예약을 덮지 않는다** (#519). 대사가 실패하면 t·cycleCash 가 낡았고,
-  // 그 낡은 값으로 계산한 pend 가 전일 예약을 덮으면 다음 날 대사가 매도 종류를 수량으로
-  // 가릴 때 q75/q25 를 잘못 읽어 T 를 ×0.25 대신 ×0.75 한다(#483 과 같은 경로).
-  // 실제로 2026-08-14 kr 에서 OPSQ0003 으로 대사가 깨진 이력이 있다. 주문은 위에서 이미
-  // q75 만 내보냈으므로, 예약도 전일 것을 그대로 두는 쪽이 정합적이다.
-  if (!degraded) state.pending = mergePending(state.pending, pend, phase);
+  // degraded 면 **슬롯마다 다르게** 합친다 (#521). #519 는 통째로 막았는데 너무 넓었다 —
+  // degraded 사이클도 q75(¾ 익절)는 실제로 내보내므로 그 수량이 예약에 남아야 한다.
+  // 안 남기면 같은 날 buy 가 prev.q75=0 을 승계하고, 다음 날 ¾ 체결이 q25 로 읽혀
+  // T 를 ×0.25 대신 ×0.75 한다. 반대로 `one` 은 낡은 cycleCash 로 계산되므로 전일 값을
+  // 지켜야 한다(전일 매수 체결의 T 증분 분모). 판단은 순수 모듈에 있다.
+  state.pending = degraded
+    ? mergeDegradedPending(state.pending, pend, phase)
+    : mergePending(state.pending, pend, phase);
   // 왜 '어제'인가: LOC 주문은 그날 종가에 체결돼 체결일 == 실행일(today)이 된다. 대사 필터는
   // `lastRunDate < date < today`(양쪽 strict)라, lastRunDate=today 로 남기면 다음 실행의
   // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를
@@ -469,12 +487,16 @@ export async function runInfiniteV4(
 
   // 요약은 **접수 수**를 말한다 (#507). 예전엔 `orders.length`(계획 수)라 전량 거부돼도
   // "주문 17건" 으로 성공처럼 보였다.
+  // degraded 는 **요약에 드러낸다** (#521). 예전엔 status=done·표기 없음이라, real 에서
+  // executions TR 이 지속 실패하면 v4 매수·VR 전량이 영구 정지하는데 대시보드는 매일 done
+  // 이었다. 요약은 모니터링 화면과 마감 메일에 그대로 실리는 유일한 한 줄이다.
+  const warn = degraded ? " ⚠대사실패(신규 매수 보류)" : "";
   const line = live
     ? `V4 ${sym}[${phase}]: 접수 ${accepted}건/계획 ${orders.length}건`
       + (rejected ? ` · 거부 ${rejected}건` : "")
-      + ` (T=${state.t.toFixed(2)} mode=${state.mode} 보유 ${holding})`
+      + ` (T=${state.t.toFixed(2)} mode=${state.mode} 보유 ${holding})${warn}`
     : `V4 ${sym}[${phase}]: 계획 ${orders.length}건 [DRY-RUN] (T=${state.t.toFixed(2)} `
-      + `mode=${state.mode} 보유 ${holding})`;
+      + `mode=${state.mode} 보유 ${holding})${warn}`;
   log(line);
   // 낼 게 있었는데 **한 건도 못 냈으면** 사이클을 실패로 만든다 — 그래야 실패 메일이 나가고
   // 모니터링에 남는다. ⚠ dry-run 은 애초에 place() 를 안 부르므로 반드시 live 로 게이트한다

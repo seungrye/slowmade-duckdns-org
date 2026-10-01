@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
-import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun } from "./scheduler";
+import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
 import { valueHoldings } from "./close-sync";
 
@@ -259,5 +259,41 @@ describe("canRetryRun — 거부 행은 '나간 주문' 이 아니다 (#511)", (
 
   it("접수된 주문이 있으면 재시도하지 않는다 — 중복 주문이 유실보다 위험하다", () => {
     expect(canRetryRun(failed, 1)).toBe(false);
+  });
+});
+
+// #521 — 사이클이 **아예 안 돈 날**을 잡는 장치가 없었다. 실측으로 2026-09-04 미장 하루가
+// run·메일·에러 0건으로 통째 유실됐다(호스트 다운 + catch-up 90분 상한 + 다음 날 토요일).
+// 운영자는 시스템이 돌고 있다고 믿는다.
+//
+// ⚠ catch-up 상한을 늘려 고치면 안 된다 — 마감 후 LOC 가 엉뚱한 가격에 걸린다.
+// 고칠 지점은 **결손 감지·통보**다.
+describe("missingRunDates — 어제 돌았어야 할 사이클이 비었는지 (#521)", () => {
+  const pf = { market: "kr" as const, runAt: "09:30", weekdaysOnly: true };
+
+  it("어제가 평일인데 run 이 하나도 없으면 결손", () => {
+    expect(missingRunDates(pf, [], "2026-10-01")).toEqual(["2026-09-30"]);
+  });
+
+  it("어제 run 이 있으면 결손 아님", () => {
+    expect(missingRunDates(pf, ["2026-09-30"], "2026-10-01")).toEqual([]);
+  });
+
+  it("어제가 주말이면 보지 않는다 — weekdaysOnly", () => {
+    // 2026-10-04(일) → 어제 10-03(토). 가장 가까운 평일은 10-02(금).
+    expect(missingRunDates(pf, ["2026-10-02"], "2026-10-04")).toEqual([]);
+    expect(missingRunDates(pf, [], "2026-10-04")).toEqual(["2026-10-02"]);
+  });
+
+  it("weekdaysOnly 가 아니면 주말도 본다", () => {
+    expect(missingRunDates({ ...pf, weekdaysOnly: false }, [], "2026-10-04")).toEqual(["2026-10-03"]);
+  });
+
+  it("월 경계를 넘어간다", () => {
+    expect(missingRunDates(pf, [], "2026-10-01")).toEqual(["2026-09-30"]);
+  });
+
+  it("빈 날짜 목록이 와도 던지지 않는다", () => {
+    expect(() => missingRunDates(pf, [], "2026-10-01")).not.toThrow();
   });
 });

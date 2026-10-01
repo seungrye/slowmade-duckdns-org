@@ -215,7 +215,10 @@ export async function runValueRebalancing(
   const 상태 = live
     ? `접수 ${sent.accepted}건/계획 ${orders.length}건` + (sent.rejected ? ` · 거부 ${sent.rejected}건` : "")
     : `계획 ${orders.length}건 [DRY-RUN]`;
-  const line = `VR ${sym}: ${상태} (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`;
+  // degraded 는 요약에 드러낸다 (#521) — VR 은 사다리가 그날의 유일한 체결 수단이라
+  // 대사 실패 = 리밸런싱 완전 정지인데, 예전엔 status=done 에 표기도 없었다.
+  const line = `VR ${sym}: ${상태} (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`
+    + (degraded ? " ⚠대사실패(주문 전량 보류)" : "");
   log(line);
   return line;
 }

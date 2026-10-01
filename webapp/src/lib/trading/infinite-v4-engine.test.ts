@@ -472,7 +472,9 @@ describe("infinite-v4-engine — 매수는 가용현금 안에서만 나간다 (
   const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
 
   // dry-run 이라 broker.place 는 안 불린다 — 주문은 원장(TradingOrderLog)에 남는다.
-  const buys = () => orderLogs.filter((o) => o.side === "buy");
+  // #521 로 보류된 주문도 원장에 남는다 — '나간 주문'만 센다.
+  const buys = () => orderLogs.filter((o) => o.side === "buy"
+    && !String(o.reason).includes("현금 부족 보류"));
   const sells = () => orderLogs.filter((o) => o.side === "sell");
   const buyCost = () => buys().reduce((a, o) => a + Number(o.qty) * Number(o.price), 0);
 
@@ -546,13 +548,137 @@ describe("infinite-v4-engine — degraded 면 예약(pending)을 덮지 않는�
 
   beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
 
-  it("대사가 실패하면 전일 예약이 그대로 남는다", async () => {
+  it("대사가 실패하면 전일 one 이 그대로 남는다 — 낡은 장부로 다시 계산하지 않는다", async () => {
+    // q75 는 #521 부터 **당일 발주값으로 갱신**된다(degraded 여도 ¾ 익절은 실제로 내보낸다).
+    // 여기서 지켜야 하는 건 T 증분 분모인 one 이다.
     await run(true);
-    expect((persisted.at(-1) as V4State).pending).toEqual(PEND);
+    expect((persisted.at(-1) as V4State).pending.one).toBe(PEND.one);
   });
 
   it("대사가 성공하면 종전대로 새 예약으로 갱신된다 — 회귀 방지", async () => {
     await run(false);
     expect((persisted.at(-1) as V4State).pending).not.toEqual(PEND);
+  });
+});
+
+// #521 — degraded 사이클이 실제로 내보낸 q75 가 예약에 남아야 한다(#519 가 통째로 막았다).
+describe("infinite-v4-engine — degraded 여도 내보낸 q75 는 예약에 남는다 (#521)", () => {
+  const CFG = { symbol: "069500", principal: 10_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
+  const PREV = { one: 493_886, q25: 7, q75: 18, reverseSell: 3, reverseFirst: false };
+
+  const broker: V4Broker = {
+    snapshot: async () => ({ holding: 32, avg: 100, price: 130, cash: 6_000 }), // 평단+30% → 익절
+    historyLong: async () => [],
+    executions: async () => { throw new Error("OPSQ0003: 서비스 라우팅 오류"); },
+    openOrders: async () => [],
+    cancel: async () => {},
+    place: async () => "ORD",
+  };
+
+  const run = (phase: "both" | "sell" | "buy") => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("069500", 20, 10_000), t: 6.93, cycleCash: 6_000,
+                     lastRunDate: "20260921", pending: PREV } } } as never,
+    "run1" as never, broker, phase, () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("sell phase: 오늘 낸 q75 수량이 예약에 기록된다", async () => {
+    await run("sell");
+    const q75Sent = orderLogs.find((o) => String(o.reason).includes("75% 익절"));
+    expect(q75Sent).toBeDefined();
+    expect((persisted.at(-1) as V4State).pending.q75).toBe(Number(q75Sent!.qty));
+  });
+
+  it("전일 one 은 그대로 — 낡은 장부로 다시 계산하면 T 증분이 틀린다", async () => {
+    await run("sell");
+    expect((persisted.at(-1) as V4State).pending.one).toBe(PREV.one);
+  });
+
+  it("오늘 안 낸 칸은 비운다", async () => {
+    await run("sell");
+    const p = (persisted.at(-1) as V4State).pending;
+    expect(p.q25).toBe(0);
+    expect(p.reverseSell).toBe(0);
+  });
+
+  it("buy phase 는 앞 phase 의 q75 를 이어받는다 — #483 과 같은 이유", async () => {
+    await run("buy");
+    expect((persisted.at(-1) as V4State).pending.q75).toBe(PREV.q75);
+  });
+});
+
+// #521 ② — 현금 게이트가 떨어낸 매수가 원장에 0줄이고, 전량 skip 이면 실패 게이트도 안 걸린다.
+describe("infinite-v4-engine — 현금으로 떨어낸 주문은 흔적을 남긴다 (#521)", () => {
+  const CFG = { symbol: "TQQQ", principal: 100_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
+
+  const broker = (cash: number, holding = 0, avg = 0): V4Broker => ({
+    snapshot: async () => ({ holding, avg, price: 100, cash }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {}, place: async () => "ORD",
+  });
+
+  const run = (b: V4Broker) => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "us", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("TQQQ", 20, 100_000), lastRunDate: "20260921" } } } as never,
+    "run1" as never, b, "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("현금으로 떨어낸 매수가 원장에 남는다 — 안 남으면 왜 안 샀는지 못 본다", async () => {
+    await run(broker(1_000)); // 계획보다 훨씬 적은 현금
+    const held = orderLogs.filter((o) => String(o.reason).includes("현금 부족"));
+    expect(held.length).toBeGreaterThan(0);
+    expect(held[0].orderNo).toBe("");
+  });
+
+  it("떨어낸 주문은 전송되지 않는다", async () => {
+    const placed: unknown[] = [];
+    const b = { ...broker(1_000), place: async () => { placed.push(1); return "ORD"; } };
+    await run(b as V4Broker);
+    expect(placed).toHaveLength(0); // dry-run 이라 어차피 0 — 회귀 가드
+  });
+
+  it("매도는 떨어내지 않는다", async () => {
+    await run(broker(0, 100, 50));
+    expect(orderLogs.filter((o) => o.side === "sell").length).toBeGreaterThan(0);
+    expect(orderLogs.filter((o) => o.side === "sell" && String(o.reason).includes("현금 부족")))
+      .toHaveLength(0);
+  });
+});
+
+// #521 ③ — degraded 사이클이 status=done·요약 표기 없이 끝났다. real 에서 executions TR 이
+// 지속 실패하면 v4 매수·VR 전량이 영구 정지하는데 대시보드는 매일 done 이다.
+describe("infinite-v4-engine — degraded 는 요약에 드러난다 (#521)", () => {
+  const CFG = { symbol: "069500", principal: 10_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
+  const broker = (fail: boolean): V4Broker => ({
+    snapshot: async () => ({ holding: 32, avg: 100, price: 130, cash: 6_000 }),
+    historyLong: async () => [],
+    executions: async () => { if (fail) throw new Error("OPSQ0003"); return []; },
+    openOrders: async () => [], cancel: async () => {}, place: async () => "ORD",
+  });
+  const run = (fail: boolean) => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("069500", 20, 10_000), t: 6.93, cycleCash: 6_000,
+                     lastRunDate: "20260921" } } } as never,
+    "run1" as never, broker(fail), "both", () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("요약에 '대사실패' 가 들어간다 — 요약은 모니터링·메일에 그대로 실린다", async () => {
+    expect(await run(true)).toMatch(/대사실패/);
+  });
+
+  it("정상이면 안 붙는다", async () => {
+    expect(await run(false)).not.toMatch(/대사실패/);
   });
 });
