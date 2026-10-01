@@ -140,11 +140,34 @@ async function claimRun(
     if (!existing) return null;
     if (existing.status === "running" &&
         Date.now() - existing.startedAt.getTime() > STALE_MS) {
-      await TradingRun.updateOne(
+      const flipped = await TradingRun.updateOne(
         { _id: existing._id, status: "running" },
         { $set: { status: "failed", error: "stale running(크래시 추정) — 자동 정리", finishedAt: new Date() } },
       );
       existing.status = "failed"; // 아래 재시도 판단에 반영(같은 틱에 바로 잡을 수 있게)
+      // **알린다** (#523). 이 경로는 in-process catch 를 못 타므로 여기서 안 보내면 아무도
+      // 모른다. 전환에 실제로 성공한 쪽만 보낸다(blue/green 두 인스턴스 중복 방지).
+      if (flipped.modifiedCount) {
+        try {
+          const [pf, acct] = await Promise.all([
+            TradingPortfolio.findById(portfolioId).select({ market: 1, strategy: 1, config: 1 }).lean(),
+            TradingAccount.findById(accountId).select({ envKey: 1 }).lean(),
+          ]);
+          const n = staleRunNotice(
+            {
+              envKey: String((acct as { envKey?: string } | null)?.envKey ?? accountId),
+              market: String((pf as { market?: string } | null)?.market ?? "?"),
+              strategy: String((pf as { strategy?: string } | null)?.strategy ?? "?"),
+              symbol: (pf as { config?: { symbol?: string } } | null)?.config?.symbol,
+            },
+            dateKey, phase, existing.startedAt,
+          );
+          const { sendTradingMail } = await import("./mailer");
+          await sendTradingMail(n.subject, n.body);
+        } catch (e) {
+          console.warn("[trading] 중단 알림 실패(삼킴):", e instanceof Error ? e.message : e);
+        }
+      }
     }
     // 일시 오류(KIS 5xx·빈 응답·배포 중 종료)로 실패한 사이클은 그날 다시 잡는다 (#487).
     // 주문이 이미 나갔으면 잡지 않는다 — 판단 근거는 KIS 가 아니라 우리 주문 원장이다.
@@ -293,6 +316,28 @@ async function reportMissingRuns(): Promise<void> {
   } catch (e) {
     console.warn("[trading] 결손 점검 실패(삼킴):", e instanceof Error ? e.message : e);
   }
+}
+
+/**
+ * 죽은 사이클(stale running → failed) 알림 문구 — **순수** (#523).
+ *
+ * 실패 메일이 `run_cycle` 의 **in-process catch** 안에만 있었다. 그래서 `systemctl stop`
+ * (TimeoutStopSec=30)이나 크래시로 죽은 런은 catch 에 도달하지 못하고, 다음 틱의
+ * stale→failed 전환은 `updateOne` 뿐이라 **아무에게도 안 알렸다.** 배포마다 생기는 경로다.
+ */
+export function staleRunNotice(
+  p: { envKey: string; market: string; strategy: string; symbol?: string },
+  dateKey: string, phase: string, startedAt: Date,
+): { subject: string; body: string } {
+  const who = `${p.envKey} ${p.market}/${p.strategy}${p.symbol ? ` ${p.symbol}` : ""}`;
+  return {
+    subject: `⚠ 사이클 중단 ${dateKey}/${phase} — ${who}`,
+    body: `${who} 의 ${dateKey} ${phase} 사이클이 **끝나지 않은 채 사라졌습니다.**\n`
+      + `시작: ${startedAt.toISOString()}\n\n`
+      + "프로세스가 죽은 것으로 봅니다(배포·재시작·크래시·OOM). 그 사이클의 주문이 어디까지\n"
+      + "나갔는지는 주문 원장을 확인하세요 — 이미 접수된 주문이 있으면 그날은 재시도하지\n"
+      + "않습니다(중복 주문 방지).",
+  };
 }
 
 // ── 기동(instrumentation 에서 호출) ──────────────────────────────

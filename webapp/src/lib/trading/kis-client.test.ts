@@ -229,3 +229,30 @@ describe("usAccount — 매수가능금액 조회 실패를 삼키지 않는다 
     expect(cash).toBeGreaterThan(0);
   });
 });
+
+// #523 ② — KIS HTTP 호출에 **타임아웃이 없었다**(AbortSignal grep 0건). undici 기본 300초 ×
+// 재시도면 GET 하나가 최대 20분이고, 60초 틱의 재진입 가드와 겹치면 그날 전 포트폴리오가
+// 선다 — 알림도 안 나간다(사이클이 끝나질 않으니 실패 메일도 없다).
+describe("HTTP 타임아웃 — 응답이 안 와도 사이클을 잡아먹지 않는다 (#523)", () => {
+  it("조회에 AbortSignal 이 붙는다", async () => {
+    fetchMock.mockResolvedValue(res({ rt_cd: "0", output: {} }));
+    await settle(client().usBuyable("SPY", 1));
+    const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    expect(init?.signal).toBeDefined();
+  });
+
+  it("주문에도 붙는다", async () => {
+    fetchMock.mockResolvedValue(res(OK));
+    await settle(order());
+    const init = fetchMock.mock.calls.at(-1)![1] as RequestInit | undefined;
+    expect(init?.signal).toBeDefined();
+  });
+
+  it("토큰 발급에도 붙는다", async () => {
+    store.doc = null; // 캐시 미스 → 발급 경로
+    fetchMock.mockResolvedValue(res({ access_token: "T", expires_in: 86400 }));
+    await settle(client().usBuyable("SPY", 1));
+    const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    expect(init?.signal).toBeDefined();
+  });
+});

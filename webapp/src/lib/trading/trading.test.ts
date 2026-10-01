@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
-import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates } from "./scheduler";
+import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates, staleRunNotice } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
 import { valueHoldings } from "./close-sync";
 
@@ -295,5 +295,32 @@ describe("missingRunDates — 어제 돌았어야 할 사이클이 비었는지 
 
   it("빈 날짜 목록이 와도 던지지 않는다", () => {
     expect(() => missingRunDates(pf, [], "2026-10-01")).not.toThrow();
+  });
+});
+
+// #523 ③ — 프로세스가 죽은 사이클은 **메일 없이** failed 가 됐다. 실패 메일이 in-process
+// catch 안에만 있어서, systemctl stop 으로 죽은 런은 catch 에 도달하지 못하고 다음 틱의
+// stale→failed 전환은 updateOne 뿐이었다. 배포마다 이 경로가 생긴다.
+describe("staleRunNotice — 죽은 사이클을 사람에게 알린다 (#523)", () => {
+  const at = new Date("2026-10-01T04:30:00Z");
+  const n = staleRunNotice(
+    { envKey: "paper-1", market: "kr", strategy: "infinite_v4", symbol: "069500" },
+    "2026-10-01", "sell", at,
+  );
+
+  it("제목에 어느 블록인지 들어간다 — 받은편지함에서 바로 구분돼야 한다", () => {
+    expect(n.subject).toContain("069500");
+    expect(n.subject).toContain("sell");
+  });
+
+  it("본문에 시작 시각과 원인 후보가 들어간다", () => {
+    expect(n.body).toContain("2026-10-01");
+    expect(n.body).toMatch(/배포|재시작|크래시/);
+  });
+
+  it("종목이 없는 전략도 던지지 않는다", () => {
+    expect(() => staleRunNotice(
+      { envKey: "paper-1", market: "us", strategy: "trend_v1" }, "2026-10-01", "main", at,
+    )).not.toThrow();
   });
 });

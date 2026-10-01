@@ -17,7 +17,7 @@ import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
 import { TossClient } from "./toss-client";
 import {
-  absorbIdleCash, emptyPending, mergeDegradedPending, mergePending, newV4State, reconcileDay,
+  absorbIdleCash, emptyPending, newV4State, reconcileDay, recordPending,
   type V4Fill, type V4State,
 } from "./infinite-v4-state";
 import { v4PlanDay, type V4PlannedOrder } from "./v4-plan";
@@ -258,7 +258,7 @@ export async function runInfiniteV4(
       .filter((f) => state.lastRunDate < f.date && f.date < today);
     for (const date of [...new Set(fills.map((f) => f.date))].sort()) {
       const day = fills.filter((f) => f.date === date);
-      state = reconcileDay(state, day, holding);
+      state = reconcileDay(state, day, holding, date);
       log(`[v4:${sym}] ${date} 체결 반영: 매수 ${day.filter((f) => f.side === "buy").length}건·` +
           `매도 ${day.filter((f) => f.side === "sell").length}건 → T=${state.t.toFixed(2)} ` +
           `mode=${state.mode} cash=${formatMoney(state.cycleCash, market)}`);
@@ -407,6 +407,9 @@ export async function runInfiniteV4(
         try {
           await TradingOrderLog.create({
             runId, accountId: account._id, portfolioId: portfolio._id, envKey: account.envKey,
+            // strategy 는 **필수**다 — 빠지면 create 가 ValidationError 로 100% throw 해서
+            // #521 이 넣은 "보류도 원장에 남긴다" 가 한 줄도 안 남았다 (#523).
+            strategy: "infinite_v4",
             market, symbol: sym, side: o.side, qty: o.qty, price: o.price, ordType: o.ordType,
             reason: `${o.reason} — 현금 부족 보류(가용 ${formatMoney(cash, market)})`,
             dryRun: !live, orderNo: "",
@@ -469,14 +472,17 @@ export async function runInfiniteV4(
 
   // 국장 2단계(sell 09:30 / buy 15:20)는 하루의 예약을 나눠 적는다 — buy 가 통째로 덮으면
   // sell 의 q75(¾ 익절)가 사라져 다음 날 대사가 그 체결을 q25 로 잘못 읽는다 (#483).
-  // degraded 면 **슬롯마다 다르게** 합친다 (#521). #519 는 통째로 막았는데 너무 넓었다 —
-  // degraded 사이클도 q75(¾ 익절)는 실제로 내보내므로 그 수량이 예약에 남아야 한다.
-  // 안 남기면 같은 날 buy 가 prev.q75=0 을 승계하고, 다음 날 ¾ 체결이 q25 로 읽혀
-  // T 를 ×0.25 대신 ×0.75 한다. 반대로 `one` 은 낡은 cycleCash 로 계산되므로 전일 값을
-  // 지켜야 한다(전일 매수 체결의 T 증분 분모). 판단은 순수 모듈에 있다.
-  state.pending = degraded
-    ? mergeDegradedPending(state.pending, pend, phase)
-    : mergePending(state.pending, pend, phase);
+  // 예약은 **발주일 칸**에 쌓는다 (#523). 예전엔 `state.pending` 하나가 "오늘 발주한 것" 과
+  // "체결일에 걸려 있던 예약" 두 역할을 겸해서, 대사가 하루 밀리거나(degraded) 창이 이틀
+  // 이상이면 둘이 어긋나 T 가 틀어졌다 — 같은 자리에서 세 번 회귀했다(#519 → #521 → 3차 감사).
+  // 발주일로 키를 두면 degraded·다중일 창·국장 2단계(sell 09:30 / buy 15:20 이 같은 칸에
+  // 쌓인다)가 전부 같은 규칙으로 처리되고, degraded 특수 분기가 필요 없어진다.
+  //
+  // LOC 는 그날 종가에 체결되므로 발주일 == 체결일(today)이다.
+  // degraded 면 매수를 안 내므로 `one`(매수 체결의 T 증분 분모)도 기록하지 않는다 —
+  // 낡은 cycleCash 로 계산된 값이라 남기면 거짓이다. 다른 날 칸은 건드리지 않는다.
+  if (degraded) pend.one = 0;
+  state.pendingByDate = recordPending(state.pendingByDate, today, pend);
   // 왜 '어제'인가: LOC 주문은 그날 종가에 체결돼 체결일 == 실행일(today)이 된다. 대사 필터는
   // `lastRunDate < date < today`(양쪽 strict)라, lastRunDate=today 로 남기면 다음 실행의
   // 창(어제<date<오늘)이 매일 비어 전일 체결이 영영 반영되지 않는다(장부 정지 버그). lastRunDate 를

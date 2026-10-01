@@ -9,6 +9,21 @@ import { krTickRound } from "./kr-tick";
 import { throttle } from "./rate-limit";
 import { feeInclusiveQty } from "./buyable";
 
+/**
+ * HTTP 타임아웃 (#523) — 예전엔 **하나도 없었다**(AbortSignal grep 0건).
+ *
+ * undici 기본값은 300초다. 재시도까지 겹치면 조회 하나가 최대 20분을 잡고, 60초 틱의
+ * 재진입 가드와 만나면 **그날 전 포트폴리오가 선다.** 사이클이 끝나질 않으니 실패 메일도
+ * 안 나가서 아무도 모른다. 증권사 응답이 느린 건 흔한 일이고, real 은 조회량이 더 많다.
+ *
+ * 조회는 멱등이라 끊고 재시도해도 되지만 **주문은 비멱등**이라 길게 준다 — 끊었는데
+ * 서버가 받았으면 중복 주문이 되므로, 애매하면 기다리는 쪽이 안전하다.
+ */
+export const HTTP_TIMEOUT_MS = Number(process.env.KIS_HTTP_TIMEOUT_MS ?? 20_000);
+export const HTTP_TIMEOUT_POST_MS = Number(process.env.KIS_HTTP_TIMEOUT_POST_MS ?? 45_000);
+/** fetch 에 실을 AbortSignal — Node 18+ 내장. */
+const abortIn = (ms: number): AbortSignal => AbortSignal.timeout(ms);
+
 export type TossCreds = {
   clientId: string;
   clientSecret: string;
@@ -57,6 +72,7 @@ export class TossClient {
     await throttle();
     const resp = await fetch(`${BASE}/oauth2/token`, {
       method: "POST",
+      signal: abortIn(HTTP_TIMEOUT_MS),
       headers: { "content-type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "client_credentials",
@@ -111,7 +127,8 @@ export class TossClient {
       await throttle();
       let resp: Response;
       try {
-        resp = await fetch(url, { headers: await this.headers(account) });
+        resp = await fetch(url, { headers: await this.headers(account),
+                                  signal: abortIn(HTTP_TIMEOUT_MS) });
       } catch (e) {
         if (attempt === 3) throw e;
         await sleep(1000 * 2 ** (attempt - 1));
@@ -137,6 +154,8 @@ export class TossClient {
     const doPost = async () =>
       fetch(`${BASE}${path}`, {
         method: "POST",
+        // 주문은 비멱등 — 길게 준다(끊었는데 서버가 받았으면 중복 주문).
+        signal: abortIn(HTTP_TIMEOUT_POST_MS),
         headers: { ...(await this.headers(account)), "content-type": "application/json" },
         body: JSON.stringify(body),
       });
