@@ -691,3 +691,42 @@ describe("infinite-v4-engine — degraded 는 요약에 드러난다 (#521)", ()
     expect(await run(false)).not.toMatch(/대사실패/);
   });
 });
+
+// #525 — 타임아웃·네트워크로 끊긴 주문은 **접수 여부를 모른다**. 거부와 같은 orderNo:"" 로
+// 적으면 재시도 가드가 "안 나갔다" 로 읽고 같은 수량을 다시 낸다.
+describe("infinite-v4-engine — 접수 불명은 거부와 다르게 적는다 (#525)", () => {
+  const CFG = { symbol: "TQQQ", principal: 100_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: true };
+
+  const mk = (err: string): V4Broker => ({
+    snapshot: async () => ({ holding: 0, avg: 0, price: 100, cash: 1_000_000 }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {},
+    place: async () => { throw new Error(err); },
+  });
+
+  const run = (err: string) => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "us", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("TQQQ", 20, 100_000), lastRunDate: "20260921" } } } as never,
+    "run1" as never, mk(err), "both", () => {},
+  ).catch((e) => String(e));
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("타임아웃이면 orderNo 가 '?' 다", async () => {
+    await run("The operation was aborted due to timeout");
+    expect(orderLogs.length).toBeGreaterThan(0);
+    expect(orderLogs[0].orderNo).toBe("?");
+  });
+
+  it("증권사 거부는 종전대로 빈 문자열이다 — 안 나간 게 분명하다", async () => {
+    await run("40250000: 주문가능금액이 부족합니다");
+    expect(orderLogs[0].orderNo).toBe("");
+  });
+
+  it("접수 불명 사유가 원장에 남는다 — 사후에 증권사와 대조해야 한다", async () => {
+    await run("fetch failed");
+    expect(String(orderLogs[0].reason)).toMatch(/접수 불명/);
+  });
+});

@@ -14,6 +14,7 @@
 import TradingOrderLog from "@/models/trading-order-log";
 import { savePortfolioState, type StateSaver } from "./state-saver";
 import { isStillLive } from "./killswitch";
+import { isUnknownAck, UNKNOWN_ACK } from "./scheduler";
 import { summarizeRejects } from "./reject-reason";
 import type { Types } from "mongoose";
 import type { ValueRebalancingConfig } from "@/lib/backtest/types";
@@ -214,6 +215,7 @@ export async function runValueRebalancing(
   // 남아 있었다 — 전량 거부돼도 "주문 19건" 으로 성공처럼 보이던 그 증상 그대로다.
   const 상태 = live
     ? `접수 ${sent.accepted}건/계획 ${orders.length}건` + (sent.rejected ? ` · 거부 ${sent.rejected}건` : "")
+      + (sent.unknownAck ? ` · ⚠접수불명 ${sent.unknownAck}건` : "")
     : `계획 ${orders.length}건 [DRY-RUN]`;
   // degraded 는 요약에 드러낸다 (#521) — VR 은 사다리가 그날의 유일한 체결 수단이라
   // 대사 실패 = 리밸런싱 완전 정지인데, 예전엔 status=done 에 표기도 없었다.
@@ -231,8 +233,8 @@ async function sendOrders(
     account: { _id: Types.ObjectId; envKey: string };
     runId: Types.ObjectId; market: "kr" | "us"; sym: string; live: boolean; log: CycleLogger;
   },
-): Promise<{ accepted: number; rejected: number }> {
-  let accepted = 0, rejected = 0;
+): Promise<{ accepted: number; rejected: number; unknownAck: number }> {
+  let accepted = 0, rejected = 0, unknownAck = 0;
   const rejectMsgs: string[] = [];
   for (const o of orders) {
     let orderNo = "";
@@ -254,6 +256,8 @@ async function sendOrders(
     } catch (e) {
       rejected++;
       error = e instanceof Error ? e.message : String(e);
+      // 접수 여부를 모르는 실패는 거부와 다르게 적는다 (#525) — 같은 주문을 다시 내면 안 된다.
+      if (isUnknownAck(error)) { orderNo = UNKNOWN_ACK; unknownAck++; }
       rejectMsgs.push(error);
       ctx.log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, ctx.market)}) — 다음 주문 계속: ${error}`);
     }
@@ -277,8 +281,8 @@ async function sendOrders(
     const 내역 = Object.entries(why.counts).map(([k, n]) => `${k} ${n}건`).join(" · ");
     const msg = `${ctx.sym}: 주문 ${orders.length}건 전부 거부 — 접수 0건 [${내역}]\n`
       + `${why.advice}\n마지막 사유: ${rejectMsgs[rejectMsgs.length - 1] ?? "(없음)"}`;
-    if (!why.needsAction) { ctx.log(`ℹ ${msg}`); return { accepted, rejected }; }
+    if (!why.needsAction) { ctx.log(`ℹ ${msg}`); return { accepted, rejected, unknownAck }; }
     throw new Error(msg);
   }
-  return { accepted, rejected };
+  return { accepted, rejected, unknownAck };
 }

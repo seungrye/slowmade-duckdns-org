@@ -24,6 +24,10 @@ const TradingRunSchema = new Schema(
     dateKey: { type: String, required: true }, // 시장 tz 기준 YYYY-MM-DD
     phase: { type: String, default: "main" }, // main|both|sell|buy — 국장 v4 는 sell/buy 2사이클
     status: { type: String, required: true, enum: ["running", "done", "failed"], default: "running" },
+    /** 창 밖 중단을 **알린 시각** (#525). status 는 건드리지 않는다 — failed 로 내리면
+     *  창 안의 claimRun 이 재클레임해 살아 있는 장시간 사이클과 중복 주문이 날 수 있다.
+     *  이 필드는 중복 통보만 막는다. */
+    stuckNotifiedAt: { type: Date, default: null },
     dryRun: { type: Boolean, default: true },
     catchUp: { type: Boolean, default: false },
     /**

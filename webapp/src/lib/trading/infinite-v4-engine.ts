@@ -12,6 +12,7 @@
 import TradingOrderLog from "@/models/trading-order-log";
 import { savePortfolioState, type StateSaver } from "./state-saver";
 import { isStillLive } from "./killswitch";
+import { isUnknownAck, UNKNOWN_ACK } from "./scheduler";
 import { summarizeRejects } from "./reject-reason";
 import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
@@ -424,7 +425,7 @@ export async function runInfiniteV4(
   }
 
   // ── 4) 주문 전송(dry-run 게이트) + 상태 저장 ──
-  let accepted = 0, rejected = 0;
+  let accepted = 0, rejected = 0, unknownAck = 0;
   const rejectMsgs: string[] = [];
   for (const o of orders) {
     let orderNo = "";
@@ -448,7 +449,17 @@ export async function runInfiniteV4(
       rejected++;
       error = e instanceof Error ? e.message : String(e);
       rejectMsgs.push(error);
-      log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${error}`);
+      // **접수 여부를 모르는 실패**는 거부와 다르게 적는다 (#525). 타임아웃(#523 의 45초)이나
+      // 네트워크 끊김이면 KIS 가 받았는지 알 수 없는데, 거부와 같은 `orderNo: ""` 로 적으면
+      // 재시도 가드가 "안 나갔다" 로 읽고 **같은 수량을 다시 낸다.**
+      if (isUnknownAck(error)) {
+        unknownAck++;
+        orderNo = UNKNOWN_ACK;
+        log(`⚠ 접수 불명(${o.side} x${o.qty}) — 증권사가 받았는지 모른다. 이 사이클은 재시도하지 `
+          + `않는다. 증권사 체결내역과 대조하세요: ${error}`);
+      } else {
+        log(`주문 실패(${o.side} x${o.qty} @${formatMoney(o.price, market)}) — 다음 주문 계속: ${error}`);
+      }
     }
     // 거부도 남긴다 (#507). 예전엔 `continue` 로 건너뛰어 **흔적이 0** 이었다 — 6영업일간
     // 100% 거부된 것이 어디에도 안 남고 요약은 "주문 17건" 으로 성공처럼 찍혔다.
@@ -461,7 +472,10 @@ export async function runInfiniteV4(
         accountId: account._id, runId, envKey: account.envKey,
         market, strategy: "infinite_v4",
         symbol: sym, side: o.side, qty: o.qty, price: Math.round(o.price * 100) / 100,
-        ordType: o.ordType, reason: error ? `${o.reason} — 거부: ${error}` : o.reason,
+        ordType: o.ordType,
+        reason: error
+          ? `${o.reason} — ${orderNo === UNKNOWN_ACK ? "접수 불명" : "거부"}: ${error}`
+          : o.reason,
         dryRun: !live, orderNo,
       });
     } catch (e) {
@@ -500,6 +514,7 @@ export async function runInfiniteV4(
   const line = live
     ? `V4 ${sym}[${phase}]: 접수 ${accepted}건/계획 ${orders.length}건`
       + (rejected ? ` · 거부 ${rejected}건` : "")
+      + (unknownAck ? ` · ⚠접수불명 ${unknownAck}건` : "")
       + ` (T=${state.t.toFixed(2)} mode=${state.mode} 보유 ${holding})${warn}`
     : `V4 ${sym}[${phase}]: 계획 ${orders.length}건 [DRY-RUN] (T=${state.t.toFixed(2)} `
       + `mode=${state.mode} 보유 ${holding})${warn}`;
