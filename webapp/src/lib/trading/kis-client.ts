@@ -14,6 +14,21 @@ import { krTickRound, type KrTickKind } from "./kr-tick";
 import { pickField } from "./buyable";
 import { throttle } from "./rate-limit";
 
+/**
+ * HTTP 타임아웃 (#523) — 예전엔 **하나도 없었다**(AbortSignal grep 0건).
+ *
+ * undici 기본값은 300초다. 재시도까지 겹치면 조회 하나가 최대 20분을 잡고, 60초 틱의
+ * 재진입 가드와 만나면 **그날 전 포트폴리오가 선다.** 사이클이 끝나질 않으니 실패 메일도
+ * 안 나가서 아무도 모른다. 증권사 응답이 느린 건 흔한 일이고, real 은 조회량이 더 많다.
+ *
+ * 조회는 멱등이라 끊고 재시도해도 되지만 **주문은 비멱등**이라 길게 준다 — 끊었는데
+ * 서버가 받았으면 중복 주문이 되므로, 애매하면 기다리는 쪽이 안전하다.
+ */
+export const HTTP_TIMEOUT_MS = Number(process.env.KIS_HTTP_TIMEOUT_MS ?? 20_000);
+export const HTTP_TIMEOUT_POST_MS = Number(process.env.KIS_HTTP_TIMEOUT_POST_MS ?? 45_000);
+/** fetch 에 실을 AbortSignal — Node 18+ 내장. */
+const abortIn = (ms: number): AbortSignal => AbortSignal.timeout(ms);
+
 export type KisCreds = {
   env: "paper" | "real";
   appKey: string;
@@ -101,6 +116,7 @@ export class KisClient {
     await throttle();
     const resp = await fetch(`${this.base}/oauth2/tokenP`, {
       method: "POST",
+      signal: abortIn(HTTP_TIMEOUT_MS), // 토큰은 멱등 — 짧게 끊고 다시 받는다
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         grant_type: "client_credentials",
@@ -157,7 +173,8 @@ export class KisClient {
       await throttle();
       let resp: Response;
       try {
-        resp = await fetch(url, { headers: { ...(await this.headers(trId)), ...extraHeaders } });
+        resp = await fetch(url, { headers: { ...(await this.headers(trId)), ...extraHeaders },
+                                  signal: abortIn(HTTP_TIMEOUT_MS) });
       } catch (e) {
         if (attempt === MAX_GET_RETRIES) throw e;
         await sleep(backoffMs(attempt));
@@ -226,6 +243,8 @@ export class KisClient {
       await throttle();
       const resp = await fetch(url, {
         method: "POST", headers: await this.headers(trId), body: JSON.stringify(body),
+        // 주문은 **비멱등**이라 길게 준다 — 끊었는데 서버가 받았으면 중복 주문이 된다.
+        signal: abortIn(HTTP_TIMEOUT_POST_MS),
       });
       const text = await resp.text();
       if (resp.status >= 500 && KisClient.isTokenExpired(text) && !tokenRefreshed) {

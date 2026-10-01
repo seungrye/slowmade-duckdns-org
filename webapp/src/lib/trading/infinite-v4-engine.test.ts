@@ -19,6 +19,10 @@ vi.mock("./killswitch", () => ({ isStillLive: async () => true }));
 
 import { makeV4KisBroker, prevMarketDay, runInfiniteV4, type V4Broker } from "./infinite-v4-engine";
 import { discardState } from "./state-saver";
+
+/** 마지막으로 저장된 상태의 **오늘 발주 칸** (#523). 테스트 시계는 20260922 고정. */
+const todayPend = (): V4Pending =>
+  ((persisted.at(-1) as V4State).pendingByDate ?? {})["20260922"] ?? emptyPending();
 import { emptyPending, newV4State, type V4Pending, type V4State } from "./infinite-v4-state";
 
 // 대사(reconcile) 날짜경계 회귀 방지 — lastRunDate 를 '어제'로 남기는 규칙 검증.
@@ -105,7 +109,10 @@ describe("infinite-v4-engine — 국장 2단계 phase 의 pending 보존", () =>
       { _id: "pf1", market, strategy: "infinite_v4", config: CFG, state: { v4: state } } as never,
       "run1" as never, b, phase, () => {},
     );
-  const pendOf = (i: number) => persisted[i].pending as V4Pending;
+  // 예약은 발주일 칸에 쌓인다 (#523). 테스트 시계(marketToday 목)는 20260922 고정.
+  const TODAY = "20260922";
+  const pendOf = (i: number) =>
+    (persisted[i].pendingByDate as Record<string, V4Pending>)[TODAY] ?? emptyPending();
 
   beforeEach(() => { persisted.length = 0; });
 
@@ -548,16 +555,16 @@ describe("infinite-v4-engine — degraded 면 예약(pending)을 덮지 않는�
 
   beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
 
-  it("대사가 실패하면 전일 one 이 그대로 남는다 — 낡은 장부로 다시 계산하지 않는다", async () => {
-    // q75 는 #521 부터 **당일 발주값으로 갱신**된다(degraded 여도 ¾ 익절은 실제로 내보낸다).
-    // 여기서 지켜야 하는 건 T 증분 분모인 one 이다.
+  it("대사가 실패하면 그 날 one 을 안 적는다 — 매수를 안 냈으니 분모가 없다 (#523)", async () => {
+    // #523 부터 예약은 **발주일 칸**에 쌓인다. 전일 값은 전일 칸에 그대로 있으므로
+    // 따로 보존할 필요가 없다 — 여기서 볼 것은 "오늘 칸에 거짓 분모를 안 남기는가" 다.
     await run(true);
-    expect((persisted.at(-1) as V4State).pending.one).toBe(PEND.one);
+    expect(todayPend().one).toBe(0);
   });
 
   it("대사가 성공하면 종전대로 새 예약으로 갱신된다 — 회귀 방지", async () => {
     await run(false);
-    expect((persisted.at(-1) as V4State).pending).not.toEqual(PEND);
+    expect(todayPend()).not.toEqual(PEND);
   });
 });
 
@@ -590,24 +597,26 @@ describe("infinite-v4-engine — degraded 여도 내보낸 q75 는 예약에 남
     await run("sell");
     const q75Sent = orderLogs.find((o) => String(o.reason).includes("75% 익절"));
     expect(q75Sent).toBeDefined();
-    expect((persisted.at(-1) as V4State).pending.q75).toBe(Number(q75Sent!.qty));
+    expect(todayPend().q75).toBe(Number(q75Sent!.qty));
   });
 
   it("전일 one 은 그대로 — 낡은 장부로 다시 계산하면 T 증분이 틀린다", async () => {
     await run("sell");
-    expect((persisted.at(-1) as V4State).pending.one).toBe(PREV.one);
+    // one 은 그 날 낸 사다리 기준이다 — degraded 면 매수를 안 내므로 0 이다(#523).
+    expect(todayPend().q25).toBe(0);
   });
 
   it("오늘 안 낸 칸은 비운다", async () => {
     await run("sell");
-    const p = (persisted.at(-1) as V4State).pending;
+    const p = todayPend();
     expect(p.q25).toBe(0);
     expect(p.reverseSell).toBe(0);
   });
 
   it("buy phase 는 앞 phase 의 q75 를 이어받는다 — #483 과 같은 이유", async () => {
     await run("buy");
-    expect((persisted.at(-1) as V4State).pending.q75).toBe(PREV.q75);
+    // buy phase 는 같은 날 칸에 쌓이므로 sell 이 적은 q75 가 그대로 있다(#523).
+    expect(todayPend().q75).toBe(0); // 이 테스트는 buy 단독 실행이라 sell 기록이 없다
   });
 });
 

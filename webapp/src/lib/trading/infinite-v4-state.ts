@@ -20,7 +20,17 @@ export type V4State = {
   reverseFirstDay: boolean;
   recoverConfirmed: boolean;
   lastRunDate: string; // YYYYMMDD — 이 날짜 이후 체결을 대사
-  pending: V4Pending;
+  pending: V4Pending;  /**
+   * **발주일 → 그 날 건 예약** (#523).
+   *
+   * `pending` 하나가 "오늘 발주한 것" 과 "체결일에 걸려 있던 예약" 두 역할을 겸해서 같은
+   * 자리에서 세 번 회귀했다(#519 → #521 → 3차 감사). `reconcileDay` 는 **체결일**의 예약으로
+   * 매도 종류를 가려야 하는데, 대사가 하루 밀리거나(degraded) 창이 이틀 이상이면 그 둘이
+   * 어긋났다. 발주일로 키를 두면 degraded·다중일 창·국장 2단계가 전부 같은 규칙으로 처리된다.
+   *
+   * 옛 문서에는 없다 — 없으면 그냥 빈 칸으로 본다(마이그레이션 불필요).
+   */
+  pendingByDate: Record<string, V4Pending>;
 };
 
 export const emptyPending = (): V4Pending => ({
@@ -32,6 +42,7 @@ export function newV4State(symbol: string, splits: number, principal: number): V
     symbol, splits, cycleCash: principal, t: 0, mode: "normal",
     entryLimit: 0, reverseFirstDay: false, recoverConfirmed: false,
     lastRunDate: "", pending: emptyPending(),
+    pendingByDate: {},
   };
 }
 
@@ -106,12 +117,36 @@ export function mergeDegradedPending(
   };
 }
 
+/** 발주일 칸에 쌓는다 — 같은 날 두 phase(국장 sell 09:30 / buy 15:20)가 서로 덮지 않게
+ *  **0 이 아닌 칸만** 덮어쓴다. 순수(불변). 오래된 날은 버린다(문서가 무한정 자라면 안 된다). */
+const KEEP_DAYS = 15;
+export function recordPending(
+  byDate: Record<string, V4Pending> | undefined, dateKey: string, sent: V4Pending,
+): Record<string, V4Pending> {
+  const cur = byDate?.[dateKey] ?? emptyPending();
+  const merged: V4Pending = {
+    one: sent.one || cur.one,
+    q25: sent.q25 || cur.q25,
+    q75: sent.q75 || cur.q75,
+    reverseSell: sent.reverseSell || cur.reverseSell,
+    reverseFirst: sent.reverseFirst || cur.reverseFirst,
+  };
+  const next = { ...(byDate ?? {}), [dateKey]: merged };
+  const keys = Object.keys(next).sort();
+  for (const k of keys.slice(0, Math.max(0, keys.length - KEEP_DAYS))) delete next[k];
+  return next;
+}
+
 export type V4Fill = { side: "buy" | "sell"; qty: number; price: number };
 
 /** 하루치 체결을 상태에 적용(순수 — 원본 불변). holdingAfter: 그 날 이후 보유수량 근사. */
-export function reconcileDay(state: V4State, fills: V4Fill[], holdingAfter: number): V4State {
-  const s: V4State = { ...state, pending: { ...state.pending } };
-  const pend = state.pending;
+export function reconcileDay(
+  state: V4State, fills: V4Fill[], holdingAfter: number, fillDate: string,
+): V4State {
+  const byDate = { ...(state.pendingByDate ?? {}) };
+  // **체결일**의 예약으로 가린다 (#523). 없으면 모르는 것이므로 T 를 건드리지 않는다.
+  const pend = byDate[fillDate] ?? emptyPending();
+  const s: V4State = { ...state, pending: { ...state.pending }, pendingByDate: byDate };
   const buys = fills.filter((f) => f.side === "buy");
   const sells = fills.filter((f) => f.side === "sell");
   const buyAmt = buys.reduce((a, f) => a + f.qty * f.price, 0);
@@ -131,6 +166,7 @@ export function reconcileDay(state: V4State, fills: V4Fill[], holdingAfter: numb
       s.mode = "normal";
       s.entryLimit = 0;
       s.pending = emptyPending();
+      s.pendingByDate = {}; // 사이클이 끝났다 — 남은 예약은 의미가 없다
       return s;
     }
     if (soldQty > 0) {
@@ -152,5 +188,6 @@ export function reconcileDay(state: V4State, fills: V4Fill[], holdingAfter: numb
     }
   }
   s.pending = emptyPending();
+  delete s.pendingByDate[fillDate]; // 처리한 날만 지운다 — 다른 날 예약은 살려 둔다
   return s;
 }
