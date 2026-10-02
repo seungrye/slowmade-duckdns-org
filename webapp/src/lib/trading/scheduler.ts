@@ -434,22 +434,28 @@ export function staleRunNotice(
  *
  * 국장은 체결도 `today` 도 KST 라 변환이 항등이다(그래도 같은 함수를 통과시킨다 —
  * 시장별 분기를 호출부마다 두면 또 어긋난다).
+ *
+ * ⚠ **반환은 `YYYYMMDD`** 다 (#529). 하이픈 ISO 를 돌려줬더니 엔진의 `today`·`lastRunDate`
+ *   (둘 다 `YYYYMMDD`)와의 **문자열 비교가 깨져 대사 창이 전건 탈락**했다 — `'-'`(0x2D)가
+ *   `'0'`(0x30)보다 작아서 `"20261001" < "2026-10-01"` 이 false 다. 대사가 통째로 죽은 채
+ *   배포됐고, `degraded` 는 false 라 경고도 없었다. ISO 가 필요한 곳(차트·DB 날짜)은
+ *   호출측이 하이픈을 붙인다.
  */
 export function fillMarketDate(ordDate: string, ordTime: string, market: string): string {
   const d = String(ordDate ?? "").trim();
   if (d.length < 8) return "";
-  const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
-  if (market !== "us") return iso; // 국장은 양쪽 KST
+  if (market !== "us") return d; // 국장은 양쪽 KST — 그대로
   const raw = String(ordTime ?? "").trim();
-  if (!raw) return iso; // 시각이 없으면 변환할 근거가 없다(패딩하면 00:00 과 구분이 안 된다)
+  if (!raw) return d; // 시각이 없으면 변환할 근거가 없다(패딩하면 00:00 과 구분이 안 된다)
   const tm = raw.padStart(6, "0").slice(0, 6);
-  if (!/^\d{6}$/.test(tm)) return iso;
+  if (!/^\d{6}$/.test(tm)) return d;
   // KST(UTC+9) 벽시계 → UTC → ET 날짜
   const utc = Date.UTC(
     Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8)),
     Number(tm.slice(0, 2)) - 9, Number(tm.slice(2, 4)), Number(tm.slice(4, 6)),
   );
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(utc));
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" })
+    .format(new Date(utc)).replace(/-/g, "");
 }
 
 /** 접수 불명 주문의 원장 표식 — 거부("")와 **다른 값**이어야 가드가 가린다 (#525). */

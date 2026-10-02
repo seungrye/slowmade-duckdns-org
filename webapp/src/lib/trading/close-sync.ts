@@ -94,8 +94,10 @@ export function parseFill(f: Json, market: "kr" | "us" = "us"): Fill | null {
   //   유니크 키이자 하루 안의 정렬 기준일 뿐이고, 시각까지 바꾸면 이미 쌓인 행과 키가
   //   달라져 재푸시가 갱신이 아니라 **중복 행**이 된다. 날짜만 고치면 ET 날짜 + KST 시계가
   //   섞이지만(예: 11:30 ET 체결이 "…T00:30:00"), 유일성·정렬은 그대로다.
-  const d = fillMarketDate(dateRaw, tmd, market)
-    || `${dateRaw.slice(0, 4)}-${dateRaw.slice(4, 6)}-${dateRaw.slice(6, 8)}`;
+  // fillMarketDate 는 **YYYYMMDD** 를 돌려준다(엔진의 비교 포맷, #529) — 여기선 ISO 가
+  // 필요하므로 하이픈을 붙인다.
+  const compact = fillMarketDate(dateRaw, tmd, market) || dateRaw.slice(0, 8);
+  const d = `${compact.slice(0, 4)}-${compact.slice(4, 6)}-${compact.slice(6, 8)}`;
   return {
     ticker, date: d,
     time: `${d}T${tmd.slice(0, 2)}:${tmd.slice(2, 4)}:${tmd.slice(4, 6)}`,

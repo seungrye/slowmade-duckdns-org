@@ -403,34 +403,36 @@ describe("missingRunDates — status·phase 를 본다 (#525)", () => {
 // 그런데 엔진의 today 는 ET 라, KST 자정(EDT 11:00 ET / EST 10:00 ET)을 넘긴 체결은
 // '내일 날짜' 로 들어온다. EST 가 되면 VR(10:50 ET = 00:50 KST 익일)이 **매일** 어긋난다.
 describe("fillMarketDate — KST 체결시각을 시장 날짜로 옮긴다 (#527)", () => {
+  // **YYYYMMDD 로 돌려준다** (#529). 하이픈 ISO 를 돌려줬더니 엔진의 today·lastRunDate
+  // (YYYYMMDD)와 문자열 비교가 깨져 대사 창이 전건 탈락했다 — '-'(0x2D) < '0'(0x30).
   it("EDT: 09:36 ET 주문은 같은 날이다", () => {
     // 22:36 KST = 13:36 UTC = 09:36 EDT (2026-10-01)
-    expect(fillMarketDate("20261001", "223600", "us")).toBe("2026-10-01");
+    expect(fillMarketDate("20261001", "223600", "us")).toBe("20261001");
   });
 
   it("EDT: KST 자정을 넘긴 체결(11:30 ET)은 ET 로 되돌린다", () => {
     // 00:30 KST(10-02) = 15:30 UTC(10-01) = 11:30 EDT(10-01)
-    expect(fillMarketDate("20261002", "003000", "us")).toBe("2026-10-01");
+    expect(fillMarketDate("20261002", "003000", "us")).toBe("20261001");
   });
 
   it("EST: VR 10:50 ET 체결이 같은 날로 돌아온다 — 이게 11-02 부터 매일 걸린다", () => {
     // 00:50 KST(11-03) = 15:50 UTC(11-02) = 10:50 EST(11-02)
-    expect(fillMarketDate("20261103", "005000", "us")).toBe("2026-11-02");
+    expect(fillMarketDate("20261103", "005000", "us")).toBe("20261102");
   });
 
   it("EST: 09:35 ET 는 같은 날", () => {
     // 23:35 KST(11-02) = 14:35 UTC = 09:35 EST(11-02)
-    expect(fillMarketDate("20261102", "233500", "us")).toBe("2026-11-02");
+    expect(fillMarketDate("20261102", "233500", "us")).toBe("20261102");
   });
 
   it("국장은 양쪽 KST 라 그대로다", () => {
-    expect(fillMarketDate("20261001", "152000", "kr")).toBe("2026-10-01");
-    expect(fillMarketDate("20261001", "093000", "kr")).toBe("2026-10-01");
+    expect(fillMarketDate("20261001", "152000", "kr")).toBe("20261001");
+    expect(fillMarketDate("20261001", "093000", "kr")).toBe("20261001");
   });
 
   it("시각이 없으면 날짜만 쓴다 — 변환할 근거가 없다", () => {
-    expect(fillMarketDate("20261002", "", "us")).toBe("2026-10-02");
-    expect(fillMarketDate("20261002", "000000", "us")).toBe("2026-10-01"); // 00:00 KST 는 전날 ET
+    expect(fillMarketDate("20261002", "", "us")).toBe("20261002");
+    expect(fillMarketDate("20261002", "000000", "us")).toBe("20261001"); // 00:00 KST 는 전날 ET
   });
 
   it("잘못된 입력에 던지지 않는다", () => {
@@ -467,5 +469,38 @@ describe("marketClock — DST 경계 (#527)", () => {
   it("KST 자정 경계 — EDT 는 11:00 ET, EST 는 10:00 ET", () => {
     expect(at("2026-10-01T15:00:00Z").hhmm).toBe("11:00"); // 00:00 KST(10-02)
     expect(at("2026-11-02T15:00:00Z").hhmm).toBe("10:00"); // 00:00 KST(11-03)
+  });
+});
+
+// #529 — **대사 창 필터를 실제 값으로** 검증한다. 이 그물이 없어서 #527 이 대사를 통째로
+// 죽인 채 배포됐다(3,795건이 못 잡았다 — 엔진 테스트가 전부 YYYYMMDD 를 돌려주는 수제
+// fake broker 를 썼고, fillMarketDate 단위 테스트는 포맷만 보고 **비교**를 안 봤다).
+describe("대사 창 필터 — fillMarketDate 결과가 today/lastRunDate 와 비교 가능해야 한다 (#529)", () => {
+  /** 엔진의 필터와 같은 식: lastRunDate < date < today (양쪽 strict) */
+  const inWindow = (last: string, date: string, today: string) => last < date && date < today;
+
+  it("어제 체결이 창에 들어온다 — 이게 false 면 대사가 죽는다", () => {
+    const d = fillMarketDate("20261001", "223600", "us"); // 미장 09:36 ET
+    expect(inWindow("20260930", d, "20261002")).toBe(true);
+  });
+
+  it("국장도 같다", () => {
+    const d = fillMarketDate("20261001", "152000", "kr");
+    expect(inWindow("20260930", d, "20261002")).toBe(true);
+  });
+
+  it("오늘 체결은 제외된다 — 종가 체결이라 아직 안 끝났다", () => {
+    const d = fillMarketDate("20261002", "223600", "us");
+    expect(inWindow("20261001", d, "20261002")).toBe(false);
+  });
+
+  it("이미 반영한 날은 제외된다", () => {
+    const d = fillMarketDate("20261001", "223600", "us");
+    expect(inWindow("20261001", d, "20261002")).toBe(false);
+  });
+
+  it("포맷이 today 와 같다 — 길이·숫자만", () => {
+    expect(fillMarketDate("20261001", "223600", "us")).toMatch(/^\d{8}$/);
+    expect(fillMarketDate("20261001", "152000", "kr")).toMatch(/^\d{8}$/);
   });
 });
