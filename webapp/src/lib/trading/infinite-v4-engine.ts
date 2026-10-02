@@ -285,7 +285,19 @@ export async function runInfiniteV4(
     // 대사 실패일엔 건너뛴다 (#497). absorb 는 cycleCash 를 계좌현금으로 **덮어쓰는데**,
     // 못 읽은 체결의 대금이 이미 계좌현금에 들어 있으므로 내일 그 체결을 대사하면
     // 같은 돈을 두 번 세게 된다.
-    state = degraded ? state : absorbIdleCash(state, cash, holding, reinvest, cfg.principal);
+    //
+    // **buy phase 도 같은 이유로 건너뛴다** (#531). 국장은 하루 2단계인데(sell 09:30 /
+    // buy 15:20), sell 이 lastRunDate 를 어제로 올리므로 같은 날 buy 의 대사 창은
+    // **구조적으로 비어 있다** — 09:30 에 건 ¾ 익절이 장중에 체결돼 15:20 스냅샷이
+    // holding=0 이어도 그 매도는 **아직 미대사**다. 그 상태로 absorb 하면 매도대금이 이미
+    // 들어 있는 계좌현금으로 장부를 올리고, 다음 날 대사가 sellAmt 를 한 번 더 더한다.
+    // 재현 측정: 참값 6,569,465 vs 6,904,025(+334,560 = 매도 원가, 원금의 4.9%).
+    //
+    // 잃는 것이 없다 — 전날 끝난 사이클은 09:30 sell phase 가 대사 후 흡수하므로 보장되고,
+    // 같은 날 플립 케이스만 하루 보수적으로 가다가 다음 날 자가치유된다.
+    // 미장 both 는 대사(1) → absorb(1.5) 한 사이클이라 영향 없다.
+    const canAbsorb = !degraded && phase !== "buy";
+    state = canAbsorb ? absorbIdleCash(state, cash, holding, reinvest, cfg.principal) : state;
     if (state.cycleCash !== before) {
       log(`[v4:${sym}] 유휴현금 반영 cycleCash ${formatMoney(before, market)}→${formatMoney(state.cycleCash, market)}(플랫 — 입금/미투입 흡수)`);
     }

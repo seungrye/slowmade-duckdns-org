@@ -317,3 +317,47 @@ describe("recordPending — 발주일 칸에 쌓는다 (#523)", () => {
     expect(JSON.stringify(m)).toBe(snap);
   });
 });
+
+// #531 ② — 전량소진 리셋이 **normal 분기 안에만** 있어서, 리버스 모드에서 보유가 0 이
+// 돼도 사이클이 안 닫혔다. 백테스트는 닫는다(backtest/infinite-v4.ts) — 라이브만 안 닫혔다.
+// 그 상태로 남으면 v4PlanDay 의 진입 분기(holding===0 && mode==="normal")를 건너뛰고
+// reverse 의 rev_qbuy(장부의 25%)만 남아 다음 매수가 정상 진입의 5배로 나간다.
+describe("reconcileDay — 리버스에서도 전량 소진이면 사이클이 닫힌다 (#531)", () => {
+  const rev = (over: Partial<V4State> = {}): V4State => ({
+    ...newV4State("TQQQ", 20, 10_000), t: 19.5, cycleCash: 8_000,
+    mode: "reverse", reverseFirstDay: false,
+    pendingByDate: { D: { ...emptyPending(), one: 500, reverseSell: 10 } }, ...over,
+  });
+  const sell = (qty: number) => [{ side: "sell" as const, qty, price: 100 }];
+
+  it("보유가 0 이 되면 normal 로 돌아가고 t 가 리셋된다", () => {
+    const s = reconcileDay(rev(), sell(10), 0, "D");
+    expect(s.mode).toBe("normal");
+    expect(s.t).toBe(0);
+    expect(s.entryLimit).toBe(0);
+  });
+
+  it("매도대금은 장부에 들어간다 — 복리", () => {
+    expect(reconcileDay(rev(), sell(10), 0, "D").cycleCash).toBe(8_000 + 10 * 100);
+  });
+
+  it("같은 날 재진입 체결이 있으면 1회차로 시작한다", () => {
+    const s = reconcileDay(rev(), [...sell(10), { side: "buy", qty: 1, price: 50 }], 0, "D");
+    expect(s.t).toBe(1.0);
+  });
+
+  it("남은 예약도 비운다 — 끝난 사이클의 예약은 의미가 없다", () => {
+    expect(Object.keys(reconcileDay(rev(), sell(10), 0, "D").pendingByDate)).toHaveLength(0);
+  });
+
+  it("보유가 남으면 종전대로 리버스 감쇠만 한다 — 회귀 방지", () => {
+    const s = reconcileDay(rev(), sell(5), 8, "D");
+    expect(s.mode).toBe("reverse");
+    expect(s.t).toBeCloseTo(19.5 * 0.9, 6); // splits=20 → decay 0.9
+  });
+
+  it("매도가 없으면 닫지 않는다 — 보유 0 은 매도로만 도달한다", () => {
+    const s = reconcileDay(rev(), [], 0, "D");
+    expect(s.mode).toBe("reverse");
+  });
+});

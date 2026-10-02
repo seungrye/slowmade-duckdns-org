@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { walkLedger, type LedgerRow } from "./close-sync";
+import { parseFill, walkLedger, type LedgerRow } from "./close-sync";
 
 // #500 — 누적 실현손익이 "누적" 이 아니라 "최근 90일 창 재계산" 이었다.
 // 창 밖으로 밀려난 매수는 원가를 잃고, 그 물량을 팔면 매도대금 전액이 이익으로 잡혔다.
@@ -148,5 +148,41 @@ describe("walkLedger — 결정적이다", () => {
 
   it("빈 원장은 0 · 미상 없음", () => {
     expect(walkLedger([], TODAY)).toMatchObject({ run: 0, cum: 0, unknownCost: [] });
+  });
+});
+
+// #531 ③ — 체결가 파싱이 `??` 체인이라 **빈 문자열을 유효값으로** 보고 폴백을 건너뛴다.
+// `Number("") === 0` 이라 0원 행이 원장에 들어가고, 그 물량을 팔면 매도대금 전액이
+// 이익으로 잡힌다(#500 과 같은 기전). 파이썬 원본(site_sync.py)은 `or` 라 폴백이 돈다.
+// 같은 함수의 **수량**은 이미 빈 문자열을 거르는 루프를 쓴다 — 가격만 안 막혔다.
+describe("parseFill — 체결가 폴백 (#531)", () => {
+  const base = { pdno: "TQQQ", sll_buy_dvsn_cd: "02", ord_dt: "20261001",
+                 ord_tmd: "223600", ft_ccld_qty: "30" };
+
+  it("첫 후보가 빈 문자열이면 다음 후보를 쓴다 — 0 으로 떨어지면 안 된다", () => {
+    const f = parseFill({ ...base, ft_ccld_unpr3: "", ft_ccld_unpr: "78.655" }, "us");
+    expect(f?.price).toBeCloseTo(78.655, 6);
+  });
+
+  it("둘 다 비면 세 번째를 쓴다", () => {
+    const f = parseFill({ ...base, ft_ccld_unpr3: "", ft_ccld_unpr: "", avg_prvs: "80" }, "us");
+    expect(f?.price).toBe(80);
+  });
+
+  it("정상값은 첫 후보를 쓴다 — 회귀 방지", () => {
+    const f = parseFill({ ...base, ft_ccld_unpr3: "78.655", avg_prvs: "999" }, "us");
+    expect(f?.price).toBeCloseTo(78.655, 6);
+  });
+
+  it("전부 비면 체결로 보지 않는다 — 0원 행을 원장에 넣지 않는다", () => {
+    expect(parseFill({ ...base, ft_ccld_unpr3: "", ft_ccld_unpr: "", avg_prvs: "" }, "us")).toBeNull();
+  });
+
+  it("가격이 0 이어도 체결로 보지 않는다", () => {
+    expect(parseFill({ ...base, ft_ccld_unpr3: "0" }, "us")).toBeNull();
+  });
+
+  it("수량이 없으면 종전대로 null", () => {
+    expect(parseFill({ ...base, ft_ccld_qty: "0", ft_ccld_unpr3: "78" }, "us")).toBeNull();
   });
 });

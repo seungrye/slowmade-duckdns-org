@@ -153,6 +153,22 @@ export function reconcileDay(
   const sellAmt = sells.reduce((a, f) => a + f.qty * f.price, 0);
   s.cycleCash += sellAmt - buyAmt;
 
+  // 전량 소진이면 **모드와 무관하게** 사이클을 닫는다 (#531). 예전엔 이 리셋이 normal
+  // 분기 안에만 있어서, 리버스에서 보유가 0 이 돼도 mode="reverse" 로 남았다 —
+  // v4PlanDay 의 진입 분기는 `holding===0 && mode==="normal"` 이라 건너뛰고, reverse
+  // 블록의 rev_qbuy(장부의 25%)만 남아 **다음 매수가 정상 진입의 5배**로 나갔다.
+  // 백테스트는 이미 닫고 있다(backtest/infinite-v4.ts) — 라이브만 어긋나 있었다.
+  const soldAll = sells.reduce((a, f) => a + f.qty, 0) > 0 && holdingAfter <= 0;
+  if (soldAll) {
+    s.t = buyAmt > 0 ? 1.0 : 0.0; // 같은 날 재진입 체결이 있으면 1회차로
+    s.mode = "normal";
+    s.entryLimit = 0;
+    s.reverseFirstDay = false;
+    s.pending = emptyPending();
+    s.pendingByDate = {}; // 끝난 사이클의 예약은 의미가 없다
+    return s;
+  }
+
   if (s.mode === "reverse") {
     const decay = s.splits === 20 ? 0.9 : 0.95;
     if (sells.length) s.t *= decay;
@@ -160,15 +176,7 @@ export function reconcileDay(
     s.reverseFirstDay = false;
   } else {
     const soldQty = sells.reduce((a, f) => a + f.qty, 0);
-    if (soldQty > 0 && holdingAfter <= 0) {
-      // 전량 소진 → 사이클 종료(복리 리셋). 같은 날 재진입 체결이 있으면 1회차로.
-      s.t = buyAmt > 0 ? 1.0 : 0.0;
-      s.mode = "normal";
-      s.entryLimit = 0;
-      s.pending = emptyPending();
-      s.pendingByDate = {}; // 사이클이 끝났다 — 남은 예약은 의미가 없다
-      return s;
-    }
+    // 전량 소진은 위에서 모드 무관하게 처리했다 (#531).
     if (soldQty > 0) {
       // 매도 종류 판별 — q75(지정가)면 ×0.25, q25(쿼터 LOC)면 ×0.75. 모호하면 T 유지.
       if (pend.q75 && soldQty >= pend.q75) s.t *= 0.25;

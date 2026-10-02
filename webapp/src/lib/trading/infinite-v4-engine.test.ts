@@ -764,3 +764,55 @@ describe("makeV4KisBroker.executions — date 는 today 와 같은 포맷이어�
     expect("20260930" < f.date && f.date < "20261002").toBe(true);
   });
 });
+
+// #531 ① — 국장 사이클 종료일에 매도대금이 장부에 **두 번** 들어갔다.
+// sell(09:30)이 ¾ 익절을 걸고 장중에 체결되면 buy(15:20) 스냅샷은 holding=0 이다.
+// 그런데 그 매도는 **아직 미대사**다(sell 이 lastRunDate 를 어제로 올려 같은 날 buy 의
+// 대사 창은 구조적으로 빈다). absorb 가 먼저 돌면 매도대금이 이미 들어 있는 계좌현금으로
+// cycleCash 를 올리고, 다음 날 대사가 sellAmt 를 한 번 더 더한다.
+//
+// 재현 측정: 참값 6,569,465 vs 버그 6,904,025 — 차이 334,560 = 매도 3주 원가(원금 4.9%).
+// 미장 both phase 는 대사(1) → absorb(1.5) 순서라 안전하다 — 국장 2단계만 뚫렸다.
+describe("infinite-v4-engine — buy phase 는 유휴현금을 흡수하지 않는다 (#531)", () => {
+  const CFG = { symbol: "069500", principal: 10_000_000, splits: 20, starBase: 15, sellTarget: 10 };
+  const account = { _id: "acc1", envKey: "paper-1", liveEnabled: false };
+
+  // 보유 0(장중 전량 익절 체결) · 계좌현금은 매도대금을 이미 포함
+  const broker: V4Broker = {
+    snapshot: async () => ({ holding: 0, avg: 0, price: 47_000, cash: 10_000_000 }),
+    historyLong: async () => [], executions: async () => [], openOrders: async () => [],
+    cancel: async () => {}, place: async () => "ORD",
+  };
+
+  const run = (phase: "both" | "sell" | "buy") => runInfiniteV4(
+    account as never,
+    { _id: "pf1", market: "kr", strategy: "infinite_v4", config: CFG,
+      state: { v4: { ...newV4State("069500", 20, 10_000_000),
+                     t: 1, cycleCash: 6_445_440, lastRunDate: "20260921" } } } as never,
+    "run1" as never, broker, phase, () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; orderLogs.length = 0; });
+
+  it("buy phase 는 cycleCash 를 올리지 않는다 — 그 돈은 아직 미대사다", async () => {
+    await run("buy");
+    expect((persisted.at(-1) as V4State).cycleCash).toBe(6_445_440);
+  });
+
+  it("sell phase 는 종전대로 흡수한다 — 대사가 먼저 돌았다", async () => {
+    await run("sell");
+    expect((persisted.at(-1) as V4State).cycleCash).toBeGreaterThan(6_445_440);
+  });
+
+  it("미장 both 도 종전대로 — 대사 → absorb 순서라 안전하다", async () => {
+    await runInfiniteV4(
+      account as never,
+      { _id: "pf1", market: "us", strategy: "infinite_v4",
+        config: { ...CFG, symbol: "TQQQ" },
+        state: { v4: { ...newV4State("TQQQ", 20, 10_000_000),
+                       t: 1, cycleCash: 6_445_440, lastRunDate: "20260921" } } } as never,
+      "run1" as never, broker, "both", () => {},
+    );
+    expect((persisted.at(-1) as V4State).cycleCash).toBeGreaterThan(6_445_440);
+  });
+});
