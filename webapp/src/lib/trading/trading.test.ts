@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { decryptSecret, encryptSecret, maskSecret } from "./crypto";
 import { lrsDecide, momentum, rotationDecide, smaNewest, trendDecide } from "./strategies";
-import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates, staleRunNotice, isUnknownAck } from "./scheduler";
+import { addMinutes, canRetryRun, firstTradingPhase, isDue, marketClock, mayRetryRun, missingRunDates, staleRunNotice, isUnknownAck, fillMarketDate } from "./scheduler";
 import { krTickRound, krTickSize } from "./kr-tick";
 import { valueHoldings } from "./close-sync";
 
@@ -394,5 +394,78 @@ describe("missingRunDates — status·phase 를 본다 (#525)", () => {
   it("주말은 그대로 건너뛴다 — 회귀 방지", () => {
     expect(missingRunDates(pf, [{ dateKey: "2026-10-02", phase: "sell", status: "done" }],
       "2026-10-04", ["sell"])).toEqual([]);
+  });
+});
+
+// #527 — KIS 해외 체결의 ord_dt·ord_tmd 는 **KST** 다. 실측으로 확정했다:
+//   {"pdno":"TQQQ","ord_dt":"20261001","ord_tmd":"223600","dmst_ord_dt":"20261001"}
+//   그 주문은 2026-10-01 13:36 UTC = 09:36 EDT 에 나갔다 → 22:36 KST.
+// 그런데 엔진의 today 는 ET 라, KST 자정(EDT 11:00 ET / EST 10:00 ET)을 넘긴 체결은
+// '내일 날짜' 로 들어온다. EST 가 되면 VR(10:50 ET = 00:50 KST 익일)이 **매일** 어긋난다.
+describe("fillMarketDate — KST 체결시각을 시장 날짜로 옮긴다 (#527)", () => {
+  it("EDT: 09:36 ET 주문은 같은 날이다", () => {
+    // 22:36 KST = 13:36 UTC = 09:36 EDT (2026-10-01)
+    expect(fillMarketDate("20261001", "223600", "us")).toBe("2026-10-01");
+  });
+
+  it("EDT: KST 자정을 넘긴 체결(11:30 ET)은 ET 로 되돌린다", () => {
+    // 00:30 KST(10-02) = 15:30 UTC(10-01) = 11:30 EDT(10-01)
+    expect(fillMarketDate("20261002", "003000", "us")).toBe("2026-10-01");
+  });
+
+  it("EST: VR 10:50 ET 체결이 같은 날로 돌아온다 — 이게 11-02 부터 매일 걸린다", () => {
+    // 00:50 KST(11-03) = 15:50 UTC(11-02) = 10:50 EST(11-02)
+    expect(fillMarketDate("20261103", "005000", "us")).toBe("2026-11-02");
+  });
+
+  it("EST: 09:35 ET 는 같은 날", () => {
+    // 23:35 KST(11-02) = 14:35 UTC = 09:35 EST(11-02)
+    expect(fillMarketDate("20261102", "233500", "us")).toBe("2026-11-02");
+  });
+
+  it("국장은 양쪽 KST 라 그대로다", () => {
+    expect(fillMarketDate("20261001", "152000", "kr")).toBe("2026-10-01");
+    expect(fillMarketDate("20261001", "093000", "kr")).toBe("2026-10-01");
+  });
+
+  it("시각이 없으면 날짜만 쓴다 — 변환할 근거가 없다", () => {
+    expect(fillMarketDate("20261002", "", "us")).toBe("2026-10-02");
+    expect(fillMarketDate("20261002", "000000", "us")).toBe("2026-10-01"); // 00:00 KST 는 전날 ET
+  });
+
+  it("잘못된 입력에 던지지 않는다", () => {
+    expect(fillMarketDate("", "223600", "us")).toBe("");
+    expect(fillMarketDate("2026100", "223600", "us")).toBe("");
+  });
+});
+
+// #527 ④ — DST 를 넘는 테스트가 0건이었다. marketClock 검증이 7월(EDT) 한 시점뿐이라
+// ①을 고쳐도 회귀를 잡아 줄 그물이 없다. 2026-11-01 에 ET 가 UTC-4 → UTC-5 로 바뀐다.
+describe("marketClock — DST 경계 (#527)", () => {
+  const at = (iso: string) => marketClock("us", new Date(iso));
+
+  it("EDT: 13:35 UTC 는 09:35 ET", () => {
+    expect(at("2026-10-01T13:35:00Z").hhmm).toBe("09:35");
+    expect(at("2026-10-01T13:35:00Z").dateKey).toBe("2026-10-01");
+  });
+
+  it("EST: 같은 벽시계 09:35 ET 가 14:35 UTC 다 — 한 시간 밀린다", () => {
+    expect(at("2026-11-02T14:35:00Z").hhmm).toBe("09:35");
+    expect(at("2026-11-02T13:35:00Z").hhmm).toBe("08:35"); // 전환 전 시각으로 보면 장 시작 전
+  });
+
+  it("전환 당일(2026-11-01 일요일)에도 날짜가 깨지지 않는다", () => {
+    expect(at("2026-11-01T06:00:00Z").dateKey).toBe("2026-11-01");
+    expect(at("2026-11-01T20:00:00Z").dateKey).toBe("2026-11-01");
+  });
+
+  it("국장은 DST 가 없다 — 항상 UTC+9", () => {
+    expect(marketClock("kr", new Date("2026-11-02T00:30:00Z")).hhmm).toBe("09:30");
+    expect(marketClock("kr", new Date("2026-07-02T00:30:00Z")).hhmm).toBe("09:30");
+  });
+
+  it("KST 자정 경계 — EDT 는 11:00 ET, EST 는 10:00 ET", () => {
+    expect(at("2026-10-01T15:00:00Z").hhmm).toBe("11:00"); // 00:00 KST(10-02)
+    expect(at("2026-11-02T15:00:00Z").hhmm).toBe("10:00"); // 00:00 KST(11-03)
   });
 });
