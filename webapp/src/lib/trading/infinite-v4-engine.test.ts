@@ -730,3 +730,37 @@ describe("infinite-v4-engine — 접수 불명은 거부와 다르게 적는다 
     expect(String(orderLogs[0].reason)).toMatch(/접수 불명/);
   });
 });
+
+// #529 — makeV4KisBroker.executions 가 돌려주는 **date 포맷**을 못박는다.
+// 이 단정이 없어서 #527 이 하이픈 ISO 를 흘려보냈고, 대사 창 필터
+// (lastRunDate < date < today)가 전건 탈락한 채 배포됐다 — '-'(0x2D) < '0'(0x30).
+// 엔진 테스트들은 전부 YYYYMMDD 를 돌려주는 수제 fake broker 를 써서 못 잡았다.
+describe("makeV4KisBroker.executions — date 는 today 와 같은 포맷이어야 한다 (#529)", () => {
+  // 실측한 KIS 원시 행(미장): ord_dt·ord_tmd 는 KST 다.
+  const usRow = { ord_dt: "20261001", ord_tmd: "223600", sll_buy_dvsn_cd: "02",
+                  ft_ccld_qty: "30", avg_prvs: "78.655" };
+  const krRow = { ord_dt: "20261001", ord_tmd: "152000", sll_buy_dvsn_cd: "02",
+                  ft_ccld_qty: "3", avg_prvs: "122000" };
+  const client = (rows: unknown[]) => ({
+    usExecutions: async () => rows, krExecutions: async () => rows,
+  });
+
+  it("미장: YYYYMMDD 다 — 하이픈이 섞이면 창 필터가 죽는다", async () => {
+    const [f] = await makeV4KisBroker(client([usRow]) as never, "us")
+      .executions("TQQQ", "20260930", "20261002");
+    expect(f.date).toMatch(/^\d{8}$/);
+    expect(f.date).toBe("20261001"); // 22:36 KST = 09:36 EDT 같은 날
+  });
+
+  it("국장: YYYYMMDD 그대로", async () => {
+    const [f] = await makeV4KisBroker(client([krRow]) as never, "kr")
+      .executions("069500", "20260930", "20261002");
+    expect(f.date).toBe("20261001");
+  });
+
+  it("그 값이 실제 창 필터를 통과한다 — 이게 핵심 회귀 단정", async () => {
+    const [f] = await makeV4KisBroker(client([usRow]) as never, "us")
+      .executions("TQQQ", "20260930", "20261002");
+    expect("20260930" < f.date && f.date < "20261002").toBe(true);
+  });
+});
