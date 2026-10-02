@@ -412,6 +412,46 @@ export function staleRunNotice(
   };
 }
 
+/**
+ * KIS 체결의 **KST 시각**을 그 시장의 날짜로 옮긴다 — **순수** (#527).
+ *
+ * 실측으로 확정했다. `inquire-ccnl` 원시 행:
+ *
+ *   {"pdno":"TQQQ","ord_dt":"20261001","ord_tmd":"223600","dmst_ord_dt":"20261001"}
+ *
+ * 그 주문은 2026-10-01 **13:36 UTC = 09:36 EDT** 에 나갔다 → `223600` 은 **22:36 KST** 다.
+ * 즉 해외 체결의 날짜·시각 필드가 전부 한국시각이다. 그런데 엔진의 `today` 는 ET 라
+ * (`marketToday("us")`), 둘을 그대로 비교하면 KST 자정을 넘긴 체결이 '내일' 로 들어온다.
+ *
+ * KST 자정은 EDT 로 11:00 ET, **EST 로 10:00 ET** 다:
+ *
+ *   us v4 09:35 ET  — 지금은 catch-up(+90분)이 11:05 ET 까지라 5분 노출,
+ *                     EST 부터는 10:00~11:05 ET 65분으로 넓어진다
+ *   us VR 10:50 ET  — EDT 는 같은 날(23:50 KST), **EST 는 00:50 KST 익일 → 매일 어긋난다**
+ *
+ * 키가 어긋나면 `pendingByDate[fillDate]` 가 `emptyPending()` 을 돌려줘 **cycleCash 만 깎이고
+ * t 는 안 오른다** — 회차가 조용히 멈추고 status=done 으로 찍힌다.
+ *
+ * 국장은 체결도 `today` 도 KST 라 변환이 항등이다(그래도 같은 함수를 통과시킨다 —
+ * 시장별 분기를 호출부마다 두면 또 어긋난다).
+ */
+export function fillMarketDate(ordDate: string, ordTime: string, market: string): string {
+  const d = String(ordDate ?? "").trim();
+  if (d.length < 8) return "";
+  const iso = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+  if (market !== "us") return iso; // 국장은 양쪽 KST
+  const raw = String(ordTime ?? "").trim();
+  if (!raw) return iso; // 시각이 없으면 변환할 근거가 없다(패딩하면 00:00 과 구분이 안 된다)
+  const tm = raw.padStart(6, "0").slice(0, 6);
+  if (!/^\d{6}$/.test(tm)) return iso;
+  // KST(UTC+9) 벽시계 → UTC → ET 날짜
+  const utc = Date.UTC(
+    Number(d.slice(0, 4)), Number(d.slice(4, 6)) - 1, Number(d.slice(6, 8)),
+    Number(tm.slice(0, 2)) - 9, Number(tm.slice(2, 4)), Number(tm.slice(4, 6)),
+  );
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date(utc));
+}
+
 /** 접수 불명 주문의 원장 표식 — 거부("")와 **다른 값**이어야 가드가 가린다 (#525). */
 export const UNKNOWN_ACK = "?";
 

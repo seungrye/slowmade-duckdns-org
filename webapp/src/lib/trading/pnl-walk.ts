@@ -155,3 +155,33 @@ export function reconcileBooks(
   }
   return { residual, reasons };
 }
+
+/**
+ * 같은 키(`ticker|time|side`)의 체결을 **합산**한다 — 순수 (#527).
+ *
+ * close-sync 의 ledger dedup 은 같은 키가 오면 **뒤 행을 버렸다**. 그런데 같은 파일의
+ * 매매기록 집계(`agg`)는 같은 키를 **합산**한다 — 같은 입력에 규칙이 둘이었다.
+ *
+ * `ord_tmd` 는 초 단위라 **한 주문의 부분체결은 전부 같은 값**을 갖는다(그래서 `agg` 가
+ * 합산하는 것이다). 버리면 수량과 원가가 함께 사라진다. 실측: 2026-10-01 TQQQ 에서
+ * `⚠ 원장 수량 불일치 원장 32 vs 보유 33` — stocktrades 전수 306행 중 그 1건.
+ * paper 는 1주로 끝났지만 real 에서 30주가 10+20 으로 갈리면 20주 원가가 사라진다.
+ *
+ * ⚠ dedup 자체를 없애면 안 된다 — 그건 **fills 와 DB 행**의 중복을 막는 장치다.
+ *   fills 를 먼저 이 함수로 합친 뒤 DB 와 dedup 해야 한다.
+ */
+export function mergeFills<T extends {
+  ticker: string; time: string; side: string; qty: number; price: number;
+}>(fills: T[]): T[] {
+  const by = new Map<string, T>();
+  for (const f of fills) {
+    const k = `${f.ticker}|${f.time}|${f.side}`;
+    const cur = by.get(k);
+    if (!cur) { by.set(k, { ...f }); continue; }
+    const qty = cur.qty + f.qty;
+    // 가중평균 — 수량만 더하고 가격을 덮으면 원가가 틀어진다.
+    cur.price = qty > 0 ? (cur.price * cur.qty + f.price * f.qty) / qty : cur.price;
+    cur.qty = qty;
+  }
+  return [...by.values()];
+}

@@ -12,7 +12,7 @@
 import TradingOrderLog from "@/models/trading-order-log";
 import { savePortfolioState, type StateSaver } from "./state-saver";
 import { isStillLive } from "./killswitch";
-import { isUnknownAck, UNKNOWN_ACK } from "./scheduler";
+import { fillMarketDate, isUnknownAck, UNKNOWN_ACK } from "./scheduler";
 import { summarizeRejects } from "./reject-reason";
 import type { Types } from "mongoose";
 import { KisClient, US_ORDER_EXCD, usQuoteExcd } from "./kis-client";
@@ -81,7 +81,11 @@ export function makeV4KisBroker(client: KisClient, market: "kr" | "us"): V4Broke
         : await client.usExecutions(sym, fromDate, toDate, usExcd(sym));
       const fills: DatedFill[] = [];
       for (const r of rows as Json[]) {
-        const date = String(r.ord_dt ?? "").trim();
+        // KIS 해외 체결의 ord_dt·ord_tmd 는 **KST** 다(실측, #527). today 는 ET 라
+        // 그대로 비교하면 KST 자정을 넘긴 체결이 '내일' 로 들어오고, pendingByDate 키가
+        // 어긋나 cycleCash 만 깎이고 t 는 안 오른다. 국장은 양쪽 KST 라 항등이다.
+        const date = fillMarketDate(
+          String(r.ord_dt ?? ""), String(r.ord_tmd ?? r.thco_ord_tmd ?? ""), market);
         const side = String(r.sll_buy_dvsn_cd ?? "").trim();
         const qty = Number(r.ft_ccld_qty ?? r.ccld_qty ?? r.tot_ccld_qty ?? 0);
         const price = Number(r.avg_prvs ?? r.ft_ccld_unpr3 ?? r.avg_unpr ?? r.ccld_unpr ?? 0);

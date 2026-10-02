@@ -17,6 +17,8 @@ import { blockSnapshot } from "./block-snapshot";
 import TradingOrderLog from "@/models/trading-order-log";
 import type { Types } from "mongoose";
 import { KisClient, usQuoteExcd, registerUsExcd } from "./kis-client";
+import { fillMarketDate } from "./scheduler";
+import { mergeFills } from "./pnl-walk";
 import { makeKisClient, makeTossClient, marketToday } from "./engines";
 import type { CycleLogger } from "./engines";
 import { TossClient } from "./toss-client";
@@ -68,7 +70,7 @@ export function valueHoldings(
 
 // ── 파이썬 site_sync._parse_fill / fills_to_trades_and_pnl 포팅 ──
 
-export function parseFill(f: Json): Fill | null {
+export function parseFill(f: Json, market: "kr" | "us" = "us"): Fill | null {
   const dateRaw = String(f.ord_dt ?? f.dmst_ord_dt ?? "").trim();
   const side = { "02": "buy", "01": "sell" }[String(f.sll_buy_dvsn_cd ?? "").trim()] as
     "buy" | "sell" | undefined;
@@ -85,7 +87,15 @@ export function parseFill(f: Json): Fill | null {
   if (!(qty > 0)) return null; // 체결분만
   const price = Number(f.ft_ccld_unpr3 ?? f.ft_ccld_unpr ?? f.avg_prvs ?? 0);
   const tmd = String(f.ord_tmd ?? f.thco_ord_tmd ?? "000000").trim().padStart(6, "0").slice(0, 6);
-  const d = `${dateRaw.slice(0, 4)}-${dateRaw.slice(4, 6)}-${dateRaw.slice(6, 8)}`;
+  // 해외 체결의 ord_dt·ord_tmd 는 **KST** 다(실측, #527) — 날짜만 시장 기준(ET)으로 옮긴다.
+  // 그래야 runPnl 의 `r.date === today` 비교와 차트 x축이 하루 안 밀린다.
+  //
+  // ⚠ `time` 의 시·분·초는 **KST 벽시계 그대로** 둔다. 이 값은 (env,ticker,time,action)
+  //   유니크 키이자 하루 안의 정렬 기준일 뿐이고, 시각까지 바꾸면 이미 쌓인 행과 키가
+  //   달라져 재푸시가 갱신이 아니라 **중복 행**이 된다. 날짜만 고치면 ET 날짜 + KST 시계가
+  //   섞이지만(예: 11:30 ET 체결이 "…T00:30:00"), 유일성·정렬은 그대로다.
+  const d = fillMarketDate(dateRaw, tmd, market)
+    || `${dateRaw.slice(0, 4)}-${dateRaw.slice(4, 6)}-${dateRaw.slice(6, 8)}`;
   return {
     ticker, date: d,
     time: `${d}T${tmd.slice(0, 2)}:${tmd.slice(2, 4)}:${tmd.slice(4, 6)}`,
@@ -341,7 +351,7 @@ export async function runCloseSync(
     // 놓쳐 실현손익이 0 이 되던 원인 → 전 거래소 일괄로 교체.
     try {
       for (const r of await kis!.usExecutionsAll(start, todayKey)) {
-        const p = parseFill(r as Json);
+        const p = parseFill(r as Json, "us");
         if (p) fills.push(p);
       }
     } catch (e) {
@@ -352,7 +362,7 @@ export async function runCloseSync(
     for (const sym of tradeSyms) {
       try {
         for (const r of await kis!.krExecutions(sym, start, todayKey)) {
-          const p = parseFill(r as Json);
+          const p = parseFill(r as Json, "kr");
           if (p) fills.push(p);
         }
       } catch (e) {
@@ -407,7 +417,9 @@ export async function runCloseSync(
     ledger.push(r);
   };
   // 오늘 새로 들어온 체결을 먼저 넣어 DB 의 옛 값보다 우선한다(정정 반영).
-  for (const f of fills) {
+  // **먼저 같은 키끼리 합산한다** (#527) — pushRow 의 dedup 은 fills↔DB 중복을 막는
+  // 장치인데, fills 끼리도 걸려서 같은 초 형제 체결(한 주문의 부분체결)을 버렸다.
+  for (const f of mergeFills(fills)) {
     pushRow({ ticker: f.ticker, date: f.date, time: f.time, side: f.side,
               qty: f.qty, price: f.price, currency: f.currency || currency });
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cumAsOf, reconcileBooks, walkBooks, type BookRow } from "./pnl-walk";
+import { cumAsOf, mergeFills, reconcileBooks, walkBooks, type BookRow } from "./pnl-walk";
 
 // #505 — 블록별 누적손익. 정의는 **가장 단순한 것**이다: 그 블록에 귀속된 체결만으로 돌린
 // 평균단가 워크. pro-rata 배분은 기각됐다(한 주도 안 판 블록에 실현손익이 찍힌다).
@@ -119,5 +119,51 @@ describe("walkBooks — #500 에서 상속한 계약", () => {
     const cut = walkBooks(full.slice(1), TODAY).books.A;
     expect(cut.cum).toBe(0);
     expect(cut.unknownCost).toHaveLength(1);
+  });
+});
+
+// #527 ② — close-sync 의 fills dedup 이 `ticker|time|side` 로 **fills 끼리도** 적용돼
+// 같은 초 형제 체결을 버렸다. 그런데 같은 파일의 `agg` 는 같은 키를 **합산**한다 —
+// 같은 키에 규칙이 둘이었다.
+//
+// ord_tmd 는 초 단위라 **한 주문의 부분체결은 전부 같은 값**을 갖는다. paper 는 1주로
+// 끝났지만(⚠ 원장 수량 불일치 TQQQ: 원장 32 vs 보유 33, 2026-10-01 실측), real 에서
+// 30주가 10+20 으로 갈리면 20주의 원가가 사라진다.
+describe("mergeFills — 같은 초 형제 체결을 합산한다 (#527)", () => {
+  const f = (qty: number, price: number, time = "2026-10-01T22:36:02") =>
+    ({ ticker: "TQQQ", date: "2026-10-01", time, side: "buy" as const, qty, price, currency: "USD" });
+
+  it("같은 키면 수량을 더하고 가격은 가중평균한다 — 버리지 않는다", () => {
+    const [r] = mergeFills([f(10, 100), f(20, 70)]);
+    expect(r.qty).toBe(30);
+    expect(r.price).toBeCloseTo((10 * 100 + 20 * 70) / 30, 6); // 80
+  });
+
+  it("운영 실측 그대로 — 같은 초 1+1 이 2 가 된다", () => {
+    const rows = mergeFills([f(30, 78, "2026-10-01T22:36:00"), f(1, 78, "2026-10-01T22:36:01"),
+                             f(1, 78), f(1, 78)]);
+    expect(rows).toHaveLength(3);
+    expect(rows.find((x) => x.time === "2026-10-01T22:36:02")!.qty).toBe(2);
+    expect(rows.reduce((a, x) => a + x.qty, 0)).toBe(33); // 32 가 아니다
+  });
+
+  it("매수와 매도는 따로 센다 — 같은 초여도 다른 건이다", () => {
+    const rows = mergeFills([f(5, 100), { ...f(5, 100), side: "sell" as const }]);
+    expect(rows).toHaveLength(2);
+  });
+
+  it("종목이 다르면 따로", () => {
+    expect(mergeFills([f(1, 1), { ...f(1, 1), ticker: "SOXL" }])).toHaveLength(2);
+  });
+
+  it("빈 입력은 빈 배열", () => {
+    expect(mergeFills([])).toEqual([]);
+  });
+
+  it("입력을 건드리지 않는다", () => {
+    const xs = [f(10, 100), f(20, 70)];
+    const snap = JSON.stringify(xs);
+    mergeFills(xs);
+    expect(JSON.stringify(xs)).toBe(snap);
   });
 });

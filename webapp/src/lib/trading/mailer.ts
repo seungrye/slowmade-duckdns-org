@@ -32,6 +32,10 @@ export async function sendTradingMail(
     const transporter = nodemailer.createTransport({
       host: c.host, port: c.port, secure: false, // STARTTLS(587)
       auth: { user: c.username, pass: c.password },
+      // **타임아웃을 박는다** (#527). 스케줄러가 `await sendTradingMail` 하는 자리가 있어
+      // (중단 통보·사이클 실패) SMTP 가 멈추면 **틱 전체가 선다** — nodemailer 기본은
+      // connection 2분·greeting 30초·socket 10분이라 매매 창(90분)을 통째로 먹을 수 있다.
+      connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000,
     });
     await transporter.sendMail({
       from: c.sender,
