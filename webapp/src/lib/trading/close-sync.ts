@@ -85,7 +85,19 @@ export function parseFill(f: Json, market: "kr" | "us" = "us"): Fill | null {
     }
   }
   if (!(qty > 0)) return null; // 체결분만
-  const price = Number(f.ft_ccld_unpr3 ?? f.ft_ccld_unpr ?? f.avg_prvs ?? 0);
+  // 가격도 **빈 문자열을 거르고** 다음 후보로 넘어간다 (#531). `??` 는 빈 문자열을 유효값
+  // 으로 보고 멈춰서 `Number("") === 0` 이 됐다 — 파이썬 원본(site_sync.py)은 `or` 라
+  // 폴백이 돈다. 바로 위 수량 루프와 같은 규칙이고, kis-client 의 #507 규칙(`v===""` 은
+  // 모름)과도 맞다. 0원 행이 원장에 들어가면 그 물량 매도 시 대금 전액이 이익으로 잡힌다.
+  let price = 0;
+  for (const k of ["ft_ccld_unpr3", "ft_ccld_unpr", "avg_prvs"]) {
+    const v = f[k];
+    if (v !== undefined && v !== null && v !== "") {
+      price = Number(v);
+      break;
+    }
+  }
+  if (!(price > 0)) return null; // 가격을 모르면 체결로 보지 않는다
   const tmd = String(f.ord_tmd ?? f.thco_ord_tmd ?? "000000").trim().padStart(6, "0").slice(0, 6);
   // 해외 체결의 ord_dt·ord_tmd 는 **KST** 다(실측, #527) — 날짜만 시장 기준(ET)으로 옮긴다.
   // 그래야 runPnl 의 `r.date === today` 비교와 차트 x축이 하루 안 밀린다.
