@@ -58,6 +58,10 @@ export function vrFormOf(cashflow?: number): VRForm {
  */
 export function defaultsForForm(cashflow?: number): { gradient: number; poolLimitPct: number } {
   switch (vrFormOf(cashflow)) {
+    // 원문 7.1 표(적립 10/75% · 거치 10/50% · 인출 20/25%). G 는 **시트별 설정**이라
+    // 원문이 "임의로 고정하지 말고 해당 시트를 따르라" 고 하므로 설정값이 있으면 그게 이긴다.
+    // 2026-10 검토 메모: 새 운용자료(4·6·7기)는 전부 적립식이라 G=10 만 관측된다 —
+    // **인출식(5기) 자료가 없는 것이지 G=20 이 틀린 게 아니다.** 7.1 표 값을 유지한다 (#533).
     case "적립식": return { gradient: 10, poolLimitPct: 0.75 };
     case "인출식": return { gradient: 20, poolLimitPct: 0.25 };
     default: return { gradient: 10, poolLimitPct: 0.5 };
@@ -142,6 +146,56 @@ export function cycleCoverSellQty(state: VRState, cfg: ValueRebalancingConfig, p
     return Math.min(state.qty, Math.ceil(-(state.pool + cf) / (price * (1 - fee))));
   }
   return 0;
+}
+
+/**
+ * 사이클 경계를 **달력**으로 판정한다 — 순수 (#533).
+ *
+ * 예전엔 실행 횟수였다(`sinceCycle >= cycleDays`). 원문은 **격주 월요일**, 즉 달력 기준이다.
+ * 실행 횟수로 세면 휴장·실행 실패가 쌓일 때마다 경계가 뒤로 밀리고, V 갱신과 **적립 시점이
+ * 같이 밀린다** — 2주 적립이 2주 반이 되는 식으로 원문과 벌어진다.
+ *
+ * 경계를 **넘겨서** 실행돼도(연휴·장애) 한 번은 돌게 `>=` 로 둔다. 앵커가 없으면 첫 실행이라
+ * 보고 바로 기준을 세운다.
+ *
+ * @param anchor 마지막으로 사이클을 갱신한 날(YYYY-MM-DD). 없으면 첫 실행.
+ * @param today  오늘(YYYY-MM-DD, 시장 날짜)
+ * @param days   주기 길이(달력 일수). 원문 2주 = 14
+ */
+export function isCycleDue(anchor: string | undefined, today: string, days: number): boolean {
+  if (!anchor) return true;
+  const a = Date.parse(`${anchor}T00:00:00Z`);
+  const t = Date.parse(`${today}T00:00:00Z`);
+  if (!Number.isFinite(a) || !Number.isFinite(t)) return true; // 모르면 갱신 쪽으로
+  return (t - a) / 86_400_000 >= Math.max(1, days);
+}
+
+/**
+ * 실행일(거래일) 단위 주기를 **달력일**로 환산한다 — 순수 (#534).
+ *
+ * 설정의 `cycleDays` 는 실행일 단위다(기본 10 = 2주). 달력 판정에 그대로 먹이면
+ * 10 달력일 ≈ 7 평일이라 **V 갱신이 40% 잦아진다.** 주 5일 기준으로 환산한다.
+ */
+export function cycleCalendarDays(runDays: number): number {
+  const d = Math.max(1, Math.floor(runDays));
+  return Math.max(1, Math.round((d / 5) * 7));
+}
+
+/**
+ * 다음 앵커 — **격자에 맞춘다**. 순수 (#534).
+ *
+ * 앵커를 '실행일' 로 갱신하면 연휴·장애로 늦게 돈 만큼 다음 경계가 뒤로 밀리고 그게
+ * **누적**된다(격자가 기어간다). 원문은 격주 고정 격자이므로, 지난 격자점 중 오늘을 넘지
+ * 않는 **가장 최근 점**으로 옮긴다: `anchor + days × floor(경과 / days)`.
+ */
+export function nextCycleAnchor(anchor: string | undefined, today: string, days: number): string {
+  if (!anchor) return today;
+  const a = Date.parse(`${anchor}T00:00:00Z`);
+  const t = Date.parse(`${today}T00:00:00Z`);
+  const d = Math.max(1, days);
+  if (!Number.isFinite(a) || !Number.isFinite(t) || t < a) return today;
+  const steps = Math.floor((t - a) / 86_400_000 / d);
+  return new Date(a + steps * d * 86_400_000).toISOString().slice(0, 10);
 }
 
 /** 사이클 경계: V 갱신(V₂=V₁+Pool/G+CF, Pool 은 CF 반영 전) + CF 적용 + 매수예산 리셋 + sinceCycle=0.

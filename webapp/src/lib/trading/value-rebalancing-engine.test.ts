@@ -317,3 +317,125 @@ describe("VR 엔진 — degraded 는 요약에 드러난다 (#521)", () => {
     expect(String(await run(false))).not.toMatch(/대사실패/);
   });
 });
+
+// #534 ① — sendOrders 가 saveState 보다 먼저 돌아서, 전량 거부로 throw 하면 **그 사이클의
+// V 갱신이 통째로 버려졌다.** 2026-09-30 에 실제로 났다 — 로그에 "사이클 경계: V→$7,285.08"
+// 이 찍혔는데 "주문 24건 전부 거부" 로 throw 해 state 는 sinceCycle:9, V:6895.15 로 남았다.
+// 사이클 경계는 2주에 한 번이라 한 번 놓치면 2주가 밀린다.
+describe("VR 엔진 — 상태 저장이 주문 실패에 묻히지 않는다 (#534)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 85, pool: 1500, V: 8500,
+                   buyBudget: 750, sinceCycle: 99, cumBuy: 8500, cumSell: 0,
+                   lastRunDate: "20260718" };
+  const rejecting: V4Broker = {
+    snapshot: async () => ({ holding: 85, avg: 100, price: 100, cash: 1500 }),
+    historyLong: async () => [], executions: async () => [],
+    openOrders: async () => [], cancel: async () => {},
+    place: async () => { throw new Error("40910000: 모의투자 주문이 불가한 계좌입니다."); },
+  };
+  const run = () => runValueRebalancing(
+    acct(true) as never, pf(CFG, { vr: seeded }) as never, "run1" as never, rejecting, () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; });
+
+  it("전량 거부로 던져도 사이클 경계 갱신이 저장된다", async () => {
+    await run().catch(() => {});
+    expect(persisted.length).toBeGreaterThan(0);
+    expect((persisted.at(-1) as { V: number }).V).not.toBe(8500); // 갱신됐다
+  });
+
+  it("그래도 던지기는 한다 — 실패 메일이 나가야 한다", async () => {
+    await expect(run()).rejects.toThrow();
+  });
+});
+
+// #534 ② — 기존 보유 채택 시 cumBuy 를 **수량 × 현재가**로 깔았다. 취득원가가 아니라
+// 현재 평가금이다. 실계좌에서 7,581.15 vs 실제 ≈6,916.79 → 실효평단 +9.6% 과대.
+describe("VR 엔진 — 채택 시 cumBuy 는 취득원가다 (#534)", () => {
+  const broker = (avg: number): V4Broker => ({
+    snapshot: async () => ({ holding: 50, avg, price: 120, cash: 1000 }),
+    historyLong: async () => [], executions: async () => [],
+    openOrders: async () => [], cancel: async () => {}, place: placeSpy,
+  });
+  const run = (avg: number) => runValueRebalancing(
+    acct(false) as never, pf(CFG, {}) as never, "run1" as never, broker(avg), () => {},
+  );
+
+  beforeEach(() => { persisted.length = 0; });
+
+  it("증권사 평단이 있으면 그걸 쓴다 — 현재가가 아니다", async () => {
+    await run(80);
+    expect((persisted.at(-1) as { cumBuy: number }).cumBuy).toBe(50 * 80);
+  });
+
+  it("평단이 없으면 현재가로 폴백한다 — 모르면 가장 보수적인 값", async () => {
+    await run(0);
+    expect((persisted.at(-1) as { cumBuy: number }).cumBuy).toBe(50 * 120);
+  });
+
+  it("V 는 종전대로 평가금이다 — 밴드 기준이라 현재가가 맞다", async () => {
+    await run(80);
+    expect((persisted.at(-1) as { V: number }).V).toBe(50 * 120);
+  });
+});
+
+// #534 ③ — 실효평단 (매수금−매도금)/개수 를 원문은 매주 핵심 지표로 쓴다.
+describe("VR 엔진 — 요약에 실효평단을 싣는다 (#534)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 50, pool: 1500, V: 6000,
+                   buyBudget: 750, sinceCycle: 2, cumBuy: 5000, cumSell: 1000,
+                   lastRunDate: "20260718" };
+  const b: V4Broker = {
+    snapshot: async () => ({ holding: 50, avg: 100, price: 120, cash: 1500 }),
+    historyLong: async () => [], executions: async () => [],
+    openOrders: async () => [], cancel: async () => {}, place: placeSpy,
+  };
+
+  it("실효평단이 요약에 나온다 — (5000-1000)/50 = 80", async () => {
+    const line = await runValueRebalancing(
+      acct(false) as never, pf(CFG, { vr: seeded }) as never, "run1" as never, b, () => {},
+    );
+    expect(String(line)).toMatch(/실효평단/);
+    expect(String(line)).toMatch(/80/);
+  });
+});
+
+// #534 ⑤ — 달력 경계 연결. 가장 위험한 건 **배포 첫 런**이다: 앵커가 없으면
+// isCycleDue(undefined,…)===true 라 그날 바로 경계가 터진다(원래 13일 남았는데).
+// 그래서 앵커가 없으면 기존 sinceCycle 로 역산해 시드한다.
+describe("VR 엔진 — 달력 사이클 경계 (#534)", () => {
+  const base = { symbol: "TQQQ", vInit: true, qty: 50, pool: 1500, V: 6000,
+                 buyBudget: 750, cumBuy: 5000, cumSell: 1000 };
+  const b: V4Broker = {
+    snapshot: async () => ({ holding: 50, avg: 100, price: 120, cash: 1500 }),
+    historyLong: async () => [], executions: async () => [],
+    openOrders: async () => [], cancel: async () => {}, place: placeSpy,
+  };
+  const run = (vr: Record<string, unknown>) => runValueRebalancing(
+    acct(false) as never, pf(CFG, { vr }) as never, "run1" as never, b, () => {},
+  );
+  const saved = () => persisted.at(-1) as { V: number; cycleAnchor?: string };
+
+  beforeEach(() => { persisted.length = 0; });
+
+  it("앵커가 없고 사이클 초반이면 경계를 안 터뜨린다 — 배포 첫 런 보호", async () => {
+    // sinceCycle=1 → 이제 막 시작한 사이클. 앵커를 역산해 시드만 하고 갱신은 안 한다.
+    await run({ ...base, sinceCycle: 1, lastRunDate: "20260921" });
+    expect(saved().V).toBe(6000);           // 갱신 안 됨
+    expect(saved().cycleAnchor).toBeTruthy(); // 앵커는 세워졌다
+  });
+
+  it("앵커가 없고 사이클 끝물이면 그날 갱신한다", async () => {
+    await run({ ...base, sinceCycle: 10, lastRunDate: "20260921" });
+    expect(saved().V).not.toBe(6000);
+  });
+
+  it("앵커가 있고 아직 안 됐으면 갱신 안 한다", async () => {
+    await run({ ...base, sinceCycle: 0, cycleAnchor: "2026-09-22", lastRunDate: "20260921" });
+    expect(saved().V).toBe(6000);
+  });
+
+  it("앵커를 저장해 다음 실행이 이어받는다", async () => {
+    await run({ ...base, sinceCycle: 0, cycleAnchor: "2026-09-22", lastRunDate: "20260921" });
+    expect(saved().cycleAnchor).toBe("2026-09-22");
+  });
+});
