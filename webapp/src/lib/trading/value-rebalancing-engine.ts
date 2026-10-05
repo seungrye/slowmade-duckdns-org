@@ -102,7 +102,6 @@ export async function runValueRebalancing(
   if (!persisted) {
     if (holding > 0) {
       const stockVal = holding * price;
-      const pool = Math.max(0, cfg.principal - stockVal);
       // cumBuy 는 **취득원가**다 (#534). 예전엔 `stockVal`(수량×현재가)을 깔았는데 그건
       // 평가금이지 원가가 아니다 — 실계좌에서 7,581.15 vs 실제 ≈6,916.79 로 실효평단이
       // 9.6% 과대였다. 증권사 평단이 있으면 그걸 쓰고, 없으면 현재가로 폴백하되 밝힌다.
@@ -111,6 +110,21 @@ export async function runValueRebalancing(
       if (!(avg > 0)) {
         log(`[vr:${sym}] ⚠ 증권사 평단을 못 읽어 취득원가를 현재가로 갈음한다 — `
           + `실효평단이 과대/과소일 수 있다`);
+      }
+      // **Pool 도 취득원가 기준이다** (#536). #534 가 cumBuy 만 고치고 바로 옆 pool 을
+      // 놓쳤다 — `원금 − 평가금` 으로 깔면 미실현손익이 현금원장에 묻힌다.
+      // 원문의 Pool 은 현금원장이고 「이전 Pool + 순매매 현금흐름 + 배당 = 마지막 Pool」로만
+      // 움직인다(VR 4기 1주차:76). 같은 저장소의 `seedVR` 도 이미 `principal − cumBuy` 다 —
+      // 라이브 채택 분기만 평가금 기준이라 "백테스트=라이브 단일 소스" 가 깨져 있었다.
+      //
+      // 운영 실측: 10-01 체결 45 @ $149.345 = $6,720.52 인데 pool 418.85(= 8000 − 45×168.47).
+      // 올바른 값 1,279.48 — **$860.62 과소**라 매수 사다리가 4칸에서 1칸이 됐고,
+      // `V₂ = V₁ + Pool/G` 라 매 사이클 V 가 $86 덜 올랐다.
+      const pool = Math.max(0, cfg.principal - cumBuy);
+      if (pool === 0) {
+        log(`[vr:${sym}] ⚠ 취득원가 ${formatMoney(cumBuy, market)} 가 원금 `
+          + `${formatMoney(cfg.principal, market)} 이상 — Pool 0, **매수 사다리가 안 나간다**. `
+          + `원금을 올리거나 블록을 다시 세우세요`);
       }
       const st: VRState = {
         qty: holding, pool, V: stockVal, buyBudget: resolveVR(cfg).poolLimitPct * pool,
@@ -186,8 +200,24 @@ export async function runValueRebalancing(
     if (cf < 0 && state.pool + cf < 0) {
       log(`[vr:${sym}] ⚠ 인출 ${formatMoney(cf, market)} 이 Pool(${formatMoney(state.pool, market)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
     }
-    // 실력공식은 사이클 종료 시점 평가금(qty×price)을 본다 (#358).
-    state = advanceCycleVR(state, cfg, price);
+    // 실력공식의 E 는 **그 주기 마지막 종가**다 (#358·#536) — 원문: 「E | 이번 주기
+    // 마지막의 실제 주식 평가금: 보유 수량 × 종가」. 주문 기간도 금요일 **종가**로 계산해
+    // 월요일에 발주한다. 예전엔 `broker.snapshot` 의 **장중가**를 넘겨서, 주석은 "사이클
+    // 종료 시점" 인데 실제론 **새 사이클 첫 세션 가격**이었다(실측 09-16 경계 +0.74% 이탈).
+    // `runAt` 을 당겨도 안 고쳐진다 — 시가로도 0.6% 벌어진다.
+    //
+    // 조회 실패는 **던지지 않는다** — 던지면 #534 가 고친 "경계 갱신 유실" 이 되살아난다.
+    let closeE = price;
+    try {
+      const hist = await broker.historyLong(sym, 5);
+      const prev = hist.find(([d]) => d < today);
+      if (prev && prev[1] > 0) closeE = prev[1];
+      else log(`[vr:${sym}] ⚠ 전일종가를 못 찾아 장중가로 폴백한다 — 경계 E 가 약간 어긋난다`);
+    } catch (e) {
+      log(`[vr:${sym}] ⚠ 전일종가 조회 실패 — 장중가로 폴백한다(경계 E 가 어긋남): `
+        + `${e instanceof Error ? e.message : e}`);
+    }
+    state = advanceCycleVR(state, cfg, closeE);
     // 앵커는 **격자에 맞춰** 전진한다 — 실행일로 당기면 늦게 돈 만큼 다음 경계가 밀려 누적된다.
     anchor = nextCycleAnchor(anchor, todayIso, calDays);
     log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)} 다음앵커 ${anchor}`);

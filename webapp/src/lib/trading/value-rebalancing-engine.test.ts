@@ -439,3 +439,112 @@ describe("VR 엔진 — 달력 사이클 경계 (#534)", () => {
     expect(saved().cycleAnchor).toBe("2026-09-22");
   });
 });
+
+// #536 ① — #534 가 cumBuy 만 고치고 **바로 옆 pool 을 놓쳤다.** 채택 시 Pool 이
+// `원금 − 평가금` 이라 미실현손익이 현금원장에 묻힌다.
+//
+// 원문의 Pool 은 현금원장이다: 「이전 다음 Pool + 순매매 현금흐름 + 배당 = 마지막 Pool」
+// (VR 4기 1주차:76). 같은 저장소의 seedVR 도 이미 `principal − cumBuy`(취득원가)를 쓴다 —
+// 라이브 채택 분기만 평가금 기준이라 "백테스트=라이브 단일 소스" 가 깨져 있었다.
+//
+// 운영 실측: 10-01 체결 45 @ 149.345 = $6,720.52 인데 pool 418.85(= 8000 − 45×168.47).
+// 올바른 값 1,279.48. **$860.62 과소** → 매수 사다리 4칸이 1칸으로 줄었다.
+describe("VR 엔진 — 채택 시 Pool 은 취득원가 기준 (#536)", () => {
+  const broker = (avg: number, price: number): V4Broker => ({
+    snapshot: async () => ({ holding: 45, avg, price, cash: 10_000 }),
+    historyLong: async () => [], executions: async () => [],
+    openOrders: async () => [], cancel: async () => {}, place: placeSpy,
+  });
+  const CFG8000 = { ...CFG, principal: 8000 };
+  const run = (avg: number, price: number) => runValueRebalancing(
+    acct(false) as never, pf(CFG8000, {}) as never, "run1" as never, broker(avg, price), () => {},
+  );
+  const saved = () => persisted.at(-1) as { pool: number; buyBudget: number; cumBuy: number; V: number };
+
+  beforeEach(() => { persisted.length = 0; });
+
+  it("운영 사례 재현 — Pool 은 원금 − 취득원가다", async () => {
+    await run(149.345, 168.47);
+    expect(saved().pool).toBeCloseTo(8000 - 45 * 149.345, 4); // 1,279.475
+  });
+
+  it("예전 동작(원금 − 평가금)이 아니다 — 그게 $860 을 묻었다", async () => {
+    await run(149.345, 168.47);
+    expect(saved().pool).not.toBeCloseTo(8000 - 45 * 168.47, 2); // 418.85
+  });
+
+  it("매수 예산도 같이 따라온다", async () => {
+    await run(149.345, 168.47);
+    expect(saved().buyBudget).toBeCloseTo(0.5 * (8000 - 45 * 149.345), 4);
+  });
+
+  it("평단을 못 읽으면 종전대로 평가금 폴백 — 모르면 보수적으로", async () => {
+    await run(0, 168.47);
+    expect(saved().pool).toBeCloseTo(Math.max(0, 8000 - 45 * 168.47), 4);
+  });
+
+  it("V 는 그대로 평가금이다 — 밴드 기준값이라 현재가가 맞다", async () => {
+    await run(149.345, 168.47);
+    expect(saved().V).toBeCloseTo(45 * 168.47, 4);
+  });
+
+  it("취득원가가 원금을 넘으면 Pool 0 으로 클램프하고 **경고한다**", async () => {
+    const logs: string[] = [];
+    await runValueRebalancing(
+      acct(false) as never, pf({ ...CFG, principal: 5000 }, {}) as never, "run1" as never,
+      broker(149.345, 168.47), (l: string) => logs.push(l),
+    );
+    expect(saved().pool).toBe(0);
+    expect(logs.some((l) => /Pool 0|매수 보류|매수 불가/.test(l))).toBe(true);
+  });
+});
+
+// #536 ② — 사이클 경계의 E 가 **장중가**였다. 원문은 「E = 이번 주기 **마지막의** 실제
+// 주식 평가금: 보유 수량 × **종가**」(VR_투자방식_세션정리:24)이고, 주문 기간도
+// 「8월 31일~9월 11일」로 금요일 **종가**로 계산해 월요일에 발주한다(흐름 검토:151).
+//
+// 구현은 broker.snapshot 의 장중가를 넘겼다 — 코드 주석은 "사이클 종료 시점 평가금" 이라
+// 적혀 있는데 실제론 **새 사이클 첫 세션 가격**이다. 실측 09-16 경계에서 +0.74% 이탈.
+// runAt 을 당겨도 안 고쳐진다(시가로도 0.6% 이탈).
+describe("VR 엔진 — 경계 E 는 전일 종가다 (#536)", () => {
+  const seeded = { symbol: "TQQQ", vInit: true, qty: 100, pool: 1000, V: 10_000,
+                   buyBudget: 500, sinceCycle: 99, cumBuy: 10_000, cumSell: 0,
+                   lastRunDate: "20260718", cycleAnchor: "2026-07-01" }; // 오늘=20260722 → 경계
+  // 전일종가 90, 장중가 110 — 둘이 다르면 어느 쪽을 썼는지 드러난다.
+  const b: V4Broker = {
+    snapshot: async () => ({ holding: 100, avg: 100, price: 110, cash: 1000 }),
+    historyLong: async () => [["20260721", 90], ["20260718", 88]] as [string, number][],
+    executions: async () => [], openOrders: async () => [],
+    cancel: async () => {}, place: placeSpy,
+  };
+  const noHist: V4Broker = { ...b, historyLong: async () => { throw new Error("조회 실패"); } };
+
+  beforeEach(() => { persisted.length = 0; });
+
+  it("전일 종가로 V 를 갱신한다 — 장중가가 아니다", async () => {
+    await runValueRebalancing(acct(false) as never, pf(CFG, { vr: seeded }) as never,
+      "run1" as never, b, () => {});
+    // 실력공식: V + pool/G + (E−V)/(2√G), E = 100×90 = 9,000 (110 이면 11,000)
+    const V = (persisted.at(-1) as { V: number }).V;
+    const 기대 = 10_000 + 1000 / 10 + (9_000 - 10_000) / (2 * Math.sqrt(10));
+    expect(V).toBeCloseTo(기대, 4);
+  });
+
+  it("전일종가 조회가 실패하면 장중가로 폴백하고 **로그에 남긴다** — 던지면 안 된다", async () => {
+    const logs: string[] = [];
+    await runValueRebalancing(acct(false) as never, pf(CFG, { vr: seeded }) as never,
+      "run1" as never, noHist, (l: string) => logs.push(l));
+    const V = (persisted.at(-1) as { V: number }).V;
+    expect(V).toBeCloseTo(10_000 + 100 + (11_000 - 10_000) / (2 * Math.sqrt(10)), 4);
+    expect(logs.some((l) => /전일종가|폴백/.test(l))).toBe(true);
+  });
+
+  it("경계가 아닌 날은 전일종가를 조회하지 않는다 — 불필요한 호출을 안 한다", async () => {
+    let called = 0;
+    const spy: V4Broker = { ...b, historyLong: async () => { called++; return []; } };
+    await runValueRebalancing(acct(false) as never,
+      pf(CFG, { vr: { ...seeded, sinceCycle: 0, cycleAnchor: "2026-07-21" } }) as never,
+      "run1" as never, spy, () => {});
+    expect(called).toBe(0);
+  });
+});

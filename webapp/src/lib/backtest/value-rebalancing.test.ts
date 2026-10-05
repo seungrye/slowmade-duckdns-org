@@ -364,3 +364,40 @@ describe("cycleCalendarDays — 실행일을 달력일로 환산 (#534)", () => 
     expect(cycleCalendarDays(1)).toBeGreaterThanOrEqual(1);
   });
 });
+
+// #536 ③ — 백테스트의 경계 E 도 **당일 종가**라 룩어헤드였다(그날 종가를 보고 그날 밴드를
+// 정한다). 라이브를 전일종가로 고쳤으니 백테스트도 같이 고쳐야 괴리가 안 벌어진다.
+//
+// ⚠ `price` 변수를 통째로 치환하면 안 된다 — 같은 블록의 `cycleCoverSellQty`·`fill` 이 그
+//   변수를 써서 **인출 충당 매도가 전일가로 기록**된다(인출식 전용 경로).
+describe("백테스트 — 경계 E 는 전일 종가다 (#536)", () => {
+  const bar = (date: string, close: number): Bar =>
+    ({ date, open: close, high: close, low: close, close, volume: 0 });
+  // 경계일에 가격이 크게 튀는 시계열 — 어느 날 종가를 썼는지 드러난다.
+  const bars: Bar[] = [
+    bar("2026-01-02", 100), bar("2026-01-05", 100), bar("2026-01-06", 100),
+    bar("2026-01-07", 100), bar("2026-01-08", 100), bar("2026-01-09", 100),
+    bar("2026-01-12", 100), bar("2026-01-13", 100), bar("2026-01-14", 100),
+    bar("2026-01-15", 100), bar("2026-01-16", 200), // ← 경계일, 당일 종가가 2배
+  ];
+  const target = { ticker: "T", bars } as unknown as RotationCandidate;
+  const cfg: ValueRebalancingConfig = {
+    symbol: "T", principal: 10_000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5,
+    cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0, formula: "skill",
+  } as ValueRebalancingConfig;
+
+  it("경계일 당일 종가(200)가 아니라 전일 종가(100)로 V 를 갱신한다", () => {
+    const r = runValueRebalancingBacktest(target, cfg);
+    const 경계 = r.vrBand?.find((x) => x.date === "2026-01-16");
+    expect(경계).toBeDefined();
+    // seed: 85주 · cumBuy 8500 · pool 1500 · V 8500.
+    // E = 85×100(전일) → V = 8500 + 1500/10 + 0 = 8650
+    // E = 85×200(당일) → V = 9993.97  ← 룩어헤드
+    expect(경계!.v).toBeCloseTo(8650, 2);
+  });
+
+  it("바가 하나뿐이면 던지지 않는다", () => {
+    const one = { ticker: "T", bars: [bar("2026-01-02", 100)] } as unknown as RotationCandidate;
+    expect(() => runValueRebalancingBacktest(one, cfg)).not.toThrow();
+  });
+});

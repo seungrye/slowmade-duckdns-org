@@ -267,7 +267,14 @@ export function runValueRebalancingBacktest(target: RotationCandidate, cfg: Valu
     if (i > 0 && state.sinceCycle >= cycleDays) {
       const coverQ = cycleCoverSellQty(state, cfg, price);
       if (coverQ > 0) fill(date, "sell", price, coverQ);
-      state = advanceCycleVR(state, cfg, price);
+      // 경계의 E 는 **전일 종가**다 (#536) — 원문: 「E = 이번 주기 **마지막의** 평가금
+      // (보유수량 × 종가)」. 당일 종가를 쓰면 **그날 종가를 보고 그날 밴드를 정하는**
+      // 룩어헤드다(실측 36조합 전부 +0.33%p 유리). 라이브도 같이 전일종가로 고쳤다 —
+      // 한쪽만 고치면 백테스트와 라이브가 갈라진다.
+      //
+      // ⚠ `price` 를 통째로 바꾸면 안 된다 — 바로 위 `cycleCoverSellQty`·`fill` 이 같은
+      //   변수를 써서 **인출 충당 매도가 전일가로 체결된 것처럼** 기록된다(인출식 전용 경로).
+      state = advanceCycleVR(state, cfg, bars[i - 1].close);
       if (cf !== 0) contributions.push({ date, amount: cf });
       // 존버모드 감지: Pool 이 1주도 못 살 만큼 소진 → V 정체(기본공식 한계)
       if (state.pool < price) poolLog.push(`${date} 존버모드 경보: Pool 소진(${state.pool.toFixed(0)}) — 기본공식 V 정체`);
