@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   updateVBasic, bandOf, rebalanceShares, runValueRebalancingBacktest,
   seedVR, cycleCoverSellQty, advanceCycleVR, applyVRFill,
-  vrFormOf, defaultsForForm, effectiveAvgPrice,
+  vrFormOf, defaultsForForm, effectiveAvgPrice, isCycleDue, nextCycleAnchor, cycleCalendarDays,
 } from "./value-rebalancing";
 import type { Bar, ValueRebalancingConfig } from "./types";
 import type { RotationCandidate } from "./rotation";
@@ -279,5 +279,125 @@ describe("effectiveAvgPrice — (누적매수 − 누적매도) / 보유수량",
     const r = runValueRebalancingBacktest(cand(Array(30).fill(100)), CFG);
     expect(r.effectiveAvg).not.toBeNull();
     expect(typeof r.effectiveAvg).toBe("number");
+  });
+});
+
+// #533 ② — 사이클 경계가 **실행 횟수**(sinceCycle >= cycleDays) 기반이었다. 원문은
+// **격주 월요일**(달력)이다. 휴장·실행 실패가 쌓이면 경계가 밀리고 적립 시점도 같이 밀린다.
+describe("isCycleDue — 달력 기준 사이클 경계 (#533)", () => {
+  // 앵커 2026-10-05(월). 2주 주기면 다음 경계는 10-19(월).
+  const A = "2026-10-05";
+
+  it("앵커 당일은 경계가 아니다 — 그날 이미 갱신했다", () => {
+    expect(isCycleDue(A, "2026-10-05", 14)).toBe(false);
+  });
+
+  it("13일 뒤는 아직 아니다", () => {
+    expect(isCycleDue(A, "2026-10-18", 14)).toBe(false);
+  });
+
+  it("14일 뒤가 경계다", () => {
+    expect(isCycleDue(A, "2026-10-19", 14)).toBe(true);
+  });
+
+  it("경계를 넘겨 실행해도(휴장·장애) 한 번은 돈다 — 밀리지 않는다", () => {
+    expect(isCycleDue(A, "2026-10-23", 14)).toBe(true);
+  });
+
+  it("앵커가 없으면(첫 실행) 경계로 본다 — 바로 기준을 세운다", () => {
+    expect(isCycleDue("", "2026-10-05", 14)).toBe(true);
+    expect(isCycleDue(undefined, "2026-10-05", 14)).toBe(true);
+  });
+
+  it("주기 길이는 설정으로 바뀐다", () => {
+    expect(isCycleDue(A, "2026-10-12", 7)).toBe(true);
+    expect(isCycleDue(A, "2026-10-11", 7)).toBe(false);
+  });
+
+  it("월·연 경계를 넘는다", () => {
+    expect(isCycleDue("2026-12-28", "2027-01-11", 14)).toBe(true);
+    expect(isCycleDue("2026-12-28", "2027-01-10", 14)).toBe(false);
+  });
+
+  it("잘못된 날짜에 던지지 않는다", () => {
+    expect(() => isCycleDue("bad", "2026-10-19", 14)).not.toThrow();
+  });
+});
+
+// #534 ⑤ — 달력 경계로 바꿀 때 격자가 기어가면 안 된다. 앵커를 "실행일" 로 갱신하면
+// 연휴·장애로 늦게 돈 만큼 다음 경계가 뒤로 밀려 **누적**된다. 원문은 격주 고정 격자다.
+describe("nextCycleAnchor — 격자가 기어가지 않는다 (#534)", () => {
+  const A = "2026-10-05"; // 월
+
+  it("정시에 돌면 앵커가 14일 뒤로", () => {
+    expect(nextCycleAnchor(A, "2026-10-19", 14)).toBe("2026-10-19");
+  });
+
+  it("늦게 돌아도 격자에 맞춘다 — 실행일로 당기지 않는다", () => {
+    // 10-23(금)에 돌아도 앵커는 10-19(격자), 다음 경계는 11-02 로 유지된다
+    expect(nextCycleAnchor(A, "2026-10-23", 14)).toBe("2026-10-19");
+  });
+
+  it("두 주기를 통째로 건너뛰어도 가장 최근 격자로", () => {
+    expect(nextCycleAnchor(A, "2026-11-05", 14)).toBe("2026-11-02");
+  });
+
+  it("앵커가 없으면 오늘을 기준으로 세운다", () => {
+    expect(nextCycleAnchor(undefined, "2026-10-19", 14)).toBe("2026-10-19");
+  });
+
+  it("잘못된 입력이면 오늘", () => {
+    expect(nextCycleAnchor("bad", "2026-10-19", 14)).toBe("2026-10-19");
+  });
+});
+
+// 운영 config 의 cycleDays 는 **실행일(거래일) 단위**다. 달력 판정에 그대로 먹이면
+// 10 달력일 ≈ 7 평일이라 V 갱신이 40% 잦아진다. 환산을 명시적으로 둔다.
+describe("cycleCalendarDays — 실행일을 달력일로 환산 (#534)", () => {
+  it("10 실행일 = 14 달력일(2주) — 원문 기준", () => {
+    expect(cycleCalendarDays(10)).toBe(14);
+  });
+  it("5 실행일 = 7 달력일(1주)", () => {
+    expect(cycleCalendarDays(5)).toBe(7);
+  });
+  it("비정수도 올림으로 안전하게", () => {
+    expect(cycleCalendarDays(1)).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// #536 ③ — 백테스트의 경계 E 도 **당일 종가**라 룩어헤드였다(그날 종가를 보고 그날 밴드를
+// 정한다). 라이브를 전일종가로 고쳤으니 백테스트도 같이 고쳐야 괴리가 안 벌어진다.
+//
+// ⚠ `price` 변수를 통째로 치환하면 안 된다 — 같은 블록의 `cycleCoverSellQty`·`fill` 이 그
+//   변수를 써서 **인출 충당 매도가 전일가로 기록**된다(인출식 전용 경로).
+describe("백테스트 — 경계 E 는 전일 종가다 (#536)", () => {
+  const bar = (date: string, close: number): Bar =>
+    ({ date, open: close, high: close, low: close, close, volume: 0 });
+  // 경계일에 가격이 크게 튀는 시계열 — 어느 날 종가를 썼는지 드러난다.
+  const bars: Bar[] = [
+    bar("2026-01-02", 100), bar("2026-01-05", 100), bar("2026-01-06", 100),
+    bar("2026-01-07", 100), bar("2026-01-08", 100), bar("2026-01-09", 100),
+    bar("2026-01-12", 100), bar("2026-01-13", 100), bar("2026-01-14", 100),
+    bar("2026-01-15", 100), bar("2026-01-16", 200), // ← 경계일, 당일 종가가 2배
+  ];
+  const target = { ticker: "T", bars } as unknown as RotationCandidate;
+  const cfg: ValueRebalancingConfig = {
+    symbol: "T", principal: 10_000, gradient: 10, bandPct: 0.15, poolLimitPct: 0.5,
+    cycleDays: 10, initStockRatio: 0.85, cashflow: 0, feeRate: 0, formula: "skill",
+  } as ValueRebalancingConfig;
+
+  it("경계일 당일 종가(200)가 아니라 전일 종가(100)로 V 를 갱신한다", () => {
+    const r = runValueRebalancingBacktest(target, cfg);
+    const 경계 = r.vrBand?.find((x) => x.date === "2026-01-16");
+    expect(경계).toBeDefined();
+    // seed: 85주 · cumBuy 8500 · pool 1500 · V 8500.
+    // E = 85×100(전일) → V = 8500 + 1500/10 + 0 = 8650
+    // E = 85×200(당일) → V = 9993.97  ← 룩어헤드
+    expect(경계!.v).toBeCloseTo(8650, 2);
+  });
+
+  it("바가 하나뿐이면 던지지 않는다", () => {
+    const one = { ticker: "T", bars: [bar("2026-01-02", 100)] } as unknown as RotationCandidate;
+    expect(() => runValueRebalancingBacktest(one, cfg)).not.toThrow();
   });
 });

@@ -19,7 +19,8 @@ import { summarizeRejects } from "./reject-reason";
 import type { Types } from "mongoose";
 import type { ValueRebalancingConfig } from "@/lib/backtest/types";
 import {
-  advanceCycleVR, applyVRFill, bandOf, seedVR, type VRState, resolveVR } from "@/lib/backtest/value-rebalancing";
+  advanceCycleVR, applyVRFill, bandOf, cycleCalendarDays, effectiveAvgPrice, isCycleDue,
+  nextCycleAnchor, seedVR, type VRState, resolveVR } from "@/lib/backtest/value-rebalancing";
 import { ladderLot, vrBuyLadder, vrSellLadder } from "@/lib/backtest/vr-ladder";
 
 /** 한쪽 사다리에 걸 최대 칸 수. 문서는 6~11칸이고, 유량제한(호출당 ≥1초)도 감안한 값이다. */
@@ -35,7 +36,11 @@ const LOOKBACK_DAYS = 14;
 export type VRLiveConfig = ValueRebalancingConfig & { symbol: string };
 
 /** 영속 상태 = VR 장부(VRState) + 종목·초기화 플래그·마지막 실행일. TradingPortfolio.state.vr 에 저장. */
-type VRPersist = VRState & { symbol: string; vInit: boolean; lastRunDate: string };
+type VRPersist = VRState & {
+  symbol: string; vInit: boolean; lastRunDate: string;
+  /** 사이클 격자의 기준일(YYYY-MM-DD) — 달력 경계 판정에 쓴다 (#534). 옛 문서엔 없다. */
+  cycleAnchor?: string;
+};
 
 export function parseVRCfg(config: Json): VRLiveConfig {
   const symbol = String(config.symbol ?? "");
@@ -84,7 +89,7 @@ export async function runValueRebalancing(
   const live = Boolean(account.liveEnabled) && process.env.TRADING_LIVE_ALLOWED === "true";
   const today = marketToday(market);
 
-  const { holding, price, cash } = await broker.snapshot(sym);
+  const { holding, price, cash, avg } = await broker.snapshot(sym);
   if (!(price > 0)) throw new Error(`VR ${sym}: 현재가 조회 실패`);
 
   const orders: { side: "buy" | "sell"; qty: number; price: number; reason: string; ordType?: "loc" | "limit" }[] = [];
@@ -97,10 +102,33 @@ export async function runValueRebalancing(
   if (!persisted) {
     if (holding > 0) {
       const stockVal = holding * price;
-      const pool = Math.max(0, cfg.principal - stockVal);
+      // cumBuy 는 **취득원가**다 (#534). 예전엔 `stockVal`(수량×현재가)을 깔았는데 그건
+      // 평가금이지 원가가 아니다 — 실계좌에서 7,581.15 vs 실제 ≈6,916.79 로 실효평단이
+      // 9.6% 과대였다. 증권사 평단이 있으면 그걸 쓰고, 없으면 현재가로 폴백하되 밝힌다.
+      // (V 는 밴드 기준값이라 평가금 `stockVal` 이 맞다 — 둘은 다른 값이다.)
+      const cumBuy = avg > 0 ? holding * avg : stockVal;
+      if (!(avg > 0)) {
+        log(`[vr:${sym}] ⚠ 증권사 평단을 못 읽어 취득원가를 현재가로 갈음한다 — `
+          + `실효평단이 과대/과소일 수 있다`);
+      }
+      // **Pool 도 취득원가 기준이다** (#536). #534 가 cumBuy 만 고치고 바로 옆 pool 을
+      // 놓쳤다 — `원금 − 평가금` 으로 깔면 미실현손익이 현금원장에 묻힌다.
+      // 원문의 Pool 은 현금원장이고 「이전 Pool + 순매매 현금흐름 + 배당 = 마지막 Pool」로만
+      // 움직인다(VR 4기 1주차:76). 같은 저장소의 `seedVR` 도 이미 `principal − cumBuy` 다 —
+      // 라이브 채택 분기만 평가금 기준이라 "백테스트=라이브 단일 소스" 가 깨져 있었다.
+      //
+      // 운영 실측: 10-01 체결 45 @ $149.345 = $6,720.52 인데 pool 418.85(= 8000 − 45×168.47).
+      // 올바른 값 1,279.48 — **$860.62 과소**라 매수 사다리가 4칸에서 1칸이 됐고,
+      // `V₂ = V₁ + Pool/G` 라 매 사이클 V 가 $86 덜 올랐다.
+      const pool = Math.max(0, cfg.principal - cumBuy);
+      if (pool === 0) {
+        log(`[vr:${sym}] ⚠ 취득원가 ${formatMoney(cumBuy, market)} 가 원금 `
+          + `${formatMoney(cfg.principal, market)} 이상 — Pool 0, **매수 사다리가 안 나간다**. `
+          + `원금을 올리거나 블록을 다시 세우세요`);
+      }
       const st: VRState = {
         qty: holding, pool, V: stockVal, buyBudget: resolveVR(cfg).poolLimitPct * pool,
-        sinceCycle: 0, cumBuy: stockVal, cumSell: 0,
+        sinceCycle: 0, cumBuy, cumSell: 0,
       };
       persisted = { ...st, symbol: sym, vInit: true, lastRunDate: prevMarketDay(today) };
       log(`[vr:${sym}] 기존 보유 ${holding} 채택 → V=${formatMoney(stockVal, market)} Pool=${formatMoney(pool, market)}`);
@@ -147,15 +175,52 @@ export async function runValueRebalancing(
   // ── 사이클 경계: V 갱신 + 밴드/예산 리셋(라이브는 인출 자동청산 대신 Pool 클램프) ──
   // 대사 실패일엔 사이클도 멈춘다 (#497) — 낡은 pool 로 V 를 재계산하면 값이 틀리고,
   // sinceCycle 이 0 으로 리셋돼 다음 경계까지 일정이 통째로 밀린다.
+  // 경계는 **달력**으로 본다 (#534). 예전엔 실행 횟수(sinceCycle >= cycleDays)라 결손·실패
+  // 런이 쌓일 때마다 경계가 뒤로 밀리고 그게 **영구·누적**됐다. 원문은 격주 고정 격자다.
+  //
+  // 설정의 cycleDays 는 **실행일 단위**라 달력일로 환산한다(10 → 14). 그냥 먹이면
+  // 10 달력일 ≈ 7 평일이라 V 갱신이 40% 잦아진다.
+  const calDays = cycleCalendarDays(cycleDays);
+  const todayIso = `${today.slice(0, 4)}-${today.slice(4, 6)}-${today.slice(6, 8)}`;
+  // 앵커가 없는 옛 상태(배포 직후)는 **sinceCycle 로 역산해 시드**한다. 그냥 두면
+  // isCycleDue(undefined,…)===true 라 첫 런이 13일 이른 경계를 터뜨린다.
+  let anchor = persisted.cycleAnchor;
+  if (!anchor) {
+    // `sinceCycle` 은 **이번 실행 전까지** 센 횟수다(옛 규칙은 +1 한 뒤 비교했다) — 이번
+    // 실행을 포함한 (sinceCycle+1) 로 역산해야 옛 경계 시점과 같은 날 떨어진다.
+    const 지난달력일 = Math.min(
+      calDays, Math.round(((state.sinceCycle + 1) / Math.max(1, cycleDays)) * calDays));
+    anchor = new Date(Date.parse(`${todayIso}T00:00:00Z`) - 지난달력일 * 86_400_000)
+      .toISOString().slice(0, 10);
+    log(`[vr:${sym}] 사이클 앵커 시드 → ${anchor}(sinceCycle ${state.sinceCycle}/${cycleDays} 역산)`);
+  }
   if (!degraded) state.sinceCycle += 1;
-  if (!degraded && state.sinceCycle >= cycleDays) {
+  if (!degraded && isCycleDue(anchor, todayIso, calDays)) {
     const cf = cfg.cashflow ?? 0;
     if (cf < 0 && state.pool + cf < 0) {
       log(`[vr:${sym}] ⚠ 인출 ${formatMoney(cf, market)} 이 Pool(${formatMoney(state.pool, market)})로 부족 — Pool 0 클램프(자동청산 안 함, 자금 보충 필요)`);
     }
-    // 실력공식은 사이클 종료 시점 평가금(qty×price)을 본다 (#358).
-    state = advanceCycleVR(state, cfg, price);
-    log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)}`);
+    // 실력공식의 E 는 **그 주기 마지막 종가**다 (#358·#536) — 원문: 「E | 이번 주기
+    // 마지막의 실제 주식 평가금: 보유 수량 × 종가」. 주문 기간도 금요일 **종가**로 계산해
+    // 월요일에 발주한다. 예전엔 `broker.snapshot` 의 **장중가**를 넘겨서, 주석은 "사이클
+    // 종료 시점" 인데 실제론 **새 사이클 첫 세션 가격**이었다(실측 09-16 경계 +0.74% 이탈).
+    // `runAt` 을 당겨도 안 고쳐진다 — 시가로도 0.6% 벌어진다.
+    //
+    // 조회 실패는 **던지지 않는다** — 던지면 #534 가 고친 "경계 갱신 유실" 이 되살아난다.
+    let closeE = price;
+    try {
+      const hist = await broker.historyLong(sym, 5);
+      const prev = hist.find(([d]) => d < today);
+      if (prev && prev[1] > 0) closeE = prev[1];
+      else log(`[vr:${sym}] ⚠ 전일종가를 못 찾아 장중가로 폴백한다 — 경계 E 가 약간 어긋난다`);
+    } catch (e) {
+      log(`[vr:${sym}] ⚠ 전일종가 조회 실패 — 장중가로 폴백한다(경계 E 가 어긋남): `
+        + `${e instanceof Error ? e.message : e}`);
+    }
+    state = advanceCycleVR(state, cfg, closeE);
+    // 앵커는 **격자에 맞춰** 전진한다 — 실행일로 당기면 늦게 돈 만큼 다음 경계가 밀려 누적된다.
+    anchor = nextCycleAnchor(anchor, todayIso, calDays);
+    log(`[vr:${sym}] 사이클 경계: V→${formatMoney(state.V, market)} Pool→${formatMoney(state.pool, market)} 매수예산→${formatMoney(state.buyBudget, market)} 다음앵커 ${anchor}`);
   }
 
   // ── 밴드 경계 기준 1주씩 지정가 사다리 (#360) ──
@@ -201,15 +266,24 @@ export async function runValueRebalancing(
       reason: `VR 사다리 매도 ${r.qtyAfter}주째(밴드상단 ${formatMoney(band.high, market)})` });
   }
 
-  const sent = await sendOrders(degraded ? [] : orders, broker,
-                                { account, runId, market, sym, live, log });
-
-  // ── 상태 저장 — lastRunDate='어제'로 남겨 오늘 LOC 체결을 다음 실행이 대사(v4 와 동일 창) ──
+  // ── 상태 저장 — **주문 전송보다 먼저** (#534) ──
+  //
+  // 예전엔 sendOrders 가 먼저였다. 전량 거부면 sendOrders 가 throw 해서 saveState 를 못
+  // 밟고, **그 사이클의 V 갱신이 통째로 버려졌다.** 2026-09-30 에 실제로 났다 — 로그에
+  // "사이클 경계: V→$7,285.08" 이 찍혔는데 "주문 24건 전부 거부" 로 던져 상태는
+  // sinceCycle:9, V:6895.15 로 남았다. 사이클 경계는 2주에 한 번이라 한 번 놓치면 2주가 밀린다.
+  //
+  // 먼저 저장해도 안전하다 — 이 상태는 **대사 결과와 사이클 갱신**이고, 주문이 나갔는지와
+  // 무관하게 이미 일어난 사실이다. 체결은 다음 실행이 lastRunDate 창으로 다시 읽는다.
+  // lastRunDate='어제'로 남겨 오늘 체결을 다음 실행이 대사한다(v4 와 동일 창).
   const persist: VRPersist = {
-    ...state, symbol: sym, vInit: true,
+    ...state, symbol: sym, vInit: true, cycleAnchor: anchor,
     lastRunDate: degraded ? persisted.lastRunDate : prevMarketDay(today),
   };
   await saveState({ "state.vr": persist });
+
+  const sent = await sendOrders(degraded ? [] : orders, broker,
+                                { account, runId, market, sym, live, log });
 
   // 요약은 **접수 수**를 말한다 (#511). #507 이 v4·engines 는 고쳤는데 VR 만 계획 수가
   // 남아 있었다 — 전량 거부돼도 "주문 19건" 으로 성공처럼 보이던 그 증상 그대로다.
@@ -219,7 +293,11 @@ export async function runValueRebalancing(
     : `계획 ${orders.length}건 [DRY-RUN]`;
   // degraded 는 요약에 드러낸다 (#521) — VR 은 사다리가 그날의 유일한 체결 수단이라
   // 대사 실패 = 리밸런싱 완전 정지인데, 예전엔 status=done 에 표기도 없었다.
-  const line = `VR ${sym}: ${상태} (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)})`
+  // 실효평단 — 원문이 매주 쓰는 핵심 지표다: (누적매수 − 누적매도) / 보유수량 (#534).
+  // 음수면 원문의 "원금 ZERO 상태"(판 돈이 산 돈을 넘었다).
+  const ea = effectiveAvgPrice(state);
+  const 평단 = ea === null ? "" : ` 실효평단 ${formatMoney(ea, market)}${ea < 0 ? "(원금ZERO)" : ""}`;
+  const line = `VR ${sym}: ${상태} (V=${formatMoney(state.V, market)} 밴드[${formatMoney(band.low, market)},${formatMoney(band.high, market)}] 보유 ${holding} Pool ${formatMoney(state.pool, market)}${평단})`
     + (degraded ? " ⚠대사실패(주문 전량 보류)" : "");
   log(line);
   return line;
